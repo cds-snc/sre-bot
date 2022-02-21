@@ -1,0 +1,13 @@
+# .coveragerc to control coverage.py
+[run]
+source = ./
+omit = 
+    ./tests/*
+
+[html]
+directory = coverage_html_report
+
+[report]
+
+exclude_lines =
+    if __name__ == .__main__.:

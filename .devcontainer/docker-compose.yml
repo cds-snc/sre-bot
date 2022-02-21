@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  app:
+    build: 
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        VARIANT: "3.9"
+        INSTALL_NODE: "true"
+        NODE_VERSION: "lts/*"
+        SHELLCHECK_VERSION: "0.7.2"
+        SHELLCHECK_CHECKSUM: "70423609f27b504d6c0c47e340f33652aea975e45f312324f2dbf91c95a3b188"
+        TERRAFORM_VERSION: "1.0.3"
+        TERRAFORM_CHECKSUM: "99c4866ffc4d3a749671b1f74d37f907eda1d67d7fc29ed5485aeff592980644"
+        TERRAGRUNT_VERSION: "0.31.1"
+        TERRAGRUNT_CHECKSUM: "76b253919ad688025a4a37338e5602543b0426cae1be1f863b4f3d60dd95ac28"
+        AWS_CLI_VERSION: "2.2.29"
+    volumes:
+      - ..:/workspace:cached   
+    command: sleep infinity
+    environment:
+      SHELL: /bin/zsh

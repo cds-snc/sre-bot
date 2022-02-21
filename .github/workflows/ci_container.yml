@@ -1,0 +1,23 @@
+name: Build containers CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build container
+        working-directory: ./app
+        run: |
+          docker build \
+          --build-arg git_sha=$GITHUB_SHA \
+          -t $REGISTRY/sre-bot:latest .
