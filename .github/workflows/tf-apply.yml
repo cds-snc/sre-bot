@@ -44,7 +44,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@master
         with:
           role-to-assume: arn:aws:iam::283582579564:role/SREBotTerraformAdministratorRole
-          role-session-name: SentinelGitHubActions
+          role-session-name: SREBotGitHubActions
           aws-region: "ca-central-1"
 
       - name: Terraform Apply
