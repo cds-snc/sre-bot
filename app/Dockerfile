@@ -2,6 +2,10 @@ FROM python:3.9.0-slim
 
 WORKDIR /app
 
+# Set build variables
+ARG git_sha
+ENV GIT_SHA=$git_sha
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
