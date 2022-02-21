@@ -1,0 +1,42 @@
+name: Build and Push to Container Registry
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build container
+        working-directory: ./app
+        run: |
+          docker build \
+          --build-arg git_sha=$GITHUB_SHA \
+          -t $REGISTRY/sre-bot:$GITHUB_SHA \
+          -t $REGISTRY/sre-bot:latest .
+
+      - name: Configure aws credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: arn:aws:iam::283582579564:role/SREBotTerraformAdministratorRole
+          role-session-name: SREBotTerraformAdministratorRole
+          aws-region: "ca-central-1"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Push containers to Amazon ECR
+        run: |
+          docker push $REGISTRY/sre-bot:$GITHUB_SHA
+          docker push $REGISTRY/sre-bot:latest
