@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - app/**
+      - .github/workflows/ci_code.yml
 
 env:
   TERRAGRUNT_VERSION: v0.31.1
@@ -11,23 +12,9 @@ env:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        folder: ["app"]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: Check for changes
-        uses: dorny/paths-filter@b2feaf19c27470162a626bd6fa8438ae5b263721 # v2.10.2
-        id: filter
-        with:
-          filters: |
-            changes:
-              - '${{ matrix.folder }}/**'
-              - '.github/workflows/ci_code.yml'
 
       - name: Setup python
         if: ${{ steps.filter.outputs.changes == 'true' }}
