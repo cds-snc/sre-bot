@@ -8,14 +8,19 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 load_dotenv()
 
-SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
-APP_TOKEN = os.environ.get("APP_TOKEN")
 
-app = App(token=SLACK_TOKEN)
+def main():
+    SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
+    APP_TOKEN = os.environ.get("APP_TOKEN")
 
-# Register incident events
-app.command("/incident")(incident.open_modal)
-app.view("incident_view")(incident.submit)
+    app = App(token=SLACK_TOKEN)
+
+    # Register incident events
+    app.command("/incident")(incident.open_modal)
+    app.view("incident_view")(incident.submit)
+
+    SocketModeHandler(app, APP_TOKEN).start()
+
 
 if __name__ == "__main__":
-    SocketModeHandler(app, APP_TOKEN).start()
+    main()
