@@ -1,0 +1,61 @@
+name: Lint, format and test code
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - app/**
+
+env:
+  TERRAGRUNT_VERSION: v0.31.1
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        folder: ["app"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Check for changes
+        uses: dorny/paths-filter@b2feaf19c27470162a626bd6fa8438ae5b263721 # v2.10.2
+        id: filter
+        with:
+          filters: |
+            changes:
+              - '${{ matrix.folder }}/**'
+              - '.github/workflows/ci_code.yml'
+
+      - name: Setup python
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.9"
+
+      - name: Install dev dependencies
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        working-directory: ${{ matrix.folder }}
+        run: make install-dev
+
+      - name: Install dependencies
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        working-directory: ${{ matrix.folder }}
+        run: make install
+
+      - name: Lint
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        working-directory: ${{ matrix.folder }}
+        run: make lint-ci
+
+      - name: Format
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        working-directory: ${{ matrix.folder }}
+        run: make fmt-ci
+
+      - name: Test
+        if: ${{ steps.filter.outputs.changes == 'true' }}
+        working-directory: ${{ matrix.folder }}
+        run: make test

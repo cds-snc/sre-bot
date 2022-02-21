@@ -1,0 +1,17 @@
+name: Source code security scan using Bandit
+on:
+  pull_request:
+    paths:
+      - "**/*.py"
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Bandit
+      run: |
+        .github/workflows/scripts/run_bandit_scan.sh
+
+
+

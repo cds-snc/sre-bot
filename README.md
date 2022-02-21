@@ -1,10 +1,5 @@
-# Generic Project Template
+# SRE Bot
 
-This repository provides some base files for setting up a repository at
-CDS. Plan is to create more project template for specific technologies:
+A slack bot for site reliability engineering at CDS. 
 
-- project-template-terraform
-- project-template-python
-- project-template-nodejs
-
-Note that default community health files are maintained at https://github.com/cds-snc/.github 
+This bot is using the Bolt framework in python (https://slack.dev/bolt-python/) and uses a web socket connection to Slack.
