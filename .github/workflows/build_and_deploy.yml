@@ -8,7 +8,7 @@ on:
 
 env:
   GITHUB_SHA: ${{ github.sha }}
-  REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
+  REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com
 
 permissions:
   id-token: write
@@ -37,11 +37,11 @@ jobs:
         run: |
           docker build \
           --build-arg git_sha=$GITHUB_SHA \
-          -t $REGISTRY/bot:$GITHUB_SHA \
-          -t $REGISTRY/bot:latest .
+          -t $REGISTRY/sre-bot:$GITHUB_SHA \
+          -t $REGISTRY/sre-bot:latest .
 
       - name: Push containers to Amazon ECR
         working-directory: ./app
         run: |
-          docker push $REGISTRY/bot:$GITHUB_SHA
-          docker push $REGISTRY/bot:latest
+          docker push $REGISTRY/sre-bot:$GITHUB_SHA
+          docker push $REGISTRY/sre-bot:latest
