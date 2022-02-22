@@ -23,7 +23,7 @@ lint-ci:
 	flake8 .
 
 fmt-ci:
-	black --check .
+	black --check . --target-version py310
 
 run:
 	python3 main.py
