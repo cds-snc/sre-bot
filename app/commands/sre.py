@@ -2,6 +2,10 @@ import os
 
 from commands import utils
 
+help_text = """
+\n `/sre help` - show this help text
+\n `/sre version` - show the version of the SRE Bot"""
+
 
 def sre_command(ack, command, logger, respond):
     ack()
@@ -16,9 +20,6 @@ def sre_command(ack, command, logger, respond):
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case "help":
-            help_text = """
-\n `/sre help` - show this help text
-\n `/sre version` - show the version of the SRE Bot"""
             respond(help_text)
         case _:
             respond(
