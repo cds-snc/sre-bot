@@ -45,5 +45,5 @@ def test_sr_command_with_unknown_argument():
     respond = MagicMock()
     sre.sre_command(MagicMock(), {"text": "unknown"}, MagicMock(), respond)
     respond.assert_called_once_with(
-        f"Unknown command: unknown. Type `/sre help` to see a list of commands."
+        "Unknown command: unknown. Type `/sre help` to see a list of commands."
     )
