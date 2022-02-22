@@ -6,7 +6,7 @@ locals {
 data "aws_caller_identity" "current" {}
 
 module "gh_oidc_roles" {
-  source = "github.com/cds-snc/terraform-modules?ref=v1.0.11//gh_oidc_role"
+  source      = "github.com/cds-snc/terraform-modules?ref=v1.0.11//gh_oidc_role"
   oidc_exists = true
   roles = [
     {
