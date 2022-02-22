@@ -1,7 +1,10 @@
-.PHONY: fmt install lint test fmt-ci lint-ci install-dev run
+.PHONY: dev fmt install lint test fmt-ci lint-ci install-dev run
+
+dev:
+	jurigged main.py
 
 fmt:
-	black . $(ARGS)
+	black . $(ARGS) --target-version py310
 
 install:
 	pip3 install --user -r requirements.txt

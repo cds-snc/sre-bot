@@ -6,7 +6,7 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile
       args:
-        VARIANT: "3.9"
+        VARIANT: "3.10"
         INSTALL_NODE: "true"
         NODE_VERSION: "lts/*"
         SHELLCHECK_VERSION: "0.7.2"

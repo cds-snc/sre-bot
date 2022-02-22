@@ -1,10 +1,13 @@
-from commands import incident
+from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt import App
+from dotenv import load_dotenv
+from commands import incident, sre
+
+import logging
 import os
 
-from dotenv import load_dotenv
+logging.basicConfig(level=logging.INFO)
 
-from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 load_dotenv()
 
@@ -18,6 +21,9 @@ def main():
     # Register incident events
     app.command("/incident")(incident.open_modal)
     app.view("incident_view")(incident.submit)
+
+    # Register SRE events
+    app.command("/sre")(sre.sre_command)
 
     SocketModeHandler(app, APP_TOKEN).start()
 
