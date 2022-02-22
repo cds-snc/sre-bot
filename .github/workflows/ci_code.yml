@@ -22,21 +22,21 @@ jobs:
           python-version: "3.9"
 
       - name: Install dev dependencies
-        working-directory: ${{ matrix.folder }}
+        working-directory: ./app
         run: make install-dev
 
       - name: Install dependencies
-        working-directory: ${{ matrix.folder }}
+        working-directory: ./app
         run: make install
 
       - name: Lint
-        working-directory: ${{ matrix.folder }}
+        working-directory: ./app
         run: make lint-ci
 
       - name: Format
-        working-directory: ${{ matrix.folder }}
+        working-directory: ./app
         run: make fmt-ci
 
       - name: Test
-        working-directory: ${{ matrix.folder }}
+        working-directory: ./app
         run: make test
