@@ -203,3 +203,5 @@ typings/
 package
 .env
 .pickle
+
+auto.tfvars
