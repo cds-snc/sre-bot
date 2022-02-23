@@ -10,6 +10,8 @@ env:
   TERRAFORM_VERSION: 1.0.3
   TERRAGRUNT_VERSION: v0.31.1
   CONFTEST_VERSION: 0.27.0
+  TF_VAR_slack_token: ${{ secrets.SLACK_TOKEN }}
+  TF_VAR_app_token: ${{ secrets.APP_TOKEN }}
 
 permissions:
   id-token: write
