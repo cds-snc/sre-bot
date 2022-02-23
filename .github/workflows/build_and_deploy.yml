@@ -45,3 +45,7 @@ jobs:
         run: |
           docker push $REGISTRY/sre-bot:$GITHUB_SHA
           docker push $REGISTRY/sre-bot:latest
+
+      - name: Restart ECS
+        run: |
+          aws ecs update-service --cluster sre-bot-cluster --service sre-bot-service --force-new-deployment
