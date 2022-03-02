@@ -1,7 +1,7 @@
 .PHONY: dev fmt install lint test fmt-ci lint-ci install-dev run
 
 dev:
-	jurigged main.py
+	PREFIX="dev-" jurigged main.py
 
 fmt:
 	black . $(ARGS) --target-version py310

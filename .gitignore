@@ -202,6 +202,7 @@ typings/
 
 package
 .env
-.pickle
+*.pickle
+token.json
 
 auto.tfvars

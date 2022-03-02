@@ -12,6 +12,12 @@ env:
   CONFTEST_VERSION: 0.27.0
   TF_VAR_slack_token: ${{ secrets.SLACK_TOKEN }}
   TF_VAR_app_token: ${{ secrets.APP_TOKEN }}
+  TF_VAR_sre_drive_id: ${{ secrets.SRE_DRIVE_ID }}
+  TF_VAR_sre_incident_folder: ${{ secrets.SRE_INCIDENT_FOLDER }}
+  TF_VAR_sre_incident_template: ${{ secrets.INCIDENT_TEMPLATE }}
+  TF_VAR_sre_incident_list: ${{ secrets.INCIDENT_LIST }}
+  TF_VAR_slack_incident_channel: ${{ secrets.INCIDENT_CHANNEL }}
+  TF_VAR_pickle_string: ${{ secrets.PICKLE_STRING }}
 
 permissions:
   id-token: write

@@ -2,7 +2,7 @@ import os
 
 from commands import sre
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_sre_command_calls_ack():
@@ -34,11 +34,15 @@ def test_sre_command_with_version_argument():
 def test_sre_command_with_help_argument():
     respond = MagicMock()
     sre.sre_command(MagicMock(), {"text": "help"}, MagicMock(), respond)
-    respond.assert_called_once_with(
-        """
-\n `/sre help` - show this help text
-\n `/sre version` - show the version of the SRE Bot"""
-    )
+    respond.assert_called_once_with(sre.help_text)
+
+
+@patch("commands.sre.incident_helper.handle_incident_command")
+def test_sre_command_with_incident_argument(command_runner):
+    command_runner.return_value = "incident command help"
+    respond = MagicMock()
+    sre.sre_command(MagicMock(), {"text": "incident"}, MagicMock(), respond)
+    respond.assert_called_once_with("incident command help")
 
 
 def test_sr_command_with_unknown_argument():
