@@ -91,7 +91,9 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     say = MagicMock()
     body = {"user": {"id": "user_id"}}
     client = MagicMock()
-    client.conversations_create.return_value = {"channel": {"id": "channel_id"}}
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
     incident.submit(ack, view, say, body, client, logger)
     client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
     client.conversations_setTopic.assert_called_once_with(
@@ -117,7 +119,9 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     say = MagicMock()
     body = {"user": {"id": "user_id"}}
     client = MagicMock()
-    client.conversations_create.return_value = {"channel": {"id": "channel_id"}}
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
     incident.submit(ack, view, say, body, client, logger)
 
     client.bookmarks_add.assert_any_call(
@@ -147,7 +151,9 @@ def test_incident_submit_creates_a_document_and_announces_it(
     say = MagicMock()
     body = {"user": {"id": "user_id"}}
     client = MagicMock()
-    client.conversations_create.return_value = {"channel": {"id": "channel_id"}}
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
 
     mock_create_new_incident.return_value = "id"
 

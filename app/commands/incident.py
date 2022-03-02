@@ -2,8 +2,6 @@ import os
 import re
 import datetime
 
-from pyrsistent import v
-
 from integrations import google_drive
 
 from dotenv import load_dotenv
