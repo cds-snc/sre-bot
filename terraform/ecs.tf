@@ -28,6 +28,12 @@ data "template_file" "sre-bot" {
     aws_region            = "ca-central-1"
     slack_token           = aws_secretsmanager_secret_version.slack_token.arn
     app_token             = aws_secretsmanager_secret_version.app_token.arn
+    pickle_string         = aws_secretsmanager_secret_version.pickle_string.arn
+    sre_drive_id          = var.sre_drive_id
+    sre_incident_folder   = var.sre_incident_folder
+    incident_template     = var.sre_incident_template
+    incident_list         = var.sre_incident_list
+    incident_channel      = var.slack_incident_channel
   }
 }
 
@@ -53,7 +59,7 @@ resource "aws_ecs_service" "main" {
   network_configuration {
     security_groups  = [aws_security_group.ecs_tasks.id]
     subnets          = module.vpc.private_subnet_ids
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   depends_on = [aws_iam_role_policy_attachment.ecs_task_execution]
