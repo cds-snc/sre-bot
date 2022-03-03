@@ -23,7 +23,7 @@ resource "aws_secretsmanager_secret_version" "app_token" {
 }
 
 resource "aws_secretsmanager_secret" "pickle_string" {
-  name = "app-token-${random_string.random.result}"
+  name = "pickle-string-${random_string.random.result}"
 }
 
 resource "aws_secretsmanager_secret_version" "pickle_string" {
