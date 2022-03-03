@@ -20,6 +20,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     resources = [
       aws_secretsmanager_secret.slack_token.arn,
       aws_secretsmanager_secret.app_token.arn,
+      aws_secretsmanager_secret.pickle_string.arn,
     ]
   }
 }
