@@ -1,6 +1,6 @@
 # SRE Bot
 
-![image](https://user-images.githubusercontent.com/70960477/156048600-e15ff3b1-513c-4fa7-ac96-e3704f7920e0.png)
+![image](https://user-images.githubusercontent.com/867334/156588127-aaae9fff-cd4b-4984-90f0-4d74dfaf4993.png)
 
 A slack bot for site reliability engineering at CDS. 
 
