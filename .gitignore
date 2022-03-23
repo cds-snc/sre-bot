@@ -206,3 +206,4 @@ package
 token.json
 
 auto.tfvars
+*.db

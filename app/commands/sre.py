@@ -2,15 +2,16 @@ import os
 
 from commands import utils
 
-from commands.helpers import incident_helper
+from commands.helpers import incident_helper, webhook_helper
 
 help_text = """
 \n `/sre help` - show this help text
 \n `/sre incident` - lists incident commands
+\n `/sre webhooks` - lists webhook commands
 \n `/sre version` - show the version of the SRE Bot"""
 
 
-def sre_command(ack, command, logger, respond):
+def sre_command(ack, command, logger, respond, client, body):
     ack()
     logger.info("SRE command received: %s", command["text"])
 
@@ -25,6 +26,8 @@ def sre_command(ack, command, logger, respond):
         case "incident":
             resp = incident_helper.handle_incident_command(args)
             respond(resp)
+        case "webhooks":
+            webhook_helper.handle_webhook_command(args, client, body)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case _:
