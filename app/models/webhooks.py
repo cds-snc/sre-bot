@@ -8,6 +8,7 @@ client = boto3.client(
     endpoint_url=(
         "http://dynamodb-local:8000" if os.environ.get("PREFIX", None) else None
     ),
+    region_name="ca-central-1",
 )
 
 table = "webhooks"
