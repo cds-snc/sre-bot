@@ -45,6 +45,7 @@ resource "aws_ecs_task_definition" "sre-bot" {
   cpu                      = var.fargate_cpu
   memory                   = var.fargate_memory
   container_definitions    = data.template_file.sre-bot.rendered
+  task_role_arn            = aws_iam_role.sre-bot.arn
 }
 
 resource "aws_ecs_service" "main" {
