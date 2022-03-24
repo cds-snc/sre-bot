@@ -7,25 +7,33 @@ from unittest.mock import MagicMock, patch
 
 def test_sre_command_calls_ack():
     ack = MagicMock()
-    sre.sre_command(ack, {"text": "command"}, MagicMock(), MagicMock())
+    sre.sre_command(
+        ack, {"text": "command"}, MagicMock(), MagicMock(), MagicMock(), MagicMock()
+    )
     ack.assert_called_once()
 
 
 def test_sre_command_calls_logger():
     logger = MagicMock()
-    sre.sre_command(MagicMock(), {"text": "command"}, logger, MagicMock())
+    sre.sre_command(
+        MagicMock(), {"text": "command"}, logger, MagicMock(), MagicMock(), MagicMock()
+    )
     logger.info.assert_called_once()
 
 
 def test_sre_command_with_empty_string():
     respond = MagicMock()
-    sre.sre_command(MagicMock(), {"text": ""}, MagicMock(), respond)
+    sre.sre_command(
+        MagicMock(), {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock()
+    )
     respond.assert_called_once_with("Type `/sre help` to see a list of commands.")
 
 
 def test_sre_command_with_version_argument():
     respond = MagicMock()
-    sre.sre_command(MagicMock(), {"text": "version"}, MagicMock(), respond)
+    sre.sre_command(
+        MagicMock(), {"text": "version"}, MagicMock(), respond, MagicMock(), MagicMock()
+    )
     respond.assert_called_once_with(
         f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}"
     )
@@ -33,7 +41,9 @@ def test_sre_command_with_version_argument():
 
 def test_sre_command_with_help_argument():
     respond = MagicMock()
-    sre.sre_command(MagicMock(), {"text": "help"}, MagicMock(), respond)
+    sre.sre_command(
+        MagicMock(), {"text": "help"}, MagicMock(), respond, MagicMock(), MagicMock()
+    )
     respond.assert_called_once_with(sre.help_text)
 
 
@@ -41,13 +51,33 @@ def test_sre_command_with_help_argument():
 def test_sre_command_with_incident_argument(command_runner):
     command_runner.return_value = "incident command help"
     respond = MagicMock()
-    sre.sre_command(MagicMock(), {"text": "incident"}, MagicMock(), respond)
+    sre.sre_command(
+        MagicMock(),
+        {"text": "incident"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
+    )
     respond.assert_called_once_with("incident command help")
 
 
-def test_sr_command_with_unknown_argument():
+@patch("commands.sre.webhook_helper.handle_webhook_command")
+def test_sre_command_with_webhooks_argument(command_runner):
+    command_runner.return_value = "webhooks command help"
+    clientMock = MagicMock()
+    body = MagicMock()
+    sre.sre_command(
+        MagicMock(), {"text": "webhooks"}, MagicMock(), MagicMock(), clientMock, body
+    )
+    command_runner.assert_called_once_with([], clientMock, body)
+
+
+def test_sre_command_with_unknown_argument():
     respond = MagicMock()
-    sre.sre_command(MagicMock(), {"text": "unknown"}, MagicMock(), respond)
+    sre.sre_command(
+        MagicMock(), {"text": "unknown"}, MagicMock(), respond, MagicMock(), MagicMock()
+    )
     respond.assert_called_once_with(
         "Unknown command: unknown. Type `/sre help` to see a list of commands."
     )

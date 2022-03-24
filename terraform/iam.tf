@@ -23,6 +23,24 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       aws_secretsmanager_secret.pickle_string.arn,
     ]
   }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:Query",
+      "dynamodb:Scan",
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem"
+    ]
+
+    resources = [
+      aws_dynamodb_table.webhooks_table.arn,
+    ]
+
+  }
 }
 
 resource "aws_iam_policy" "sre-bot_secrets_manager" {

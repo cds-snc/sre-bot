@@ -2,6 +2,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
 from commands import incident, sre
+from commands.helpers import webhook_helper
 
 import logging
 import os
@@ -25,6 +26,11 @@ def main():
 
     # Register SRE events
     app.command(f"/{PREFIX}sre")(sre.sre_command)
+
+    # Webhooks events
+    app.view("create_webhooks_view")(webhook_helper.create_webhook)
+    app.action("toggle-webhook")(webhook_helper.toggle_webhook)
+    app.action("reveal-webhook")(webhook_helper.reveal_webhook)
 
     SocketModeHandler(app, APP_TOKEN).start()
 
