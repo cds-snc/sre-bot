@@ -1,3 +1,9 @@
+def log_ops_message(client, message):
+    channel_id = "C0388M21LKZ"
+    client.conversations_join(channel=channel_id)
+    client.chat_postMessage(channel=channel_id, text=message, as_user=True)
+
+
 def parse_command(command):
     """
     Parses a command string into a list of arguments.

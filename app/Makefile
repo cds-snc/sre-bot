@@ -1,7 +1,7 @@
 .PHONY: dev fmt install lint test fmt-ci lint-ci install-dev run
 
 dev:
-	PREFIX="dev-" jurigged main.py
+	PREFIX="dev-" uvicorn main:server_app --reload
 
 fmt:
 	black . $(ARGS) --target-version py310
@@ -26,4 +26,4 @@ fmt-ci:
 	black --check . --target-version py310
 
 run:
-	python3 main.py
+	uvicorn main:server_app

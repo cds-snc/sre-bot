@@ -7,6 +7,65 @@ from unittest.mock import MagicMock, patch
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
 
+@patch("commands.incident.open_modal")
+def test_handle_incident_action_buttons_call_incident(open_modal_mock):
+    client = MagicMock()
+    ack = MagicMock()
+    body = {
+        "actions": [
+            {
+                "name": "call-incident",
+                "value": "incident_id",
+                "type": "button",
+            }
+        ],
+        "user": {"id": "user_id"},
+    }
+    incident.handle_incident_action_buttons(client, ack, body)
+    open_modal_mock.assert_called_with(client, ack, {"text": "incident_id"}, body)
+
+
+@patch("commands.incident.webhooks.increment_acknowledged_count")
+def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock):
+    client = MagicMock()
+    ack = MagicMock()
+    body = {
+        "actions": [
+            {
+                "name": "ignore-incident",
+                "value": "incident_id",
+                "type": "button",
+            }
+        ],
+        "channel": {"id": "channel_id"},
+        "user": {"id": "user_id"},
+        "original_message": {
+            "attachments": [
+                {
+                    "color": "3AA3E3",
+                    "fallback": "foo",
+                    "text": "bar",
+                }
+            ],
+        },
+    }
+    incident.handle_incident_action_buttons(client, ack, body)
+    increment_acknowledged_count_mock.assert_called_with("incident_id")
+    client.api_call.assert_called_with(
+        "chat.update",
+        json={
+            "channel": "channel_id",
+            "attachments": [
+                {
+                    "color": "3AA3E3",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                }
+            ],
+        },
+    )
+
+
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_ack(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]

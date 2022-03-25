@@ -43,6 +43,7 @@ def create_webhook(ack, view, body, logger, client, say):
         return
 
     id = webhooks.create_webhook(channel, user, name)
+    client.conversations_join(channel=channel)
     if id:
         message = f"Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/{id}"
         logger.info(message)
@@ -244,7 +245,7 @@ def webhook_list_item(hook):
                 "text": {"type": "plain_text", "text": "Reveal", "emoji": True},
                 "style": "primary",
                 "value": hook["id"]["S"],
-                "action_id": "reveal-webhook",
+                "action_id": "reveal_webhook",
             },
         },
         {
@@ -262,7 +263,7 @@ def webhook_list_item(hook):
                 },
                 "style": "danger",
                 "value": hook["id"]["S"],
-                "action_id": "toggle-webhook",
+                "action_id": "toggle_webhook",
             },
         },
         {

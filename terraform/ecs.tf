@@ -1,16 +1,3 @@
-resource "aws_security_group" "ecs_tasks" {
-  name        = "sre-bot-security-group"
-  description = "Only allow outbound traffic"
-  vpc_id      = module.vpc.vpc_id
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 resource "aws_ecs_cluster" "sre-bot" {
   name = "sre-bot-cluster"
 }
@@ -63,7 +50,16 @@ resource "aws_ecs_service" "main" {
     assign_public_ip = false
   }
 
-  depends_on = [aws_iam_role_policy_attachment.ecs_task_execution]
+  depends_on = [
+    aws_lb_listener.sre_bot_listener,
+    aws_iam_role_policy_attachment.ecs_task_execution
+  ]
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.sre_bot.arn
+    container_name   = "sre-bot"
+    container_port   = 8000
+  }
 
   tags = {
     "CostCentre" = var.billing_code

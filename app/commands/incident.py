@@ -3,12 +3,34 @@ import re
 import datetime
 
 from integrations import google_drive
+from models import webhooks
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
+
+
+def handle_incident_action_buttons(client, ack, body):
+    name = body["actions"][0]["name"]
+    value = body["actions"][0]["value"]
+    user = body["user"]["id"]
+    if name == "call-incident":
+        open_modal(client, ack, {"text": value}, body)
+    elif name == "ignore-incident":
+        ack()
+        webhooks.increment_acknowledged_count(value)
+        attachments = body["original_message"]["attachments"]
+        msg = f"🙈  <@{user}> has acknowledged and ignored the incident."
+        attachments[-1] = {
+            "color": "3AA3E3",
+            "fallback": f"{msg}",
+            "text": f"{msg}",
+        }
+        body["original_message"]["attachments"] = attachments
+        body["original_message"]["channel"] = body["channel"]["id"]
+        client.api_call("chat.update", json=body["original_message"])
 
 
 def open_modal(client, ack, command, body):
