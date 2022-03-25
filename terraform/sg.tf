@@ -14,7 +14,7 @@ resource "aws_security_group" "sre_bot_load_balancer" {
     protocol    = "tcp"
     from_port   = 8000
     to_port     = 8000
-    cidr_blocks = module.vpc.cidr_block #tfsec:ignore:AWS008
+    cidr_blocks = ["${module.vpc.cidr_block}"] #tfsec:ignore:AWS008
   }
 
   tags = {
@@ -32,7 +32,7 @@ resource "aws_security_group" "ecs_tasks" {
     protocol    = "tcp"
     from_port   = 8000
     to_port     = 8000
-    cidr_blocks = module.vpc.cidr_block
+    cidr_blocks = ["${module.vpc.cidr_block}"]
   }
 
   egress {
