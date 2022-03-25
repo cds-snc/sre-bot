@@ -118,7 +118,6 @@ def create_webhook_modal(client, body):
 
 
 def list_all_webhooks(client, body, update=False):
-
     hooks = webhooks.list_all_webhooks()
     active_hooks = list(
         map(
@@ -252,7 +251,7 @@ def webhook_list_item(hook):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": " in  <#{}>".format(hook["channel"]["S"]),
+                "text": "<#{}>".format(hook["channel"]["S"]),
             },
             "accessory": {
                 "type": "button",
@@ -272,7 +271,7 @@ def webhook_list_item(hook):
                 {
                     "type": "plain_text",
                     "emoji": True,
-                    "text": f"on {hook['created_at']['S']}",
+                    "text": f"{hook['created_at']['S']} \n {hook['invocation_count']['N']} invocations | {hook['acknowledged_count']['N']} acknowledged",
                 }
             ],
         },

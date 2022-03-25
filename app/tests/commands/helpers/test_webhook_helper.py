@@ -194,7 +194,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": " in  <#channel1>"},
+                    "text": {"type": "mrkdwn", "text": "<#channel1>"},
                     "accessory": {
                         "type": "button",
                         "text": {
@@ -213,7 +213,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         {
                             "type": "plain_text",
                             "emoji": True,
-                            "text": "on 2020-01-01T00:00:00.000Z",
+                            "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
                         }
                     ],
                 },
@@ -231,7 +231,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                 },
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": " in  <#channel2>"},
+                    "text": {"type": "mrkdwn", "text": "<#channel2>"},
                     "accessory": {
                         "type": "button",
                         "text": {
@@ -250,7 +250,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         {
                             "type": "plain_text",
                             "emoji": True,
-                            "text": "on 2020-01-01T00:00:00.000Z",
+                            "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
                         }
                     ],
                 },
@@ -345,7 +345,7 @@ def test_webhook_list_item():
                 "type": "button",
                 "value": "id",
             },
-            "text": {"text": " in  <#channel>", "type": "mrkdwn"},
+            "text": {"text": "<#channel>", "type": "mrkdwn"},
             "type": "section",
         },
         {
@@ -354,7 +354,7 @@ def test_webhook_list_item():
                 {
                     "type": "plain_text",
                     "emoji": True,
-                    "text": "on 2020-01-01T00:00:00.000Z",
+                    "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
                 }
             ],
         },
@@ -380,4 +380,6 @@ def helper_generate_webhook(name="name", channel="channel", id="id", active=True
         "id": {"S": id},
         "active": {"BOOL": active},
         "created_at": {"S": "2020-01-01T00:00:00.000Z"},
+        "invocation_count": {"N": "0"},
+        "acknowledged_count": {"N": "0"},
     }
