@@ -4,7 +4,7 @@ resource "aws_lb_target_group" "sre_bot" {
   protocol             = "HTTP"
   target_type          = "ip"
   deregistration_delay = 30
-  vpc_id               = module.vpc.id
+  vpc_id               = module.vpc.vpc_id
 
   health_check {
     enabled             = true

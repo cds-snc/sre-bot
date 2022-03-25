@@ -1,7 +1,7 @@
 resource "aws_security_group" "sre_bot_load_balancer" {
   name        = "SRE Bot load balancer"
   description = "Ingress - SRE Bot Load Balancer"
-  vpc_id      = module.vpc.id
+  vpc_id      = module.vpc.vpc_id
 
   ingress {
     protocol    = "tcp"
