@@ -43,6 +43,7 @@ def create_webhook(ack, view, body, logger, client, say):
         return
 
     id = webhooks.create_webhook(channel, user, name)
+    client.conversations_join(channel=channel)
     if id:
         message = f"Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/{id}"
         logger.info(message)

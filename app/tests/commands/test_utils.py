@@ -1,5 +1,16 @@
 from commands import utils
 
+from unittest.mock import MagicMock
+
+
+def test_log_ops_message():
+    client = MagicMock()
+    msg = "foo bar baz"
+    utils.log_ops_message(client, msg)
+    client.chat_postMessage.assert_called_with(
+        channel="C0388M21LKZ", text=msg, as_user=True
+    )
+
 
 def test_parse_command_empty_string():
     assert utils.parse_command("") == []

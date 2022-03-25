@@ -1,8 +1,12 @@
 import json
+import logging
 import os
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from models import webhooks
+from commands.utils import log_ops_message
+
+logging.basicConfig(level=logging.INFO)
 
 
 class WebhookPayload(BaseModel):
@@ -36,10 +40,18 @@ def handle_webhook(id: str, payload: WebhookPayload, request: Request):
         webhooks.increment_invocation_count(id)
         payload.channel = webhook["channel"]["S"]
         payload = append_incident_buttons(payload, id)
-        request.state.bot.client.api_call(
-            "chat.postMessage", json=json.loads(payload.json(exclude_none=True))
-        )
-        return {"ok": True}
+        try:
+            request.state.bot.client.api_call(
+                "chat.postMessage", json=json.loads(payload.json(exclude_none=True))
+            )
+            return {"ok": True}
+        except Exception as e:
+            logging.error(e)
+            body = payload.json(exclude_none=True)
+            log_ops_message(
+                request.state.bot.client, f"Error posting message: ```{body}```"
+            )
+            raise HTTPException(status_code=500, detail="Failed to send message")
     else:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
