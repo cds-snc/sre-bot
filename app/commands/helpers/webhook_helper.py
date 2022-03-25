@@ -244,7 +244,7 @@ def webhook_list_item(hook):
                 "text": {"type": "plain_text", "text": "Reveal", "emoji": True},
                 "style": "primary",
                 "value": hook["id"]["S"],
-                "action_id": "reveal-webhook",
+                "action_id": "reveal_webhook",
             },
         },
         {
@@ -262,7 +262,7 @@ def webhook_list_item(hook):
                 },
                 "style": "danger",
                 "value": hook["id"]["S"],
-                "action_id": "toggle-webhook",
+                "action_id": "toggle_webhook",
             },
         },
         {

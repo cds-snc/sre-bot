@@ -189,7 +189,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         "text": {"type": "plain_text", "text": "Reveal", "emoji": True},
                         "style": "primary",
                         "value": "id1",
-                        "action_id": "reveal-webhook",
+                        "action_id": "reveal_webhook",
                     },
                 },
                 {
@@ -204,7 +204,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         },
                         "style": "danger",
                         "value": "id1",
-                        "action_id": "toggle-webhook",
+                        "action_id": "toggle_webhook",
                     },
                 },
                 {
@@ -226,7 +226,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         "text": {"type": "plain_text", "text": "Reveal", "emoji": True},
                         "style": "primary",
                         "value": "id2",
-                        "action_id": "reveal-webhook",
+                        "action_id": "reveal_webhook",
                     },
                 },
                 {
@@ -241,7 +241,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         },
                         "style": "danger",
                         "value": "id2",
-                        "action_id": "toggle-webhook",
+                        "action_id": "toggle_webhook",
                     },
                 },
                 {
@@ -328,7 +328,7 @@ def test_webhook_list_item():
     assert webhook_helper.webhook_list_item(hook) == [
         {
             "accessory": {
-                "action_id": "reveal-webhook",
+                "action_id": "reveal_webhook",
                 "style": "primary",
                 "text": {"emoji": True, "text": "Reveal", "type": "plain_text"},
                 "type": "button",
@@ -339,7 +339,7 @@ def test_webhook_list_item():
         },
         {
             "accessory": {
-                "action_id": "toggle-webhook",
+                "action_id": "toggle_webhook",
                 "style": "danger",
                 "text": {"emoji": True, "text": "Disable", "type": "plain_text"},
                 "type": "button",
