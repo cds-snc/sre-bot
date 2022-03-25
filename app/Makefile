@@ -26,4 +26,4 @@ fmt-ci:
 	black --check . --target-version py310
 
 run:
-	python3 main.py
+	uvicorn main:server_app
