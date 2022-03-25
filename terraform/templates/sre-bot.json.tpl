@@ -39,6 +39,11 @@
       }
     },
     "name": "sre-bot",
+    "portMappings": [
+      {
+        "containerPort": 8000
+      }
+    ],
     "secrets": [
       {
         "name": "SLACK_TOKEN",
