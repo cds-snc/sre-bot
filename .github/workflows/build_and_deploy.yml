@@ -48,4 +48,4 @@ jobs:
 
       - name: Restart ECS
         run: |
-          aws ecs update-service --cluster sre-bot-cluster --service sre-bot-service --force-new-deployment
+          aws ecs update-service --cluster sre-bot-cluster --service sre-bot-service --force-new-deployment > /dev/null 2>&1
