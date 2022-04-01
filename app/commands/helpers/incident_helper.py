@@ -6,20 +6,23 @@ help_text = """
 \n `/sre incident list-folders` - list all folders in the incident drive"""
 
 
-def handle_incident_command(args):
+def handle_incident_command(args, client, body, respond):
 
     if len(args) == 0:
-        return help_text
+        respond(help_text)
+        return
 
     action, *args = args
     match action:
         case "create-folder":
             name = " ".join(args)
-            return google_drive.create_folder(name)
+            respond(google_drive.create_folder(name))
         case "help":
-            return help_text
+            respond(help_text)
         case "list-folders":
             names = list(n["name"] for n in google_drive.list_folders())
-            return ", ".join(names)
+            respond(", ".join(names))
         case _:
-            return f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
+            respond(
+                f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
+            )

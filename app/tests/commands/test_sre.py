@@ -50,16 +50,18 @@ def test_sre_command_with_help_argument():
 @patch("commands.sre.incident_helper.handle_incident_command")
 def test_sre_command_with_incident_argument(command_runner):
     command_runner.return_value = "incident command help"
+    clientMock = MagicMock()
+    body = MagicMock()
     respond = MagicMock()
     sre.sre_command(
         MagicMock(),
         {"text": "incident"},
         MagicMock(),
         respond,
-        MagicMock(),
-        MagicMock(),
+        clientMock,
+        body,
     )
-    respond.assert_called_once_with("incident command help")
+    command_runner.assert_called_once_with([], clientMock, body, respond)
 
 
 @patch("commands.sre.webhook_helper.handle_webhook_command")
@@ -67,10 +69,11 @@ def test_sre_command_with_webhooks_argument(command_runner):
     command_runner.return_value = "webhooks command help"
     clientMock = MagicMock()
     body = MagicMock()
+    respond = MagicMock()
     sre.sre_command(
-        MagicMock(), {"text": "webhooks"}, MagicMock(), MagicMock(), clientMock, body
+        MagicMock(), {"text": "webhooks"}, MagicMock(), respond, clientMock, body
     )
-    command_runner.assert_called_once_with([], clientMock, body)
+    command_runner.assert_called_once_with([], clientMock, body, respond)
 
 
 def test_sre_command_with_unknown_argument():

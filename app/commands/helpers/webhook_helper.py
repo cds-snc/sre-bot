@@ -9,20 +9,23 @@ help_text = """
 """
 
 
-def handle_webhook_command(args, client, body):
+def handle_webhook_command(args, client, body, respond):
     if len(args) == 0:
-        return help_text
+        respond(help_text)
+        return
 
     action, *args = args
     match action:
         case "create":
             create_webhook_modal(client, body)
         case "help":
-            return help_text
+            respond(help_text)
         case "list":
             list_all_webhooks(client, body)
         case _:
-            return f"Unknown command: {action}. Type `/sre webhook help` to see a list of commands."
+            respond(
+                f"Unknown command: {action}. Type `/sre webhook help` to see a list of commands."
+            )
 
 
 def create_webhook(ack, view, body, logger, client, say):

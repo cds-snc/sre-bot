@@ -5,10 +5,9 @@ from unittest.mock import ANY, MagicMock, patch
 
 
 def test_handle_webhooks_command_with_empty_args():
-    assert (
-        webhook_helper.handle_webhook_command([], MagicMock(), MagicMock())
-        == webhook_helper.help_text
-    )
+    respond = MagicMock()
+    webhook_helper.handle_webhook_command([], MagicMock(), MagicMock(), respond)
+    respond.assert_called_once_with(webhook_helper.help_text)
 
 
 @patch("commands.helpers.webhook_helper.create_webhook_modal")
@@ -19,30 +18,33 @@ def test_handle_webhooks_command_with_create_command(create_webhook_modal_mock):
         ["create"],
         client,
         body,
+        MagicMock(),
     )
 
     create_webhook_modal_mock.assert_called_with(client, body)
 
 
 def test_handle_webhooks_command_with_help():
-    assert (
-        webhook_helper.handle_webhook_command(["help"], MagicMock(), MagicMock())
-        == webhook_helper.help_text
-    )
+    respond = MagicMock()
+    webhook_helper.handle_webhook_command(["help"], MagicMock(), MagicMock(), respond)
+    respond.assert_called_once_with(webhook_helper.help_text)
 
 
 @patch("commands.helpers.webhook_helper.list_all_webhooks")
 def test_handle_webhooks_command_with_list_command(list_all_webhooks_mock):
     client = MagicMock()
     body = MagicMock()
-    webhook_helper.handle_webhook_command(["list"], client, body)
+    webhook_helper.handle_webhook_command(["list"], client, body, MagicMock())
     list_all_webhooks_mock.assert_called_with(client, body)
 
 
 def test_handle_webhooks_command_with_unkown_command():
-    assert (
-        webhook_helper.handle_webhook_command(["unknown"], MagicMock(), MagicMock())
-        == "Unknown command: unknown. Type `/sre webhook help` to see a list of commands."
+    respond = MagicMock()
+    webhook_helper.handle_webhook_command(
+        ["unknown"], MagicMock(), MagicMock(), respond
+    )
+    respond.assert_called_once_with(
+        "Unknown command: unknown. Type `/sre webhook help` to see a list of commands."
     )
 
 
