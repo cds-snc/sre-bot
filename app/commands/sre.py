@@ -24,10 +24,9 @@ def sre_command(ack, command, logger, respond, client, body):
         case "help":
             respond(help_text)
         case "incident":
-            resp = incident_helper.handle_incident_command(args)
-            respond(resp)
+            incident_helper.handle_incident_command(args, client, body, respond)
         case "webhooks":
-            webhook_helper.handle_webhook_command(args, client, body)
+            webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case _:
