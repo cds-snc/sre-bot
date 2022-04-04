@@ -24,7 +24,7 @@ def sre_command(ack, command, logger, respond, client, body):
         case "help":
             respond(help_text)
         case "incident":
-            incident_helper.handle_incident_command(args, client, body, respond)
+            incident_helper.handle_incident_command(args, client, body, respond, ack)
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":

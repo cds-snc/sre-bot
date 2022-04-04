@@ -42,6 +42,21 @@ def get_google_service(service, version):
     return build(service, version, credentials=creds)
 
 
+def add_metadata(file_id, key, value):
+    service = get_google_service("drive", "v3")
+    result = (
+        service.files()
+        .update(
+            fileId=file_id,
+            body={"appProperties": {key: value}},
+            fields="name, appProperties",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+    return result
+
+
 def create_folder(name):
     service = get_google_service("drive", "v3")
     results = (
@@ -74,6 +89,21 @@ def create_new_incident(name, folder):
     return result["id"]
 
 
+def delete_metadata(file_id, key):
+    service = get_google_service("drive", "v3")
+    result = (
+        service.files()
+        .update(
+            fileId=file_id,
+            body={"appProperties": {key: None}},
+            fields="name, appProperties",
+            supportsAllDrives=True,
+        )
+        .execute()
+    )
+    return result
+
+
 def list_folders():
     service = get_google_service("drive", "v3")
     results = (
@@ -92,6 +122,16 @@ def list_folders():
         .execute()
     )
     return results.get("files", [])
+
+
+def list_metadata(file_id):
+    service = get_google_service("drive", "v3")
+    result = (
+        service.files()
+        .get(supportsAllDrives=True, fileId=file_id, fields="id, name, appProperties")
+        .execute()
+    )
+    return result
 
 
 def merge_data(file_id, name, product, slack_channel):

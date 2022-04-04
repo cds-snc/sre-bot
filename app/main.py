@@ -4,7 +4,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
 from commands import incident, sre
-from commands.helpers import webhook_helper
+from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
 server_app = server.handler
@@ -30,6 +30,13 @@ def main():
     bot.action("handle_incident_action_buttons")(
         incident.handle_incident_action_buttons
     )
+
+    # Incident events
+    bot.action("add_folder_metadata")(incident_helper.add_folder_metadata)
+    bot.action("view_folder_metadata")(incident_helper.view_folder_metadata)
+    bot.view("view_folder_metadata_modal")(incident_helper.list_folders)
+    bot.view("add_metadata_view")(incident_helper.save_metadata)
+    bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
 
     # Register SRE events
     bot.command(f"/{PREFIX}sre")(sre.sre_command)

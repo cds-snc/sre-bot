@@ -31,6 +31,16 @@ def test_get_google_service_raises_exception_if_pickle_string_is_invalid(pickle_
 
 
 @patch("integrations.google_drive.get_google_service")
+def test_add_metadata_returns_result(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.update.return_value.execute.return_value = {
+        "name": "test_folder",
+        "appProperties": {"key": "value"},
+    }
+    result = google_drive.add_metadata("file_id", "key", "value")
+    assert result == {"name": "test_folder", "appProperties": {"key": "value"}}
+
+
+@patch("integrations.google_drive.get_google_service")
 def test_create_folder_returns_folder_name(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
         "name": "test_folder"
@@ -50,11 +60,40 @@ def test_create_new_incident(get_google_service_mock):
 
 
 @patch("integrations.google_drive.get_google_service")
+def test_delete_metadata_returns_result(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.update.return_value.execute.return_value = {
+        "name": "test_folder",
+        "appProperties": {},
+    }
+    result = google_drive.delete_metadata("file_id", "key")
+    get_google_service_mock.return_value.files.return_value.update.assert_called_once_with(
+        fileId="file_id",
+        body={"appProperties": {"key": None}},
+        fields="name, appProperties",
+        supportsAllDrives=True,
+    )
+    assert result == {"name": "test_folder", "appProperties": {}}
+
+
+@patch("integrations.google_drive.get_google_service")
 def test_list_folders_returns_folder_names(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
         "files": [{"name": "test_folder"}]
     }
     assert google_drive.list_folders() == [{"name": "test_folder"}]
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_list_metadata(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.get.return_value.execute.return_value = {
+        "name": "test_folder",
+        "appProperties": {"key": "value"},
+    }
+
+    assert google_drive.list_metadata("file_id") == {
+        "name": "test_folder",
+        "appProperties": {"key": "value"},
+    }
 
 
 @patch("integrations.google_drive.get_google_service")
