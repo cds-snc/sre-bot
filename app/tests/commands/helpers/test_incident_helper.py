@@ -210,7 +210,7 @@ def test_metadata_items():
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*key*\nvalue",
+                "text": "*key*\nvalue",
             },
             "accessory": {
                 "type": "button",
