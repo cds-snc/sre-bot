@@ -20,5 +20,5 @@ def get_on_call_users(schedule):
 def api_get_request(url, auth):
     req = Request(url)
     req.add_header("Authorization", f"{auth['name']} {auth['token']}")
-    conn = urlopen(req)
+    conn = urlopen(req)  # nosec - Scheme is hardcoded to https
     return conn.read().decode("utf-8")
