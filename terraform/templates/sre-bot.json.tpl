@@ -22,16 +22,6 @@
         "value": "${incident_channel}"
       }
     ],
-    "healthCheck": {
-        "retries": 3,
-        "command": [
-            "CMD-SHELL",
-            "curl -f http://0.0.0.0:8000/version || exit 1"
-        ],
-        "timeout": 5,
-        "interval": 30,
-        "startPeriod": null
-    },
     "image": "${image}",
     "linuxParameters": {
       "capabilities": {
