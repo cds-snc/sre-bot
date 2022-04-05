@@ -30,3 +30,12 @@ resource "aws_secretsmanager_secret_version" "pickle_string" {
   secret_id     = aws_secretsmanager_secret.pickle_string.id
   secret_string = var.pickle_string
 }
+
+resource "aws_secretsmanager_secret" "opsgenie_key" {
+  name = "opsgenie-key-${random_string.random.result}"
+}
+
+resource "aws_secretsmanager_secret_version" "opsgenie_key" {
+  secret_id     = aws_secretsmanager_secret.opsgenie_key.id
+  secret_string = var.opsgenie_key
+}

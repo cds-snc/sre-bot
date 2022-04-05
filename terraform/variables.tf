@@ -29,6 +29,12 @@ variable "app_token" {
 
 # Container secrets for Google Drive
 
+variable "opsgenie_key" {
+  description = "The API key for OpsGenie"
+  type        = string
+  sensitive   = true
+}
+
 variable "pickle_string" {
   description = "The pickle string used to access Google Drive"
   type        = string
