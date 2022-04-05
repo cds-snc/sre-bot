@@ -93,7 +93,9 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
 def test_incident_submit_calls_ack(
+    _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
     _mock_update_incident_list,
@@ -139,7 +141,9 @@ def test_incident_submit_returns_error_if_description_is_too_long():
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
 def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
+    _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
     _mock_update_incident_list,
@@ -167,7 +171,9 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
 def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
+    _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
     _mock_update_incident_list,
@@ -199,7 +205,9 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
 def test_incident_submit_creates_a_document_and_announces_it(
+    mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
     mock_update_incident_list,
@@ -216,10 +224,12 @@ def test_incident_submit_creates_a_document_and_announces_it(
 
     mock_create_new_incident.return_value = "id"
 
+    mock_list_metadata.return_value = {"appProperties": {}}
+
     incident.submit(ack, view, say, body, client, logger)
     mock_create_new_incident.assert_called_once_with(f"{DATE}-name", "folder")
     mock_merge_data.assert_called_once_with(
-        "id", "name", "product", "https://gcdigital.slack.com/archives/channel_id"
+        "id", "name", "product", "https://gcdigital.slack.com/archives/channel_id", ""
     )
     mock_update_incident_list.assert_called_once_with(
         "https://docs.google.com/document/d/id/edit",
@@ -227,6 +237,45 @@ def test_incident_submit_creates_a_document_and_announces_it(
         f"{DATE}-name",
         "product",
         "https://gcdigital.slack.com/archives/channel_id",
+    )
+
+
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.opsgenie.get_on_call_users")
+def test_incident_submit_pulls_oncall_people_into_the_channel(
+    mock_get_on_call_users,
+    mock_list_metadata,
+    mock_create_new_incident,
+    mock_merge_data,
+    mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
+    }
+
+    mock_create_new_incident.return_value = "id"
+
+    mock_get_on_call_users.return_value = ["email"]
+    mock_list_metadata.return_value = {"appProperties": {"genie_schedule": "oncall"}}
+
+    incident.submit(ack, view, say, body, client, logger)
+    mock_get_on_call_users.assert_called_once_with("oncall")
+    client.users_lookupByEmail.assert_any_call(email="email")
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users="user_id"
     )
 
 

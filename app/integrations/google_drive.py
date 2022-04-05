@@ -134,7 +134,7 @@ def list_metadata(file_id):
     return result
 
 
-def merge_data(file_id, name, product, slack_channel):
+def merge_data(file_id, name, product, slack_channel, on_call_names):
     changes = {
         "requests": [
             {
@@ -147,6 +147,12 @@ def merge_data(file_id, name, product, slack_channel):
                 "replaceAllText": {
                     "containsText": {"text": "{{name}}", "matchCase": "true"},
                     "replaceText": str(name),
+                }
+            },
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "{{on-call-names}}", "matchCase": "true"},
+                    "replaceText": str(on_call_names),
                 }
             },
             {

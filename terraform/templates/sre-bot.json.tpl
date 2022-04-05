@@ -54,6 +54,10 @@
         "valueFrom": "${app_token}"
       },
       {
+        "name": "OPSGENIE_KEY",
+        "valueFrom": "${opsgenie_key}"
+      }
+      {
         "name": "PICKLE_STRING",
         "valueFrom": "${pickle_string}"
       }

@@ -15,6 +15,7 @@ data "template_file" "sre-bot" {
     aws_region            = "ca-central-1"
     slack_token           = aws_secretsmanager_secret_version.slack_token.arn
     app_token             = aws_secretsmanager_secret_version.app_token.arn
+    opsgenie_key          = aws_secretsmanager_secret_version.opsgenie_key.arn
     pickle_string         = aws_secretsmanager_secret_version.pickle_string.arn
     sre_drive_id          = var.sre_drive_id
     sre_incident_folder   = var.sre_incident_folder

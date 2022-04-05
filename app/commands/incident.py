@@ -2,7 +2,7 @@ import os
 import re
 import datetime
 
-from integrations import google_drive
+from integrations import google_drive, opsgenie
 from models import webhooks
 
 from dotenv import load_dotenv
@@ -134,9 +134,21 @@ def submit(ack, view, say, body, client, logger):
         ack(response_action="errors", errors=errors)
         return
 
+    # Get folder metadata
+    folder_metadata = google_drive.list_metadata(folder).get("appProperties", {})
+    oncall = []
+
+    # Get OpsGenie data
+    if "genie_schedule" in folder_metadata:
+        for email in opsgenie.get_on_call_users(folder_metadata["genie_schedule"]):
+            r = client.users_lookupByEmail(email=email)
+            if r.get("ok"):
+                oncall.append(r["user"])
+
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     slug = f"{date} {name}".replace(" ", "-").lower()
 
+    # Create channel
     response = client.conversations_create(name=f"incident-{slug}")
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
@@ -145,14 +157,17 @@ def submit(ack, view, say, body, client, logger):
     channel_id = response["channel"]["id"]
     channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
 
+    # Set topic
     client.conversations_setTopic(
         channel=channel_id, topic=f"Incident: {name} / {product}"
     )
 
+    # Announce incident
     user_id = body["user"]["id"]
     text = f"<@{user_id}> has kicked off a new incident: {name} for {product} in <#{channel_id}>"
     say(text=text, channel=INCIDENT_CHANNEL)
 
+    # Add meeting link
     meet_link = f"https://g.co/meet/incident-{slug}"
     client.bookmarks_add(
         channel_id=channel_id, title="Meet link", type="link", link=meet_link
@@ -161,13 +176,24 @@ def submit(ack, view, say, body, client, logger):
     text = f"A hangout has been created at: {meet_link}"
     say(text=text, channel=channel_id)
 
+    # Create incident document
     document_id = google_drive.create_new_incident(slug, folder)
     logger.info(f"Created document: {slug} in folder: {folder} / {document_id}")
-    google_drive.merge_data(document_id, name, product, channel_url)
+
+    # Merge data
+    google_drive.merge_data(
+        document_id,
+        name,
+        product,
+        channel_url,
+        ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
+    )
     document_link = f"https://docs.google.com/document/d/{document_id}/edit"
 
+    # Update incident list
     google_drive.update_incident_list(document_link, name, slug, product, channel_url)
 
+    # Bookmark incident document
     client.bookmarks_add(
         channel_id=channel_id,
         title="Incident report",
@@ -177,3 +203,7 @@ def submit(ack, view, say, body, client, logger):
 
     text = f":lapage: An incident report has been created at: {document_link}"
     say(text=text, channel=channel_id)
+
+    # Invite oncall to channel
+    for user in oncall:
+        client.conversations_invite(channel=channel_id, users=user["id"])

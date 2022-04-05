@@ -102,7 +102,8 @@ def test_merge_data(get_google_service_mock):
         True
     )
     assert (
-        google_drive.merge_data("file_id", "name", "product", "slack_channel") is True
+        google_drive.merge_data("file_id", "name", "product", "slack_channel", "")
+        is True
     )
 
 

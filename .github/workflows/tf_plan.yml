@@ -17,6 +17,7 @@ env:
   TF_VAR_sre_incident_template: ${{ secrets.INCIDENT_TEMPLATE }}
   TF_VAR_sre_incident_list: ${{ secrets.INCIDENT_LIST }}
   TF_VAR_slack_incident_channel: ${{ secrets.INCIDENT_CHANNEL }}
+  TF_VAR_opsgenie_key: ${{ secrets.OPSGENIE_KEY }}
   TF_VAR_pickle_string: ${{ secrets.PICKLE_STRING }}
 
 permissions:
