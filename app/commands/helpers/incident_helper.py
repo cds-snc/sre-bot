@@ -190,7 +190,7 @@ def channel_item(channel):
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": channel["topic"]["value"],
+                    "text": channel["topic"]["value"] if channel["topic"]["value"] else "No information available",
                 }
             ],
         },

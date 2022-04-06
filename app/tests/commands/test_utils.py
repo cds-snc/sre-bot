@@ -12,13 +12,13 @@ def test_get_incident_channels():
                 "name": "channel_name",
             },
             {
-                "name": "incident-channel",
+                "name": "incident-2022-channel",
             },
         ],
     }
     assert utils.get_incident_channels(client) == [
         {
-            "name": "incident-channel",
+            "name": "incident-2022-channel",
         },
     ]
 
@@ -46,7 +46,7 @@ def test_get_messages_in_time_period():
         }
     ]
     client.conversations_join.assert_called_with(channel="channel_id")
-    client.conversations_history.assert_called_with(channel="channel_id", oldest=ANY)
+    client.conversations_history.assert_called_with(channel="channel_id", oldest=ANY, limit=10)
 
 
 def test_get_messages_in_time_period_with_error():
@@ -64,11 +64,11 @@ def test_get_stale_channels(
 ):
     client = MagicMock()
     get_incident_channels_mock.return_value = [
-        {"id": "id", "name": "incident-channel", "created": 0},
+        {"id": "id", "name": "incident-2022-channel", "created": 0},
     ]
     get_messages_in_time_period_mock.return_value = []
     assert utils.get_stale_channels(client) == [
-        {"id": "id", "name": "incident-channel", "created": 0}
+        {"id": "id", "name": "incident-2022-channel", "created": 0}
     ]
 
 

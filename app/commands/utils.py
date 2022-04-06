@@ -9,7 +9,7 @@ def get_incident_channels(client):
     )
     if response["ok"]:
         channels = list(
-            filter(lambda x: x["name"].startswith("incident"), response["channels"])
+            filter(lambda x: x["name"].startswith("incident-20"), response["channels"])
         )
     return channels
 
@@ -18,6 +18,7 @@ def get_messages_in_time_period(client, channel_id, time_delta):
     client.conversations_join(channel=channel_id)
     messages = client.conversations_history(
         channel=channel_id,
+        limit=10,
         oldest=time.mktime((datetime.now() - time_delta).timetuple()),
     )
     if messages["ok"]:
