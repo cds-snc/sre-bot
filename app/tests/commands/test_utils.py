@@ -1,6 +1,75 @@
 from commands import utils
+from datetime import timedelta
+from unittest.mock import ANY, MagicMock, patch
 
-from unittest.mock import MagicMock
+
+def test_get_incident_channels():
+    client = MagicMock()
+    client.conversations_list.return_value = {
+        "ok": True,
+        "channels": [
+            {
+                "name": "channel_name",
+            },
+            {
+                "name": "incident-channel",
+            },
+        ],
+    }
+    assert utils.get_incident_channels(client) == [
+        {
+            "name": "incident-channel",
+        },
+    ]
+
+
+def test_get_messages_in_time_period():
+    client = MagicMock()
+    client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "message": "message",
+            },
+            {
+                "message": "message",
+                "team": "team",
+            },
+        ],
+    }
+    assert utils.get_messages_in_time_period(
+        client, "channel_id", timedelta(days=1)
+    ) == [
+        {
+            "message": "message",
+            "team": "team",
+        }
+    ]
+    client.conversations_join.assert_called_with(channel="channel_id")
+    client.conversations_history.assert_called_with(channel="channel_id", oldest=ANY)
+
+
+def test_get_messages_in_time_period_with_error():
+    client = MagicMock()
+    client.conversations_history.return_value = {"ok": False}
+    assert (
+        utils.get_messages_in_time_period(client, "channel_id", timedelta(days=1)) == []
+    )
+
+
+@patch("commands.utils.get_incident_channels")
+@patch("commands.utils.get_messages_in_time_period")
+def test_get_stale_channels(
+    get_messages_in_time_period_mock, get_incident_channels_mock
+):
+    client = MagicMock()
+    get_incident_channels_mock.return_value = [
+        {"id": "id", "name": "incident-channel", "created": 0},
+    ]
+    get_messages_in_time_period_mock.return_value = []
+    assert utils.get_stale_channels(client) == [
+        {"id": "id", "name": "incident-channel", "created": 0}
+    ]
 
 
 def test_log_ops_message():

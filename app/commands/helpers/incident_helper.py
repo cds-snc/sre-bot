@@ -1,9 +1,12 @@
 from integrations import google_drive
+from commands.utils import get_stale_channels
 
 help_text = """
 \n `/sre incident create-folder <folder_name>` - create a folder for a team in the incident drive
 \n `/sre incident help` - show this help text
-\n `/sre incident list-folders` - list all folders in the incident drive"""
+\n `/sre incident list-folders` - list all folders in the incident drive
+\n `/sre incident stale - lists all incidents older than 14 days with no activity`
+"""
 
 
 def handle_incident_command(args, client, body, respond, ack):
@@ -21,6 +24,8 @@ def handle_incident_command(args, client, body, respond, ack):
             respond(help_text)
         case "list-folders":
             list_folders(client, body, ack)
+        case "stale":
+            stale_incidents(client, body, ack)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -115,6 +120,23 @@ def save_metadata(client, body, ack, view):
     view_folder_metadata(client, body, ack)
 
 
+def stale_incidents(client, body, ack):
+    ack()
+    stale_channels = get_stale_channels(client)
+    blocks = {
+        "type": "modal",
+        "callback_id": "stale_incidents_view",
+        "title": {"type": "plain_text", "text": "SRE - Stale incidents"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [
+            item
+            for sublist in list(map(channel_item, stale_channels))
+            for item in sublist
+        ],
+    }
+    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+
 def view_folder_metadata(client, body, ack):
     ack()
     folder_id = body["actions"][0]["value"]
@@ -152,6 +174,28 @@ def view_folder_metadata(client, body, ack):
         )
     else:
         client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+
+def channel_item(channel):
+    return [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"<#{channel['id']}>",
+            },
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": channel["topic"]["value"],
+                }
+            ],
+        },
+        {"type": "divider"},
+    ]
 
 
 def folder_item(folder):

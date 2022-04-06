@@ -43,6 +43,16 @@ def test_handle_incident_command_with_list_folders(list_folders_mock):
     list_folders_mock.assert_called_once_with(client, body, ack)
 
 
+@patch("commands.helpers.incident_helper.stale_incidents")
+def test_handle_incident_command_with_stale(stale_incidents_mock):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+    incident_helper.handle_incident_command(["stale"], client, body, respond, ack)
+    stale_incidents_mock.assert_called_once_with(client, body, ack)
+
+
 def test_handle_incident_command_with_unknown_command():
     respond = MagicMock()
     ack = MagicMock()
@@ -119,6 +129,19 @@ def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
     )
 
 
+@patch("commands.helpers.incident_helper.get_stale_channels")
+def test_stale_incidents(get_stale_channels_mock):
+    client = MagicMock()
+    body = {"trigger_id": "foo"}
+    ack = MagicMock()
+    get_stale_channels_mock.return_value = [
+        {"id": "id", "topic": {"value": "topic_value"}}
+    ]
+    incident_helper.stale_incidents(client, body, ack)
+    ack.assert_called_once()
+    client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
+
+
 @patch("commands.helpers.incident_helper.google_drive.list_metadata")
 @patch("commands.helpers.incident_helper.metadata_items")
 def test_view_folder_metadata_open(metadata_items_mock, list_metadata_mock):
@@ -159,6 +182,30 @@ def test_view_folder_metadata_update(metadata_items_mock, list_metadata_mock):
         {"name": "folder", "appProperties": [{"key": "key", "value": "value"}]}
     )
     client.views_update(view_id="view_id", view=ANY)
+
+
+def test_channel_item():
+    assert incident_helper.channel_item(
+        {"id": "id", "topic": {"value": "topic_value"}}
+    ) == [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "<#id>",
+            },
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": "topic_value",
+                }
+            ],
+        },
+        {"type": "divider"},
+    ]
 
 
 def test_folder_item():
