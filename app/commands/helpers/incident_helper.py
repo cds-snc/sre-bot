@@ -122,7 +122,29 @@ def save_metadata(client, body, ack, view):
 
 def stale_incidents(client, body, ack):
     ack()
+
+    placeholder = {
+        "type": "modal",
+        "callback_id": "stale_incidents_view",
+        "title": {"type": "plain_text", "text": "SRE - Stale incidents"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "Loading stale incident list ...",
+                },
+            }
+        ],
+    }
+
+    placeholder_modal = client.views_open(
+        trigger_id=body["trigger_id"], view=placeholder
+    )
+
     stale_channels = get_stale_channels(client)
+
     blocks = {
         "type": "modal",
         "callback_id": "stale_incidents_view",
@@ -134,7 +156,8 @@ def stale_incidents(client, body, ack):
             for item in sublist
         ],
     }
-    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+    client.views_update(view_id=placeholder_modal["view"]["id"], view=blocks)
 
 
 def view_folder_metadata(client, body, ack):
