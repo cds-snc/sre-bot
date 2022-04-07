@@ -46,7 +46,9 @@ def test_get_messages_in_time_period():
         }
     ]
     client.conversations_join.assert_called_with(channel="channel_id")
-    client.conversations_history.assert_called_with(channel="channel_id", oldest=ANY, limit=10)
+    client.conversations_history.assert_called_with(
+        channel="channel_id", oldest=ANY, limit=10
+    )
 
 
 def test_get_messages_in_time_period_with_error():

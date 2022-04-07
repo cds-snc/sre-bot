@@ -44,7 +44,7 @@ def test_handle_webhooks_command_with_unkown_command():
         ["unknown"], MagicMock(), MagicMock(), respond
     )
     respond.assert_called_once_with(
-        "Unknown command: unknown. Type `/sre webhook help` to see a list of commands."
+        "Unknown command: unknown. Type `/sre webhooks help` to see a list of commands."
     )
 
 
