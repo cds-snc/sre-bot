@@ -137,9 +137,11 @@ def test_stale_incidents(get_stale_channels_mock):
     get_stale_channels_mock.return_value = [
         {"id": "id", "topic": {"value": "topic_value"}}
     ]
+    client.views_open.return_value = {"view": {"id": "view_id"}}
     incident_helper.stale_incidents(client, body, ack)
     ack.assert_called_once()
     client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
+    client.views_update.assert_called_once_with(view_id="view_id", view=ANY)
 
 
 @patch("commands.helpers.incident_helper.google_drive.list_metadata")
