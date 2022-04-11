@@ -38,13 +38,13 @@ jobs:
           docker build \
           --build-arg git_sha=$GITHUB_SHA \
           --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
-          -t $REGISTRY/sre-bot:$GITHUB_SHA \
+          -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .
 
       - name: Push containers to Amazon ECR
         working-directory: ./app
         run: |
-          docker push $REGISTRY/sre-bot:$GITHUB_SHA
+          docker push $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'`
           docker push $REGISTRY/sre-bot:latest
 
       - name: Restart ECS
