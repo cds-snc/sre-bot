@@ -17,5 +17,5 @@ def test_geolocate_command_with_ip(maxmind_mock):
     respond = MagicMock()
     geolocate_helper.geolocate(["111.111.111.111"], respond)
     respond.assert_called_once_with(
-        f"111.111.111.111 is located in Iqaluit, CA :flag-CA: - <https://www.google.com/maps/@0,0,12z|View on map>"
+        "111.111.111.111 is located in Iqaluit, CA :flag-CA: - <https://www.google.com/maps/@0,0,12z|View on map>"
     )
