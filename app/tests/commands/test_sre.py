@@ -47,6 +47,33 @@ def test_sre_command_with_help_argument():
     respond.assert_called_once_with(sre.help_text)
 
 
+def test_sre_command_with_geolocate_argument_and_no_ip():
+    respond = MagicMock()
+    sre.sre_command(
+        MagicMock(),
+        {"text": "geolocate"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
+    )
+    respond.assert_called_once_with("Please provide an IP address.")
+
+
+@patch("commands.sre.geolocate_helper.geolocate")
+def test_sre_command_with_geolocate_argument_and_ip(geolocate_mock):
+    respond = MagicMock()
+    sre.sre_command(
+        MagicMock(),
+        {"text": "geolocate 111.111.111.111"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
+    )
+    geolocate_mock.assert_called_once_with(["111.111.111.111"], respond)
+
+
 @patch("commands.sre.incident_helper.handle_incident_command")
 def test_sre_command_with_incident_argument(command_runner):
     command_runner.return_value = "incident command help"

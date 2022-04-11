@@ -1,5 +1,6 @@
 boto3==1.21.23
 fastapi==0.75.0
+geoip2==4.5.0
 google-api-python-client==2.37.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.4.6

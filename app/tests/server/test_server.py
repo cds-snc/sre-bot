@@ -6,6 +6,29 @@ from fastapi.testclient import TestClient
 from unittest.mock import call, MagicMock, patch, PropertyMock
 
 
+@patch("server.server.maxmind.geolocate")
+def test_geolocate_success(mock_geolocate):
+    mock_geolocate.return_value = "country", "city", "latitude", "longitude"
+    client = TestClient(server.handler)
+    response = client.get("/geolocate/111.111.111.111")
+    assert response.status_code == 200
+    assert response.json() == {
+        "country": "country",
+        "city": "city",
+        "latitude": "latitude",
+        "longitude": "longitude",
+    }
+
+
+@patch("server.server.maxmind.geolocate")
+def test_geolocate_failure(mock_geolocate):
+    mock_geolocate.return_value = "error"
+    client = TestClient(server.handler)
+    response = client.get("/geolocate/111")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "error"}
+
+
 @patch("server.server.append_incident_buttons")
 @patch("server.server.webhooks.get_webhook")
 @patch("server.server.webhooks.increment_invocation_count")

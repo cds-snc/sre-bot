@@ -207,3 +207,5 @@ token.json
 
 auto.tfvars
 *.db
+
+geodb

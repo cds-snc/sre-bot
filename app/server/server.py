@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from models import webhooks
 from commands.utils import log_ops_message
+from integrations import maxmind
 
 logging.basicConfig(level=logging.INFO)
 
@@ -31,6 +32,21 @@ class WebhookPayload(BaseModel):
 
 
 handler = FastAPI()
+
+
+@handler.get("/geolocate/{ip}")
+def geolocate(ip):
+    reader = maxmind.geolocate(ip)
+    if isinstance(reader, str):
+        raise HTTPException(status_code=404, detail=reader)
+    else:
+        country, city, latitude, longitude = reader
+        return {
+            "country": country,
+            "city": city,
+            "latitude": latitude,
+            "longitude": longitude,
+        }
 
 
 @handler.post("/hook/{id}")
