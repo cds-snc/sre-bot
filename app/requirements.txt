@@ -4,5 +4,6 @@ google-api-python-client==2.37.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.4.6
 python-dotenv==0.19.2
+schedule==1.1.0
 slack-bolt==1.11.4
 uvicorn==0.17.6

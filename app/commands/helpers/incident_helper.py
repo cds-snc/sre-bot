@@ -84,6 +84,20 @@ def add_folder_metadata(client, body, ack):
     )
 
 
+def archive_channel_action(client, body, ack):
+    ack()
+    channel_id = body["channel"]["id"]
+    action = body["actions"][0]["value"]
+    user = body["user"]["id"]
+    if action == "ignore":
+        msg = f"<@{user}> has delayed archiving this channel for 14 days."
+        client.chat_update(
+            channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
+        )
+    elif action == "archive":
+        client.conversations_archive(channel=channel_id)
+
+
 def delete_folder_metadata(client, body, ack):
     ack()
     folder_id = body["view"]["private_metadata"]

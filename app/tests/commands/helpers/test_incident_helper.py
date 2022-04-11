@@ -73,6 +73,39 @@ def test_add_folder_metadata():
     client.views_update.assert_called_once_with(view_id="bar", view=ANY)
 
 
+def test_archive_channel_action_ignore():
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "ignore"}],
+        "channel": {"id": "channel_id"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+    }
+    ack = MagicMock()
+    incident_helper.archive_channel_action(client, body, ack)
+    ack.assert_called_once()
+    client.chat_update(
+        channel="channel_id",
+        text="<@user_id> has delayed archiving this channel for 14 days.",
+        ts="message_ts",
+        attachments=[],
+    )
+
+
+def test_archive_channel_action_archive():
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "archive"}],
+        "channel": {"id": "channel_id"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+    }
+    ack = MagicMock()
+    incident_helper.archive_channel_action(client, body, ack)
+    ack.assert_called_once()
+    client.conversations_archive(channel="channel_id")
+
+
 @patch("commands.helpers.incident_helper.google_drive.delete_metadata")
 @patch("commands.helpers.incident_helper.view_folder_metadata")
 def test_delete_folder_metadata(view_folder_metadata_mock, delete_metadata_mock):
