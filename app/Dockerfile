@@ -19,9 +19,9 @@ ARG LICENSE_KEY
 
 RUN mkdir -p /app/geodb
 RUN wget -O "/app/geodb/GeoLite2-City.tar.gz" "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=$LICENSE_KEY&suffix=tar.gz"
-RUN tar -xzvf GeoLite2-City*.tar.gz
+RUN tar -xzvf /app/geodb/GeoLite2-City*.tar.gz
 RUN cp /app/geodb/GeoLite2-City_*/GeoLite2-City.mmdb /app/geodb/GeoLite2-City.mmdb
 RUN rm -rf /app/geodb/GeoLite2-City_*
-RUN rm GeoLite2-City*.tar.gz
+RUN rm /app/geodb/GeoLite2-City*.tar.gz
 
 CMD [ "uvicorn", "main:server_app", "--host=0.0.0.0" ]
