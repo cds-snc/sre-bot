@@ -7,6 +7,8 @@ from commands import incident, sre
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
+from jobs import scheduled_tasks
+
 server_app = server.handler
 
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +39,7 @@ def main():
     bot.view("view_folder_metadata_modal")(incident_helper.list_folders)
     bot.view("add_metadata_view")(incident_helper.save_metadata)
     bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
+    bot.action("archive_channel")(incident_helper.archive_channel_action)
 
     # Register SRE events
     bot.command(f"/{PREFIX}sre")(sre.sre_command)
@@ -47,6 +50,11 @@ def main():
     bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
+
+    # Run scheduled tasks
+    scheduled_tasks.init(bot)
+    stop_run_continuously = scheduled_tasks.run_continuously()
+    server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
 
 
 server_app.add_event_handler("startup", main)

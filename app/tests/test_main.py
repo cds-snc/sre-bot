@@ -6,7 +6,10 @@ from unittest.mock import patch
 
 @patch("main.SocketModeHandler")
 @patch("main.App")
-def test_main_invokes_socket_handler(mock_app, mock_socket_mode_handler):
+@patch("main.scheduled_tasks")
+def test_main_invokes_socket_handler(
+    mock_scheduled_tasks, mock_app, mock_socket_mode_handler
+):
     main.main()
 
     mock_app.assert_called_once_with(token=os.environ.get("SLACK_TOKEN"))
@@ -24,3 +27,6 @@ def test_main_invokes_socket_handler(mock_app, mock_socket_mode_handler):
     mock_socket_mode_handler.assert_called_once_with(
         mock_app(), os.environ.get("APP_TOKEN")
     )
+
+    mock_scheduled_tasks.init.assert_called_once_with(mock_app.return_value)
+    mock_scheduled_tasks.run_continuously.assert_called_once_with()
