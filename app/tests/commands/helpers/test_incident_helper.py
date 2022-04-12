@@ -182,7 +182,7 @@ def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
     respond.assert_called_once_with(
-        f"No incident document found for `channel_name`. Please make sure the channel matches the document name."
+        "No incident document found for `channel_name`. Please make sure the channel matches the document name."
     )
 
 
