@@ -51,10 +51,11 @@ def main():
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 
-    # Run scheduled tasks
-    scheduled_tasks.init(bot)
-    stop_run_continuously = scheduled_tasks.run_continuously()
-    server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
+    # Run scheduled tasks if not in dev
+    if os.environ.get("PREFIX") == "":
+        scheduled_tasks.init(bot)
+        stop_run_continuously = scheduled_tasks.run_continuously()
+        server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
 
 
 server_app.add_event_handler("startup", main)

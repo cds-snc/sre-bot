@@ -1,7 +1,11 @@
 from commands import utils
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 def notify_stale_incident_channels(client):
+    logging.info("Checking for stale incident channels")
     channels = utils.get_stale_channels(client)
     text = "👋  Hi! There have been no updates in this incident channel for 14 days! Consider archiving it."
     attachments = [

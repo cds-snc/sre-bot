@@ -4,6 +4,7 @@ import main
 from unittest.mock import patch
 
 
+@patch.dict(os.environ, {"PREFIX": ""})
 @patch("main.SocketModeHandler")
 @patch("main.App")
 @patch("main.scheduled_tasks")
