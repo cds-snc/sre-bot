@@ -76,6 +76,22 @@ def test_delete_metadata_returns_result(get_google_service_mock):
 
 
 @patch("integrations.google_drive.get_google_service")
+def test_get_document_by_channel_name(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
+        "files": [
+            {
+                "name": "test_document",
+                "id": "test_document_id",
+                "appProperties": {},
+            }
+        ]
+    }
+    assert google_drive.get_document_by_channel_name("test_channel_name") == [
+        {"name": "test_document", "id": "test_document_id", "appProperties": {}}
+    ]
+
+
+@patch("integrations.google_drive.get_google_service")
 def test_list_folders_returns_folder_names(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
         "files": [{"name": "test_folder"}]
