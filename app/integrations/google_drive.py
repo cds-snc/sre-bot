@@ -104,6 +104,24 @@ def delete_metadata(file_id, key):
     return result
 
 
+def get_document_by_channel_name(channel_name):
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .list(
+            pageSize=1,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            corpora="drive",
+            q="trashed=false and name='{}'".format(channel_name),
+            driveId=SRE_DRIVE_ID,
+            fields="files(appProperties, id, name)",
+        )
+        .execute()
+    )
+    return results.get("files", [])
+
+
 def list_folders():
     service = get_google_service("drive", "v3")
     results = (

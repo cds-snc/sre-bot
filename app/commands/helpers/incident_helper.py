@@ -1,3 +1,5 @@
+import json
+
 from integrations import google_drive
 from commands.utils import get_stale_channels
 
@@ -5,6 +7,7 @@ help_text = """
 \n `/sre incident create-folder <folder_name>` - create a folder for a team in the incident drive
 \n `/sre incident help` - show this help text
 \n `/sre incident list-folders` - list all folders in the incident drive
+\n `/sre incident roles` - manages roles in an incident channel
 \n `/sre incident stale - lists all incidents older than 14 days with no activity`
 """
 
@@ -24,6 +27,8 @@ def handle_incident_command(args, client, body, respond, ack):
             respond(help_text)
         case "list-folders":
             list_folders(client, body, ack)
+        case "roles":
+            manage_roles(client, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case _:
@@ -123,6 +128,102 @@ def list_folders(client, body, ack):
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
 
 
+def manage_roles(client, body, ack, respond):
+    ack()
+    channel_name = body["channel_name"]
+    channel_name = channel_name[
+        channel_name.startswith("incident-") and len("incident-") :
+    ]
+    documents = google_drive.get_document_by_channel_name(channel_name)
+
+    if len(documents) == 0:
+        respond(
+            f"No incident document found for `{channel_name}`. Please make sure the channel matches the document name."
+        )
+        return
+
+    document = documents[0]
+    current_ic = (
+        document["appProperties"]["ic_id"]
+        if "appProperties" in document and "ic_id" in document["appProperties"]
+        else False
+    )
+    current_ol = (
+        document["appProperties"]["ol_id"]
+        if "appProperties" in document and "ol_id" in document["appProperties"]
+        else False
+    )
+
+    ic_element = {
+        "type": "users_select",
+        "placeholder": {
+            "type": "plain_text",
+            "text": "Select an incident commander",
+        },
+        "action_id": "ic_select",
+    }
+    if current_ic:
+        ic_element["initial_user"] = current_ic
+
+    ol_element = {
+        "type": "users_select",
+        "placeholder": {
+            "type": "plain_text",
+            "text": "Select an operations lead",
+        },
+        "action_id": "ol_select",
+    }
+    if current_ol:
+        ol_element["initial_user"] = current_ol
+
+    blocks = {
+        "type": "modal",
+        "callback_id": "view_save_incident_roles",
+        "title": {"type": "plain_text", "text": "SRE - Roles management"},
+        "submit": {"type": "plain_text", "text": "Save roles"},
+        "private_metadata": json.dumps(
+            {
+                "id": document["id"],
+                "ic_id": current_ic,
+                "ol_id": current_ol,
+                "channel_id": body["channel_id"],
+            }
+        ),
+        "blocks": (
+            [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"Roles for {channel_name}",
+                    },
+                },
+                {"type": "divider"},
+                {
+                    "type": "input",
+                    "block_id": "ic_name",
+                    "element": ic_element,
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Incident Commander",
+                    },
+                },
+                {"type": "divider"},
+                {
+                    "type": "input",
+                    "block_id": "ol_name",
+                    "element": ol_element,
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Operations Lead",
+                    },
+                },
+            ]
+        ),
+    }
+    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+
 def save_metadata(client, body, ack, view):
     ack()
     folder_id = view["private_metadata"]
@@ -132,6 +233,30 @@ def save_metadata(client, body, ack, view):
     body["actions"] = [{"value": folder_id}]
     del body["view"]
     view_folder_metadata(client, body, ack)
+
+
+def save_incident_roles(client, ack, view):
+    ack()
+    selected_ic = view["state"]["values"]["ic_name"]["ic_select"]["selected_user"]
+    selected_ol = view["state"]["values"]["ol_name"]["ol_select"]["selected_user"]
+    metadata = json.loads(view["private_metadata"])
+    file_id = metadata["id"]
+    google_drive.add_metadata(file_id, "ic_id", selected_ic)
+    google_drive.add_metadata(file_id, "ol_id", selected_ol)
+    if metadata["ic_id"] != selected_ic:
+        client.chat_postMessage(
+            text=f"<@{selected_ic}> has been assigned as incident commander for this incident.",
+            channel=metadata["channel_id"],
+        )
+    if metadata["ol_id"] != selected_ol:
+        client.chat_postMessage(
+            text=f"<@{selected_ol}> has been assigned as operations lead for this incident.",
+            channel=metadata["channel_id"],
+        )
+    client.conversations_setTopic(
+        topic=f"IC: <@{selected_ic}> / OL: <@{selected_ol}>",
+        channel=metadata["channel_id"],
+    )
 
 
 def stale_incidents(client, body, ack):

@@ -19,6 +19,14 @@ def test_main_invokes_socket_handler(
     mock_app.return_value.view.assert_any_call("incident_view")
     mock_app.return_value.action.assert_any_call("handle_incident_action_buttons")
 
+    mock_app.return_value.action.assert_any_call("add_folder_metadata")
+    mock_app.return_value.action.assert_any_call("view_folder_metadata")
+    mock_app.return_value.view.assert_any_call("view_folder_metadata_modal")
+    mock_app.return_value.view.assert_any_call("add_metadata_view")
+    mock_app.return_value.action.assert_any_call("delete_folder_metadata")
+    mock_app.return_value.action.assert_any_call("archive_channel")
+    mock_app.return_value.view.assert_any_call("view_save_incident_roles")
+
     mock_app.return_value.command.assert_any_call("/sre")
 
     mock_app.return_value.view.assert_any_call("create_webhooks_view")

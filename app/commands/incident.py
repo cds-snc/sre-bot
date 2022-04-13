@@ -207,3 +207,6 @@ def submit(ack, view, say, body, client, logger):
     # Invite oncall to channel
     for user in oncall:
         client.conversations_invite(channel=channel_id, users=user["id"])
+
+    text = "Run `/sre incident roles` to assign roles to the incident"
+    say(text=text, channel=channel_id)

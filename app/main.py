@@ -40,6 +40,7 @@ def main():
     bot.view("add_metadata_view")(incident_helper.save_metadata)
     bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
     bot.action("archive_channel")(incident_helper.archive_channel_action)
+    bot.view("view_save_incident_roles")(incident_helper.save_incident_roles)
 
     # Register SRE events
     bot.command(f"/{PREFIX}sre")(sre.sre_command)
