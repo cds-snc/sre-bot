@@ -1,15 +1,17 @@
+from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 import threading
 import time
 import schedule
+import logging
 
-from jobs.notify_stale_incident_channels import notify_stale_incident_channels
+logging.basicConfig(level=logging.INFO)
 
 
 def init(bot):
+    logging.info("Scheduled tasks initialized ...")
     schedule.every().day.at("16:00").do(
         notify_stale_incident_channels, client=bot.client
     )
-    return
 
 
 def run_continuously(interval=1):
