@@ -9,9 +9,15 @@ logging.basicConfig(level=logging.INFO)
 
 def init(bot):
     logging.info("Scheduled tasks initialized ...")
+
     schedule.every().day.at("16:00").do(
         notify_stale_incident_channels, client=bot.client
     )
+    schedule.every(5).minutes.do(scheduler_heartbeat)
+
+
+def scheduler_heartbeat():
+    logging.info("Scheduler is running at %s", time.ctime())
 
 
 def run_continuously(interval=1):
