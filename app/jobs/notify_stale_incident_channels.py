@@ -33,4 +33,6 @@ def notify_stale_incident_channels(client):
         }
     ]
     for channel in channels:
-        client.chat_postMessage(channel=channel, text=text, attachments=attachments)
+        client.chat_postMessage(
+            channel=channel["id"], text=text, attachments=attachments
+        )
