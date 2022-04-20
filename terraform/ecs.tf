@@ -1,5 +1,10 @@
 resource "aws_ecs_cluster" "sre-bot" {
   name = "sre-bot-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
 data "template_file" "sre-bot" {
