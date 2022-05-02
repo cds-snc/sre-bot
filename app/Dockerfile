@@ -24,4 +24,6 @@ RUN cp /app/geodb/GeoLite2-City_*/GeoLite2-City.mmdb /app/geodb/GeoLite2-City.mm
 RUN rm -rf /app/geodb/GeoLite2-City_*
 RUN rm /app/geodb/GeoLite2-City.tar.gz
 
-CMD [ "uvicorn", "main:server_app", "--host=0.0.0.0" ]
+COPY bin/entry.sh /app
+
+ENTRYPOINT [ "/entry.sh" ]

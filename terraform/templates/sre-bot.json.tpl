@@ -44,24 +44,6 @@
         "containerPort": 8000
       }
     ],
-    "secrets": [
-      {
-        "name": "SLACK_TOKEN",
-        "valueFrom": "${slack_token}"
-      },
-      {
-        "name": "APP_TOKEN",
-        "valueFrom": "${app_token}"
-      },
-      {
-        "name": "OPSGENIE_KEY",
-        "valueFrom": "${opsgenie_key}"
-      },
-      {
-        "name": "PICKLE_STRING",
-        "valueFrom": "${pickle_string}"
-      }
-    ],
     "ulimits": [
       {
         "hardLimit": 1000000,
