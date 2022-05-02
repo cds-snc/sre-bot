@@ -1,5 +1,10 @@
 resource "aws_ecs_cluster" "sre-bot" {
   name = "sre-bot-cluster"
+
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
 }
 
 data "template_file" "sre-bot" {
@@ -13,15 +18,6 @@ data "template_file" "sre-bot" {
     fargate_cpu           = var.fargate_cpu
     fargate_memory        = var.fargate_memory
     aws_region            = "ca-central-1"
-    slack_token           = aws_secretsmanager_secret_version.slack_token.arn
-    app_token             = aws_secretsmanager_secret_version.app_token.arn
-    opsgenie_key          = aws_secretsmanager_secret_version.opsgenie_key.arn
-    pickle_string         = aws_secretsmanager_secret_version.pickle_string.arn
-    sre_drive_id          = var.sre_drive_id
-    sre_incident_folder   = var.sre_incident_folder
-    incident_template     = var.sre_incident_template
-    incident_list         = var.sre_incident_list
-    incident_channel      = var.slack_incident_channel
   }
 }
 

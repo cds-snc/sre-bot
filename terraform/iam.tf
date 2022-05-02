@@ -12,16 +12,11 @@ data "aws_iam_policy_document" "sre-bot" {
 data "aws_iam_policy_document" "sre-bot_secrets_manager" {
   statement {
     effect = "Allow"
-
     actions = [
-      "secretsmanager:GetSecretValue",
+      "ssm:GetParameters",
     ]
-
     resources = [
-      aws_secretsmanager_secret.slack_token.arn,
-      aws_secretsmanager_secret.app_token.arn,
-      aws_secretsmanager_secret.pickle_string.arn,
-      aws_secretsmanager_secret.opsgenie_key.arn,
+      "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config"
     ]
   }
 
