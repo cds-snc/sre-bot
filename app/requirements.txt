@@ -1,5 +1,5 @@
 awscli==1.23.4
-boto3==1.21.23
+boto3==1.25.4
 fastapi==0.75.0
 geoip2==4.5.0
 google-api-python-client==2.37.0
