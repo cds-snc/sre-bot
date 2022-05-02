@@ -12,21 +12,6 @@ data "aws_iam_policy_document" "sre-bot" {
 data "aws_iam_policy_document" "sre-bot_secrets_manager" {
   statement {
     effect = "Allow"
-
-    actions = [
-      "secretsmanager:GetSecretValue",
-    ]
-
-    resources = [
-      aws_secretsmanager_secret.slack_token.arn,
-      aws_secretsmanager_secret.app_token.arn,
-      aws_secretsmanager_secret.pickle_string.arn,
-      aws_secretsmanager_secret.opsgenie_key.arn,
-    ]
-  }
-
-  statement {
-    effect = "Allow"
     actions = [
       "ssm:GetParameters",
     ]
