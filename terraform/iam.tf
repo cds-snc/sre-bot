@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 data "aws_iam_policy_document" "sre-bot" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -31,7 +33,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       "ssm:GetParameters",
     ]
     resources = [
-      "arn:aws:ssm:${var.region}:${var.account_id}:parameter/sre-bot-config"
+      "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config"
     ]
   }
 
