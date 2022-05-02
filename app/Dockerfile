@@ -26,4 +26,4 @@ RUN rm /app/geodb/GeoLite2-City.tar.gz
 
 COPY bin/entry.sh /app
 
-ENTRYPOINT [ "entry.sh" ]
+ENTRYPOINT [ "./app/entry.sh" ]
