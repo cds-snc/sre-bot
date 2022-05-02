@@ -27,6 +27,16 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
 
   statement {
     effect = "Allow"
+    actions = [
+      "ssm:GetParameters",
+    ]
+    resources = [
+      "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config"
+    ]
+  }
+
+  statement {
+    effect = "Allow"
 
     actions = [
       "dynamodb:Query",
