@@ -1,27 +1,5 @@
 [
   {
-    "environment": [
-      {
-        "name": "SRE_DRIVE_ID",
-        "value": "${sre_drive_id}"
-      },
-      {
-        "name": "SRE_INCIDENT_FOLDER",
-        "value": "${sre_incident_folder}"
-      },
-      {
-        "name": "INCIDENT_TEMPLATE",
-        "value": "${incident_template}"
-      },
-      {
-        "name": "INCIDENT_LIST",
-        "value": "${incident_list}"
-      },
-      {
-        "name": "INCIDENT_CHANNEL",
-        "value": "${incident_channel}"
-      }
-    ],
     "image": "${image}",
     "linuxParameters": {
       "capabilities": {
