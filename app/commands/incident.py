@@ -12,7 +12,7 @@ load_dotenv()
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 
 
-def handle_incident_action_buttons(client, ack, body):
+def handle_incident_action_buttons(client, ack, body, logger):
     name = body["actions"][0]["name"]
     value = body["actions"][0]["value"]
     user = body["user"]["id"]
@@ -30,6 +30,8 @@ def handle_incident_action_buttons(client, ack, body):
         }
         body["original_message"]["attachments"] = attachments
         body["original_message"]["channel"] = body["channel"]["id"]
+
+        logger.info(f"Updating chat: {body['original_message']}")
         client.api_call("chat.update", json=body["original_message"])
 
 
