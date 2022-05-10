@@ -11,6 +11,7 @@ DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 def test_handle_incident_action_buttons_call_incident(open_modal_mock):
     client = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -21,7 +22,7 @@ def test_handle_incident_action_buttons_call_incident(open_modal_mock):
         ],
         "user": {"id": "user_id"},
     }
-    incident.handle_incident_action_buttons(client, ack, body)
+    incident.handle_incident_action_buttons(client, ack, body, logger)
     open_modal_mock.assert_called_with(client, ack, {"text": "incident_id"}, body)
 
 
@@ -29,6 +30,7 @@ def test_handle_incident_action_buttons_call_incident(open_modal_mock):
 def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock):
     client = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -49,7 +51,7 @@ def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock
             ],
         },
     }
-    incident.handle_incident_action_buttons(client, ack, body)
+    incident.handle_incident_action_buttons(client, ack, body, logger)
     increment_acknowledged_count_mock.assert_called_with("incident_id")
     client.api_call.assert_called_with(
         "chat.update",
