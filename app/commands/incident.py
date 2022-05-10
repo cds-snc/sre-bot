@@ -36,7 +36,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
         # https://github.com/slackapi/bolt-js/issues/1324
         if "blocks" in body["original_message"]:
             for block in body["original_message"]["blocks"]:
-                if block["type"] == "rich_text":
+                if "type" in block and block["type"] == "rich_text":
                     delete_block = True
 
         if delete_block:
