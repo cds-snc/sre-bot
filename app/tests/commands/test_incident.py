@@ -68,6 +68,63 @@ def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock
     )
 
 
+@patch("commands.incident.webhooks.increment_acknowledged_count")
+def test_handle_incident_action_buttons_ignore_drop_richtext_block(
+    increment_acknowledged_count_mock,
+):
+    client = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+    body = {
+        "actions": [
+            {
+                "name": "ignore-incident",
+                "value": "incident_id",
+                "type": "button",
+            }
+        ],
+        "channel": {"id": "channel_id"},
+        "user": {"id": "user_id"},
+        "original_message": {
+            "attachments": [
+                {
+                    "color": "3AA3E3",
+                    "fallback": "foo",
+                    "text": "bar",
+                }
+            ],
+            "blocks": [
+                {
+                    "type": "rich_text",
+                    "block_id": "6Qv",
+                    "elements": [
+                        {
+                            "type": "rich_text_section",
+                            "elements": [{"type": "text", "text": "AWS notification"}],
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    incident.handle_incident_action_buttons(client, ack, body, logger)
+    increment_acknowledged_count_mock.assert_called_with("incident_id")
+    client.api_call.assert_called_with(
+        "chat.update",
+        json={
+            "channel": "channel_id",
+            "attachments": [
+                {
+                    "color": "3AA3E3",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                }
+            ],
+            "blocks": [],
+        },
+    )
+
+
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_ack(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]

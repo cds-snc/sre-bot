@@ -13,6 +13,7 @@ INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
+    delete_block = False
     name = body["actions"][0]["name"]
     value = body["actions"][0]["value"]
     user = body["user"]["id"]
@@ -30,6 +31,16 @@ def handle_incident_action_buttons(client, ack, body, logger):
         }
         body["original_message"]["attachments"] = attachments
         body["original_message"]["channel"] = body["channel"]["id"]
+
+        # rich_text blocks are only available for 1st party Slack clients (meaning Desktop, iOS, Android Slack apps)
+        # https://github.com/slackapi/bolt-js/issues/1324
+        if "blocks" in body["original_message"]:
+            for block in body["original_message"]["blocks"]:
+                if block["type"] == "rich_text":
+                    delete_block = True
+
+        if delete_block:
+            body["original_message"]["blocks"] = []
 
         logger.info(f"Updating chat: {body['original_message']}")
         client.api_call("chat.update", json=body["original_message"])
