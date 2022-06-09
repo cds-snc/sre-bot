@@ -2,6 +2,7 @@ from commands import utils
 
 from integrations import aws_sso
 from commands.utils import log_ops_message
+from models import aws_access_requests
 
 help_text = """
 \n `/aws help` - show this help text
@@ -28,25 +29,60 @@ def aws_command(ack, command, logger, respond, client, body):
             )
 
 
-def access_view_handler(ack, body, logger, respond, client):
+def access_view_handler(ack, body, logger, client):
     ack()
-    user = body["user"]["name"]
+
+    errors = {}
+
+    rationale = body["view"]["state"]["values"]["rationale"]["rationale"]["value"]
+
+    if len(rationale) > 2000:
+        errors["rationale"] = "Please use less than 2000 characters"
+    if len(errors) > 0:
+        ack(response_action="errors", errors=errors)
+        return
+
     user_id = body["user"]["id"]
+
+    user = client.users_info(user=user_id)["user"]
+    email = user["profile"]["email"]
+
     account = body["view"]["state"]["values"]["account"]["account"]["selected_option"][
         "value"
     ]
+
     account_name = body["view"]["state"]["values"]["account"]["account"][
         "selected_option"
     ]["text"]["text"]
+
     access_type = body["view"]["state"]["values"]["access_type"]["access_type"][
         "selected_option"
     ]["value"]
-    rationale = body["view"]["state"]["values"]["rationale"]["rationale"]["value"]
-    msg = f"<@{user_id}> ({user}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
+
+    msg = f"<@{user_id}> ({email}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
+
     logger.info(msg)
-    # log_ops_message(client, msg)
-    # aws_sso.request_access(account, access_type, rationale)
-    # respond("Access request sent.")
+    log_ops_message(client, msg)
+    aws_user_id = aws_sso.get_user_id(email)
+
+    if aws_user_id is None:
+        msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator."
+    elif expires := aws_access_requests.already_has_access(
+        account, user_id, access_type
+    ):
+        msg = f"You already have access to {account_name} ({account}) with access type {access_type}. Your access will expire in {expires} minutes."
+    elif aws_access_requests.create_aws_access_request(
+        account, account_name, user_id, email, access_type, rationale
+    ) and aws_sso.add_permissions_for_user(aws_user_id, account, access_type):
+        msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access."
+    else:
+        msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel."
+
+    client.chat_postEphemeral(
+        channel=user_id,
+        user=user_id,
+        text=msg,
+    )
 
 
 def request_modal(client, body):

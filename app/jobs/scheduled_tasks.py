@@ -1,3 +1,4 @@
+from jobs.revoke_aws_sso_access import revoke_aws_sso_access
 from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 import threading
 import time
@@ -13,6 +14,8 @@ def init(bot):
     schedule.every().day.at("16:00").do(
         notify_stale_incident_channels, client=bot.client
     )
+
+    schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(scheduler_heartbeat)
 
 

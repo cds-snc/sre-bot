@@ -14,6 +14,28 @@ INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
 INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
 
 
+def add_permissions_for_user(user_id, account_id, permission_set):
+    if permission_set == "write":
+        permissions = SYSTEM_ADMIN_PERMISSIONS
+    else:
+        permissions = VIEW_ONLY_PERMISSIONS
+
+    client = assume_role_client("sso-admin")
+    resp = client.create_account_assignment(
+        InstanceArn=INSTANCE_ARN,
+        TargetId=account_id,
+        TargetType="AWS_ACCOUNT",
+        PermissionSetArn=permissions,
+        PrincipalType="USER",
+        PrincipalId=user_id,
+    )
+
+    if resp["AccountAssignmentCreationStatus"]["Status"] != "FAILED":
+        return True
+    else:
+        return False
+
+
 def assume_role_client(client_type):
     client = boto3.client("sts")
 
@@ -46,6 +68,28 @@ def get_user_id(email):
 
     response = client.list_users(IdentityStoreId=INSTANCE_ID, Filters=[user_filter])
     if response["Users"] and len(response["Users"]) > 0:
-        return response["Users"][0]["Id"]
+        return response["Users"][0]["UserId"]
 
     return None
+
+
+def remove_permissions_for_user(user_id, account_id, permission_set):
+    if permission_set == "write":
+        permissions = SYSTEM_ADMIN_PERMISSIONS
+    else:
+        permissions = VIEW_ONLY_PERMISSIONS
+
+    client = assume_role_client("sso-admin")
+    resp = client.delete_account_assignment(
+        InstanceArn=INSTANCE_ARN,
+        TargetId=account_id,
+        TargetType="AWS_ACCOUNT",
+        PermissionSetArn=permissions,
+        PrincipalType="USER",
+        PrincipalId=user_id,
+    )
+
+    if resp["AccountAssignmentDeletionStatus"]["Status"] != "FAILED":
+        return True
+    else:
+        return False
