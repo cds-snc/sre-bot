@@ -13,6 +13,16 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
   statement {
     effect = "Allow"
     actions = [
+      "sts:AssumeRole",
+    ]
+    resources = [
+      "arn:aws:iam::797698708703:role/SREBot_SSO_Rotate"
+    ]
+  }
+  
+  statement {
+    effect = "Allow"
+    actions = [
       "ssm:GetParameters",
     ]
     resources = [
