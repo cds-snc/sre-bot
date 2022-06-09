@@ -9,7 +9,7 @@ ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN")
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 
-ACCOUNTS = json.loads(os.environ.get("AWS_ACCOUNT_JSON", ""))
+ACCOUNTS = json.loads(os.environ.get("AWS_ACCOUNT_JSON", "{}"))
 INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
 INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
 

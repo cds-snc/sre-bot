@@ -1,6 +1,6 @@
 from commands import aws
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 
 def test_aws_command_handles_empty_command():
@@ -210,6 +210,20 @@ def test_access_view_handler_failed_access_request(
         channel="user_id",
         user="user_id",
         text="Failed to provision access_type access request for account (account_id). Please drop a note in the <#sre-and-tech-ops> channel.",
+    )
+
+
+@patch("commands.aws.aws_sso.get_accounts")
+def test_request_modal(get_accounts_mock):
+    get_accounts_mock.return_value = {"id": "name"}
+
+    client = MagicMock()
+    body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}
+
+    aws.request_modal(client, body)
+    client.views_open.assert_called_with(
+        trigger_id="trigger_id",
+        view=ANY,
     )
 
 
