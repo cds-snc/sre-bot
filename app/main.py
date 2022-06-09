@@ -3,7 +3,7 @@ import logging
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import incident, sre
+from commands import aws, incident, sre
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -25,6 +25,10 @@ def main():
 
     # Add bot to server_app
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+
+    # Register AWS commands
+    bot.command(f"/{PREFIX}aws")(aws.aws_command)
+    bot.view("aws_access_view")(aws.access_view_handler)
 
     # Register incident events
     bot.command(f"/{PREFIX}incident")(incident.open_modal)
