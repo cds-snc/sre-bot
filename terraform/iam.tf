@@ -33,6 +33,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     ]
 
     resources = [
+      aws_dynamodb_table.aws_access_requests_table.arn,
       aws_dynamodb_table.webhooks_table.arn,
     ]
 
