@@ -5,8 +5,8 @@ from commands.utils import log_ops_message
 from models import aws_access_requests
 
 help_text = """
-\n `/aws help` - show this help text
-\n `/aws access` - starts the process to access and AWS account"""
+\n `/aws help` - show this help text | montre le dialogue d'aide
+\n `/aws access` - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS"""
 
 
 def aws_command(ack, command, logger, respond, client, body):
@@ -14,7 +14,7 @@ def aws_command(ack, command, logger, respond, client, body):
     logger.info("AWS command received: %s", command["text"])
 
     if command["text"] == "":
-        respond("Type `/aws help` to see a list of commands.")
+        respond("Type `/aws help` to see a list of commands. \n Tapez `/aws help` pour une liste des commandes")
         return
 
     action, *args = utils.parse_command(command["text"])
@@ -25,7 +25,8 @@ def aws_command(ack, command, logger, respond, client, body):
             request_modal(client, body)
         case _:
             respond(
-                f"Unknown command: {action}. Type `/aws help` to see a list of commands."
+                f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
+                f"Commande inconnue: `{action}`. Tapez `/aws help` pour voir une liste des commandes."
             )
 
 
@@ -66,7 +67,7 @@ def access_view_handler(ack, body, logger, client):
     aws_user_id = aws_sso.get_user_id(email)
 
     if aws_user_id is None:
-        msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator."
+        msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator.\n<@{user_id}> ({email}) n'est pas enregistré avec AWS SSO. SVP contactez votre administrateur."
     elif expires := aws_access_requests.already_has_access(
         account, user_id, access_type
     ):
@@ -74,9 +75,9 @@ def access_view_handler(ack, body, logger, client):
     elif aws_access_requests.create_aws_access_request(
         account, account_name, user_id, email, access_type, rationale
     ) and aws_sso.add_permissions_for_user(aws_user_id, account, access_type):
-        msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access."
+        msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.\nTraitement de la requête d'accès {access_type} pour le compte {account_name} ({account}) en cours. Cela peut prendre quelques minutes. Visitez <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> pour y accéder"
     else:
-        msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel."
+        msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel.\nLa requête d'accès {access_type} pour {account_name} ({account}) a échouée. Envoyez une note sur le canal <#sre-and-tech-ops>"
 
     client.chat_postEphemeral(
         channel=user_id,
@@ -109,7 +110,7 @@ def request_modal(client, body):
                         "type": "static_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select an account you want access to",
+                            "text": "Select an account to access | Choisissez un compte à accéder",
                         },
                         "options": options,
                         "action_id": "account",
@@ -121,7 +122,7 @@ def request_modal(client, body):
                     "type": "input",
                     "label": {
                         "type": "plain_text",
-                        "text": "What type of access do you want? :this-is-fine-fire:",
+                        "text": "What type of access do you want? :this-is-fine-fire: | Quel type d'accès désirez-vous? :this-is-fine-fire:",
                         "emoji": True,
                     },
                     "element": {
@@ -130,7 +131,7 @@ def request_modal(client, body):
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "Read access - just need to check something",
+                                    "text": "Read access - just need to check something \n Lecture seule - je dois juste regarder quelque chose",
                                     "emoji": True,
                                 },
                                 "value": "read",
@@ -138,7 +139,7 @@ def request_modal(client, body):
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "Write access - need to modify something",
+                                    "text": "Write access - need to modify something \n Écriture - je dois modifier quelque chose",
                                     "emoji": True,
                                 },
                                 "value": "write",
@@ -157,7 +158,7 @@ def request_modal(client, body):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "What do you plan on doing?",
+                        "text": "What do you plan on doing? | Que planifiez-vous faire?",
                         "emoji": True,
                     },
                 },
