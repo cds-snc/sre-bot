@@ -3,9 +3,15 @@ import re
 from models import webhooks
 
 help_text = """
-\n `/sre webhooks create` - create a new webhook
-\n `/sre webhooks help` - show this help text
-\n `/sre webhooks list` - lists webhooks
+\n `/sre webhooks create`
+\n      - create a new webhook
+\n      - créer un nouveau webhook
+\n `/sre webhooks help`
+\n      - show this help text
+\n      - montrer ce texte d'aide
+\n `/sre webhooks list`
+\n      - lists webhooks
+\n      - lister les webhooks
 """
 
 
@@ -24,7 +30,10 @@ def handle_webhook_command(args, client, body, respond):
             list_all_webhooks(client, body)
         case _:
             respond(
-                f"Unknown command: {action}. Type `/sre webhooks help` to see a list of commands."
+                f"Unknown command: {action}. "
+                "Type `/sre webhooks help` to see a list of commands."
+                f"Commande inconnue: {action}. "
+                "Tapez `/sre webhooks help` pour voir une liste de commandes."
             )
 
 
