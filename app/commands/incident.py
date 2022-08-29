@@ -143,9 +143,13 @@ def submit(ack, view, say, body, client, logger):
     ]
 
     if not re.match(r"^[\w\-\s]+$", name):
-        errors["name"] = "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
+        errors[
+            "name"
+        ] = "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
     if len(name) > 80:
-        errors["name"] = "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
+        errors[
+            "name"
+        ] = "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
         return

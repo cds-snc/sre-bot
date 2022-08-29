@@ -27,7 +27,9 @@ def sre_command(ack, command, logger, respond, client, body):
     logger.info("SRE command received: %s", command["text"])
 
     if command["text"] == "":
-        respond("Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes")
+        respond(
+            "Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes"
+        )
         return
 
     action, *args = utils.parse_command(command["text"])
@@ -36,10 +38,7 @@ def sre_command(ack, command, logger, respond, client, body):
             respond(help_text)
         case "geolocate":
             if len(args) == 0:
-                respond(
-                    "Please provide an IP address.\n"
-                    "SVP fournir une adresse IP"
-                )
+                respond("Please provide an IP address.\n" "SVP fournir une adresse IP")
                 return
             geolocate_helper.geolocate(args, respond)
         case "incident":

@@ -14,7 +14,9 @@ def aws_command(ack, command, logger, respond, client, body):
     logger.info("AWS command received: %s", command["text"])
 
     if command["text"] == "":
-        respond("Type `/aws help` to see a list of commands. \n Tapez `/aws help` pour une liste des commandes")
+        respond(
+            "Type `/aws help` to see a list of commands. \n Tapez `/aws help` pour une liste des commandes"
+        )
         return
 
     action, *args = utils.parse_command(command["text"])

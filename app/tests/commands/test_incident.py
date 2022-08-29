@@ -247,7 +247,9 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
         response_action="errors",
-        errors={"name": "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"},
+        errors={
+            "name": "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
+        },
     )
 
 
@@ -261,7 +263,9 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
         response_action="errors",
-        errors={"name": "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"},
+        errors={
+            "name": "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
+        },
     )
 
 
