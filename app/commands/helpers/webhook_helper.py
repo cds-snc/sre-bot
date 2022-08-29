@@ -30,9 +30,9 @@ def handle_webhook_command(args, client, body, respond):
             list_all_webhooks(client, body)
         case _:
             respond(
-                f"Unknown command: {action}. "
-                "Type `/sre webhooks help` to see a list of commands."
-                f"Commande inconnue: {action}. "
+                f"Unknown command: `{action}`. "
+                "Type `/sre webhooks help` to see a list of commands.\n"
+                f"Commande inconnue: `{action}`. "
                 "Tapez `/sre webhooks help` pour voir une liste de commandes."
             )
 
