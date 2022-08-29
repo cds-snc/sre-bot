@@ -25,7 +25,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
         attachments = body["original_message"]["attachments"]
         msg = (
             f"🙈  <@{user}> has acknowledged and ignored the incident.\n"
-            f"<@{user}> a pris connaissance et ignoré l'incident"
+            f"<@{user}> a pris connaissance et ignoré l'incident."
         )
         attachments[-1] = {
             "color": "3AA3E3",
@@ -184,7 +184,7 @@ def submit(ack, view, say, body, client, logger):
         f"<@{user_id}> has kicked off a new incident: {name} for {product}"
         f" in <#{channel_id}>\n"
         f"<@{user_id}> a initié un nouvel incident: {name} pour {product}"
-        f" dans <#{channel_id}>\n"
+        f" dans <#{channel_id}>"
     )
     say(text=text, channel=INCIDENT_CHANNEL)
 
