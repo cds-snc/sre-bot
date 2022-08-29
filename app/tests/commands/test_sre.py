@@ -26,7 +26,7 @@ def test_sre_command_with_empty_string():
     sre.sre_command(
         MagicMock(), {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock()
     )
-    respond.assert_called_once_with("Type `/sre help` to see a list of commands.")
+    respond.assert_called_once_with("Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes")
 
 
 def test_sre_command_with_version_argument():
@@ -57,7 +57,7 @@ def test_sre_command_with_geolocate_argument_and_no_ip():
         MagicMock(),
         MagicMock(),
     )
-    respond.assert_called_once_with("Please provide an IP address.")
+    respond.assert_called_once_with("Please provide an IP address.\nSVP fournir une adresse IP")
 
 
 @patch("commands.sre.geolocate_helper.geolocate")
@@ -110,5 +110,5 @@ def test_sre_command_with_unknown_argument():
         MagicMock(), {"text": "unknown"}, MagicMock(), respond, MagicMock(), MagicMock()
     )
     respond.assert_called_once_with(
-        "Unknown command: unknown. Type `/sre help` to see a list of commands."
+        "Unknown command: `unknown`. Type `/sre help` to see a list of commands. \nCommande inconnue: `unknown`. Entrez `/sre help` pour une liste des commandes valides"
     )
