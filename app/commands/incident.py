@@ -23,7 +23,10 @@ def handle_incident_action_buttons(client, ack, body, logger):
         ack()
         webhooks.increment_acknowledged_count(value)
         attachments = body["original_message"]["attachments"]
-        msg = f"🙈  <@{user}> has acknowledged and ignored the incident."
+        msg = (
+            f"🙈  <@{user}> has acknowledged and ignored the incident.\n"
+            f"<@{user}> a pris connaissance et ignoré l'incident."
+        )
         attachments[-1] = {
             "color": "3AA3E3",
             "fallback": f"{msg}",
@@ -69,7 +72,7 @@ def open_modal(client, ack, command, body):
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "Congratulations!",
+                        "text": "Congratulations! // Félicitations!",
                         "emoji": True,
                     },
                 },
@@ -77,14 +80,14 @@ def open_modal(client, ack, command, body):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "Something has gone wrong. You've got this!",
+                        "text": "Something has gone wrong. You've got this! // Il y a eu un problème. Vous pouvez y arriver!",
                     },
                 },
                 {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "This app is going to help you get set up. It will create the following: \n \n • a channel \n • an incident report \n • a Google Meet",
+                        "text": "This app is going to help you get set up. It will create the following: \n \n • a channel \n • an incident report \n • a Google Meet\n\n--\n\nCette application vous aidera à vous préparer. Elle créera les choses suivantes: \n \n • un canal \n • un rapport d'incident \n • une rencontre Google Meet\n\n",
                     },
                 },
                 {"type": "divider"},
@@ -92,7 +95,7 @@ def open_modal(client, ack, command, body):
                     "type": "section",
                     "text": {
                         "type": "plain_text",
-                        "text": "Fill out the two fields below and you are good to go:",
+                        "text": "Fill out the two fields below and you are good to go // Remplissez les deux champs ici-bas et vous pourrez commencer:",
                     },
                 },
                 {
@@ -105,7 +108,7 @@ def open_modal(client, ack, command, body):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Short description (ex: too many 500 errors)",
+                        "text": "Short description (ex: too many 500 errors) | Courte description",
                     },
                 },
                 {
@@ -115,7 +118,7 @@ def open_modal(client, ack, command, body):
                         "type": "static_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a product",
+                            "text": "Select a product | Choisissez un produit",
                         },
                         "options": options,
                         "action_id": "product",
@@ -140,9 +143,13 @@ def submit(ack, view, say, body, client, logger):
     ]
 
     if not re.match(r"^[\w\-\s]+$", name):
-        errors["name"] = "Description must only contain number and letters"
+        errors[
+            "name"
+        ] = "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
     if len(name) > 80:
-        errors["name"] = "Description must be less than 80 characters"
+        errors[
+            "name"
+        ] = "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
         return
@@ -177,7 +184,12 @@ def submit(ack, view, say, body, client, logger):
 
     # Announce incident
     user_id = body["user"]["id"]
-    text = f"<@{user_id}> has kicked off a new incident: {name} for {product} in <#{channel_id}>"
+    text = (
+        f"<@{user_id}> has kicked off a new incident: {name} for {product}"
+        f" in <#{channel_id}>\n"
+        f"<@{user_id}> a initié un nouvel incident: {name} pour {product}"
+        f" dans <#{channel_id}>"
+    )
     say(text=text, channel=INCIDENT_CHANNEL)
 
     # Add meeting link

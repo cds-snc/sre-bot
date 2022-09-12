@@ -60,8 +60,8 @@ def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock
             "attachments": [
                 {
                     "color": "3AA3E3",
-                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.",
-                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
                 }
             ],
         },
@@ -116,8 +116,8 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
             "attachments": [
                 {
                     "color": "3AA3E3",
-                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.",
-                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
                 }
             ],
             "blocks": [],
@@ -173,8 +173,8 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
             "attachments": [
                 {
                     "color": "3AA3E3",
-                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.",
-                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
                 }
             ],
             "blocks": [
@@ -247,7 +247,9 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
         response_action="errors",
-        errors={"name": "Description must only contain number and letters"},
+        errors={
+            "name": "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
+        },
     )
 
 
@@ -261,7 +263,9 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
         response_action="errors",
-        errors={"name": "Description must be less than 80 characters"},
+        errors={
+            "name": "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
+        },
     )
 
 
@@ -290,7 +294,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
         channel="channel_id", topic="Incident: name / product"
     )
     say.assert_any_call(
-        text="<@user_id> has kicked off a new incident: name for product in <#channel_id>",
+        text="<@user_id> has kicked off a new incident: name for product in <#channel_id>\n<@user_id> a initié un nouvel incident: name pour product dans <#channel_id>",
         channel=incident.INCIDENT_CHANNEL,
     )
 

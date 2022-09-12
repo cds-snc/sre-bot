@@ -4,11 +4,21 @@ from integrations import google_drive
 from commands.utils import get_stale_channels
 
 help_text = """
-\n `/sre incident create-folder <folder_name>` - create a folder for a team in the incident drive
-\n `/sre incident help` - show this help text
-\n `/sre incident list-folders` - list all folders in the incident drive
-\n `/sre incident roles` - manages roles in an incident channel
-\n `/sre incident stale - lists all incidents older than 14 days with no activity`
+\n `/sre incident create-folder <folder_name>`
+\n      - create a folder for a team in the incident drive
+\n      - créer un dossier pour une équipe dans le dossier d'incidents
+\n `/sre incident help`
+\n      - show this help text
+\n      - afficher ce texte d'aide
+\n `/sre incident list-folders`
+\n      - list all folders in the incident drive
+\n      - lister tous les dossiers dans le dossier d'incidents
+\n `/sre incident roles`
+\n      - manages roles in an incident channel
+\n      - gérer les rôles dans un canal d'incident
+\n `/sre incident stale`
+\n      - lists all incidents older than 14 days with no activity
+\n      - lister tous les incidents plus vieux que 14 jours sans activité
 """
 
 

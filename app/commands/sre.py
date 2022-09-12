@@ -5,11 +5,21 @@ from commands import utils
 from commands.helpers import geolocate_helper, incident_helper, webhook_helper
 
 help_text = """
-\n `/sre help` - show this help text
-\n `/sre geolocate <ip>` - geolocate an IP address
-\n `/sre incident` - lists incident commands
-\n `/sre webhooks` - lists webhook commands
-\n `/sre version` - show the version of the SRE Bot"""
+\n `/sre help`
+\n      - show this help text
+\n      - montre le texte d'aide
+\n `/sre geolocate <ip>`
+\n      - geolocate an IP address
+\n      - géolocaliser une adresse IP
+\n `/sre incident`
+\n      - lists incident commands
+\n      - lister les commandes d'incidents
+\n `/sre webhooks`
+\n      - lists webhook commands
+\n      - lister les commandes de liens de rappel HTTP
+\n `/sre version`
+\n      - show the version of the SRE Bot
+\n      - montre la version du bot SRE"""
 
 
 def sre_command(ack, command, logger, respond, client, body):
@@ -17,7 +27,9 @@ def sre_command(ack, command, logger, respond, client, body):
     logger.info("SRE command received: %s", command["text"])
 
     if command["text"] == "":
-        respond("Type `/sre help` to see a list of commands.")
+        respond(
+            "Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes"
+        )
         return
 
     action, *args = utils.parse_command(command["text"])
@@ -26,7 +38,7 @@ def sre_command(ack, command, logger, respond, client, body):
             respond(help_text)
         case "geolocate":
             if len(args) == 0:
-                respond("Please provide an IP address.")
+                respond("Please provide an IP address.\n" "SVP fournir une adresse IP")
                 return
             geolocate_helper.geolocate(args, respond)
         case "incident":
@@ -37,5 +49,5 @@ def sre_command(ack, command, logger, respond, client, body):
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case _:
             respond(
-                f"Unknown command: {action}. Type `/sre help` to see a list of commands."
+                f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
             )

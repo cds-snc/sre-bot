@@ -44,7 +44,7 @@ def test_aws_command_handles_unknown_command():
     )
     ack.assert_called
     respond.assert_called_with(
-        "Unknown command: unknown. Type `/aws help` to see a list of commands."
+        "Unknown command: `unknown`. Type `/aws help` to see a list of commands.\nCommande inconnue: `unknown`. Tapez `/aws help` pour voir une liste des commandes."
     )
 
 
@@ -88,7 +88,7 @@ def test_access_view_handler_with_unknown_sso_user(
     client.chat_postEphemeral.assert_called_with(
         channel="user_id",
         user="user_id",
-        text="<@user_id> (email) is not registered with AWS SSO. Please contact your administrator.",
+        text="<@user_id> (email) is not registered with AWS SSO. Please contact your administrator.\n<@user_id> (email) n'est pas enregistré avec AWS SSO. SVP contactez votre administrateur.",
     )
 
 
@@ -166,7 +166,7 @@ def test_access_view_handler_successful_access_request(
     client.chat_postEphemeral.assert_called_with(
         channel="user_id",
         user="user_id",
-        text="Provisioning access_type access request for account (account_id). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.",
+        text="Provisioning access_type access request for account (account_id). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.\nTraitement de la requête d'accès access_type pour le compte account (account_id) en cours. Cela peut prendre quelques minutes. Visitez <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> pour y accéder",
     )
 
 
@@ -209,7 +209,7 @@ def test_access_view_handler_failed_access_request(
     client.chat_postEphemeral.assert_called_with(
         channel="user_id",
         user="user_id",
-        text="Failed to provision access_type access request for account (account_id). Please drop a note in the <#sre-and-tech-ops> channel.",
+        text="Failed to provision access_type access request for account (account_id). Please drop a note in the <#sre-and-tech-ops> channel.\nLa requête d'accès access_type pour account (account_id) a échouée. Envoyez une note sur le canal <#sre-and-tech-ops>",
     )
 
 
