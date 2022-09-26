@@ -5,9 +5,14 @@ from commands.utils import log_ops_message
 
 
 def parse(payload, client):
-    msg = json.loads(payload.Message)
-    if "AlarmArn" in msg:
+    try:
+        msg = json.loads(payload.Message)
+    except Exception:
+        msg = payload.Message
+    if isinstance(msg, dict) and "AlarmArn" in msg:
         blocks = format_cloudwatch_alarm(msg)
+    elif isinstance(msg, str) and "AWS Budget Notification" in msg:
+        blocks = format_budget_notification(payload)
     else:
         blocks = []
         log_ops_message(
@@ -16,6 +21,30 @@ def parse(payload, client):
         )
 
     return blocks
+
+
+def format_budget_notification(payload):
+    regex = r"arn:aws:sns:\w.*:(\d.*):\w.*"
+    account = re.search(regex, payload.TopicArn).groups()[0]
+
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*<https://console.aws.amazon.com/billing/home#/budgets| 💸 Budget Alert | {account}>*",
+            },
+        },
+        {
+            "type": "header",
+            "text": {"type": "plain_text", "text": f"{payload.Subject}"},
+        },
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": f"{payload.Message}"},
+        },
+    ]
 
 
 def format_cloudwatch_alarm(msg):
