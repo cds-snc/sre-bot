@@ -3,7 +3,7 @@ from server import server
 import os
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import call, MagicMock, patch, PropertyMock
+from unittest.mock import ANY, call, MagicMock, patch, PropertyMock
 
 
 @patch("server.server.maxmind.geolocate")
@@ -45,6 +45,93 @@ def test_handle_webhook_found(
     assert get_webhook_mock.call_count == 1
     assert increment_invocation_count_mock.call_count == 1
     assert append_incident_buttons_mock.call_count == 1
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
+def test_handle_webhook_with_invalid_aws_json_payload(
+    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+):
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = "not a json payload"
+    client = TestClient(server.handler)
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 500
+    assert response.json() == {"detail": ANY}
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
+def test_handle_webhook_with_bad_aws_signature(
+    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+):
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "foo"}'
+    client = TestClient(server.handler)
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 500
+    assert response.json() == {"detail": ANY}
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
+@patch("server.server.sns_message_validator.validate_message")
+@patch("server.server.requests.get")
+def test_handle_webhook_with_SubscriptionConfirmation_payload(
+    get_mock,
+    validate_message_mock,
+    log_ops_message_mock,
+    _increment_invocation_count_mock,
+    get_webhook_mock,
+):
+    validate_message_mock.return_value = True
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "SubscriptionConfirmation", "SubscribeURL": "SubscribeURL", "TopicArn": "TopicArn"}'
+    client = TestClient(server.handler)
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert log_ops_message_mock.call_count == 1
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.sns_message_validator.validate_message")
+def test_handle_webhook_with_UnsubscribeConfirmation_payload(
+    validate_message_mock,
+    _increment_invocation_count_mock,
+    get_webhook_mock,
+):
+    validate_message_mock.return_value = True
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "UnsubscribeConfirmation"}'
+    client = TestClient(server.handler)
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.sns_message_validator.validate_message")
+@patch("server.server.aws.parse")
+def test_handle_webhook_with_Notification_payload(
+    parse_mock,
+    validate_message_mock,
+    _increment_invocation_count_mock,
+    get_webhook_mock,
+):
+    validate_message_mock.return_value = True
+    parse_mock.return_value = ["foo", "bar"]
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "Notification"}'
+    client = TestClient(server.handler)
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
 
 
 @patch("server.server.append_incident_buttons")
