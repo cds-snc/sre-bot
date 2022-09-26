@@ -102,6 +102,10 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                 return {"ok": True}
 
             if payload.Type == "UnsubscribeConfirmation":
+                log_ops_message(
+                    request.state.bot.client,
+                    f"{payload.TopicArn} unsubscribed from webhook {id}",
+                )
                 return {"ok": True}
 
             if payload.Type == "Notification":

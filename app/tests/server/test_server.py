@@ -100,7 +100,9 @@ def test_handle_webhook_with_SubscriptionConfirmation_payload(
 @patch("server.server.webhooks.get_webhook")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.sns_message_validator.validate_message")
+@patch("server.server.log_ops_message")
 def test_handle_webhook_with_UnsubscribeConfirmation_payload(
+    log_ops_message_mock,
     validate_message_mock,
     _increment_invocation_count_mock,
     get_webhook_mock,
@@ -112,6 +114,7 @@ def test_handle_webhook_with_UnsubscribeConfirmation_payload(
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
+    assert log_ops_message_mock.call_count == 1
 
 
 @patch("server.server.webhooks.get_webhook")
