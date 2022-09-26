@@ -12,7 +12,7 @@ def parse(payload, client):
         blocks = []
         log_ops_message(
             client,
-            f"Unidentified AWS event recerived ```{payload.Message}```",
+            f"Unidentified AWS event received ```{payload.Message}```",
         )
 
     return blocks

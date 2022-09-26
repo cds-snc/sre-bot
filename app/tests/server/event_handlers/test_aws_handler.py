@@ -11,7 +11,7 @@ def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mo
     response = aws.parse(payload, client)
     assert response == []
     log_ops_message_mock.assert_called_once_with(
-        client, f"Unidentified AWS event recerived ```{payload.Message}```"
+        client, f"Unidentified AWS event received ```{payload.Message}```"
     )
 
 
