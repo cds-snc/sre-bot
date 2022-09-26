@@ -1,13 +1,19 @@
 import json
 import logging
 import os
+import requests
+
+
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from models import webhooks
 from commands.utils import log_ops_message
 from integrations import maxmind
+from server.event_handlers import aws
+from sns_message_validator import SNSMessageValidator
 
 logging.basicConfig(level=logging.INFO)
+sns_message_validator = SNSMessageValidator()
 
 
 class WebhookPayload(BaseModel):
@@ -26,6 +32,24 @@ class WebhookPayload(BaseModel):
     link_names: bool | None = None
     username: str | None = None
     parse: str | None = None
+
+    class Config:
+        extra = Extra.forbid
+
+
+class AwsSnsPayload(BaseModel):
+    Type: str | None = None
+    MessageId: str | None = None
+    Token: str | None = None
+    TopicArn: str | None = None
+    Message: str | None = None
+    SubscribeURL: str | None = None
+    Timestamp: str | None = None
+    SignatureVersion: str | None = None
+    Signature: str | None = None
+    SigningCertURL: str | None = None
+    Subject: str | None = None
+    UnsubscribeURL: str | None = None
 
     class Config:
         extra = Extra.forbid
@@ -50,10 +74,44 @@ def geolocate(ip):
 
 
 @handler.post("/hook/{id}")
-def handle_webhook(id: str, payload: WebhookPayload, request: Request):
+def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     webhook = webhooks.get_webhook(id)
     if webhook:
         webhooks.increment_invocation_count(id)
+
+        if isinstance(payload, str):
+            try:
+                payload = AwsSnsPayload.parse_raw(payload)
+                sns_message_validator.validate_message(message=payload.dict())
+            except Exception as e:
+                logging.error(e)
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Error parsing AWS event: ```{payload}```",
+                )
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to parse AWS event message: {e}"
+                )
+            if payload.Type == "SubscriptionConfirmation":
+                requests.get(payload.SubscribeURL)
+                logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Subscribed webhook {id} to topic {payload.TopicArn}",
+                )
+                return {"ok": True}
+
+            if payload.Type == "UnsubscribeConfirmation":
+                log_ops_message(
+                    request.state.bot.client,
+                    f"{payload.TopicArn} unsubscribed from webhook {id}",
+                )
+                return {"ok": True}
+
+            if payload.Type == "Notification":
+                blocks = aws.parse(payload, request.state.bot.client)
+                payload = WebhookPayload(blocks=blocks)
+
         payload.channel = webhook["channel"]["S"]
         payload = append_incident_buttons(payload, id)
         try:
