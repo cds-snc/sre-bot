@@ -25,6 +25,36 @@ def test_parse_returns_blocks_if_AlarmArn_in_msg(format_cloudwatch_alarm_mock):
     format_cloudwatch_alarm_mock.assert_called_once_with(json.loads(payload.Message))
 
 
+@patch("server.event_handlers.aws.format_budget_notification")
+def test_parse_returns_blocks_if_budget_notification_in_msg(
+    format_budget_notification_mock,
+):
+    client = MagicMock()
+    format_budget_notification_mock.return_value = ["foo", "bar"]
+    payload = mock_budget_alert()
+    response = aws.parse(payload, client)
+    assert response == ["foo", "bar"]
+    format_budget_notification_mock.assert_called_once_with(payload)
+
+
+def test_format_budget_notification_extracts_the_account_id_and_inserts_it_into_blocks():
+    payload = mock_budget_alert()
+    response = aws.format_budget_notification(payload)
+    assert "017790921725" in response[1]["text"]["text"]
+
+
+def test_format_budget_notificatio_adds_the_subject_into_blocks():
+    payload = mock_budget_alert()
+    response = aws.format_budget_notification(payload)
+    assert response[2]["text"]["text"] == payload.Subject
+
+
+def test_format_budget_notificatio_adds_the_message_into_blocks():
+    payload = mock_budget_alert()
+    response = aws.format_budget_notification(payload)
+    assert response[3]["text"]["text"] == payload.Message
+
+
 def test_format_cloudwatch_alarm_extracts_the_region_and_inserts_it_into_blocks():
     msg = json.loads(mock_cloudwatch_alarm().Message)
     response = aws.format_cloudwatch_alarm(msg)
@@ -56,6 +86,21 @@ def test_format_cloudwatch_alarm_replaces_empty_AlarmDescription_with_blank():
     msg["AlarmDescription"] = None
     response = aws.format_cloudwatch_alarm(msg)
     assert response[3]["text"]["text"] == " "
+
+
+def mock_budget_alert():
+    return MagicMock(
+        Type="Notification",
+        MessageId="0da238f6-da6c-5214-96e1-635d27a9b79b",
+        TopicArn="arn:aws:sns:ca-central-1:017790921725:test-sre-bot",
+        Subject="AWS Budgets: Test Budget has exceeded your alert threshold",
+        Message="AWS Budget Notification September 26, 2022\nAWS Account 017790921725\n\nDear AWS Customer,\n\nYou requested that we alert you when the ACTUAL Cost associated with your Test Budget budget is greater than $0.16 for the current month. The ACTUAL Cost associated with this budget is $0.59. You can find additional details below and by accessing the AWS Budgets dashboard [1].\n\nBudget Name: Test Budget\nBudget Type: Cost\nBudgeted Amount: $0.20\nAlert Type: ACTUAL\nAlert Threshold: > $0.16\nACTUAL Amount: $0.59\n\n[1] https://console.aws.amazon.com/billing/home#/budgets\n",
+        Timestamp="2022-09-26T19:20:37.147Z",
+        SignatureVersion="1",
+        Signature="HLsCTKHEC2FXGe6LFkV/JGD7k/apzJZD42R8ph4AzcD9NcrxZyjINTyPFe1zMtg3kcGSge2J3MqFcTTyQJtkRrKZZftIVZRflwWKu4OLHt1atHSOavI8n7Qh3bRtwR5C3mezhtu6oWbfEdTXAuyz4AWcZ0L9dxE4B3bOMS302ViQA3hIfjSlGLRr+j/Ra7+IbzY35QUJLxtVcmcAAw/ByuyXeDRy+6qhJtKndOTeMBLTKAQlIOPubyJP1Q2BWo0spREmIESnPtB14c5k+6LWxa/srPjfOWu66ICUNnydKnvf5EuIlpooycLldttvDtwmD2NZt6kQr2FJhkqARyr/Ng==",
+        SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
+        UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:017790921725:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
+    )
 
 
 def mock_cloudwatch_alarm():
