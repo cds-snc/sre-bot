@@ -8,7 +8,10 @@ DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
 
 @patch("commands.incident.open_modal")
-def test_handle_incident_action_buttons_call_incident(open_modal_mock):
+@patch("commands.incident.log_to_sentinel")
+def test_handle_incident_action_buttons_call_incident(
+    _log_to_sentinel_mock, open_modal_mock
+):
     client = MagicMock()
     ack = MagicMock()
     logger = MagicMock()
@@ -27,7 +30,10 @@ def test_handle_incident_action_buttons_call_incident(open_modal_mock):
 
 
 @patch("commands.incident.webhooks.increment_acknowledged_count")
-def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock):
+@patch("commands.incident.log_to_sentinel")
+def test_handle_incident_action_buttons_ignore(
+    _log_to_sentinel_mock, increment_acknowledged_count_mock
+):
     client = MagicMock()
     ack = MagicMock()
     logger = MagicMock()
@@ -69,7 +75,9 @@ def test_handle_incident_action_buttons_ignore(increment_acknowledged_count_mock
 
 
 @patch("commands.incident.webhooks.increment_acknowledged_count")
+@patch("commands.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_ignore_drop_richtext_block(
+    _log_to_sentinel_mock,
     increment_acknowledged_count_mock,
 ):
     client = MagicMock()
@@ -126,7 +134,9 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
 
 
 @patch("commands.incident.webhooks.increment_acknowledged_count")
+@patch("commands.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
+    _log_to_sentinel_mock,
     increment_acknowledged_count_mock,
 ):
     client = MagicMock()
@@ -221,7 +231,9 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
 def test_incident_submit_calls_ack(
+    _log_to_sentinel_mock,
     _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
@@ -273,7 +285,9 @@ def test_incident_submit_returns_error_if_description_is_too_long():
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
 def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
+    _log_to_sentinel_mock,
     _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
@@ -303,7 +317,9 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
 def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
+    _log_to_sentinel_mock,
     _mock_list_metadata,
     _mock_create_new_incident,
     _mock_merge_data,
@@ -337,7 +353,9 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
 def test_incident_submit_creates_a_document_and_announces_it(
+    _log_to_sentinel_mock,
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
@@ -376,7 +394,9 @@ def test_incident_submit_creates_a_document_and_announces_it(
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
 @patch("commands.incident.opsgenie.get_on_call_users")
+@patch("commands.incident.log_to_sentinel")
 def test_incident_submit_pulls_oncall_people_into_the_channel(
+    _log_to_sentinel_mock,
     mock_get_on_call_users,
     mock_list_metadata,
     mock_create_new_incident,

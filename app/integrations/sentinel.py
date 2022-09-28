@@ -19,7 +19,7 @@ def send_event(payload):
         logging.error("customer_id, log_type, or shared_key is missing")
         return False
 
-    ##post_data(customer_id, shared_key, json.dumps(payload), log_type)
+    post_data(customer_id, shared_key, json.dumps(payload), log_type)
     return True
 
 

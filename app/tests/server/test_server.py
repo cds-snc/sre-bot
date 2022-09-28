@@ -32,8 +32,12 @@ def test_geolocate_failure(mock_geolocate):
 @patch("server.server.append_incident_buttons")
 @patch("server.server.webhooks.get_webhook")
 @patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_to_sentinel")
 def test_handle_webhook_found(
-    increment_invocation_count_mock, get_webhook_mock, append_incident_buttons_mock
+    _log_to_sentinel_mock,
+    increment_invocation_count_mock,
+    get_webhook_mock,
+    append_incident_buttons_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = {"channel": "channel"}
@@ -121,7 +125,9 @@ def test_handle_webhook_with_UnsubscribeConfirmation_payload(
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.sns_message_validator.validate_message")
 @patch("server.server.aws.parse")
+@patch("server.server.log_to_sentinel")
 def test_handle_webhook_with_Notification_payload(
+    _log_to_sentinel_mock,
     parse_mock,
     validate_message_mock,
     _increment_invocation_count_mock,
