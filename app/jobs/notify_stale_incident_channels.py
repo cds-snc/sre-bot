@@ -1,3 +1,4 @@
+from commands.utils import log_to_sentinel
 from commands import utils
 import logging
 
@@ -34,6 +35,7 @@ def notify_stale_incident_channels(client):
         }
     ]
     for channel in channels:
+        log_to_sentinel("sent_stale_channel_notification", {"channel": channel})
         client.chat_postMessage(
             channel=channel["id"], text=text, attachments=attachments
         )
