@@ -7,7 +7,7 @@ import requests
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from models import webhooks
-from commands.utils import log_ops_message
+from commands.utils import log_ops_message, log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
 from sns_message_validator import SNSMessageValidator
@@ -115,8 +115,10 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
         payload.channel = webhook["channel"]["S"]
         payload = append_incident_buttons(payload, id)
         try:
-            request.state.bot.client.api_call(
-                "chat.postMessage", json=json.loads(payload.json(exclude_none=True))
+            message = json.loads(payload.json(exclude_none=True))
+            request.state.bot.client.api_call("chat.postMessage", json=message)
+            log_to_sentinel(
+                "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
             )
             return {"ok": True}
         except Exception as e:

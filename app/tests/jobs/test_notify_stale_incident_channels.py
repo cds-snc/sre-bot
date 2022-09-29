@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, patch
 
 
 @patch("commands.utils.get_stale_channels")
-def test_notify_stale_incident_channels(get_stale_channels_mock):
+@patch("jobs.notify_stale_incident_channels.log_to_sentinel")
+def test_notify_stale_incident_channels(_log_to_sentinel_mock, get_stale_channels_mock):
     get_stale_channels_mock.return_value = [{"id": "channel_id"}]
     client = MagicMock()
     notify_stale_incident_channels.notify_stale_incident_channels(client)

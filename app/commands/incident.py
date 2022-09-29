@@ -4,6 +4,8 @@ import datetime
 
 from integrations import google_drive, opsgenie
 from models import webhooks
+from commands.utils import log_to_sentinel
+
 
 from dotenv import load_dotenv
 
@@ -19,6 +21,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
     user = body["user"]["id"]
     if name == "call-incident":
         open_modal(client, ack, {"text": value}, body)
+        log_to_sentinel("call_incident_button_pressed", body)
     elif name == "ignore-incident":
         ack()
         webhooks.increment_acknowledged_count(value)
@@ -47,6 +50,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
 
         logger.info(f"Updating chat: {body['original_message']}")
         client.api_call("chat.update", json=body["original_message"])
+        log_to_sentinel("ignore_incident_button_pressed", body)
 
 
 def open_modal(client, ack, command, body):
@@ -153,6 +157,8 @@ def submit(ack, view, say, body, client, logger):
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
         return
+
+    log_to_sentinel("incident_called", body)
 
     # Get folder metadata
     folder_metadata = google_drive.list_metadata(folder).get("appProperties", {})
