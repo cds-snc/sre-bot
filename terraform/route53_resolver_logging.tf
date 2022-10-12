@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_log_group" "sre_bot_dns" {
-  name              = "/aws/route53/sre_bot_vpc"
+  name              = "/aws/route53/${module.vpc.vpc_id}"
   retention_in_days = 30
 }
 
@@ -32,5 +32,5 @@ resource "aws_route53_resolver_query_log_config" "sre_bot" {
 
 resource "aws_route53_resolver_query_log_config_association" "sre_bot" {
   resolver_query_log_config_id = aws_route53_resolver_query_log_config.sre_bot.id
-  resource_id                  = module.vpc.id
+  resource_id                  = module.vpc.vpc_id
 }
