@@ -19,7 +19,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       "arn:aws:iam::797698708703:role/SREBot_SSO_Rotate"
     ]
   }
-  
+
   statement {
     effect = "Allow"
     actions = [
