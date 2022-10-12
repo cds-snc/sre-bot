@@ -1,4 +1,4 @@
-esource "aws_cloudwatch_log_group" "sre_bot_dns" {
+resource "aws_cloudwatch_log_group" "sre_bot_dns" {
   provider = aws.us-east-1
 
   name              = "/aws/route53/${aws_route53_zone.sre_bot.name}"
