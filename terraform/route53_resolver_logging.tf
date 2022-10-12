@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_log_group" "sre_bot_dns" {
-  name              = "/aws/route53/${module.vpc.id}"
+  name              = "/aws/route53/sre_bot_vpc"
   retention_in_days = 30
 }
 
