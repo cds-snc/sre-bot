@@ -235,6 +235,10 @@ def submit(ack, view, say, body, client, logger):
     text = f":lapage: An incident report has been created at: {document_link}"
     say(text=text, channel=channel_id)
 
+    # Reminder to brief up
+    text = "If this is a cybersecurity incident, please initiate the briefing process for CCCS and TBS OCIO Cyber"
+    say(text=text, channel=channel_id)
+
     # Invite oncall to channel
     for user in oncall:
         client.conversations_invite(channel=channel_id, users=user["id"])
