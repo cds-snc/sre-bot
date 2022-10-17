@@ -41,5 +41,14 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"remoteUser": "vscode"
+	"remoteUser": "vscode",
+	"features": {
+		"ghcr.io/devcontainers/features/aws-cli:1": {
+			"version": "2.2.29"
+		},
+		"ghcr.io/devcontainers/features/terraform:1": {
+			"version": "1.0.3",
+			"terragrunt": "0.31.1"
+		}
+	}
 }
