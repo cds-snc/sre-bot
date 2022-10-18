@@ -5,20 +5,21 @@ variable "secret" {
 }
 
 
-data "aws_iam_policy_document" "test_role" {
-  statement {
-    sid     = "AssumeRole"
-    actions = ["sts:AssumeRole"]
-    principals {
-      type = "AWS"
-      identifiers = [
-        var.secret
-      ]
-    }
-  }
-}
-
 resource "aws_iam_role" "sre_bot" {
   name               = "test_role-${var.secret}"
-  assume_role_policy = data.aws_iam_policy_document.test_role.json
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "${var.secret}"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
 }
