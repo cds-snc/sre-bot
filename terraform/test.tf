@@ -1,4 +1,4 @@
-variable "my_secret" {
+variable "secret" {
   description = "This is a secret"
   type        = string
   sensitive   = true
