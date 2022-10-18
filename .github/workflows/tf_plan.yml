@@ -63,7 +63,7 @@ jobs:
 
       - name: Terraform Plan ${{ matrix.module }}
         env:
-          TF_VAR_secret: "not-a-secret"
+          TF_VAR_secret: "super-secret"
         uses: cds-snc/terraform-plan@v2
         with:
           comment-delete: true
