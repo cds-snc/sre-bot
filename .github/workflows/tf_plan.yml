@@ -62,6 +62,8 @@ jobs:
           aws-region: "ca-central-1"
 
       - name: Terraform Plan ${{ matrix.module }}
+        env:
+          TF_VAR_secret: "not-a-secret"
         uses: cds-snc/terraform-plan@v2
         with:
           comment-delete: true
