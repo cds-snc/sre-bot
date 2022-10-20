@@ -16,7 +16,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       "sts:AssumeRole",
     ]
     resources = [
-      "arn:aws:iam::797698708703:role/SREBot_SSO_Rotate"
+      "arn:aws:iam::659087519042:role/sre_bot_role"
     ]
   }
 
