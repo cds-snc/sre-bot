@@ -106,12 +106,11 @@ def test_get_account_spend_with_data(assume_role_client_mock):
         Filter={"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": ["test_account_id"]}},
     )
 
+
 @patch("integrations.aws_account_health.assume_role_client")
 def test_get_account_spend_with_no_data(assume_role_client_mock):
     client = MagicMock()
-    client.get_cost_and_usage.return_value = {
-        "ResultsByTime": [{}]
-    }
+    client.get_cost_and_usage.return_value = {"ResultsByTime": [{}]}
     assume_role_client_mock.return_value = client
     assert (
         aws_account_health.get_account_spend(

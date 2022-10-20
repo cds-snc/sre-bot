@@ -1,6 +1,5 @@
 import arrow
 import boto3
-import datetime
 import os
 
 ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
