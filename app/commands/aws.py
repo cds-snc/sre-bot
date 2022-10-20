@@ -1,12 +1,14 @@
 from commands import utils
 
-from integrations import aws_sso
+from integrations import aws_sso, aws_account_health
 from commands.utils import log_ops_message
 from models import aws_access_requests
 
 help_text = """
+\n `/aws access` - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
+\n `/aws health` - query the health of an AWS account | demander l'état de santé d'un compte AWS
 \n `/aws help` - show this help text | montre le dialogue d'aide
-\n `/aws access` - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS"""
+"""
 
 
 def aws_command(ack, command, logger, respond, client, body):
@@ -24,7 +26,9 @@ def aws_command(ack, command, logger, respond, client, body):
         case "help":
             respond(help_text)
         case "access":
-            request_modal(client, body)
+            request_access_modal(client, body)
+        case "health":
+            request_health_modal(client, body)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -88,7 +92,70 @@ def access_view_handler(ack, body, logger, client):
     )
 
 
-def request_modal(client, body):
+def health_view_handler(ack, body, logger, client):
+    ack()
+
+    account_id = body["view"]["state"]["values"]["account"]["account"][
+        "selected_option"
+    ]["value"]
+
+    account_name = body["view"]["state"]["values"]["account"]["account"][
+        "selected_option"
+    ]["text"]["text"]
+
+    account_info = aws_account_health.get_account_health(account_id)
+
+    blocks = {
+        "type": "modal",
+        "callback_id": "health_view",
+        "title": {"type": "plain_text", "text": "AWS - Health Check"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"Health check for *{account_name}*: ({account_id})",
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"""
+*Cost:*
+
+{account_info['cost']['last_month']['start_date']} - {account_info['cost']['last_month']['end_date']}: ${account_info['cost']['last_month']['amount']} USD
+{account_info['cost']['current_month']['start_date']} - {account_info['cost']['current_month']['end_date']}: ${account_info['cost']['current_month']['amount']} USD
+                        """,
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"""
+*Security:*
+
+{"✅" if account_info['security']['config'] == 0 else "❌"} Config ({account_info['security']['config']} issues)\n
+{"✅" if account_info['security']['guardduty'] == 0 else "❌"} GuardDuty ({account_info['security']['guardduty']} issues)\n
+{"✅" if account_info['security']['securityhub'] == 0 else "❌"} SecurityHub ({account_info['security']['securityhub']} issues)\n
+{"✅" if account_info['security']['trusted_advisor'] == 0 else "❌"} Trusted Advisor ({account_info['security']['trusted_advisor']} issues)\n
+                        """,
+                },
+            },
+        ],
+    }
+
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view=blocks,
+    )
+
+
+def request_access_modal(client, body):
     accounts = aws_sso.get_accounts()
     options = [
         {
@@ -164,6 +231,42 @@ def request_modal(client, body):
                         "emoji": True,
                     },
                 },
+            ],
+        },
+    )
+
+
+def request_health_modal(client, body):
+    accounts = aws_account_health.get_accounts()
+    options = [
+        {
+            "text": {"type": "plain_text", "text": value},
+            "value": key,
+        }
+        for key, value in accounts.items()
+    ]
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view={
+            "type": "modal",
+            "callback_id": "aws_health_view",
+            "title": {"type": "plain_text", "text": "AWS - Account health"},
+            "submit": {"type": "plain_text", "text": "Submit"},
+            "blocks": [
+                {
+                    "block_id": "account",
+                    "type": "input",
+                    "element": {
+                        "type": "static_select",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select an account to view | Choisissez un compte à afficher",
+                        },
+                        "options": options,
+                        "action_id": "account",
+                    },
+                    "label": {"type": "plain_text", "text": "Account", "emoji": True},
+                }
             ],
         },
     )

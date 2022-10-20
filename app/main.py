@@ -29,6 +29,7 @@ def main():
     # Register AWS commands
     bot.command(f"/{PREFIX}aws")(aws.aws_command)
     bot.view("aws_access_view")(aws.access_view_handler)
+    bot.view("aws_health_view")(aws.health_view_handler)
 
     # Register incident events
     bot.command(f"/{PREFIX}incident")(incident.open_modal)
