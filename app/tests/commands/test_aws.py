@@ -23,8 +23,8 @@ def test_aws_command_handles_help_command():
     assert respond.called_with(aws.help_text)
 
 
-@patch("commands.aws.access_view_handler")
-def test_aws_command_handles_access_command(access_view_handler):
+@patch("commands.aws.request_access_modal")
+def test_aws_command_handles_access_command(request_access_modal):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
@@ -32,7 +32,19 @@ def test_aws_command_handles_access_command(access_view_handler):
 
     aws.aws_command(ack, {"text": "access"}, MagicMock(), respond, client, body)
     ack.assert_called
-    assert access_view_handler.called_with(client, body)
+    assert request_access_modal.called_with(client, body)
+
+
+@patch("commands.aws.request_health_modal")
+def test_aws_command_handles_health_command(request_health_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    aws.aws_command(ack, {"text": "health"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_health_modal.called_with(client, body)
 
 
 def test_aws_command_handles_unknown_command():
@@ -213,14 +225,58 @@ def test_access_view_handler_failed_access_request(
     )
 
 
+@patch("commands.aws.aws_account_health.get_account_health")
+def test_health_view_handler(get_account_health_mock):
+    ack = MagicMock()
+    body = {
+        "trigger_id": "trigger_id",
+        "view": {
+            "state": {
+                "values": {
+                    "account": {
+                        "account": {
+                            "selected_option": {
+                                "value": "account_id",
+                                "text": {"text": "account_name"},
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    }
+    client = MagicMock()
+
+    aws.health_view_handler(ack, body, MagicMock(), client)
+    ack.assert_called
+    client.views_open.assert_called_with(
+        trigger_id="trigger_id",
+        view=ANY,
+    )
+
+
 @patch("commands.aws.aws_sso.get_accounts")
-def test_request_modal(get_accounts_mock):
+def test_request_access_modal(get_accounts_mock):
     get_accounts_mock.return_value = {"id": "name"}
 
     client = MagicMock()
     body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}
 
-    aws.request_modal(client, body)
+    aws.request_access_modal(client, body)
+    client.views_open.assert_called_with(
+        trigger_id="trigger_id",
+        view=ANY,
+    )
+
+
+@patch("commands.aws.aws_account_health.get_accounts")
+def test_request_health_modal(get_accounts_mocks):
+    client = MagicMock()
+    body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}
+
+    get_accounts_mocks.return_value = {"id": "name"}
+
+    aws.request_health_modal(client, body)
     client.views_open.assert_called_with(
         trigger_id="trigger_id",
         view=ANY,
