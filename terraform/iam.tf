@@ -16,7 +16,9 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       "sts:AssumeRole",
     ]
     resources = [
-      "arn:aws:iam::659087519042:role/sre_bot_role"
+      "arn:aws:iam::274536870005:role/sre_bot_role",
+      "arn:aws:iam::659087519042:role/sre_bot_role",
+      "arn:aws:iam::886481071419:role/sre_bot_role"
     ]
   }
 
