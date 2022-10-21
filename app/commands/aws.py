@@ -142,7 +142,6 @@ def health_view_handler(ack, body, logger, client):
 {"✅" if account_info['security']['config'] == 0 else "❌"} Config ({account_info['security']['config']} issues)\n
 {"✅" if account_info['security']['guardduty'] == 0 else "❌"} GuardDuty ({account_info['security']['guardduty']} issues)\n
 {"✅" if account_info['security']['securityhub'] == 0 else "❌"} SecurityHub ({account_info['security']['securityhub']} issues)\n
-{"✅" if account_info['security']['trusted_advisor'] == 0 else "❌"} Trusted Advisor ({account_info['security']['trusted_advisor']} issues)\n
                         """,
                 },
             },

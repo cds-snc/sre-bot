@@ -2,14 +2,16 @@ import arrow
 import boto3
 import os
 
-ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
+AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
+LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
+ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
 
 
-def assume_role_client(client_type):
+def assume_role_client(client_type, role=ORG_ROLE_ARN, region="ca-central-1"):
     client = boto3.client("sts")
 
     response = client.assume_role(
-        RoleArn=ROLE_ARN, RoleSessionName="SREBot_Org_Account_Role"
+        RoleArn=role, RoleSessionName="SREBot_Org_Account_Role"
     )
 
     session = boto3.Session(
@@ -18,7 +20,7 @@ def assume_role_client(client_type):
         aws_session_token=response["Credentials"]["SessionToken"],
     )
 
-    return session.client(client_type)
+    return session.client(client_type, region_name=region)
 
 
 def get_accounts():
@@ -65,10 +67,9 @@ def get_account_health(account_id):
             },
         },
         "security": {
-            "config": 0,
-            "guardduty": 0,
-            "securityhub": 0,
-            "trusted_advisor": 0,
+            "config": get_config_summary(account_id),
+            "guardduty": get_guardduty_summary(account_id),
+            "securityhub": get_securityhub_summary(account_id),
         },
     }
 
@@ -96,3 +97,81 @@ def get_account_spend(account_id, start_date, end_date):
         )
     else:
         return "0.00"
+
+
+def get_config_summary(account_id):
+    client = assume_role_client("config", role=AUDIT_ROLE_ARN)
+    response = client.describe_aggregate_compliance_by_config_rules(
+        ConfigurationAggregatorName="aws-controltower-GuardrailsComplianceAggregator",
+        Filters={
+            "AccountId": account_id,
+            "ComplianceType": "NON_COMPLIANT",
+        },
+    )
+    return len(response["AggregateComplianceByConfigRules"])
+
+
+def get_guardduty_summary(account_id):
+    client = assume_role_client("guardduty", role=LOGGING_ROLE_ARN)
+    detector_id = client.list_detectors()["DetectorIds"][0]
+    response = client.get_findings_statistics(
+        DetectorId=detector_id,
+        FindingStatisticTypes=[
+            "COUNT_BY_SEVERITY",
+        ],
+        FindingCriteria={
+            "Criterion": {
+                "accountId": {"Eq": [account_id]},
+                "service.archived": {"Eq": ["false", "false"]},
+                "severity": {"Gte": 7},
+            }
+        },
+    )
+
+    return sum(response["FindingStatistics"]["CountBySeverity"].values())
+
+
+def get_securityhub_summary(account_id):
+    client = assume_role_client("securityhub", role=LOGGING_ROLE_ARN)
+    response = client.get_findings(
+        Filters={
+            "AwsAccountId": [{"Value": account_id, "Comparison": "EQUALS"}],
+            "ComplianceStatus": [
+                {"Value": "FAILED", "Comparison": "EQUALS"},
+            ],
+            "RecordState": [
+                {"Value": "ACTIVE", "Comparison": "EQUALS"},
+            ],
+            "SeverityProduct": [
+                {
+                    "Gte": 70,
+                    "Lte": 100,
+                },
+            ],
+            "Title": get_ignored_security_hub_issues(),
+            "UpdatedAt": [
+                {"DateRange": {"Value": 1, "Unit": "DAYS"}},
+            ],
+            "WorkflowStatus": [
+                {"Value": "NEW", "Comparison": "EQUALS"},
+            ],
+        }
+    )
+    issues = 0
+    # Loop response for NextToken
+    while True:
+        issues += len(response["Findings"])
+        if "NextToken" in response:
+            response = client.get_findings(NextToken=response["NextToken"])
+        else:
+            break
+    return issues
+
+
+def get_ignored_security_hub_issues():
+    ignored_issues = [
+        "IAM.6 Hardware MFA should be enabled for the root user",
+        '1.14 Ensure hardware MFA is enabled for the "root" account',
+    ]
+
+    return list(map(lambda t: {"Value": t, "Comparison": "NOT_EQUALS"}, ignored_issues))
