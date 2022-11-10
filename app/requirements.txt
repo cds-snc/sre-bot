@@ -11,4 +11,5 @@ python-dotenv==0.19.2
 requests==2.28.1
 schedule==1.1.0
 slack-bolt==1.11.4
+trello==0.9.7.3
 uvicorn==0.17.6

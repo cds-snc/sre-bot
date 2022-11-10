@@ -3,7 +3,7 @@ import logging
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import aws, incident, sre
+from commands import atip, aws, incident, sre
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -25,6 +25,11 @@ def main():
 
     # Add bot to server_app
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+
+    # Register ATIP commands
+    bot.command(f"/{PREFIX}atip")(atip.atip_command)
+    bot.action("ati_search_width")(atip.atip_width_action)
+    bot.view("atip_view")(atip.atip_view_handler)
 
     # Register AWS commands
     bot.command(f"/{PREFIX}aws")(aws.aws_command)
