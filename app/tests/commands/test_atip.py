@@ -62,7 +62,8 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set():
     )
 
 
-def test_atip_view_handler_success():
+@patch("integrations.trello.add_atip_card_to_trello")
+def test_atip_view_handler_success(add_atip_card_to_trello_mock):
     ack = MagicMock()
     body = helper_generate_payload()
     say = MagicMock()
@@ -75,6 +76,7 @@ def test_atip_view_handler_success():
     client.conversations_create.assert_called_with(name="tmp-atip-number")
     client.conversations_setTopic.call_count == 1
     assert say.call_count == 3
+    assert add_atip_card_to_trello_mock.call_count == 1
 
 
 def test_atip_width_action_calls_ack():

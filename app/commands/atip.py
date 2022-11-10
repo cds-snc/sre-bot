@@ -1,4 +1,5 @@
 from commands import utils
+from integrations import trello
 
 import os
 
@@ -125,14 +126,14 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Other SaaS / Autres SaaS",
+                                    "text": "Other SaaS / Autres outils SaaS",
                                 },
                                 "value": "width_other_saas",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "All of the above / Tout ce qui précède",
+                                    "text": "All of the above / Tous",
                                 },
                                 "value": "width_all",
                             },
@@ -268,9 +269,9 @@ def atip_view_handler(ack, body, say, logger, client):
     ati_due_date = body["view"]["state"]["values"]["ati_due_date"]["ati_due_date"][
         "selected_date"
     ]
-    # ati_request_deadline = body["view"]["state"]["values"]["ati_request_deadline"][
-    #    "ati_request_deadline"
-    # ]["selected_date"]
+    ati_request_deadline = body["view"]["state"]["values"]["ati_request_deadline"][
+        "ati_request_deadline"
+    ]["selected_date"]
     ati_tbs_email = body["view"]["state"]["values"]["ati_tbs_email"]["ati_tbs_email"][
         "value"
     ]
@@ -331,7 +332,7 @@ def atip_view_handler(ack, body, say, logger, client):
         "width_drive": "Google drive",
         "width_email": "Emails / Courriels",
         "width_github": "GitHub",
-        "width_other_saas": "Other SaaS / Autres SaaS",
+        "width_other_saas": "Other SaaS / Autres outils SaaS",
         "width_all": "",
     }
 
@@ -342,7 +343,12 @@ def atip_view_handler(ack, body, say, logger, client):
     else:
         options = [options_map[option["value"]] for option in ati_search_width]
 
-    terms = filter(
+    en_terms = filter(
+        lambda x: x is not None,
+        [ati_search_term_a, ati_search_term_b, ati_search_term_c],
+    )
+
+    fr_terms = filter(
         lambda x: x is not None,
         [ati_search_term_a, ati_search_term_b, ati_search_term_c],
     )
@@ -356,7 +362,7 @@ Hello! CDS has received an Access to Information request for the following recor
 To fulfill this request, please search your {", ".join(options)} for the following terms:
 
 """
-        + "\n".join([f"- {term}" for term in terms])
+        + "\n".join([f"- {term}" for term in en_terms])
         + f"""
 
 Please do this search by *{formatted_date}*.
@@ -367,7 +373,31 @@ It is important that you do not delete any records pertaining to the request for
 
 Thank you for your understanding! Access to information makes our democracy stronger. 💪
 
+---
+
+Bonjour! Le SNC a reçu une demande d’accès à l’information pour les documents suivants :
+
+{ati_content}
+
+Pour répondre à cette demande, veuillez rechercher les termes suivants dans votre {", ".join(options)}:
+
+"""
+        + "\n".join([f"- {term}" for term in fr_terms])
+        + f"""
+
+Veuillez effectuer cette recherche avant le *{formatted_date}*.
+
+Si vous avez des documents pertinents, veuillez les envoyer à <@{ati_contact}> à l’adresse courriel {ati_tbs_email}. Le canal Slack <#{channel_id}>  a été créé afin que vous puissiez y poser vos questions. Nous vous recommandons de rejoindre le canal si vous avez des documents pertinents. Si vous pensez avoir un volume important de documentation (c.-à-d. plus de 500 pages), veuillez en informer <@{ati_contact}> immédiatement.
+
+Il est important que vous ne supprimiez aucune documentation relative à la demande, et ce, pour la durée de l’accès à l’information.
+
+Merci de votre compréhension! L’accès à l’information renforce notre démocratie. 💪
 """
     )
     say(text=post_content, channel=ATIP_ANNOUNCE_CHANNEL)
     say(text=post_content, channel=channel_id)
+
+    # Add trello card
+    trello.add_atip_card_to_trello(
+        ati_id, ati_content, datetime.strptime(ati_request_deadline, "%Y-%m-%d")
+    )
