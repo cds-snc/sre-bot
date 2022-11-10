@@ -7,7 +7,7 @@ from datetime import datetime
 
 help_text = """
 \n `/atip help` - show this help text | montre le dialogue d'aide
-\n `/atip start` - start the ATIP process | démarre le processus ATIP
+\n `/atip start` - start the ATIP process | démarre le processus AIPRP
 """
 
 ATIP_ANNOUNCE_CHANNEL = os.environ.get("ATIP_ANNOUNCE_CHANNEL")
@@ -93,7 +93,7 @@ def request_start_modal(client, body, ati_id=""):
                     "block_id": "ati_search_width",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "*Search width / Largeur de la recherche*",
+                        "text": "*Search width / Étendue de la recherche*",
                     },
                     "accessory": {
                         "type": "checkboxes",
