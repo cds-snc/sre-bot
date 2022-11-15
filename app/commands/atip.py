@@ -18,7 +18,7 @@ def atip_command(ack, command, logger, respond, client, body):
     logger.info("Atip command received: %s", command["text"])
 
     logger.info(f"ATIP_ANNOUNCE_CHANNEL: {ATIP_ANNOUNCE_CHANNEL}")
-    logger.info(f"ATIP_ANNOUNCE_CHANNEL_ENV: {os.environ.get('ATIP_ANNOUNCE_CHANNEL'}")
+    logger.info(f"ATIP_ANNOUNCE_CHANNEL_ENV: {os.environ.get('ATIP_ANNOUNCE_CHANNEL')}")
 
     if command["text"] == "":
         respond(
