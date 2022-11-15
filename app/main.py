@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
@@ -22,6 +23,10 @@ def main():
 
     PREFIX = os.environ.get("PREFIX", "")
     bot = App(token=SLACK_TOKEN)
+
+    # Log startup output
+    logging.info(f"Starting up with SHA {os.environ.get('GIT_SHA', 'unknown')}")
+    logging.info(f"ENV keys: {json.dumps(list(os.environ.keys()))}")
 
     # Add bot to server_app
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
