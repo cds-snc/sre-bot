@@ -10,15 +10,10 @@ help_text = """
 \n `/atip start` - start the ATIP process | démarre le processus AIPRP
 """
 
-ATIP_ANNOUNCE_CHANNEL = os.environ.get("ATIP_ANNOUNCE_CHANNEL")
-
 
 def atip_command(ack, command, logger, respond, client, body):
     ack()
     logger.info("Atip command received: %s", command["text"])
-
-    logger.info(f"ATIP_ANNOUNCE_CHANNEL: {ATIP_ANNOUNCE_CHANNEL}")
-    logger.info(f"ATIP_ANNOUNCE_CHANNEL_ENV: {os.environ.get('ATIP_ANNOUNCE_CHANNEL')}")
 
     if command["text"] == "":
         respond(
@@ -397,7 +392,7 @@ Il est important que vous ne supprimiez aucune documentation relative à la dema
 Merci de votre compréhension! L’accès à l’information renforce notre démocratie. 💪
 """
     )
-    say(text=post_content, channel=ATIP_ANNOUNCE_CHANNEL)
+    say(text=post_content, channel=os.environ.get("ATIP_ANNOUNCE_CHANNEL"))
     say(text=post_content, channel=channel_id)
 
     # Add trello card
