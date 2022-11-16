@@ -48,7 +48,7 @@ def request_start_modal(client, body, ati_id=""):
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "ATIP process at CDS / Le processus ATIP à la SNC",
+                        "text": "ATIP process at CDS | Le processus d'AIPRP au SNC",
                         "emoji": True,
                     },
                 },
@@ -56,7 +56,7 @@ def request_start_modal(client, body, ati_id=""):
                     "type": "section",
                     "text": {
                         "type": "plain_text",
-                        "text": "Fill out the fields below and you are good to go // Remplissez les champs ici-bas et vous pourrez commencer:",
+                        "text": "Fill out the fields below and you are good to go | Remplissez les champs ci-dessous pour démarrer le processus:",
                     },
                 },
                 {
@@ -69,7 +69,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "ATI number / Numéro ATI",
+                        "text": "ATI number | Numéro ATI",
                     },
                 },
                 {
@@ -82,7 +82,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "ATI content / Contenu de l'ATI",
+                        "text": "ATI content | Contenu de l'ATI",
                         "emoji": True,
                     },
                 },
@@ -91,7 +91,7 @@ def request_start_modal(client, body, ati_id=""):
                     "block_id": "ati_search_width",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "*Search width / Étendue de la recherche*",
+                        "text": "*Search width | Étendue de la recherche*",
                     },
                     "accessory": {
                         "type": "checkboxes",
@@ -99,7 +99,7 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Slack messages / Messages Slack",
+                                    "text": "Slack messages | Messages Slack",
                                 },
                                 "value": "width_slack",
                             },
@@ -113,7 +113,7 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Emails / Courriels",
+                                    "text": "Emails | Courriels",
                                 },
                                 "value": "width_email",
                             },
@@ -124,14 +124,14 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Other SaaS / Autres outils SaaS",
+                                    "text": "Other SaaS | Autres outils SaaS",
                                 },
                                 "value": "width_other_saas",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "All of the above / Tous",
+                                    "text": "All of the above | Tous",
                                 },
                                 "value": "width_all",
                             },
@@ -147,14 +147,14 @@ def request_start_modal(client, body, ati_id=""):
                         "initial_date": datetime.today().strftime("%Y-%m-%d"),
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a date / Sélectionnez une date",
+                            "text": "Select a date | Sélectionnez une date",
                             "emoji": True,
                         },
                         "action_id": "ati_due_date",
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Due date / Date d'échéance",
+                        "text": "Due date | Date d'échéance",
                         "emoji": True,
                     },
                 },
@@ -166,14 +166,14 @@ def request_start_modal(client, body, ati_id=""):
                         "initial_date": datetime.today().strftime("%Y-%m-%d"),
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a date / Sélectionnez une date",
+                            "text": "Select a date | Sélectionnez une date",
                             "emoji": True,
                         },
                         "action_id": "ati_request_deadline",
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Request deadline / Date limite de la demande",
+                        "text": "Request deadline | Date limite de la demande",
                         "emoji": True,
                     },
                 },
@@ -184,14 +184,14 @@ def request_start_modal(client, body, ati_id=""):
                         "type": "users_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a contact / Sélectionnez un contact",
+                            "text": "Select a contact | Sélectionnez un contact",
                         },
                         "action_id": "ati_contact",
                         "initial_user": user,
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Primary contact / Contact principal",
+                        "text": "Primary contact | Contact principal",
                     },
                 },
                 {
@@ -203,7 +203,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "TBS Email / Courriel TBS",
+                        "text": "TBS Email | Adresse courriel du SCT",
                     },
                 },
                 {
@@ -215,7 +215,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term A / Terme de recherche A",
+                        "text": "Search term A | Terme de recherche A",
                         "emoji": True,
                     },
                 },
@@ -229,7 +229,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term B / Terme de recherche B",
+                        "text": "Search term B | Terme de recherche B",
                         "emoji": True,
                     },
                 },
@@ -243,7 +243,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term C / Terme de recherche C",
+                        "text": "Search term C | Terme de recherche C",
                         "emoji": True,
                     },
                 },
