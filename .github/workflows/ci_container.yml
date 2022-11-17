@@ -15,11 +15,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Build container
         working-directory: ./app
         run: |
-          docker build \
+          docker buildx build \
           --build-arg git_sha=$GITHUB_SHA \
           --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
+          --platform=linux/arm64 \
           -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .

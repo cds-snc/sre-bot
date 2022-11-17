@@ -41,6 +41,11 @@ resource "aws_ecs_service" "main" {
   platform_version = "1.4.0"
   propagate_tags   = "SERVICE"
 
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
   network_configuration {
     security_groups  = [aws_security_group.ecs_tasks.id]
     subnets          = module.vpc.private_subnet_ids
