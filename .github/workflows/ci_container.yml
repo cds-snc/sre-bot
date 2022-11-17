@@ -8,27 +8,12 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-
-      - name: Configure aws credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@master
-        with:
-          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-apply
-          role-session-name: SREBotGitHubActions
-          aws-region: "ca-central-1"
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -43,5 +28,5 @@ jobs:
           --build-arg git_sha=$GITHUB_SHA \
           --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
           --platform=linux/arm64 \
-          --push \
-          -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'`-ARM64 \
+          -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
+          -t $REGISTRY/sre-bot:latest .
