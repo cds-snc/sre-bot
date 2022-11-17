@@ -30,6 +30,11 @@ resource "aws_ecs_task_definition" "sre-bot" {
   memory                   = var.fargate_memory
   container_definitions    = data.template_file.sre-bot.rendered
   task_role_arn            = aws_iam_role.sre-bot.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
 }
 
 resource "aws_ecs_service" "main" {
@@ -40,11 +45,6 @@ resource "aws_ecs_service" "main" {
   launch_type      = "FARGATE"
   platform_version = "1.4.0"
   propagate_tags   = "SERVICE"
-
-  runtime_platform {
-    operating_system_family = "LINUX"
-    cpu_architecture        = "ARM64"
-  }
 
   network_configuration {
     security_groups  = [aws_security_group.ecs_tasks.id]
