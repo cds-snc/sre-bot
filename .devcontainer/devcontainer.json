@@ -46,6 +46,10 @@
 		"ghcr.io/devcontainers/features/aws-cli:1": {
 			"version": "2.2.29"
 		},
+		"docker-in-docker": {
+			"version": "latest",
+			"moby": true
+		},
 		"ghcr.io/devcontainers/features/terraform:1": {
 			"version": "1.0.3",
 			"terragrunt": "0.31.1"
