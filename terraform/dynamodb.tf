@@ -27,21 +27,3 @@ resource "aws_dynamodb_table" "aws_access_requests_table" {
     type = "N"
   }
 }
-
-resource "aws_dynamodb_table" "sre_bot_data" {
-  name           = "sre_bot_data"
-  hash_key       = "PK"
-  range_key      = "SK"
-  read_capacity  = 2
-  write_capacity = 2
-
-  attribute {
-    name = "PK"
-    type = "S"
-  }
-
-  attribute {
-    name = "SK"
-    type = "S"
-  }
-}
