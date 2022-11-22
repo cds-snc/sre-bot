@@ -6,17 +6,16 @@ import i18n
 
 from datetime import datetime
 
-i18n.load_path.append('./commands/locales/')
+i18n.load_path.append("./commands/locales/")
 
-i18n.set('locale', 'en')
+i18n.set("locale", "en-US")
 
-help_text = i18n.t('atip.help')
+help_text = i18n.t("atip.help")
 
 
 def atip_command(ack, command, logger, respond, client, body):
     ack()
     logger.info("Atip command received: %s", command["text"])
-
     if command["text"] == "":
         respond(
             "Type `/atip help` to see a list of commands. \n Tapez `/atip help` pour une liste des commandes"
@@ -24,9 +23,13 @@ def atip_command(ack, command, logger, respond, client, body):
         return
 
     action, *args = utils.parse_command(command["text"])
+    user_locale = client.users_info(
+        user=utils.parse_command(command["user_id"])[0], include_locale=True
+    )["user"]["locale"]
+    i18n.set("locale", user_locale)
     match action:
         case "help":
-            respond(help_text)
+            respond(i18n.t("atip.help"))
         case "start":
             request_start_modal(client, body, *args)
         case _:
