@@ -2,13 +2,15 @@ from commands import utils
 from integrations import trello
 
 import os
+import i18n
 
 from datetime import datetime
 
-help_text = """
-\n `/atip help` - show this help text | montre le dialogue d'aide
-\n `/atip start` - start the ATIP process | démarre le processus AIPRP
-"""
+i18n.load_path.append('./commands/locales/')
+
+i18n.set('locale', 'en')
+
+help_text = i18n.t('atip.help')
 
 
 def atip_command(ack, command, logger, respond, client, body):
