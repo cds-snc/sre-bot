@@ -10,23 +10,18 @@ i18n.load_path.append("./commands/locales/")
 
 i18n.set("locale", "en-US")
 
-help_text = i18n.t("atip.help")
-
 
 def atip_command(ack, command, logger, respond, client, body):
     ack()
+    user_id = body["user_id"]
+    i18n.set("locale", utils.get_user_locale(user_id, client))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
         respond(
             "Type `/atip help` to see a list of commands. \n Tapez `/atip help` pour une liste des commandes"
         )
         return
-
     action, *args = utils.parse_command(command["text"])
-    user_locale = client.users_info(
-        user=utils.parse_command(command["user_id"])[0], include_locale=True
-    )["user"]["locale"]
-    i18n.set("locale", user_locale)
     match action:
         case "help":
             respond(i18n.t("atip.help"))
@@ -41,6 +36,7 @@ def atip_command(ack, command, logger, respond, client, body):
 
 def request_start_modal(client, body, ati_id=""):
     user = body["user_id"]
+    i18n.set("locale", utils.get_user_locale(user, client))
     client.views_open(
         trigger_id=body["trigger_id"],
         view={
