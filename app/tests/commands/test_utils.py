@@ -125,10 +125,7 @@ def test_get_user_locale_supported_locale():
     user_id = MagicMock()
     client.users_info.return_value = {
         "ok": True,
-        "user": {
-            "id": "U00AAAAAAA0",
-            "locale": "fr-FR"
-        }
+        "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
     }
     assert utils.get_user_locale(user_id, client) == "fr-FR"
 
@@ -138,10 +135,7 @@ def test_get_user_locale_unsupported_locale():
     user_id = MagicMock()
     client.users_info.return_value = {
         "ok": True,
-        "user": {
-            "id": "U00AAAAAAA0",
-            "locale": "es-ES"
-        }
+        "user": {"id": "U00AAAAAAA0", "locale": "es-ES"},
     }
     assert utils.get_user_locale(user_id, client) == "en-US"
 
@@ -149,7 +143,5 @@ def test_get_user_locale_unsupported_locale():
 def test_get_user_locale_without_locale():
     client = MagicMock()
     user_id = MagicMock()
-    client.users_info.return_value = {
-        "ok": False
-    }
+    client.users_info.return_value = {"ok": False}
     assert utils.get_user_locale(user_id, client) == "en-US"
