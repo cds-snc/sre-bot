@@ -1,4 +1,5 @@
 from commands import atip
+import i18n
 
 from unittest.mock import ANY, MagicMock, patch
 
@@ -20,7 +21,7 @@ def test_atip_command_handles_help_command():
         ack, {"text": "help"}, MagicMock(), respond, MagicMock(), MagicMock()
     )
     ack.assert_called
-    assert respond.called_with(atip.help_text)
+    assert respond.called_with(i18n.t("atip.help"))
 
 
 def test_atip_command_handles_unknown_command():
@@ -31,7 +32,7 @@ def test_atip_command_handles_unknown_command():
         ack, {"text": "foo"}, MagicMock(), respond, MagicMock(), MagicMock()
     )
     ack.assert_called
-    assert respond.called_with(atip.help_text)
+    assert respond.called_with(i18n.t("atip.help"))
 
 
 @patch("commands.atip.request_start_modal")
