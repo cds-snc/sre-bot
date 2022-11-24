@@ -9,6 +9,7 @@ from datetime import datetime
 i18n.load_path.append("./commands/locales/")
 
 i18n.set("locale", "en-US")
+i18n.set("fallback", "en-US")
 
 
 def atip_command(ack, command, logger, respond, client, body):
@@ -25,12 +26,15 @@ def atip_command(ack, command, logger, respond, client, body):
     match action:
         case "help":
             respond(i18n.t("atip.help"))
+        case "aide":
+            respond(i18n.t("atip.help"))
         case "start":
+            request_start_modal(client, body, *args)
+        case "lancer":
             request_start_modal(client, body, *args)
         case _:
             respond(
-                f"Unknown command: `{action}`. Type `/atip help` to see a list of commands.\n"
-                f"Commande inconnue: `{action}`. Tapez `/atip help` pour voir une liste des commandes."
+                f"{i18n.t('atip.unknown_command', action=f'{action}')}"
             )
 
 
