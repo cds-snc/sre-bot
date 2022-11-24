@@ -1,2 +1,3 @@
 fr-FR:
-  help: "\n `/atip help` - montre le dialogue d'aide \n `/atip start` - démarre le processus AIPRP"
+  help: "\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
+  unknown_command: "Commande inconnue: `%{action}`. Tapez `/atip aide` pour voir une liste des commandes."
