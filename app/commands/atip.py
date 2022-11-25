@@ -18,9 +18,7 @@ def atip_command(ack, command, logger, respond, client, body):
     i18n.set("locale", utils.get_user_locale(user_id, client))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
-        respond(
-            "Type `/atip help` to see a list of commands. \n Tapez `/atip help` pour une liste des commandes"
-        )
+        respond(i18n.t("atip.help"))
         return
     action, *args = utils.parse_command(command["text"])
     match action:
@@ -34,7 +32,7 @@ def atip_command(ack, command, logger, respond, client, body):
             request_start_modal(client, body, *args)
         case _:
             respond(
-                f"{i18n.t('atip.unknown_command', action=f'{action}')}"
+                i18n.t('atip.unknown_command', action=f'{action}')
             )
 
 
@@ -46,14 +44,14 @@ def request_start_modal(client, body, ati_id=""):
         view={
             "type": "modal",
             "callback_id": "atip_view",
-            "title": {"type": "plain_text", "text": "Start ATIP process"},
-            "submit": {"type": "plain_text", "text": "Submit"},
+            "title": {"type": "plain_text", "text": i18n.t("atip.modal.title")},
+            "submit": {"type": "plain_text", "text": i18n.t("atip.modal.submit")},
             "blocks": [
                 {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "ATIP process at CDS | Le processus d'AIPRP au SNC",
+                        "text": i18n.t("atip.modal.process"),
                         "emoji": True,
                     },
                 },

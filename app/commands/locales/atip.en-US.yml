@@ -1,3 +1,7 @@
 en-US:
   help: "\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
   unknown_command: "Unknown command: `%{action}`. Type `/atip help` to see a list of commands."
+  modal:
+    title: "Start ATIP process"
+    submit: "Submit"
+    process: "ATIP process at CDS"

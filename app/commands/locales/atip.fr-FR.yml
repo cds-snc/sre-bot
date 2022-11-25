@@ -1,3 +1,8 @@
 fr-FR:
   help: "\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
   unknown_command: "Commande inconnue: `%{action}`. Tapez `/atip aide` pour voir une liste des commandes."
+  modal:
+    title: "Processus AIPRP"
+    submit: "Soumettre"
+    process: "Le processus d'AIPRP au SNC"
+
