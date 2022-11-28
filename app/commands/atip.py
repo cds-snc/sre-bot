@@ -18,21 +18,21 @@ def atip_command(ack, command, logger, respond, client, body):
     i18n.set("locale", utils.get_user_locale(user_id, client))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
-        respond(i18n.t("atip.help"))
+        respond(i18n.t("atip.help_text"))
         return
     action, *args = utils.parse_command(command["text"])
     match action:
         case "help":
-            respond(i18n.t("atip.help"))
+            respond(i18n.t("atip.help_text"))
         case "aide":
-            respond(i18n.t("atip.help"))
+            respond(i18n.t("atip.help_text"))
         case "start":
             request_start_modal(client, body, *args)
         case "lancer":
             request_start_modal(client, body, *args)
         case _:
             respond(
-                i18n.t('atip.unknown_command', action=f'{action}')
+                i18n.t('atip.unknown_command', action=action)
             )
 
 
@@ -51,7 +51,7 @@ def request_start_modal(client, body, ati_id=""):
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.process"),
+                        "text": i18n.t("atip.modal.process_header"),
                         "emoji": True,
                     },
                 },
@@ -59,7 +59,7 @@ def request_start_modal(client, body, ati_id=""):
                     "type": "section",
                     "text": {
                         "type": "plain_text",
-                        "text": "Fill out the fields below and you are good to go | Remplissez les champs ci-dessous pour démarrer le processus:",
+                        "text": i18n.t("atip.modal.process_instructions"),
                     },
                 },
                 {
@@ -72,7 +72,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "ATI number | Numéro ATI",
+                        "text": i18n.t("atip.modal.ati_number"),
                     },
                 },
                 {
@@ -85,7 +85,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "ATI content | Contenu de l'ATI",
+                        "text": i18n.t("atip.modal.ati_content"),
                         "emoji": True,
                     },
                 },
@@ -94,7 +94,7 @@ def request_start_modal(client, body, ati_id=""):
                     "block_id": "ati_search_width",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "*Search width | Étendue de la recherche*",
+                        "text": f"*{i18n.t('atip.modal.ati_search_width')}*",
                     },
                     "accessory": {
                         "type": "checkboxes",
@@ -102,39 +102,42 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Slack messages | Messages Slack",
+                                    "text": i18n.t("atip.modal.slack"),
                                 },
                                 "value": "width_slack",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Google drive",
+                                    "text": i18n.t("atip.modal.google_drive"),
                                 },
                                 "value": "width_drive",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Emails | Courriels",
+                                    "text": i18n.t("atip.modal.emails"),
                                 },
                                 "value": "width_email",
                             },
                             {
-                                "text": {"type": "mrkdwn", "text": "GitHub"},
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": i18n.t("atip.modal.github")
+                                },
                                 "value": "width_github",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "Other SaaS | Autres outils SaaS",
+                                    "text": i18n.t("atip.modal.saas"),
                                 },
                                 "value": "width_other_saas",
                             },
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": "All of the above | Tous",
+                                    "text": i18n.t("atip.modal.all"),
                                 },
                                 "value": "width_all",
                             },
@@ -150,14 +153,14 @@ def request_start_modal(client, body, ati_id=""):
                         "initial_date": datetime.today().strftime("%Y-%m-%d"),
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a date | Sélectionnez une date",
+                            "text": i18n.t("atip.modal.select_date_placeholder"),
                             "emoji": True,
                         },
                         "action_id": "ati_due_date",
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Due date | Date d'échéance",
+                        "text": i18n.t("atip.modal.ati_due_date"),
                         "emoji": True,
                     },
                 },
@@ -169,14 +172,14 @@ def request_start_modal(client, body, ati_id=""):
                         "initial_date": datetime.today().strftime("%Y-%m-%d"),
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a date | Sélectionnez une date",
+                            "text": i18n.t("atip.modal.select_date_placeholder"),
                             "emoji": True,
                         },
                         "action_id": "ati_request_deadline",
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Request deadline | Date limite de la demande",
+                        "text": i18n.t("atip.modal.ati_request_deadline"),
                         "emoji": True,
                     },
                 },
@@ -187,14 +190,14 @@ def request_start_modal(client, body, ati_id=""):
                         "type": "users_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select a contact | Sélectionnez un contact",
+                            "text": i18n.t("atip.modal.select_contact"),
                         },
                         "action_id": "ati_contact",
                         "initial_user": user,
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Primary contact | Contact principal",
+                        "text": i18n.t("atip.modal.primary_contact"),
                     },
                 },
                 {
@@ -206,7 +209,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "TBS Email | Adresse courriel du SCT",
+                        "text": i18n.t("atip.modal.tbs_email"),
                     },
                 },
                 {
@@ -218,7 +221,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term A | Terme de recherche A",
+                        "text": i18n.t("atip.modal.search_term_a"),
                         "emoji": True,
                     },
                 },
@@ -232,7 +235,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term B | Terme de recherche B",
+                        "text": i18n.t("atip.modal.search_term_b"),
                         "emoji": True,
                     },
                 },
@@ -246,7 +249,7 @@ def request_start_modal(client, body, ati_id=""):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "Search term C | Terme de recherche C",
+                        "text": i18n.t("atip.modal.search_term_c"),
                         "emoji": True,
                     },
                 },
@@ -294,7 +297,7 @@ def atip_view_handler(ack, body, say, logger, client):
     if ati_search_width == []:
         errors[
             "ati_search_width"
-        ] = "Please select at least one search width / Veuillez sélectionner au moins une largeur de recherche"
+        ] = i18n.t("atip.modal.search_width_error")
 
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
