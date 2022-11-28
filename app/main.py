@@ -33,6 +33,7 @@ def main():
 
     # Register ATIP commands
     bot.command(f"/{PREFIX}atip")(atip.atip_command)
+    bot.command(f"/{PREFIX}aiprp")(atip.atip_command)
     bot.action("ati_search_width")(atip.atip_width_action)
     bot.view("atip_view")(atip.atip_view_handler)
 
