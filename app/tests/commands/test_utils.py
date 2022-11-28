@@ -118,3 +118,30 @@ def test_parse_command_two_args():
 
 def test_parse_command_with_quotes():
     assert utils.parse_command('sre "foo bar baz"') == ["sre", "foo bar baz"]
+
+
+def test_get_user_locale_supported_locale():
+    client = MagicMock()
+    user_id = MagicMock()
+    client.users_info.return_value = {
+        "ok": True,
+        "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
+    }
+    assert utils.get_user_locale(user_id, client) == "fr-FR"
+
+
+def test_get_user_locale_unsupported_locale():
+    client = MagicMock()
+    user_id = MagicMock()
+    client.users_info.return_value = {
+        "ok": True,
+        "user": {"id": "U00AAAAAAA0", "locale": "es-ES"},
+    }
+    assert utils.get_user_locale(user_id, client) == "en-US"
+
+
+def test_get_user_locale_without_locale():
+    client = MagicMock()
+    user_id = MagicMock()
+    client.users_info.return_value = {"ok": False}
+    assert utils.get_user_locale(user_id, client) == "en-US"
