@@ -1,6 +1,6 @@
 en-US:
-  help_text: "\n `%{command_text} help` - show this help text \n `%{command_text} start` - start the ATIP process"
-  unknown_command: "Unknown command: `%{action}`. Type `%{command_text} help` to see a list of commands."
+  help_text: "\n `%{command} help` - show this help text \n `%{command} start` - start the ATIP process"
+  unknown_command: "Unknown command: `%{action}`. Type `%{command} help` to see a list of commands."
   modal:
     title: "Start ATIP process"
     submit: "Submit"
