@@ -31,9 +31,7 @@ def atip_command(ack, command, logger, respond, client, body):
         case "lancer":
             request_start_modal(client, body, *args)
         case _:
-            respond(
-                i18n.t('atip.unknown_command', action=action)
-            )
+            respond(i18n.t("atip.unknown_command", action=action))
 
 
 def request_start_modal(client, body, ati_id=""):
@@ -123,7 +121,7 @@ def request_start_modal(client, body, ati_id=""):
                             {
                                 "text": {
                                     "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.github")
+                                    "text": i18n.t("atip.modal.github"),
                                 },
                                 "value": "width_github",
                             },
@@ -295,9 +293,7 @@ def atip_view_handler(ack, body, say, logger, client):
     errors = {}
 
     if ati_search_width == []:
-        errors[
-            "ati_search_width"
-        ] = i18n.t("atip.modal.search_width_error")
+        errors["ati_search_width"] = i18n.t("atip.modal.search_width_error")
 
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)

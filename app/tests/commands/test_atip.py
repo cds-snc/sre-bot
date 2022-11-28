@@ -57,9 +57,7 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set():
     atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
     ack.assert_called_with(
         response_action="errors",
-        errors={
-            "ati_search_width": i18n.t("atip.modal.search_width_error")
-        },
+        errors={"ati_search_width": i18n.t("atip.modal.search_width_error")},
     )
 
 
