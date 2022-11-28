@@ -15,29 +15,35 @@ i18n.set("fallback", "en-US")
 def atip_command(ack, command, logger, respond, client, body):
     ack()
     user_id = body["user_id"]
-    command_text = utils.parse_command(command["command"])[0]
     i18n.set("locale", utils.get_user_locale(user_id, client))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
-        respond(i18n.t("atip.help_text", command_text=command_text))
+        respond(i18n.t("atip.help_text", command=command["command"]))
         return
     action, *args = utils.parse_command(command["text"])
     match action:
         case "help":
-            respond(i18n.t("atip.help_text", command_text=command_text))
+            # i18n.set("locale", "en-US")
+            respond(i18n.t("atip.help_text", command=command["command"]))
         case "aide":
-            respond(i18n.t("atip.help_text", command_text=command_text))
+            # i18n.set("locale", "fr-FR")
+            respond(i18n.t("atip.help_text", command=command["command"]))
         case "start":
             request_start_modal(client, body, *args)
+            # request_start_modal(client, body, locale="en-US", *args)
         case "lancer":
             request_start_modal(client, body, *args)
+            # request_start_modal(client, body, locale="fr-FR", *args)
         case _:
-            respond(i18n.t("atip.unknown_command", action=action, command_text=command_text))
+            respond(i18n.t("atip.unknown_command", action=action, command=command["command"]))
 
 
-def request_start_modal(client, body, ati_id=""):
+def request_start_modal(client, body, locale="", ati_id=""):
     user = body["user_id"]
-    i18n.set("locale", utils.get_user_locale(user, client))
+    if locale == "":
+        i18n.set("locale", utils.get_user_locale(user, client))
+    else:
+        i18n.set("locale", locale)
     client.views_open(
         trigger_id=body["trigger_id"],
         view={
