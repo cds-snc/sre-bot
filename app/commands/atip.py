@@ -15,23 +15,24 @@ i18n.set("fallback", "en-US")
 def atip_command(ack, command, logger, respond, client, body):
     ack()
     user_id = body["user_id"]
+    command_text = utils.parse_command(command["command"])[0]
     i18n.set("locale", utils.get_user_locale(user_id, client))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
-        respond(i18n.t("atip.help_text"))
+        respond(i18n.t("atip.help_text", command_text=command_text))
         return
     action, *args = utils.parse_command(command["text"])
     match action:
         case "help":
-            respond(i18n.t("atip.help_text"))
+            respond(i18n.t("atip.help_text", command_text=command_text))
         case "aide":
-            respond(i18n.t("atip.help_text"))
+            respond(i18n.t("atip.help_text", command_text=command_text))
         case "start":
             request_start_modal(client, body, *args)
         case "lancer":
             request_start_modal(client, body, *args)
         case _:
-            respond(i18n.t("atip.unknown_command", action=action))
+            respond(i18n.t("atip.unknown_command", action=action, command_text=command_text))
 
 
 def request_start_modal(client, body, ati_id=""):
