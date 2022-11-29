@@ -23,17 +23,15 @@ def atip_command(ack, command, logger, respond, client, body):
     action, *args = utils.parse_command(command["text"])
     match action:
         case "help":
-            # i18n.set("locale", "en-US")
+            i18n.set("locale", "en-US")
             respond(i18n.t("atip.help_text", command=command["command"]))
         case "aide":
-            # i18n.set("locale", "fr-FR")
+            i18n.set("locale", "fr-FR")
             respond(i18n.t("atip.help_text", command=command["command"]))
         case "start":
-            request_start_modal(client, body, *args)
-            # request_start_modal(client, body, locale="en-US", *args)
+            request_start_modal(client, body, locale="en-US", *args)
         case "lancer":
-            request_start_modal(client, body, *args)
-            # request_start_modal(client, body, locale="fr-FR", *args)
+            request_start_modal(client, body, locale="fr-FR", *args)
         case _:
             respond(
                 i18n.t(
@@ -44,9 +42,7 @@ def atip_command(ack, command, logger, respond, client, body):
 
 def request_start_modal(client, body, locale="", ati_id=""):
     user = body["user_id"]
-    if locale == "":
-        i18n.set("locale", utils.get_user_locale(user, client))
-    else:
+    if locale != "":
         i18n.set("locale", locale)
     client.views_open(
         trigger_id=body["trigger_id"],

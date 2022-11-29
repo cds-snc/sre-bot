@@ -1,8 +1,8 @@
 fr-FR:
-  help_text: "\n `%{command} aide` - montre le dialogue d'aide \n `%{command} lancer` - lance le processus AIPRP"
+  help_text: "\n `%{command} help` - For help in English\n---\n\n `%{command} aide` - montre le dialogue d'aide \n `%{command} lancer` - lance le processus AIPRP"
   unknown_command: "Commande inconnue: `%{action}`. Tapez `%{command} aide` pour voir une liste des commandes."
   modal:
-    title: "Processus AIPRP"
+    title: "Processus d'AIPRP"
     submit: "Soumettre"
     process_header: "Le processus d'AIPRP au SNC"
     process_instructions: "Remplissez les champs ci-dessous pour démarrer le processus:"

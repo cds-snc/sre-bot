@@ -1,5 +1,5 @@
 en-US:
-  help_text: "\n `%{command} help` - show this help text \n `%{command} start` - start the ATIP process"
+  help_text: "\n `%{command} aide` - Pour de l'aide en français\n---\n\n `%{command} help` - show this help text \n `%{command} start` - start the ATIP process"
   unknown_command: "Unknown command: `%{action}`. Type `%{command} help` to see a list of commands."
   modal:
     title: "Start ATIP process"
