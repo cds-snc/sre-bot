@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
           - module: terraform
-    uses: cds-snc/workflows/.github/workflows/terragrunt-plan.yml@main
+    uses: cds-snc/workflows/.github/workflows/terragrunt-apply.yml@main
     with:
       module: ${{ matrix.module }}
       role_arn: arn:aws:iam::283582579564:role/sre-bot-apply
