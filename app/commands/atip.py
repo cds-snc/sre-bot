@@ -35,7 +35,11 @@ def atip_command(ack, command, logger, respond, client, body):
             request_start_modal(client, body, *args)
             # request_start_modal(client, body, locale="fr-FR", *args)
         case _:
-            respond(i18n.t("atip.unknown_command", action=action, command=command["command"]))
+            respond(
+                i18n.t(
+                    "atip.unknown_command", action=action, command=command["command"]
+                )
+            )
 
 
 def request_start_modal(client, body, locale="", ati_id=""):

@@ -8,9 +8,18 @@ from unittest.mock import ANY, MagicMock, patch
 def test_atip_command_handles_empty_command():
     ack = MagicMock()
     respond = MagicMock()
-    atip.atip_command(ack, {"text": "", "command": "/atip"}, MagicMock(), respond, MagicMock(), MagicMock())
+    atip.atip_command(
+        ack,
+        {"text": "", "command": "/atip"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
+    )
     ack.assert_called
-    respond.assert_called_with("\n `/atip help` - show this help text \n `/atip start` - start the ATIP process")
+    respond.assert_called_with(
+        "\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
+    )
 
 
 def test_atip_command_handles_help_command():
@@ -18,20 +27,34 @@ def test_atip_command_handles_help_command():
     respond = MagicMock()
 
     atip.atip_command(
-        ack, {"text": "help", "command": "/atip"}, MagicMock(), respond, MagicMock(), MagicMock()
+        ack,
+        {"text": "help", "command": "/atip"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
     )
     ack.assert_called
-    respond.assert_called_with("\n `/atip help` - show this help text \n `/atip start` - start the ATIP process")
+    respond.assert_called_with(
+        "\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
+    )
 
 
 def test_atip_command_handles_unknown_command():
     ack = MagicMock()
     respond = MagicMock()
     atip.atip_command(
-        ack, {"text": "foo", "command": "/atip"}, MagicMock(), respond, MagicMock(), MagicMock()
+        ack,
+        {"text": "foo", "command": "/atip"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
     )
     ack.assert_called
-    respond.assert_called_with("Unknown command: `foo`. Type `/atip help` to see a list of commands.")
+    respond.assert_called_with(
+        "Unknown command: `foo`. Type `/atip help` to see a list of commands."
+    )
 
 
 @patch("commands.atip.request_start_modal")
