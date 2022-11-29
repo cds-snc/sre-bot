@@ -18,11 +18,11 @@ def test_atip_command_handles_empty_command():
     )
     ack.assert_called
     respond.assert_called_with(
-        "\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
+        "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
     )
 
 
-def test_atip_command_handles_help_command():
+def test_atip_command_handles_help_command_EN():
     ack = MagicMock()
     respond = MagicMock()
 
@@ -36,7 +36,25 @@ def test_atip_command_handles_help_command():
     )
     ack.assert_called
     respond.assert_called_with(
-        "\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
+        "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
+    )
+
+
+def test_atip_command_handles_help_command_FR():
+    ack = MagicMock()
+    respond = MagicMock()
+
+    atip.atip_command(
+        ack,
+        {"text": "aide", "command": "/atip"},
+        MagicMock(),
+        respond,
+        MagicMock(),
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(
+        "\n `/atip help` - For help in English\n---\n\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
     )
 
 
