@@ -8,4 +8,4 @@ on:
 
 jobs:
   teest:
-    uses: cds-snc/workflows/.github/workflows/test_inherit.yml@84a8526dfdf3951c65abc3866d9fa31b1ce7418f
+    uses: cds-snc/workflows/.github/workflows/test_inherit.yml@8069a8e07337b97c2fbd94ae38608535b2f05a59
