@@ -1,0 +1,11 @@
+name: Teest
+on:
+  workflow_dispatch:
+    pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/**"
+
+jobs:
+  teest:
+    uses: cds-snc/workflows/.github/workflows/test_inherit.yml@2ffe446b1c88ffc4d0151d8ff9bb41967502827b
