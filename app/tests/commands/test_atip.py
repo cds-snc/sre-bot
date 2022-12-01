@@ -2,71 +2,111 @@ from commands import atip
 
 from unittest.mock import ANY, MagicMock, patch
 
-# Tests currently default to "en-US" only.
+help_text_fr = "\n `/atip help` - For help in English\n---\n\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
+help_text_en = "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
 
 
-def test_atip_command_handles_empty_command():
+def test_atip_command_handles_empty_command_EN_client():
     ack = MagicMock()
     respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
     atip.atip_command(
         ack,
         {"text": "", "command": "/atip"},
         MagicMock(),
         respond,
-        MagicMock(),
+        client,
         MagicMock(),
     )
     ack.assert_called
-    respond.assert_called_with(
-        "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
-    )
+    respond.assert_called_with(help_text_en)
 
 
-def test_atip_command_handles_help_command_EN():
+def test_atip_command_handles_empty_command_FR_client():
     ack = MagicMock()
     respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+
+    atip.atip_command(
+        ack,
+        {"text": "", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_fr)
+
+
+def test_atip_command_handles_help_EN_command_EN_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
 
     atip.atip_command(
         ack,
         {"text": "help", "command": "/atip"},
         MagicMock(),
         respond,
-        MagicMock(),
+        client,
         MagicMock(),
     )
     ack.assert_called
-    respond.assert_called_with(
-        "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
-    )
+    respond.assert_called_with(help_text_en)
 
 
-def test_atip_command_handles_help_command_FR():
+def test_atip_command_handles_help_EN_command_FR_client():
     ack = MagicMock()
     respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
+    atip.atip_command(
+        ack,
+        {"text": "help", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_en)
+
+
+def test_atip_command_handles_help_FR_command_EN_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
 
     atip.atip_command(
         ack,
         {"text": "aide", "command": "/atip"},
         MagicMock(),
         respond,
-        MagicMock(),
+        client,
         MagicMock(),
     )
     ack.assert_called
-    respond.assert_called_with(
-        "\n `/atip help` - For help in English\n---\n\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
-    )
+    respond.assert_called_with(help_text_fr)
 
 
-def test_atip_command_handles_unknown_command():
+def test_atip_command_handles_unknown_command_EN_client():
     ack = MagicMock()
     respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
     atip.atip_command(
         ack,
         {"text": "foo", "command": "/atip"},
         MagicMock(),
         respond,
-        MagicMock(),
+        client,
         MagicMock(),
     )
     ack.assert_called
@@ -75,11 +115,31 @@ def test_atip_command_handles_unknown_command():
     )
 
 
+def test_atip_command_handles_unknown_command_FR_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    atip.atip_command(
+        ack,
+        {"text": "foo", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(
+        "Commande inconnue: `foo`. Tapez `/atip aide` pour voir une liste des commandes."
+    )
+
+
 @patch("commands.atip.request_start_modal")
 def test_atip_command_handles_access_command(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
     body = MagicMock()
 
     atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
@@ -137,6 +197,19 @@ def test_request_start_modal():
         trigger_id="trigger_id",
         view=ANY,
     )
+
+
+def helper_client_locale(locale=""):
+    if locale == "fr":
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
+        }
+    else:
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "en-US"},
+        }
 
 
 def helper_generate_payload():
