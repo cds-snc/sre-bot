@@ -186,9 +186,9 @@ def test_atip_command_handles_access_FR_command_FR_client(request_start_modal):
     assert request_start_modal.called_with(client, body)
 
 
-def test_atip_view_handler_returns_error_if_no_search_width_is_set():
+def test_atip_view_handler_returns_error_if_no_search_width_is_set_EN_client():
     ack = MagicMock()
-    body = helper_generate_payload()
+    body = helper_generate_payload("en-US")
     body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
         "selected_options"
     ] = []
@@ -200,10 +200,24 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set():
     )
 
 
+def test_atip_view_handler_returns_error_if_no_search_width_is_set_FR_client():
+    ack = MagicMock()
+    body = helper_generate_payload("fr-FR")
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
+        "selected_options"
+    ] = []
+
+    atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
+    ack.assert_called_with(
+        response_action="errors",
+        errors={"ati_search_width": "Veuillez sélectionner au moins une largeur de recherche"},
+    )
+
+
 @patch("integrations.trello.add_atip_card_to_trello")
 def test_atip_view_handler_success(add_atip_card_to_trello_mock):
     ack = MagicMock()
-    body = helper_generate_payload()
+    body = helper_generate_payload("en-US")
     say = MagicMock()
     logger = MagicMock()
     client = MagicMock()
@@ -251,7 +265,7 @@ def helper_client_locale(locale=""):
         }
 
 
-def helper_generate_payload():
+def helper_generate_payload(locale):
     return {
         "type": "view_submission",
         "team": {"id": "team_id", "domain": "slack_domain"},
@@ -273,7 +287,7 @@ def helper_generate_payload():
             "state": {
                 "values": {
                     "ati_locale": {
-                        "atip_change_locale": {"type": "plain_text_input", "value": "en-US"}
+                        "atip_change_locale": {"type": "plain_text_input", "value": locale}
                     },
                     "ati_id": {
                         "ati_id": {"type": "plain_text_input", "value": "number"}
