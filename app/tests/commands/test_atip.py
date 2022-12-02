@@ -1,45 +1,145 @@
 from commands import atip
-import i18n
 
 from unittest.mock import ANY, MagicMock, patch
 
-
-def test_atip_command_handles_empty_command():
-    ack = MagicMock()
-    respond = MagicMock()
-
-    atip.atip_command(ack, {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock())
-    ack.assert_called
-    assert respond.called
+help_text_fr = "\n `/atip help` - For help in English\n---\n\n `/atip aide` - montre le dialogue d'aide \n `/atip lancer` - lance le processus AIPRP"
+help_text_en = "\n `/atip aide` - Pour de l'aide en français\n---\n\n `/atip help` - show this help text \n `/atip start` - start the ATIP process"
 
 
-def test_atip_command_handles_help_command():
-    ack = MagicMock()
-    respond = MagicMock()
-
-    atip.atip_command(
-        ack, {"text": "help"}, MagicMock(), respond, MagicMock(), MagicMock()
-    )
-    ack.assert_called
-    assert respond.called_with(i18n.t("atip.help_text"))
-
-
-def test_atip_command_handles_unknown_command():
-    ack = MagicMock()
-    respond = MagicMock()
-
-    atip.atip_command(
-        ack, {"text": "foo"}, MagicMock(), respond, MagicMock(), MagicMock()
-    )
-    ack.assert_called
-    assert respond.called_with(i18n.t("atip.help_text"))
-
-
-@patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_command(request_start_modal):
+def test_atip_command_handles_empty_command_EN_client():
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
+    atip.atip_command(
+        ack,
+        {"text": "", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_en)
+
+
+def test_atip_command_handles_empty_command_FR_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+
+    atip.atip_command(
+        ack,
+        {"text": "", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_fr)
+
+
+def test_atip_command_handles_help_EN_command_EN_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
+    atip.atip_command(
+        ack,
+        {"text": "help", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_en)
+
+
+def test_atip_command_handles_help_EN_command_FR_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
+    atip.atip_command(
+        ack,
+        {"text": "help", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_en)
+
+
+def test_atip_command_handles_help_FR_command_EN_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+
+    atip.atip_command(
+        ack,
+        {"text": "aide", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(help_text_fr)
+
+
+def test_atip_command_handles_unknown_command_EN_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    atip.atip_command(
+        ack,
+        {"text": "foo", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(
+        "Unknown command: `foo`. Type `/atip help` to see a list of commands."
+    )
+
+
+def test_atip_command_handles_unknown_command_FR_client():
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    atip.atip_command(
+        ack,
+        {"text": "foo", "command": "/atip"},
+        MagicMock(),
+        respond,
+        client,
+        MagicMock(),
+    )
+    ack.assert_called
+    respond.assert_called_with(
+        "Commande inconnue: `foo`. Tapez `/atip aide` pour voir une liste des commandes."
+    )
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_EN_command_EN_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
     body = MagicMock()
 
     atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
@@ -47,9 +147,70 @@ def test_atip_command_handles_access_command(request_start_modal):
     assert request_start_modal.called_with(client, body)
 
 
-def test_atip_view_handler_returns_error_if_no_search_width_is_set():
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_EN_command_FR_client(request_start_modal):
     ack = MagicMock()
-    body = helper_generate_payload()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_FR_command_EN_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_FR_command_FR_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.update_modal_locale")
+def test_atip_action_update_locale_to_FR(update_modal_locale):
+    ack = MagicMock()
+    client = MagicMock()
+    body = helper_generate_payload("en-US")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    assert update_modal_locale.called_with(client, body)
+
+
+@patch("commands.atip.update_modal_locale")
+def test_atip_action_update_locale_to_EN(update_modal_locale):
+    ack = MagicMock()
+    client = MagicMock()
+    body = helper_generate_payload("fr-FR")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    assert update_modal_locale.called_with(client, body)
+
+
+def test_atip_view_handler_returns_error_if_no_search_width_is_set_EN_client():
+    ack = MagicMock()
+    body = helper_generate_payload("en-US")
     body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
         "selected_options"
     ] = []
@@ -57,14 +218,30 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set():
     atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
     ack.assert_called_with(
         response_action="errors",
-        errors={"ati_search_width": i18n.t("atip.modal.search_width_error")},
+        errors={"ati_search_width": "Please select at least one search width"},
+    )
+
+
+def test_atip_view_handler_returns_error_if_no_search_width_is_set_FR_client():
+    ack = MagicMock()
+    body = helper_generate_payload("fr-FR")
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
+        "selected_options"
+    ] = []
+
+    atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
+    ack.assert_called_with(
+        response_action="errors",
+        errors={
+            "ati_search_width": "Veuillez sélectionner au moins une largeur de recherche"
+        },
     )
 
 
 @patch("integrations.trello.add_atip_card_to_trello")
 def test_atip_view_handler_success(add_atip_card_to_trello_mock):
     ack = MagicMock()
-    body = helper_generate_payload()
+    body = helper_generate_payload("en-US")
     say = MagicMock()
     logger = MagicMock()
     client = MagicMock()
@@ -99,7 +276,20 @@ def test_request_start_modal():
     )
 
 
-def helper_generate_payload():
+def helper_client_locale(locale=""):
+    if locale == "fr":
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
+        }
+    else:
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "en-US"},
+        }
+
+
+def helper_generate_payload(locale):
     return {
         "type": "view_submission",
         "team": {"id": "team_id", "domain": "slack_domain"},
@@ -120,6 +310,12 @@ def helper_generate_payload():
             "callback_id": "atip_view",
             "state": {
                 "values": {
+                    "ati_locale": {
+                        "atip_change_locale": {
+                            "type": "plain_text_input",
+                            "value": locale,
+                        }
+                    },
                     "ati_id": {
                         "ati_id": {"type": "plain_text_input", "value": "number"}
                     },
