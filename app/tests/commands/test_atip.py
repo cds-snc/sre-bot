@@ -135,7 +135,7 @@ def test_atip_command_handles_unknown_command_FR_client():
 
 
 @patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_command(request_start_modal):
+def test_atip_command_handles_access_EN_command_EN_client(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
@@ -143,6 +143,45 @@ def test_atip_command_handles_access_command(request_start_modal):
     body = MagicMock()
 
     atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_EN_command_FR_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_FR_command_EN_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert request_start_modal.called_with(client, body)
+
+
+@patch("commands.atip.request_start_modal")
+def test_atip_command_handles_access_FR_command_FR_client(request_start_modal):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale("fr")
+    body = MagicMock()
+
+    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
     ack.assert_called
     assert request_start_modal.called_with(client, body)
 
@@ -233,6 +272,9 @@ def helper_generate_payload():
             "callback_id": "atip_view",
             "state": {
                 "values": {
+                    "ati_locale": {
+                        "atip_change_locale": {"type": "plain_text_input", "value": "en-US"}
+                    },
                     "ati_id": {
                         "ati_id": {"type": "plain_text_input", "value": "number"}
                     },
