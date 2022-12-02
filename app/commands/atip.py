@@ -29,8 +29,10 @@ def atip_command(ack, command, logger, respond, client, body):
             i18n.set("locale", "fr-FR")
             respond(i18n.t("atip.help_text", command=command["command"]))
         case "start":
+            i18n.set("locale", "en-US")
             request_start_modal(client, body, locale="en-US", *args)
         case "lancer":
+            i18n.set("locale", "fr-FR")
             request_start_modal(client, body, locale="fr-FR", *args)
         case _:
             respond(
@@ -40,227 +42,295 @@ def atip_command(ack, command, logger, respond, client, body):
             )
 
 
+def atip_modal_view(user, ati_id, locale):
+    view = {
+        "type": "modal",
+        "callback_id": "atip_view",
+        "title": {"type": "plain_text", "text": i18n.t("atip.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("atip.modal.submit")},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "ati_locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": i18n.t("atip.locale_button"),
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "atip_change_locale",
+                    },
+                ],
+            },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.process_header"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.process_instructions"),
+                },
+            },
+            {
+                "block_id": "ati_id",
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "ati_id",
+                    "initial_value": ati_id,
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.ati_number"),
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_content",
+                "element": {
+                    "type": "plain_text_input",
+                    "multiline": True,
+                    "action_id": "ati_content",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.ati_content"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "block_id": "ati_search_width",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*{i18n.t('atip.modal.ati_search_width')}*",
+                },
+                "accessory": {
+                    "type": "checkboxes",
+                    "options": [
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.slack"),
+                            },
+                            "value": "width_slack",
+                        },
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.google_drive"),
+                            },
+                            "value": "width_drive",
+                        },
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.emails"),
+                            },
+                            "value": "width_email",
+                        },
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.github"),
+                            },
+                            "value": "width_github",
+                        },
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.saas"),
+                            },
+                            "value": "width_other_saas",
+                        },
+                        {
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": i18n.t("atip.modal.all"),
+                            },
+                            "value": "width_all",
+                        },
+                    ],
+                    "action_id": "ati_search_width",
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_due_date",
+                "element": {
+                    "type": "datepicker",
+                    "initial_date": datetime.today().strftime("%Y-%m-%d"),
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.select_date_placeholder"),
+                        "emoji": True,
+                    },
+                    "action_id": "ati_due_date",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.ati_due_date"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_request_deadline",
+                "element": {
+                    "type": "datepicker",
+                    "initial_date": datetime.today().strftime("%Y-%m-%d"),
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.select_date_placeholder"),
+                        "emoji": True,
+                    },
+                    "action_id": "ati_request_deadline",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.ati_request_deadline"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_contact",
+                "element": {
+                    "type": "users_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.select_contact"),
+                    },
+                    "action_id": "ati_contact",
+                    "initial_user": user,
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.primary_contact"),
+                },
+            },
+            {
+                "block_id": "ati_tbs_email",
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "ati_tbs_email",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.tbs_email"),
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_search_term_a",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "ati_search_term_a",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.search_term_a"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_search_term_b",
+                "optional": True,
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "ati_search_term_b",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.search_term_b"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "ati_search_term_c",
+                "optional": True,
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "ati_search_term_c",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("atip.modal.placeholder_write_something")
+                    }
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("atip.modal.search_term_c"),
+                    "emoji": True,
+                },
+            },
+        ],
+    }
+    return view
+
+
 def request_start_modal(client, body, locale="", ati_id=""):
     user = body["user_id"]
-    if locale != "":
-        i18n.set("locale", locale)
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "atip_view",
-            "title": {"type": "plain_text", "text": i18n.t("atip.modal.title")},
-            "submit": {"type": "plain_text", "text": i18n.t("atip.modal.submit")},
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.process_header"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.process_instructions"),
-                    },
-                },
-                {
-                    "block_id": "ati_id",
-                    "type": "input",
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "ati_id",
-                        "initial_value": ati_id,
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.ati_number"),
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_content",
-                    "element": {
-                        "type": "plain_text_input",
-                        "multiline": True,
-                        "action_id": "ati_content",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.ati_content"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "section",
-                    "block_id": "ati_search_width",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*{i18n.t('atip.modal.ati_search_width')}*",
-                    },
-                    "accessory": {
-                        "type": "checkboxes",
-                        "options": [
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.slack"),
-                                },
-                                "value": "width_slack",
-                            },
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.google_drive"),
-                                },
-                                "value": "width_drive",
-                            },
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.emails"),
-                                },
-                                "value": "width_email",
-                            },
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.github"),
-                                },
-                                "value": "width_github",
-                            },
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.saas"),
-                                },
-                                "value": "width_other_saas",
-                            },
-                            {
-                                "text": {
-                                    "type": "mrkdwn",
-                                    "text": i18n.t("atip.modal.all"),
-                                },
-                                "value": "width_all",
-                            },
-                        ],
-                        "action_id": "ati_search_width",
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_due_date",
-                    "element": {
-                        "type": "datepicker",
-                        "initial_date": datetime.today().strftime("%Y-%m-%d"),
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": i18n.t("atip.modal.select_date_placeholder"),
-                            "emoji": True,
-                        },
-                        "action_id": "ati_due_date",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.ati_due_date"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_request_deadline",
-                    "element": {
-                        "type": "datepicker",
-                        "initial_date": datetime.today().strftime("%Y-%m-%d"),
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": i18n.t("atip.modal.select_date_placeholder"),
-                            "emoji": True,
-                        },
-                        "action_id": "ati_request_deadline",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.ati_request_deadline"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_contact",
-                    "element": {
-                        "type": "users_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": i18n.t("atip.modal.select_contact"),
-                        },
-                        "action_id": "ati_contact",
-                        "initial_user": user,
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.primary_contact"),
-                    },
-                },
-                {
-                    "block_id": "ati_tbs_email",
-                    "type": "input",
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "ati_tbs_email",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.tbs_email"),
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_search_term_a",
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "ati_search_term_a",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.search_term_a"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_search_term_b",
-                    "optional": True,
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "ati_search_term_b",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.search_term_b"),
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "ati_search_term_c",
-                    "optional": True,
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "ati_search_term_c",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": i18n.t("atip.modal.search_term_c"),
-                        "emoji": True,
-                    },
-                },
-            ],
-        },
-    )
+    if locale == "":
+        locale = "en-US"
+    i18n.set("locale", locale)
+    view = atip_modal_view(user, ati_id, locale)
+    client.views_open(trigger_id=body["trigger_id"], view=view)
+
+
+def update_modal_locale(ack, client, body):
+    ack()
+    user = body["user"]["id"]
+    ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
+    if ati_id is None:
+        ati_id = ""
+    locale = next(
+        (
+            action
+            for action in body["actions"]
+            if action["action_id"] == "atip_change_locale"
+        ),
+        None,
+    )["value"]
+    if locale == "en-US":
+        locale = "fr-FR"
+    else:
+        locale = "en-US"
+    i18n.set("locale", locale)
+    view_id = body["view"]["id"]
+    view = atip_modal_view(user, ati_id, locale)
+    client.views_update(view_id=view_id, view=view)
 
 
 def atip_width_action(ack):
@@ -270,6 +340,9 @@ def atip_width_action(ack):
 def atip_view_handler(ack, body, say, logger, client):
     ack()
 
+    ati_locale = body["view"]["state"]["values"]["ati_locale"]["atip_change_locale"][
+        "value"
+    ]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
     ati_content = body["view"]["state"]["values"]["ati_content"]["ati_content"]["value"]
     ati_contact = body["view"]["state"]["values"]["ati_contact"]["ati_contact"][
@@ -299,6 +372,7 @@ def atip_view_handler(ack, body, say, logger, client):
 
     errors = {}
 
+    i18n.set("locale", ati_locale)
     if ati_search_width == []:
         errors["ati_search_width"] = i18n.t("atip.modal.search_width_error")
 
