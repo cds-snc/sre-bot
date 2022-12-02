@@ -89,8 +89,8 @@ def atip_modal_view(user, ati_id, locale):
                     "initial_value": ati_id,
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",
@@ -106,8 +106,8 @@ def atip_modal_view(user, ati_id, locale):
                     "action_id": "ati_content",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",
@@ -234,8 +234,8 @@ def atip_modal_view(user, ati_id, locale):
                     "action_id": "ati_tbs_email",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",
@@ -250,8 +250,8 @@ def atip_modal_view(user, ati_id, locale):
                     "action_id": "ati_search_term_a",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",
@@ -268,8 +268,8 @@ def atip_modal_view(user, ati_id, locale):
                     "action_id": "ati_search_term_b",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",
@@ -286,8 +286,8 @@ def atip_modal_view(user, ati_id, locale):
                     "action_id": "ati_search_term_c",
                     "placeholder": {
                         "type": "plain_text",
-                        "text": i18n.t("atip.modal.placeholder_write_something")
-                    }
+                        "text": i18n.t("atip.modal.placeholder_write_something"),
+                    },
                 },
                 "label": {
                     "type": "plain_text",

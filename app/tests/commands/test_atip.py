@@ -232,7 +232,9 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set_FR_client():
     atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
     ack.assert_called_with(
         response_action="errors",
-        errors={"ati_search_width": "Veuillez sélectionner au moins une largeur de recherche"},
+        errors={
+            "ati_search_width": "Veuillez sélectionner au moins une largeur de recherche"
+        },
     )
 
 
@@ -309,7 +311,10 @@ def helper_generate_payload(locale):
             "state": {
                 "values": {
                     "ati_locale": {
-                        "atip_change_locale": {"type": "plain_text_input", "value": locale}
+                        "atip_change_locale": {
+                            "type": "plain_text_input",
+                            "value": locale,
+                        }
                     },
                     "ati_id": {
                         "ati_id": {"type": "plain_text_input", "value": "number"}
