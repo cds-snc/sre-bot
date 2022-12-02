@@ -186,6 +186,28 @@ def test_atip_command_handles_access_FR_command_FR_client(request_start_modal):
     assert request_start_modal.called_with(client, body)
 
 
+@patch("commands.atip.update_modal_locale")
+def test_atip_action_update_locale_to_FR(update_modal_locale):
+    ack = MagicMock()
+    client = MagicMock()
+    body = helper_generate_payload("en-US")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    assert update_modal_locale.called_with(client, body)
+
+
+@patch("commands.atip.update_modal_locale")
+def test_atip_action_update_locale_to_EN(update_modal_locale):
+    ack = MagicMock()
+    client = MagicMock()
+    body = helper_generate_payload("fr-FR")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    assert update_modal_locale.called_with(client, body)
+
+
 def test_atip_view_handler_returns_error_if_no_search_width_is_set_EN_client():
     ack = MagicMock()
     body = helper_generate_payload("en-US")

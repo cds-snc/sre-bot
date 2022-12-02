@@ -1,4 +1,8 @@
 en-US:
+  locale_button: "Français"
+  locale_value: "en-US"
+  submit: "Submit"
+  close: "Close"
   help_text: "\n `%{command} aide` - Pour de l'aide en français\n---\n\n `%{command} help` - show this help text \n `%{command} start` - start the ATIP process"
   unknown_command: "Unknown command: `%{action}`. Type `%{command} help` to see a list of commands."
   modal:
@@ -25,3 +29,4 @@ en-US:
     search_term_b: "Search term B"
     search_term_c: "Search term C"
     search_width_error: "Please select at least one search width"
+    placeholder_write_something: "Write something"

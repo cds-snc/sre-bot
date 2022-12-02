@@ -1,4 +1,8 @@
 fr-FR:
+  locale_button: "English"
+  locale_value: "fr-FR"
+  submit: "Soumettre"
+  close: "Fermer"
   help_text: "\n `%{command} help` - For help in English\n---\n\n `%{command} aide` - montre le dialogue d'aide \n `%{command} lancer` - lance le processus AIPRP"
   unknown_command: "Commande inconnue: `%{action}`. Tapez `%{command} aide` pour voir une liste des commandes."
   modal:
@@ -25,3 +29,4 @@ fr-FR:
     search_term_b: "Terme de recherche B"
     search_term_c: "Terme de recherche C"
     search_width_error: Veuillez sélectionner au moins une largeur de recherche
+    placeholder_write_something: "Écrivez quelque chose"
