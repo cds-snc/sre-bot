@@ -135,7 +135,7 @@ def test_atip_command_handles_unknown_command_FR_client():
 
 
 @patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_EN_command_EN_client(request_start_modal):
+def test_atip_command_handles_access_EN_command(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
@@ -144,24 +144,11 @@ def test_atip_command_handles_access_EN_command_EN_client(request_start_modal):
 
     atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
     ack.assert_called
-    assert request_start_modal.called_with(client, body)
+    request_start_modal.assert_called_with(client, body, locale="en-US")
 
 
 @patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_EN_command_FR_client(request_start_modal):
-    ack = MagicMock()
-    respond = MagicMock()
-    client = MagicMock()
-    client.users_info.return_value = helper_client_locale("fr")
-    body = MagicMock()
-
-    atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
-    ack.assert_called
-    assert request_start_modal.called_with(client, body)
-
-
-@patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_FR_command_EN_client(request_start_modal):
+def test_atip_command_handles_access_FR_command(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
@@ -170,42 +157,29 @@ def test_atip_command_handles_access_FR_command_EN_client(request_start_modal):
 
     atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
     ack.assert_called
-    assert request_start_modal.called_with(client, body)
+    request_start_modal.assert_called_with(client, body, locale="fr-FR")
 
 
-@patch("commands.atip.request_start_modal")
-def test_atip_command_handles_access_FR_command_FR_client(request_start_modal):
-    ack = MagicMock()
-    respond = MagicMock()
-    client = MagicMock()
-    client.users_info.return_value = helper_client_locale("fr")
-    body = MagicMock()
-
-    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
-    ack.assert_called
-    assert request_start_modal.called_with(client, body)
-
-
-@patch("commands.atip.update_modal_locale")
-def test_atip_action_update_locale_to_FR(update_modal_locale):
+@patch("commands.atip.atip_modal_view")
+def test_atip_action_update_locale_to_FR(atip_modal_view):
     ack = MagicMock()
     client = MagicMock()
-    body = helper_generate_payload("en-US")
+    body = helper_body_payload("en-US")
 
     atip.update_modal_locale(ack, client, body)
     ack.assert_called
-    assert update_modal_locale.called_with(client, body)
+    atip_modal_view.assert_called_with("user_id", "", "fr-FR")
 
 
-@patch("commands.atip.update_modal_locale")
-def test_atip_action_update_locale_to_EN(update_modal_locale):
+@patch("commands.atip.atip_modal_view")
+def test_atip_action_update_locale_to_EN(atip_modal_view):
     ack = MagicMock()
     client = MagicMock()
-    body = helper_generate_payload("fr-FR")
+    body = helper_body_payload("fr-FR", "ati_id")
 
     atip.update_modal_locale(ack, client, body)
     ack.assert_called
-    assert update_modal_locale.called_with(client, body)
+    atip_modal_view.assert_called_with("user_id", "ati_id", "en-US")
 
 
 def test_atip_view_handler_returns_error_if_no_search_width_is_set_EN_client():
@@ -276,6 +250,24 @@ def test_request_start_modal():
     )
 
 
+def test_update_modal_locale():
+    ack = MagicMock()
+    client = MagicMock()
+    body = helper_body_payload("fr-FR")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    view = atip.atip_modal_view("user_id", "", "en-US")
+    client.views_update.assert_called_with(view_id="view_id", view=view)
+
+    body = helper_body_payload("en-US")
+
+    atip.update_modal_locale(ack, client, body)
+    ack.assert_called
+    view = atip.atip_modal_view("user_id", "", "fr-FR")
+    client.views_update.assert_called_with(view_id="view_id", view=view)
+
+
 def helper_client_locale(locale=""):
     if locale == "fr":
         return {
@@ -287,6 +279,17 @@ def helper_client_locale(locale=""):
             "ok": True,
             "user": {"id": "U00AAAAAAA0", "locale": "en-US"},
         }
+
+
+def helper_body_payload(locale, ati_id=None):
+    return {
+        "user": {"id": "user_id"},
+        "view": {
+            "id": "view_id",
+            "state": {"values": {"ati_id": {"ati_id": {"value": ati_id}}}},
+        },
+        "actions": [{"action_id": "atip_change_locale", "value": locale}],
+    }
 
 
 def helper_generate_payload(locale):
