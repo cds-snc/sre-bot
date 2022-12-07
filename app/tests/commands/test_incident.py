@@ -215,7 +215,14 @@ def test_incident_open_modal_calls_ack_EN_client(mock_list_folders):
     args = client.views_open.call_args_list
     _, kwargs = args[0]
     ack.assert_called_once()
-    locale = next((block for block in kwargs["view"]["blocks"] if block["elements"][0] == "value"), None)["elements"][0]["value"]
+    locale = next(
+        (
+            block
+            for block in kwargs["view"]["blocks"]
+            if block["elements"][0] == "value"
+        ),
+        None,
+    )["elements"][0]["value"]
     assert locale == "en-US"
     assert kwargs["trigger_id"] == "trigger_id"
     assert kwargs["view"]["type"] == "modal"
