@@ -4,7 +4,7 @@ import datetime
 
 from integrations import google_drive, opsgenie
 from models import webhooks
-from commands.utils import log_to_sentinel
+from commands.utils import log_to_sentinel, get_user_locale
 
 
 from dotenv import load_dotenv
@@ -63,6 +63,8 @@ def open_modal(client, ack, command, body):
         }
         for i in folders
     ]
+    user_id = body["user"]["id"]
+    locale = get_user_locale(user_id, client)
 
     client.views_open(
         trigger_id=body["trigger_id"],
@@ -72,6 +74,22 @@ def open_modal(client, ack, command, body):
             "title": {"type": "plain_text", "text": "SRE - Start an incident"},
             "submit": {"type": "plain_text", "text": "Submit"},
             "blocks": [
+                {
+                    "type": "actions",
+                    "block_id": "locale",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "language",
+                                "emoji": True,
+                            },
+                            "value": locale,
+                            "action_id": "atip_change_locale",
+                        }
+                    ],
+                },
                 {
                     "type": "header",
                     "text": {
