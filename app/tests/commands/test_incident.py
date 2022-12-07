@@ -204,7 +204,32 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
 
 
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_open_modal_calls_ack_EN_client(mock_list_folders):
+def test_incident_open_modal_calls_ack(mock_list_folders):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
+    incident.open_modal(client, ack, command, body)
+    args = client.views_open.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called_once()
+
+    assert kwargs["trigger_id"] == "trigger_id"
+    assert kwargs["view"]["type"] == "modal"
+    assert kwargs["view"]["callback_id"] == "incident_view"
+    assert (
+        kwargs["view"]["blocks"][6]["element"]["initial_value"]
+        == "incident description"
+    )
+    assert kwargs["view"]["blocks"][7]["element"]["options"][0]["value"] == "id"
+    assert (
+        kwargs["view"]["blocks"][7]["element"]["options"][0]["text"]["text"] == "name"
+    )
+
+
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
@@ -222,17 +247,6 @@ def test_incident_open_modal_calls_ack_EN_client(mock_list_folders):
     )["elements"][0]["value"]
 
     assert locale == "en-US"
-    assert kwargs["trigger_id"] == "trigger_id"
-    assert kwargs["view"]["type"] == "modal"
-    assert kwargs["view"]["callback_id"] == "incident_view"
-    assert (
-        kwargs["view"]["blocks"][6]["element"]["initial_value"]
-        == "incident description"
-    )
-    assert kwargs["view"]["blocks"][7]["element"]["options"][0]["value"] == "id"
-    assert (
-        kwargs["view"]["blocks"][7]["element"]["options"][0]["text"]["text"] == "name"
-    )
 
 
 @patch("commands.incident.google_drive.update_incident_list")
