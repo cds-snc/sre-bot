@@ -250,22 +250,28 @@ def test_request_start_modal():
     )
 
 
-def test_update_modal_locale():
+def test_update_modal_locale_to_EN():
     ack = MagicMock()
     client = MagicMock()
     body = helper_body_payload("fr-FR")
 
     atip.update_modal_locale(ack, client, body)
-    ack.assert_called
-    view = atip.atip_modal_view("user_id", "", "en-US")
-    client.views_update.assert_called_with(view_id="view_id", view=view)
+    args = client.views_update.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called()
+    assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
+
+def test_update_modal_locale_to_FR():
+    ack = MagicMock()
+    client = MagicMock()
     body = helper_body_payload("en-US")
 
     atip.update_modal_locale(ack, client, body)
-    ack.assert_called
-    view = atip.atip_modal_view("user_id", "", "fr-FR")
-    client.views_update.assert_called_with(view_id="view_id", view=view)
+    args = client.views_update.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called()
+    assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "fr-FR"
 
 
 def helper_client_locale(locale=""):
