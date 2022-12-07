@@ -204,9 +204,10 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
 
 
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_open_modal_calls_ack(mock_list_folders):
+def test_incident_open_modal_calls_ack_EN_client(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id"}
@@ -214,6 +215,8 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     args = client.views_open.call_args_list
     _, kwargs = args[0]
     ack.assert_called_once()
+    locale = next((block for block in kwargs["view"]["blocks"] if block["elements"][0] == "value"), None)["elements"][0]["value"]
+    assert locale == "en-US"
     assert kwargs["trigger_id"] == "trigger_id"
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
@@ -428,6 +431,19 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     client.conversations_invite.assert_called_once_with(
         channel="channel_id", users="user_id"
     )
+
+
+def helper_client_locale(locale=""):
+    if locale == "fr":
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
+        }
+    else:
+        return {
+            "ok": True,
+            "user": {"id": "U00AAAAAAA0", "locale": "en-US"},
+        }
 
 
 def helper_generate_view(name="name"):
