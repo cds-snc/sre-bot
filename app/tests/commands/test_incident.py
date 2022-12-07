@@ -210,30 +210,28 @@ def test_incident_open_modal_calls_ack_EN_client(mock_list_folders):
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
     ack.assert_called_once()
+
     locale = next(
-        (
-            block
-            for block in kwargs["view"]["blocks"]
-            if block["elements"][0] == "value"
-        ),
+        (block for block in kwargs["view"]["blocks"] if block["block_id"] == "locale"),
         None,
     )["elements"][0]["value"]
+
     assert locale == "en-US"
     assert kwargs["trigger_id"] == "trigger_id"
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
     assert (
-        kwargs["view"]["blocks"][5]["element"]["initial_value"]
+        kwargs["view"]["blocks"][6]["element"]["initial_value"]
         == "incident description"
     )
-    assert kwargs["view"]["blocks"][6]["element"]["options"][0]["value"] == "id"
+    assert kwargs["view"]["blocks"][7]["element"]["options"][0]["value"] == "id"
     assert (
-        kwargs["view"]["blocks"][6]["element"]["options"][0]["text"]["text"] == "name"
+        kwargs["view"]["blocks"][7]["element"]["options"][0]["text"]["text"] == "name"
     )
 
 
@@ -444,12 +442,12 @@ def helper_client_locale(locale=""):
     if locale == "fr":
         return {
             "ok": True,
-            "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
+            "user": {"id": "user_id", "locale": "fr-FR"},
         }
     else:
         return {
             "ok": True,
-            "user": {"id": "U00AAAAAAA0", "locale": "en-US"},
+            "user": {"id": "user_id", "locale": "en-US"},
         }
 
 
