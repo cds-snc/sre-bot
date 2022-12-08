@@ -209,7 +209,7 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     client = MagicMock()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
@@ -228,6 +228,30 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     )
 
 
+@patch("commands.incident.incident_modal_view")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_calls_incident_modal_view(
+    mock_list_folders, mock_incident_modal_view
+):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    folders = mock_list_folders()
+    options = [
+        {
+            "text": {"type": "plain_text", "text": i["name"]},
+            "value": i["id"],
+        }
+        for i in folders
+    ]
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    incident.open_modal(client, ack, command, body)
+    ack.assert_called_once()
+    mock_incident_modal_view.assert_called_with(command, options, "en-US")
+
+
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
@@ -235,7 +259,7 @@ def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
