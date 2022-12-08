@@ -1,6 +1,6 @@
 black==22.3.0
 coverage==6.5.0
-flake8==3.9.2
+flake8==6.0.0
 pytest==6.2.4
 pytest-asyncio==0.18.2
 pytest-env==0.6.2
