@@ -325,6 +325,25 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
 
 
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_local_button_calls_views_update(mock_list_folders):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    ack = MagicMock()
+    client = MagicMock()
+    command = {"text": "name"}
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
+    incident.handle_change_locale_button(ack, client, command, body)
+    args = client.views_update.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called()
+    assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
+
+
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
