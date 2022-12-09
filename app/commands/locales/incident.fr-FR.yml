@@ -1,0 +1,13 @@
+fr-FR:
+  locale_button: "English"
+  locale_value: "fr-FR"
+  submit: "Soumettre"
+  close: "Fermer"
+  modal:
+    title: "IFS - Lancer un incident"
+    congratulations: "Félicitations!"
+    something_wrong: "Il y a eu un problème. Vous pouvez y arriver!"
+    app_help: "Cette application vous aidera à vous préparer. Elle créera les choses suivantes: \n \n • un canal \n • un rapport d'incident \n • une rencontre Google Meet\n\n"
+    fill_the_fields: "Remplissez les deux champs ici-bas et vous pourrez commencer:"
+    description: "Courte description (ex: trop d'erreurs 500)"
+    product: "Choisissez un produit"

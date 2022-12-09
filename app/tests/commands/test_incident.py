@@ -209,22 +209,139 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     client = MagicMock()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
     ack.assert_called_once()
+
     assert kwargs["trigger_id"] == "trigger_id"
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
     assert (
-        kwargs["view"]["blocks"][5]["element"]["initial_value"]
+        kwargs["view"]["blocks"][6]["element"]["initial_value"]
         == "incident description"
     )
-    assert kwargs["view"]["blocks"][6]["element"]["options"][0]["value"] == "id"
+    assert kwargs["view"]["blocks"][7]["element"]["options"][0]["value"] == "id"
     assert (
-        kwargs["view"]["blocks"][6]["element"]["options"][0]["text"]["text"] == "name"
+        kwargs["view"]["blocks"][7]["element"]["options"][0]["text"]["text"] == "name"
     )
+
+
+@patch("commands.incident.generate_incident_modal_view")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_calls_generate_incident_modal_view(
+    mock_list_folders, mock_generate_incident_modal_view
+):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    incident.open_modal(client, ack, command, body)
+    ack.assert_called_once()
+    mock_generate_incident_modal_view.assert_called_once()
+
+
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    incident.open_modal(client, ack, command, body)
+    args = client.views_open.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called_once()
+
+    locale = next(
+        (block for block in kwargs["view"]["blocks"] if block["block_id"] == "locale"),
+        None,
+    )["elements"][0]["value"]
+
+    assert locale == "en-US"
+
+
+@patch("commands.incident.i18n")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_i18n):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    incident.open_modal(client, ack, command, body)
+    args = client.views_open.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called_once()
+    mock_i18n.t.assert_called()
+
+
+@patch("commands.incident.i18n")
+@patch("commands.utils.get_user_locale")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_locale_button_calls_ack(
+    mock_list_folders, mock_get_user_locale, mock_i18n
+):
+    ack = MagicMock()
+    client = MagicMock()
+    command = {"text": "incident_command"}
+
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
+    incident.handle_change_locale_button(ack, client, command, body)
+
+    ack.assert_called_once()
+
+
+@patch("commands.incident.generate_incident_modal_view")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_locale_button_updates_view_modal_locale_value(
+    mock_list_folders,
+    mock_generate_incident_modal_view,
+):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    ack = MagicMock()
+    client = MagicMock()
+    options = helper_options()
+    command = {"text": "name"}
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
+    incident.handle_change_locale_button(ack, client, command, body)
+
+    ack.assert_called
+    mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
+
+
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_local_button_calls_views_update(mock_list_folders):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    ack = MagicMock()
+    client = MagicMock()
+    command = {"text": "name"}
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
+    incident.handle_change_locale_button(ack, client, command, body)
+    args = client.views_update.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called()
+    assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
 @patch("commands.incident.google_drive.update_incident_list")
@@ -311,6 +428,45 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
         text="<@user_id> has kicked off a new incident: name for product in <#channel_id>\n<@user_id> a initié un nouvel incident: name pour product dans <#channel_id>",
         channel=incident.INCIDENT_CHANNEL,
     )
+
+
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_submit_truncates_meet_link_if_too_long(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    name = "a" * 80
+    view = helper_generate_view(name)
+    meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": f"channel_{name}"}
+    }
+    incident.submit(ack, view, say, body, client, logger)
+
+    ack.assert_called()
+    client.bookmarks_add.assert_any_call(
+        channel_id="channel_id",
+        title="Meet link",
+        type="link",
+        link=meet_link,
+    )
+
+    args = client.bookmarks_add.call_args_list
+    _, kwargs = args[0]
+
+    assert len(kwargs["link"]) <= 78
 
 
 @patch("commands.incident.google_drive.update_incident_list")
@@ -430,11 +586,57 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
-def helper_generate_view(name="name"):
+def helper_options():
+    return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
+
+
+def helper_client_locale(locale=""):
+    if locale == "fr":
+        return {
+            "ok": True,
+            "user": {"id": "user_id", "locale": "fr-FR"},
+        }
+    else:
+        return {
+            "ok": True,
+            "user": {"id": "user_id", "locale": "en-US"},
+        }
+
+
+def helper_generate_modal(locale="en-US"):
     return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": "incident_modal"},
+        "submit": {"type": "plain_text", "text": "submit"},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "button",
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "incident_change_locale",
+                    }
+                ],
+            },
+        ],
+    }
+
+
+def helper_generate_view(name="name", locale="en-US"):
+    return {
+        "id": "view_id",
         "state": {
             "values": {
                 "name": {"name": {"value": name}},
+                "locale": {"value": locale},
                 "product": {
                     "product": {
                         "selected_option": {
@@ -444,5 +646,5 @@ def helper_generate_view(name="name"):
                     }
                 },
             }
-        }
+        },
     }

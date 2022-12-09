@@ -1,15 +1,20 @@
 import os
 import re
 import datetime
+import i18n
 
 from integrations import google_drive, opsgenie
 from models import webhooks
-from commands.utils import log_to_sentinel
-
+from commands.utils import log_to_sentinel, get_user_locale
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+i18n.load_path.append("./commands/locales/")
+
+i18n.set("locale", "en-US")
+i18n.set("fallback", "en-US")
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 
@@ -53,6 +58,117 @@ def handle_incident_action_buttons(client, ack, body, logger):
         log_to_sentinel("ignore_incident_button_pressed", body)
 
 
+def generate_incident_modal_view(command, options=[], locale="en-US"):
+    return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": i18n.t("incident.locale_button"),
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "incident_change_locale",
+                    }
+                ],
+            },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.congratulations"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.something_wrong"),
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.app_help"),
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.fill_the_fields"),
+                },
+            },
+            {
+                "block_id": "name",
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name",
+                    "initial_value": command["text"],
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.description"),
+                },
+            },
+            {
+                "block_id": "product",
+                "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("incident.modal.product"),
+                    },
+                    "options": options,
+                    "action_id": "product",
+                },
+                "label": {"type": "plain_text", "text": "Product", "emoji": True},
+            },
+        ],
+    }
+
+
+def update_view_modal(locale):
+    return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": i18n.t("incident.locale_button"),
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "incident_change_locale",
+                    }
+                ],
+            },
+        ],
+    }
+
+
 def open_modal(client, ack, command, body):
     ack()
     folders = google_drive.list_folders()
@@ -63,75 +179,34 @@ def open_modal(client, ack, command, body):
         }
         for i in folders
     ]
+    user_id = body["user_id"]
+    locale = get_user_locale(user_id, client)
+    i18n.set("locale", locale)
+    view = generate_incident_modal_view(command, options, locale)
+    client.views_open(trigger_id=body["trigger_id"], view=view)
 
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "incident_view",
-            "title": {"type": "plain_text", "text": "SRE - Start an incident"},
-            "submit": {"type": "plain_text", "text": "Submit"},
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Congratulations! // Félicitations!",
-                        "emoji": True,
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Something has gone wrong. You've got this! // Il y a eu un problème. Vous pouvez y arriver!",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "This app is going to help you get set up. It will create the following: \n \n • a channel \n • an incident report \n • a Google Meet\n\n--\n\nCette application vous aidera à vous préparer. Elle créera les choses suivantes: \n \n • un canal \n • un rapport d'incident \n • une rencontre Google Meet\n\n",
-                    },
-                },
-                {"type": "divider"},
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Fill out the two fields below and you are good to go // Remplissez les deux champs ici-bas et vous pourrez commencer:",
-                    },
-                },
-                {
-                    "block_id": "name",
-                    "type": "input",
-                    "element": {
-                        "type": "plain_text_input",
-                        "action_id": "name",
-                        "initial_value": command["text"],
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Short description (ex: too many 500 errors) | Courte description",
-                    },
-                },
-                {
-                    "block_id": "product",
-                    "type": "input",
-                    "element": {
-                        "type": "static_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Select a product | Choisissez un produit",
-                        },
-                        "options": options,
-                        "action_id": "product",
-                    },
-                    "label": {"type": "plain_text", "text": "Product", "emoji": True},
-                },
-            ],
-        },
-    )
+
+def handle_change_locale_button(ack, client, command, body):
+    ack()
+    folders = google_drive.list_folders()
+    options = [
+        {
+            "text": {"type": "plain_text", "text": i["name"]},
+            "value": i["id"],
+        }
+        for i in folders
+    ]
+    locale = body["actions"][0]["value"]
+    if locale == "en-US":
+        locale = "fr-FR"
+    else:
+        locale = "en-US"
+    i18n.set("locale", locale)
+    command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
+    if command["text"] is None:
+        command["text"] = ""
+    view = generate_incident_modal_view(command, options, locale)
+    client.views_update(view_id=body["view"]["id"], view=view)
 
 
 def submit(ack, view, say, body, client, logger):
@@ -202,7 +277,7 @@ def submit(ack, view, say, body, client, logger):
     meet_link = f"https://g.co/meet/incident-{slug}"
     # Max character length for Google Meet nickname is 60, 78 with constant URI
     if len(meet_link) > 78:
-        meet_link[:78]
+        meet_link = meet_link[:78]
     client.bookmarks_add(
         channel_id=channel_id, title="Meet link", type="link", link=meet_link
     )
