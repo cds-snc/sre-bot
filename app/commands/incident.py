@@ -220,7 +220,7 @@ def submit(ack, view, say, body, client, logger):
     meet_link = f"https://g.co/meet/incident-{slug}"
     # Max character length for Google Meet nickname is 60, 78 with constant URI
     if len(meet_link) > 78:
-        meet_link[:78]
+        meeting_link = meet_link[:78]
     client.bookmarks_add(
         channel_id=channel_id, title="Meet link", type="link", link=meet_link
     )
