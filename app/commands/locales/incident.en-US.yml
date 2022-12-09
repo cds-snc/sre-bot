@@ -1,3 +1,13 @@
 en-US:
   locale_button: "Français"
   locale_value: "en-US"
+  submit: "Submit"
+  close: "Close"
+  modal:
+    title: "SRE - Start an incident"
+    congratulations: "Congratulations!"
+    something_wrong: "Something has gone wrong. You've got this!"
+    app_help: "This app is going to help you get set up. It will create the following: \n \n • a channel \n • an incident report \n • a Google Meet\n\n"
+    fill_the_fields: "Fill out the two fields below and you are good to go:"
+    description: "Short description (ex: too many 500 errors)"
+    product: "Select a product"
