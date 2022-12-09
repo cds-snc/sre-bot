@@ -284,18 +284,39 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
 @patch("commands.incident.i18n")
 @patch("commands.utils.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_button_calls_update_locale(
+def test_incident_locale_button_calls_ack(
     mock_list_folders, mock_get_user_locale, mock_i18n
 ):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
-    mock_get_user_locale.return_value = "fr-FR"
+    # mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    # mock_get_user_locale.return_value = "fr-FR"
     ack = MagicMock()
     client = MagicMock()
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     view = helper_generate_view()
-    incident.handle_update_locale_button(ack, client, body, view)
+    incident.handle_change_locale_button(ack, client, body, view)
 
     ack.assert_called_once()
+
+
+@patch("commands.incident.i18n")
+@patch("commands.incident.generate_incident_modal_view")
+@patch("commands.utils.get_user_locale")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_locale_button_updates_locale(
+    mock_list_folders, mock_get_user_locale, mock_generate_incident_modal_view, mock_i18n
+):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    ack = MagicMock()
+    client = MagicMock()
+    options = MagicMock()
+    command = {"text": "incident_command"}
+    mock_get_user_locale.return_value = "fr-FR"
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    view = helper_generate_view()
+    incident.handle_change_locale_button(ack, client, body, view)
+
+    ack.assert_called
+    mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
 
 
 @patch("commands.incident.google_drive.update_incident_list")
@@ -578,11 +599,12 @@ def helper_generate_modal(locale="en-US"):
     }
 
 
-def helper_generate_view(name="name"):
+def helper_generate_view(name="name", locale="en-US"):
     return {
         "state": {
             "values": {
                 "name": {"name": {"value": name}},
+                "locale": {"value": locale},
                 "product": {
                     "product": {
                         "selected_option": {
