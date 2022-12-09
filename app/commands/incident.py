@@ -159,7 +159,7 @@ def open_modal(client, ack, command, body):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-def handle_change_locale_button(ack, client, command, body, view):
+def handle_change_locale_button(ack, client, command, body):
     ack()
     folders = google_drive.list_folders()
     options = [
@@ -169,9 +169,17 @@ def handle_change_locale_button(ack, client, command, body, view):
         }
         for i in folders
     ]
-    user_id = body["user_id"]
-    locale = get_user_locale(user_id, client)
+    locale = body["actions"][0]["value"]
+    if locale == "en-US":
+        locale = "fr-FR"
+    else:
+        locale = "en-US"
+    i18n.set("locale", locale)
+    command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
+    if command["text"] == None:
+        command["text"] = ""
     view = generate_incident_modal_view(command, options, locale)
+    client.views_update(view_id=body["view"]["id"], view=view)
 
 
 def submit(ack, view, say, body, client, logger):
