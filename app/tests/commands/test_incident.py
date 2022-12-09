@@ -291,7 +291,12 @@ def test_incident_locale_button_calls_ack(
     client = MagicMock()
     command = {"text": "incident_command"}
 
-    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}], "view": helper_generate_view(name=command["text"])}
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
     incident.handle_change_locale_button(ack, client, command, body)
 
     ack.assert_called_once()
@@ -308,7 +313,12 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     client = MagicMock()
     options = helper_options()
     command = {"text": "name"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}], "view": helper_generate_view(name=command["text"])}
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "fr-FR"}],
+        "view": helper_generate_view(name=command["text"]),
+    }
     incident.handle_change_locale_button(ack, client, command, body)
 
     ack.assert_called
@@ -617,5 +627,5 @@ def helper_generate_view(name="name", locale="en-US"):
                     }
                 },
             }
-        }
+        },
     }
