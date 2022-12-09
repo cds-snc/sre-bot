@@ -266,6 +266,22 @@ def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
 
 
 @patch("commands.incident.i18n")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_i18n):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    client.users_info.return_value = helper_client_locale()
+    ack = MagicMock()
+    command = {"text": "incident description"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    incident.open_modal(client, ack, command, body)
+    args = client.views_open.call_args_list
+    _, kwargs = args[0]
+    ack.assert_called_once()
+    mock_i18n.t.assert_called()
+
+
+@patch("commands.incident.i18n")
 @patch("commands.utils.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_button_calls_update_locale(
