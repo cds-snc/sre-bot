@@ -49,6 +49,7 @@ def main():
     bot.action("handle_incident_action_buttons")(
         incident.handle_incident_action_buttons
     )
+    bot.action("incident_change_locale")(incident.handle_change_locale_button)
 
     # Incident events
     bot.action("add_folder_metadata")(incident_helper.add_folder_metadata)
