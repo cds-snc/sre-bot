@@ -600,7 +600,7 @@ def helper_generate_modal(locale="en-US"):
                             "emoji": True,
                         },
                         "value": locale,
-                        "action_id": "change_locale",
+                        "action_id": "incident_change_locale",
                     }
                 ],
             },
