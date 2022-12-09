@@ -207,7 +207,7 @@ def handle_change_locale_button(ack, client, command, body):
         command["text"] = ""
     view = generate_incident_modal_view(command, options, locale)
     client.views_update(
-        view_id=body["view"]["id"], hash=body["view"]["hash"], view=view
+        view_id=body["view"]["id"], view=view
     )
 
 
