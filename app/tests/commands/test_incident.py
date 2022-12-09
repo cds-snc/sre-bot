@@ -228,10 +228,10 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     )
 
 
-@patch("commands.incident.incident_modal_view")
+@patch("commands.incident.generate_incident_modal_view")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_open_modal_calls_incident_modal_view(
-    mock_list_folders, mock_incident_modal_view
+def test_incident_open_modal_calls_generate_incident_modal_view(
+    mock_list_folders, mock_generate_incident_modal_view
 ):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
@@ -241,7 +241,7 @@ def test_incident_open_modal_calls_incident_modal_view(
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     incident.open_modal(client, ack, command, body)
     ack.assert_called_once()
-    mock_incident_modal_view.assert_called_once()
+    mock_generate_incident_modal_view.assert_called_once()
 
 
 @patch("commands.incident.google_drive.list_folders")
@@ -263,6 +263,23 @@ def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
     )["elements"][0]["value"]
 
     assert locale == "en-US"
+
+
+@patch("commands.incident.i18n")
+@patch("commands.utils.get_user_locale")
+@patch("commands.incident.google_drive.list_folders")
+def test_incident_button_calls_update_locale(
+    mock_list_folders, mock_get_user_locale, mock_i18n
+):
+    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_get_user_locale.return_value = "fr-FR"
+    ack = MagicMock()
+    client = MagicMock()
+    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    view = helper_generate_view()
+    incident.handle_update_locale_button(ack, client, body, view)
+
+    ack.assert_called_once()
 
 
 @patch("commands.incident.google_drive.update_incident_list")
@@ -518,6 +535,31 @@ def helper_client_locale(locale=""):
             "ok": True,
             "user": {"id": "user_id", "locale": "en-US"},
         }
+
+
+def helper_generate_modal(locale="en-US"):
+    return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": "incident_modal"},
+        "submit": {"type": "plain_text", "text": "submit"},
+        "blocks": [{
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "button",
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "change_locale",
+                    }
+                ],
+        }, ],
+    }
 
 
 def helper_generate_view(name="name"):
