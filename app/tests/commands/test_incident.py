@@ -234,14 +234,6 @@ def test_incident_open_modal_calls_incident_modal_view(
     mock_list_folders, mock_incident_modal_view
 ):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
-    folders = mock_list_folders()
-    options = [
-        {
-            "text": {"type": "plain_text", "text": i["name"]},
-            "value": i["id"],
-        }
-        for i in folders
-    ]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
@@ -249,7 +241,7 @@ def test_incident_open_modal_calls_incident_modal_view(
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     incident.open_modal(client, ack, command, body)
     ack.assert_called_once()
-    mock_incident_modal_view.assert_called_with(command, options, "en-US")
+    mock_incident_modal_view.assert_called_once()
 
 
 @patch("commands.incident.google_drive.list_folders")
