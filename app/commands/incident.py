@@ -142,6 +142,33 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
     }
 
 
+def update_view_modal(locale):
+    return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": i18n.t("incident.locale_button"),
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "incident_change_locale",
+                    }
+                ],
+            },
+        ],
+    }
+
+
 def open_modal(client, ack, command, body):
     ack()
     folders = google_drive.list_folders()
@@ -176,10 +203,12 @@ def handle_change_locale_button(ack, client, command, body):
         locale = "en-US"
     i18n.set("locale", locale)
     command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
-    if command["text"] == None:
+    if command["text"] is None:
         command["text"] = ""
     view = generate_incident_modal_view(command, options, locale)
-    client.views_update(view_id=body["view"]["id"], view=view)
+    client.views_update(
+        view_id=body["view"]["id"], hash=body["view"]["hash"], view=view
+    )
 
 
 def submit(ack, view, say, body, client, logger):
