@@ -77,7 +77,7 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
                             "emoji": True,
                         },
                         "value": locale,
-                        "action_id": "change_locale",
+                        "action_id": "incident_change_locale",
                     }
                 ],
             },
