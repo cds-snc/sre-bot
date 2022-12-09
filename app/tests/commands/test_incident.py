@@ -291,29 +291,32 @@ def test_incident_locale_button_calls_ack(
     # mock_get_user_locale.return_value = "fr-FR"
     ack = MagicMock()
     client = MagicMock()
+    command = {"text": "incident_command"}
+
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     view = helper_generate_view()
-    incident.handle_change_locale_button(ack, client, body, view)
+    incident.handle_change_locale_button(ack, client, command, body, view)
 
     ack.assert_called_once()
 
 
-@patch("commands.incident.i18n")
 @patch("commands.incident.generate_incident_modal_view")
 @patch("commands.utils.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_locale_button_updates_locale(
-    mock_list_folders, mock_get_user_locale, mock_generate_incident_modal_view, mock_i18n
+def test_incident_locale_button_updates_view_locale_value(
+    mock_list_folders,
+    mock_get_user_locale,
+    mock_generate_incident_modal_view,
 ):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
-    options = MagicMock()
+    options = helper_options()
     command = {"text": "incident_command"}
     mock_get_user_locale.return_value = "fr-FR"
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
     view = helper_generate_view()
-    incident.handle_change_locale_button(ack, client, body, view)
+    incident.handle_change_locale_button(ack, client, command, body, view)
 
     ack.assert_called
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
@@ -561,6 +564,10 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
+def helper_options():
+    return [{'text': {'type': 'plain_text', 'text': 'name'}, 'value': 'id'}]
+
+
 def helper_client_locale(locale=""):
     if locale == "fr":
         return {
@@ -580,7 +587,8 @@ def helper_generate_modal(locale="en-US"):
         "callback_id": "incident_view",
         "title": {"type": "plain_text", "text": "incident_modal"},
         "submit": {"type": "plain_text", "text": "submit"},
-        "blocks": [{
+        "blocks": [
+            {
                 "type": "actions",
                 "block_id": "locale",
                 "elements": [
@@ -595,7 +603,8 @@ def helper_generate_modal(locale="en-US"):
                         "action_id": "change_locale",
                     }
                 ],
-        }, ],
+            },
+        ],
     }
 
 
