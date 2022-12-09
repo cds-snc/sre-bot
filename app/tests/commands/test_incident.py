@@ -293,7 +293,7 @@ def test_incident_locale_button_calls_ack(
     client = MagicMock()
     command = {"text": "incident_command"}
 
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}]}
     view = helper_generate_view()
     incident.handle_change_locale_button(ack, client, command, body, view)
 
@@ -303,7 +303,7 @@ def test_incident_locale_button_calls_ack(
 @patch("commands.incident.generate_incident_modal_view")
 @patch("commands.utils.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_locale_button_updates_view_locale_value(
+def test_incident_locale_button_updates_view_modal_locale_value(
     mock_list_folders,
     mock_get_user_locale,
     mock_generate_incident_modal_view,
@@ -313,8 +313,7 @@ def test_incident_locale_button_updates_view_locale_value(
     client = MagicMock()
     options = helper_options()
     command = {"text": "incident_command"}
-    mock_get_user_locale.return_value = "fr-FR"
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}]}
     view = helper_generate_view()
     incident.handle_change_locale_button(ack, client, command, body, view)
 
@@ -565,7 +564,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
 
 
 def helper_options():
-    return [{'text': {'type': 'plain_text', 'text': 'name'}, 'value': 'id'}]
+    return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
 
 
 def helper_client_locale(locale=""):
