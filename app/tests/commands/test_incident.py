@@ -287,35 +287,29 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
 def test_incident_locale_button_calls_ack(
     mock_list_folders, mock_get_user_locale, mock_i18n
 ):
-    # mock_list_folders.return_value = [{"id": "id", "name": "name"}]
-    # mock_get_user_locale.return_value = "fr-FR"
     ack = MagicMock()
     client = MagicMock()
     command = {"text": "incident_command"}
 
-    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}]}
-    view = helper_generate_view()
-    incident.handle_change_locale_button(ack, client, command, body, view)
+    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}], "view": helper_generate_view(name=command["text"])}
+    incident.handle_change_locale_button(ack, client, command, body)
 
     ack.assert_called_once()
 
 
 @patch("commands.incident.generate_incident_modal_view")
-@patch("commands.utils.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_locale_button_updates_view_modal_locale_value(
     mock_list_folders,
-    mock_get_user_locale,
     mock_generate_incident_modal_view,
 ):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
     options = helper_options()
-    command = {"text": "incident_command"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}]}
-    view = helper_generate_view()
-    incident.handle_change_locale_button(ack, client, command, body, view)
+    command = {"text": "name"}
+    body = {"trigger_id": "trigger_id", "user_id": "user_id", "actions": [{"value": "fr-FR"}], "view": helper_generate_view(name=command["text"])}
+    incident.handle_change_locale_button(ack, client, command, body)
 
     ack.assert_called
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
@@ -609,6 +603,7 @@ def helper_generate_modal(locale="en-US"):
 
 def helper_generate_view(name="name", locale="en-US"):
     return {
+        "id": "view_id",
         "state": {
             "values": {
                 "name": {"name": {"value": name}},
