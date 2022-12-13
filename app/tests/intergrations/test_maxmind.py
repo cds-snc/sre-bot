@@ -21,7 +21,9 @@ def test_geolocate(geiop2_mock):
 
 @patch("integrations.maxmind.geoip2")
 def test_geolocate_not_found(geiop2_mock):
-    geiop2_mock.database.Reader().city.side_effect = geoip2.errors.AddressNotFoundError
+    geiop2_mock.database.Reader().city.side_effect = geoip2.errors.AddressNotFoundError(
+        "IP address not found"
+    )
     assert maxmind.geolocate("test_ip") == "IP address not found"
 
 
