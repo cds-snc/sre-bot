@@ -586,6 +586,35 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_submit_calls_success_modal(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
+    }
+    incident.submit(ack, view, say, body, client, logger)
+    incident.open_success_modal.assert_called_once()
+
+
 def helper_options():
     return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
 
