@@ -273,6 +273,9 @@ def submit(ack, view, say, body, client, logger):
     )
     say(text=text, channel=INCIDENT_CHANNEL)
 
+    # Add incident creator to channel
+    client.conversations_invite(channel=channel_id, users=user_id)
+
     # Add meeting link
     meet_link = f"https://g.co/meet/incident-{slug}"
     # Max character length for Google Meet nickname is 60, 78 with constant URI
