@@ -297,7 +297,7 @@ def test_incident_locale_button_calls_ack(
         "actions": [{"value": "fr-FR"}],
         "view": helper_generate_view(name=command["text"]),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called_once()
 
@@ -312,14 +312,14 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     ack = MagicMock()
     client = MagicMock()
     options = helper_options()
-    command = {"text": "name"}
+    command = {"text": "command_name"}
     body = {
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view(name=command["text"]),
+        "view": helper_generate_view("command_name"),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
@@ -330,14 +330,13 @@ def test_incident_local_button_calls_views_update(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
-    command = {"text": "name"}
     body = {
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view(name=command["text"]),
+        "view": helper_generate_view(),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
     args = client.views_update.call_args_list
     _, kwargs = args[0]
     ack.assert_called()
@@ -658,11 +657,42 @@ def test_incident_open_success_modal_calls_generate_success_modal(
         "trigger_id": "trigger_id",
         "view": {"id": "view_id", "blocks": [{"elements": [{"value": "en-US"}]}]},
     }
+    locale = "en-US"
     client = MagicMock()
     channel = {"url": "channel_url", "name": "channel_name"}
 
     incident.open_success_modal(ack, body, client, channel)
-    _mock_generate_success_modal.assert_called_once()
+    _mock_generate_success_modal.assert_called_with(channel, locale)
+
+
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_open_success_modal_calls_views_open(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {
+        "user": {"id": "user_id"},
+        "trigger_id": "trigger_id",
+        "view": {"id": "view_id", "blocks": [{"elements": [{"value": "en-US"}]}]},
+    }
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+
+    incident.submit(ack, view, say, body, client, logger)
+    client.views_open.assert_called_once()
 
 
 def helper_options():
