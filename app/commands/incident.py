@@ -142,33 +142,6 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
     }
 
 
-def update_view_modal(locale):
-    return {
-        "type": "modal",
-        "callback_id": "incident_view",
-        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
-        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
-        "blocks": [
-            {
-                "type": "actions",
-                "block_id": "locale",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": i18n.t("incident.locale_button"),
-                            "emoji": True,
-                        },
-                        "value": locale,
-                        "action_id": "incident_change_locale",
-                    }
-                ],
-            },
-        ],
-    }
-
-
 def open_modal(client, ack, command, body):
     ack()
     folders = google_drive.list_folders()
@@ -186,7 +159,7 @@ def open_modal(client, ack, command, body):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-def handle_change_locale_button(ack, client, command, body):
+def handle_change_locale_button(ack, client, body):
     ack()
     folders = google_drive.list_folders()
     options = [
@@ -211,7 +184,10 @@ def handle_change_locale_button(ack, client, command, body):
 
 def submit(ack, view, say, body, client, logger):
 
-    ack()
+    ack(
+        response_action="update",
+        view=generate_success_modal(body),
+    )
 
     errors = {}
 
@@ -323,3 +299,33 @@ def submit(ack, view, say, body, client, logger):
 
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)
+
+
+def generate_success_modal(body):
+    locale = body["view"]["blocks"][0]["elements"][0]["value"]
+    if locale != "fr-FR":
+        locale = "en-US"
+    i18n.set("locale", locale)
+    return {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "close": {"type": "plain_text", "text": "OK"},
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.success"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.user_added"),
+                    "emoji": True,
+                },
+            },
+        ],
+    }
