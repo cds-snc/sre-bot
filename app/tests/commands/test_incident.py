@@ -638,6 +638,33 @@ def test_incident_open_success_modal_calls_ack():
     ack.assert_called_once()
 
 
+@patch("commands.incident.generate_success_modal")
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_open_success_modal_calls_generate_success_modal(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+    _mock_generate_success_modal,
+):
+    ack = MagicMock()
+    body = {
+        "user": {"id": "user_id"},
+        "trigger_id": "trigger_id",
+        "view": {"id": "view_id", "blocks": [{"elements": [{"value": "en-US"}]}]},
+    }
+    client = MagicMock()
+    channel = {"url": "channel_url", "name": "channel_name"}
+
+    incident.open_success_modal(ack, body, client, channel)
+    _mock_generate_success_modal.assert_called_once()
+
+
 def helper_options():
     return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
 
