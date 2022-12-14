@@ -472,7 +472,7 @@ def test_incident_submit_adds_creator_to_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "creator_user_id"}}
+    body = {"user": {"id": "creator_user_id"}, "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
