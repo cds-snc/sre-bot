@@ -11,3 +11,5 @@ en-US:
     fill_the_fields: "Fill out the two fields below and you are good to go:"
     description: "Short description (ex: too many 500 errors)"
     product: "Select a product"
+    success: "Incident successfully created"
+    user_added: "You have been added to the incident's conversation."
