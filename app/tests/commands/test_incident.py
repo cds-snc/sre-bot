@@ -392,6 +392,13 @@ def test_incident_submit_calls_ack_with_response_action(
     )
 
 
+def test_incident_generate_success_modal_returns_view_with_channel_link():
+    view = helper_generate_view("test")
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    success_view = incident.generate_success_modal(body)
+    assert success_view["blocks"][1]["text"]["text"] == f"You have been added to the incident's conversation:\n\n#incident-{DATE}-test"
+
+
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
     ack = MagicMock()
     logger = MagicMock()
@@ -658,41 +665,17 @@ def helper_client_locale(locale=""):
         }
 
 
-def helper_generate_success_modal(channel_url="channel_url", locale="en-US"):
+def helper_generate_success_modal(title="title", header="header", message="message"):
     return {
         "type": "modal",
-        "title": {"type": "plain_text", "text": "incident_modal"},
+        "title": {"type": "plain_text", "text": title},
         "close": {"type": "plain_text", "text": "OK"},
         "blocks": [
-            {
-                "type": "actions",
-                "block_id": "locale",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "button",
-                            "emoji": True,
-                        },
-                        "value": locale,
-                        "action_id": "incident_change_locale",
-                    }
-                ],
-            },
             {
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "Incident successfully created",
-                    "emoji": True,
-                },
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "plain_text",
-                    "text": "You have kicked off an incident process.\n\nYou can now use link below to join the discussion:",
+                    "text": header,
                     "emoji": True,
                 },
             },
@@ -700,7 +683,7 @@ def helper_generate_success_modal(channel_url="channel_url", locale="en-US"):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"<{channel_url}|this is a link>",
+                    "text": message,
                 },
             },
         ],
