@@ -306,6 +306,11 @@ def submit(ack, view, say, body, client, logger):
 
 def generate_success_modal(body):
     locale = body["view"]["blocks"][0]["elements"][0]["value"]
+    name = body["view"]["state"]["values"]["name"]["name"]["value"]
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    slug = f"{date} {name}".replace(" ", "-").lower()
+
+    channel_name = f"#incident-{slug}"
     if locale != "fr-FR":
         locale = "en-US"
     i18n.set("locale", locale)
@@ -325,9 +330,8 @@ def generate_success_modal(body):
             {
                 "type": "section",
                 "text": {
-                    "type": "plain_text",
-                    "text": i18n.t("incident.modal.user_added"),
-                    "emoji": True,
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.user_added", channel_name=channel_name),
                 },
             },
         ],
