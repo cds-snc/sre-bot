@@ -11,3 +11,5 @@ fr-FR:
     fill_the_fields: "Remplissez les deux champs ici-bas et vous pourrez commencer:"
     description: "Courte description (ex: trop d'erreurs 500)"
     product: "Choisissez un produit"
+    success: "Incident créé avec succès"
+    user_added: "Vous avez ajouté à la discussion de cet incident."

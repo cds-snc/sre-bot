@@ -297,7 +297,7 @@ def test_incident_locale_button_calls_ack(
         "actions": [{"value": "fr-FR"}],
         "view": helper_generate_view(name=command["text"]),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called_once()
 
@@ -312,14 +312,14 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     ack = MagicMock()
     client = MagicMock()
     options = helper_options()
-    command = {"text": "name"}
+    command = {"text": "command_name"}
     body = {
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view(name=command["text"]),
+        "view": helper_generate_view("command_name"),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
@@ -330,14 +330,13 @@ def test_incident_local_button_calls_views_update(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
-    command = {"text": "name"}
     body = {
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view(name=command["text"]),
+        "view": helper_generate_view(),
     }
-    incident.handle_change_locale_button(ack, client, command, body)
+    incident.handle_change_locale_button(ack, client, body)
     args = client.views_update.call_args_list
     _, kwargs = args[0]
     ack.assert_called()
@@ -360,10 +359,37 @@ def test_incident_submit_calls_ack(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     incident.submit(ack, view, say, body, client, logger)
-    ack.assert_called_once()
+    ack.assert_called()
+
+
+@patch("commands.incident.generate_success_modal")
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_submit_calls_ack_with_response_action(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+    _mock_generate_success_modal,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    incident.submit(ack, view, say, body, client, logger)
+    ack.assert_called_once_with(
+        response_action="update",
+        view=_mock_generate_success_modal(body),
+    )
 
 
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
@@ -371,7 +397,7 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
     logger = MagicMock()
     view = helper_generate_view("!@#$%%^&*()_+-=[]{};':,./<>?\\|`~")
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
@@ -387,7 +413,7 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     logger = MagicMock()
     view = helper_generate_view("a" * 81)
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     incident.submit(ack, view, say, body, client, logger)
     ack.assert_any_call(
@@ -414,7 +440,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -446,7 +472,7 @@ def test_incident_submit_adds_creator_to_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "creator_user_id"}}
+    body = {"user": {"id": "creator_user_id"}, "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -476,7 +502,7 @@ def test_incident_submit_truncates_meet_link_if_too_long(
     view = helper_generate_view(name)
     meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": f"channel_{name}"}
@@ -513,7 +539,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -549,7 +575,8 @@ def test_incident_submit_creates_a_document_and_announces_it(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -591,7 +618,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}}
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -631,12 +658,11 @@ def helper_client_locale(locale=""):
         }
 
 
-def helper_generate_modal(locale="en-US"):
+def helper_generate_success_modal(channel_url="channel_url", locale="en-US"):
     return {
         "type": "modal",
-        "callback_id": "incident_view",
         "title": {"type": "plain_text", "text": "incident_modal"},
-        "submit": {"type": "plain_text", "text": "submit"},
+        "close": {"type": "plain_text", "text": "OK"},
         "blocks": [
             {
                 "type": "actions",
@@ -654,6 +680,29 @@ def helper_generate_modal(locale="en-US"):
                     }
                 ],
             },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "Incident successfully created",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "plain_text",
+                    "text": "You have kicked off an incident process.\n\nYou can now use link below to join the discussion:",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"<{channel_url}|this is a link>",
+                },
+            },
         ],
     }
 
@@ -661,6 +710,11 @@ def helper_generate_modal(locale="en-US"):
 def helper_generate_view(name="name", locale="en-US"):
     return {
         "id": "view_id",
+        "blocks": [
+            {
+                "elements": [{"value": locale}],
+            },
+        ],
         "state": {
             "values": {
                 "name": {"name": {"value": name}},
