@@ -331,7 +331,9 @@ def generate_success_modal(body):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": i18n.t("incident.modal.user_added", channel_name=channel_name),
+                    "text": i18n.t(
+                        "incident.modal.user_added", channel_name=channel_name
+                    ),
                 },
             },
         ],

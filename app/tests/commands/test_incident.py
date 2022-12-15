@@ -396,7 +396,10 @@ def test_incident_generate_success_modal_returns_view_with_channel_link():
     view = helper_generate_view("test")
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     success_view = incident.generate_success_modal(body)
-    assert success_view["blocks"][1]["text"]["text"] == f"You have been added to the incident's conversation:\n\n#incident-{DATE}-test"
+    assert (
+        success_view["blocks"][1]["text"]["text"]
+        == f"You have been added to the incident's conversation:\n\n#incident-{DATE}-test"
+    )
 
 
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
