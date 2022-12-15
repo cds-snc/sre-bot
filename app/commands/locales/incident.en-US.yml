@@ -12,4 +12,4 @@ en-US:
     description: "Short description (ex: too many 500 errors)"
     product: "Select a product"
     success: "Incident successfully created"
-    user_added: "You have been added to the incident's conversation."
+    user_added: "You have been added to the incident's conversation:\n\n%{channel_name}"
