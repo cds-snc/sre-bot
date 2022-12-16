@@ -2,26 +2,26 @@ version: '3'
 
 services:
   dynamodb-local:
-      command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
-      image: "amazon/dynamodb-local:latest@sha256:1ed00881c937310f68f1e556b016af4f3bde711673ced3fbee355941b4c92151"
-      container_name: dynamodb-local
-      ports:
-        - "9000:8000"
-      volumes:
-        - "./docker/dynamodb:/home/dynamodblocal/data"
-      working_dir: /home/dynamodblocal
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest@sha256:1ed00881c937310f68f1e556b016af4f3bde711673ced3fbee355941b4c92151"
+    container_name: dynamodb-local
+    ports:
+      - "9000:8000"
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
   app:
     depends_on:
       - dynamodb-local
-    build: 
+    build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
       args:
-        VARIANT: "3.10"
+        VARIANT: "3.11"
         INSTALL_NODE: "true"
         NODE_VERSION: "lts/*"
     volumes:
-      - ..:/workspace:cached   
+      - ..:/workspace:cached
     command: sleep infinity
     environment:
       AWS_ACCESS_KEY_ID: 'AWS_ACCESS_KEY_ID'
