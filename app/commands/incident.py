@@ -201,10 +201,10 @@ def submit(ack, view, say, body, client, logger):
         errors[
             "name"
         ] = "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
-    if len(name) > 80:
+    if len(name) > 60:
         errors[
             "name"
-        ] = "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
+        ] = "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
         return

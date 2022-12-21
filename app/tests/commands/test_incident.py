@@ -411,7 +411,7 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
 def test_incident_submit_returns_error_if_description_is_too_long():
     ack = MagicMock()
     logger = MagicMock()
-    view = helper_generate_view("a" * 81)
+    view = helper_generate_view("a" * 61)
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
@@ -419,7 +419,7 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     ack.assert_any_call(
         response_action="errors",
         errors={
-            "name": "Description must be less than 80 characters // La description doit contenir moins de 80 caractères"
+            "name": "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
         },
     )
 
@@ -498,7 +498,7 @@ def test_incident_submit_truncates_meet_link_if_too_long(
 ):
     ack = MagicMock()
     logger = MagicMock()
-    name = "a" * 80
+    name = "a" * 60
     view = helper_generate_view(name)
     meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
     say = MagicMock()
