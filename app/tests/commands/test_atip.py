@@ -144,7 +144,7 @@ def test_atip_command_handles_access_EN_command(request_start_modal):
 
     atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
     ack.assert_called
-    request_start_modal.assert_called_with(client, body, locale="en-US")
+    request_start_modal.assert_called_with(client, body, "en-US")
 
 
 @patch("commands.atip.request_start_modal")
@@ -157,7 +157,7 @@ def test_atip_command_handles_access_FR_command(request_start_modal):
 
     atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
     ack.assert_called
-    request_start_modal.assert_called_with(client, body, locale="fr-FR")
+    request_start_modal.assert_called_with(client, body, "fr-FR")
 
 
 @patch("commands.atip.atip_modal_view")

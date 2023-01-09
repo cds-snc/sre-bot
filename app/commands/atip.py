@@ -30,10 +30,10 @@ def atip_command(ack, command, logger, respond, client, body):
             respond(i18n.t("atip.help_text", command=command["command"]))
         case "start":
             i18n.set("locale", "en-US")
-            request_start_modal(client, body, locale="en-US", *args)
+            request_start_modal(client, body, "en-US", *args)
         case "lancer":
             i18n.set("locale", "fr-FR")
-            request_start_modal(client, body, locale="fr-FR", *args)
+            request_start_modal(client, body, "fr-FR", *args)
         case _:
             respond(
                 i18n.t(
