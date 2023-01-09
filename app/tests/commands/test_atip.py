@@ -317,14 +317,24 @@ def helper_generate_payload(locale):
             "type": "modal",
             "private_metadata": "",
             "callback_id": "atip_view",
+            "blocks": [{
+                "type": "actions",
+                "block_id": "ati_locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "action_id": "atip_change_locale",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Français",
+                            "emoji": True
+                        },
+                        "value": locale
+                    }
+                ]
+            }, ],
             "state": {
                 "values": {
-                    "ati_locale": {
-                        "atip_change_locale": {
-                            "type": "plain_text_input",
-                            "value": locale,
-                        }
-                    },
                     "ati_id": {
                         "ati_id": {"type": "plain_text_input", "value": "number"}
                     },

@@ -340,9 +340,7 @@ def atip_width_action(ack):
 def atip_view_handler(ack, body, say, logger, client):
     ack()
 
-    ati_locale = body["view"]["state"]["values"]["ati_locale"]["atip_change_locale"][
-        "value"
-    ]
+    ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
     ati_content = body["view"]["state"]["values"]["ati_content"]["ati_content"]["value"]
     ati_contact = body["view"]["state"]["values"]["ati_contact"]["ati_contact"][
