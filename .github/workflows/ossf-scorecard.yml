@@ -4,6 +4,7 @@ on:
   schedule:
     # Weekly on Saturdays.
     - cron: "30 1 * * 6"
+  pull_request:
   push:
     branches:
       - main
@@ -33,10 +34,17 @@ jobs:
           results_format: json
           publish_results: false
 
-      - name: "Post results to Sentinel"
-        uses: cds-snc/sentinel-forward-data-action@main
-        with:
-          file_name: ossf-results.json
-          log_type: GitHubMetadata_OSSF_Scorecard
-          log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-          log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+      - name: "Add metadata"
+        run: |
+          jq '.metadata_owner |= "$GITHUB_REPOSITORY_OWNER"' ossf-results.json
+          jq '.metadata_repo |= "$GITHUB_REPOSITORY"' ossf-results.json
+          jq '.metadata_query_s |= "ossf"' ossf-results.json 
+          cat ossf-results.json
+
+      #- name: "Post results to Sentinel"
+      #  uses: cds-snc/sentinel-forward-data-action@main
+      #  with:
+      #    file_name: ossf-results.json
+      #    log_type: GitHubMetadata_OSSF_Scorecard
+      #    log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+      #    log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
