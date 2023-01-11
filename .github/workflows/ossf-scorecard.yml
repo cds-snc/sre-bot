@@ -16,8 +16,6 @@ jobs:
     name: Scorecards analysis
     runs-on: ubuntu-latest
     permissions:
-      # Needed to upload the results to code-scanning dashboard.
-      security-events: write
       actions: read
       contents: read
 
@@ -36,7 +34,7 @@ jobs:
 
       - name: "Add metadata"
         run: |
-          jq '. + {"metadata_owner": "${{ env.GITHUB_REPOSITORY_OWNER }}", "metadata_repo": "${{ env.GITHUB_REPOSITORY }}", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
+          jq '. + {"metadata_owner": "${{ github.repository_owner }}", "metadata_repo": "${{ env.GITHUB_REPOSITORY }}", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
           cat ossf-results-modified.json
 
       #- name: "Post results to Sentinel"
