@@ -12,16 +12,24 @@ jobs:
   analysis:
     name: Scorecards analysis
     runs-on: ubuntu-latest
+    permissions:
+      # Needed to upload the results to code-scanning dashboard.
+      security-events: write
+      actions: read
+      contents: read
 
     steps:
       - name: "Checkout code"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          persist-credentials: false
 
       - name: "Run analysis"
-        uses: ossf/scorecard-action@3e15ea8318eee9b333819ec77a36aca8d39df13e # tag=v1.1.1
+        uses: ossf/scorecard-action@e38b1902ae4f44df626f11ba0734b14fb91f8f86
         with:
           results_file: results.json
           results_format: json
+          publish_results: false
 
       - name: "Echo results"
         run: cat results.json
