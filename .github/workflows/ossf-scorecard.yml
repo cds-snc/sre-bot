@@ -34,7 +34,10 @@ jobs:
 
       - name: "Add metadata"
         run: |
-          jq '. + {"metadata_owner": "${{ github.repository_owner }}", "metadata_repo": "${{ env.GITHUB_REPOSITORY }}", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
+          full_repo="${{ github.repository }}"
+          OWNER=${full_repo%/*}
+          REPO=${full_repo#*/}
+          jq '. + {"metadata_owner": "$OWNER", "metadata_repo": "$REPO", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
           cat ossf-results-modified.json
 
       #- name: "Post results to Sentinel"
