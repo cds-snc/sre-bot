@@ -1,0 +1,27 @@
+name: Scorecards supply-chain security
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly on Saturdays.
+    - cron: "30 1 * * 6"
+  pull_request:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecards analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+
+      - name: "Run analysis"
+        uses: ossf/scorecard-action@3e15ea8318eee9b333819ec77a36aca8d39df13e # tag=v1.1.1
+        with:
+          results_file: results.json
+          results_format: json
+
+      - name: "Echo results"
+        run: cat results.json
