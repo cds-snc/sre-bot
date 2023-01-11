@@ -35,7 +35,7 @@ jobs:
           publish_results: false
 
       - name: "Post results to Sentinel"
-        uses: cds-snc/sentinel-forward-data-action@main
+        uses: cds-snc/sentinel-forward-data-action
         with:
           file_name: ossf-results.json
           log_type: GitHubMetadata_OSSF_Scorecard
