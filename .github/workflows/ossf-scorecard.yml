@@ -36,7 +36,7 @@ jobs:
 
       - name: "Add metadata"
         run: |
-          jq '. + {"metadata_owner": "$GITHUB_REPOSITORY_OWNER", "metadata_repo": "$GITHUB_REPOSITORY", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
+          jq '. + {"metadata_owner": "${{ env.GITHUB_REPOSITORY_OWNER }}", "metadata_repo": "${{ env.GITHUB_REPOSITORY }}", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
           cat ossf-results-modified.json
 
       #- name: "Post results to Sentinel"
