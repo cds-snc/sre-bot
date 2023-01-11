@@ -15,8 +15,6 @@ jobs:
     name: Scorecards analysis
     runs-on: ubuntu-latest
     permissions:
-      # Needed to upload the results to code-scanning dashboard.
-      security-events: write
       actions: read
       contents: read
 
@@ -33,10 +31,17 @@ jobs:
           results_format: json
           publish_results: false
 
+      - name: "Add metadata"
+        run: |
+          full_repo="${{ github.repository }}"
+          OWNER=${full_repo%/*}
+          REPO=${full_repo#*/}
+          jq '. + {"metadata_owner": "'$OWNER'", "metadata_repo": "'$REPO'", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
+
       - name: "Post results to Sentinel"
         uses: cds-snc/sentinel-forward-data-action@main
         with:
-          file_name: ossf-results.json
+          file_name: ossf-results-modified.json
           log_type: GitHubMetadata_OSSF_Scorecard
           log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
