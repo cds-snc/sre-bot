@@ -37,7 +37,6 @@ jobs:
           OWNER=${full_repo%/*}
           REPO=${full_repo#*/}
           jq -c '. + {"metadata_owner": "'$OWNER'", "metadata_repo": "'$REPO'", "metadata_query": "ossf"}' ossf-results.json > ossf-results-modified.json
-          cat ossf-results-modified.json
 
       - name: "Post results to Sentinel"
         uses: cds-snc/sentinel-forward-data-action@main
