@@ -10,7 +10,7 @@ jobs:
       - name: Report deployment to Sentinel
         uses: cds-snc/sentinel-forward-data-action@main
         with:
-          input_data: '{"product": "sre-bot", "version": "$GITHUB_SHA", "repository": "$GITHUB_REPOSITORY", "environment": "production"}'
+          input_data: '{"product": "sre-bot", "version": "${{ github.ref }}", "repository": "${{ github.repository }}", "environment": "production"}'
           log_type: Max_Test
           log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
