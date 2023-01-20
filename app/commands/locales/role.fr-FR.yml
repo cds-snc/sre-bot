@@ -7,7 +7,6 @@ fr-FR:
   unknown_command: "Désolé mais je ne comprends pas cette commande. Veuillez saisir /aide help pour obtenir des informations sur l'utilisation"
   title: "Créer un nouveau rôle"
   input_label: "Veuillez entrer le nouveau rôle"
-  folders: "Sélectionnez le dossier parent"
   placeholder_role: "Saisir un rôle"
   placeholder_channel: "Saisissez un nom de chaîne"
   select_users: "Sélectionnez les utilisateurs"
