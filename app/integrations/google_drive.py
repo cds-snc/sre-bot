@@ -13,7 +13,6 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
-TALENT_DRIVE_ID = os.environ.get("TALENT_DRIVE_ID")
 
 PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
 
