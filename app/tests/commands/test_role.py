@@ -220,19 +220,6 @@ def test_update_modal_locale_to_FR():
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "fr-FR"
 
 
-# @patch("commands.role.google_drive.create_new_folder")
-# def test_create_new_folder(mock_create_new_folder):
-#     ack = MagicMock()
-#     say = MagicMock()
-#     logger = MagicMock()
-#     body = body = helper_body_payload("en-US")
-#     client = MagicMock()
-#     mock_parent_folder = MagicMock()
-#     mock_create_new_folder.return_value = "id"
-#     role.role_view_handler(ack, body, say, logger, client)
-#     mock_create_new_folder.assert_called_once_with("name", mock_parent_folder)
-
-
 def helper_client_locale(locale=""):
     if locale == "fr":
         return {
