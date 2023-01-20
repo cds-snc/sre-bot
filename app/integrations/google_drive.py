@@ -13,6 +13,7 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
+TALENT_DRIVE_ID = os.environ.get("TALENT_DRIVE_ID")
 
 PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
 
@@ -75,6 +76,25 @@ def create_folder(name):
     return f"Created folder {results['name']}"
 
 
+# Creates a new folder in the parent_folder directory
+def create_new_folder(name, parent_folder):
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [parent_folder],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
+
+
 def create_new_incident(name, folder):
     service = get_google_service("drive", "v3")
     result = (
@@ -87,6 +107,35 @@ def create_new_incident(name, folder):
         .execute()
     )
     return result["id"]
+
+
+# Copies a file from the parent_folder to the destination_folder
+def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
+    # create the copy
+    service = get_google_service("drive", "v3")
+    copied_file = (
+        service.files()
+        .copy(
+            fileId=file_id,
+            body={"name": name, "parents": [parent_folder_id]},
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    # move the copy to the new folder
+    updated_file = (
+        service.files()
+        .update(
+            fileId=copied_file["id"],
+            addParents=destination_folder_id,
+            removeParents=parent_folder_id,
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return updated_file["id"]
 
 
 def delete_metadata(file_id, key):
@@ -102,6 +151,44 @@ def delete_metadata(file_id, key):
         .execute()
     )
     return result
+
+
+# Creates a new google docs file in the parent_folder directory
+def create_new_docs_file(name, parent_folder_id):
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.document",
+                "parents": [parent_folder_id],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
+
+
+# Creates a new google sheets file in the parent_folder directory
+def create_new_sheets_file(name, parent_folder_id):
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.spreadsheet",
+                "parents": [parent_folder_id],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
 
 
 def get_document_by_channel_name(channel_name):
@@ -135,6 +222,26 @@ def list_folders():
                 SRE_INCIDENT_FOLDER, "Templates"
             ),
             driveId=SRE_DRIVE_ID,
+            fields="nextPageToken, files(id, name)",
+        )
+        .execute()
+    )
+    return results.get("files", [])
+
+
+def list_all_folders(driveID, folderID):
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .list(
+            pageSize=25,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            corpora="drive",
+            q="parents in '{}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false and not name contains '{}'".format(
+                folderID, "Templates"
+            ),
+            driveId=driveID,
             fields="nextPageToken, files(id, name)",
         )
         .execute()

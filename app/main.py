@@ -4,7 +4,7 @@ import logging
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import atip, aws, incident, sre
+from commands import atip, aws, incident, sre, role
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -30,6 +30,11 @@ def main():
 
     # Add bot to server_app
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+
+    # Register Roles commands
+    bot.command(f"/{PREFIX}role")(role.role_command)
+    bot.view("role_view")(role.role_view_handler)
+    bot.action("role_change_locale")(role.update_modal_locale)
 
     # Register ATIP commands
     bot.command(f"/{PREFIX}atip")(atip.atip_command)
