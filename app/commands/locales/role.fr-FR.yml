@@ -8,7 +8,7 @@ fr-FR:
   title: "Créer un nouveau rôle"
   input_label: "Veuillez entrer le nouveau rôle"
   placeholder_role: "Saisir un rôle"
-  placeholder_channel: "Saisissez un nom de chaîne"
+  placeholder_channel: "Saisissez un nom de canal"
   select_users: "Sélectionnez les utilisateurs"
   channel_name: "Entrez le nom du canal privé que vous souhaitez créer"
   channel_invitees: "Sélectionnez tous les utilisateurs qui doivent être ajoutés au canal"
