@@ -13,16 +13,16 @@ i18n.load_path.append("./commands/locales/")
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-CA")
 
-# Function to update the locale
-
 
 def update_locale(locale):
+    # Function to update the locale
     if i18n.get("locale") != locale:
         i18n.set("locale", locale)
 
 
-# Function to execute the role command based on the arguments provided
 def role_command(ack, command, logger, respond, client, body):
+    # Function to execute the role command based on the arguments provided
+
     # acknowledge to slack that the command was received
     ack()
 
@@ -66,8 +66,8 @@ def request_start_modal(client, body, locale):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-# Function to display the GUI for creating a new role
 def role_modal_view(locale):
+    # Function to display the GUI for creating a new role
     view = {
         "type": "modal",
         "callback_id": "role_view",
@@ -152,6 +152,11 @@ def role_view_handler(ack, body, say, logger, client):
     logger.info("Body is: %s", body)
 
     role_name = body["view"]["state"]["values"]["role_name"]["role_name"]["value"]
+    logger.info("Role name is: %s", role_name)
+    private_channel_name = body["view"]["state"]["values"]["channel_name"][
+        "channel_name"
+    ]["value"]
+    logger.info("Channel name is: %s", private_channel_name)
 
     # Steps to execute when the modal is submitted:
     # 1. Create a new folder in the Google Drive
@@ -215,41 +220,38 @@ def role_view_handler(ack, body, say, logger, client):
     logger.info(
         f"Created document: SoMC Template in folder: SoMC Template / {somc_template_id}"
     )
-
     # Create channel
-    if role_name in client.conversations_list()["channels"][0]["name"]:
-        logger.warning(f"Channel already exists: {role_name}")
-    else:
-        response = client.conversations_create(name=role_name, is_private=True)
+    response = client.conversations_create(name=private_channel_name, is_private=True)
 
-        channel_name = response["channel"]["name"]
-        logger.info(f"Created conversation: {channel_name}")
-        channel_id = response["channel"]["id"]
+    channel_name = response["channel"]["name"]
+    logger.info(f"Created conversation: {channel_name}")
+    channel_id = response["channel"]["id"]
 
-        # Set topic and include the scoring guide id
-        client.conversations_setTopic(
-            channel=channel_id,
-            topic=f"Channel for {role_name}\nScoring Guide: https://docs.google.com/spreadsheets/d/{scoring_guide_id}",
-        )
-        # Announce channel creation
-        user_id = body["user"]["id"]
-        text = (
-            f"<@{user_id}> has created a new channel for {role_name} with channel name {channel_name}"
-            f" in <#{channel_id}>\n"
-        )
-        say(text=text, channel=channel_id)
+    # Set topic and include the scoring guide id
+    client.conversations_setTopic(
+        channel=channel_id,
+        topic=f"Channel for {role_name}\nScoring Guide: https://docs.google.com/spreadsheets/d/{scoring_guide_id}",
+    )
+    # Announce channel creation
+    user_id = body["user"]["id"]
+    text = (
+        f"<@{user_id}> has created a new channel for {role_name} with channel name {channel_name}"
+        f" in <#{channel_id}>\n"
+    )
+    say(text=text, channel=channel_id)
 
-        # Add incident creator to channel
-        client.conversations_invite(channel=channel_id, users=user_id)
+    # Add role creator to channel
+    client.conversations_invite(channel=channel_id, users=user_id)
 
-        # Invite others to the channel
-        users = body["view"]["state"]["values"]["users_invited"]["users_invited"][
-            "selected_users"
-        ]
-        client.conversations_invite(channel=channel_id, users=",".join(users))
+    # Invite others to the channel
+    users = body["view"]["state"]["values"]["users_invited"]["users_invited"][
+        "selected_users"
+    ]
+    client.conversations_invite(channel=channel_id, users=",".join(users))
 
 
 def update_modal_locale(ack, client, body):
+    # update the locale
     ack()
     locale = next(
         (

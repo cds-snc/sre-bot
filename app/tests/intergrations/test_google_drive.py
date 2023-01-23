@@ -49,6 +49,15 @@ def test_create_folder_returns_folder_name(get_google_service_mock):
 
 
 @patch("integrations.google_drive.get_google_service")
+def test_create_new_folder_returns_folder_id(get_google_service_mock):
+    # test that a new folder created returns the folder id
+    get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
+        "id": "foo"
+    }
+    assert google_drive.create_new_folder("name", "parent_folder") == "foo"
+
+
+@patch("integrations.google_drive.get_google_service")
 def test_create_new_incident(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.copy.return_value.execute.return_value = {
         "id": "test_incident"
@@ -56,6 +65,46 @@ def test_create_new_incident(get_google_service_mock):
     assert (
         google_drive.create_new_incident("test_incident", "test_folder")
         == "test_incident"
+    )
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_create_new_google_doc_file(get_google_service_mock):
+    # test that a new google doc is successfully created
+    get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
+        "id": "google_doc_id"
+    }
+    assert (
+        google_drive.create_new_docs_file("name", "parent_folder_id") == "google_doc_id"
+    )
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_create_new_google_sheets_file(get_google_service_mock):
+    # test that a new google sheets is successfully created
+    get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
+        "id": "google_sheets_id"
+    }
+    assert (
+        google_drive.create_new_sheets_file("name", "parent_folder_id")
+        == "google_sheets_id"
+    )
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_copy_file_to_folder(get_google_service_mock):
+    # test that we can successfully copy files to a different folder
+    get_google_service_mock.return_value.files.return_value.copy.return_value.execute.return_value = {
+        "id": "file_id"
+    }
+    get_google_service_mock.return_value.files.return_value.update.return_value.execute.return_value = {
+        "id": "updated_file_id"
+    }
+    assert (
+        google_drive.copy_file_to_folder(
+            "file_id", "name", "parent_folder", "destination_folder"
+        )
+        == "updated_file_id"
     )
 
 

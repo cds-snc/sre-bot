@@ -75,8 +75,8 @@ def create_folder(name):
     return f"Created folder {results['name']}"
 
 
-# Creates a new folder in the parent_folder directory
 def create_new_folder(name, parent_folder):
+    # Creates a new folder in the parent_folder directory
     service = get_google_service("drive", "v3")
     results = (
         service.files()
@@ -108,8 +108,8 @@ def create_new_incident(name, folder):
     return result["id"]
 
 
-# Copies a file from the parent_folder to the destination_folder
 def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
+    # Copies a file from the parent_folder to the destination_folder
     # create the copy
     service = get_google_service("drive", "v3")
     copied_file = (
@@ -152,8 +152,8 @@ def delete_metadata(file_id, key):
     return result
 
 
-# Creates a new google docs file in the parent_folder directory
 def create_new_docs_file(name, parent_folder_id):
+    # Creates a new google docs file in the parent_folder directory
     service = get_google_service("drive", "v3")
     results = (
         service.files()
@@ -171,8 +171,8 @@ def create_new_docs_file(name, parent_folder_id):
     return results["id"]
 
 
-# Creates a new google sheets file in the parent_folder directory
 def create_new_sheets_file(name, parent_folder_id):
+    # Creates a new google sheets file in the parent_folder directory
     service = get_google_service("drive", "v3")
     results = (
         service.files()
@@ -221,26 +221,6 @@ def list_folders():
                 SRE_INCIDENT_FOLDER, "Templates"
             ),
             driveId=SRE_DRIVE_ID,
-            fields="nextPageToken, files(id, name)",
-        )
-        .execute()
-    )
-    return results.get("files", [])
-
-
-def list_all_folders(driveID, folderID):
-    service = get_google_service("drive", "v3")
-    results = (
-        service.files()
-        .list(
-            pageSize=25,
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-            corpora="drive",
-            q="parents in '{}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false and not name contains '{}'".format(
-                folderID, "Templates"
-            ),
-            driveId=driveID,
             fields="nextPageToken, files(id, name)",
         )
         .execute()

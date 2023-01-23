@@ -32,7 +32,7 @@ def main():
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
 
     # Register Roles commands
-    bot.command(f"/{PREFIX}role")(role.role_command)
+    bot.command(f"/{PREFIX}talent-role")(role.role_command)
     bot.view("role_view")(role.role_view_handler)
     bot.action("role_change_locale")(role.update_modal_locale)
 
