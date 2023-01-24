@@ -138,7 +138,7 @@ def test_role_command_handles_unknown_command_FR_client():
     )
     ack.assert_called
     respond.assert_called_with(
-        "Désolé mais je ne comprends pas cette commande. Veuillez saisir /aide help pour obtenir des informations sur l'utilisation"
+        "Désolé mais je ne comprends pas cette commande. Veuillez saisir /role aide pour obtenir des informations sur l'utilisation"
     )
 
 
