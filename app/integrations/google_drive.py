@@ -75,6 +75,25 @@ def create_folder(name):
     return f"Created folder {results['name']}"
 
 
+def create_new_folder(name, parent_folder):
+    # Creates a new folder in the parent_folder directory
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [parent_folder],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
+
+
 def create_new_incident(name, folder):
     service = get_google_service("drive", "v3")
     result = (
@@ -87,6 +106,35 @@ def create_new_incident(name, folder):
         .execute()
     )
     return result["id"]
+
+
+def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
+    # Copies a file from the parent_folder to the destination_folder
+    # create the copy
+    service = get_google_service("drive", "v3")
+    copied_file = (
+        service.files()
+        .copy(
+            fileId=file_id,
+            body={"name": name, "parents": [parent_folder_id]},
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    # move the copy to the new folder
+    updated_file = (
+        service.files()
+        .update(
+            fileId=copied_file["id"],
+            addParents=destination_folder_id,
+            removeParents=parent_folder_id,
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return updated_file["id"]
 
 
 def delete_metadata(file_id, key):
@@ -102,6 +150,44 @@ def delete_metadata(file_id, key):
         .execute()
     )
     return result
+
+
+def create_new_docs_file(name, parent_folder_id):
+    # Creates a new google docs file in the parent_folder directory
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.document",
+                "parents": [parent_folder_id],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
+
+
+def create_new_sheets_file(name, parent_folder_id):
+    # Creates a new google sheets file in the parent_folder directory
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .create(
+            body={
+                "name": name,
+                "mimeType": "application/vnd.google-apps.spreadsheet",
+                "parents": [parent_folder_id],
+            },
+            supportsAllDrives=True,
+            fields="id",
+        )
+        .execute()
+    )
+    return results["id"]
 
 
 def get_document_by_channel_name(channel_name):
