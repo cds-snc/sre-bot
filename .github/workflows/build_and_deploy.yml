@@ -12,7 +12,7 @@ env:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -60,3 +60,11 @@ jobs:
           log_type: CDS_Product_Deployment_Data
           log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
+      - name: Docker generate SBOM
+        uses: cds-snc/security-tools/.github/actions/generate-sbom@19c655b47ec24d168ecbc701cee18701ab55f071 # v2.1.1
+        with:
+          docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
+          dockerfile_path: "app/Dockerfile"
+          sbom_name: "sre-bot"
+          token: "${{ secrets.GITHUB_TOKEN }}"          
