@@ -63,6 +63,8 @@ jobs:
 
       - name: Docker generate SBOM
         uses: cds-snc/security-tools/.github/actions/generate-sbom@19c655b47ec24d168ecbc701cee18701ab55f071 # v2.1.1
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/arm64        
         with:
           docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
           dockerfile_path: "app/Dockerfile"
