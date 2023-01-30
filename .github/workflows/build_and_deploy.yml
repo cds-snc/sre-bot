@@ -62,11 +62,10 @@ jobs:
           log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
       - name: Docker generate SBOM
-        uses: cds-snc/security-tools/.github/actions/generate-sbom@19c655b47ec24d168ecbc701cee18701ab55f071 # v2.1.1
-        env:
-          DOCKER_DEFAULT_PLATFORM: linux/arm64        
+        uses: cds-snc/security-tools/.github/actions/generate-sbom@2ac1ab2344ce61d314f8a4a78b731097ae6c4f6d # v2.1.2    
         with:
           docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
           dockerfile_path: "app/Dockerfile"
+          platform: "linux/arm64"
           sbom_name: "sre-bot"
           token: "${{ secrets.GITHUB_TOKEN }}"          
