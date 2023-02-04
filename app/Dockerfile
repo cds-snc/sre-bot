@@ -1,4 +1,4 @@
-FROM arm64v8/python:3.11.1-slim@sha256:42d9f9249bd29593a40a29b60280ef6cce55b5898b8b6b91c069ddb6df4a0557
+FROM arm64v8/python:3.11.1-slim@sha256:71471e907ed7d3410d43c1c92a63b1d5021aa0cfcf374de0ae075bdbf50e6ad1
 
 RUN  apt-get update \
   && apt-get install -y wget \
