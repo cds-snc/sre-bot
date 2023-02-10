@@ -13,6 +13,8 @@ def parse(payload, client):
         blocks = format_cloudwatch_alarm(msg)
     elif isinstance(msg, str) and "AWS Budget Notification" in msg:
         blocks = format_budget_notification(payload)
+    elif isinstance(msg, dict) and nested_get(msg, ["detail", "service"]) == "ABUSE":
+        blocks = format_abuse_notification(payload, msg)
     else:
         blocks = []
         log_ops_message(
@@ -21,6 +23,45 @@ def parse(payload, client):
         )
 
     return blocks
+
+
+def nested_get(dictionary, keys):
+    for key in keys:
+        try:
+            dictionary = dictionary[key]
+        except KeyError:
+            return None
+    return dictionary
+
+
+def format_abuse_notification(payload, msg):
+    regex = r"arn:aws:sns:\w.*:(\d.*):\w.*"
+    account = re.search(regex, payload.TopicArn).groups()[0]
+
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*<https://health.aws.amazon.com/health/home#/account/dashboard/open-issues| 🚨 Abuse Alert | {account}>*",
+            },
+        },
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"{msg['detail']['eventTypeCode'].replace('_', ' ')}",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"{msg['detail']['eventDescription'][0]['latestDescription']}",
+            },
+        },
+    ]
 
 
 def format_budget_notification(payload):
