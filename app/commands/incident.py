@@ -152,7 +152,7 @@ def open_modal(client, ack, command, body):
         }
         for i in folders
     ]
-    user_id = body["user_id"]
+    user_id = body["user"]["id"]
     locale = get_user_locale(user_id, client)
     i18n.set("locale", locale)
     view = generate_incident_modal_view(command, options, locale)
