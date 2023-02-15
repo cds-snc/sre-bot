@@ -209,7 +209,7 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     client = MagicMock()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
@@ -238,7 +238,7 @@ def test_incident_open_modal_calls_generate_incident_modal_view(
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_generate_incident_modal_view.assert_called_once()
@@ -251,7 +251,7 @@ def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
@@ -273,7 +273,7 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
-    body = {"trigger_id": "trigger_id", "user_id": "user_id"}
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
