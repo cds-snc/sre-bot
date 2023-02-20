@@ -2,9 +2,9 @@ arrow==1.2.3
 awscli==1.27.69
 aws-sns-message-validator==0.0.5
 boto3==1.26.69
-fastapi==0.89.1
+fastapi==0.91.0
 geoip2==4.6.0
-google-api-python-client==2.76.0
+google-api-python-client==2.77.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.8.0
 python-dotenv==0.21.1
