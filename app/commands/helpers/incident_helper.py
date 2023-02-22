@@ -23,7 +23,6 @@ help_text = """
 
 
 def handle_incident_command(args, client, body, respond, ack):
-
     if len(args) == 0:
         respond(help_text)
         return

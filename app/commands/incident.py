@@ -152,7 +152,10 @@ def open_modal(client, ack, command, body):
         }
         for i in folders
     ]
-    user_id = body["user"]["id"]
+    if "user" in body:
+        user_id = body["user"]["id"]
+    else:
+        user_id = body["user_id"]
     locale = get_user_locale(user_id, client)
     i18n.set("locale", locale)
     view = generate_incident_modal_view(command, options, locale)
@@ -183,7 +186,6 @@ def handle_change_locale_button(ack, client, body):
 
 
 def submit(ack, view, say, body, client, logger):
-
     ack(
         response_action="update",
         view=generate_success_modal(body),
