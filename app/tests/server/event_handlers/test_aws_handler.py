@@ -49,6 +49,17 @@ def test_parse_returns_blocks_if_service_is_ABUSE(format_abuse_notification_mock
     )
 
 
+@patch("server.event_handlers.aws.format_auto_mitigation")
+def test_parse_returns_blocks_if_auto_mitigated(format_auto_mitigation_mock):
+    # Test that the parse function returns the blocks returned by format_auto_mitigation
+    client = MagicMock()
+    format_auto_mitigation_mock.return_value = ["foo", "bar"]
+    payload = mock_auto_migitation()
+    response = aws.parse(payload, client)
+    assert response == ["foo", "bar"]
+    format_auto_mitigation_mock.assert_called_once_with(payload)
+
+
 def test_format_abuse_notification_extracts_the_account_id_and_inserts_it_into_blocks():
     payload = mock_abuse_alert()
     msg = json.loads(payload.Message)
@@ -107,6 +118,34 @@ def test_format_cloudwatch_alarm_replaces_empty_AlarmDescription_with_blank():
     assert response[3]["text"]["text"] == " "
 
 
+def test_format_auto_mitigation_extracts_the_security_group_id_and_inserts_it_into_blocks():
+    # Test that the format_auto_mitigation function extracts the security group id properly
+    payload = mock_auto_migitation()
+    response = aws.format_auto_mitigation(payload)
+    assert "sg-09d2738530b93476d" in response[2]["text"]["text"]
+
+
+def test_format_auto_mitigation_extracts_the_account_id_and_inserts_it_into_blocks():
+    # Test that the format_auto_mitigation function extracts the account id properly
+    payload = mock_auto_migitation()
+    response = aws.format_auto_mitigation(payload)
+    assert "017790921725" in response[1]["text"]["text"]
+
+
+def test_format_auto_mitigation_extracts_the_port_and_inserts_it_into_blocks():
+    # Test that the format_auto_mitigation function extracts the ip properly
+    payload = mock_auto_migitation()
+    response = aws.format_auto_mitigation(payload)
+    assert "22" in response[1]["text"]["text"]
+
+
+def test_format_auto_mitigation_extracts_the_user_and_inserts_it_into_blocks():
+    # Test that the format_auto_mitigation function extracts the user properly
+    payload = mock_auto_migitation()
+    response = aws.format_auto_mitigation(payload)
+    assert "test_user@cds-snc.ca" in response[1]["text"]["text"]
+
+
 def mock_abuse_alert():
     return MagicMock(
         Type="Notification",
@@ -147,6 +186,22 @@ def mock_cloudwatch_alarm():
         Timestamp="2022-09-25T18:50:37.868Z",
         SignatureVersion="1",
         Signature="moqTWYO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
+        SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
+        UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:017790921725:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
+    )
+
+
+# Mock the SNS message
+def mock_auto_migitation():
+    return MagicMock(
+        Type="Notification",
+        MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",
+        TopicArn="arn:aws:sns:ca-central-1:017790921725:test-sre-bot",
+        Subject="Auto-mitigation successful",
+        Message='AUTO-MITIGATED: Ingress rule removed from security group: sg-09d2738530b93476d that was added by arn:aws:sts::017790921725:assumed-role/AWSReservedSSO_AWSAdministratorAccess_a01cd72a8d380c1f/test_user@cds-snc.ca: [{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0 / 0"}]}]',
+        Timestamp="2023-09-25T20:50:37.868Z",
+        SignatureVersion="1",
+        Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
         SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
         UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:017790921725:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
     )
