@@ -1,15 +1,18 @@
-from server import server
+from server import bot_middleware, server
 
 import os
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import ANY, call, MagicMock, patch, PropertyMock
 
+app = server.handler
+app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
+client = TestClient(app)
+
 
 @patch("server.server.maxmind.geolocate")
 def test_geolocate_success(mock_geolocate):
     mock_geolocate.return_value = "country", "city", "latitude", "longitude"
-    client = TestClient(server.handler)
     response = client.get("/geolocate/111.111.111.111")
     assert response.status_code == 200
     assert response.json() == {
@@ -23,7 +26,6 @@ def test_geolocate_success(mock_geolocate):
 @patch("server.server.maxmind.geolocate")
 def test_geolocate_failure(mock_geolocate):
     mock_geolocate.return_value = "error"
-    client = TestClient(server.handler)
     response = client.get("/geolocate/111")
     assert response.status_code == 404
     assert response.json() == {"detail": "error"}
@@ -42,7 +44,6 @@ def test_handle_webhook_found(
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = {"channel": "channel"}
     append_incident_buttons_mock.return_value.json.return_value = "[]"
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -59,7 +60,6 @@ def test_handle_webhook_with_invalid_aws_json_payload(
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = "not a json payload"
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 500
     assert response.json() == {"detail": ANY}
@@ -73,7 +73,6 @@ def test_handle_webhook_with_bad_aws_signature(
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = '{"Type": "foo"}'
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 500
     assert response.json() == {"detail": ANY}
@@ -94,7 +93,6 @@ def test_handle_webhook_with_SubscriptionConfirmation_payload(
     validate_message_mock.return_value = True
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = '{"Type": "SubscriptionConfirmation", "SubscribeURL": "SubscribeURL", "TopicArn": "TopicArn"}'
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -114,7 +112,6 @@ def test_handle_webhook_with_UnsubscribeConfirmation_payload(
     validate_message_mock.return_value = True
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = '{"Type": "UnsubscribeConfirmation"}'
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -137,7 +134,6 @@ def test_handle_webhook_with_Notification_payload(
     parse_mock.return_value = ["foo", "bar"]
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = '{"Type": "Notification"}'
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
@@ -167,7 +163,6 @@ def test_handle_webhook_found_but_exception(
 def test_handle_webhook_not_found(get_webhook_mock):
     get_webhook_mock.return_value = None
     payload = {"channel": "channel"}
-    client = TestClient(server.handler)
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 404
     assert response.json() == {"detail": "Webhook not found"}
@@ -175,7 +170,6 @@ def test_handle_webhook_not_found(get_webhook_mock):
 
 
 def test_get_version_unkown():
-    client = TestClient(server.handler)
     response = client.get("/version")
     assert response.status_code == 200
     assert response.json() == {"version": "unknown"}
@@ -183,7 +177,6 @@ def test_get_version_unkown():
 
 @patch.dict(os.environ, {"GIT_SHA": "foo"}, clear=True)
 def test_get_version_known():
-    client = TestClient(server.handler)
     response = client.get("/version")
     assert response.status_code == 200
     assert response.json() == {"version": "foo"}

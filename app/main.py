@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
@@ -17,19 +18,13 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 
-def main():
-    SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
-    APP_TOKEN = os.environ.get("APP_TOKEN")
-
-    PREFIX = os.environ.get("PREFIX", "")
-    bot = App(token=SLACK_TOKEN)
-
+def main(bot):
     # Log startup output
     logging.info(f"Starting up with SHA {os.environ.get('GIT_SHA', 'unknown')}")
     logging.info(f"ENV keys: {json.dumps(list(os.environ.keys()))}")
 
-    # Add bot to server_app
-    server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+    APP_TOKEN = os.environ.get("APP_TOKEN")
+    PREFIX = os.environ.get("PREFIX", "")
 
     # Register Roles commands
     bot.command(f"/{PREFIX}talent-role")(role.role_command)
@@ -82,4 +77,15 @@ def main():
         server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
 
 
-server_app.add_event_handler("startup", main)
+def get_bot():
+    SLACK_TOKEN = os.environ.get("SLACK_TOKEN", None)
+    if not bool(SLACK_TOKEN):
+        return False
+    return App(token=SLACK_TOKEN)
+
+
+bot = get_bot()
+
+if bot:
+    server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+    server_app.add_event_handler("startup", partial(main, bot))

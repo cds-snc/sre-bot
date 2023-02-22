@@ -1,7 +1,7 @@
 .PHONY: dev fmt install lint test fmt-ci lint-ci install-dev run
 
 dev:
-	PREFIX="dev-" uvicorn main:server_app --reload
+	PREFIX="dev-" python3 -m uvicorn main:server_app --reload
 
 fmt:
 	black . $(ARGS) --target-version py310
@@ -16,8 +16,8 @@ lint:
 	flake8 .
 
 test:
-	coverage run -m pytest -s -vv tests &&\
-	coverage report -m
+	python3 -m coverage run -m pytest -s -vv tests &&\
+	python3 -m coverage report -m
 
 lint-ci:
 	flake8 .
