@@ -15,6 +15,8 @@ def parse(payload, client):
         blocks = format_budget_notification(payload)
     elif isinstance(msg, dict) and nested_get(msg, ["detail", "service"]) == "ABUSE":
         blocks = format_abuse_notification(payload, msg)
+    elif isinstance(msg, str) and "AUTO-MITIGATED" in msg:
+        blocks = format_auto_mitigation(payload)
     else:
         blocks = []
         log_ops_message(
@@ -59,6 +61,35 @@ def format_abuse_notification(payload, msg):
             "text": {
                 "type": "mrkdwn",
                 "text": f"{msg['detail']['eventDescription'][0]['latestDescription']}",
+            },
+        },
+    ]
+
+
+# If the message contains "AUTO-MITIGATED" it will be parsed by the format_auto_mitigated function. Format the message to give information about the security group, account and the user that opened the port.
+def format_auto_mitigation(payload):
+    msg = payload.Message
+    regex = r"security group: (\w.+) that was added by arn:aws:sts::(\d.+):assumed-role/\w.+/(\w.+): \[{\"IpProtocol\": \"tcp\", \"FromPort\": (\d.+), \"ToPort\":"
+    security_group = re.search(regex, msg).groups()[0]
+    account = re.search(regex, msg).groups()[1]
+    user = re.search(regex, msg).groups()[2]
+    port = re.search(regex, msg).groups()[3]
+
+    # Format the message displayed in Slack
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"🛠 Auto-mitigated: Port {port} opened in account {account} by {user} 🔩",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Inbound rule change on port {port} created by user {user} for Security group {security_group} on account {account} has been reversed.",
             },
         },
     ]
