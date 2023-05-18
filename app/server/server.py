@@ -112,7 +112,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                 blocks = aws.parse(payload, request.state.bot.client)
                 # if we have an empty message, log that we have an empty
                 # message and return without posting to slack
-                if blocks is None or len(blocks) == 0:
+                if not blocks:
                     logging.info("No blocks to post, returning")
                     return
                 payload = WebhookPayload(blocks=blocks)
