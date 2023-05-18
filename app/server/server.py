@@ -93,7 +93,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                     status_code=500, detail=f"Failed to parse AWS event message: {e}"
                 )
             if payload.Type == "SubscriptionConfirmation":
-                requests.get(payload.SubscribeURL)
+                requests.get(payload.SubscribeURL, timeout=60)
                 logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
                 log_ops_message(
                     request.state.bot.client,

@@ -77,7 +77,7 @@ def post_data(customer_id, shared_key, body, log_type):
         "x-ms-date": rfc1123date,
     }
 
-    response = requests.post(uri, data=body, headers=headers)
+    response = requests.post(uri, data=body, headers=headers, timeout=60)
     if response.status_code >= 200 and response.status_code <= 299:
         logging.info(f"Response code: {response.status_code}, log type: {log_type}")
         return True
