@@ -160,6 +160,28 @@ def test_handle_webhook_found_but_exception(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.sns_message_validator.validate_message")
+@patch("server.server.aws.parse")
+@patch("server.server.log_to_sentinel")
+def test_handle_webhook_with_empty_text_for_payload(
+    _log_to_sentinel_mock,
+    parse_mock,
+    validate_message_mock,
+    _increment_invocation_count_mock,
+    get_webhook_mock,
+):
+    # Test that we don't post to slack if we have an empty message
+    validate_message_mock.return_value = True
+    parse_mock.return_value = []
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "Notification", "Message": "{}"}'
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+@patch("server.server.webhooks.get_webhook")
 def test_handle_webhook_not_found(get_webhook_mock):
     get_webhook_mock.return_value = None
     payload = {"channel": "channel"}

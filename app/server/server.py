@@ -93,7 +93,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                     status_code=500, detail=f"Failed to parse AWS event message: {e}"
                 )
             if payload.Type == "SubscriptionConfirmation":
-                requests.get(payload.SubscribeURL)
+                requests.get(payload.SubscribeURL, timeout=60)
                 logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
                 log_ops_message(
                     request.state.bot.client,
@@ -110,6 +110,11 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
 
             if payload.Type == "Notification":
                 blocks = aws.parse(payload, request.state.bot.client)
+                # if we have an empty message, log that we have an empty
+                # message and return without posting to slack
+                if not blocks:
+                    logging.info("No blocks to post, returning")
+                    return
                 payload = WebhookPayload(blocks=blocks)
 
         payload.channel = webhook["channel"]["S"]
