@@ -9,7 +9,7 @@ google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.8.0
 python-dotenv==0.21.1
 python-i18n==0.3.9
-requests==2.30.0
+requests==2.31.0
 schedule==1.2.0
 slack-bolt==1.18.0
 trello==0.9.7.3
