@@ -3,7 +3,7 @@ awscli==1.27.134
 aws-sns-message-validator==0.0.5
 boto3==1.26.134
 fastapi==0.95.1
-geoip2==4.6.0
+geoip2==4.7.0
 google-api-python-client==2.86.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.8.0
