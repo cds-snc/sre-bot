@@ -17,6 +17,8 @@ def parse(payload, client):
         blocks = format_abuse_notification(payload, msg)
     elif isinstance(msg, str) and "AUTO-MITIGATED" in msg:
         blocks = format_auto_mitigation(payload)
+    elif isinstance(msg, str) and "IAM User" in msg:
+        blocks = format_new_iam_user(payload)
     else:
         blocks = []
         log_ops_message(
@@ -90,6 +92,35 @@ def format_auto_mitigation(payload):
             "text": {
                 "type": "mrkdwn",
                 "text": f"Inbound rule change on port {port} created by user {user} for Security group {security_group} on account {account} has been reversed.",
+            },
+        },
+    ]
+
+
+# If the message contains "IAM User" it will be parsed by the format_new_iam_user function.
+def format_new_iam_user(payload):
+    msg = payload.Message
+    regex = r"IAM User: (\w.+)"
+    user_created = re.search(regex, msg).groups()[0]
+    regex = r"Actor: arn:aws:sts::(\d.+):assumed-role/\w.+/(\w.+)"
+    account = re.search(regex, msg).groups()[0]
+    user = re.search(regex, msg).groups()[1]
+
+    # Format the message displayed in Slack
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "New IAM user created 👾",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"New IAM User named {user_created} was created in account {account} by user {user}.",
             },
         },
     ]

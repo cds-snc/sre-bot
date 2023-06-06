@@ -60,6 +60,17 @@ def test_parse_returns_blocks_if_auto_mitigated(format_auto_mitigation_mock):
     format_auto_mitigation_mock.assert_called_once_with(payload)
 
 
+@patch("server.event_handlers.aws.format_new_iam_user")
+def test_parse_returns_blocks_if_new_iam_user(format_new_iam_user_mock):
+    # Test that the parse function returns the blocks returned by format_new_iam_user
+    client = MagicMock()
+    format_new_iam_user_mock.return_value = ["foo", "bar"]
+    payload = mock_new_iam_user()
+    response = aws.parse(payload, client)
+    assert response == ["foo", "bar"]
+    format_new_iam_user_mock.assert_called_once_with(payload)
+
+
 def test_format_abuse_notification_extracts_the_account_id_and_inserts_it_into_blocks():
     payload = mock_abuse_alert()
     msg = json.loads(payload.Message)
@@ -146,6 +157,27 @@ def test_format_auto_mitigation_extracts_the_user_and_inserts_it_into_blocks():
     assert "test_user@cds-snc.ca" in response[1]["text"]["text"]
 
 
+def test_format_new_iam_user_extracts_the_iam_user_created_and_inserts_it_into_blocks():
+    # Test that the format_new_iam_user function extracts the user_created properly
+    payload = mock_new_iam_user()
+    response = aws.format_new_iam_user(payload)
+    assert "user_created" in response[2]["text"]["text"]
+
+
+def test_format_new_iam_user_extracts_the_account_and_inserts_it_into_blocks():
+    # Test that the format_new_iam_user function extracts the user_created properly
+    payload = mock_new_iam_user()
+    response = aws.format_new_iam_user(payload)
+    assert "412578375350" in response[2]["text"]["text"]
+
+
+def test_format_new_iam_user_extracts_the_user_and_inserts_it_into_blocks():
+    # Test that the format_new_iam_user function extracts the user properly
+    payload = mock_new_iam_user()
+    response = aws.format_new_iam_user(payload)
+    assert "test_user@cds-snc.ca" in response[2]["text"]["text"]
+
+
 def mock_abuse_alert():
     return MagicMock(
         Type="Notification",
@@ -204,4 +236,20 @@ def mock_auto_migitation():
         Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
         SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
         UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:017790921725:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
+    )
+
+
+# Mock the message returned from AWS when a new IAM User is created
+def mock_new_iam_user():
+    return MagicMock(
+        Type="Notification",
+        MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",
+        TopicArn="arn:aws:sns:ca-central-1:412578375350:test-sre-bot",
+        Subject="Violation - IAM User is out of compliance",
+        Message="An IAM User was created in an Account\n\nIAM ARN: arn:aws:iam::412578375350:user/test2\nIAM User: user_created\nEvent: CreateUser\nActor: arn:aws:sts::412578375350:assumed-role/AWSReservedSSO_AWSAdministratorAccess_3cbb717fd3b23655/test_user@cds-snc.ca\nSource IP Address: 69.172.156.196\nUser Agent: AWS Internal\n\nAccount: 412578375350\nRegion: us-east-1",
+        Timestamp="2023-09-25T20:50:37.868Z",
+        SignatureVersion="1",
+        Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
+        SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
+        UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:412578375350:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
     )
