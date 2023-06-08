@@ -113,7 +113,7 @@ def format_new_iam_user(payload):
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "New IAM user created 👾",
+                "text": "👾 New IAM User created 👾",
             },
         },
         {
