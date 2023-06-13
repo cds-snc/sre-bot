@@ -1,7 +1,7 @@
 arrow==1.2.3
-awscli==1.27.142
+awscli==1.27.148
 aws-sns-message-validator==0.0.5
-boto3==1.26.142
+boto3==1.26.148
 fastapi==0.95.2
 geoip2==4.7.0
 google-api-python-client==2.87.0
