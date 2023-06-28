@@ -158,21 +158,27 @@ def get_webhooks_list(hooks):
 
 def get_webhooks_button_block(type, hooks_list, end):
     if len(hooks_list) > 1:
-        button_block = [{
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": ("Next page" if end < len(hooks_list) else "End of results"),
-                        "emoji": True
-                    },
-                    "value": f"{end},{type}",
-                    "action_id": "next_page"
-                }
-            ]
-        }]
+        button_block = [
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": (
+                                "Next page"
+                                if end < len(hooks_list)
+                                else "End of results"
+                            ),
+                            "emoji": True,
+                        },
+                        "value": f"{end},{type}",
+                        "action_id": "next_page",
+                    }
+                ],
+            }
+        ]
     else:
         button_block = []
     return button_block
@@ -184,7 +190,9 @@ def list_all_webhooks(client, body, start, end, type, update=False):
     active_button_block = get_webhooks_button_block("active", active_hooks_list, end)
     disabled_hooks = get_webhooks("disabled")
     disabled_hooks_list = get_webhooks_list(disabled_hooks)
-    disabled_button_block = get_webhooks_button_block("disabled", disabled_hooks_list, end)
+    disabled_button_block = get_webhooks_button_block(
+        "disabled", disabled_hooks_list, end
+    )
 
     blocks = {
         "type": "modal",
@@ -202,7 +210,11 @@ def list_all_webhooks(client, body, start, end, type, update=False):
                 },
                 {"type": "divider"},
             ]
-            + (active_hooks_list[start:end] if type == "active" or type == "all" else active_hooks_list[0:MAX_BLOCK_SIZE])
+            + (
+                active_hooks_list[start:end]
+                if type == "active" or type == "all"
+                else active_hooks_list[0:MAX_BLOCK_SIZE]
+            )
             + active_button_block
             + [
                 {
@@ -214,7 +226,11 @@ def list_all_webhooks(client, body, start, end, type, update=False):
                 },
                 {"type": "divider"},
             ]
-            + (disabled_hooks_list[start:end] if type == "disabled" or type == "all" else disabled_hooks_list[0:MAX_BLOCK_SIZE])
+            + (
+                disabled_hooks_list[start:end]
+                if type == "disabled" or type == "all"
+                else disabled_hooks_list[0:MAX_BLOCK_SIZE]
+            )
             + disabled_button_block
         ),
     }
@@ -340,6 +356,8 @@ def next_page(ack, body, logger, client):
     end_index, type = body["actions"][0]["value"].split(",")
     end_index = int(end_index)
     if body["actions"][0]["text"]["text"] == "Next page":
-        list_all_webhooks(client, body, end_index, (end_index + MAX_BLOCK_SIZE), type, update=True)
+        list_all_webhooks(
+            client, body, end_index, (end_index + MAX_BLOCK_SIZE), type, update=True
+        )
     else:
         list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, type, update=True)
