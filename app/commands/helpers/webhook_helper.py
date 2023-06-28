@@ -14,9 +14,9 @@ help_text = """
 \n      - lister les webhooks
 """
 
-# see 3 webhooks at a time. This is done to avoid hitting the 100 block size limit and for the view to be more managable to see.
+# see 4 webhooks at a time. This is done to avoid hitting the 100 block size limit and for the view to be more managable to see.
 # has to be divisible by 4 since each webhook is 4 blocks
-MAX_BLOCK_SIZE = 12
+MAX_BLOCK_SIZE = 16
 
 
 def handle_webhook_command(args, client, body, respond):
@@ -133,8 +133,10 @@ def create_webhook_modal(client, body):
     )
 
 
+# return the list of webhooks based on the type (active or disabled)
 def get_webhooks(type):
     all_hooks = webhooks.list_all_webhooks()
+    # based on type, return the list of webhooks
     if type == "active":
         hooks = list(
             map(
@@ -142,22 +144,28 @@ def get_webhooks(type):
                 filter(lambda hook: hook["active"]["BOOL"], all_hooks),
             )
         )
-    else:
+    elif type == "disabled":
         hooks = list(
             map(
                 lambda hook: webhook_list_item(hook),
                 filter(lambda hook: not hook["active"]["BOOL"], all_hooks),
             )
         )
+    else:
+        # unrecongized type, return empty list
+        hooks = []
     return hooks
 
 
+# function to flatten the webhooks and return them in a flattened list
 def get_webhooks_list(hooks):
     return [item for sublist in hooks for item in sublist]
 
 
+# generate the button for the webhook. If there are more than 4 webhooks (MAX_BLOCK_SIZE/the number of elements in a block list),
+# show the next page button. Otherwise, show nothing
 def get_webhooks_button_block(type, hooks_list, end):
-    if len(hooks_list) > 1:
+    if len(hooks_list) > (MAX_BLOCK_SIZE / 4):
         button_block = [
             {
                 "type": "actions",
@@ -167,9 +175,7 @@ def get_webhooks_button_block(type, hooks_list, end):
                         "text": {
                             "type": "plain_text",
                             "text": (
-                                "Next page"
-                                if end < len(hooks_list)
-                                else "End of results"
+                                "Next page" if end < len(hooks_list) else "First page"
                             ),
                             "emoji": True,
                         },
@@ -184,16 +190,22 @@ def get_webhooks_button_block(type, hooks_list, end):
     return button_block
 
 
+# Get and return all webhooks. Start is the index of the first webhook to show, end is the index of the last webhook to show.
+# Type is the type of webhooks to show (active, disabled, or all)
 def list_all_webhooks(client, body, start, end, type, update=False):
+    # get the active webhooks and button block
     active_hooks = get_webhooks("active")
     active_hooks_list = get_webhooks_list(active_hooks)
     active_button_block = get_webhooks_button_block("active", active_hooks_list, end)
+
+    # get the disabled webhooks and button block
     disabled_hooks = get_webhooks("disabled")
     disabled_hooks_list = get_webhooks_list(disabled_hooks)
     disabled_button_block = get_webhooks_button_block(
         "disabled", disabled_hooks_list, end
     )
 
+    # display the webhooks in the modal
     blocks = {
         "type": "modal",
         "callback_id": "webhooks_view",
@@ -210,11 +222,14 @@ def list_all_webhooks(client, body, start, end, type, update=False):
                 },
                 {"type": "divider"},
             ]
+            # this is used to traverse the list of webhooks for the pagination. Show the webhooks slice of array based on
+            # start and end index
             + (
                 active_hooks_list[start:end]
                 if type == "active" or type == "all"
                 else active_hooks_list[0:MAX_BLOCK_SIZE]
             )
+            # display the button block
             + active_button_block
             + [
                 {
@@ -351,10 +366,14 @@ def webhook_list_item(hook):
     ]
 
 
-def next_page(ack, body, logger, client):
+# Function to handle pagination and displaying next pages
+def next_page(ack, body, client):
     ack()
     end_index, type = body["actions"][0]["value"].split(",")
     end_index = int(end_index)
+
+    # if we go to the next page, then pudate the start and end index to be the next 4 elements. Else, display the results
+    # from the beginning
     if body["actions"][0]["text"]["text"] == "Next page":
         list_all_webhooks(
             client, body, end_index, (end_index + MAX_BLOCK_SIZE), type, update=True
