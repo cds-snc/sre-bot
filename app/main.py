@@ -67,6 +67,7 @@ def main(bot):
     bot.view("create_webhooks_view")(webhook_helper.create_webhook)
     bot.action("toggle_webhook")(webhook_helper.toggle_webhook)
     bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
+    bot.action("next_page")(webhook_helper.next_page)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 

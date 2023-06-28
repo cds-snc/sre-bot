@@ -14,6 +14,10 @@ help_text = """
 \n      - lister les webhooks
 """
 
+# see 3 webhooks at a time. This is done to avoid hitting the 100 block size limit and for the view to be more managable to see.
+# has to be divisible by 4 since each webhook is 4 blocks
+MAX_BLOCK_SIZE = 12
+
 
 def handle_webhook_command(args, client, body, respond):
     if len(args) == 0:
@@ -27,7 +31,7 @@ def handle_webhook_command(args, client, body, respond):
         case "help":
             respond(help_text)
         case "list":
-            list_all_webhooks(client, body)
+            list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all")
         case _:
             respond(
                 f"Unknown command: `{action}`. "
@@ -129,20 +133,58 @@ def create_webhook_modal(client, body):
     )
 
 
-def list_all_webhooks(client, body, update=False):
-    hooks = webhooks.list_all_webhooks()
-    active_hooks = list(
-        map(
-            lambda hook: webhook_list_item(hook),
-            filter(lambda hook: hook["active"]["BOOL"], hooks),
+def get_webhooks(type):
+    all_hooks = webhooks.list_all_webhooks()
+    if type == "active":
+        hooks = list(
+            map(
+                lambda hook: webhook_list_item(hook),
+                filter(lambda hook: hook["active"]["BOOL"], all_hooks),
+            )
         )
-    )
-    disabled_hooks = list(
-        map(
-            lambda hook: webhook_list_item(hook),
-            filter(lambda hook: not hook["active"]["BOOL"], hooks),
+    else:
+        hooks = list(
+            map(
+                lambda hook: webhook_list_item(hook),
+                filter(lambda hook: not hook["active"]["BOOL"], all_hooks),
+            )
         )
-    )
+    return hooks
+
+
+def get_webhooks_list(hooks):
+    return [item for sublist in hooks for item in sublist]
+
+
+def get_webhooks_button_block(type, hooks_list, end):
+    if len(hooks_list) > 1:
+        button_block = [{
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": ("Next page" if end < len(hooks_list) else "End of results"),
+                        "emoji": True
+                    },
+                    "value": f"{end},{type}",
+                    "action_id": "next_page"
+                }
+            ]
+        }]
+    else:
+        button_block = []
+    return button_block
+
+
+def list_all_webhooks(client, body, start, end, type, update=False):
+    active_hooks = get_webhooks("active")
+    active_hooks_list = get_webhooks_list(active_hooks)
+    active_button_block = get_webhooks_button_block("active", active_hooks_list, end)
+    disabled_hooks = get_webhooks("disabled")
+    disabled_hooks_list = get_webhooks_list(disabled_hooks)
+    disabled_button_block = get_webhooks_button_block("disabled", disabled_hooks_list, end)
 
     blocks = {
         "type": "modal",
@@ -160,7 +202,8 @@ def list_all_webhooks(client, body, update=False):
                 },
                 {"type": "divider"},
             ]
-            + [item for sublist in active_hooks for item in sublist]
+            + (active_hooks_list[start:end] if type == "active" or type == "all" else active_hooks_list[0:MAX_BLOCK_SIZE])
+            + active_button_block
             + [
                 {
                     "type": "header",
@@ -171,7 +214,8 @@ def list_all_webhooks(client, body, update=False):
                 },
                 {"type": "divider"},
             ]
-            + [item for sublist in disabled_hooks for item in sublist]
+            + (disabled_hooks_list[start:end] if type == "disabled" or type == "all" else disabled_hooks_list[0:MAX_BLOCK_SIZE])
+            + disabled_button_block
         ),
     }
     if update:
@@ -238,12 +282,12 @@ def toggle_webhook(ack, body, logger, client):
     webhooks.toggle_webhook(id)
     message = f"Webhook {name} has been {'enabled' if hook['active']['BOOL'] else 'disabled'} by <@{username}>"
     logger.info(message)
-    client.chat_postMessage(
-        channel=channel,
-        user=user_id,
-        text=message,
-    )
-    list_all_webhooks(client, body, update=True)
+    # client.chat_postMessage(
+    #    channel=channel,
+    #    user=user_id,
+    #    text=message,
+    # )
+    list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", update=True)
 
 
 def webhook_list_item(hook):
@@ -289,3 +333,13 @@ def webhook_list_item(hook):
         },
         {"type": "divider"},
     ]
+
+
+def next_page(ack, body, logger, client):
+    ack()
+    end_index, type = body["actions"][0]["value"].split(",")
+    end_index = int(end_index)
+    if body["actions"][0]["text"]["text"] == "Next page":
+        list_all_webhooks(client, body, end_index, (end_index + MAX_BLOCK_SIZE), type, update=True)
+    else:
+        list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, type, update=True)
