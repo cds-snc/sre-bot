@@ -282,11 +282,11 @@ def toggle_webhook(ack, body, logger, client):
     webhooks.toggle_webhook(id)
     message = f"Webhook {name} has been {'enabled' if hook['active']['BOOL'] else 'disabled'} by <@{username}>"
     logger.info(message)
-    # client.chat_postMessage(
-    #    channel=channel,
-    #    user=user_id,
-    #    text=message,
-    # )
+    client.chat_postMessage(
+        channel=channel,
+        user=user_id,
+        text=message,
+    )
     list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", update=True)
 
 
