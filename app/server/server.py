@@ -171,6 +171,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             request.state.bot.client.api_call("chat.postMessage", json=message)
             log_to_sentinel(
                 "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
+            )
             return {"ok": True}
         except Exception as e:
             logging.error(e)
