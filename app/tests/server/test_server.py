@@ -81,6 +81,54 @@ def test_handle_webhook_with_bad_aws_signature(
 @patch("server.server.webhooks.get_webhook")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
+def test_handle_webhook_with_bad_aws_message_type(
+    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+):
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type": "foo"}'
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Failed to parse AWS event message due to InvalidMessageTypeException: foo is not a valid message type."
+    }
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
+def test_handle_webhook_with_bad_aws_invalid_cert_version(
+    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+):
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = (
+        '{"Type": "Notification", "SignatureVersion": "foo", "SigningCertURL": "foo"}'
+    )
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Failed to parse AWS event message due to InvalidSignatureVersionException: Invalid signature version. Unable to verify signature."
+    }
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
+def test_handle_webhook_with_bad_aws_invalid_signature_version(
+    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+):
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = '{"Type":"Notification", "SigningCertURL":"https://foo.pem", "SignatureVersion":"1"}'
+    response = client.post("/hook/id", json=payload)
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Failed to parse AWS event message due to InvalidCertURLException: Invalid certificate URL."
+    }
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_ops_message")
 @patch("server.server.sns_message_validator.validate_message")
 @patch("server.server.requests.get")
 def test_handle_webhook_with_SubscriptionConfirmation_payload(
