@@ -10,7 +10,13 @@ from models import webhooks
 from commands.utils import log_ops_message, log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
-from sns_message_validator import SNSMessageValidator
+from sns_message_validator import (
+    SNSMessageValidator,
+    InvalidMessageTypeException,
+    InvalidCertURLException,
+    InvalidSignatureVersionException,
+    SignatureVerificationFailureException,
+)
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -83,14 +89,55 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             try:
                 payload = AwsSnsPayload.parse_raw(payload)
                 sns_message_validator.validate_message(message=payload.dict())
+            except InvalidMessageTypeException as e:
+                logging.error(e)
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Invalid message type ```{payload.Type}``` in message: ```{payload}```",
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                )
+            except InvalidSignatureVersionException as e:
+                logging.error(e)
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                )
+            except SignatureVerificationFailureException as e:
+                logging.error(e)
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                )
+            except InvalidCertURLException as e:
+                logging.error(e)
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                )
             except Exception as e:
                 logging.error(e)
                 log_ops_message(
                     request.state.bot.client,
-                    f"Error parsing AWS event: ```{payload}```",
+                    f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{payload}```",
                 )
                 raise HTTPException(
-                    status_code=500, detail=f"Failed to parse AWS event message: {e}"
+                    status_code=500,
+                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
                 )
             if payload.Type == "SubscriptionConfirmation":
                 requests.get(payload.SubscribeURL, timeout=60)
@@ -124,7 +171,6 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             request.state.bot.client.api_call("chat.postMessage", json=message)
             log_to_sentinel(
                 "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
-            )
             return {"ok": True}
         except Exception as e:
             logging.error(e)
