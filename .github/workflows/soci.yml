@@ -41,7 +41,7 @@ jobs:
 
       - name: Download image
         run: |
-          sudo ctr i pull -u "${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}:${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}" $REGISTRY/sre-bot:latest
+          sudo ctr i pull -u "${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}:${{ steps.login-ecr.outputs.docker_password_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}" $REGISTRY/sre-bot:latest
 
       - name: Run SOCI
         run: |
