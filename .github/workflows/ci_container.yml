@@ -30,3 +30,16 @@ jobs:
           --platform=linux/arm64 \
           -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .
+
+      - name: Install SOCI
+        run: |
+          wget https://github.com/awslabs/soci-snapshotter/releases/download/v0.3.0/soci-snapshotter-0.3.0-linux-amd64.tar.gz
+          sudo tar -C /usr/local/bin -xvf soci-snapshotter-0.3.0-linux-amd64.tar.gz ./soci ./soci-snapshotter-grpc
+
+      - name: Run SOCI
+        run: |
+          sudo soci create $REGISTRY/sre-bot:latest
+          
+      - name: Show SOCI index
+        run: |
+          sudo soci index list
