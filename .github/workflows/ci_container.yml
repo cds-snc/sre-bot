@@ -15,12 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
-      - name: Install SOCI
-        working-directory: ./
-        run: |
-          wget https://github.com/awslabs/soci-snapshotter/releases/download/v0.3.0/soci-snapshotter-0.3.0-linux-amd64.tar.gz
-          sudo tar -C /usr/local/bin -xvf soci-snapshotter-0.3.0-linux-amd64.tar.gz soci
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2.2.0
 
@@ -34,13 +28,5 @@ jobs:
           --build-arg git_sha=$GITHUB_SHA \
           --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
           --platform=linux/arm64 \
-          -t sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
-          -t sre-bot:latest .
-
-      - name: Run SOCI
-        run: |
-          sudo soci create sre-bot:latest
-          
-      - name: Show SOCI index
-        run: |
-          sudo soci index list
+          -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
+          -t $REGISTRY/sre-bot:latest .
