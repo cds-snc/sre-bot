@@ -19,7 +19,7 @@ jobs:
         working-directory: ./
         run: |
           wget https://github.com/awslabs/soci-snapshotter/releases/download/v0.3.0/soci-snapshotter-0.3.0-linux-amd64.tar.gz
-          sudo tar -C /usr/local/bin -xvf soci-snapshotter-0.3.0-linux-amd64.tar.gz ./soci ./soci-snapshotter-grpc
+          sudo tar -C /usr/local/bin -xvf soci-snapshotter-0.3.0-linux-amd64.tar.gz soci
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2.2.0
