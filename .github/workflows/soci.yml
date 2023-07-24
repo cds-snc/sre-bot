@@ -40,8 +40,10 @@ jobs:
         uses: crazy-max/ghaction-setup-containerd@v2
 
       - name: Download image
+        env:
+          DOCKER_PASSWORD: ${{ steps.login-ecr.outputs.docker_password_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}
         run: |
-          sudo ctr i pull -u "${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}:${{ steps.login-ecr.outputs.docker_password_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}" $REGISTRY/sre-bot:latest
+          sudo ctr i pull --all-platforms --all-metadata -u "${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}:$DOCKER_PASSWORD" $REGISTRY/sre-bot:latest
 
       - name: Run SOCI
         run: |
