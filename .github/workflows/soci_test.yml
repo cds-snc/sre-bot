@@ -8,10 +8,6 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
 
-permissions:
-  id-token: write
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,7 +24,7 @@ jobs:
       - name: Configure aws credentials using OIDC
         uses: aws-actions/configure-aws-credentials@master
         with:
-          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-apply
+          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-plan
           role-session-name: SREBotGitHubActions
           aws-region: "ca-central-1"
 
