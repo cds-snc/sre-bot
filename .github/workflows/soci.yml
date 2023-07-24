@@ -32,18 +32,14 @@ jobs:
           role-session-name: SREBotGitHubActions
           aws-region: "ca-central-1"
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@fc3959cb4cf5a821ab7a5a636ea4f1e855b05180 # v1.6.2
-
       - name: Set up containerd
         uses: crazy-max/ghaction-setup-containerd@v2
 
       - name: Download image
         run: |
-          DOCKER_PASSWORD=$((${{ steps.login-ecr.outputs.docker_password_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}))
+          DOCKER_PASSWORD=$(aws ecr get-login-password --region ca-central-1)
           echo "::add-mask::$DOCKER_PASSWORD"
-          sudo ctr i pull --all-platforms -u "${{ steps.login-ecr.outputs.docker_username_283582579564_dkr_ecr_ca_central_1_amazonaws_com }}:$DOCKER_PASSWORD" $REGISTRY/sre-bot:latest
+          sudo ctr i pull --all-platforms -u "AWS:$DOCKER_PASSWORD" $REGISTRY/sre-bot:latest
 
       - name: Run SOCI
         run: |
