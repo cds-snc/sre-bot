@@ -1,8 +1,8 @@
 arrow==1.2.3
-awscli==1.29.10
+awscli==1.29.19
 aws-sns-message-validator==0.0.5
-boto3==1.28.10
-fastapi==0.100.0
+boto3==1.28.19
+fastapi==0.100.1
 geoip2==4.7.0
 google-api-python-client==2.95.0
 google-auth-httplib2==0.1.0
@@ -14,4 +14,4 @@ requests==2.31.0
 schedule==1.2.0
 slack-bolt==1.18.0
 trello==0.9.7.3
-uvicorn==0.23.1
+uvicorn==0.23.2
