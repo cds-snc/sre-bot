@@ -9,7 +9,7 @@ on:
         - Build containers CI
         - Docker vulnerability scan
         - GitHub repository metadata exporter
-        -  Sync repository labels workflow
+        - Sync repository labels workflow
         - Scorecards supply-chain security
         - S3 backup
         - Shellcheck
