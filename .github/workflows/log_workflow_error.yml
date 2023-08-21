@@ -1,0 +1,24 @@
+name: Log Workflow error in PR
+
+on:
+    workflow_run:
+      workflows:
+        - Source code security scan using Bandit 
+        - Build and Push to Container Registry
+        - Lint, format and test code
+        - Build containers CI
+        - Docker vulnerability scan
+        - GitHub repository metadata exporter
+        -  Sync repository labels workflow
+        - Scorecards supply-chain security
+        - S3 backup
+        - Shellcheck
+        - Terraform Apply
+        - Terraform plan
+      types: [ completed ]
+
+jobs:
+    log-error:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: quipper/comment-failure-action@v0.1.1

@@ -1,3 +1,5 @@
+name: Sync repository labels workflow
+
 on: [issues, pull_request, workflow_dispatch]
 jobs:
   sync-labels:
