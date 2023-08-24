@@ -18,8 +18,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Capture DNS traffic
-        uses: cds-snc/dns-audit-action@main
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
       - name: Checkout
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
@@ -72,16 +76,3 @@ jobs:
           platform: "linux/arm64"
           sbom_name: "sre-bot"
           token: "${{ secrets.GITHUB_TOKEN }}"          
-    
-      - name: Write DNS traffic to file
-        uses: cds-snc/dns-audit-action@main
-        with:
-          output-file: dns_traffic.json
-        
-      - name: Report DNS Data to Sentinel
-        uses: cds-snc/sentinel-forward-data-action@main
-        with:
-          file_name: dns_traffic.json
-          log_type: BuildDeploy_DNS_Queries
-          log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-          log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}

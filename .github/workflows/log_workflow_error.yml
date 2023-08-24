@@ -21,4 +21,11 @@ jobs:
     log-error:
       runs-on: ubuntu-latest
       steps:
+        - name: Audit DNS requests
+          uses: cds-snc/dns-proxy-action@main
+          env:
+            DNS_PROXY_FORWARDTOSENTINEL: "true"
+            DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+            DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
         - uses: quipper/comment-failure-action@v0.1.1
