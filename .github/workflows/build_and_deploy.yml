@@ -18,6 +18,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
       - name: Capture DNS traffic
         uses: cds-snc/dns-audit-action@main
 

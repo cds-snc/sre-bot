@@ -8,23 +8,30 @@ jobs:
   bandit:
     runs-on: ubuntu-latest
     steps:
-    - name: Capture DNS traffic
-      uses: cds-snc/dns-audit-action@main
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
-    - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
-    - name: Bandit
-      run: |
-        .github/workflows/scripts/run_bandit_scan.sh
+      - name: Capture DNS traffic
+        uses: cds-snc/dns-audit-action@main
 
-    - name: Write DNS traffic to file
-      uses: cds-snc/dns-audit-action@main
-      with:
-        output-file: dns_traffic.json
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - name: Bandit
+        run: |
+          .github/workflows/scripts/run_bandit_scan.sh
+
+      - name: Write DNS traffic to file
+        uses: cds-snc/dns-audit-action@main
+        with:
+          output-file: dns_traffic.json
     
-    - name: Report DNS data to Sentinel
-      uses: cds-snc/sentinel-forward-data-action@main
-      with:
-        file_name: dns_traffic.json
-        log_type: BanditSecurityScan_DNS_Queries
-        log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-        log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+      - name: Report DNS data to Sentinel
+        uses: cds-snc/sentinel-forward-data-action@main
+        with:
+          file_name: dns_traffic.json
+          log_type: BanditSecurityScan_DNS_Queries
+          log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
