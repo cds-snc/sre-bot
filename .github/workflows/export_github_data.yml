@@ -15,7 +15,7 @@ jobs:
           DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
-      - uses: actions/checkout@7739b9ba2efcda9dde65ad1e3c2dbe65b41dfba7
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - name: Export Data
         uses: cds-snc/github-repository-metadata-exporter@main
         with:

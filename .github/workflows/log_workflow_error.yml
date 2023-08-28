@@ -28,4 +28,4 @@ jobs:
             DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
             DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
-        - uses: quipper/comment-failure-action@v0.1.1
+        - uses: quipper/comment-failure-action@f524f18826b0aacbc0d61fd0b24287061365689c # v0.1.1
