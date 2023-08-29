@@ -9,6 +9,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     && apt-get autoremove -y && apt-get clean -y
 
+# Install Nodejs
+RUN apt-get -y install nodejs \
+    npm
+
 # Install Checkov
 RUN pip3 install --upgrade requests setuptools \
     && pip3 install --upgrade botocore checkov
