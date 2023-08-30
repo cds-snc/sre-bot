@@ -4,6 +4,9 @@ RUN  apt-get update \
   && apt-get install -y wget \
   && rm -rf /var/lib/apt/lists/*
 
+WORKDIR ../frontend
+COPY . .
+
 WORKDIR /app
 
 # Set build variables
