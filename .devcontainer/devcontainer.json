@@ -53,6 +53,9 @@
 		"ghcr.io/devcontainers/features/terraform:1": {
 			"version": "1.0.3",
 			"terragrunt": "0.31.1"
+		},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "16.20.0"
 		}
 	}
 }
