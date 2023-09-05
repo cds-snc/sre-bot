@@ -46,7 +46,7 @@ jobs:
         uses: docker/setup-buildx-action@4c0219f9ac95b02789c1075625400b2acbff50b1 # v2.9.1
 
       - name: Build container
-        working-directory: ./app
+        working-directory: ./
         run: |
           docker buildx build \
           --build-arg git_sha=$GITHUB_SHA \
@@ -72,7 +72,7 @@ jobs:
         uses: cds-snc/security-tools/.github/actions/generate-sbom@cfec0943e40dbb78cee115bbbe89dc17f07b7a0f # v2.1.3    
         with:
           docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
-          dockerfile_path: "app/Dockerfile"
+          dockerfile_path: "Dockerfile"
           platform: "linux/arm64"
           sbom_name: "sre-bot"
           token: "${{ secrets.GITHUB_TOKEN }}"          

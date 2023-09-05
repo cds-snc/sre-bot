@@ -6,15 +6,8 @@ RUN  apt-get update \
   npm \
   && rm -rf /var/lib/apt/lists/*
 
-#RUN apt-get install -y nodejs
-
-#WORKDIR /frontend
-#COPY . .
-#ADD frontend /frontend/
 WORKDIR /frontend
 COPY frontend/ .
-
-#RUN cd ../app
 
 WORKDIR /app
 
