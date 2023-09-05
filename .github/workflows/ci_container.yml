@@ -18,7 +18,7 @@ jobs:
           DNS_PROXY_FORWARDTOSENTINEL: "true"
           DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
-          
+
       - name: Checkout
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
 
@@ -37,3 +37,9 @@ jobs:
           --platform=linux/arm64 \
           -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .
+
+      - name: Dive into container
+        uses: cds-snc/dive-action@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_NAME: $REGISTRY/sre-bot:latest
