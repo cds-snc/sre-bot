@@ -42,4 +42,4 @@ jobs:
         uses: cds-snc/dive-action@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IMAGE_NAME: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot:latest
+          IMAGE_NAME: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot/sre-bot:latest
