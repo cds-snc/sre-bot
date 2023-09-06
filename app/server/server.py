@@ -2,7 +2,11 @@ import json
 import logging
 import os
 import requests
-
+from starlette.config import Config
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import RedirectResponse, HTMLResponse
+from flask_cors import CORS
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
@@ -62,6 +66,65 @@ class AwsSnsPayload(BaseModel):
 
 
 handler = FastAPI()
+
+
+# OAuth settings
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or None
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET") or None
+if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
+    raise Exception("Missing env variables")
+
+SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
+if SECRET_KEY is None:
+    raise Exception("Missing env variables")
+
+# add a session middleware to the app
+handler.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+# Set up oath
+config_data = {'GOOGLE_CLIENT_ID': GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_SECRET': GOOGLE_CLIENT_SECRET}
+starlette_config = Config(environ=config_data)
+oauth = OAuth(starlette_config)
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+
+@handler.get("/")
+def public(request: Request):
+    user = request.session.get("user")
+    if user:
+        name = user.get("name")
+        return HTMLResponse(f'<p>Hello {name}!</p><a href=/logout>Logout</a>')
+    return HTMLResponse('<a href=/login>Login</a>')
+
+
+@ handler.route("/logout")
+async def logout(request: Request):
+    request.session.pop("user", None)
+    return RedirectResponse(url='/')
+
+# Create the login route
+
+
+@handler.get("/login")
+async def login(request: Request):
+    redirect_uri = request.url_for('auth')  # this is the route that will be called after the user logs in
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@handler.route('/auth')
+async def auth(request: Request):
+    try:
+        access_token = await oauth.google.authorize_access_token(request)
+    except OAuthError as error:
+        return HTMLResponse(f'<h1>OAuth Error</h1><pre>{error.error}</pre>')
+    user_data = access_token.get('userinfo')
+    if user_data:
+        request.session['user'] = dict(user_data)
+    return RedirectResponse(url='/')
 
 
 @handler.get("/geolocate/{ip}")
