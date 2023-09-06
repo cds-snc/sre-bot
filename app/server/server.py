@@ -6,7 +6,7 @@ from starlette.config import Config
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, HTMLResponse
-from flask_cors import CORS
+from fastapi.responses import JSONResponse
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
@@ -67,6 +67,11 @@ class AwsSnsPayload(BaseModel):
 
 handler = FastAPI()
 
+# get the FRONTEND_URL from the environment variables
+FRONTEND_URL = os.environ.get("FRONTEND_URL") or None
+if FRONTEND_URL is None:
+    raise Exception("Missing frontend url")
+
 
 # OAuth settings
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or None
@@ -92,19 +97,11 @@ oauth.register(
 )
 
 
-@handler.get("/")
-def public(request: Request):
-    user = request.session.get("user")
-    if user:
-        name = user.get("name")
-        return HTMLResponse(f'<p>Hello {name}!</p><a href=/logout>Logout</a>')
-    return HTMLResponse('<a href=/login>Login</a>')
-
-
+# Logout route. If you log out of the application, you will be redirected to the homepage
 @ handler.route("/logout")
 async def logout(request: Request):
     request.session.pop("user", None)
-    return RedirectResponse(url='/')
+    return RedirectResponse(url=FRONTEND_URL)
 
 # Create the login route
 
@@ -124,7 +121,7 @@ async def auth(request: Request):
     user_data = access_token.get('userinfo')
     if user_data:
         request.session['user'] = dict(user_data)
-    return RedirectResponse(url='/')
+    return RedirectResponse(url=FRONTEND_URL + 'home')
 
 
 @handler.get("/geolocate/{ip}")
