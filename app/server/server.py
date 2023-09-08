@@ -70,7 +70,9 @@ if os.path.exists("../frontend/build"):
     # Sets the templates directory to the React build folder
     templates = Jinja2Templates(directory="../frontend/build")
     # Mounts the static folder within the build forlder to the /static route.
-    handler.mount("/static", StaticFiles(directory="../frontend/build/static"), "static")
+    handler.mount(
+        "/static", StaticFiles(directory="../frontend/build/static"), "static"
+    )
 
 
 @handler.get("/geolocate/{ip}")
