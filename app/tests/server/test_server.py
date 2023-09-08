@@ -290,3 +290,10 @@ def test_append_incident_buttons():
             ]
         ),
     ]
+
+
+def test_react_app():
+    # test the react app
+    response = client.get("/some/path")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
