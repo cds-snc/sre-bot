@@ -7,7 +7,7 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.responses import JSONResponse
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from models import webhooks
@@ -83,8 +83,21 @@ SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
 if SECRET_KEY is None:
     raise Exception("Missing env variables")
 
+origins = [
+    "http://127.0.0.1:3000",
+]
+
+
 # add a session middleware to the app
 handler.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+handler.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Set up oath
 config_data = {'GOOGLE_CLIENT_ID': GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_SECRET': GOOGLE_CLIENT_SECRET}
@@ -119,9 +132,24 @@ async def auth(request: Request):
     except OAuthError as error:
         return HTMLResponse(f'<h1>OAuth Error</h1><pre>{error.error}</pre>')
     user_data = access_token.get('userinfo')
+    print("User data is", user_data)
     if user_data:
         request.session['user'] = dict(user_data)
+        print("Request session is", request.session.get("user").get("name"))
     return RedirectResponse(url=FRONTEND_URL + 'home')
+
+
+@handler.route("/user")
+async def user(request: Request):
+    print("Request session is in user", request.session.get("user"))
+
+    user = request.session.get("user")
+    print("User is", user)
+    if user:
+        print("User is logged in", user)
+        return JSONResponse({"user": user.get("name")})
+    else:
+        return JSONResponse({"error": "Not logged in"})
 
 
 @handler.get("/geolocate/{ip}")
