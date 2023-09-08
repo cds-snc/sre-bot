@@ -96,7 +96,7 @@ if SECRET_KEY is None:
     raise Exception("Missing env variables")
 
 origins = [
-    "http://127.0.0.1:3000",
+    # "http://127.0.0.1:3000",
 ]
 
 
@@ -316,3 +316,11 @@ def append_incident_buttons(payload, webhook_id):
         }
     ]
     return payload
+
+# Defines a route handler for `/*` essentially.
+# NOTE: this needs to be the last route defined b/c it's a catch all route
+
+
+@handler.get("/{rest_of_path:path}")
+async def react_app(req: Request, rest_of_path: str):
+    return templates.TemplateResponse("index.html", {"request": req})
