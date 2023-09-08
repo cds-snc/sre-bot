@@ -6,8 +6,11 @@ RUN  apt-get update \
   npm \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /frontend
+WORKDIR frontend/
 COPY frontend/ .
+
+RUN npm install
+RUN npm run build
 
 WORKDIR /app
 
