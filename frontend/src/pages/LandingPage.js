@@ -4,7 +4,8 @@ export default function LoginPage() {
   const REACT_APP_BACKEND_URL = "http://127.0.0.1:8000" //process.env.BACKEND_URL
 
     const googleLogin = () => {
-        var login_url = REACT_APP_BACKEND_URL + "/login"
+        //var login_url = REACT_APP_BACKEND_URL + "/login"
+        var login_url = "/login"
         console.log("login_url", login_url)
         window.location.href = login_url
       }

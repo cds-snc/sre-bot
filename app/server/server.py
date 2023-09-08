@@ -70,7 +70,10 @@ class AwsSnsPayload(BaseModel):
 
 handler = FastAPI()
 
+print("Checking if frontend build exists")
+
 if os.path.exists("../frontend/build"):
+    print("Setting up static files")
     # Sets the templates directory to the React build folder
     templates = Jinja2Templates(directory="../frontend/build")
     # Mounts the static folder within the build forlder to the /static route.
@@ -145,7 +148,8 @@ async def auth(request: Request):
     if user_data:
         request.session['user'] = dict(user_data)
         print("Request session is", request.session.get("user").get("name"))
-    return RedirectResponse(url=FRONTEND_URL + 'home')
+    # return RedirectResponse(url=FRONTEND_URL + 'home')
+    return RedirectResponse(url='/home')
 
 
 @handler.route("/user")

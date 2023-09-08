@@ -9,7 +9,8 @@ export default function HomePage() {
             }
 
             const temp = () =>{
-                return fetch('http://127.0.0.1:8000/user')
+                //return fetch('http://127.0.0.1:8000/user')
+                return fetch('/user')
                 .then((response) => {
                     return response.json();
                 })
