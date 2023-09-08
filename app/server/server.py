@@ -2,6 +2,9 @@ import json
 import logging
 import os
 import requests
+
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from starlette.config import Config
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from starlette.middleware.sessions import SessionMiddleware
@@ -66,6 +69,12 @@ class AwsSnsPayload(BaseModel):
 
 
 handler = FastAPI()
+
+if os.path.exists("../frontend/build"):
+    # Sets the templates directory to the React build folder
+    templates = Jinja2Templates(directory="../frontend/build")
+    # Mounts the static folder within the build forlder to the /static route.
+    handler.mount("/static", StaticFiles(directory="../frontend/build/static"), "static")
 
 # get the FRONTEND_URL from the environment variables
 FRONTEND_URL = os.environ.get("FRONTEND_URL") or None
