@@ -65,11 +65,12 @@ class AwsSnsPayload(BaseModel):
 
 handler = FastAPI()
 
-# Sets the templates directory to the React build folder
-templates = Jinja2Templates(directory="../frontend/build")
-
-# Mounts the static folder within the build forlder to the /static route.
-handler.mount("/static", StaticFiles(directory="../frontend/build/static"), "static")
+# Set up the templates directory and static folder for the frontend with the build folder
+if os.path.exists("../frontend/build"):
+    # Sets the templates directory to the React build folder
+    templates = Jinja2Templates(directory="../frontend/build")
+    # Mounts the static folder within the build forlder to the /static route.
+    handler.mount("/static", StaticFiles(directory="../frontend/build/static"), "static")
 
 
 @handler.get("/geolocate/{ip}")
@@ -223,12 +224,3 @@ def append_incident_buttons(payload, webhook_id):
         }
     ]
     return payload
-
-
-# Defines a route handler for `/*` essentially.
-# NOTE: this needs to be the last route defined b/c it's a catch all route
-
-
-@handler.get("/{rest_of_path:path}")
-async def react_app(req: Request, rest_of_path: str):
-    return templates.TemplateResponse("index.html", {"request": req})
