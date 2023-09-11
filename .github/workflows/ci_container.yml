@@ -28,6 +28,7 @@ jobs:
           docker build \
           --build-arg git_sha=$GITHUB_SHA \
           --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
+          -t sre-bot:latest \
           -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .
 
