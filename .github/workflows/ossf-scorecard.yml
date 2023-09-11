@@ -19,20 +19,13 @@ jobs:
       contents: read
 
     steps:
-      - name: Audit DNS requests
-        uses: cds-snc/dns-proxy-action@main
-        env:
-          DNS_PROXY_FORWARDTOSENTINEL: "true"
-          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
-
       - name: "Checkout code"
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           persist-credentials: false
 
       - name: "Run analysis"
-        uses: ossf/scorecard-action@b2378380f417712c15777b69e02d96ab14c70e84
+        uses: ossf/scorecard-action@b2dd2d646c3592c87c4080778d90e24b42eae566
         with:
           results_file: ossf-results.json
           results_format: json
