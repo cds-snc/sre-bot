@@ -65,7 +65,7 @@ class AwsSnsPayload(BaseModel):
 
 handler = FastAPI()
 
-# Set up the templates directory and static folder for the frontend with the build folder
+# Set up the templates directory and static folder for the frontend with the build folder for production
 if os.path.exists("../frontend/build"):
     # Sets the templates directory to the React build folder
     templates = Jinja2Templates(directory="../frontend/build")
@@ -73,9 +73,13 @@ if os.path.exists("../frontend/build"):
     handler.mount(
         "/static", StaticFiles(directory="../frontend/build/static"), "static"
     )
+else:
+    # Sets the templates directory to the React public folder for local dev
+    templates = Jinja2Templates(directory="../frontend/public")
+    handler.mount("/static", StaticFiles(directory="../frontend/public"), "static")
 
 
-@handler.get("/geolocate/{ip}")
+@ handler.get("/geolocate/{ip}")
 def geolocate(ip):
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):

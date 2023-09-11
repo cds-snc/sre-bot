@@ -292,6 +292,7 @@ def test_append_incident_buttons():
     ]
 
 
+# Unit test the react app
 def test_react_app():
     # test the react app
     response = client.get("/some/path")
