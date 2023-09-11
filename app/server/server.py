@@ -79,7 +79,7 @@ else:
     handler.mount("/static", StaticFiles(directory="../frontend/public"), "static")
 
 
-@ handler.get("/geolocate/{ip}")
+@handler.get("/geolocate/{ip}")
 def geolocate(ip):
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
