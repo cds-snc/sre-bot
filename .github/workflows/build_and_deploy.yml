@@ -40,7 +40,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@2fc7aceee09e9e4a7105c0d060c656fad0b4f63d # v1.7.0
 
       - name: Build container
-        working-directory: ./app
+        working-directory: ./
         run: |
           docker build \
           --build-arg git_sha=$GITHUB_SHA \
@@ -70,6 +70,6 @@ jobs:
         uses: cds-snc/security-tools/.github/actions/generate-sbom@cfec0943e40dbb78cee115bbbe89dc17f07b7a0f # v2.1.3
         with:
           docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
-          dockerfile_path: "app/Dockerfile"
+          dockerfile_path: "./Dockerfile"
           sbom_name: "sre-bot"
           token: "${{ secrets.GITHUB_TOKEN }}"
