@@ -15,8 +15,6 @@ function App() {
     
     <img src = {sre_bot_logo} alt="sre_bot"></img>
     <div>
-      {/* <h1 className="text-5xl font-bold">Welcome!</h1> */}
-      {/* <p className="py-6">This is the UI for the SRE bot.</p> */}
       <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage/>} />
