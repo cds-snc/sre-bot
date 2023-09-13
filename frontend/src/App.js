@@ -1,4 +1,3 @@
-import sre_bot_logo from './sre_bot_logo.png';
 import './App.css';
 import sre_bot_logo from './sre_bot_logo.png';
 
