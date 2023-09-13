@@ -2,7 +2,15 @@ FROM python:3.11.5-slim
 
 RUN  apt-get update \
   && apt-get install -y wget \
+  && apt-get install -y nodejs \
+  npm \
   && rm -rf /var/lib/apt/lists/*
+
+WORKDIR frontend/
+COPY frontend/ .
+
+RUN npm install
+RUN npm run build
 
 WORKDIR /app
 
@@ -10,10 +18,10 @@ WORKDIR /app
 ARG git_sha
 ENV GIT_SHA=$git_sha
 
-COPY requirements.txt ./
+COPY app/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY app/ .
 
 ARG LICENSE_KEY
 
@@ -24,6 +32,6 @@ RUN cp /app/geodb/GeoLite2-City_*/GeoLite2-City.mmdb /app/geodb/GeoLite2-City.mm
 RUN rm -rf /app/geodb/GeoLite2-City_*
 RUN rm /app/geodb/GeoLite2-City.tar.gz
 
-COPY bin/entry.sh /app/entry.sh
+COPY app/bin/entry.sh /app/entry.sh
 
 ENTRYPOINT [ "/app/entry.sh" ]

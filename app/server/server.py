@@ -313,7 +313,6 @@ def append_incident_buttons(payload, webhook_id):
 
 
 # Defines a route handler for `/*` essentially.
-# NOTE: this needs to be the last route defined because it's a catch all route
 @handler.get("/{rest_of_path:path}")
 async def react_app(req: Request, rest_of_path: str):
     return templates.TemplateResponse("index.html", {"request": req})
