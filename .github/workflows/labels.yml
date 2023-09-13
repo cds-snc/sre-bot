@@ -1,18 +1,9 @@
-name: Sync repository labels workflow
-
 on: [issues, pull_request, workflow_dispatch]
 jobs:
   sync-labels:
     runs-on: ubuntu-latest
     name: Sync repository labels
     steps:
-      - name: Audit DNS requests
-        uses: cds-snc/dns-proxy-action@main
-        env:
-          DNS_PROXY_FORWARDTOSENTINEL: "true"
-          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
-
       - uses: cds-snc/sre-labels@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

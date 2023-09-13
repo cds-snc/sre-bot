@@ -1,10 +1,10 @@
 arrow==1.2.3
 Authlib==1.2.1
-awscli==1.29.31
-aws-sns-message-validator==0.0.5
-boto3==1.28.31
-fastapi==0.101.1
 Jinja2==3.1.2
+awscli==1.29.40
+aws-sns-message-validator==0.0.5
+boto3==1.28.40
+fastapi==0.103.1
 geoip2==4.7.0
 google-api-python-client==2.97.0
 google-auth-httplib2==0.1.0
