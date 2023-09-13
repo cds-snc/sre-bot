@@ -1,31 +1,47 @@
-import React, {} from 'react';
+import React, {useEffect, useState} from 'react';
 
 export default function HomePage() {
-        const REACT_APP_BACKEND_URL = "http://127.0.0.1:8000/"//process.env.BACKEND_URL
 
+    const [userData, setUserData] = useState(null);
+
+    useEffect(() => {
+    // Make a GET request to the "/user" endpoint
+    fetch('/user')
+      .then(response => {
+        // Check if the response status code is OK (200)
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        // Parse the JSON response
+        return response.json();
+      })
+      .then(data => {
+        // Handle the JSON data from the response
+        setUserData(data);
+      })
+      .catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+      });
+  }, []);
         const googleLogout = () => {
-                var logout_url= REACT_APP_BACKEND_URL + "logout"
+                var logout_url= "/logout"
                 window.location.href = logout_url 
             }
 
-            const temp = () =>{
-                //return fetch('http://127.0.0.1:8000/user')
-                return fetch('/user')
-                .then((response) => {
-                    return response.json();
-                })
-                .then((myJson) => {
-                    return myJson;
-                });
-            }
-            console.log(temp().then(data => data))
-            console.log(temp)
-
         return (
-                <section>
-                        <h1> {temp().then(data => data)} is going to be the dashboard of the SRE bot</h1>
-                        <br></br>
-                        <button onClick={googleLogout} className="btn btn-xs sm:btn-sm md:btn-md lg:btn-lg border-zinc-950">Logout from Google</button>
-        </section>
+            <div>
+            {userData ? (
+              <div>
+                <h1 className="text-5xl font-bold">Welcome {userData.name}!</h1>
+                <br></br>
+                <p>This is the SRE Bot frontend dashboard. To log out, press the logout button.</p>
+                <br></br>
+                <button onClick={googleLogout} className="btn btn-xs sm:btn-sm md:btn-md lg:btn-lg border-zinc-950">Logout from Google</button>
+              </div>
+            ) : (
+              <p>Error: Not logged in</p>
+            )}
+          </div>
+
         );
 }

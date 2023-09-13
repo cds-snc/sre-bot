@@ -290,3 +290,53 @@ def test_append_incident_buttons():
             ]
         ),
     ]
+
+
+# Unit test the react app
+def test_react_app():
+    # test the react app
+    response = client.get("/some/path")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
+# Test the logout endpoint
+def test_logout_endpoint():
+    # Test that the endpoint returns a 200 status code
+    response = client.get("/logout")
+    assert response.status_code == 200
+
+    # Test that the user session is removed
+    response = client.get("/home")
+    assert response.status_code == 200
+    assert "user" not in response.cookies
+
+
+# Test the login endpoint and that it redirects to the Google OAuth page
+def test_login_endpoint():
+    response = client.get("/login")
+    assert response.status_code == 200
+    assert "https://accounts.google.com/o/oauth2/v2/auth" in str(response.url)
+
+
+# Test the auth endpoint
+def test_auth_endpoint():
+    response = client.get("/auth")
+    assert response.status_code == 200
+    assert "http://testserver/auth" in str(response.url)
+
+
+# Test the user endpoint, logged in
+def test_user_route_logged_in():
+    # Simulate a logged-in session by creating a mock request with session data
+    session_data = {"user": {"given_name": "FirstName"}}
+    headers = {"Cookie": f"session={session_data}"}
+    response = client.get("/user", headers=headers)
+    assert response.status_code == 200
+
+
+# Test the user endpoing, not logged in
+def test_user_endpoint_with_no_logged_in_user():
+    response = client.get("/user")
+    assert response.status_code == 200
+    assert response.json() == {"error": "Not logged in"}
