@@ -3,7 +3,12 @@ import logging
 import os
 import requests
 
-
+from starlette.config import Config
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from fastapi.templating import Jinja2Templates
@@ -77,6 +82,81 @@ else:
     # Sets the templates directory to the React public folder for local dev
     templates = Jinja2Templates(directory="../frontend/public")
     handler.mount("/static", StaticFiles(directory="../frontend/public"), "static")
+
+
+# OAuth settings
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or None
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET") or None
+if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
+    raise Exception("Missing env variables")
+
+SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
+if SECRET_KEY is None:
+    raise Exception("Missing env variables")
+
+# add a session middleware to the app
+handler.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
+handler.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Set up Google OAuth
+config_data = {
+    "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
+    "GOOGLE_CLIENT_SECRET": GOOGLE_CLIENT_SECRET,
+}
+starlette_config = Config(environ=config_data)
+oauth = OAuth(starlette_config)
+oauth.register(
+    name="google",
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
+
+
+# Logout route. If you log out of the application, you will be redirected to the homepage
+@handler.route("/logout")
+async def logout(request: Request):
+    request.session.pop("user", None)
+    return RedirectResponse(url="/")
+
+
+# Login route. You will be redirected to the google login page
+@handler.get("/login")
+async def login(request: Request):
+    redirect_uri = request.url_for(
+        "auth"
+    )  # this is the route that will be called after the user logs in
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+# Authenticate route. This is the route that will be called after the user logs in and you are redirected to the /home page
+@handler.route("/auth")
+async def auth(request: Request):
+    try:
+        access_token = await oauth.google.authorize_access_token(request)
+    except OAuthError as error:
+        return HTMLResponse(f"<h1>OAuth Error</h1><pre>{error.error}</pre>")
+    user_data = access_token.get("userinfo")
+    if user_data:
+        request.session["user"] = dict(user_data)
+    return RedirectResponse(url="/home")
+
+
+# User route. Returns the user's first name that is currently logged into the application
+@handler.route("/user")
+async def user(request: Request):
+    user = request.session.get("user")
+    if user:
+        return JSONResponse({"name": user.get("given_name")})
+    else:
+        return JSONResponse({"error": "Not logged in"})
 
 
 @handler.get("/geolocate/{ip}")
@@ -233,7 +313,6 @@ def append_incident_buttons(payload, webhook_id):
 
 
 # Defines a route handler for `/*` essentially.
-# NOTE: this needs to be the last route defined b/c it's a catch all route
 @handler.get("/{rest_of_path:path}")
 async def react_app(req: Request, rest_of_path: str):
     return templates.TemplateResponse("index.html", {"request": req})
