@@ -9,6 +9,7 @@ geoip2==4.7.0
 google-api-python-client==2.97.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.8.0
+httpx==0.24.1
 itsdangerous==2.1.2
 Jinja2==3.1.2
 PyYaml==5.3.1 # need to pin down the PyYaml version since the newest version is currently broken - https://github.com/yaml/pyyaml/issues/724
