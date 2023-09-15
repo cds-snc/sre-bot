@@ -1,4 +1,4 @@
 const Dashboard = () => {
-    return <div>Dashboard</div>
+    return <div>SRE Bot Dashboard</div>
 }
 export default Dashboard;

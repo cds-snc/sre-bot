@@ -130,7 +130,7 @@ export const tokens = (mode) => ({
         palette: {
             mode: mode, 
             // official setup for dark mode
-            ...colors(mode === "dark" 
+            ...(mode === "dark" 
             ? {
                 primary:
                 {
@@ -171,36 +171,43 @@ export const tokens = (mode) => ({
       // set up the typographty for the headings
       typography: {
         // join the font names
-        fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+        // fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+        fontFamily: ["Lato", "sans-serif"].join(","),
         fontSize: 12,
         h1: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 40,
         },
         h2: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 32,
         },
         h3: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 24,
         },
         h4: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 20,
         },
         h5: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 16,
         },
         h6: {
             // h1 is the most important text
-            fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            ///fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 14,
         },
       },

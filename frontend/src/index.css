@@ -2,9 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* <style> */
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap');
-/* </style> */
+/* @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap'); */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap');
 
 html,
 body,
@@ -13,7 +12,8 @@ body,
 .content {
   height: 100%;
   width: 100%;
-  font-family: 'Source Serif 4', sans-serif;
+  /* font-family: 'Source Serif 4', sans-serif; */
+  font-family: 'Lato', sans-serif;
 }
 
 .app {
@@ -40,8 +40,8 @@ body,
   background: #555;
 }
 
-/* 
-body {
+
+/* body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
