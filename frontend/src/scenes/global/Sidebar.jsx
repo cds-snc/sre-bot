@@ -141,35 +141,35 @@ const Sidebar = () => {
                 {/* </Typography> */}
                 <Item
                   title="Start an Incident"
-                  to="/team"
+                  to="/incident"
                   icon={<AccessAlarmsIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />
                 <Item
                   title="Incident History"
-                  to="/contacts"
+                  to="/incident_history"
                   icon={<HistoryIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />
                 <Item
                   title="Manage Webhooks"
-                  to="/invoices"
+                  to="/webhooks"
                   icon={<WebhookIcon />}
                   selected={selected}
                   setSelected={setSelected}
                 />
                 <Item
                   title="Geolocate an IP"
-                  to="/invoices"
+                  to="/geolocate"
                   icon={<LocationSearchingIcon/>}
                   selected={selected}
                   setSelected={setSelected}
                 />
                 <Item
                   title="FAQ Page"
-                  to="/invoices"
+                  to="/faq"
                   icon={<InfoIcon/>}
                   selected={selected}
                   setSelected={setSelected}
