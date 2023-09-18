@@ -159,7 +159,6 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
-
 @handler.get("/geolocate/{ip}")
 def geolocate(ip):
     reader = maxmind.geolocate(ip)
