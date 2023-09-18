@@ -159,10 +159,6 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
-@handler.route("/webhooks")
-async def get_webhooks(request: Request):
-    pass
-
 
 @handler.get("/geolocate/{ip}")
 def geolocate(ip):

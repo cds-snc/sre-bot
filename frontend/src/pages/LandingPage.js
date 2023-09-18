@@ -15,7 +15,7 @@ export default function LoginPage() {
     return (
       <div className="hero min-h-screen bg-base-200">
       
-   <div className="hero-content flex-col lg:flex-row">
+      <div className="hero-content flex-col lg:flex-row">
     
      <img src = {sre_bot_logo} alt="sre_bot"></img>
    <div>
@@ -31,5 +31,5 @@ export default function LoginPage() {
     </div>
   </div>
 </div>
-    );
+);
 }

@@ -1,17 +1,18 @@
 arrow==1.2.3
 Authlib==1.2.1
 Jinja2==3.1.2
-awscli==1.29.40
+awscli==1.29.44
 aws-sns-message-validator==0.0.5
-boto3==1.28.40
+boto3==1.28.44
 fastapi==0.103.1
 geoip2==4.7.0
-google-api-python-client==2.97.0
+google-api-python-client==2.98.0
 google-auth-httplib2==0.1.0
 google-auth-oauthlib==0.8.0
+httpx==0.25.0
 itsdangerous==2.1.2
 Jinja2==3.1.2
-PyYaml==5.3.1 # need to pin down the PyYaml version since the newest version is currently broken - https://github.com/yaml/pyyaml/issues/724
+PyYAML!=6.0.0,!=5.4.0,!=5.4.1
 python-dotenv==0.21.1
 python-i18n==0.3.9
 requests==2.31.0
