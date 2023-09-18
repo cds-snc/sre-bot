@@ -146,7 +146,7 @@ async def auth(request: Request):
     user_data = access_token.get("userinfo")
     if user_data:
         request.session["user"] = dict(user_data)
-    return RedirectResponse(url="/home")
+    return RedirectResponse(url="/")
 
 
 # User route. Returns the user's first name that is currently logged into the application
@@ -157,6 +157,11 @@ async def user(request: Request):
         return JSONResponse({"name": user.get("given_name")})
     else:
         return JSONResponse({"error": "Not logged in"})
+
+
+@handler.route("/webhooks")
+async def get_webhooks(request: Request):
+    pass
 
 
 @handler.get("/geolocate/{ip}")

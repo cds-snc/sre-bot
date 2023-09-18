@@ -1,7 +1,6 @@
 import { createContext, useState, useMemo } from "react";
 import { createTheme } from "@mui/material/styles";
 
-//color design tokens
 // color design tokens export
 export const tokens = (mode) => ({
     ...(mode === "dark"
@@ -78,7 +77,7 @@ export const tokens = (mode) => ({
             100: "#040509",
             200: "#080b12",
             300: "#0c101b",
-            400: "#f2f0f0", // manually changed
+            400: "#f2f0f0",
             500: "#141b2d",
             600: "#1F2A40",
             700: "#727681",
@@ -171,42 +170,35 @@ export const tokens = (mode) => ({
       // set up the typographty for the headings
       typography: {
         // join the font names
-        // fontFamily: ["Source Serif 4", "sans-serif"].join(","),
         fontFamily: ["Lato", "sans-serif"].join(","),
         fontSize: 12,
         h1: {
-            // h1 is the most important text
-            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h1 font and size configuration 
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 40,
         },
         h2: {
-            // h1 is the most important text
-            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h2 font and size configuration
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 32,
         },
         h3: {
-            // h1 is the most important text
-            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h3 font and size configuration
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 24,
         },
         h4: {
-            // h1 is the most important text
-            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h4 font and size configuration
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 20,
         },
         h5: {
-            // h1 is the most important text
-            //fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h5 font and size configuration
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 16,
         },
         h6: {
-            // h1 is the most important text
-            ///fontFamily: ["Source Serif 4", "sans-serif"].join(","),
+            // h6 font and size configuration
             fontFamily: ["Lato", "sans-serif"].join(","),
             fontSize: 14,
         },

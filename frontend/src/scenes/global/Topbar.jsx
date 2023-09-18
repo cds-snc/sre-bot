@@ -17,7 +17,7 @@ const Topbar= () => {
 
     return (
         <Box display="flex" justifyContent="space-between" p={2}>
-          {/* SEARCH BAR */}
+          {/* Setup the search bar and icons here */}
           <Box
             display="flex"
             backgroundColor={colors.primary[400]}
@@ -29,7 +29,7 @@ const Topbar= () => {
             </IconButton>
           </Box>
     
-          {/* ICONS */}
+          {/* Setup dark and light mode. When you click on the icon, it will toggle the theme and the pallete mode (ie dark or light) */}
           <Box display="flex">
             <IconButton onClick={colorMode.toggleColorMode}>
               {theme.palette.mode === "dark" ? (
