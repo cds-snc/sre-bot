@@ -3,23 +3,33 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ColorModeContext, useMode } from "./theme";
 import { React, useState, useEffect } from "react";
 import LandingPage from './pages/LandingPage.js';
-import Topbar from "./scenes/global/Topbar";
+import Topmenu from "./scenes/global/Topmenu";
 import Dashboard from "./scenes/dashboard";
-import Sidebar from "./scenes/global/Sidebar";
+import Sidemenu from "./scenes/global/Sidemenu";
 import Webhooks from './scenes/webhooks';
 import Incident from './scenes/incident';
 import IncidentHistory from './scenes/incident_history';
 import Geolocate from './scenes/geolocate';
 import Faq from './scenes/faq';
 
+/**
+ * The main component of the application.
+ */
 function App() {
-    const [theme, colorMode] = useMode();
-    const [isSidebar, setIsSidebar] = useState(true);
 
+    // Get the current theme and color mode
+    const [theme, colorMode] = useMode();
+
+    // Set the initial state of the Sidemenu
+    const [isSidemenu, setIsSidemenu] = useState(true);
+
+    /**
+     * Custom hook to get user data from the server.
+     * @returns {boolean} Whether the user is authenticated or not.
+     */
     const useUserData = () => {
       const [userData, setUserData] = useState(null);
 
-      console.log("In user data")
       useEffect(() => {
         // Make a GET request to the "/user" endpoint
         fetch('/user')
@@ -40,14 +50,18 @@ function App() {
           });
       }, []);
 
+      // if the user is not logged in, then return false. Otherwise, return true
       if (userData && userData.error === "Not logged in") {
         return false;
       }
       return true;
     };
 
+    // Check if the user is authenticated
     const isAuthenticated = useUserData();
     
+    // Render the application. If the user is authenticated, show the Sidemenu, Topmenu and menu items. 
+    // Otherwise (ie user is not logged in), show the landing page where an user can log in.
     return (
       <BrowserRouter>
         <Routes>
@@ -58,9 +72,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <Dashboard/>
                       </main>
                     </div>
@@ -72,9 +86,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <Webhooks/>
                       </main>
                     </div>
@@ -85,9 +99,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <Incident/>
                       </main>
                     </div>
@@ -98,9 +112,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <IncidentHistory/>
                       </main>
                     </div>
@@ -111,9 +125,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <Geolocate/>
                       </main>
                     </div>
@@ -124,9 +138,9 @@ function App() {
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <div className="app">
-                      <Sidebar isSidebar={isSidebar} />
+                      <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
-                        <Topbar setIsSidebar={setIsSidebar} />
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
                         <Faq/>
                       </main>
                     </div>
@@ -141,4 +155,6 @@ function App() {
       </BrowserRouter>
     );
    }
+  
+  
   export default App;

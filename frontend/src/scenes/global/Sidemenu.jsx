@@ -32,8 +32,8 @@ const Item = ({ title, to, icon, selected, setSelected }) => {
     );
   };
 
-// Sidebar component to display the sidebar in a scene
-const Sidebar = () => {
+// Sidemenu component to display the Sidemenu in a scene
+const Sidemenu = () => {
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -201,4 +201,4 @@ const Sidebar = () => {
       );
     };
 
-    export default Sidebar;
+    export default Sidemenu;

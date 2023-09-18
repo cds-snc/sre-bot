@@ -9,7 +9,7 @@ import SearchIcon from "@mui/icons-material/Search";
 
 
 
-const Topbar= () => {
+const Topmenu= () => {
     //allows us to toggle different states for the theme and colors
     const theme = useTheme();
     const colors = tokens(theme.palette.mode);
@@ -46,4 +46,4 @@ const Topbar= () => {
       );
  };
 
- export default Topbar;
+ export default Topmenu;
