@@ -130,9 +130,12 @@ async def logout(request: Request):
 # Login route. You will be redirected to the google login page
 @handler.get("/login")
 async def login(request: Request):
+    # this is the route that will be called after the user logs in
     redirect_uri = request.url_for(
-        "auth"
-    )  # this is the route that will be called after the user logs in
+        "auth",
+    )
+    if (request.url.__str__()).startswith("https"):
+        redirect_uri = redirect_uri.__str__().replace("http", "https")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
