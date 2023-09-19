@@ -146,7 +146,7 @@ async def auth(request: Request):
     user_data = access_token.get("userinfo")
     if user_data:
         request.session["user"] = dict(user_data)
-    return RedirectResponse(url="/home")
+    return RedirectResponse(url="/")
 
 
 # User route. Returns the user's first name that is currently logged into the application
