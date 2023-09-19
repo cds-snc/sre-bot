@@ -1,0 +1,163 @@
+{
+    "pages": {
+        "login": {
+            "title": "Connectez-vous à votre compte",
+            "signin": "Connectez-vous",
+            "signup": "Enregistrez-vous",
+            "divider": "ou",
+            "fields": {
+                "email": "Courriel",
+                "password": "Mot de passe"
+            },
+            "errors": {
+                "validEmail": "Adresse courriel invalide"
+            },
+            "buttons": {
+                "submit": "Soumettre",
+                "forgotPassword": "Mot de passe oublié?",
+                "noAccount": "Pas de compte?",
+                "rememberMe": "Se souvenir de moi"
+            }
+        },
+        "forgotPassword": {
+            "title": "Mot de passe oublié?",
+            "fields": {
+                "email": "Courriel"
+            },
+            "errors": {
+                "validEmail": "Adresse courriel invalide"
+            },
+            "buttons": {
+                "submit": "Envoyer les instructions de réinitialisation"
+            }
+        },
+        "register": {
+            "title": "Créer un compte",
+            "fields": {
+                "email": "Courriel",
+                "password": "Mot de passe"
+            },
+            "errors": {
+                "validEmail": "Adresse courriel invalide"
+            },
+            "buttons": {
+                "submit": "Enregistrer",
+                "haveAccount": "Vous avez déjà un compte?"
+            }
+        },
+        "updatePassword": {
+            "title": "Changer le mot de passe",
+            "fields": {
+                "password": "Nouveau mot de passe",
+                "confirmPassword": "Confirmer le mot de passe"
+            },
+            "errors": {
+                "confirmPasswordNotMatch": "Les mots de passe ne correspondent pas"
+            },
+            "buttons": {
+                "submit": "Mettre à jour"
+            }
+        },
+        "error": {
+            "info": "You may have forgotten to add the {{action}} component to {{resource}} resource.",
+            "404": "Sorry, the page you visited does not exist.",
+            "resource404": "Are you sure you have created the {{resource}} resource.",
+            "backHome": "Back Home"
+        }
+    },
+    "actions": {
+        "list": "List",
+        "create": "Create",
+        "edit": "Edit",
+        "show": "Show"
+    },
+    "buttons": {
+        "create": "Create",
+        "save": "Save",
+        "logout": "Logout",
+        "delete": "Delete",
+        "edit": "Edit",
+        "cancel": "Cancel",
+        "confirm": "Are you sure?",
+        "filter": "Filter",
+        "clear": "Clear",
+        "refresh": "Refresh",
+        "show": "Show",
+        "undo": "Undo",
+        "import": "Import",
+        "clone": "Clone",
+        "notAccessTitle": "You don't have permission to access"
+    },
+    "warnWhenUnsavedChanges": "Are you sure you want to leave? You have unsaved changes.",
+    "notifications": {
+        "success": "Successful",
+        "error": "Error (status code: {{statusCode}})",
+        "undoable": "You have {{seconds}} seconds to undo",
+        "createSuccess": "Successfully created {{resource}}",
+        "createError": "There was an error creating {{resource}} (status code: {{statusCode}})",
+        "deleteSuccess": "Successfully deleted {{resource}}",
+        "deleteError": "Error when deleting {{resource}} (status code: {{statusCode}})",
+        "editSuccess": "Successfully edited {{resource}}",
+        "editError": "Error when editing {{resource}} (status code: {{statusCode}})",
+        "importProgress": "Importing: {{processed}}/{{total}}"
+    },
+    "loading": "Loading",
+    "tags": {
+        "clone": "Clone"
+    },
+    "dashboard": {
+        "title": "Dashboard"
+    },
+    "blog_posts": {
+        "blog_posts": "Blog Posts",
+        "fields": {
+            "id": "Id",
+            "title": "Title",
+            "content": "Content",
+            "status": "Status",
+            "createdAt": "Created At",
+            "category": "Category"
+        },
+        "titles": {
+            "create": "Create Blog Post",
+            "edit": "Edit Blog Post",
+            "list": "Blog Posts",
+            "show": "Show Blog Post"
+        }
+    },
+    "categories": {
+        "categories": "Categories",
+        "fields": {
+            "id": "Id",
+            "title": "Title",
+            "createdAt": "Created At"
+        },
+        "titles": {
+            "create": "Create Category",
+            "edit": "Edit Category",
+            "list": "Categories",
+            "show": "Show Category"
+        }
+    },
+    "documentTitle": {
+        "default": "refine",
+        "suffix": " | refine",
+        "blog_posts": {
+            "list": "Blog Posts | refine",
+            "show": "#{{id}} Show Blog Post | refine",
+            "edit": "#{{id}} Edit Blog Post | refine",
+            "create": "Create new Blog Post | refine",
+            "clone": "#{{id}} Clone Blog Post | refine"
+        },
+        "categories": {
+            "list": "Categories | refine",
+            "show": "#{{id}} Show Category | refine",
+            "edit": "#{{id}} Edit Category | refine",
+            "create": "Create new Category | refine",
+            "clone": "#{{id}} Clone Category | refine"
+        }
+    },
+    "table": {
+        "actions": "Actions"
+    }
+}
