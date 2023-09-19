@@ -25,7 +25,7 @@ type IUser = {
   avatar: string;
 };
 
-export const Header: React.FC<  RefineThemedLayoutV2HeaderProps> = ({
+export const Header: React.FC<RefineThemedLayoutV2HeaderProps> = ({
   sticky,
 }) => {
   const { data: user } = useGetIdentity<IUser>();
@@ -94,7 +94,7 @@ export const Header: React.FC<  RefineThemedLayoutV2HeaderProps> = ({
                     />
                   }
                 >
-                  {lang === "en" ? "English" : "German"}
+                  {lang === "en" ? "English" : "Français"}
                 </Menu.Item>
               ))}
             </Menu.Dropdown>

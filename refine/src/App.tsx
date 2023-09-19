@@ -1,8 +1,4 @@
-import {
-  AuthBindings,
-  Authenticated,
-  Refine,
-} from "@refinedev/core";
+import { AuthBindings, Authenticated, Refine } from "@refinedev/core";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
 import {
@@ -48,6 +44,7 @@ import {
 } from "./pages/categories";
 import { Login } from "./pages/login";
 import { parseJwt } from "./utils/parse-jwt";
+import { Geolocate } from "./pages/geolocate";
 
 const axiosInstance = axios.create();
 axiosInstance.interceptors.request.use((request: AxiosRequestConfig) => {
@@ -198,6 +195,10 @@ function App() {
                       canDelete: true,
                     },
                   },
+                  {
+                    name: "geolocate",
+                    list: "/geolocate",
+                  },
                 ]}
                 options={{
                   syncWithLocation: true,
@@ -216,7 +217,7 @@ function App() {
                           Title={({ collapsed }) => (
                             <ThemedTitleV2
                               collapsed={collapsed}
-                              text="refine Project"
+                              text="SRE Dev Portal"
                               icon={<AppIcon />}
                             />
                           )}
@@ -242,6 +243,7 @@ function App() {
                       <Route path="edit/:id" element={<CategoryEdit />} />
                       <Route path="show/:id" element={<CategoryShow />} />
                     </Route>
+                    <Route path="/geolocate" element={<Geolocate />} />
                     <Route path="*" element={<ErrorComponent />} />
                   </Route>
                   <Route
