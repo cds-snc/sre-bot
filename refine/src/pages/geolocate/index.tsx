@@ -1,5 +1,4 @@
-import { useCustom, CustomResponse } from "@refinedev/core";
-import { Box, TextInput, Button, Table } from "@mantine/core";
+import { Box, TextInput, Button, Table, Divider } from "@mantine/core";
 import { useState } from "react";
 
 interface GeolocateResponse {
@@ -20,7 +19,7 @@ export const Geolocate: React.FC = () => {
       `https://sre-bot.cdssandbox.xyz/geolocate/${ip}`
     );
     const json = await response.json();
-    setData(json.data);
+    setData(json);
     setIsLoading(false);
   };
 
@@ -39,9 +38,11 @@ export const Geolocate: React.FC = () => {
         value={ip}
         onChange={(event) => setIp(event.currentTarget.value)}
       />
+      <Divider my={"md"} />
       <Button onClick={handleButtonClick} disabled={isLoading}>
         {isLoading ? "Loading..." : "Submit"}
       </Button>
+      <Divider my={"md"} />
       {data ? (
         <Table>
           <thead>
