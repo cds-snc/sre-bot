@@ -59,102 +59,102 @@
             }
         },
         "error": {
-            "info": "You may have forgotten to add the {{action}} component to {{resource}} resource.",
-            "404": "Sorry, the page you visited does not exist.",
-            "resource404": "Are you sure you have created the {{resource}} resource.",
-            "backHome": "Back Home"
+            "info": "Vous avez peut-être oublié d'ajouter le composant {{action}} à la ressource {{resource}}.",
+            "404": "Désolé, la page que vous recherchez n'existe pas.",
+            "resource404": "Avez-vous créé la ressource {{resource}}?",
+            "backHome": "Retour à la page d'accueil"
         }
     },
     "actions": {
-        "list": "List",
-        "create": "Create",
-        "edit": "Edit",
-        "show": "Show"
+        "list": "Liste",
+        "create": "Créer",
+        "edit": "Modifier",
+        "show": "Afficher"
     },
     "buttons": {
-        "create": "Create",
-        "save": "Save",
-        "logout": "Logout",
-        "delete": "Delete",
-        "edit": "Edit",
-        "cancel": "Cancel",
-        "confirm": "Are you sure?",
-        "filter": "Filter",
-        "clear": "Clear",
-        "refresh": "Refresh",
-        "show": "Show",
-        "undo": "Undo",
-        "import": "Import",
-        "clone": "Clone",
-        "notAccessTitle": "You don't have permission to access"
+        "create": "Créer",
+        "save": "Sauvegarder",
+        "logout": "Déconnexion",
+        "delete": "Effacer",
+        "edit": "Modifier",
+        "cancel": "Annuler",
+        "confirm": "Est-ce bien ce que vous voulez faire?",
+        "filter": "Filtrer",
+        "clear": "Effacer",
+        "refresh": "Rafraîchir",
+        "show": "Montrer",
+        "undo": "Annuler",
+        "import": "Importer",
+        "clone": "Cloner",
+        "notAccessTitle": "Vous n'avez pas accès à cette page"
     },
-    "warnWhenUnsavedChanges": "Are you sure you want to leave? You have unsaved changes.",
+    "warnWhenUnsavedChanges": "Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page?",
     "notifications": {
-        "success": "Successful",
-        "error": "Error (status code: {{statusCode}})",
-        "undoable": "You have {{seconds}} seconds to undo",
-        "createSuccess": "Successfully created {{resource}}",
-        "createError": "There was an error creating {{resource}} (status code: {{statusCode}})",
-        "deleteSuccess": "Successfully deleted {{resource}}",
-        "deleteError": "Error when deleting {{resource}} (status code: {{statusCode}})",
-        "editSuccess": "Successfully edited {{resource}}",
-        "editError": "Error when editing {{resource}} (status code: {{statusCode}})",
-        "importProgress": "Importing: {{processed}}/{{total}}"
+        "success": "Réussi",
+        "error": "Erreur (code d'état: {{statusCode}})",
+        "undoable": "Vous avez {{seconds}} secondes pour annuler",
+        "createSuccess": "{{resource}} créé avec succès",
+        "createError": "Il y a eu une erreur lors de la création de {{resource}} (code d'état: {{statusCode}})",
+        "deleteSuccess": "{{resource}} supprimé avec succès",
+        "deleteError": "Il y a eu une erreur lors de la suppression de {{resource}} (code d'état: {{statusCode}})", 
+        "editSuccess": "{{resource}} modifié avec succès",
+        "editError": "Il y a eu une erreur lors de la modification de {{resource}} (code d'état: {{statusCode}})",
+        "importProgress": "Importation en cours: {{processed}}/{{total}}"
     },
-    "loading": "Loading",
+    "loading": "Chargement...",
     "tags": {
         "clone": "Clone"
     },
     "dashboard": {
-        "title": "Dashboard"
+        "title": "Tableau de bord"
     },
     "blog_posts": {
-        "blog_posts": "Blog Posts",
+        "blog_posts": "Billets",
         "fields": {
             "id": "Id",
-            "title": "Title",
-            "content": "Content",
+            "title": "Titre",
+            "content": "Contenu",
             "status": "Status",
-            "createdAt": "Created At",
-            "category": "Category"
+            "createdAt": "Créé à",
+            "category": "Catégorie"
         },
         "titles": {
-            "create": "Create Blog Post",
-            "edit": "Edit Blog Post",
-            "list": "Blog Posts",
-            "show": "Show Blog Post"
+            "create": "Créer un billet",
+            "edit": "Modifier un billet",
+            "list": "Billets",
+            "show": "Montrer"
         }
     },
     "categories": {
-        "categories": "Categories",
+        "categories": "Catégories",
         "fields": {
             "id": "Id",
-            "title": "Title",
+            "title": "Titre",
             "createdAt": "Created At"
         },
         "titles": {
-            "create": "Create Category",
-            "edit": "Edit Category",
-            "list": "Categories",
-            "show": "Show Category"
+            "create": "Créer une catégorie",
+            "edit": "Modifier une catégorie",
+            "list": "Catégories",
+            "show": "Montrer une catégorie"
         }
     },
     "documentTitle": {
-        "default": "refine",
-        "suffix": " | refine",
+        "default": "SRE",
+        "suffix": " | Dev Portal",
         "blog_posts": {
-            "list": "Blog Posts | refine",
-            "show": "#{{id}} Show Blog Post | refine",
-            "edit": "#{{id}} Edit Blog Post | refine",
-            "create": "Create new Blog Post | refine",
-            "clone": "#{{id}} Clone Blog Post | refine"
+            "list": "Billets | SRE",
+            "show": "#{{id}} Montrer le billet | SRE",
+            "edit": "#{{id}} Modifier le billet | SRE",
+            "create": "Créer un nouveau billet | SRE",
+            "clone": "#{{id}} Dupliquer le billet | SRE"
         },
         "categories": {
-            "list": "Categories | refine",
-            "show": "#{{id}} Show Category | refine",
-            "edit": "#{{id}} Edit Category | refine",
-            "create": "Create new Category | refine",
-            "clone": "#{{id}} Clone Category | refine"
+            "list": "Categories | SRE",
+            "show": "#{{id}} Show Category | SRE",
+            "edit": "#{{id}} Edit Category | SRE",
+            "create": "Create new Category | SRE",
+            "clone": "#{{id}} Clone Category | SRE"
         }
     },
     "table": {
