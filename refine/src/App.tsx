@@ -39,17 +39,11 @@ import {
 import { Login } from "./pages/login";
 import { parseJwt } from "./utils/parse-jwt";
 import { Geolocate } from "./sre-bot/pages/geolocate";
-
-import {
-  HomeOutlined,
-  MenuOutlined,
-  AccessAlarms,
-  History,
-  Webhook,
-  LocationSearching,
-  Info,
-  Logout,
-} from "@mui/icons-material";
+import { Incident } from "./sre-bot/pages/incident";
+import { IncidentHistory } from "./sre-bot/pages/incident_history";
+import { Webhooks } from "./sre-bot/pages/webhooks";
+import { Faq } from "./sre-bot/pages/faq";
+import { Dashboard } from "./sre-bot/pages/dashboard";
 
 import * as Icons from "@mui/icons-material";
 
@@ -170,6 +164,7 @@ function App() {
                   name: "SRE Bot",
                   meta: {
                     label: "SRE Bot",
+                    icon: <Icons.Android />,
                   },
                 },
                 {
@@ -201,12 +196,57 @@ function App() {
                   },
                 },
                 {
+                  name: "Dashboard",
+                  list: "/dashboard",
+                  meta: {
+                    parent: "SRE Bot",
+                    icon: <Icons.HomeOutlined />,
+                    label: "Dashboard",
+                  },
+                },
+                {
+                  name: "Start an Incident",
+                  list: "/incident",
+                  meta: {
+                    parent: "SRE Bot",
+                    icon: <Icons.AccessAlarms />,
+                    label: "Start an Incident",
+                  },
+                },
+                {
+                  name: "Incident History",
+                  list: "/incident_history",
+                  meta: {
+                    parent: "SRE Bot",
+                    icon: <Icons.History />,
+                    label: "Incident History",
+                  },
+                },
+                {
+                  name: "Webhooks",
+                  list: "/webhooks",
+                  meta: {
+                    parent: "SRE Bot",
+                    icon: <Icons.Webhook />,
+                    label: "Webhooks",
+                  },
+                },
+                {
                   name: "geolocate",
                   list: "/geolocate",
                   meta: {
                     parent: "SRE Bot",
                     icon: <Icons.LocationSearching />,
                     label: "Geolocate",
+                  },
+                },
+                {
+                  name: "FAQ",
+                  list: "/faq",
+                  meta: {
+                    parent: "SRE Bot",
+                    icon: <Icons.Info />,
+                    label: "FAQ",
                   },
                 },
               ]}
@@ -234,7 +274,15 @@ function App() {
                     </Authenticated>
                   }
                 >
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/incident" element={<Incident />} />
+                  <Route
+                    path="/incident_history"
+                    element={<IncidentHistory />}
+                  />
+                  <Route path="/webhooks" element={<Webhooks />} />
                   <Route path="/geolocate" element={<Geolocate />} />
+                  <Route path="/faq" element={<Faq />} />
                   <Route
                     index
                     element={<NavigateToResource resource="blog_posts" />}
