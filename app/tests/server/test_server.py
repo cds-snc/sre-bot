@@ -355,8 +355,6 @@ def test_login_endpoint_redirect_uri_dev():
 
 
 # Test the auth endpoint
-
-
 def test_auth_endpoint():
     response = client.get("/auth")
     assert response.status_code == 200
