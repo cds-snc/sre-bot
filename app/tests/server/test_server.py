@@ -1,4 +1,6 @@
+from unittest import mock
 from server import bot_middleware, server
+import urllib.parse
 
 import os
 import pytest
@@ -317,6 +319,39 @@ def test_login_endpoint():
     response = client.get("/login")
     assert response.status_code == 200
     assert "https://accounts.google.com/o/oauth2/v2/auth" in str(response.url)
+
+
+# Test the login endpoint converts the redirect_uri to https
+@mock.patch.dict(os.environ, {"ENVIRONMENT": "prod"})
+def test_login_endpoint_redirect_uri_prod():
+    # Make a test request to the login endpoint
+    response = client.get("/login")
+
+    # assert the call is successful
+    assert response.status_code == 200
+
+    if os.environ.get("ENVIRONMENT") == "prod":
+        redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+        redirect_uri = redirect_uri.__str__().replace("http", "https")
+
+    # assert that the response url we get from the login endpoint contains the redirect_uri replaced with https
+    assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
+
+
+# Test the login endpoing that does not convert the redirect uri
+@mock.patch.dict(os.environ, {"ENVIRONMENT": "dev"})
+def test_login_endpoint_redirect_uri_dev():
+    # Make a test request to the login endpoint
+    response = client.get("/login")
+
+    # assert the call is successful
+    assert response.status_code == 200
+
+    if os.environ.get("ENVIRONMENT") == "dev":
+        redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+
+    # assert that the response url we get from the login endpoint contains the redirect_uri is not replaced with https (we need to keep the http)
+    assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
 
 
 # Test the auth endpoint
