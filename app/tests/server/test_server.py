@@ -350,7 +350,7 @@ def test_login_endpoint_redirect_uri_dev():
     if os.environ.get("ENVIRONMENT") == "dev":
         redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
 
-    # assert that the response url we get from the login endpoint contains the redirect_uri replaced with https
+    # assert that the response url we get from the login endpoint contains the redirect_uri is not replaced with https (we need to keep the http)
     assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
 
 
