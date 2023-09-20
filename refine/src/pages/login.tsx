@@ -1,13 +1,14 @@
 import { useLogin } from "@refinedev/core";
 import { useEffect, useRef } from "react";
 
-import { Box, Space, Text } from "@mantine/core";
-import { ThemedTitleV2 } from "@refinedev/mantine";
+import Box from "@mui/material/Box";
+import Container from "@mui/material/Container";
+import Typography from "@mui/material/Typography";
+import { ThemedTitleV2 } from "@refinedev/mui";
 
 import { CredentialResponse } from "../interfaces/google";
 
-import { AppIcon } from "../components/app-icon";
-
+// Todo: Update your Google Client ID here
 const GOOGLE_CLIENT_ID =
   "216196914678-8q2rt8u8342igcue61fod5h5g6gcncqc.apps.googleusercontent.com";
 
@@ -46,37 +47,40 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <Box
-      sx={{
+    <Container
+      style={{
         height: "100vh",
         display: "flex",
-        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
       }}
     >
-      <ThemedTitleV2
-        collapsed={false}
-        wrapperStyles={{
-          fontSize: "22px",
-        }}
-        text="refine Project"
-        icon={<AppIcon />}
-      />
-      <Space h="xl" />
-
-      <GoogleButton />
-
-      <Space h="xl" />
-      <Text fz="sm" color="gray">
-        Powered by
-        <img
-          style={{ padding: "0 5px" }}
-          alt="Google"
-          src="https://refine.ams3.cdn.digitaloceanspaces.com/superplate-auth-icons%2Fgoogle.svg"
+      <Box
+        display="flex"
+        gap="36px"
+        justifyContent="center"
+        flexDirection="column"
+      >
+        <ThemedTitleV2
+          collapsed={false}
+          wrapperStyles={{
+            fontSize: "22px",
+            justifyContent: "center",
+          }}
         />
-        Google
-      </Text>
-    </Box>
+
+        <GoogleButton />
+
+        <Typography align="center" color={"text.secondary"} fontSize="12px">
+          Powered by
+          <img
+            style={{ padding: "0 5px" }}
+            alt="Google"
+            src="https://refine.ams3.cdn.digitaloceanspaces.com/superplate-auth-icons%2Fgoogle.svg"
+          />
+          Google
+        </Typography>
+      </Box>
+    </Container>
   );
 };
