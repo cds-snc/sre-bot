@@ -23,6 +23,9 @@ function App() {
     // Set the initial state of the Sidemenu
     const [isSidemenu, setIsSidemenu] = useState(true);
 
+    // Set the state of whether a user is authenticated or not. Initially, this is set to null. 
+    const[isAuthenticated, setIsAuthenticated] = useState(null);
+
     /**
      * Custom hook to get user data from the server.
      * @returns {boolean} Whether the user is authenticated or not.
@@ -44,21 +47,27 @@ function App() {
           .then(data => {
             // Handle the JSON data from the response
             setUserData(data);
+            // If the user is not logged in, set the state of isAuthenticated to false. Otherwise, set it to true.
+            if (data.error === "Not logged in") {
+              setIsAuthenticated(false);
+            }
+            else {
+              setIsAuthenticated(true);
+            }
           })
           .catch(error => {
             console.error('There was a problem with the fetch operation:', error);
           });
       }, []);
-
-      // if the user is not logged in, then return false. Otherwise, return true
-      if (userData && userData.error === "Not logged in") {
-        return false;
-      }
-      return true;
     };
 
-    // Check if the user is authenticated
-    const isAuthenticated = useUserData();
+    // Call the custom hook to get user data
+    useUserData();
+
+    // if we are initially loading the page and isAuthenticated is null, return null. This fixes a flashing issue. 
+    if (isAuthenticated === null) {
+      return null; 
+    }
     
     // Render the application. If the user is authenticated, show the Sidemenu, Topmenu and menu items. 
     // Otherwise (ie user is not logged in), show the landing page where an user can log in.
