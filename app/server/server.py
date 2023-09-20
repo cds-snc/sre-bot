@@ -130,12 +130,16 @@ async def logout(request: Request):
 # Login route. You will be redirected to the google login page
 @handler.get("/login")
 async def login(request: Request):
+    # get the current environment (ie dev or prod)
+    environment = os.environ.get("ENVIRONMENT")
     # this is the route that will be called after the user logs in
     redirect_uri = request.url_for(
         "auth",
     )
-    if (request.url.__str__()).startswith("https"):
+    # if the environment is production, then make sure to replace the http to https, else don't do anything (ie if you are in dev)
+    if environment == "prod":
         redirect_uri = redirect_uri.__str__().replace("http", "https")
+
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
