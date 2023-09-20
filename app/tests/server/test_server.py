@@ -1,5 +1,4 @@
 from unittest import mock
-import httpx
 from server import bot_middleware, server
 import urllib.parse
 
