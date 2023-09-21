@@ -19,13 +19,13 @@ const geoUrl =
 
 // call the backend API to fetch the location data using the /geolocate endpoint
 function fetchLocationData(inputValue) {
-  console.log("ENVIRONMENT: " + process.env.ENVIRONMENT)
-  if (process.env.ENVIRONMENT === 'dev') {
+  console.log("ENVIRONMENT: " + process.env.REACT_ENVIRONMENT)
+  if (process.env.REACT_ENVIRONMENT === 'dev') {
     console.log("In dev mode, using mock data")
-    return fetch('https://sre-bot.cdssandbox.xyz/geolocate/');
+    return fetch(process.env.REACT_API_URL + '/geolocate/' + inputValue);
   }
   else {
-  return fetch('https://sre-bot.cdssandbox.xyz/geolocate/' + inputValue);
+  return fetch('/geolocate' + inputValue);
   }
 }
 
