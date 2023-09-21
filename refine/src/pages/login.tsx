@@ -66,11 +66,11 @@ export const Login: React.FC = () => {
           }}
         >
           <Box sx={{ ml: { xs: 0, lg: 4 } }}>
-          <img
-            src={sre_bot_logo}
-            alt="sre_bot"
-            style={{ width: "25%", height: "25%" }}
-          />
+            <img
+              src={sre_bot_logo}
+              alt="sre_bot"
+              style={{ width: "25%", height: "25%" }}
+            />
 
             {/* <ThemedTitleV2
           collapsed={false}

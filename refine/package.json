@@ -23,13 +23,16 @@
     "i18next": "^20.1.0",
     "i18next-browser-languagedetector": "^6.1.1",
     "i18next-xhr-backend": "^3.2.2",
+    "leaflet": "^1.9.4",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-hook-form": "^7.30.0",
     "react-i18next": "^11.8.11",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.8.1"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.4",
     "@types/node": "^18.16.2",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",

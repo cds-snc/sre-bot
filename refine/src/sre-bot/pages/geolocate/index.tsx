@@ -6,8 +6,9 @@ import {
   Grid,
   Typography,
 } from "@mui/material";
-// import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { useState } from "react";
+import L from "leaflet";
 
 interface GeolocateResponse {
   country: string | null;
@@ -27,6 +28,7 @@ export const Geolocate: React.FC = () => {
   //   width: "100%",
   //   height: "50vh"
   // });
+  const [position, setPosition] = useState<[number, number] | null>(null);
   // const [selectedLocation, setSelectedLocation] = useState<GeolocateResponse | null>(null);
 
   const handleButtonClick = async () => {
@@ -36,14 +38,14 @@ export const Geolocate: React.FC = () => {
     );
     const data = await response.json();
     setData(data);
-    // setViewport({
-    //   latitude: data.latitude || 0,
-    //   longitude: data.longitude || 0,
-    //   zoom: 13,
-    //   width: "100%",
-    //   height: "50vh"
-    // });
+    setPosition([data.latitude || 0, data.longitude || 0]);
     setIsLoading(false);
+  };
+
+  const handleMapCreated = (map: L.Map) => {
+    if (position) {
+      map.setView(position, 13);
+    }
   };
 
   return (
@@ -90,6 +92,20 @@ export const Geolocate: React.FC = () => {
           <Typography variant="body1" align="center" color="textSecondary">
             Map
           </Typography>
+          <MapContainer
+            center={position ?? [0, 0]}
+            zoom={2}
+            style={{ height: "50vh", width: "100%" }}
+          >
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {position && (
+              <Marker position={position}>
+                <Popup>
+                  {data?.city}, {data?.country}
+                </Popup>
+              </Marker>
+            )}
+          </MapContainer>
         </Box>
       )}
     </Box>
