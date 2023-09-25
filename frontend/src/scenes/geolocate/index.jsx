@@ -20,12 +20,7 @@ const geoUrl =
 // call the backend API to fetch the location data using the /geolocate endpoint
 // if we are in development we need to call the API using the full URL
 function fetchLocationData(inputValue) {
-  if (process.env.REACT_APP_ENVIRONMENT === 'dev') {
     return fetch(process.env.REACT_APP_API_URL + '/geolocate/' + inputValue);
-  }
-  else {
-  return fetch('/geolocate' + inputValue);
-  }
 }
 
 function Geolocate() {
