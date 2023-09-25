@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: sre-bot
+  annotations:
+    github.com/project-slug: cds-snc/sre-bot
+spec:
+  type: other
+  lifecycle: unknown
