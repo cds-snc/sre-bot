@@ -20,6 +20,8 @@ services:
         VARIANT: "3.11"
         INSTALL_NODE: "true"
         NODE_VERSION: "lts/*"
+        LICENSE_KEY: '${MAXMIND_KEY}'
+
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
