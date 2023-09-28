@@ -20,11 +20,12 @@ services:
         VARIANT: "3.11"
         INSTALL_NODE: "true"
         NODE_VERSION: "lts/*"
+        LICENSE_KEY: '${MAXMIND_KEY}'
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
     environment:
-      AWS_ACCESS_KEY_ID: 'AWS_ACCESS_KEY_ID'
-      AWS_SECRET_ACCESS_KEY: 'AWS_SECRET_ACCESS_KEY'
+      AWS_ACCESS_KEY_ID: 'AWSACCESSKEYID'
+      AWS_SECRET_ACCESS_KEY: 'AWSSECRETACCESSKEY'
       SHELL: /bin/zsh
       ENVIRONMENT: 'dev'

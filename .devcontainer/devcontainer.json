@@ -40,8 +40,8 @@
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-	//use postcommand to create the maxmind db
-	'postCreateCommand': '.devcontainer/maxmind-create.sh',
+	// Use 'postCreateCommand' to run commands after the container is created.
+	'postCreateCommand': '.devcontainer/maxmind-create.sh && .devcontainer/dynamodb-create.sh',
 	"remoteUser": "vscode",
 	"features": {
 		"ghcr.io/devcontainers/features/aws-cli:1": {
