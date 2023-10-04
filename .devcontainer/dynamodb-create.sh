@@ -1,22 +1,22 @@
-aws dynamodb create-table \
-   --table-name webhooks \
-   --attribute-definitions AttributeName=id,AttributeType=S \
-   --key-schema AttributeName=id,KeyType=HASH \
-   --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-   --endpoint-url http://dynamodb-local:8000
+#!/bin/bash
 
+create_table() {
+  local TABLE_NAME=$1
 
-aws dynamodb create-table \
-   --table-name aws_access_requests \
-   --attribute-definitions AttributeName=account_id,AttributeType=S AttributeName=created_at,AttributeType=N \
-   --key-schema AttributeName=account_id,KeyType=HASH AttributeName=created_at,KeyType=RANGE \
-   --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-   --endpoint-url http://dynamodb-local:8000
+  # Check if table exists
+  if aws dynamodb describe-table --table-name $TABLE_NAME --endpoint-url http://dynamodb-local:8000 >/dev/null 2>&1; then
+    echo "Table $TABLE_NAME already exists, skipping creation"
+  else
+    # Create table
+    aws dynamodb create-table \
+      --table-name $TABLE_NAME \
+      --attribute-definitions AttributeName=id,AttributeType=S \
+      --key-schema AttributeName=id,KeyType=HASH \
+      --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+      --endpoint-url http://dynamodb-local:8000
+  fi
+}
 
-
-aws dynamodb create-table \
-   --table-name sre_bot_data \
-   --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
-   --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
-   --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-   --endpoint-url http://dynamodb-local:8000
+create_table "webhooks"
+create_table "aws_access_requests"
+create_table "sre_bot_data"
