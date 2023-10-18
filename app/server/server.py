@@ -291,6 +291,10 @@ def get_version():
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
 
+@handler.get("/list_webhooks")
+def list_webhooks():
+    return webhooks.list_all_webhooks()
+
 def append_incident_buttons(payload, webhook_id):
     payload.attachments = payload.attachments + [
         {
