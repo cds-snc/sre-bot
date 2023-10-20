@@ -67,7 +67,9 @@ def alert_on_call(product, client, api_key, github_repo):
             message += f"<@{user['id']}> "
             private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key is *{api_key}* and the file is {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
             # send the private message
-            client.chat_postMessage(channel=user["id"], text=private_message, as_user=True)
+            client.chat_postMessage(
+                channel=user["id"], text=private_message, as_user=True
+            )
         message += "have been notified."
     return message
 
@@ -233,6 +235,7 @@ def format_cloudwatch_alarm(msg):
     ]
     return blocks
 
+
 # If the message contains an api key it will be parsed by the format_api_key_detected function.
 
 
@@ -268,6 +271,6 @@ def format_api_key_detected(payload, client):
             "text": {
                 "type": "plain_text",
                 "text": f"{on_call_message}",
-            }
-        }
+            },
+        },
     ]

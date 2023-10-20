@@ -190,7 +190,9 @@ def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
 
 
 @patch("server.event_handlers.aws.alert_on_call")
-def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks(alert_on_call_mock):
+def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
     # Test that the format_api_key_detected function extracts the api key properly
     client = MagicMock()
     payload = mock_api_key_detected()
@@ -199,7 +201,9 @@ def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks
 
 
 @patch("server.event_handlers.aws.alert_on_call")
-def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(alert_on_call_mock):
+def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
     # Test that the format_api_key_detected function extracts the url properly
     client = MagicMock()
     payload = mock_api_key_detected()
@@ -208,7 +212,9 @@ def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(ale
 
 
 @patch("server.event_handlers.aws.alert_on_call")
-def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_into_blocks(alert_on_call_mock):
+def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
     # Test that the format_api_key_detected function extracts the on call message properly
     client = MagicMock()
     alert_on_call_mock.return_value = "test message"
@@ -221,14 +227,28 @@ def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_int
 @patch("commands.incident.google_drive.list_folders")
 @patch("commands.incident.google_drive.list_metadata")
 @patch("integrations.opsgenie.get_on_call_users")
-def test_alert_on_call_returns_message(get_on_call_users_mock, list_metadata_mock, google_list_folders_mock, get_google_service_mock):
+def test_alert_on_call_returns_message(
+    get_on_call_users_mock,
+    list_metadata_mock,
+    google_list_folders_mock,
+    get_google_service_mock,
+):
     # Test that the alert_on_call function returns the proper message
     client = MagicMock()
     product = "test"
     api_key = "test_api_key"
     github_repo = "test_repo"
-    google_list_folders_mock.return_value = [{"name": "Notify", "id": 12345, "appProperties": {"genie_schedule": "test_schedule"}}]
-    list_metadata_mock.return_value = {"name": "Notify", "appProperties": {"genie_schedule": "test_schedule"}}
+    google_list_folders_mock.return_value = [
+        {
+            "name": "Notify",
+            "id": 12345,
+            "appProperties": {"genie_schedule": "test_schedule"},
+        }
+    ]
+    list_metadata_mock.return_value = {
+        "name": "Notify",
+        "appProperties": {"genie_schedule": "test_schedule"},
+    }
     response = aws.alert_on_call(product, client, api_key, github_repo)
     assert "test on-call staff have been notified" in response
 
