@@ -45,7 +45,7 @@ resource "aws_lb" "sre_bot" {
   internal                   = false #tfsec:ignore:AWS005
   load_balancer_type         = "application"
   enable_deletion_protection = true
-  
+
   security_groups = [
     aws_security_group.sre_bot_load_balancer.id
   ]
