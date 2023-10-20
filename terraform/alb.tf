@@ -41,9 +41,10 @@ resource "aws_lb_listener" "sre_bot_listener" {
 
 resource "aws_lb" "sre_bot" {
 
-  name               = "sre-bot"
-  internal           = false #tfsec:ignore:AWS005
-  load_balancer_type = "application"
+  name                       = "sre-bot"
+  internal                   = false #tfsec:ignore:AWS005
+  load_balancer_type         = "application"
+  enable_deletion_protection = true
 
   security_groups = [
     aws_security_group.sre_bot_load_balancer.id
