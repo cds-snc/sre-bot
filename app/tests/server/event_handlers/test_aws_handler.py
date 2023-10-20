@@ -300,7 +300,7 @@ def mock_new_iam_user():
         Type="Notification",
         MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",
         TopicArn="arn:aws:sns:ca-central-1:412578375350:test-sre-bot",
-        Subject="Notify API key has been leaked",
+        Subject="Violation - IAM User is out of compliance",
         Message="An IAM User was created in an Account\n\nIAM ARN: arn:aws:iam::412578375350:user/test2\nIAM User: user_created\nEvent: CreateUser\nActor: arn:aws:sts::412578375350:assumed-role/AWSReservedSSO_AWSAdministratorAccess_3cbb717fd3b23655/test_user@cds-snc.ca\nSource IP Address: 69.172.156.196\nUser Agent: AWS Internal\n\nAccount: 412578375350\nRegion: us-east-1",
         Timestamp="2023-09-25T20:50:37.868Z",
         SignatureVersion="1",
