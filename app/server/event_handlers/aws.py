@@ -2,6 +2,7 @@ import json
 import re
 import urllib.parse
 from commands.utils import log_ops_message
+from integrations import google_drive, opsgenie
 
 
 def parse(payload, client):
@@ -19,6 +20,8 @@ def parse(payload, client):
         blocks = format_auto_mitigation(payload)
     elif isinstance(msg, str) and "IAM User" in msg:
         blocks = format_new_iam_user(payload)
+    elif isinstance(msg, str) and "API Key with value token=" in msg:
+        blocks = format_api_key_detected(payload, client)
     else:
         blocks = []
         log_ops_message(
@@ -36,6 +39,39 @@ def nested_get(dictionary, keys):
         except KeyError:
             return None
     return dictionary
+
+
+def alert_on_call(product, client, api_key, github_repo):
+    # get the list of folders
+    folders = google_drive.list_folders()
+    # get the folder id for the Product
+    for folder in folders:
+        if folder["name"] == product:
+            folder = folder["id"]
+            break
+    # Get folder metadata
+    folder_metadata = google_drive.list_metadata(folder).get("appProperties", {})
+    oncall = []
+    message = ""
+    private_message = ""
+
+    # Get OpsGenie users on call and construct string
+    if "genie_schedule" in folder_metadata:
+        for email in opsgenie.get_on_call_users(folder_metadata["genie_schedule"]):
+            r = client.users_lookupByEmail(email=email)
+            if r.get("ok"):
+                oncall.append(r["user"])
+        message = f"{product} on-call staff "
+        for user in oncall:
+            # send a private message to the people on call.
+            message += f"<@{user['id']}> "
+            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key is *{api_key}* and the file is {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
+            # send the private message
+            client.chat_postMessage(
+                channel=user["id"], text=private_message, as_user=True
+            )
+        message += "have been notified."
+    return message
 
 
 def format_abuse_notification(payload, msg):
@@ -198,3 +234,43 @@ def format_cloudwatch_alarm(msg):
         {"type": "section", "text": {"type": "mrkdwn", "text": link}},
     ]
     return blocks
+
+
+# If the message contains an api key it will be parsed by the format_api_key_detected function.
+
+
+def format_api_key_detected(payload, client):
+    msg = payload.Message
+    regex = r"API Key with value token='(\w.+)' has been detected in url='(\w.+)'"
+    # extract the api key and the github repo from the message
+    api_key = re.search(regex, msg).groups()[0]
+    github_repo = re.search(regex, msg).groups()[1]
+
+    # send a private message with the api-key and github repo to the people on call.
+    on_call_message = alert_on_call("Notify", client, api_key, github_repo)
+
+    # Format the message displayed in Slack
+    return [
+        {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "🙀 Notify API Key has been compromised!🔑",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Notify API Key *{api_key}* has been committed in github file {github_repo}. The key needs to be revoked!",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "plain_text",
+                "text": f"{on_call_message}",
+            },
+        },
+    ]

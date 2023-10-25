@@ -178,6 +178,81 @@ def test_format_new_iam_user_extracts_the_user_and_inserts_it_into_blocks():
     assert "test_user@cds-snc.ca" in response[2]["text"]["text"]
 
 
+@patch("server.event_handlers.aws.format_api_key_detected")
+def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
+    # Test that the parse function returns the blocks returned by format_api_key_detected
+    client = MagicMock()
+    format_api_key_detected_mock.return_value = ["foo", "bar"]
+    payload = mock_api_key_detected()
+    response = aws.parse(payload, client)
+    assert response == ["foo", "bar"]
+    format_api_key_detected_mock.assert_called_once_with(payload, client)
+
+
+@patch("server.event_handlers.aws.alert_on_call")
+def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
+    # Test that the format_api_key_detected function extracts the api key properly
+    client = MagicMock()
+    payload = mock_api_key_detected()
+    response = aws.format_api_key_detected(payload, client)
+    assert "gcntfy-api-key-blah" in response[2]["text"]["text"]
+
+
+@patch("server.event_handlers.aws.alert_on_call")
+def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
+    # Test that the format_api_key_detected function extracts the url properly
+    client = MagicMock()
+    payload = mock_api_key_detected()
+    response = aws.format_api_key_detected(payload, client)
+    assert "https://github.com/blah" in response[2]["text"]["text"]
+
+
+@patch("server.event_handlers.aws.alert_on_call")
+def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_into_blocks(
+    alert_on_call_mock,
+):
+    # Test that the format_api_key_detected function extracts the on call message properly
+    client = MagicMock()
+    alert_on_call_mock.return_value = "test message"
+    payload = mock_api_key_detected()
+    response = aws.format_api_key_detected(payload, client)
+    assert "test message" in response[3]["text"]["text"]
+
+
+@patch("integrations.google_drive.get_google_service")
+@patch("commands.incident.google_drive.list_folders")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("integrations.opsgenie.get_on_call_users")
+def test_alert_on_call_returns_message(
+    get_on_call_users_mock,
+    list_metadata_mock,
+    google_list_folders_mock,
+    get_google_service_mock,
+):
+    # Test that the alert_on_call function returns the proper message
+    client = MagicMock()
+    product = "test"
+    api_key = "test_api_key"
+    github_repo = "test_repo"
+    google_list_folders_mock.return_value = [
+        {
+            "name": "Notify",
+            "id": 12345,
+            "appProperties": {"genie_schedule": "test_schedule"},
+        }
+    ]
+    list_metadata_mock.return_value = {
+        "name": "Notify",
+        "appProperties": {"genie_schedule": "test_schedule"},
+    }
+    response = aws.alert_on_call(product, client, api_key, github_repo)
+    assert "test on-call staff have been notified" in response
+
+
 def mock_abuse_alert():
     return MagicMock(
         Type="Notification",
@@ -247,6 +322,22 @@ def mock_new_iam_user():
         TopicArn="arn:aws:sns:ca-central-1:412578375350:test-sre-bot",
         Subject="Violation - IAM User is out of compliance",
         Message="An IAM User was created in an Account\n\nIAM ARN: arn:aws:iam::412578375350:user/test2\nIAM User: user_created\nEvent: CreateUser\nActor: arn:aws:sts::412578375350:assumed-role/AWSReservedSSO_AWSAdministratorAccess_3cbb717fd3b23655/test_user@cds-snc.ca\nSource IP Address: 69.172.156.196\nUser Agent: AWS Internal\n\nAccount: 412578375350\nRegion: us-east-1",
+        Timestamp="2023-09-25T20:50:37.868Z",
+        SignatureVersion="1",
+        Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
+        SigningCertURL="https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-56e67fcb41f6fec09b0196692625d385.pem",
+        UnsubscribeURL="https://sns.ca-central-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:ca-central-1:412578375350:test-sre-bot:4636a013-5224-4207-91b2-d6d7c7ab7ea7",
+    )
+
+
+# Mock the message returned from AWS when a API key has been compromised
+def mock_api_key_detected():
+    return MagicMock(
+        Type="Notification",
+        MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",
+        TopicArn="arn:aws:sns:ca-central-1:412578375350:test-sre-bot",
+        Subject="API Key detected",
+        Message="API Key with value token='gcntfy-api-key-blah' has been detected in url='https://github.com/blah'! This key needs to be revoked asap.",
         Timestamp="2023-09-25T20:50:37.868Z",
         SignatureVersion="1",
         Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",
