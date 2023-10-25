@@ -54,6 +54,7 @@ def alert_on_call(product, client, api_key, github_repo):
     oncall = []
     message = ""
     private_message = ""
+    api_message_info = f"The key is *{api_key}* and the file is {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
 
     # Get OpsGenie users on call and construct string
     if "genie_schedule" in folder_metadata:
@@ -65,12 +66,17 @@ def alert_on_call(product, client, api_key, github_repo):
         for user in oncall:
             # send a private message to the people on call.
             message += f"<@{user['id']}> "
-            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key is *{api_key}* and the file is {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
+            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \n" + api_message_info
             # send the private message
             client.chat_postMessage(
                 channel=user["id"], text=private_message, as_user=True
             )
         message += "have been notified."
+
+    # create an alert in OpsGenie
+    result = opsgenie.create_alert(api_message_info)
+    message += f"\nAn alert has been created in OpsGenie with result: {result}."
+
     return message
 
 
