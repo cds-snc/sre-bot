@@ -256,7 +256,7 @@ def format_api_key_detected(payload, client):
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "🙀 Notify API Key has been compromised!🔑",
+                "text": "🙀 Notify API Key has been compromised! 🔑",
             },
         },
         {
@@ -269,7 +269,7 @@ def format_api_key_detected(payload, client):
         {
             "type": "section",
             "text": {
-                "type": "plain_text",
+                "type": "mrkdwn",
                 "text": f"{on_call_message}",
             },
         },
