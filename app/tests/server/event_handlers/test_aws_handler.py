@@ -226,9 +226,11 @@ def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_int
 @patch("integrations.google_drive.get_google_service")
 @patch("commands.incident.google_drive.list_folders")
 @patch("commands.incident.google_drive.list_metadata")
+@patch("integrations.opsgenie.create_alert")
 @patch("integrations.opsgenie.get_on_call_users")
 def test_alert_on_call_returns_message(
     get_on_call_users_mock,
+    create_alert_mock,
     list_metadata_mock,
     google_list_folders_mock,
     get_google_service_mock,
@@ -249,8 +251,12 @@ def test_alert_on_call_returns_message(
         "name": "Notify",
         "appProperties": {"genie_schedule": "test_schedule"},
     }
+    create_alert_mock.return_value = "test result"
     response = aws.alert_on_call(product, client, api_key, github_repo)
-    assert "test on-call staff have been notified" in response
+    assert (
+        "test on-call staff have been notified.\nAn alert has been created in OpsGenie with result: test result."
+        in response
+    )
 
 
 def mock_abuse_alert():

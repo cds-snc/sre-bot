@@ -265,13 +265,13 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                     logging.info("No blocks to post, returning")
                     return
                 payload = WebhookPayload(blocks=blocks)
-                try:
-                    msg = json.loads(payload.Message)
-                except Exception:
-                    msg = payload.Message
-                # if the message is for Notify API secret, unfurl links will be set to false
-                if "API Key with value token=" in msg:
-                    payload.unfurl_links = False
+                # try:
+                #     msg = json.loads(payload.Message)
+                # except Exception:
+                #     msg = payload.Message
+                # # if the message is for Notify API secret, unfurl links will be set to false
+                # if "API Key with value token=" in msg:
+                #     payload.unfurl_links = False
 
         payload.channel = webhook["channel"]["S"]
         payload = append_incident_buttons(payload, id)

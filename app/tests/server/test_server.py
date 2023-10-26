@@ -184,6 +184,7 @@ def test_handle_webhook_with_Notification_payload(
     parse_mock.return_value = ["foo", "bar"]
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
     payload = '{"Type": "Notification"}'
+    # payload = '{"Type": "Notification", "Message: "foo"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
     assert response.json() == {"ok": True}

@@ -66,7 +66,10 @@ def alert_on_call(product, client, api_key, github_repo):
         for user in oncall:
             # send a private message to the people on call.
             message += f"<@{user['id']}> "
-            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \n" + api_message_info
+            private_message = (
+                f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \n"
+                + api_message_info
+            )
             # send the private message
             client.chat_postMessage(
                 channel=user["id"], text=private_message, as_user=True
