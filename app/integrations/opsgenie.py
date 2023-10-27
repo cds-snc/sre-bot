@@ -21,7 +21,7 @@ def get_on_call_users(schedule):
 # Create an Opsgenie alert. This is used to notify the on-call users
 def create_alert(description):
     content = api_post_request(
-        f"https://api.opsgenie.com/v2/alerts",
+        "https://api.opsgenie.com/v2/alerts",
         {"name": "GenieKey", "token": OPSGENIE_KEY},
         {
             "message": "Notify API Key has been compromised!",
