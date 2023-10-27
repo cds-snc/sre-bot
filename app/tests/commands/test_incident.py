@@ -202,6 +202,7 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
         },
     )
 
+
 # Test that the order of the ignore buttons are appended properly and the preview is moved up once the ignore button is clicked
 
 
@@ -235,7 +236,7 @@ def test_handle_incident_action_buttons_link_preview(
                     "title": "title",
                     "thumb_url": "http://blah.com/g/200/200",
                     "image_url": "http://blah.com/g/200/200",
-                }
+                },
             ],
         },
     }
@@ -256,7 +257,7 @@ def test_handle_incident_action_buttons_link_preview(
                     "color": "3AA3E3",
                     "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
                     "text": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
-                }
+                },
             ],
         },
     )

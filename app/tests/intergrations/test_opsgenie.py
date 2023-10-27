@@ -79,9 +79,10 @@ def test_api_post_request(urlopen_mock, request_mock):
     )
     request_mock.assert_called_once_with(
         "test_url",
-        data=b'{"message": "Notify API Key has been compromised!", "description": "test_description"}'
+        data=b'{"message": "Notify API Key has been compromised!", "description": "test_description"}',
     )
     request_mock.return_value.add_header.assert_called_with(
-        "Authorization", "GenieKey OPSGENIE_KEY",
+        "Authorization",
+        "GenieKey OPSGENIE_KEY",
     )
     urlopen_mock.assert_called_once_with(request_mock.return_value)
