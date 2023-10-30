@@ -35,6 +35,9 @@ def handle_incident_action_buttons(client, ack, body, logger):
             f"🙈  <@{user}> has acknowledged and ignored the incident.\n"
             f"<@{user}> a pris connaissance et ignoré l'incident."
         )
+        # if the last attachment is a preview from a link, switch the places of the last 2 attachments so that the incident buttons can be appended properly
+        if len(attachments) > 1 and attachments[-1]["thumb_url"]:
+            attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
         attachments[-1] = {
             "color": "3AA3E3",
             "fallback": f"{msg}",

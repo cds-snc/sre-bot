@@ -265,7 +265,6 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                     logging.info("No blocks to post, returning")
                     return
                 payload = WebhookPayload(blocks=blocks)
-
         payload.channel = webhook["channel"]["S"]
         payload = append_incident_buttons(payload, id)
         try:

@@ -203,6 +203,66 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
     )
 
 
+# Test that the order of the ignore buttons are appended properly and the preview is moved up once the ignore button is clicked
+
+
+@patch("commands.incident.webhooks.increment_acknowledged_count")
+@patch("commands.incident.log_to_sentinel")
+def test_handle_incident_action_buttons_link_preview(
+    _log_to_sentinel_mock, increment_acknowledged_count_mock
+):
+    client = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+    body = {
+        "actions": [
+            {
+                "name": "ignore-incident",
+                "value": "incident_id",
+                "type": "button",
+            }
+        ],
+        "channel": {"id": "channel_id"},
+        "user": {"id": "user_id"},
+        "original_message": {
+            "attachments": [
+                {
+                    "color": "3AA3E3",
+                    "fallback": "foo",
+                    "text": "bar",
+                },
+                {
+                    "text": "test",
+                    "title": "title",
+                    "thumb_url": "http://blah.com/g/200/200",
+                    "image_url": "http://blah.com/g/200/200",
+                },
+            ],
+        },
+    }
+    incident.handle_incident_action_buttons(client, ack, body, logger)
+    increment_acknowledged_count_mock.assert_called_with("incident_id")
+    client.api_call.assert_called_with(
+        "chat.update",
+        json={
+            "channel": "channel_id",
+            "attachments": [
+                {
+                    "text": "test",
+                    "title": "title",
+                    "thumb_url": "http://blah.com/g/200/200",
+                    "image_url": "http://blah.com/g/200/200",
+                },
+                {
+                    "color": "3AA3E3",
+                    "fallback": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
+                    "text": "🙈  <@user_id> has acknowledged and ignored the incident.\n<@user_id> a pris connaissance et ignoré l'incident.",
+                },
+            ],
+        },
+    )
+
+
 @patch("commands.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_ack(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]

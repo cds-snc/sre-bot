@@ -41,7 +41,7 @@ def nested_get(dictionary, keys):
     return dictionary
 
 
-def alert_on_call(product, client, api_key, github_repo):
+def alert_on_call(product, client, api_key_name, github_repo):
     # get the list of folders
     folders = google_drive.list_folders()
     # get the folder id for the Product
@@ -55,6 +55,9 @@ def alert_on_call(product, client, api_key, github_repo):
     message = ""
     private_message = ""
 
+    # Generate the opsgenie message. We don't want to expose the api key value exposed so we will just provide the name of the key.
+    opsgenie_message = f"Notify key with name {api_key_name} has been leaked and needs to be revoked. Please check Slack in #internal-sre-alerts or on-call staff can check your private messages for more detailed information. "
+
     # Get OpsGenie users on call and construct string
     if "genie_schedule" in folder_metadata:
         for email in opsgenie.get_on_call_users(folder_metadata["genie_schedule"]):
@@ -65,12 +68,17 @@ def alert_on_call(product, client, api_key, github_repo):
         for user in oncall:
             # send a private message to the people on call.
             message += f"<@{user['id']}> "
-            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key is *{api_key}* and the file is {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
+            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key name is *{api_key_name}* and it is exposed in file {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
             # send the private message
             client.chat_postMessage(
                 channel=user["id"], text=private_message, as_user=True
             )
         message += "have been notified."
+
+        # create an alert in OpsGenie
+        result = opsgenie.create_alert(opsgenie_message)
+        message += f"\nAn alert has been created in OpsGenie with result: {result}."
+
     return message
 
 
@@ -246,8 +254,12 @@ def format_api_key_detected(payload, client):
     api_key = re.search(regex, msg).groups()[0]
     github_repo = re.search(regex, msg).groups()[1]
 
+    # We don't want to send the actual api-key through Slack, but we do want the name to be given,
+    # so therefore extract the api key name by following the format of a Notify api key
+    api_key_name = api_key[7 : len(api_key) - 74]
+
     # send a private message with the api-key and github repo to the people on call.
-    on_call_message = alert_on_call("Notify", client, api_key, github_repo)
+    on_call_message = alert_on_call("Notify", client, api_key_name, github_repo)
 
     # Format the message displayed in Slack
     return [
@@ -263,7 +275,7 @@ def format_api_key_detected(payload, client):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key *{api_key}* has been committed in github file {github_repo}. The key needs to be revoked!",
+                "text": f"Notify API Key Name *{api_key_name}* has been committed in github file {github_repo}. The key needs to be revoked!",
             },
         },
         {
