@@ -16,7 +16,9 @@ def get_on_call_users(schedule):
         data = json.loads(content)
         return list(map(lambda x: x["name"], data["data"]["onCallParticipants"]))
     except Exception as e:
-        logging.error(f"Could not get on call users for schedule {schedule}. Details of error: {e}")
+        logging.error(
+            f"Could not get on call users for schedule {schedule}. Details of error: {e}"
+        )
         return []
 
 
