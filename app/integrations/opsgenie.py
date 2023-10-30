@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 from urllib.request import Request, urlopen
 
 # Use the integrations API Key as the Opsgenie API Key
@@ -14,7 +15,8 @@ def get_on_call_users(schedule):
     try:
         data = json.loads(content)
         return list(map(lambda x: x["name"], data["data"]["onCallParticipants"]))
-    except Exception:
+    except Exception as e:
+        logging.error(f"Could not get on call users for schedule {schedule}. Details of error: {e}")
         return []
 
 
@@ -30,8 +32,10 @@ def create_alert(description):
     )
     try:
         data = json.loads(content)
+        logging.info(f"Created opsgenie alert with result: {data['result']}")
         return data["result"]
-    except Exception:
+    except Exception as e:
+        logging.error(f"Could not create opsgenie alert. Error: {e}")
         return "Could not issue alert to Opsgenie!"
 
 
