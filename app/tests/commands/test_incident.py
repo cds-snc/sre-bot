@@ -234,6 +234,7 @@ def test_handle_incident_action_buttons_link_preview(
                 {
                     "text": "test",
                     "title": "title",
+                    "app_unfurl_url": "http://blah.com",
                     "thumb_url": "http://blah.com/g/200/200",
                     "image_url": "http://blah.com/g/200/200",
                 },
@@ -250,6 +251,7 @@ def test_handle_incident_action_buttons_link_preview(
                 {
                     "text": "test",
                     "title": "title",
+                    "app_unfurl_url": "http://blah.com",
                     "thumb_url": "http://blah.com/g/200/200",
                     "image_url": "http://blah.com/g/200/200",
                 },
