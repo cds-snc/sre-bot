@@ -4,9 +4,9 @@ Jinja2==3.1.2
 awscli==1.29.73
 aws-sns-message-validator==0.0.5
 boto3==1.28.73
-fastapi==0.103.2
+fastapi==0.104.1
 geoip2==4.7.0
-google-api-python-client==2.102.0
+google-api-python-client==2.105.0
 google-auth-httplib2==0.1.1
 google-auth-oauthlib==0.8.0
 httpx==0.25.0
