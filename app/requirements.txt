@@ -6,7 +6,7 @@ aws-sns-message-validator==0.0.5
 boto3==1.28.73
 fastapi==0.104.1
 geoip2==4.7.0
-google-api-python-client==2.105.0
+google-api-python-client==2.106.0
 google-auth-httplib2==0.1.1
 google-auth-oauthlib==0.8.0
 httpx==0.25.0
@@ -19,4 +19,4 @@ requests==2.31.0
 schedule==1.2.1
 slack-bolt==1.18.0
 trello==0.9.7.3
-uvicorn==0.23.2
+uvicorn==0.24.0.post1
