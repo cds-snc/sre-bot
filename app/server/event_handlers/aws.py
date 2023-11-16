@@ -240,7 +240,7 @@ def format_api_key_detected(payload, client):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key Name * {api_key_name} * has been committed in github file {github_repo}.
+                "text": f"Notify API Key Name * {api_key_name} * was committed in github file {github_repo}."
             },
         },
         {

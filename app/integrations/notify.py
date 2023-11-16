@@ -48,11 +48,11 @@ def create_jwt_token(secret, client_id):
 # Function to create the authorization header for the Notify API
 def create_authorization_header():
     # get the client_id and secret from the environment variables
-    client_id = os.getenv("SRE_USER_NAME")
-    secret = os.getenv("SRE_CLIENT_SECRET")
+    client_id = os.getenv("NOTIFY_SRE_USER_NAME")
+    secret = os.getenv("NOTIFY_SRE_CLIENT_SECRET")
 
     if client_id is None or secret is None:
-        logging.error("SRE_USER_NAME or SRE_CLIENT_SECRET is missing")
+        logging.error("NOTIFY_SRE_USER_NAME or NOTIFY_SRE_CLIENT_SECRET is missing")
 
     # Create the jwt token and return the authorization header
     token = create_jwt_token(secret=secret, client_id=client_id)
@@ -68,7 +68,7 @@ def post_event(url, payload):
 # Function to revoke an api key by calling Notify's revoke api endpoint
 
 
-def revoke_api_key(api_key, api_key_name, github_repo):
+def revoke_api_key(api_key, api_key_type, github_repo, source):
     # get the url and jwt_token
     url = os.getenv("NOTIFY_API_URL")
 
@@ -82,16 +82,16 @@ def revoke_api_key(api_key, api_key_name, github_repo):
     # generate the payload
     payload = {
         "token": api_key,
-        "type": api_key_name,
+        "type": api_key_type,
         "url": github_repo,
-        "source": "content",
+        "source": source,
     }
 
     # post the event (ie call the api)
     response = post_event(url, payload)
     if response.status_code == 200:
-        logging.info(f"API key {api_key_name} has been revoked")
+        logging.info(f"API key {api_key} has been successfully revoked")
         return True
     else:
-        logging.error(f"API key {api_key_name} could not be revoked. Response code: {response.status_code}")
+        logging.error(f"API key {api_key} could not be revoked. Response code: {response.status_code}")
         return False
