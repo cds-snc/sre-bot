@@ -80,9 +80,3 @@ def test_successful_creation_of_header(self, mock_header, mock_jwt_token):
     self.assertEqual(header_key, "Authorization")
     self.assertEqual(header_value, "Bearer mocked_jwt_token")
 
-    result = notify.create_authorization_header()
-    assert result
-
-    assert notify.create_authorization_header.
-    assert notify.create_authorization_header == ("Authorization, "Bearer foo")
-    return "Authorization", "Bearer {}".format(token)
