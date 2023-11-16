@@ -53,3 +53,5 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
           NOTIFY_TEST_KEY: ${{ secrets.NOTIFY_TEST_KEY }}
+          NOTIFY_SRE_USER_NAME: ${{ secrets.NOTIFY_SRE_USER_NAME }}
+          NOTIFY_SRE_CLIENT_SECRET: ${{ secrets.NOTIFY_SRE_CLIENT_SECRET }}
