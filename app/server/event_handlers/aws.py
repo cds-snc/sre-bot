@@ -1,11 +1,8 @@
 import json
 import re
-import logging
-import os
-import requests
 import urllib.parse
 from commands.utils import log_ops_message
-from integrations import google_drive, opsgenie, notify
+from integrations import notify
 
 
 def parse(payload, client):
@@ -211,20 +208,26 @@ def format_cloudwatch_alarm(msg):
 
 def format_api_key_detected(payload, client):
     msg = payload.Message
-    regex = r"API Key with value token='(\w.+)' has been detected in url='(\w.+)'"
+    regex = r"API Key with value token='(\w.+)', type='(\w.+)' and source='(\w.+)' has been detected in url='(\w.+)'!"
     # extract the api key and the github repo from the message
     api_key = re.search(regex, msg).groups()[0]
-    github_repo = re.search(regex, msg).groups()[1]
+    type = re.search(regex, msg).groups()[1]
+    source = re.search(regex, msg).groups()[2]
+    github_repo = re.search(regex, msg).groups()[3]
 
     # We don't want to send the actual api-key through Slack, but we do want the name to be given,
     # so therefore extract the api key name by following the format of a Notify api key
     api_key_name = api_key[7 : len(api_key) - 74]
 
     # call the revoke api endpoint to revoke the api key
-    if (notify.revoke_api_key(api_key, api_key_name, github_repo)):
-        revoke_api_key_message = f"API key {api_key_name} has been successfully revoked."
+    if notify.revoke_api_key(api_key, type, github_repo, source):
+        revoke_api_key_message = (
+            f"API key {api_key_name} has been successfully revoked."
+        )
     else:
-        revoke_api_key_message = f"API key {api_key_name} could not be revoked."
+        revoke_api_key_message = (
+            f"API key {api_key_name} could not be revoked due to an error."
+        )
 
     # Format the message displayed in Slack
     return [
@@ -240,14 +243,14 @@ def format_api_key_detected(payload, client):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key Name * {api_key_name} * was committed in github file {github_repo}."
+                "text": f"Notify API Key Name {api_key_name} was committed in github file {github_repo} and {api_key}.",
             },
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"{revoke_api_key_message}",
+                "text": f"*{revoke_api_key_message}*",
             },
         },
     ]

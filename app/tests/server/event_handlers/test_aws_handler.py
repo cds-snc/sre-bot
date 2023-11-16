@@ -190,9 +190,9 @@ def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
     format_api_key_detected_mock.assert_called_once_with(payload, client)
 
 
-@patch("server.event_handlers.aws.alert_on_call")
+@patch("integrations.notify.revoke_api_key")
 def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks(
-    alert_on_call_mock,
+    revoke_api_key_mock,
 ):
     # Test that the format_api_key_detected function extracts the api key properly
     client = MagicMock()
@@ -201,9 +201,9 @@ def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks
     assert "api-key-blah" in response[2]["text"]["text"]
 
 
-@patch("server.event_handlers.aws.alert_on_call")
+@patch("integrations.notify.revoke_api_key")
 def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(
-    alert_on_call_mock,
+    revoke_api_key_mock,
 ):
     # Test that the format_api_key_detected function extracts the url properly
     client = MagicMock()
@@ -212,51 +212,34 @@ def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(
     assert "https://github.com/blah" in response[2]["text"]["text"]
 
 
-@patch("server.event_handlers.aws.alert_on_call")
-def test_format_api_key_detected_extracts_the_on_call_message_and_inserts_it_into_blocks(
-    alert_on_call_mock,
+# Test that the format_api_key_detected function extracts the api revoke message if it is successful
+@patch("integrations.notify.revoke_api_key")
+def test_format_api_key_detected_success_extracts_the_api_revoke_message_and_inserts_it_into_blocks(
+    revoke_api_key_mock,
 ):
     # Test that the format_api_key_detected function extracts the on call message properly
     client = MagicMock()
-    alert_on_call_mock.return_value = "test message"
+    revoke_api_key_mock.return_value = True
     payload = mock_api_key_detected()
     response = aws.format_api_key_detected(payload, client)
-    assert "test message" in response[3]["text"]["text"]
-
-
-@patch("integrations.google_drive.get_google_service")
-@patch("commands.incident.google_drive.list_folders")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("integrations.opsgenie.create_alert")
-@patch("integrations.opsgenie.get_on_call_users")
-def test_alert_on_call_returns_message(
-    get_on_call_users_mock,
-    create_alert_mock,
-    list_metadata_mock,
-    google_list_folders_mock,
-    get_google_service_mock,
-):
-    # Test that the alert_on_call function returns the proper message
-    client = MagicMock()
-    product = "test"
-    api_key = "test_api_key"
-    github_repo = "test_repo"
-    google_list_folders_mock.return_value = [
-        {
-            "name": "Notify",
-            "id": 12345,
-            "appProperties": {"genie_schedule": "test_schedule"},
-        }
-    ]
-    list_metadata_mock.return_value = {
-        "name": "Notify",
-        "appProperties": {"genie_schedule": "test_schedule"},
-    }
-    create_alert_mock.return_value = "test result"
-    response = aws.alert_on_call(product, client, api_key, github_repo)
     assert (
-        "test on-call staff have been notified.\nAn alert has been created in OpsGenie with result: test result."
-        in response
+        "*API key api-key-blah has been successfully revoked.*"
+        in response[3]["text"]["text"]
+    )
+
+
+# Test that the format_api_key_detected function extracts the api revoke message if it is unsuccessful
+@patch("integrations.notify.revoke_api_key")
+def test_format_api_key_detected_failure_extracts_the_api_revoke_message_and_inserts_it_into_blocks(
+    revoke_api_key_mock,
+):
+    client = MagicMock()
+    revoke_api_key_mock.return_value = False
+    payload = mock_api_key_detected()
+    response = aws.format_api_key_detected(payload, client)
+    assert (
+        "*API key api-key-blah could not be revoked due to an error.*"
+        in response[3]["text"]["text"]
     )
 
 
@@ -346,7 +329,7 @@ def mock_api_key_detected():
         MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",
         TopicArn="arn:aws:sns:ca-central-1:412578375350:test-sre-bot",
         Subject="API Key detected",
-        Message=f"API Key with value token='{NOTIFY_TEST_KEY}' has been detected in url='https://github.com/blah'! This key needs to be revoked asap.",
+        Message=f"API Key with value token='{NOTIFY_TEST_KEY}', type='cds_test_type' and source='source_data' has been detected in url='https://github.com/blah'!",
         Timestamp="2023-09-25T20:50:37.868Z",
         SignatureVersion="1",
         Signature="EXAMPLEO0OA1HN4MIHrtym3N6SWqvotsY4EcG+Ty/wrfZcxpQ3mximWM7ZfoYlzZ8NBh4s1XTPuqbl5efK64TEuPgNWBMKsm5Gc2d8H6hoDpLqAOELGl2/xlvWf2CovLH/KPj8xrSwAgOS9jL4r/EEMdXYb705YMMBudu78gooatU9EpVl+1I2MCP2AW0ZJWrcSwYMqxo9yo7H6coyBRlmTxP97PlELXoqXLfufsfFBjZ0eFycndG5A0YHeue82uLF5fIHGpcTjqNzLF0PXuJoS9xVkGx3X7p+dzmRE4rp/swGyKCqbXvgldPRycuj7GSk3r8HLSfzjqHyThnDqMECA==",

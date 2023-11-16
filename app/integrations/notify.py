@@ -51,8 +51,9 @@ def create_authorization_header():
     client_id = os.getenv("NOTIFY_SRE_USER_NAME")
     secret = os.getenv("NOTIFY_SRE_CLIENT_SECRET")
 
-    if client_id is None or secret is None:
-        logging.error("NOTIFY_SRE_USER_NAME or NOTIFY_SRE_CLIENT_SECRET is missing")
+    # If the client_id or secret is missing, raise an assertion error
+    assert client_id, "NOTIFY_SRE_USER_NAME is missing"
+    assert secret, "NOTIFY_SRE_CLIENT_SECRET is missing"
 
     # Create the jwt token and return the authorization header
     token = create_jwt_token(secret=secret, client_id=client_id)
@@ -61,14 +62,17 @@ def create_authorization_header():
 
 # Function to post an api call to Notify
 def post_event(url, payload):
-    header = create_authorization_header()
+    # Create the authorization headers
+    header_key, header_value = create_authorization_header()
+    header = {header_key: header_value, "Content-Type": "application/json"}
+
+    # Post the response
     response = requests.post(url, data=json.dumps(payload), headers=header)
     return response
 
+
 # Function to revoke an api key by calling Notify's revoke api endpoint
-
-
-def revoke_api_key(api_key, api_key_type, github_repo, source):
+def revoke_api_key(api_key, api_type, github_repo, source):
     # get the url and jwt_token
     url = os.getenv("NOTIFY_API_URL")
 
@@ -82,16 +86,19 @@ def revoke_api_key(api_key, api_key_type, github_repo, source):
     # generate the payload
     payload = {
         "token": api_key,
-        "type": api_key_type,
+        "type": api_type,
         "url": github_repo,
         "source": source,
     }
 
     # post the event (ie call the api)
     response = post_event(url, payload)
-    if response.status_code == 200:
+    # A successful response has a status code of 201
+    if response.status_code == 201:
         logging.info(f"API key {api_key} has been successfully revoked")
         return True
     else:
-        logging.error(f"API key {api_key} could not be revoked. Response code: {response.status_code}")
+        logging.error(
+            f"API key {api_key} could not be revoked. Response code: {response.status_code}"
+        )
         return False
