@@ -5,7 +5,7 @@ import os
 import requests
 import urllib.parse
 from commands.utils import log_ops_message
-from integrations import google_drive, opsgenie
+from integrations import google_drive, opsgenie, notify
 
 
 def parse(payload, client):
@@ -42,42 +42,6 @@ def nested_get(dictionary, keys):
         except KeyError:
             return None
     return dictionary
-
-
-# Function to revoke an api key by calling Notify's revoke api endpoint
-def revoke_api_key(api_key, api_key_name, github_repo):
-    # get the url and jwt_token
-    url = os.getenv("NOTIFY_API_URL")
-    jwt_token = os.getenv("NOTIFY_JWT_TOKEN")
-
-    if url is None:
-        logging.error("NOTIFY_API_URL usmissing")
-        return False
-
-    if jwt_token is None:
-        logging.error("NOTIFY_JWT_TOKEN is missing")
-        return False
-
-    # append the revoke-endpoint to the url
-    url = url + "/sre-tools/api-key-revoke"
-    # generate the payload
-    payload = {
-        "token": api_key,
-        "type": api_key_name,
-        "url": github_repo,
-        "source": "content",
-    }
-    # generate the headers
-    headers = {
-        "Authorization:" f"Bearer {jwt_token}"
-    }
-    response = requests.post(url, data=json.dumps(payload), headers=headers)
-    if response.status_code == 200:
-        logging.info(f"API key {api_key_name} has been revoked")
-        return True
-    else:
-        logging.error(f"API key {api_key_name} could not be revoked. Response code: {response.status_code}")
-        return False
 
 
 def format_abuse_notification(payload, msg):
@@ -257,7 +221,7 @@ def format_api_key_detected(payload, client):
     api_key_name = api_key[7 : len(api_key) - 74]
 
     # call the revoke api endpoint to revoke the api key
-    if (revoke_api_key(api_key, api_key_name, github_repo)):
+    if (notify.revoke_api_key(api_key, api_key_name, github_repo)):
         revoke_api_key_message = f"API key {api_key_name} has been successfully revoked."
     else:
         revoke_api_key_message = f"API key {api_key_name} could not be revoked."
