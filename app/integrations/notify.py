@@ -67,7 +67,7 @@ def post_event(url, payload):
     header = {header_key: header_value, "Content-Type": "application/json"}
 
     # Post the response
-    response = requests.post(url, data=json.dumps(payload), headers=header)
+    response = requests.post(url, data=json.dumps(payload), headers=header, timeout=60)
     return response
 
 
