@@ -77,7 +77,7 @@ def revoke_api_key(api_key, api_type, github_repo, source):
     url = os.getenv("NOTIFY_API_URL")
 
     if url is None:
-        logging.error("NOTIFY_API_URL usmissing")
+        logging.error("NOTIFY_API_URL is missing")
         return False
 
     # append the revoke-endpoint to the url
