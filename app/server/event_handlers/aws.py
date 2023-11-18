@@ -1,5 +1,6 @@
 import json
 import re
+import os
 import urllib.parse
 from commands.utils import log_ops_message
 from integrations import notify
@@ -203,9 +204,18 @@ def format_cloudwatch_alarm(msg):
     return blocks
 
 
+# Function to send the message to the Notify ops channel fo alerting. Right now it is set to #notification-ops channel
+def send_message_to_notify_chanel(client, blocks):
+    NOTIFY_OPS_CHANNEL_ID = os.environ.get("NOTIFY_OPS_CHANNEL_ID")
+
+    # Raise an exception if the NOTIFY_OPS_CHANNEL_ID is not set
+    assert NOTIFY_OPS_CHANNEL_ID, "NOTIFY_OPS_CHANNEL_ID is not set in the environment"
+
+    # post the message to the notification channel
+    client.chat_postMessage(channel=NOTIFY_OPS_CHANNEL_ID, blocks=blocks)
+
+
 # If the message contains an api key it will be parsed by the format_api_key_detected function.
-
-
 def format_api_key_detected(payload, client):
     msg = payload.Message
     regex = r"API Key with value token='(\w.+)', type='(\w.+)' and source='(\w.+)' has been detected in url='(\w.+)'!"
@@ -214,6 +224,13 @@ def format_api_key_detected(payload, client):
     type = re.search(regex, msg).groups()[1]
     source = re.search(regex, msg).groups()[2]
     github_repo = re.search(regex, msg).groups()[3]
+
+    # Extract the service id so that we can include it in the message
+    api_regex = r"(?P<prefix>gcntfy-)(?P<keyname>.*)(?P<service_id>[-A-Za-z0-9]{36})-(?P<key_id>[-A-Za-z0-9]{36})"
+    pattern = re.compile(api_regex)
+    match = pattern.search(api_key)
+    if match:
+        service_id = match.group("service_id")
 
     # We don't want to send the actual api-key through Slack, but we do want the name to be given,
     # so therefore extract the api key name by following the format of a Notify api key
@@ -224,26 +241,25 @@ def format_api_key_detected(payload, client):
         revoke_api_key_message = (
             f"API key {api_key_name} has been successfully revoked."
         )
+        header_text = "🙀 Notify API Key has been exposed and revoked! 😌"
     else:
         revoke_api_key_message = (
             f"API key {api_key_name} could not be revoked due to an error."
         )
+        header_text = "🙀 Notify API Key has been exposed but could not be revoked! 😱"
 
     # Format the message displayed in Slack
-    return [
+    blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
         {
             "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🙀 Notify API Key has been exposed and revoked 😌!",
-            },
+            "text": {"type": "plain_text", "text": f"{header_text}"},
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key Name {api_key_name} was committed in github file {github_repo}.",
+                "text": f"Notify API Key Name {api_key_name} from service id {service_id} was committed in github file {github_repo}.\n",
             },
         },
         {
@@ -254,3 +270,7 @@ def format_api_key_detected(payload, client):
             },
         },
     ]
+    # send the message to the notify ops channel
+    send_message_to_notify_chanel(client, blocks)
+
+    return blocks

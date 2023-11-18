@@ -2,6 +2,7 @@ from server.event_handlers import aws
 
 import json
 import os
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -190,6 +191,17 @@ def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
     format_api_key_detected_mock.assert_called_once_with(payload, client)
 
 
+@patch("server.event_handlers.aws.format_api_key_detected")
+def test_parse_returns_blocks_if_api_key_compromised(format_api_key_detected_mock):
+    # Test that the parse function returns the blocks returned by format_new_iam_user
+    client = MagicMock()
+    aws.format_api_key_detected.return_value = ["foo", "bar"]
+    payload = mock_api_key_detected()
+    response = aws.parse(payload, client)
+    assert response == ["foo", "bar"]
+    aws.format_api_key_detected.assert_called_once_with(payload, client)
+
+
 @patch("integrations.notify.revoke_api_key")
 def test_format_api_key_detected_extracts_the_api_key_and_inserts_it_into_blocks(
     revoke_api_key_mock,
@@ -210,6 +222,17 @@ def test_format_api_key_detected_extracts_the_url_and_inserts_it_into_blocks(
     payload = mock_api_key_detected()
     response = aws.format_api_key_detected(payload, client)
     assert "https://github.com/blah" in response[2]["text"]["text"]
+
+
+@patch("integrations.notify.revoke_api_key")
+def test_format_api_key_detected_extracts_the_service_id_and_inserts_it_into_blocks(
+    revoke_api_key_mock,
+):
+    # Test that the format_api_key_detected function extracts the url properly
+    client = MagicMock()
+    payload = mock_api_key_detected()
+    response = aws.format_api_key_detected(payload, client)
+    assert "00000000-0000-0000-0000-000000000000" in response[2]["text"]["text"]
 
 
 # Test that the format_api_key_detected function extracts the api revoke message if it is successful
@@ -241,6 +264,31 @@ def test_format_api_key_detected_failure_extracts_the_api_revoke_message_and_ins
         "*API key api-key-blah could not be revoked due to an error.*"
         in response[3]["text"]["text"]
     )
+
+
+@patch.dict(os.environ, {"NOTIFY_OPS_CHANNEL_ID": "test_channel_id"})
+def test_successful_message_post_notify_channel_for_notify():
+    # Mock the chat_postMessage method
+    client = MagicMock()
+    blocks = ["test_blocks"]
+
+    # Call the function
+    aws.send_message_to_notify_chanel(client, blocks)
+
+    # Assert that chat_postMessage was called with the correct parameters
+    client.chat_postMessage.assert_called_once_with(
+        channel="test_channel_id", blocks=["test_blocks"]
+    )
+
+
+@patch.dict(os.environ, {"NOTIFY_OPS_CHANNEL_ID": ""})
+def test_exception_for_missing_env_variable_notify_channel_for_notify():
+    # Test that an exception is reaised if the NOTIFY_POS_CHANNEL_ID is not set
+    with pytest.raises(AssertionError) as err:
+        client = MagicMock()
+        aws.send_message_to_notify_chanel(client, ["test_blocks"])
+    # assert that the correct exception is raised
+    assert str(err.value) == "NOTIFY_OPS_CHANNEL_ID is not set in the environment"
 
 
 def mock_abuse_alert():
