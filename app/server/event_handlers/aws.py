@@ -1,8 +1,9 @@
 import json
 import re
+import os
 import urllib.parse
 from commands.utils import log_ops_message
-from integrations import google_drive, opsgenie
+from integrations import notify
 
 
 def parse(payload, client):
@@ -39,47 +40,6 @@ def nested_get(dictionary, keys):
         except KeyError:
             return None
     return dictionary
-
-
-def alert_on_call(product, client, api_key_name, github_repo):
-    # get the list of folders
-    folders = google_drive.list_folders()
-    # get the folder id for the Product
-    for folder in folders:
-        if folder["name"] == product:
-            folder = folder["id"]
-            break
-    # Get folder metadata
-    folder_metadata = google_drive.list_metadata(folder).get("appProperties", {})
-    oncall = []
-    message = ""
-    private_message = ""
-
-    # Generate the opsgenie message. We don't want to expose the api key value exposed so we will just provide the name of the key.
-    opsgenie_message = f"Notify key with name {api_key_name} has been leaked and needs to be revoked. Please check Slack in #internal-sre-alerts or on-call staff can check your private messages for more detailed information. "
-
-    # Get OpsGenie users on call and construct string
-    if "genie_schedule" in folder_metadata:
-        for email in opsgenie.get_on_call_users(folder_metadata["genie_schedule"]):
-            r = client.users_lookupByEmail(email=email)
-            if r.get("ok"):
-                oncall.append(r["user"])
-        message = f"{product} on-call staff "
-        for user in oncall:
-            # send a private message to the people on call.
-            message += f"<@{user['id']}> "
-            private_message = f"Hello {user['profile']['first_name']}!\nA Notify API key has been leaked and needs to be revoked. 🙀 \nThe key name is *{api_key_name}* and it is exposed in file {github_repo}. You can see the message in #internal-sre-alerts to start an incident."
-            # send the private message
-            client.chat_postMessage(
-                channel=user["id"], text=private_message, as_user=True
-            )
-        message += "have been notified."
-
-        # create an alert in OpsGenie
-        result = opsgenie.create_alert(opsgenie_message)
-        message += f"\nAn alert has been created in OpsGenie with result: {result}."
-
-    return message
 
 
 def format_abuse_notification(payload, msg):
@@ -244,45 +204,73 @@ def format_cloudwatch_alarm(msg):
     return blocks
 
 
+# Function to send the message to the Notify ops channel fo alerting. Right now it is set to #notification-ops channel
+def send_message_to_notify_chanel(client, blocks):
+    NOTIFY_OPS_CHANNEL_ID = os.environ.get("NOTIFY_OPS_CHANNEL_ID")
+
+    # Raise an exception if the NOTIFY_OPS_CHANNEL_ID is not set
+    assert NOTIFY_OPS_CHANNEL_ID, "NOTIFY_OPS_CHANNEL_ID is not set in the environment"
+
+    # post the message to the notification channel
+    client.chat_postMessage(channel=NOTIFY_OPS_CHANNEL_ID, blocks=blocks)
+
+
 # If the message contains an api key it will be parsed by the format_api_key_detected function.
-
-
 def format_api_key_detected(payload, client):
     msg = payload.Message
-    regex = r"API Key with value token='(\w.+)' has been detected in url='(\w.+)'"
+    regex = r"API Key with value token='(\w.+)', type='(\w.+)' and source='(\w.+)' has been detected in url='(\w.+)'!"
     # extract the api key and the github repo from the message
     api_key = re.search(regex, msg).groups()[0]
-    github_repo = re.search(regex, msg).groups()[1]
+    type = re.search(regex, msg).groups()[1]
+    source = re.search(regex, msg).groups()[2]
+    github_repo = re.search(regex, msg).groups()[3]
+
+    # Extract the service id so that we can include it in the message
+    api_regex = r"(?P<prefix>gcntfy-)(?P<keyname>.*)(?P<service_id>[-A-Za-z0-9]{36})-(?P<key_id>[-A-Za-z0-9]{36})"
+    pattern = re.compile(api_regex)
+    match = pattern.search(api_key)
+    if match:
+        service_id = match.group("service_id")
 
     # We don't want to send the actual api-key through Slack, but we do want the name to be given,
     # so therefore extract the api key name by following the format of a Notify api key
     api_key_name = api_key[7 : len(api_key) - 74]
 
-    # send a private message with the api-key and github repo to the people on call.
-    on_call_message = alert_on_call("Notify", client, api_key_name, github_repo)
+    # call the revoke api endpoint to revoke the api key
+    if notify.revoke_api_key(api_key, type, github_repo, source):
+        revoke_api_key_message = (
+            f"API key {api_key_name} has been successfully revoked."
+        )
+        header_text = "🙀 Notify API Key has been exposed and revoked! 😌"
+    else:
+        revoke_api_key_message = (
+            f"API key {api_key_name} could not be revoked due to an error."
+        )
+        header_text = "🙀 Notify API Key has been exposed but could not be revoked! 😱"
 
     # Format the message displayed in Slack
-    return [
+    blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
         {
             "type": "header",
+            "text": {"type": "plain_text", "text": f"{header_text}"},
+        },
+        {
+            "type": "section",
             "text": {
-                "type": "plain_text",
-                "text": "🙀 Notify API Key has been compromised! 🔑",
+                "type": "mrkdwn",
+                "text": f"Notify API Key Name {api_key_name} from service id {service_id} was committed in github file {github_repo}.\n",
             },
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key Name *{api_key_name}* has been committed in github file {github_repo}. The key needs to be revoked!",
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"{on_call_message}",
+                "text": f"*{revoke_api_key_message}*",
             },
         },
     ]
+    # send the message to the notify ops channel
+    send_message_to_notify_chanel(client, blocks)
+
+    return blocks
