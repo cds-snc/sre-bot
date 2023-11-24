@@ -241,7 +241,7 @@ def submit(ack, view, say, body, client, logger):
 
     # Change the retention days to 2 years (730 days)
     response = client.admin_conversations_setCustomRetention(channel_id = channel_id, duration_days=730) 
-    print("response: ", response)
+    
     # Set topic
     client.conversations_setTopic(
         channel=channel_id, topic=f"Incident: {name} / {product}"
