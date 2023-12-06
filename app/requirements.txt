@@ -1,9 +1,9 @@
 arrow==1.3.0
 Authlib==1.2.1
 Jinja2==3.1.2
-awscli==1.30.7
+awscli==1.31.2
 aws-sns-message-validator==0.0.5
-boto3==1.29.7
+boto3==1.33.2
 fastapi==0.104.1
 geoip2==4.7.0
 google-api-python-client==2.108.0
