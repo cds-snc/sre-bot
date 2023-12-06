@@ -17,6 +17,7 @@ i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
+SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
@@ -298,7 +299,7 @@ def submit(ack, view, say, body, client, logger):
     say(text=text, channel=channel_id)
 
     # Reminder to brief up
-    text = ":one: Is this a `cybersecurity incident`? Please initiate the briefing process for CCCS and TBS OCIO Cyber"
+    text = ":one: Is this a `cybersecurity incident` (e.g. secret or data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber"
     say(text=text, channel=channel_id)
 
     # Reminder to stop planned testing
@@ -308,6 +309,9 @@ def submit(ack, view, say, body, client, logger):
     # Invite oncall to channel
     for user in oncall:
         client.conversations_invite(channel=channel_id, users=user["id"])
+
+    # Invite the @security user group to channel
+    client.conversations_invite(channel=channel_id, users=SLACK_SECURITY_USER_GROUP_ID)
 
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)

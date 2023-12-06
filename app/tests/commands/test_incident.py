@@ -2,7 +2,7 @@ import datetime
 
 from commands import incident
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import call, MagicMock, patch
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
@@ -557,8 +557,11 @@ def test_incident_submit_adds_creator_to_channel(
     }
     client.users_lookupByEmail.return_value = {"ok": False, "error": "users_not_found"}
     incident.submit(ack, view, say, body, client, logger)
-    client.conversations_invite.assert_called_with(
-        channel="channel_id", users="creator_user_id"
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="creator_user_id"),
+            call(channel="channel_id", users='"SLACK_SECURITY_USER_GROUP_ID"'),
+        ]
     )
 
 
@@ -714,8 +717,12 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     incident.submit(ack, view, say, body, client, logger)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
-    client.conversations_invite.assert_called_with(
-        channel="channel_id", users="user_id"
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="user_id"),
+            call(channel="channel_id", users="user_id"),
+            call(channel="channel_id", users='"SLACK_SECURITY_USER_GROUP_ID"'),
+        ]
     )
 
 
