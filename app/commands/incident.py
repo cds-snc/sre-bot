@@ -298,7 +298,11 @@ def submit(ack, view, say, body, client, logger):
     say(text=text, channel=channel_id)
 
     # Reminder to brief up
-    text = ":rotating_light: If this is a cybersecurity incident, please initiate the briefing process for CCCS and TBS OCIO Cyber"
+    text = ":one: Is this a `cybersecurity incident`? Please initiate the briefing process for CCCS and TBS OCIO Cyber"
+    say(text=text, channel=channel_id)
+
+    # Reminder to stop planned testing
+    text = ":two: Is there active `penetration or performance testing`? Please stop it immediately"
     say(text=text, channel=channel_id)
 
     # Invite oncall to channel
