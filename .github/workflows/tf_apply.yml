@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  TF_VAR_google_oauth_pickle_string: "${{ secrets.GOOGLE_PICKLE_STRING }}"
+
 jobs:
   terragrunt-apply:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

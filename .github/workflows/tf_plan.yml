@@ -6,6 +6,9 @@ on:
       - "terraform/**"
       - ".github/workflows/**"
 
+env:
+  TF_VAR_google_oauth_pickle_string: "${{ secrets.GOOGLE_PICKLE_STRING }}"
+
 jobs:
   terraform-plan:
     strategy:
