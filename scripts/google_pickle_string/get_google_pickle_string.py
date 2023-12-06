@@ -3,7 +3,7 @@ import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/docs",
     "https://www.googleapis.com/auth/spreadsheets",
 ]
