@@ -699,14 +699,17 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
-        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
+        "user": {
+            "id": "on_call_user_id",
+            "profile": {"display_name_normalized": "name"},
+        },
     }
 
     mock_create_new_incident.return_value = "id"
@@ -719,8 +722,8 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     client.users_lookupByEmail.assert_any_call(email="email")
     client.conversations_invite.assert_has_calls(
         [
-            call(channel="channel_id", users="user_id"),
-            call(channel="channel_id", users="user_id"),
+            call(channel="channel_id", users="creator_user_id"),
+            call(channel="channel_id", users="on_call_user_id"),
             call(channel="channel_id", users='"SLACK_SECURITY_USER_GROUP_ID"'),
         ]
     )
