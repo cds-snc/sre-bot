@@ -12,3 +12,9 @@ variable "fargate_memory" {
   type    = number
   default = 512
 }
+
+variable "google_oauth_pickle_string" {
+  description = "(Required) The Google OAuth pickle string"
+  type        = string
+  sensitive   = true
+}

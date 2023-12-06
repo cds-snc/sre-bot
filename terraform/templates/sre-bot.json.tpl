@@ -22,6 +22,12 @@
         "containerPort": 8000
       }
     ],
+    "secrets": [
+      {
+        "name": "PICKLE_STRING",
+        "valueFrom": "${PICKLE_STRING}"
+      }
+    ],
     "ulimits": [
       {
         "hardLimit": 1000000,
