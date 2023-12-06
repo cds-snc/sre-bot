@@ -216,3 +216,6 @@ auto.tfvars
 *.db
 
 geodb
+
+
+credentials.json
