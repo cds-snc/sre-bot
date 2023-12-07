@@ -2,7 +2,7 @@ import datetime
 
 from commands import incident
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import call, MagicMock, patch
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
@@ -555,10 +555,15 @@ def test_incident_submit_adds_creator_to_channel(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
+    client.usergroups_users_list.return_value = {
+        "ok": False,
+    }
     client.users_lookupByEmail.return_value = {"ok": False, "error": "users_not_found"}
     incident.submit(ack, view, say, body, client, logger)
-    client.conversations_invite.assert_called_with(
-        channel="channel_id", users="creator_user_id"
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="creator_user_id"),
+        ]
     )
 
 
@@ -696,14 +701,24 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
-        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
+        "user": {
+            "id": "on_call_user_id",
+            "profile": {"display_name_normalized": "name"},
+        },
+    }
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": [
+            "security_user_id_1",
+            "security_user_id_2",
+        ],
     }
 
     mock_create_new_incident.return_value = "id"
@@ -714,8 +729,15 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     incident.submit(ack, view, say, body, client, logger)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
-    client.conversations_invite.assert_called_with(
-        channel="channel_id", users="user_id"
+    client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="creator_user_id"),
+            call(channel="channel_id", users="on_call_user_id"),
+            call(
+                channel="channel_id", users=["security_user_id_1", "security_user_id_2"]
+            ),
+        ]
     )
 
 
