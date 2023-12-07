@@ -310,8 +310,10 @@ def submit(ack, view, say, body, client, logger):
     for user in oncall:
         client.conversations_invite(channel=channel_id, users=user["id"])
 
-    # Invite the @security user group to channel
-    client.conversations_invite(channel=channel_id, users=SLACK_SECURITY_USER_GROUP_ID)
+    # Invite the @security users to channel
+    response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
+    if response.get("ok"):
+        client.conversations_invite(channel=channel_id, users=response["users"])
 
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)
