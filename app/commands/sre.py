@@ -2,7 +2,7 @@ import os
 
 from commands import utils
 
-from commands.helpers import geolocate_helper, incident_helper, webhook_helper
+from commands.helpers import geolocate_helper, incident_helper, vpn_helper, webhook_helper
 
 help_text = """
 \n `/sre help`
@@ -14,6 +14,9 @@ help_text = """
 \n `/sre incident`
 \n      - lists incident commands
 \n      - lister les commandes d'incidents
+\n `/sre vpn`
+\n      - lists VPN commands
+\n      - lister les commandes du RPV
 \n `/sre webhooks`
 \n      - lists webhook commands
 \n      - lister les commandes de liens de rappel HTTP
@@ -47,6 +50,8 @@ def sre_command(ack, command, logger, respond, client, body):
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
+        case "vpn":
+            vpn_helper.handle_webhook_command(args, client, body, respond)            
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
