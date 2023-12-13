@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_error" {
   name           = local.error_logged
-  pattern        = "?ERROR ?Error"
+  pattern        = "?ERROR:slack_bolt.App"
   log_group_name = local.api_cloudwatch_log_group
 
   metric_transformation {
@@ -29,7 +29,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_error" {
 
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_warning" {
   name           = local.warning_logged
-  pattern        = "?WARNING ?Warning"
+  pattern        = "?WARNING:slack_bolt.App"
   log_group_name = local.api_cloudwatch_log_group
 
   metric_transformation {
