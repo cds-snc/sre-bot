@@ -5,8 +5,8 @@ awscli==1.31.9
 aws-sns-message-validator==0.0.5
 boto3==1.33.9
 fastapi==0.104.1
-geoip2==4.7.0
-google-api-python-client==2.108.0
+geoip2==4.8.0
+google-api-python-client==2.109.0
 google-auth-httplib2==0.1.1
 google-auth-oauthlib==0.8.0
 httpx==0.25.2
