@@ -6,7 +6,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
 from commands import atip, aws, incident, sre, role
-from commands.helpers import incident_helper, webhook_helper
+from commands.helpers import incident_helper, vpn_helper, webhook_helper
 from server import bot_middleware, server
 
 from jobs import scheduled_tasks
@@ -68,6 +68,9 @@ def main(bot):
     bot.action("toggle_webhook")(webhook_helper.toggle_webhook)
     bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
     bot.action("next_page")(webhook_helper.next_page)
+
+    # VPN events
+    bot.view("vpn_on")(vpn_helper.vpn_on)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 
