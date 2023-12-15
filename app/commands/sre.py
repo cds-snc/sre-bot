@@ -2,7 +2,12 @@ import os
 
 from commands import utils
 
-from commands.helpers import geolocate_helper, incident_helper, vpn_helper, webhook_helper
+from commands.helpers import (
+    geolocate_helper,
+    incident_helper,
+    vpn_helper,
+    webhook_helper,
+)
 
 help_text = """
 \n `/sre help`
@@ -51,7 +56,7 @@ def sre_command(ack, command, logger, respond, client, body):
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case "vpn":
-            vpn_helper.handle_vpn_command(args, client, body, respond)            
+            vpn_helper.handle_vpn_command(args, client, body, respond)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"

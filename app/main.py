@@ -71,6 +71,7 @@ def main(bot):
 
     # VPN events
     bot.view("vpn_on")(vpn_helper.vpn_on)
+    bot.view("vpn_status")(vpn_helper.vpn_status)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 
