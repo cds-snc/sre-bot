@@ -306,9 +306,12 @@ def submit(ack, view, say, body, client, logger):
     text = ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
     say(text=text, channel=channel_id)
 
+
     # Invite oncall to channel
     for user in oncall:
-        client.conversations_invite(channel=channel_id, users=user["id"])
+        # if the incident creator is also oncall, don't invite them again
+        if user is not user_id: 
+            client.conversations_invite(channel=channel_id, users=user["id"])
 
     # Invite the @security users to channel
     response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)

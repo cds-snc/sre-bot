@@ -740,6 +740,63 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
         ]
     )
 
+    
+@patch("commands.incident.google_drive.update_incident_list")
+@patch("commands.incident.google_drive.merge_data")
+@patch("commands.incident.google_drive.create_new_incident")
+@patch("commands.incident.google_drive.list_metadata")
+@patch("commands.incident.opsgenie.get_on_call_users")
+@patch("commands.incident.log_to_sentinel")
+def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
+    _log_to_sentinel_mock,
+    mock_get_on_call_users,
+    mock_list_metadata,
+    mock_create_new_incident,
+    mock_merge_data,
+    mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {
+            "id": "creator_user_id",
+            "profile": {"display_name_normalized": "name"},
+        },
+    }
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": [
+            "security_user_id_1",
+            "security_user_id_2",
+        ],
+    }
+
+    mock_create_new_incident.return_value = "id"
+
+    mock_get_on_call_users.return_value = ["email"]
+    mock_list_metadata.return_value = {"appProperties": {"genie_schedule": "oncall"}}
+
+    incident.submit(ack, view, say, body, client, logger)
+    mock_get_on_call_users.assert_called_once_with("oncall")
+    client.users_lookupByEmail.assert_any_call(email="email")
+    client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="creator_user_id"),
+            call(
+                channel="channel_id", users=["security_user_id_1", "security_user_id_2"]
+            ),
+        ]
+    )
+
 
 def helper_options():
     return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
