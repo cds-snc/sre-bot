@@ -306,16 +306,24 @@ def submit(ack, view, say, body, client, logger):
     text = ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
     say(text=text, channel=channel_id)
 
-    # Invite oncall to channel
-    for user in oncall:
-        # if the incident creator is also oncall, don't invite them again
-        if user is not user_id:
-            client.conversations_invite(channel=channel_id, users=user["id"])
+    # Gather all user IDs in a list to ensure uniqueness
+    users_to_invite = []
 
-    # Invite the @security users to channel
+    # Add oncall users, excluding the user_id
+    for user in oncall:
+        if user["id"] != user_id:
+            users_to_invite.append(user["id"])
+
+    # Get users from the @security group
     response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
     if response.get("ok"):
-        client.conversations_invite(channel=channel_id, users=response["users"])
+        for security_user in response["users"]:
+            if security_user != user_id:
+                users_to_invite.append(security_user)
+
+    # Invite all collected users to the channel in a single API call
+    if users_to_invite:
+        client.conversations_invite(channel=channel_id, users=users_to_invite)
 
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)
