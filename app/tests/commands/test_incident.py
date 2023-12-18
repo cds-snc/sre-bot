@@ -740,7 +740,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
         ]
     )
 
-    
+
 @patch("commands.incident.google_drive.update_incident_list")
 @patch("commands.incident.google_drive.merge_data")
 @patch("commands.incident.google_drive.create_new_incident")
