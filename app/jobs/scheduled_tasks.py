@@ -1,3 +1,4 @@
+from jobs.client_vpn_turn_off import client_vpn_turn_off
 from jobs.revoke_aws_sso_access import revoke_aws_sso_access
 from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 import threading
@@ -17,6 +18,7 @@ def init(bot):
 
     schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(scheduler_heartbeat)
+    schedule.every(5).minutes.do(client_vpn_turn_off)
 
 
 def scheduler_heartbeat():

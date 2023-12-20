@@ -1,4 +1,5 @@
 import os
+import datetime
 
 from integrations.aws_client_vpn import AWSClientVPN
 
@@ -12,8 +13,7 @@ help_text = """
 \n      - obtenir le statut du RPV
 """
 
-# Comma separated list of products that have an AWS client VPN installed
-VPN_DURATIONS = os.environ.get("VPN_DURATIONS", "1,4,8").split(",")
+VPN_DURATION_HOURS = os.environ.get("VPN_DURATION_HOURS", "1,4,8").split(",")
 VPN_PRODUCTS = {
     "Notify": {
         "channel_id": os.environ.get("VPN_NOTIFY_CHANNEL_ID"),
@@ -88,7 +88,7 @@ def vpn_on_modal(client, body):
                             "text": "Select a duration",
                         },
                         "options": get_select_options(
-                            VPN_DURATIONS,
+                            VPN_DURATION_HOURS,
                             transform=lambda time: f"{time} hour{'' if time == '1' else 's'}",
                         ),
                         "action_id": "duration",
@@ -132,7 +132,7 @@ def vpn_on(ack, view, client, body, logger):
         errors["vpn"] = "Please select a VPN from the dropdown"
     if not reason:
         errors["reason"] = "Please enter a reason"
-    if duration not in VPN_DURATIONS:
+    if duration not in VPN_DURATION_HOURS:
         errors["duration"] = "Please select a valid duration"
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
@@ -140,21 +140,22 @@ def vpn_on(ack, view, client, body, logger):
 
     # Get the VPN status and respond to the user
     client_vpn = AWSClientVPN(
-        client_vpn_id=VPN_PRODUCTS[vpn]["vpn_id"],
+        name=vpn,
+        reason=reason,
+        duration=duration,
+        vpn_id=VPN_PRODUCTS[vpn]["vpn_id"],
         assume_role_arn=VPN_PRODUCTS[vpn]["role_arn"],
     )
     status = client_vpn.turn_on()
-    if status == AWSClientVPN.STATUS_ON:
-        result = f"{get_status_icon(status)} The `{vpn}` VPN is `{status}`."
-    elif status == AWSClientVPN.STATUS_TURNING_ON:
+    if status in [AWSClientVPN.STATUS_ON, AWSClientVPN.STATUS_TURNING_ON]:
         result = (
-            f"{get_status_icon(status)} The `{vpn}` VPN is `{status}` for {duration} hour{'' if duration == '1' else 's'}:\n"
-            f"```{reason}```\n\n"
+            f"{get_status_icon(status)} The `{vpn}` VPN is `{status}` for {pluralize(int(duration), 'hour')}:\n"
+            f"```Reason: {reason}```\n\n"
             f"This can take up to 5 minutes.  Use the following to check the status.\n"
             f"```/sre vpn status```"
         )
     else:
-        result = f"{get_status_icon(status)} There was an error turning on the `{vpn}` VPN.  Please contact SRE for assistance."
+        result = f"{get_status_icon(status)} There was an error turning on the `{vpn}` VPN.  Please contact SRE for help."
     logger.info(
         "VPN On: vpn: %s, duration: %s, reason: %s, slack user: %s, ",
         vpn,
@@ -220,11 +221,33 @@ def vpn_status(ack, view, client, body, logger):
 
     # Get the VPN status and respond to the user
     client_vpn = AWSClientVPN(
-        client_vpn_id=VPN_PRODUCTS[vpn]["vpn_id"],
+        name=vpn,
+        vpn_id=VPN_PRODUCTS[vpn]["vpn_id"],
         assume_role_arn=VPN_PRODUCTS[vpn]["role_arn"],
     )
     status = client_vpn.get_status()
-    result = f"{get_status_icon(status)} The `{vpn}` VPN is `{status}`."
+    status_code = status.get("status")
+    session = status.get("session")
+    result = f"{get_status_icon(status_code)} The `{vpn}` VPN is `{status_code}`"
+
+    # If the VPN is on, add the remaining time and reason
+    if session and status_code in [
+        AWSClientVPN.STATUS_ON,
+        AWSClientVPN.STATUS_TURNING_ON,
+    ]:
+        if status_code == AWSClientVPN.STATUS_ON:
+            remaining_seconds = (
+                float(session["expires_at"]["N"]) - datetime.datetime.now().timestamp()
+            )
+            if (
+                remaining_seconds > 0
+            ):  # Checking for the edge case where the VPN will turn off momentarily
+                remaining_hours = int(remaining_seconds / 3600)
+                remaining_minutes = int(remaining_seconds % 3600 / 60)
+                result += f" for{' ' + pluralize(remaining_hours, 'hour') if remaining_hours > 0 else ''}{' ' + pluralize(remaining_minutes, 'minute') if remaining_minutes > 0 else ''}:\n"
+        else:
+            result += f" for {pluralize(int(session['duration']['N']), 'hour')}:\n"
+        result += f"```Reason: {session['reason']['S']}```"
 
     logger.info(
         "VPN status: vpn: %s, status: %s, slack user: %s, ",
@@ -255,8 +278,13 @@ def get_select_options(options_list, transform=lambda x: x):
 def get_status_icon(status):
     "Helper function to get the icon for the status"
     if status == AWSClientVPN.STATUS_ON:
-        return ":large_green_circle:"
-    elif status in [AWSClientVPN.STATUS_TURNING_ON, AWSClientVPN.STATUS_TURNING_OFF]:
-        return ":large_yellow_circle:"
+        return ":green:"
+    elif status == AWSClientVPN.STATUS_TURNING_ON:
+        return ":beach-ball:"
     else:
-        return ":red_circle:"
+        return ":red:"
+
+
+def pluralize(number, string):
+    "Helper function to pluralize a string"
+    return f"{number} {string}{'s' if number != 1 else ''}"

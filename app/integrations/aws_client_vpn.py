@@ -1,4 +1,5 @@
 import boto3
+import datetime
 import logging
 import os
 
@@ -12,40 +13,56 @@ class AWSClientVPN:
     Manage an account's client VPN endpoint.
     """
 
+    DYNAMODB_TABLE = "sre_bot_data"
     STATUS_ON = "on"
     STATUS_OFF = "off"
     STATUS_TURNING_ON = "turning-on"
     STATUS_TURNING_OFF = "turning-off"
     STATUS_ERROR = "error"
 
-    def __init__(self, client_vpn_id, assume_role_arn, region_name=AWS_REGION):
+    def __init__(
+        self,
+        name="",
+        vpn_id="",
+        assume_role_arn="",
+        reason="",
+        duration="",
+        region_name=AWS_REGION,
+    ):
         """
         Initializes the AWSClientVPN class with the client VPN ID and an boto3 `ec2`
         client that has assumed the role required to manage the account's client VPN.
         """
-        logging.info(
-            f"Initializing AWSClientVPN for client_vpn_id: {client_vpn_id} with assume_role_arn: {assume_role_arn}"
-        )
-        self.client_vpn_id = client_vpn_id
+        self.name = name
+        self.reason = reason
+        self.duration = duration
+        self.vpn_id = vpn_id
+        self.assume_role_arn = assume_role_arn
+        logging.info(f"Initializing AWSClientVPN: {vars(self)}")
 
-        client = boto3.client("sts")
-        response = client.assume_role(
-            RoleArn=assume_role_arn, RoleSessionName="SREBot_Client_VPN_Role"
-        )
-        session = boto3.Session(
-            aws_access_key_id=response["Credentials"]["AccessKeyId"],
-            aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
-            aws_session_token=response["Credentials"]["SessionToken"],
-        )
-        self.client = session.client("ec2", region_name=region_name)
+        # Assume the product role to manage the client VPN
+        if self.assume_role_arn:
+            client = boto3.client("sts")
+            response = client.assume_role(
+                RoleArn=assume_role_arn, RoleSessionName="SREBot_Client_VPN_Role"
+            )
+            session = boto3.Session(
+                aws_access_key_id=response["Credentials"]["AccessKeyId"],
+                aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
+                aws_session_token=response["Credentials"]["SessionToken"],
+            )
+            self.client_ec2 = session.client("ec2", region_name=region_name)
+
+        # DynamoDB table is managed by the SRE Bot's role
+        self.client_ddb = boto3.client("dynamodb", region_name=region_name)
 
     def get_status(self):
         """
         Returns the status of the client VPN endpoint.
         """
         status = "error"
-        response = self.client.describe_client_vpn_endpoints(
-            ClientVpnEndpointIds=[self.client_vpn_id]
+        response = self.client_ec2.describe_client_vpn_endpoints(
+            ClientVpnEndpointIds=[self.vpn_id]
         )
 
         if response["ClientVpnEndpoints"]:
@@ -53,8 +70,8 @@ class AWSClientVPN:
             if statusCode == "available":
                 status = self.STATUS_ON
             else:
-                response = self.client.describe_client_vpn_target_networks(
-                    ClientVpnEndpointId=self.client_vpn_id
+                response = self.client_ec2.describe_client_vpn_target_networks(
+                    ClientVpnEndpointId=self.vpn_id
                 )
                 if response["ClientVpnTargetNetworks"]:
                     networkStatus = [
@@ -71,7 +88,10 @@ class AWSClientVPN:
 
         logging.info(f"Client VPN status: {status}")
         logging.info(f"Client VPN response: {response}")
-        return status
+        return {
+            "status": status,
+            "session": self.get_vpn_sesssion(),
+        }
 
     def turn_on(self):
         """
@@ -83,13 +103,14 @@ class AWSClientVPN:
         can take up to 5 minutes before it completes.
         """
         status = self.get_status()
-        if status in [self.STATUS_ON, self.STATUS_TURNING_ON]:
+        if status.get("status") in [self.STATUS_ON, self.STATUS_TURNING_ON]:
             logging.info(f"Client VPN is already on or turning on: {status}")
-            return status
+            self.put_vpn_session()
+            return status.get("status")
 
         status = self.STATUS_ERROR
-        response = self.client.describe_client_vpn_authorization_rules(
-            ClientVpnEndpointId=self.client_vpn_id
+        response = self.client_ec2.describe_client_vpn_authorization_rules(
+            ClientVpnEndpointId=self.vpn_id
         )
         logging.info(
             f"Client VPN describe_client_vpn_authorization_rules response: {response}"
@@ -103,7 +124,7 @@ class AWSClientVPN:
             ]
 
             if subnets_cidrs:
-                response = self.client.describe_subnets(
+                response = self.client_ec2.describe_subnets(
                     Filters=[{"Name": "cidr-block", "Values": subnets_cidrs}]
                 )
                 logging.info(f"Client VPN describe_subnets response: {response}")
@@ -112,8 +133,10 @@ class AWSClientVPN:
                     subnet_ids = [subnet["SubnetId"] for subnet in response["Subnets"]]
                     for id in subnet_ids:
                         try:
-                            response = self.client.associate_client_vpn_target_network(
-                                ClientVpnEndpointId=self.client_vpn_id, SubnetId=id
+                            response = (
+                                self.client_ec2.associate_client_vpn_target_network(
+                                    ClientVpnEndpointId=self.vpn_id, SubnetId=id
+                                )
                             )
                             logging.info(
                                 f"Client VPN associate_client_vpn_target_network response: {response}"
@@ -131,6 +154,7 @@ class AWSClientVPN:
                                     f"Client VPN associate_client_vpn_target_network error: {error}"
                                 )
                                 raise error
+                    self.put_vpn_session()
                     status = self.STATUS_TURNING_ON
 
         logging.info(f"Client VPN turn_on status: {status}")
@@ -138,13 +162,13 @@ class AWSClientVPN:
 
     def turn_off(self):
         status = self.get_status()
-        if status in [self.STATUS_OFF, self.STATUS_TURNING_OFF]:
+        if status.get("status") in [self.STATUS_OFF, self.STATUS_TURNING_OFF]:
             logging.info(f"Client VPN is already off or turning off: {status}")
             return status
 
         status = self.STATUS_ERROR
-        response = self.client.describe_client_vpn_target_networks(
-            ClientVpnEndpointId=self.client_vpn_id
+        response = self.client_ec2.describe_client_vpn_target_networks(
+            ClientVpnEndpointId=self.vpn_id
         )
         logging.info(
             f"Client VPN describe_client_vpn_target_networks response: {response}"
@@ -160,8 +184,10 @@ class AWSClientVPN:
             if association_ids:
                 for id in association_ids:
                     try:
-                        response = self.client.disassociate_client_vpn_target_network(
-                            ClientVpnEndpointId=self.client_vpn_id, AssociationId=id
+                        response = (
+                            self.client_ec2.disassociate_client_vpn_target_network(
+                                ClientVpnEndpointId=self.vpn_id, AssociationId=id
+                            )
                         )
                         logging.info(
                             f"Client VPN disassociate_client_vpn_target_network response: {response}"
@@ -171,7 +197,108 @@ class AWSClientVPN:
                             f"Client VPN disassociate_client_vpn_target_network error: {error}"
                         )
                         raise error
+                self.delete_vpn_session()
                 status = self.STATUS_TURNING_OFF
 
         logging.info(f"Client VPN turn_off status: {status}")
         return status
+
+    def get_vpn_sessions(self):
+        """
+        Returns all VPN sessions from the DynamoDB table.
+        """
+        logging.info("Getting all VPN sessions")
+        response = self.client_ddb.query(
+            TableName=self.DYNAMODB_TABLE,
+            KeyConditionExpression="PK = :pk",
+            ExpressionAttributeValues={
+                ":pk": {"S": "vpn_session"},
+            },
+        )
+        logging.info(f"get_vpn_sessions response: {response}")
+        return response["Items"]
+
+    def get_vpn_sesssion(self):
+        """
+        Returns the VPN session from the DynamoDB table.
+        """
+        if self.name:
+            logging.info(f"Getting VPN session for {self.name}")
+            response = self.client_ddb.get_item(
+                TableName=self.DYNAMODB_TABLE,
+                Key={
+                    "PK": {"S": "vpn_session"},
+                    "SK": {"S": self.name},
+                },
+            )
+            logging.info(f"get_vpn_session response: {response}")
+            if "Item" in response:
+                return response["Item"]
+        return None
+
+    def put_vpn_session(self):
+        """
+        Adds the VPN session to the DynamoDB table.  If a session already exists, it will be updated.
+        This allows a team to extend an existing session if required.
+        """
+        created_at = datetime.datetime.now()
+        expires_at = created_at + datetime.timedelta(hours=float(self.duration))
+        is_session = self.get_vpn_sesssion()
+        logging.info(
+            f"Putting VPN session for {self.name} with {self.reason} ({self.duration}) is_session: {is_session}"
+        )
+
+        # If the session doesn't exist, create it.  Otherwise, update it.
+        if not is_session:
+            response = self.client_ddb.put_item(
+                TableName=self.DYNAMODB_TABLE,
+                Item={
+                    "PK": {"S": "vpn_session"},
+                    "SK": {"S": self.name},
+                    "reason": {"S": self.reason},
+                    "duration": {"N": self.duration},
+                    "vpn_id": {"S": self.vpn_id},
+                    "assume_role_arn": {"S": self.assume_role_arn},
+                    "created_at": {"N": str(created_at.timestamp())},
+                    "expires_at": {"N": str(expires_at.timestamp())},
+                },
+            )
+        else:
+            response = self.client_ddb.update_item(
+                TableName=self.DYNAMODB_TABLE,
+                Key={
+                    "PK": {"S": "vpn_session"},
+                    "SK": {"S": self.name},
+                },
+                UpdateExpression="set reason = :reason, #dur = :duration, created_at = :created_at, expires_at = :expires_at, vpn_id = :vpn_id, assume_role_arn = :assume_role_arn",
+                ExpressionAttributeValues={
+                    ":reason": {"S": self.reason},
+                    ":duration": {"N": self.duration},
+                    ":created_at": {"N": str(created_at.timestamp())},
+                    ":expires_at": {"N": str(expires_at.timestamp())},
+                    ":vpn_id": {"S": self.vpn_id},
+                    ":assume_role_arn": {"S": self.assume_role_arn},
+                },
+                ExpressionAttributeNames={"#dur": "duration"},
+            )
+        logging.info(f"put_vpn_session response: {response}")
+        return response["ResponseMetadata"]["HTTPStatusCode"] == 200
+
+    def delete_vpn_session(self):
+        """
+        Deletes the VPN session from the DynamoDB table.
+        """
+        is_session = self.get_vpn_sesssion()
+        logging.info(f"Deleting VPN session for {self.name} is_session: {is_session}")
+        if is_session:
+            response = self.client_ddb.delete_item(
+                TableName=self.DYNAMODB_TABLE,
+                Key={
+                    "PK": {"S": "vpn_session"},
+                    "SK": {"S": self.name},
+                },
+            )
+            logging.info(f"delete_vpn_session response: {response}")
+            return response["ResponseMetadata"]["HTTPStatusCode"] == 200
+        else:
+            return True
