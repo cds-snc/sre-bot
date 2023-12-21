@@ -122,7 +122,6 @@ def vpn_on(ack, view, client, body, logger):
 
     # Get inputs and validate
     errors = {}
-    user = body["user"]["id"]
     vpn = view["state"]["values"]["vpn"]["vpn"]["selected_option"]["value"]
     duration = view["state"]["values"]["duration"]["duration"]["selected_option"][
         "value"
@@ -163,9 +162,7 @@ def vpn_on(ack, view, client, body, logger):
         reason,
         body["user"],
     )
-    client.chat_postEphemeral(
-        channel=VPN_PRODUCTS[vpn]["channel_id"], text=result, user=user
-    )
+    client.chat_postMessage(channel=VPN_PRODUCTS[vpn]["channel_id"], text=result)
 
 
 def vpn_status_modal(client, body):

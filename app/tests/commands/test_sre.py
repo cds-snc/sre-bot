@@ -108,6 +108,18 @@ def test_sre_command_with_webhooks_argument(command_runner):
     command_runner.assert_called_once_with([], clientMock, body, respond)
 
 
+@patch("commands.sre.vpn_helper.handle_vpn_command")
+def test_sre_command_with_vpn_argument(command_runner):
+    command_runner.return_value = "vpn command help"
+    clientMock = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    sre.sre_command(
+        MagicMock(), {"text": "vpn"}, MagicMock(), respond, clientMock, body
+    )
+    command_runner.assert_called_once_with([], clientMock, body, respond)
+
+
 def test_sre_command_with_unknown_argument():
     respond = MagicMock()
     sre.sre_command(

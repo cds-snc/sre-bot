@@ -42,6 +42,9 @@ def test_main_invokes_socket_handler(
     mock_app.action.assert_any_call("toggle_webhook")
     mock_app.action.assert_any_call("reveal_webhook")
 
+    mock_app.view.assert_any_call("vpn_on")
+    mock_app.view.assert_any_call("vpn_status")
+
     mock_socket_mode_handler.assert_called_once_with(
         mock_app, os.environ.get("APP_TOKEN")
     )

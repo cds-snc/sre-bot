@@ -65,7 +65,7 @@ class AWSClientVPN:
             ClientVpnEndpointIds=[self.vpn_id]
         )
 
-        if response["ClientVpnEndpoints"]:
+        if response.get("ClientVpnEndpoints"):
             statusCode = response["ClientVpnEndpoints"][0]["Status"]["Code"]
             if statusCode == "available":
                 status = self.STATUS_ON
@@ -116,7 +116,7 @@ class AWSClientVPN:
             f"Client VPN describe_client_vpn_authorization_rules response: {response}"
         )
 
-        if response["AuthorizationRules"]:
+        if response.get("AuthorizationRules"):
             subnets_cidrs = [
                 subnet["DestinationCidr"]
                 for subnet in response["AuthorizationRules"]
@@ -129,7 +129,7 @@ class AWSClientVPN:
                 )
                 logging.info(f"Client VPN describe_subnets response: {response}")
 
-                if response["Subnets"]:
+                if response.get("Subnets"):
                     subnet_ids = [subnet["SubnetId"] for subnet in response["Subnets"]]
                     for id in subnet_ids:
                         try:
@@ -164,7 +164,7 @@ class AWSClientVPN:
         status = self.get_status()
         if status.get("status") in [self.STATUS_OFF, self.STATUS_TURNING_OFF]:
             logging.info(f"Client VPN is already off or turning off: {status}")
-            return status
+            return status.get("status")
 
         status = self.STATUS_ERROR
         response = self.client_ec2.describe_client_vpn_target_networks(
@@ -174,7 +174,7 @@ class AWSClientVPN:
             f"Client VPN describe_client_vpn_target_networks response: {response}"
         )
 
-        if response["ClientVpnTargetNetworks"]:
+        if response.get("ClientVpnTargetNetworks"):
             association_ids = [
                 association["AssociationId"]
                 for association in response["ClientVpnTargetNetworks"]
@@ -203,21 +203,6 @@ class AWSClientVPN:
         logging.info(f"Client VPN turn_off status: {status}")
         return status
 
-    def get_vpn_sessions(self):
-        """
-        Returns all VPN sessions from the DynamoDB table.
-        """
-        logging.info("Getting all VPN sessions")
-        response = self.client_ddb.query(
-            TableName=self.DYNAMODB_TABLE,
-            KeyConditionExpression="PK = :pk",
-            ExpressionAttributeValues={
-                ":pk": {"S": "vpn_session"},
-            },
-        )
-        logging.info(f"get_vpn_sessions response: {response}")
-        return response["Items"]
-
     def get_vpn_sesssion(self):
         """
         Returns the VPN session from the DynamoDB table.
@@ -235,6 +220,21 @@ class AWSClientVPN:
             if "Item" in response:
                 return response["Item"]
         return None
+
+    def get_vpn_sessions(self):
+        """
+        Returns all VPN sessions from the DynamoDB table.
+        """
+        logging.info("Getting all VPN sessions")
+        response = self.client_ddb.query(
+            TableName=self.DYNAMODB_TABLE,
+            KeyConditionExpression="PK = :pk",
+            ExpressionAttributeValues={
+                ":pk": {"S": "vpn_session"},
+            },
+        )
+        logging.info(f"get_vpn_sessions response: {response}")
+        return response.get("Items")
 
     def put_vpn_session(self):
         """
