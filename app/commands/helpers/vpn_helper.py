@@ -1,6 +1,7 @@
 import os
 import datetime
 
+from commands.utils import log_to_sentinel
 from integrations.aws_client_vpn import AWSClientVPN
 
 
@@ -152,6 +153,15 @@ def vpn_on(ack, view, client, body, logger):
             f"```Reason: {reason}```\n\n"
             f"This can take up to 5 minutes.  Use the following to check the status.\n"
             f"```/sre vpn status```"
+        )
+        log_to_sentinel(
+            "vpn_turned_on",
+            {
+                "vpn": vpn,
+                "duration": duration,
+                "reason": reason,
+                "slack_user": body["user"],
+            },
         )
     else:
         result = f"{get_status_icon(status)} There was an error turning on the `{vpn}` VPN.  Please contact SRE for help."

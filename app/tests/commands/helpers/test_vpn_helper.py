@@ -164,7 +164,8 @@ def test_vpn_on_modal():
     {"vpn1": {"vpn_id": "vpn-123", "role_arn": "test/role-name", "channel_id": "456"}},
 )
 @patch("commands.helpers.vpn_helper.AWSClientVPN")
-def test_vpn_on(mock_aws_client_vpn):
+@patch("commands.helpers.vpn_helper.log_to_sentinel")
+def test_vpn_on(mock_log_to_sentinel, mock_aws_client_vpn):
     ack = MagicMock()
     view = {
         "state": {
@@ -198,6 +199,15 @@ def test_vpn_on(mock_aws_client_vpn):
         channel="456",
         text=":beach-ball: The `vpn1` VPN is `turning-on` for 1 hour:\n```Reason: because```\n\nThis can take up to 5 minutes.  Use the following to check the status.\n```/sre vpn status```",
     )
+    mock_log_to_sentinel.assert_called_with(
+        "vpn_turned_on",
+        {
+            "vpn": "vpn1",
+            "duration": "1",
+            "reason": "because",
+            "slack_user": {"id": "user"},
+        },
+    )
 
 
 @patch(
@@ -205,7 +215,8 @@ def test_vpn_on(mock_aws_client_vpn):
     {"vpn1": {"vpn_id": "vpn-123", "role_arn": "test/role-name", "channel_id": "456"}},
 )
 @patch("commands.helpers.vpn_helper.AWSClientVPN")
-def test_vpn_on_error(mock_aws_client_vpn):
+@patch("commands.helpers.vpn_helper.log_to_sentinel")
+def test_vpn_on_error(mock_log_to_sentinel, mock_aws_client_vpn):
     ack = MagicMock()
     view = {
         "state": {
@@ -239,6 +250,7 @@ def test_vpn_on_error(mock_aws_client_vpn):
         channel="456",
         text=":red: There was an error turning on the `vpn1` VPN.  Please contact SRE for help.",
     )
+    mock_log_to_sentinel.assert_not_called()
 
 
 def test_vpn_on_validation_error():
