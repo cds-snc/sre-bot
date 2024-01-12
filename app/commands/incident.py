@@ -329,9 +329,6 @@ def submit(ack, view, say, body, client, logger):
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)
 
-    # Announce how we can update the status of an incident
-    text = "Run `/sre incident status` to update the status of the incident and to close the incident"
-
 
 def generate_success_modal(body):
     locale = body["view"]["blocks"][0]["elements"][0]["value"]
