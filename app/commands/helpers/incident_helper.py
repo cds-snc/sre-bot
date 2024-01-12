@@ -16,6 +16,9 @@ help_text = """
 \n `/sre incident roles`
 \n      - manages roles in an incident channel
 \n      - gérer les rôles dans un canal d'incident
+\n `/sre incident close`
+\n      - close the incident, archive the channel and update the incident spreadsheet and document 
+\n      - clôturer l'incident, archiver le canal et mettre à jour la feuille de calcul et le document de l'incident
 \n `/sre incident stale`
 \n      - lists all incidents older than 14 days with no activity
 \n      - lister tous les incidents plus vieux que 14 jours sans activité
@@ -38,6 +41,8 @@ def handle_incident_command(args, client, body, respond, ack):
             list_folders(client, body, ack)
         case "roles":
             manage_roles(client, body, ack, respond)
+        case "close":
+            close_incident(client, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case _:
@@ -267,6 +272,30 @@ def save_incident_roles(client, ack, view):
         channel=metadata["channel_id"],
     )
 
+
+def close_incident(client, body, ack, respond):
+    ack()
+    # get the current chanel
+    channel_id = body["channel"]["id"]
+
+    # update the incident document
+    
+    # update the spreadsheet with status "Closed
+    
+    # archive the channel 
+    client.conversations_archive(channel=channel_id)
+    
+    # update the document and the spreadsheet 
+    action = body["actions"][0]["value"]
+    user = body["user"]["id"]
+    if action == "ignore":
+        msg = f"<@{user}> has delayed archiving this channel for 14 days."
+        client.chat_update(
+            channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
+        )
+    elif action == "archive":
+        client.conversations_archive(channel=channel_id)
+    pass
 
 def stale_incidents(client, body, ack):
     ack()
