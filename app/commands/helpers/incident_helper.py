@@ -292,7 +292,6 @@ def stale_incidents(client, body, ack):
     )
 
     stale_channels = get_stale_channels(client)
-    print("stale_channels", stale_channels)
 
     blocks = {
         "type": "modal",
