@@ -37,8 +37,9 @@ def handle_incident_action_buttons(client, ack, body, logger):
             f"<@{user}> a pris connaissance et ignoré l'incident."
         )
         # if the last attachment is a preview from a link, switch the places of the last 2 attachments so that the incident buttons can be appended properly
-        if len(attachments) > 1 and attachments[-1]["app_unfurl_url"]:
-            attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
+        if len(attachments) > 1:
+            if "app_unfurl_url" in attachments[-1]:
+                attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
         attachments[-1] = {
             "color": "3AA3E3",
             "fallback": f"{msg}",
@@ -327,6 +328,9 @@ def submit(ack, view, say, body, client, logger):
 
     text = "Run `/sre incident roles` to assign roles to the incident"
     say(text=text, channel=channel_id)
+
+    # Announce how we can update the status of an incident
+    text = "Run `/sre incident status` to update the status of the incident and to close the incident"
 
 
 def generate_success_modal(body):
