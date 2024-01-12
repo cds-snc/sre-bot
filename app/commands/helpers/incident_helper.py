@@ -281,7 +281,7 @@ def stale_incidents(client, body, ack):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Loading stale incident list ...",
+                    "text": "Loading stale incident list ...(this may take a minute)",
                 },
             }
         ],
@@ -292,6 +292,7 @@ def stale_incidents(client, body, ack):
     )
 
     stale_channels = get_stale_channels(client)
+    print("stale_channels", stale_channels)
 
     blocks = {
         "type": "modal",

@@ -15,12 +15,48 @@ def test_get_incident_channels():
                 "name": "incident-2022-channel",
             },
         ],
+        "response_metadata": {"next_cursor": ""},
     }
     assert utils.get_incident_channels(client) == [
         {
             "name": "incident-2022-channel",
         },
     ]
+
+
+# Test get_incident_channels with multiple pages of results
+def test_get_incident_channels_with_multiple_pages():
+    client = MagicMock()
+
+    # Define mock responses
+    mock_response_page_1 = {
+        "ok": True,
+        "channels": [
+            {"name": "incident-2021-alpha"},
+            {"name": "general"},
+            {"name": "incident-2020-beta"},
+        ],
+        "response_metadata": {"next_cursor": "cursor123"},
+    }
+    mock_response_page_2 = {
+        "ok": True,
+        "channels": [{"name": "random"}, {"name": "incident-2022-gamma"}],
+        "response_metadata": {"next_cursor": ""},
+    }
+
+    # Set the side_effect of the conversations_list method
+    client.conversations_list.side_effect = [mock_response_page_1, mock_response_page_2]
+
+    # Call the function
+    result = utils.get_incident_channels(client)
+
+    # Verify results
+    expected_channels = [
+        {"name": "incident-2021-alpha"},
+        {"name": "incident-2020-beta"},
+        {"name": "incident-2022-gamma"},
+    ]
+    assert result == expected_channels
 
 
 def test_get_messages_in_time_period():
