@@ -281,7 +281,7 @@ def stale_incidents(client, body, ack):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "Loading stale incident list ...",
+                    "text": "Loading stale incident list ...(this may take a minute)",
                 },
             }
         ],
