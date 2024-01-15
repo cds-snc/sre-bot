@@ -291,6 +291,34 @@ def merge_data(file_id, name, product, slack_channel, on_call_names):
     return result
 
 
+# Update the incident document with status of "Closed"
+def close_incident_document(file_id):
+    # List of possible statuses to be replaced
+    possible_statuses = ["In Progress", "Open", "Ready to be Reviewed", "Reviewed"]
+
+    changes = {
+        "requests": [
+            {
+                "replaceAllText": {
+                    "containsText": {"text": f"Status: {status}", "matchCase": "true"},
+                    "replaceText": "Status: Closed",
+                }
+            }
+            for status in possible_statuses
+        ]
+    }
+    service = get_google_service("docs", "v1")
+    result = (
+        service.documents()
+        .batchUpdate(
+            documentId=file_id,
+            body=changes,
+        )
+        .execute()
+    )
+    return result
+
+
 def update_incident_list(document_link, name, slug, product, channel_url):
     service = get_google_service("sheets", "v4")
     list = [
@@ -317,3 +345,33 @@ def update_incident_list(document_link, name, slug, product, channel_url):
     )
 
     return result
+
+
+def update_spreadsheet_close_incident(channel_name):
+    # Read the data from the sheet
+    print("Channel name: ", channel_name)
+    service = get_google_service("sheets", "v4")
+    sheet_name = "Sheet1"
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(spreadsheetId=INCIDENT_LIST, range=sheet_name)
+        .execute()
+    )
+    values = result.get("values", [])
+    # Find the row with the search value
+    for i, row in enumerate(values):
+        if channel_name in row:
+            # Update the 4th column (index 3) of the found row
+            update_range = (
+                f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
+            )
+            body = {"values": [["Closed"]]}
+            service.spreadsheets().values().update(
+                spreadsheetId=INCIDENT_LIST,
+                range=update_range,
+                valueInputOption="USER_ENTERED",
+                body=body,
+            ).execute()
+            return True
+    return False

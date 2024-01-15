@@ -80,6 +80,17 @@ def test_create_new_google_doc_file(get_google_service_mock):
 
 
 @patch("integrations.google_drive.get_google_service")
+def test_update_incident_file(get_google_service_mock):
+    # test that incident doc's status is
+    get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
+        "id": "google_doc_id"
+    }
+    assert (
+        google_drive.create_new_docs_file("name", "parent_folder_id") == "google_doc_id"
+    )
+
+
+@patch("integrations.google_drive.get_google_service")
 def test_create_new_google_sheets_file(get_google_service_mock):
     # test that a new google sheets is successfully created
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
@@ -183,3 +194,33 @@ def test_update_incident_list(get_google_service_mock):
         )
         is True
     )
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_close_incident_document(get_google_service_mock):
+    # Define a mock response for the batchUpdate call
+    get_google_service_mock.return_value.documents.return_value.batchUpdate.return_value.execute.return_value = {
+        "status": "success"
+    }
+
+    # Assert that the function returns the correct response
+    assert google_drive.close_incident_document("file_id") == {"status": "success"}
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_update_spreadsheet(get_google_service_mock):
+    # Define a mock response for the get values call
+    mock_values = [
+        ["Channel A", "Detail 1", "Open"],
+        ["Channel B", "Detail 2", "In Progress"],
+        ["Channel C", "Detail 3", "Reviewed"],
+    ]
+    get_google_service_mock.return_value.spreadsheets.return_value.values.return_value.get.return_value.execute.return_value = {
+        "values": mock_values
+    }
+
+    # Define a channel name to search for
+    channel_name = "Channel B"
+
+    # assert that the function returns the correct response
+    assert google_drive.update_spreadsheet_close_incident(channel_name) is True
