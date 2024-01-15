@@ -108,10 +108,10 @@ def archive_channel_action(client, body, ack):
         client.chat_update(
             channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
         )
-        log_to_sentinel(f"incident_channel_archive_delayed: {body}")
+        log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         client.conversations_archive(channel=channel_id)
-        log_to_sentinel(f"incident_channel_archived: {body}")
+        log_to_sentinel("incident_channel_archived", body)
 
 
 def delete_folder_metadata(client, body, ack):
