@@ -215,6 +215,8 @@ def test_update_spreadsheet(get_google_service_mock):
         ["Channel B", "Detail 2", "In Progress"],
         ["Channel C", "Detail 3", "Reviewed"],
     ]
+
+    # get the return values from the mock
     get_google_service_mock.return_value.spreadsheets.return_value.values.return_value.get.return_value.execute.return_value = {
         "values": mock_values
     }

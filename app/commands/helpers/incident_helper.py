@@ -469,6 +469,7 @@ def extract_google_doc_id(url):
     # Regular expression pattern to match Google Docs ID
     pattern = r"/d/([a-zA-Z0-9_-]+)/"
 
+    # Search in the given text for all occurences of pattern
     match = re.search(pattern, url)
     if match:
         return match.group(1)
@@ -477,6 +478,7 @@ def extract_google_doc_id(url):
 
 
 def return_channel_name(input_str):
+    # return the channel name without the incident- prefix and appending a # to the channel name
     prefix = "incident-"
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]

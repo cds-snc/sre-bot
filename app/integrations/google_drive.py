@@ -296,6 +296,7 @@ def close_incident_document(file_id):
     # List of possible statuses to be replaced
     possible_statuses = ["In Progress", "Open", "Ready to be Reviewed", "Reviewed"]
 
+    # Replace all possible statuses with "Closed"
     changes = {
         "requests": [
             {
@@ -307,6 +308,7 @@ def close_incident_document(file_id):
             for status in possible_statuses
         ]
     }
+    # Execute the batchUpdate request
     service = get_google_service("docs", "v1")
     result = (
         service.documents()
@@ -348,8 +350,8 @@ def update_incident_list(document_link, name, slug, product, channel_url):
 
 
 def update_spreadsheet_close_incident(channel_name):
+    # Find the row in the spreadsheet with the channel_name and update it's status to Closed
     # Read the data from the sheet
-    print("Channel name: ", channel_name)
     service = get_google_service("sheets", "v4")
     sheet_name = "Sheet1"
     result = (

@@ -515,44 +515,44 @@ def test_conversations_archive_fail(
 
 
 def test_return_channel_name_with_prefix():
-    """Test the function with a string that includes the prefix."""
+    # Test the function with a string that includes the prefix.
     assert incident_helper.return_channel_name("incident-abc123") == "#abc123"
 
 
 def test_return_channel_name_without_prefix():
-    """Test the function with a string that does not include the prefix."""
+    # Test the function with a string that does not include the prefix.
     assert incident_helper.return_channel_name("general") == "general"
 
 
 def test_return_channel_name_empty_string():
-    """Test the function with an empty string."""
+    # Test the function with an empty string.
     assert incident_helper.return_channel_name("") == ""
 
 
 def test_return_channel_name_prefix_only():
-    """Test the function with a string that is only the prefix."""
+    # Test the function with a string that is only the prefix.
     assert incident_helper.return_channel_name("incident-") == "#"
 
 
 def test_extract_google_doc_id_valid_url():
-    """Test the function with a valid Google Docs URL."""
+    # Test the function with a valid Google Docs URL.
     url = "https://docs.google.com/document/d/1XWvE5s_OeB_12345/edit"
     assert incident_helper.extract_google_doc_id(url) == "1XWvE5s_OeB_12345"
 
 
 def test_extract_google_doc_id_invalid_url():
-    """Test the function with an invalid URL."""
+    # Test the function with an invalid URL.
     url = "https://www.example.com/page"
     assert incident_helper.extract_google_doc_id(url) is None
 
 
 def test_extract_google_doc_id_url_with_no_id():
-    """Test the function with a Google Docs URL that has no ID."""
+    # Test the function with a Google Docs URL that has no ID.
     url = "https://docs.google.com/document/d/"
     assert incident_helper.extract_google_doc_id(url) is None
 
 
 def test_extract_google_doc_id_empty_string():
-    """Test the function with an empty string."""
+    # Test the function with an empty string.
     url = ""
     assert incident_helper.extract_google_doc_id(url) is None
