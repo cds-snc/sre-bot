@@ -85,7 +85,8 @@ def test_add_folder_metadata():
     client.views_update.assert_called_once_with(view_id="bar", view=ANY)
 
 
-def test_archive_channel_action_ignore():
+@patch("commands.utils.log_to_sentinel")
+def test_archive_channel_action_ignore(mock_log_to_sentinel):
     client = MagicMock()
     body = {
         "actions": [{"value": "ignore"}],
@@ -102,9 +103,11 @@ def test_archive_channel_action_ignore():
         ts="message_ts",
         attachments=[],
     )
+    mock_log_to_sentinel.assert_called_once_with(f"incident_channel_archive_delayed: {body}")
 
 
-def test_archive_channel_action_archive():
+@patch("commands.utils.log_to_sentinel")
+def test_archive_channel_action_archive(mock_log_to_sentinel):
     client = MagicMock()
     body = {
         "actions": [{"value": "archive"}],
@@ -116,6 +119,7 @@ def test_archive_channel_action_archive():
     incident_helper.archive_channel_action(client, body, ack)
     ack.assert_called_once()
     client.conversations_archive(channel="channel_id")
+    mock_log_to_sentinel.assert_called_once_with(f"incident_channel_archived: {body}")
 
 
 @patch("commands.helpers.incident_helper.google_drive.delete_metadata")

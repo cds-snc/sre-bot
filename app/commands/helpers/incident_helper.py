@@ -1,7 +1,7 @@
 import json
 
 from integrations import google_drive
-from commands.utils import get_stale_channels
+from commands.utils import get_stale_channels, log_to_sentinel
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -108,8 +108,10 @@ def archive_channel_action(client, body, ack):
         client.chat_update(
             channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
         )
+        log_to_sentinel(f"incident_channel_archive_delayed: {body}")
     elif action == "archive":
         client.conversations_archive(channel=channel_id)
+        log_to_sentinel(f"incident_channel_archived: {body}")
 
 
 def delete_folder_metadata(client, body, ack):
