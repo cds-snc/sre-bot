@@ -1,5 +1,6 @@
 import json
 import re
+import logging
 from integrations import google_drive
 from commands.utils import get_stale_channels
 
@@ -290,6 +291,8 @@ def close_incident(client, body, ack):
     # Update the document status to "Closed" if we can get the document
     if document_id != "":
         google_drive.close_incident_document(document_id)
+    else:
+        logging.warning("No incident document found for this channel.")
 
     # Update the spreadsheet with the current incident with status = closed
     google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
