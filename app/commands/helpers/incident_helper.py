@@ -1,5 +1,6 @@
 import json
-
+import re
+import logging
 from integrations import google_drive
 from commands.utils import get_stale_channels, log_to_sentinel
 
@@ -16,6 +17,9 @@ help_text = """
 \n `/sre incident roles`
 \n      - manages roles in an incident channel
 \n      - gérer les rôles dans un canal d'incident
+\n `/sre incident close`
+\n      - close the incident, archive the channel and update the incident spreadsheet and document
+\n      - clôturer l'incident, archiver le canal et mettre à jour la feuille de calcul et le document de l'incident
 \n `/sre incident stale`
 \n      - lists all incidents older than 14 days with no activity
 \n      - lister tous les incidents plus vieux que 14 jours sans activité
@@ -38,6 +42,8 @@ def handle_incident_command(args, client, body, respond, ack):
             list_folders(client, body, ack)
         case "roles":
             manage_roles(client, body, ack, respond)
+        case "close":
+            close_incident(client, body, ack)
         case "stale":
             stale_incidents(client, body, ack)
         case _:
@@ -270,6 +276,33 @@ def save_incident_roles(client, ack, view):
     )
 
 
+def close_incident(client, body, ack):
+    ack()
+    # get the current chanel id and name
+    channel_id = body["channel_id"]
+    channel_name = body["channel_name"]
+
+    # get and update the incident document
+    document_id = ""
+    response = client.bookmarks_list(channel_id=channel_id)
+    if response["ok"]:
+        for item in range(len(response["bookmarks"])):
+            if response["bookmarks"][item]["title"] == "Incident report":
+                document_id = extract_google_doc_id(response["bookmarks"][item]["link"])
+
+    # Update the document status to "Closed" if we can get the document
+    if document_id != "":
+        google_drive.close_incident_document(document_id)
+    else:
+        logging.warning("No incident document found for this channel.")
+
+    # Update the spreadsheet with the current incident with status = closed
+    google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
+
+    # archive the channel
+    client.conversations_archive(channel=channel_id)
+
+
 def stale_incidents(client, body, ack):
     ack()
 
@@ -435,3 +468,23 @@ def metadata_items(folder):
             }
             for key, value in folder["appProperties"].items()
         ]
+
+
+def extract_google_doc_id(url):
+    # Regular expression pattern to match Google Docs ID
+    pattern = r"/d/([a-zA-Z0-9_-]+)/"
+
+    # Search in the given text for all occurences of pattern
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+
+def return_channel_name(input_str):
+    # return the channel name without the incident- prefix and appending a # to the channel name
+    prefix = "incident-"
+    if input_str.startswith(prefix):
+        return "#" + input_str[len(prefix) :]
+    return input_str
