@@ -55,7 +55,7 @@ def get_messages_in_time_period(client, channel_id, time_delta):
 
 
 def get_stale_channels(client):
-    STALE_PERIOD = timedelta(days=14)
+    STALE_PERIOD = timedelta(days=1)
     now = datetime.now()
     stale_channels = []
     channels = list(

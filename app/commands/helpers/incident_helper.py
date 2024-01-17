@@ -3,6 +3,7 @@ import re
 import logging
 from integrations import google_drive
 from commands.utils import get_stale_channels, log_to_sentinel
+from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -46,6 +47,8 @@ def handle_incident_command(args, client, body, respond, ack):
             close_incident(client, body, ack)
         case "stale":
             stale_incidents(client, body, ack)
+        case "notify":
+            notify_stale_incident_channels(client)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -116,7 +119,11 @@ def archive_channel_action(client, body, ack):
         )
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
-        client.conversations_archive(channel=channel_id)
+        # get the current chanel id and name and make up the body with those 2 values
+        body = {"channel_id": channel_id, "channel_name": body["channel"]["name"]}
+        # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
+        close_incident(client, body, ack)
+        # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
 
 
