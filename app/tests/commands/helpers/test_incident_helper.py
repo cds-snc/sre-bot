@@ -107,6 +107,7 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
         "incident_channel_archive_delayed", body
     )
 
+
 @patch("commands.helpers.incident_helper.google_drive.close_incident_document")
 @patch(
     "commands.helpers.incident_helper.google_drive.update_spreadsheet_close_incident"
@@ -116,7 +117,9 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     return_value="dummy_document_id",
 )
 @patch("commands.helpers.incident_helper.log_to_sentinel")
-def test_archive_channel_action_archive(mock_log_to_sentinel, mock_extract_id, mock_update_spreadsheet, mock_close_document):
+def test_archive_channel_action_archive(
+    mock_log_to_sentinel, mock_extract_id, mock_update_spreadsheet, mock_close_document
+):
     client = MagicMock()
     body = {
         "actions": [{"value": "archive"}],
@@ -128,11 +131,12 @@ def test_archive_channel_action_archive(mock_log_to_sentinel, mock_extract_id, m
     incident_helper.archive_channel_action(client, body, ack)
     assert ack.call_count == 2
     mock_log_to_sentinel.assert_called_once_with(
-    "incident_channel_archived", 
-    {
-        "channel_id": "channel_id", "channel_name": "incident-2024-01-12-test",
-    }
-)
+        "incident_channel_archived",
+        {
+            "channel_id": "channel_id",
+            "channel_name": "incident-2024-01-12-test",
+        },
+    )
 
 
 @patch("commands.helpers.incident_helper.google_drive.delete_metadata")

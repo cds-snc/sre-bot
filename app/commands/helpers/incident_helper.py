@@ -3,7 +3,6 @@ import re
 import logging
 from integrations import google_drive
 from commands.utils import get_stale_channels, log_to_sentinel
-from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -47,8 +46,6 @@ def handle_incident_command(args, client, body, respond, ack):
             close_incident(client, body, ack)
         case "stale":
             stale_incidents(client, body, ack)
-        case "notify":
-            notify_stale_incident_channels(client)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
