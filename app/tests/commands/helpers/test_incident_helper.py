@@ -130,13 +130,7 @@ def test_archive_channel_action_archive(
     ack = MagicMock()
     incident_helper.archive_channel_action(client, body, ack)
     assert ack.call_count == 2
-    mock_log_to_sentinel.assert_called_once_with(
-        "incident_channel_archived",
-        {
-            "channel_id": "channel_id",
-            "channel_name": "incident-2024-01-12-test",
-        },
-    )
+    mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
 
 
 @patch("commands.helpers.incident_helper.google_drive.delete_metadata")
