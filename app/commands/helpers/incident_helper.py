@@ -289,6 +289,15 @@ def close_incident(client, body, ack):
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
 
+    if not channel_name.startswith("incident-"):
+        user_id = body["user_id"]
+        client.chat_postEphemeral(
+            text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
+            channel=channel_id,
+            user=user_id,
+        )
+        return
+
     # get and update the incident document
     document_id = ""
     response = client.bookmarks_list(channel_id=channel_id)

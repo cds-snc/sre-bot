@@ -486,6 +486,35 @@ def test_close_incident_no_bookmarks(
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test")
 
 
+# Test that the channel that the command is ran in,  is not an incident channel.
+def test_close_incident_not_incident_channel():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+
+    # Mock the response of the private message to have been posted as expected
+    mock_client.chat_postEphemeral.return_value = {"ok": True}
+
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "user_id": "12345",
+            "channel_name": "some-other-channel",
+        },
+        mock_ack,
+    )
+
+    # Assert that ack was called
+    mock_ack.assert_called_once()
+
+    # Assert that the private message was posted as expected with the expected text
+    expected_text = "Channel some-other-channel is not an incident channel. Please use this command in an incident channel."
+    mock_client.chat_postEphemeral.assert_called_once_with(
+        channel="C12345", user="12345", text=expected_text
+    )
+
+
 @patch("commands.helpers.incident_helper.google_drive.close_incident_document")
 @patch(
     "commands.helpers.incident_helper.google_drive.update_spreadsheet_close_incident"
