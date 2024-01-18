@@ -117,9 +117,12 @@ def archive_channel_action(client, body, ack):
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         # get the current chanel id and name and make up the body with those 2 values
-        body = {"channel_id": channel_id, "channel_name": body["channel"]["name"]}
+        channel_info = {
+            "channel_id": channel_id,
+            "channel_name": body["channel"]["name"],
+        }
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        close_incident(client, body, ack)
+        close_incident(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
 

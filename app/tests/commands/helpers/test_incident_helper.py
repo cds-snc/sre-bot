@@ -108,19 +108,28 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     )
 
 
+@patch("commands.helpers.incident_helper.google_drive.close_incident_document")
+@patch(
+    "commands.helpers.incident_helper.google_drive.update_spreadsheet_close_incident"
+)
+@patch(
+    "commands.helpers.incident_helper.extract_google_doc_id",
+    return_value="dummy_document_id",
+)
 @patch("commands.helpers.incident_helper.log_to_sentinel")
-def test_archive_channel_action_archive(mock_log_to_sentinel):
+def test_archive_channel_action_archive(
+    mock_log_to_sentinel, mock_extract_id, mock_update_spreadsheet, mock_close_document
+):
     client = MagicMock()
     body = {
         "actions": [{"value": "archive"}],
-        "channel": {"id": "channel_id"},
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
         "message_ts": "message_ts",
         "user": {"id": "user_id"},
     }
     ack = MagicMock()
     incident_helper.archive_channel_action(client, body, ack)
-    ack.assert_called_once()
-    client.conversations_archive(channel="channel_id")
+    assert ack.call_count == 2
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
 
 
