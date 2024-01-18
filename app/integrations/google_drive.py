@@ -301,7 +301,7 @@ def close_incident_document(file_id):
         "requests": [
             {
                 "replaceAllText": {
-                    "containsText": {"text": f"Status: {status}", "matchCase": "true"},
+                    "containsText": {"text": f"Status: {status}", "matchCase": "false"},
                     "replaceText": "Status: Closed",
                 }
             }
