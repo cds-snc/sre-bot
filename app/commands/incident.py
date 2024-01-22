@@ -300,7 +300,7 @@ def submit(ack, view, say, body, client, logger):
     say(text=text, channel=channel_id)
 
     # Reminder to brief up
-    text = ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber."
+    text = ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber. This just means we should send a summary of the incident (or initial findings and updates if incident is ongoing) to cyberincident@cyber.gc.ca and CC zztbscybers@tbs-sct.gc.ca, and security@cds-snc.ca!"
     say(text=text, channel=channel_id)
 
     # Reminder to stop planned testing
