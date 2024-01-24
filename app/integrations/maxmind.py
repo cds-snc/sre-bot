@@ -1,3 +1,4 @@
+import logging
 import geoip2.database
 from geoip2.errors import AddressNotFoundError
 
@@ -16,3 +17,15 @@ def geolocate(ip):
         return "IP address not found"
     except ValueError:
         return "Invalid IP address"
+
+
+def healthcheck():
+    """Check if the bot can interact with Maxmind."""
+    healthy = False
+    try:
+        result = geolocate("8.8.8.8")
+        healthy = isinstance(result, tuple)
+        logging.info(f"Maxmind healthcheck result: {result}")
+    except Exception as error:
+        logging.error(f"Maxmind healthcheck failed: {error}")
+    return healthy

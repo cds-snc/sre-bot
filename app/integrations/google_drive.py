@@ -377,3 +377,15 @@ def update_spreadsheet_close_incident(channel_name):
             ).execute()
             return True
     return False
+
+
+def healthcheck():
+    """Check if the bot can interact with Google Drive."""
+    healthy = False
+    try:
+        metadata = list_metadata(INCIDENT_TEMPLATE)
+        healthy = "id" in metadata
+        logging.info(f"Google Drive healthcheck result: {metadata}")
+    except Exception as error:
+        logging.error(f"Google Drive healthcheck failed: {error}")
+    return healthy

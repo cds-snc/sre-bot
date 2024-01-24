@@ -24,20 +24,35 @@ def test_run_continuously(time_mock, threading_mock, schedule_mock):
     assert result == cease_continuous_run
 
 
+@patch("jobs.scheduled_tasks.google_drive")
+@patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
 @patch("jobs.scheduled_tasks.logging")
-def test_integration_healthchecks_healthy(mock_logging, mock_opsgenie):
+def test_integration_healthchecks_healthy(
+    mock_logging, mock_opsgenie, mock_maxmind, mock_google_drive
+):
+    mock_google_drive.healthcheck.return_value = True
+    mock_maxmind.healthcheck.return_value = True
     mock_opsgenie.healthcheck.return_value = True
     scheduled_tasks.integration_healthchecks()
+    assert mock_google_drive.healthcheck.call_count == 1
+    assert mock_maxmind.healthcheck.call_count == 1
     assert mock_opsgenie.healthcheck.call_count == 1
     assert mock_logging.error.call_count == 0
 
 
+@patch("jobs.scheduled_tasks.google_drive")
+@patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
 @patch("jobs.scheduled_tasks.logging")
-def test_integration_healthchecks_unhealthy(mock_logging, mock_opsgenie):
-    mock_opsgenie.healthcheck.return_value = False
-    mock_opsgenie.healthcheck.__name__ = "test_integration"
+def test_integration_healthchecks_unhealthy(
+    mock_logging, mock_opsgenie, mock_maxmind, mock_google_drive
+):
+    mock_google_drive.healthcheck.return_value = False
+    mock_maxmind.healthcheck.return_value = False
+    mock_opsgenie.healthcheck.return_value = True
     scheduled_tasks.integration_healthchecks()
+    assert mock_google_drive.healthcheck.call_count == 1
+    assert mock_maxmind.healthcheck.call_count == 1
     assert mock_opsgenie.healthcheck.call_count == 1
-    assert mock_logging.error.call_count == 1
+    assert mock_logging.error.call_count == 2
