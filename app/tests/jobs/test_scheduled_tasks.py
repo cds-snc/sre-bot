@@ -22,3 +22,22 @@ def test_run_continuously(time_mock, threading_mock, schedule_mock):
     threading_mock.Event.return_value = cease_continuous_run
     result = scheduled_tasks.run_continuously(interval=1)
     assert result == cease_continuous_run
+
+
+@patch("jobs.scheduled_tasks.opsgenie")
+@patch("jobs.scheduled_tasks.logging")
+def test_integration_healthchecks_healthy(mock_logging, mock_opsgenie):
+    mock_opsgenie.healthcheck.return_value = True
+    scheduled_tasks.integration_healthchecks()
+    assert mock_opsgenie.healthcheck.call_count == 1
+    assert mock_logging.error.call_count == 0
+
+
+@patch("jobs.scheduled_tasks.opsgenie")
+@patch("jobs.scheduled_tasks.logging")
+def test_integration_healthchecks_unhealthy(mock_logging, mock_opsgenie):
+    mock_opsgenie.healthcheck.return_value = False
+    mock_opsgenie.healthcheck.__name__ = "test_integration"
+    scheduled_tasks.integration_healthchecks()
+    assert mock_opsgenie.healthcheck.call_count == 1
+    assert mock_logging.error.call_count == 1

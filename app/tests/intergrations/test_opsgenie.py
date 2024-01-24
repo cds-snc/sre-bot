@@ -86,3 +86,21 @@ def test_api_post_request(urlopen_mock, request_mock):
         "GenieKey OPSGENIE_KEY",
     )
     urlopen_mock.assert_called_once_with(request_mock.return_value)
+
+
+@patch("integrations.opsgenie.api_get_request")
+def test_healthcheck_healthy(api_get_request_mock):
+    api_get_request_mock.return_value = '{"data": {"name": "test_user"}}'
+    assert opsgenie.healthcheck() is True
+
+
+@patch("integrations.opsgenie.api_get_request")
+def test_healthcheck_unhealthy(api_get_request_mock):
+    api_get_request_mock.return_value = '{"error": "failed"}'
+    assert opsgenie.healthcheck() is False
+
+
+@patch("integrations.opsgenie.api_get_request")
+def test_healthcheck_unhealthy_error(api_get_request_mock):
+    api_get_request_mock.return_value = "{]"
+    assert opsgenie.healthcheck() is False
