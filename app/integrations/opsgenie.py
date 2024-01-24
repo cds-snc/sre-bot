@@ -44,14 +44,14 @@ def create_alert(description):
 def healthcheck():
     """Check if the bot can interact with the Opsgenie API."""
     healthy = False
-    content = api_get_request(
-        "https://api.opsgenie.com/v2/account",
-        {"name": "GenieKey", "token": OPSGENIE_KEY},
-    )
     try:
+        content = api_get_request(
+            "https://api.opsgenie.com/v1/services",
+            {"name": "GenieKey", "token": OPSGENIE_KEY},
+        )
         result = json.loads(content)
-        logging.info(f"OpsGenie healthcheck result: {result}")
         healthy = "data" in result
+        logging.info(f"OpsGenie healthcheck result: {result}")
     except Exception as error:
         logging.error(f"OpsGenie healthcheck failed: {error}")
     return healthy

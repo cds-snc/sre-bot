@@ -28,10 +28,14 @@ def scheduler_heartbeat():
 
 def integration_healthchecks():
     logging.info("Running integration healthchecks ...")
-    healthchecks = [opsgenie.healthcheck]
-    for healthcheck in healthchecks:
+    healthchecks = {
+        "opsgenie": opsgenie.healthcheck,
+    }
+    for key, healthcheck in healthchecks.items():
         if not healthcheck():
-            logging.error(f"Integration {healthcheck.__name__} is unhealthy 💀")
+            logging.error(f"Integration {key} is unhealthy 💀")
+        else:
+            logging.info(f"Integration {key} is healthy 🌈")
 
 
 def run_continuously(interval=1):
