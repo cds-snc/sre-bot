@@ -5,6 +5,8 @@ import time
 import schedule
 import logging
 
+from integrations import opsgenie
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -17,10 +19,19 @@ def init(bot):
 
     schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(scheduler_heartbeat)
+    schedule.every(5).minutes.do(integration_healthchecks)
 
 
 def scheduler_heartbeat():
     logging.info("Scheduler is running at %s", time.ctime())
+
+
+def integration_healthchecks():
+    logging.info("Running integration healthchecks ...")
+    healthchecks = [opsgenie.healthcheck]
+    for healthcheck in healthchecks:
+        if not healthcheck():
+            logging.error(f"Integration {healthcheck.__name__} is unhealthy 💀")
 
 
 def run_continuously(interval=1):
