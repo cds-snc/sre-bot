@@ -31,3 +31,18 @@ def test_geolocate_not_found(geiop2_mock):
 def test_geolocate_invalid_ip(geiop2_mock):
     geiop2_mock.database.Reader().city.side_effect = ValueError
     assert maxmind.geolocate("test_ip") == "Invalid IP address"
+
+
+@patch("integrations.maxmind.geoip2")
+def test_healthcheck_healthy(geiop2_mock):
+    geiop2_mock.database.Reader().city.return_value.country.iso_code = "CA"
+    geiop2_mock.database.Reader().city.return_value.city.name = "test_city"
+    geiop2_mock.database.Reader().city.return_value.location.latitude = "test_lat"
+    geiop2_mock.database.Reader().city.return_value.location.longitude = "test_long"
+    assert maxmind.healthcheck() is True
+
+
+@patch("integrations.maxmind.geoip2")
+def test_healthcheck_unhealthy(geiop2_mock):
+    geiop2_mock.database.Reader().city.side_effect = ValueError
+    assert maxmind.healthcheck() is False

@@ -5,7 +5,7 @@ import time
 import schedule
 import logging
 
-from integrations import opsgenie
+from integrations import google_drive, maxmind, opsgenie
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +29,8 @@ def scheduler_heartbeat():
 def integration_healthchecks():
     logging.info("Running integration healthchecks ...")
     healthchecks = {
+        "google_drive": google_drive.healthcheck,
+        "maxmind": maxmind.healthcheck,
         "opsgenie": opsgenie.healthcheck,
     }
     for key, healthcheck in healthchecks.items():

@@ -226,3 +226,15 @@ def test_update_spreadsheet(get_google_service_mock):
 
     # assert that the function returns the correct response
     assert google_drive.update_spreadsheet_close_incident(channel_name) is True
+
+
+@patch("integrations.google_drive.list_metadata")
+def test_healthcheck_healthy(mock_list_metadata):
+    mock_list_metadata.return_value = {"id": "test_doc"}
+    assert google_drive.healthcheck() is True
+
+
+@patch("integrations.google_drive.list_metadata")
+def test_healthcheck_unhealthy(mock_list_metadata):
+    mock_list_metadata.return_value = None
+    assert google_drive.healthcheck() is False
