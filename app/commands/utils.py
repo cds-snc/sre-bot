@@ -2,6 +2,8 @@ import logging
 import time
 from datetime import datetime, timedelta
 from integrations.sentinel import send_event
+import re
+import pytz
 
 logging.basicConfig(level=logging.INFO)
 
@@ -124,3 +126,100 @@ def get_user_locale(user_id, client):
     if user_locale["ok"] and (user_locale["user"]["locale"] in supported_locales):
         return user_locale["user"]["locale"]
     return default_locale
+
+
+def rearrange_by_datetime_ascending(text):
+    # Split the text by lines
+    lines = text.split("\n")
+    print("lines", lines)
+
+    # Temporary storage for multiline entries
+    entries = []
+    current_entry = []
+
+    # Iterate over each line
+    for line in lines:
+        # Check if the line starts with a datetime format including 'EST'
+        if re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST", line):
+            if current_entry:
+                # Combine the lines in current_entry and add to entries
+                entries.append("\n".join(current_entry))
+                current_entry = [line]
+            else:
+                current_entry.append(line)
+        else:
+            # If not a datetime, it's a continuation of the previous message
+            current_entry.append(line)
+
+    # Add the last entry
+    if current_entry:
+        print("CUrr entry", current_entry)
+        if current_entry.__len__() > 1:
+            # that means we have a multiline entry
+            joined_current_entry = "\n".join(current_entry)
+            print("JOINED", joined_current_entry)
+            entries.append(joined_current_entry)
+        else:
+            entries.append("\n".join(current_entry))
+
+    print("entries", entries)
+    # Now extract date, time, and message from each entry
+    dated_entries = []
+    for entry in entries:
+        match = re.match(
+            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST):?[\s,]*(.*)", entry, re.DOTALL
+        )
+        if match:
+            date_str, msg = match.groups()
+            # Parse the datetime string (ignoring 'EST' for parsing)
+            dt = datetime.strptime(date_str[:-4].strip(), "%Y-%m-%d %H:%M:%S")
+            dated_entries.append((dt, msg))
+
+    # Sort the entries by datetime in ascending order
+    sorted_entries = sorted(dated_entries, key=lambda x: x[0], reverse=False)
+
+    print("Sorted enteries in sorting fucntion", sorted_entries)
+    # Reformat the entries back into strings, including 'EST'
+    sorted_text = "\n".join(
+        [
+            f"{entry[0].strftime('%Y-%m-%d %H:%M:%S')} EST {entry[1]}"
+            for entry in sorted_entries
+        ]
+    )
+
+    return sorted_text
+
+
+def convert_epoch_to_datetime_est(epoch_time):
+    """
+    Convert an epoch time to a standard date/time format in Eastern Standard Time (EST).
+
+    Args:
+    epoch_time (float): The epoch time.
+
+    Returns:
+    str: The corresponding date and time in the format YYYY-MM-DD HH:MM:SS EST.
+    """
+    # Define the Eastern Standard Timezone
+    est = pytz.timezone("US/Eastern")
+
+    # Convert epoch time to a datetime object in UTC
+    utc_datetime = datetime.utcfromtimestamp(float(epoch_time))
+
+    # Convert UTC datetime object to EST
+    est_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(est)
+
+    # Format the datetime object to a string in the desired format with 'EST' at the end
+    return est_datetime.strftime("%Y-%m-%d %H:%M:%S") + " EST"
+
+
+def extract_google_doc_id(url):
+    # Regular expression pattern to match Google Docs ID
+    pattern = r"/d/([a-zA-Z0-9_-]+)/"
+
+    # Search in the given text for all occurences of pattern
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    else:
+        return None

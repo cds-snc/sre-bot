@@ -69,6 +69,10 @@ def main(bot):
     bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
     bot.action("next_page")(webhook_helper.next_page)
 
+    # Handle event subscriptions
+    bot.event("reaction_added")(incident.handle_reaction_added)
+    bot.event("reaction_removed")(incident.handle_reaction_removed)
+
     SocketModeHandler(bot, APP_TOKEN).connect()
 
     # Run scheduled tasks if not in dev

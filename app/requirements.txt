@@ -16,6 +16,7 @@ PyJWT==2.8.0
 PyYAML!=6.0.0,!=5.4.0,!=5.4.1
 python-dotenv==0.21.1
 python-i18n==0.3.9
+pytz==2023.3.post1
 requests==2.31.0
 schedule==1.2.1
 slack-bolt==1.18.1

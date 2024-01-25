@@ -2,10 +2,21 @@ import os
 import re
 import datetime
 import i18n
+import logging
 
 from integrations import google_drive, opsgenie
 from models import webhooks
-from commands.utils import log_to_sentinel, get_user_locale
+from commands.utils import (
+    log_to_sentinel,
+    get_user_locale,
+    rearrange_by_datetime_ascending,
+    convert_epoch_to_datetime_est,
+    extract_google_doc_id,
+)
+from integrations.google_drive import (
+    get_timeline_section,
+    replace_text_between_headings,
+)
 
 from dotenv import load_dotenv
 
@@ -18,6 +29,8 @@ i18n.set("fallback", "en-US")
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
+START_HEADING = "Detailed Timeline"
+END_HEADING = "Trigger"
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
@@ -361,3 +374,178 @@ def generate_success_modal(body):
             },
         ],
     }
+
+
+def handle_reaction_added(client, ack, body, logger):
+    ack()
+    # get the channel in which the reaction was used
+    channel_id = body["event"]["item"]["channel"]
+    # Get the channel name which requires us to use the conversations_info API call
+    channel_name = client.conversations_info(channel=channel_id)["channel"]["name"]
+
+    # if the emoji added is a floppy disk emoji and we are in an incident channel, then add the message to the incident timeline
+    if body["event"]["reaction"] == "floppy_disk" and channel_name.startswith(
+        "incident-"
+    ):
+        # get the message from the conversation
+        try:
+            result = client.conversations_history(
+                channel=channel_id,
+                limit=1,
+                inclusive=True,
+                include_all_metadata=True,
+                oldest=body["event"]["item"]["ts"],
+            )
+            # get the actual message from the result. This is the text of the message
+            messages = result["messages"]
+
+            # if there are no messages, then the message is part of a thread, so obtain the message from the thread.
+            if messages.__len__() == 0:
+                # get the latest message from the thread
+                result = client.conversations_replies(
+                    channel=channel_id,
+                    ts=body["event"]["item"]["ts"],
+                    inclusive=True,
+                    include_all_metadata=True,
+                )
+                # get the message
+                messages = result["messages"]
+
+            # get the incident report document id from the incident channel
+            # get and update the incident document
+            document_id = ""
+            response = client.bookmarks_list(channel_id=channel_id)
+            if response["ok"]:
+                for item in range(len(response["bookmarks"])):
+                    if response["bookmarks"][item]["title"] == "Incident report":
+                        document_id = extract_google_doc_id(
+                            response["bookmarks"][item]["link"]
+                        )
+                        if document_id == "":
+                            logging.error(
+                                "No incident document found for this channel."
+                            )
+
+            for message in messages:
+                # convert the time which is now in epoch time to standard EST Time
+                message_date_time = convert_epoch_to_datetime_est(message["ts"])
+                # get the user name from the message
+                user = client.users_profile_get(user=message["user"])
+                # get the full name of the user so that we include it into the timeline
+                user_full_name = user["profile"]["real_name"]
+
+                # get the current timeline section content
+                content = get_timeline_section(document_id)
+
+                # if the message already exists in the timeline, then don't put it there again
+                if message_date_time not in content:
+                    # append the new message to the content
+                    content += (
+                        f"{message_date_time} {user_full_name}: {message['text']}"
+                    )
+
+                    # if there is an image in the message, then add it to the timeline
+                    if "files" in message:
+                        image = message["files"][0]["url_private"]
+                        content += f"\nImage: {image}"
+
+                    # sort all the message to be in ascending chronological order
+                    sorted_content = rearrange_by_datetime_ascending(content)
+
+                    # replace the content in the file with the new headings
+                    replace_text_between_headings(
+                        document_id, sorted_content, START_HEADING, END_HEADING
+                    )
+        except Exception as e:
+            logger.error(e)
+
+
+# Execute this function when a reaction was removed
+def handle_reaction_removed(client, ack, body, logger):
+    ack()
+    # get the channel id
+    channel_id = body["event"]["item"]["channel"]
+
+    # Get the channel name which requires us to use the conversations_info API call
+    result = client.conversations_info(channel=channel_id)
+    channel_name = result["channel"]["name"]
+
+    if body["event"]["reaction"] == "floppy_disk" and channel_name.startswith(
+        "incident-"
+    ):
+        try:
+            # Fetch the message that had the reaction removed
+            result = client.conversations_history(
+                channel=channel_id,
+                limit=1,
+                inclusive=True,
+                oldest=body["event"]["item"]["ts"],
+            )
+            # get the messages
+            messages = result["messages"]
+            # if the lenght is 0, then the message is part of a thread, so get the message from the thread
+            if messages.__len__() == 0:
+                # get thread messages
+                result = client.conversations_replies(
+                    channel=channel_id,
+                    ts=body["event"]["item"]["ts"],
+                    inclusive=True,
+                    include_all_metadata=True,
+                )
+                messages = result["messages"]
+            if not messages:
+                logging.warning("No messages found")
+                return
+            # get the message we want to delete
+            message = messages[0]
+
+            # convert the epoch time to standard EST day/time
+            message_date_time = convert_epoch_to_datetime_est(message["ts"])
+
+            # get the user of the person that send the message
+            user = client.users_profile_get(user=message["user"])
+            # get the user's full name
+            user_full_name = user["profile"]["real_name"]
+
+            # get the incident report document id from the incident channel
+            # get and update the incident document
+            document_id = ""
+            response = client.bookmarks_list(channel_id=channel_id)
+            if response["ok"]:
+                for item in range(len(response["bookmarks"])):
+                    if response["bookmarks"][item]["title"] == "Incident report":
+                        document_id = extract_google_doc_id(
+                            response["bookmarks"][item]["link"]
+                        )
+                        if document_id == "":
+                            logging.error(
+                                "No incident document found for this channel."
+                            )
+
+            # Retrieve the current content of the timeline
+            content = get_timeline_section(document_id)
+
+            # Construct the message to remove
+            message_to_remove = (
+                f"\n{message_date_time} {user_full_name}: {message['text']}\n"
+            )
+            # if there is a file in the message, then add it to the message to remove
+            if "files" in message:
+                image = message["files"][0]["url_private"]
+                message_to_remove += f"\nImage: {image}"
+
+            # Remove the message
+            if message_to_remove in content:
+                content = content.replace(message_to_remove, "")
+
+                # Update the timeline content
+                result = replace_text_between_headings(
+                    document_id,
+                    content,
+                    START_HEADING,
+                    END_HEADING,
+                )
+            else:
+                logging.warning("Message not found in the timeline")
+        except Exception as e:
+            logging.error(e)
