@@ -36,6 +36,10 @@ def test_main_invokes_socket_handler(
     mock_app.action.assert_any_call("archive_channel")
     mock_app.view.assert_any_call("view_save_incident_roles")
 
+    mock_app.command.assert_any_call("/secret")
+    mock_app.action.assert_any_call("secret_change_locale")
+    mock_app.view.assert_any_call("secret_view")
+
     mock_app.command.assert_any_call("/sre")
 
     mock_app.view.assert_any_call("create_webhooks_view")

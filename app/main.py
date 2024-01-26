@@ -5,7 +5,7 @@ from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import atip, aws, incident, sre, role
+from commands import atip, aws, incident, secret, sre, role
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -59,6 +59,11 @@ def main(bot):
     bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
     bot.action("archive_channel")(incident_helper.archive_channel_action)
     bot.view("view_save_incident_roles")(incident_helper.save_incident_roles)
+
+    # Register Secret command
+    bot.command(f"/{PREFIX}secret")(secret.secret_command)
+    bot.action("secret_change_locale")(secret.handle_change_locale_button)
+    bot.view("secret_view")(secret.secret_view_handler)
 
     # Register SRE events
     bot.command(f"/{PREFIX}sre")(sre.sre_command)
