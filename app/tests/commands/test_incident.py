@@ -877,23 +877,6 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
     mock_client.conversations_info.assert_called_once()
 
 
-def test_handle_reaction_added_non_floppy_disk_reaction():
-    logger = MagicMock()
-    mock_client = MagicMock()
-    body = {
-        "event": {
-            "reaction": "thumbs_up",
-            "item": {"channel": "C123456", "ts": "123456"},
-        }
-    }
-
-    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
-
-    # Assert that certain functions are not called when the reaction is not floppy_disk
-    mock_client.conversations_info.assert_called_once()
-    mock_client.conversations_history.assert_not_called()
-
-
 def test_handle_reaction_added_non_incident_channel():
     logger = MagicMock()
     mock_client = MagicMock()

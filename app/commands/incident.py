@@ -383,9 +383,7 @@ def handle_reaction_added(client, ack, body, logger):
     channel_name = client.conversations_info(channel=channel_id)["channel"]["name"]
 
     # if the emoji added is a floppy disk emoji and we are in an incident channel, then add the message to the incident timeline
-    if body["event"]["reaction"] == "floppy_disk" and channel_name.startswith(
-        "incident-"
-    ):
+    if channel_name.startswith("incident-"):
         # get the message from the conversation
         try:
             result = client.conversations_history(
@@ -467,9 +465,7 @@ def handle_reaction_removed(client, ack, body, logger):
     result = client.conversations_info(channel=channel_id)
     channel_name = result["channel"]["name"]
 
-    if body["event"]["reaction"] == "floppy_disk" and channel_name.startswith(
-        "incident-"
-    ):
+    if channel_name.startswith("incident-"):
         try:
             # Fetch the message that had the reaction removed
             result = client.conversations_history(

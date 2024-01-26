@@ -74,9 +74,17 @@ def main(bot):
     bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
     bot.action("next_page")(webhook_helper.next_page)
 
-    # Handle event subscriptions
-    bot.event("reaction_added")(incident.handle_reaction_added)
-    bot.event("reaction_removed")(incident.handle_reaction_removed)
+    # Handle event subscriptions when it matches floppy_disk
+    bot.event("reaction_added", matchers=[is_floppy_disk])(
+        incident.handle_reaction_added
+    )
+    bot.event("reaction_removed", matchers=[is_floppy_disk])(
+        incident.handle_reaction_removed
+    )
+
+    # For all other reaction events that are not floppy_disk, just ack the event
+    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
+    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 
@@ -99,3 +107,13 @@ bot = get_bot()
 if bot:
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
     server_app.add_event_handler("startup", partial(main, bot))
+
+
+# Make sure that we are listening only on floppy disk reaction
+def is_floppy_disk(event: dict) -> bool:
+    return event["reaction"] == "floppy_disk"
+
+
+# We need to ack all other reactions so that they don't get processed
+def just_ack_the_rest_of_reaction_events():
+    pass
