@@ -569,7 +569,7 @@ def test_replace_text_between_headings_neither_heading_not_found(mock_service):
     # Check if batchUpdate was not called as the start heading was not found
     assert not mock_service.return_value.documents().batchUpdate.called
 
-    
+
 @patch("integrations.google_drive.list_metadata")
 def test_healthcheck_healthy(mock_list_metadata):
     mock_list_metadata.return_value = {"id": "test_doc"}
@@ -580,4 +580,3 @@ def test_healthcheck_healthy(mock_list_metadata):
 def test_healthcheck_unhealthy(mock_list_metadata):
     mock_list_metadata.return_value = None
     assert google_drive.healthcheck() is False
-
