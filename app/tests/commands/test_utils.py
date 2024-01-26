@@ -1,7 +1,6 @@
 from commands import utils
 from datetime import timedelta
 from unittest.mock import ANY, MagicMock, patch
-import time
 
 
 def test_get_incident_channels():
@@ -183,16 +182,16 @@ def test_get_user_locale_without_locale():
     client.users_info.return_value = {"ok": False}
     assert utils.get_user_locale(user_id, client) == "en-US"
 
+
 def test_basic_functionality_rearrange_by_datetime_ascending():
     input_text = (
-        "2024-01-01 10:00:00 EST Message A\n"
-        "2024-01-02 11:00:00 EST Message B"
+        "2024-01-01 10:00:00 EST Message A\n" "2024-01-02 11:00:00 EST Message B"
     )
     expected_output = (
-        "2024-01-01 10:00:00 EST Message A\n"
-        "2024-01-02 11:00:00 EST Message B"
+        "2024-01-01 10:00:00 EST Message A\n" "2024-01-02 11:00:00 EST Message B"
     )
     assert utils.rearrange_by_datetime_ascending(input_text) == expected_output
+
 
 def test_multiline_entries_rearrange_by_datetime_ascending():
     input_text = (
@@ -205,46 +204,49 @@ def test_multiline_entries_rearrange_by_datetime_ascending():
     )
     assert utils.rearrange_by_datetime_ascending(input_text) == expected_output
 
+
 def test_entries_out_of_order_rearrange_by_datetime_ascending():
     input_text = (
-        "2024-01-02 11:00:00 EST Message B\n"
-        "2024-01-01 10:00:00 EST Message A"
+        "2024-01-02 11:00:00 EST Message B\n" "2024-01-01 10:00:00 EST Message A"
     )
     expected_output = (
-        "2024-01-01 10:00:00 EST Message A\n"
-        "2024-01-02 11:00:00 EST Message B"
+        "2024-01-01 10:00:00 EST Message A\n" "2024-01-02 11:00:00 EST Message B"
     )
     assert utils.rearrange_by_datetime_ascending(input_text) == expected_output
 
+
 def test_invalid_entries_rearrange_by_datetime_ascending():
-    input_text = (
-        "Invalid Entry\n"
-        "2024-01-01 10:00:00 EST Message A"
-    )
+    input_text = "Invalid Entry\n" "2024-01-01 10:00:00 EST Message A"
     expected_output = "2024-01-01 10:00:00 EST Message A"
     assert utils.rearrange_by_datetime_ascending(input_text) == expected_output
+
 
 def test_empty_input_rearrange_by_datetime_ascending():
     assert utils.rearrange_by_datetime_ascending("") == ""
 
+
 def test_no_datetime_entries_rearrange_by_datetime_ascending():
     input_text = "Message without datetime\nAnother message"
     assert utils.rearrange_by_datetime_ascending(input_text) == ""
-    
+
+
 def test_known_epoch_time():
     # Example: 0 epoch time corresponds to 1969-12-31 19:00:00 EST
     assert utils.convert_epoch_to_datetime_est(0) == "1969-12-31 19:00:00 EST"
+
 
 def test_daylight_saving_time_change():
     # Test with an epoch time known to fall in DST transition
     # For example, 1583652000 corresponds to 2020-03-08 03:20:00 EST
     assert utils.convert_epoch_to_datetime_est(1583652000) == "2020-03-08 03:20:00 EST"
 
+
 def test_current_epoch_time():
     time = MagicMock()
     time.return_value = 1609459200
     current_est = utils.convert_epoch_to_datetime_est(time)
     assert current_est == "1969-12-31 19:00:01 EST"
+
 
 def test_edge_cases():
     # Test with the epoch time at 0
@@ -257,20 +259,25 @@ def test_valid_google_docs_url():
     url = "https://docs.google.com/document/d/1aBcD_efGHI/edit"
     assert utils.extract_google_doc_id(url) == "1aBcD_efGHI"
 
+
 def test_google_docs_url_with_parameters():
     url = "https://docs.google.com/document/d/1aBcD_efGHI/edit?usp=sharing"
     assert utils.extract_google_doc_id(url) == "1aBcD_efGHI"
+
 
 def test_non_google_docs_url():
     url = "https://www.example.com/page/d/1aBcD_efGHI/other"
     assert utils.extract_google_doc_id(url) is None
 
+
 def test_invalid_url_format():
     url = "https://docs.google.com/document/1aBcD_efGHI"
     assert utils.extract_google_doc_id(url) is None
 
+
 def test_empty_string():
     assert utils.extract_google_doc_id("") is None
+
 
 def test_none_input():
     assert utils.extract_google_doc_id(None) is None

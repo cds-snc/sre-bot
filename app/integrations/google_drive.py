@@ -301,8 +301,10 @@ def get_timeline_section(document_id):
 
     timeline_content = ""
     record = False
+    found_start = False
+    found_end = False
 
-    # Iterate through the elements of the document in order to return the content between the headings (START_HEADING and END_HEADING)
+    # Iterate through the elements of the document
     for element in content:
         if "paragraph" in element:
             paragraph_elements = element.get("paragraph").get("elements")
@@ -310,16 +312,18 @@ def get_timeline_section(document_id):
                 text_run = elem.get("textRun")
                 if text_run:
                     text = text_run.get("content")
-                    if END_HEADING in text:
-                        record = False
-                        break
                     if START_HEADING in text:
                         record = True
-                        continue
-                    if record:
+                        found_start = True
+                    elif END_HEADING in text:
+                        found_end = True
+                        if found_start:
+                            return timeline_content
+                    elif record:
                         timeline_content += text
 
-    return timeline_content
+    # Return None if either START_HEADING or END_HEADING not found
+    return None if not (found_start and found_end) else timeline_content
 
 
 # Replace the text between the headings

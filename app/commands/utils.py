@@ -209,7 +209,6 @@ def convert_epoch_to_datetime_est(epoch_time):
 
 
 def extract_google_doc_id(url):
-
     # if the url is empty or None, then log an error
     if not url:
         logging.error("URL is empty or None")

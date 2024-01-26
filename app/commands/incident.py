@@ -2,7 +2,6 @@ import os
 import re
 import datetime
 import i18n
-import logging
 
 from integrations import google_drive, opsgenie
 from models import webhooks
@@ -422,9 +421,7 @@ def handle_reaction_added(client, ack, body, logger):
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":
-                            logging.error(
-                                "No incident document found for this channel."
-                            )
+                            logger.error("No incident document found for this channel.")
 
             for message in messages:
                 # convert the time which is now in epoch time to standard EST Time
@@ -494,7 +491,7 @@ def handle_reaction_removed(client, ack, body, logger):
                 )
                 messages = result["messages"]
             if not messages:
-                logging.warning("No messages found")
+                logger.warning("No messages found")
                 return
             # get the message we want to delete
             message = messages[0]
@@ -518,9 +515,7 @@ def handle_reaction_removed(client, ack, body, logger):
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":
-                            logging.error(
-                                "No incident document found for this channel."
-                            )
+                            logger.error("No incident document found for this channel.")
 
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
@@ -546,6 +541,7 @@ def handle_reaction_removed(client, ack, body, logger):
                     END_HEADING,
                 )
             else:
-                logging.warning("Message not found in the timeline")
+                logger.warning("Message not found in the timeline")
+                return
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
