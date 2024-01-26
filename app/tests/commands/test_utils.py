@@ -184,9 +184,7 @@ def test_get_user_locale_without_locale():
 
 
 def test_basic_functionality_rearrange_by_datetime_ascending():
-    input_text = (
-        "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
-    )
+    input_text = "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
     expected_output = (
         "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
     )
@@ -206,9 +204,7 @@ def test_multiline_entries_rearrange_by_datetime_ascending():
 
 
 def test_entries_out_of_order_rearrange_by_datetime_ascending():
-    input_text = (
-        "2024-01-02 11:00:00 ET Message B\n" "2024-01-01 10:00:00 ET Message A"
-    )
+    input_text = "2024-01-02 11:00:00 ET Message B\n" "2024-01-01 10:00:00 ET Message A"
     expected_output = (
         "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
     )
