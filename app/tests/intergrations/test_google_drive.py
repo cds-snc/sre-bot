@@ -226,3 +226,63 @@ def test_update_spreadsheet(get_google_service_mock):
 
     # assert that the function returns the correct response
     assert google_drive.update_spreadsheet_close_incident(channel_name) is True
+
+    
+# Constants for the test
+START_HEADING = "Detailed Timeline"
+END_HEADING = "Trigger"
+
+def create_document_content(paragraphs):
+    # Helper function to create document content in the expected format
+    content = []
+    for paragraph in paragraphs:
+        content.append({
+            "paragraph": {
+                "elements": [{
+                    "textRun": {
+                        "content": paragraph
+                    }
+                }]
+            }
+        })
+    return {"body": {"content": content}}
+
+@patch("integrations.google_drive.get_google_service")
+def test_document_with_timeline_section(mock_google_service):
+    # Mock the Google Docs API call
+    paragraphs = [START_HEADING, "Timeline Entry 1", END_HEADING]
+    mock_google_service.documents().get().execute.return_value = create_document_content(paragraphs)
+
+    assert google_drive.get_timeline_section("doc_id") == "Timeline Entry 1"
+
+@patch("integrations.google_drive.get_google_service")
+def test_document_without_timeline_section(mock_google_service):
+    # Test when the document doesn't contain the timeline section
+    paragraphs = ["Some Content", "More Content"]
+    mock_google_service.documents().get().execute.return_value = create_document_content(paragraphs)
+
+    assert google_drive.get_timeline_section("doc_id") == ""
+
+@patch("integrations.google_drive.get_google_service")
+def test_document_with_start_heading_only(mock_google_service):
+    # Test when the document contains only the start heading
+    paragraphs = [START_HEADING, "Timeline Entry 1"]
+    mock_google_service.documents().get().execute.return_value = create_document_content(paragraphs)
+
+    assert google_drive.get_timeline_section("doc_id") == "Timeline Entry 1"
+
+@patch("integrations.google_drive.get_google_service")
+def test_malformed_document(mock_google_service):
+    # Test with a malformed document structure
+    mock_google_service.documents().get().execute.return_value = {"body": {"content": None}}
+
+    assert google_drive.get_timeline_section("doc_id") == ""
+
+@patch("integrations.google_drive.get_google_service")
+def test_api_error_handling(mock_google_service):
+    # Test error handling during the API call
+    mock_google_service.documents().get().execute.side_effect = Exception("API error")
+
+    with pytest.raises(Exception):
+        google_drive.get_timeline_section("doc_id")
+

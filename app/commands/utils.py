@@ -131,7 +131,6 @@ def get_user_locale(user_id, client):
 def rearrange_by_datetime_ascending(text):
     # Split the text by lines
     lines = text.split("\n")
-    print("lines", lines)
 
     # Temporary storage for multiline entries
     entries = []
@@ -153,16 +152,13 @@ def rearrange_by_datetime_ascending(text):
 
     # Add the last entry
     if current_entry:
-        print("CUrr entry", current_entry)
         if current_entry.__len__() > 1:
             # that means we have a multiline entry
             joined_current_entry = "\n".join(current_entry)
-            print("JOINED", joined_current_entry)
             entries.append(joined_current_entry)
         else:
             entries.append("\n".join(current_entry))
 
-    print("entries", entries)
     # Now extract date, time, and message from each entry
     dated_entries = []
     for entry in entries:
@@ -178,7 +174,6 @@ def rearrange_by_datetime_ascending(text):
     # Sort the entries by datetime in ascending order
     sorted_entries = sorted(dated_entries, key=lambda x: x[0], reverse=False)
 
-    print("Sorted enteries in sorting fucntion", sorted_entries)
     # Reformat the entries back into strings, including 'EST'
     sorted_text = "\n".join(
         [
@@ -214,8 +209,14 @@ def convert_epoch_to_datetime_est(epoch_time):
 
 
 def extract_google_doc_id(url):
+
+    # if the url is empty or None, then log an error
+    if not url:
+        logging.error("URL is empty or None")
+        return None
+
     # Regular expression pattern to match Google Docs ID
-    pattern = r"/d/([a-zA-Z0-9_-]+)/"
+    pattern = r"https://docs.google.com/document/d/([a-zA-Z0-9_-]+)/"
 
     # Search in the given text for all occurences of pattern
     match = re.search(pattern, url)
