@@ -32,7 +32,7 @@ def secret_view_handler(ack, client, view, logger):
     endpoint = "https://encrypted-message.cdssandbox.xyz/encrypt"
     json = {"body": secret, "ttl": int(ttl) + int(time.time())}
     response = requests.post(
-        endpoint, json=json, headers={"Content-Type": "application/json"}
+        endpoint, json=json, timeout=10, headers={"Content-Type": "application/json"}
     )
 
     try:

@@ -78,6 +78,7 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
     mock_requests.post.assert_called_once_with(
         "https://encrypted-message.cdssandbox.xyz/encrypt",
         json={"body": "secret", "ttl": 1},
+        timeout=10,
         headers={"Content-Type": "application/json"},
     )
 
@@ -135,6 +136,7 @@ def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
     mock_requests.post.assert_called_once_with(
         "https://encrypted-message.cdssandbox.xyz/encrypt",
         json={"body": "secret", "ttl": 1},
+        timeout=10,
         headers={"Content-Type": "application/json"},
     )
 
