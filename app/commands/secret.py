@@ -21,7 +21,7 @@ def secret_command(client, ack, command, body):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-def secret_view_handler(ack, client, view):
+def secret_view_handler(ack, client, view, logger):
     ack()
     locale = view["blocks"][0]["elements"][0]["value"]
     i18n.set("locale", locale)
@@ -43,7 +43,8 @@ def secret_view_handler(ack, client, view):
             user=view["private_metadata"],
             text=f"{i18n.t('secret.link_available')} {url}",
         )
-    except:
+    except Exception as e:
+        logger.error(e)
         client.chat_postEphemeral(
             channel=view["private_metadata"],
             user=view["private_metadata"],

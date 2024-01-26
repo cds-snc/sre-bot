@@ -1,8 +1,6 @@
-import datetime
-
 from commands import secret
 
-from unittest.mock import call, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 @patch("commands.secret.generate_secret_command_modal_view")
@@ -38,6 +36,7 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
 def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
     ack = MagicMock()
     client = MagicMock()
+    logger = MagicMock()
     view = {
         "blocks": [
             {
@@ -71,7 +70,7 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
 
     mock_requests.post.return_value.json.return_value = {"id": "id"}
 
-    secret.secret_view_handler(ack, client, view)
+    secret.secret_view_handler(ack, client, view, logger)
 
     ack.assert_called_once_with()
 
@@ -94,6 +93,7 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
 def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
     ack = MagicMock()
     client = MagicMock()
+    logger = MagicMock()
     view = {
         "blocks": [
             {
@@ -127,7 +127,7 @@ def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
 
     mock_requests.post.return_value.json.return_value = {}
 
-    secret.secret_view_handler(ack, client, view)
+    secret.secret_view_handler(ack, client, view, logger)
 
     ack.assert_called_once_with()
 
