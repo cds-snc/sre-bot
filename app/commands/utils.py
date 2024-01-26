@@ -138,8 +138,8 @@ def rearrange_by_datetime_ascending(text):
 
     # Iterate over each line
     for line in lines:
-        # Check if the line starts with a datetime format including 'EST'
-        if re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST", line):
+        # Check if the line starts with a datetime format including 'ET'
+        if re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ET", line):
             if current_entry:
                 # Combine the lines in current_entry and add to entries
                 entries.append("\n".join(current_entry))
@@ -163,21 +163,21 @@ def rearrange_by_datetime_ascending(text):
     dated_entries = []
     for entry in entries:
         match = re.match(
-            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST):?[\s,]*(.*)", entry, re.DOTALL
+            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ET):?[\s,]*(.*)", entry, re.DOTALL
         )
         if match:
             date_str, msg = match.groups()
-            # Parse the datetime string (ignoring 'EST' for parsing)
-            dt = datetime.strptime(date_str[:-4].strip(), "%Y-%m-%d %H:%M:%S")
+            # Parse the datetime string (ignoring 'ET' for parsing)
+            dt = datetime.strptime(date_str[:-3].strip(), "%Y-%m-%d %H:%M:%S")
             dated_entries.append((dt, msg))
 
     # Sort the entries by datetime in ascending order
     sorted_entries = sorted(dated_entries, key=lambda x: x[0], reverse=False)
 
-    # Reformat the entries back into strings, including 'EST'
+    # Reformat the entries back into strings, including 'ET'
     sorted_text = "\n".join(
         [
-            f"{entry[0].strftime('%Y-%m-%d %H:%M:%S')} EST {entry[1]}"
+            f"{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET {entry[1]}"
             for entry in sorted_entries
         ]
     )
@@ -187,13 +187,13 @@ def rearrange_by_datetime_ascending(text):
 
 def convert_epoch_to_datetime_est(epoch_time):
     """
-    Convert an epoch time to a standard date/time format in Eastern Standard Time (EST).
+    Convert an epoch time to a standard date/time format in Eastern Standard Time (ET).
 
     Args:
     epoch_time (float): The epoch time.
 
     Returns:
-    str: The corresponding date and time in the format YYYY-MM-DD HH:MM:SS EST.
+    str: The corresponding date and time in the format YYYY-MM-DD HH:MM:SS ET.
     """
     # Define the Eastern Standard Timezone
     est = pytz.timezone("US/Eastern")
@@ -201,11 +201,11 @@ def convert_epoch_to_datetime_est(epoch_time):
     # Convert epoch time to a datetime object in UTC
     utc_datetime = datetime.utcfromtimestamp(float(epoch_time))
 
-    # Convert UTC datetime object to EST
+    # Convert UTC datetime object to ET
     est_datetime = utc_datetime.replace(tzinfo=pytz.utc).astimezone(est)
 
-    # Format the datetime object to a string in the desired format with 'EST' at the end
-    return est_datetime.strftime("%Y-%m-%d %H:%M:%S") + " EST"
+    # Format the datetime object to a string in the desired format with 'ET' at the end
+    return est_datetime.strftime("%Y-%m-%d %H:%M:%S") + " ET"
 
 
 def extract_google_doc_id(url):

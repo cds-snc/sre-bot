@@ -298,6 +298,7 @@ def get_timeline_section(document_id):
     service = get_google_service("docs", "v1")
     document = service.documents().get(documentId=document_id).execute()
     content = document.get("body").get("content")
+    print("In google, content is", content)
 
     timeline_content = ""
     record = False

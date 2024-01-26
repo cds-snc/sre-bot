@@ -386,27 +386,8 @@ def handle_reaction_added(client, ack, body, logger):
     if channel_name.startswith("incident-"):
         # get the message from the conversation
         try:
-            result = client.conversations_history(
-                channel=channel_id,
-                limit=1,
-                inclusive=True,
-                include_all_metadata=True,
-                oldest=body["event"]["item"]["ts"],
-            )
-            # get the actual message from the result. This is the text of the message
-            messages = result["messages"]
-
-            # if there are no messages, then the message is part of a thread, so obtain the message from the thread.
-            if messages.__len__() == 0:
-                # get the latest message from the thread
-                result = client.conversations_replies(
-                    channel=channel_id,
-                    ts=body["event"]["item"]["ts"],
-                    inclusive=True,
-                    include_all_metadata=True,
-                )
-                # get the message
-                messages = result["messages"]
+            # get the messages from the conversation and incident channel 
+            messages = return_messages(client, body, channel_id)
 
             # get the incident report document id from the incident channel
             # get and update the incident document
@@ -422,7 +403,7 @@ def handle_reaction_added(client, ack, body, logger):
                             logger.error("No incident document found for this channel.")
 
             for message in messages:
-                # convert the time which is now in epoch time to standard EST Time
+                # convert the time which is now in epoch time to standard ET Time
                 message_date_time = convert_epoch_to_datetime_est(message["ts"])
                 # get the user name from the message
                 user = client.users_profile_get(user=message["user"])
@@ -467,32 +448,15 @@ def handle_reaction_removed(client, ack, body, logger):
 
     if channel_name.startswith("incident-"):
         try:
-            # Fetch the message that had the reaction removed
-            result = client.conversations_history(
-                channel=channel_id,
-                limit=1,
-                inclusive=True,
-                oldest=body["event"]["item"]["ts"],
-            )
-            # get the messages
-            messages = result["messages"]
-            # if the lenght is 0, then the message is part of a thread, so get the message from the thread
-            if messages.__len__() == 0:
-                # get thread messages
-                result = client.conversations_replies(
-                    channel=channel_id,
-                    ts=body["event"]["item"]["ts"],
-                    inclusive=True,
-                    include_all_metadata=True,
-                )
-                messages = result["messages"]
+            messages = return_messages(client, body, channel_id)
+
             if not messages:
                 logger.warning("No messages found")
                 return
             # get the message we want to delete
             message = messages[0]
 
-            # convert the epoch time to standard EST day/time
+            # convert the epoch time to standard ET day/time
             message_date_time = convert_epoch_to_datetime_est(message["ts"])
 
             # get the user of the person that send the message
@@ -541,3 +505,27 @@ def handle_reaction_removed(client, ack, body, logger):
                 return
         except Exception as e:
             logger.error(e)
+
+# Function to return the messages from the conversation
+def return_messages(client, body, channel_id):
+    # Fetch the message that had the reaction removed
+    result = client.conversations_history(
+        channel=channel_id,
+        limit=1,
+        inclusive=True,
+        oldest=body["event"]["item"]["ts"],
+    )
+    # get the messages
+    messages = result["messages"]
+    # if the lenght is 0, then the message is part of a thread, so get the message from the thread
+    if messages.__len__() == 0:
+        # get thread messages
+        result = client.conversations_replies(
+            channel=channel_id,
+            ts=body["event"]["item"]["ts"],
+            inclusive=True,
+            include_all_metadata=True,
+        )
+        messages = result["messages"]
+    
+    return messages
