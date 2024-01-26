@@ -41,6 +41,22 @@ def create_alert(description):
         return "Could not issue alert to Opsgenie!"
 
 
+def healthcheck():
+    """Check if the bot can interact with the Opsgenie API."""
+    healthy = False
+    try:
+        content = api_get_request(
+            "https://api.opsgenie.com/v1/services",
+            {"name": "GenieKey", "token": OPSGENIE_KEY},
+        )
+        result = json.loads(content)
+        healthy = "data" in result
+        logging.info(f"OpsGenie healthcheck result: {result}")
+    except Exception as error:
+        logging.error(f"OpsGenie healthcheck failed: {error}")
+    return healthy
+
+
 def api_get_request(url, auth):
     req = Request(url)
     req.add_header("Authorization", f"{auth['name']} {auth['token']}")
