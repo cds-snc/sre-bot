@@ -386,7 +386,7 @@ def handle_reaction_added(client, ack, body, logger):
     if channel_name.startswith("incident-"):
         # get the message from the conversation
         try:
-            # get the messages from the conversation and incident channel 
+            # get the messages from the conversation and incident channel
             messages = return_messages(client, body, channel_id)
 
             # get the incident report document id from the incident channel
@@ -506,6 +506,7 @@ def handle_reaction_removed(client, ack, body, logger):
         except Exception as e:
             logger.error(e)
 
+
 # Function to return the messages from the conversation
 def return_messages(client, body, channel_id):
     # Fetch the message that had the reaction removed
@@ -527,5 +528,4 @@ def return_messages(client, body, channel_id):
             include_all_metadata=True,
         )
         messages = result["messages"]
-    
     return messages
