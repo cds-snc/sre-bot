@@ -298,7 +298,7 @@ def test_extract_timeline_content_with_text_between_heading(mock_service):
 
 
 @patch("integrations.google_drive.get_google_service")
-def test_no_headings(mock_service):
+def test_get_timeline_section_no_headings(mock_service):
     content = ["Some text", "Other text"]
     mock_document = create_mock_document(content)
     mock_service.return_value.documents().get().execute.return_value = mock_document
@@ -308,7 +308,7 @@ def test_no_headings(mock_service):
 
 
 @patch("integrations.google_drive.get_google_service")
-def test_missing_start_heading(mock_service):
+def test_get_timeline_section_missing_start_heading(mock_service):
     content = ["Some text", "Timeline content", END_HEADING, "Other text"]
     mock_document = create_mock_document(content)
     mock_service.return_value.documents().get().execute.return_value = mock_document
@@ -318,7 +318,7 @@ def test_missing_start_heading(mock_service):
 
 
 @patch("integrations.google_drive.get_google_service")
-def test_missing_end_heading(mock_service):
+def test_get_timeline_section_missing_end_heading(mock_service):
     content = ["Some text", START_HEADING, "Timeline content", "Other text"]
     mock_document = create_mock_document(content)
     mock_service.return_value.documents().get().execute.return_value = mock_document
@@ -328,7 +328,7 @@ def test_missing_end_heading(mock_service):
 
 
 @patch("integrations.google_drive.get_google_service")
-def test_empty_document(mock_service):
+def test_get_timeline_section_empty_document(mock_service):
     mock_document = create_mock_document([])
     mock_service.return_value.documents().get().execute.return_value = mock_document
 

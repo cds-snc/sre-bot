@@ -931,7 +931,7 @@ def test_handle_reaction_added_empty_message_list():
     mock_client.conversations_replies.assert_called_once()
 
 
-def test_test_handle_reaction_added_message_in_thread():
+def test_handle_reaction_added_message_in_thread():
     logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
@@ -953,7 +953,7 @@ def test_test_handle_reaction_added_message_in_thread():
     mock_client.conversations_replies.assert_called_once()
 
 
-def test_test_handle_reaction_added_incident_report_document_not_found():
+def test_handle_reaction_added_incident_report_document_not_found():
     logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
@@ -972,7 +972,7 @@ def test_test_handle_reaction_added_incident_report_document_not_found():
     mock_client.users_profile_get.assert_not_called()
 
 
-def test_adding_new_message_to_timeline():
+def test_handle_reaction_added_adding_new_message_to_timeline():
     logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
