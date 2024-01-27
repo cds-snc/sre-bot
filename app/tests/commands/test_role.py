@@ -302,7 +302,7 @@ def test_copy_files_to_internal_talent_folder(
                 "Recruitment Feedback - foo",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
-            )
+            ),
         ]
     )
 
