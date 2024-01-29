@@ -1,6 +1,7 @@
 import json
 
 from commands.helpers import incident_helper
+import logging
 
 
 from unittest.mock import ANY, MagicMock, patch
@@ -567,7 +568,10 @@ def test_conversations_archive_fail(
     }
 
     # Mock the response of client.conversations_archive to indicate failure
-    mock_client.conversations_archive.return_value = {"ok": False}
+    mock_client.conversations_archive.return_value = {
+        "ok": False,
+        "error": "not_in_channel",
+    }
 
     # Call close_incident
     incident_helper.close_incident(
@@ -583,6 +587,58 @@ def test_conversations_archive_fail(
 
     # Ensure that the client's conversations_archive method was called
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
+
+
+@patch("commands.helpers.incident_helper.google_drive.close_incident_document")
+@patch(
+    "commands.helpers.incident_helper.google_drive.update_spreadsheet_close_incident"
+)
+@patch(
+    "commands.helpers.incident_helper.extract_google_doc_id",
+    return_value="dummy_document_id",
+)
+def test_conversations_archive_fail_error_message(
+    mock_extract_id, mock_update_spreadsheet, mock_close_document, caplog
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    # Mock the response of client.bookmarks_list with a valid bookmark
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    # Mock the response of client.conversations_archive to indicate failure
+    mock_client.conversations_archive.return_value = {
+        "ok": True,
+        "error": "not_in_channel",
+    }
+
+    with caplog.at_level(logging.ERROR, logger="commands.helpers.incident_helper"):
+        # Call close_incident
+        incident_helper.close_incident(
+            mock_client,
+            {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+            mock_ack,
+        )
+
+    # Assertions
+    # Ensure that the Google Drive document update method was called even if archiving fails
+    mock_close_document.assert_called_once_with("dummy_document_id")
+    mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test")
+
+    # Ensure that the client's conversations_archive method was called
+    mock_client.conversations_archive.assert_called_once_with(channel="C12345")
+
+    assert (
+        "Could not archive the channel incident-2024-01-12-test - not_in_channel"
+        not in caplog.text
+    )
 
 
 def test_return_channel_name_with_prefix():
