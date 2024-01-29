@@ -13,6 +13,8 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
+START_HEADING = "Detailed Timeline"
+END_HEADING = "Trigger"
 
 PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
 
@@ -289,6 +291,125 @@ def merge_data(file_id, name, product, slack_channel, on_call_names):
         .execute()
     )
     return result
+
+
+def get_timeline_section(document_id):
+    # Retrieve the document
+    service = get_google_service("docs", "v1")
+    document = service.documents().get(documentId=document_id).execute()
+    content = document.get("body").get("content")
+    print("In google, content is", content)
+
+    timeline_content = ""
+    record = False
+    found_start = False
+    found_end = False
+
+    # Iterate through the elements of the document
+    for element in content:
+        if "paragraph" in element:
+            paragraph_elements = element.get("paragraph").get("elements")
+            for elem in paragraph_elements:
+                text_run = elem.get("textRun")
+                if text_run:
+                    text = text_run.get("content")
+                    if START_HEADING in text:
+                        record = True
+                        found_start = True
+                    elif END_HEADING in text:
+                        found_end = True
+                        if found_start:
+                            return timeline_content
+                    elif record:
+                        timeline_content += text
+
+    # Return None if either START_HEADING or END_HEADING not found
+    return None if not (found_start and found_end) else timeline_content
+
+
+# Replace the text between the headings
+def replace_text_between_headings(doc_id, new_content, start_heading, end_heading):
+    # Setup the service
+    service = get_google_service("docs", "v1")
+
+    # Retrieve the document content
+    document = service.documents().get(documentId=doc_id).execute()
+    content = document.get("body").get("content")
+
+    # Find the start and end indices
+    start_index = None
+    end_index = None
+    for element in content:
+        if "paragraph" in element:
+            paragraph = element.get("paragraph")
+            text_runs = paragraph.get("elements")
+            for text_run in text_runs:
+                text = text_run.get("textRun").get("content")
+                if start_heading in text:
+                    # Set start_index to the end of the start heading
+                    start_index = text_run.get("endIndex")
+                if end_heading in text and start_index is not None:
+                    # Set end_index to the start of the end heading
+                    end_index = text_run.get("startIndex")
+                    break
+
+    if start_index is not None and end_index is not None:
+        # Format new content with new lines for proper insertion
+        formatted_content = "\n" + new_content + "\n"
+        content_length = len(formatted_content)
+
+        # Perform the replacement
+        requests = [
+            {
+                "deleteContentRange": {
+                    "range": {"startIndex": start_index, "endIndex": end_index}
+                }
+            },
+            {
+                "insertText": {
+                    "location": {"index": start_index},
+                    "text": formatted_content,
+                }
+            },
+        ]
+        # Format the inserted text - we want to make sure that the font size is what we want
+        requests.append(
+            {
+                "updateTextStyle": {
+                    "range": {
+                        "startIndex": start_index,
+                        "endIndex": (
+                            start_index + content_length
+                        ),  # Adjust this index based on the length of the text
+                    },
+                    "textStyle": {
+                        "fontSize": {"magnitude": 11, "unit": "PT"},
+                        "bold": False,
+                    },
+                    "fields": "bold",
+                }
+            }
+        )
+        # Update paragraph style to be normal text
+        requests.append(
+            {
+                "updateParagraphStyle": {
+                    "range": {
+                        "startIndex": start_index + 1,
+                        "endIndex": (
+                            start_index + content_length
+                        ),  # Adjust this index based on the length of the text
+                    },
+                    "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                    "fields": "namedStyleType",
+                }
+            }
+        )
+        service.documents().batchUpdate(
+            documentId=doc_id, body={"requests": requests}
+        ).execute()
+    else:
+        logging.warning("Headings not found")
 
 
 # Update the incident document with status of "Closed"

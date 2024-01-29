@@ -5,6 +5,10 @@ from integrations import google_drive
 
 from unittest.mock import patch
 
+# Constants for the test
+START_HEADING = "Detailed Timeline"
+END_HEADING = "Trigger"
+
 
 @patch("integrations.google_drive.build")
 @patch("integrations.google_drive.pickle")
@@ -226,6 +230,344 @@ def test_update_spreadsheet(get_google_service_mock):
 
     # assert that the function returns the correct response
     assert google_drive.update_spreadsheet_close_incident(channel_name) is True
+
+
+def create_mock_document(content):
+    elements = [
+        {
+            "paragraph": {
+                "elements": [
+                    {"startIndex": 1, "endIndex": 200, "textRun": {"content": text}}
+                ]
+            }
+        }
+        for text in content
+    ]
+    return {"body": {"content": elements}}
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_extract_timeline_content(mock_service):
+    # Mock document content
+    content = [START_HEADING, "Timeline content", END_HEADING]
+    mock_document = create_mock_document(content)
+    print("Mock document is ", mock_document)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result == "Timeline content"
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_extract_timeline_content_with_text_before_heading(mock_service):
+    # Mock document content
+    content = ["Some text", START_HEADING, "Timeline content", END_HEADING]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result == "Timeline content"
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_extract_timeline_content_with_text_after_heading(mock_service):
+    # Mock document content
+    content = [START_HEADING, "Timeline content", END_HEADING, "Some text"]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result == "Timeline content"
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_extract_timeline_content_with_text_between_heading(mock_service):
+    # Mock document content
+    content = [
+        "Start of some text",
+        START_HEADING,
+        "Timeline content",
+        END_HEADING,
+        "End of some text",
+    ]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result == "Timeline content"
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_get_timeline_section_no_headings(mock_service):
+    content = ["Some text", "Other text"]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result is None
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_get_timeline_section_missing_start_heading(mock_service):
+    content = ["Some text", "Timeline content", END_HEADING, "Other text"]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result is None
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_get_timeline_section_missing_end_heading(mock_service):
+    content = ["Some text", START_HEADING, "Timeline content", "Other text"]
+    mock_document = create_mock_document(content)
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result is None
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_get_timeline_section_empty_document(mock_service):
+    mock_document = create_mock_document([])
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    result = google_drive.get_timeline_section("document_id")
+    assert result is None
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_replace_text_between_headings(mock_service):
+    doc_id = ""
+    # Mock document content
+    mock_document = {
+        "body": {
+            "content": [
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": START_HEADING, "endIndex": 20}}
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 40,
+                                    "startIndex": 20,
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": END_HEADING, "startIndex": 40}}
+                        ]
+                    }
+                },
+            ]
+        }
+    }
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+    mock_service.return_value.documents().batchUpdate().execute.return_value = {}
+
+    google_drive.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+    assert mock_service.return_value.documents().batchUpdate.called
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_replace_text_between_headings_more_text(mock_service):
+    doc_id = ""
+    # Mock document content
+    mock_document = {
+        "body": {
+            "content": [
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Blah blah",
+                                    "endIndex": 40,
+                                    "startIndex": 1,
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": START_HEADING, "endIndex": 45}}
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 60,
+                                    "startIndex": 50,
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": END_HEADING, "startIndex": 70}}
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 100,
+                                    "startIndex": 80,
+                                }
+                            }
+                        ]
+                    }
+                },
+            ]
+        }
+    }
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+    mock_service.return_value.documents().batchUpdate().execute.return_value = {}
+
+    google_drive.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+    assert mock_service.return_value.documents().batchUpdate.called
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_replace_text_between_headings_start_heading_not_found(mock_service):
+    doc_id = "mock_doc_id"
+
+    # Mock document content where start heading does not exist
+    mock_document = {
+        "body": {
+            "content": [
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 40,
+                                    "startIndex": 20,
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": END_HEADING, "startIndex": 40}}
+                        ]
+                    }
+                },
+            ]
+        }
+    }
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    google_drive.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+
+    # Check if batchUpdate was not called as the start heading was not found
+    assert not mock_service.return_value.documents().batchUpdate.called
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_replace_text_between_headings_end_heading_not_found(mock_service):
+    doc_id = "mock_doc_id"
+
+    # Mock document content where start heading does not exist
+    mock_document = {
+        "body": {
+            "content": [
+                {
+                    "paragraph": {
+                        "elements": [
+                            {"textRun": {"content": START_HEADING, "endIndex": 20}}
+                        ]
+                    }
+                },
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 40,
+                                    "startIndex": 20,
+                                }
+                            }
+                        ]
+                    }
+                },
+            ]
+        }
+    }
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    google_drive.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+
+    # Check if batchUpdate was not called as the start heading was not found
+    assert not mock_service.return_value.documents().batchUpdate.called
+
+
+@patch("integrations.google_drive.get_google_service")
+def test_replace_text_between_headings_neither_heading_not_found(mock_service):
+    doc_id = "mock_doc_id"
+
+    # Mock document content where start heading does not exist
+    mock_document = {
+        "body": {
+            "content": [
+                {
+                    "paragraph": {
+                        "elements": [
+                            {
+                                "textRun": {
+                                    "content": "Some old content",
+                                    "endIndex": 40,
+                                    "startIndex": 20,
+                                }
+                            }
+                        ]
+                    }
+                },
+            ]
+        }
+    }
+    mock_service.return_value.documents().get().execute.return_value = mock_document
+
+    google_drive.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+
+    # Check if batchUpdate was not called as the start heading was not found
+    assert not mock_service.return_value.documents().batchUpdate.called
 
 
 @patch("integrations.google_drive.list_metadata")

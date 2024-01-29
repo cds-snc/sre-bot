@@ -46,9 +46,28 @@ def test_main_invokes_socket_handler(
     mock_app.action.assert_any_call("toggle_webhook")
     mock_app.action.assert_any_call("reveal_webhook")
 
+    mock_app.event.assert_any_call("reaction_added")
+    mock_app.event.assert_any_call("reaction_removed")
+
     mock_socket_mode_handler.assert_called_once_with(
         mock_app, os.environ.get("APP_TOKEN")
     )
 
     mock_scheduled_tasks.init.assert_called_once_with(mock_app)
     mock_scheduled_tasks.run_continuously.assert_called_once_with()
+
+
+def test_is_floppy_disk_true():
+    # Test case where the reaction is 'floppy_disk'
+    event = {"reaction": "floppy_disk"}
+    assert (
+        main.is_floppy_disk(event) is True
+    ), "The function should return True for 'floppy_disk' reaction"
+
+
+def test_is_floppy_disk_false():
+    # Test case where the reaction is not 'floppy_disk'
+    event = {"reaction": "thumbs_up"}
+    assert (
+        main.is_floppy_disk(event) is False
+    ), "The function should return False for reactions other than 'floppy_disk'"

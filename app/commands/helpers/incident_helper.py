@@ -1,8 +1,7 @@
 import json
-import re
 import logging
 from integrations import google_drive
-from commands.utils import get_stale_channels, log_to_sentinel
+from commands.utils import get_stale_channels, log_to_sentinel, extract_google_doc_id
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -491,18 +490,6 @@ def metadata_items(folder):
             }
             for key, value in folder["appProperties"].items()
         ]
-
-
-def extract_google_doc_id(url):
-    # Regular expression pattern to match Google Docs ID
-    pattern = r"/d/([a-zA-Z0-9_-]+)/"
-
-    # Search in the given text for all occurences of pattern
-    match = re.search(pattern, url)
-    if match:
-        return match.group(1)
-    else:
-        return None
 
 
 def return_channel_name(input_str):

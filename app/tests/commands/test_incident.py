@@ -853,6 +853,229 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
+def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
+    logger = MagicMock()
+    mock_client = MagicMock()
+
+    # Set up mock client and body to simulate the scenario
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {
+        "messages": [{"ts": "123456", "user": "U123456"}]
+    }
+    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Assert the correct API calls were made
+    mock_client.conversations_info.assert_called_once()
+
+
+def test_handle_reaction_added_non_incident_channel():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "general"}}
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Assert that certain actions are not performed for a non-incident channel
+    mock_client.conversations_history.assert_not_called()
+
+
+def test_handle_reaction_added_empty_message_list():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {"messages": []}
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Assert that the function tries to fetch replies when the message list is empty
+    mock_client.conversations_replies.assert_called_once()
+
+
+def test_handle_reaction_added_message_in_thread():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {"messages": []}
+    mock_client.conversations_replies.return_value = {
+        "messages": [{"ts": "123456", "user": "U123456"}]
+    }
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Assert that the function fetches thread replies
+    mock_client.conversations_replies.assert_called_once()
+
+
+def test_handle_reaction_added_incident_report_document_not_found():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    # Simulate no incident report document found
+    mock_client.bookmarks_list.return_value = {"ok": True, "bookmarks": []}
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    mock_client.users_profile_get.assert_not_called()
+
+
+def test_handle_reaction_added_adding_new_message_to_timeline():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Make assertion that the function calls the correct functions
+    mock_client.conversations_history.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
+    mock_client.users_profile_get.assert_called_once()
+
+
+def test_handle_reaction_removed_successful_message_removal():
+    # Mock the client and logger
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
+    }
+    mock_client.get_timeline_section.return_value = "Sample test message"
+    mock_client.replace_text_between_headings.return_value = True
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
+
+    incident.handle_reaction_removed(mock_client, lambda: None, body, logger)
+    mock_client.conversations_history.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
+    mock_client.users_profile_get.assert_called_once()
+
+
+def test_handle_reaction_removed_message_not_in_timeline():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {
+        "messages": [{"ts": "123456", "user": "U123456"}]
+    }
+    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
+    }
+    mock_client.get_timeline_section.return_value = "Some existing content"
+    mock_client.replace_text_between_headings.return_value = False
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    assert (
+        incident.handle_reaction_removed(mock_client, lambda: None, body, logger)
+        is None
+    )
+
+
+def test_handle_reaction_removed_non_incident_channel_reaction_removal():
+    mock_client = MagicMock()
+
+    # Mock a non-incident channel
+    mock_client.conversations_info.return_value = {"channel": {"name": "general"}}
+
+    # Assert that the function does not proceed with reaction removal
+    mock_client.conversations_history.assert_not_called()
+
+
+def test_handle_reaction_removed_empty_message_list_handling():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_history.return_value = {"messages": []}
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+    assert (
+        incident.handle_reaction_removed(mock_client, lambda: None, body, logger)
+        is None
+    )
+
+
 def helper_options():
     return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
 
