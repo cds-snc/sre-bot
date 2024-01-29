@@ -414,7 +414,7 @@ def handle_reaction_added(client, ack, body, logger):
                 content = get_timeline_section(document_id)
 
                 # if the message already exists in the timeline, then don't put it there again
-                if message_date_time not in content:
+                if content and message_date_time not in content:
                     # append the new message to the content
                     content += (
                         f"{message_date_time} {user_full_name}: {message['text']}"
