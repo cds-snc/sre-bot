@@ -220,6 +220,17 @@ def role_view_handler(ack, body, say, logger, client):
     logger.info(
         f"Created document: SoMC Template in folder: SoMC Template / {somc_template_id}"
     )
+
+    recruitment_feedback_template_id = google_drive.copy_file_to_folder(
+        os.getenv("RECRUITMENT_FEEDBACK_TEMPLATE"),
+        f"Recruitment Feedback - {role_name}",
+        os.getenv("TEMPLATES_FOLDER"),
+        folder_id,
+    )
+    logger.info(
+        f"Created document: Recruitment Feedback Template in folder: Recruitment Feedback/ {recruitment_feedback_template_id}"
+    )
+
     # Create channel
     response = client.conversations_create(name=private_channel_name, is_private=True)
 

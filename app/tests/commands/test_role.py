@@ -297,6 +297,12 @@ def test_copy_files_to_internal_talent_folder(
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
             ),
+            call(
+                os.getenv("RECRUITMENT_FEEDBACK_TEMPLATE"),
+                "Recruitment Feedback - foo",
+                os.getenv("TEMPLATES_FOLDER"),
+                "folder_id",
+            ),
         ]
     )
 
