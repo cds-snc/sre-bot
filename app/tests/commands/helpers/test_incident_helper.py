@@ -486,6 +486,33 @@ def test_close_incident_no_bookmarks(
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test")
 
 
+@patch("commands.helpers.incident_helper.google_drive.close_incident_document")
+@patch(
+    "commands.helpers.incident_helper.google_drive.update_spreadsheet_close_incident"
+)
+@patch("commands.helpers.incident_helper.extract_google_doc_id", return_value=None)
+def test_close_incident_no_bookmarks_error(
+    mock_extract_id, mock_update_spreadsheet, mock_close_document
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+
+    # Mock client.bookmarks_list to return no bookmarks
+    mock_client.bookmarks_list.return_value = {"ok": False, "error": "not_in_channel"}
+
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+        mock_ack,
+    )
+
+    # Assertions to ensure that document update functions are not called as there are no bookmarks
+    mock_extract_id.assert_not_called()
+    mock_close_document.assert_not_called()
+    mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test")
+
+
 # Test that the channel that the command is ran in,  is not an incident channel.
 def test_close_incident_not_incident_channel():
     mock_client = MagicMock()

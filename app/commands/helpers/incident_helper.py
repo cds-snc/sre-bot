@@ -305,12 +305,19 @@ def close_incident(client, body, ack):
         for item in range(len(response["bookmarks"])):
             if response["bookmarks"][item]["title"] == "Incident report":
                 document_id = extract_google_doc_id(response["bookmarks"][item]["link"])
+    else:
+        logging.warning(
+            "No bookmark link for the incident document found for channel %s",
+            channel_name,
+        )
 
     # Update the document status to "Closed" if we can get the document
     if document_id != "":
         google_drive.close_incident_document(document_id)
     else:
-        logging.warning("No incident document found for this channel.")
+        logging.warning(
+            "Could not close the incident document - the document was not found."
+        )
 
     # Update the spreadsheet with the current incident with status = closed
     google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
