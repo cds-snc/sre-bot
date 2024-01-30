@@ -322,7 +322,13 @@ def close_incident(client, body, ack):
     google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
 
     # archive the channel
-    client.conversations_archive(channel=channel_id)
+    response = client.conversations_archive(channel=channel_id)
+
+    # if the response is not successful, then we have to log the message
+    if not response["ok"]:
+        logging.error(
+            "Could not archive the channel %s - %s", channel_name, response["error"]
+        )
 
 
 def stale_incidents(client, body, ack):
