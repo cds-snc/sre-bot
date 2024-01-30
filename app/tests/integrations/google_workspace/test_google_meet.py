@@ -1,5 +1,4 @@
 """Test google_meet.py functions."""
-git
 from unittest.mock import patch
 from integrations.google_workspace import google_meet
 
