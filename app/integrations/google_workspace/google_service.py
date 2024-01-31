@@ -1,17 +1,14 @@
 """Google Service Module."""
 import os
-import pickle
-import base64
 import logging
+import json
 
-from pickle import UnpicklingError
+from json import JSONDecodeError
 from dotenv import load_dotenv
-# from google.oauth2 import service_account
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 load_dotenv()
-
-PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
 
 
 def get_google_service(service, version):
@@ -26,28 +23,17 @@ def get_google_service(service, version):
         The authenticated Google service resource.
     """
 
-    creds = None
+    creds_json = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", False)
 
-    # # This is for local testing only
-    # # get the file service_account_file.json from the current folder
-    # service_account_file = os.path.join(
-    #     os.path.dirname(__file__), "service_account_file.json"
-    # )
-
-    # if not os.path.exists(service_account_file):
-    #     raise ValueError("Service account file not found")
-
-    # creds = service_account.Credentials.from_service_account_file(service_account_file)
-
-    if PICKLE_STRING is False:
-        raise ValueError("Pickle string not set")
+    if creds_json is False:
+        raise ValueError("Credentials JSON not set")
 
     try:
-        pickle_string = base64.b64decode(PICKLE_STRING)
-        # ignore Bandit complaint about insecure pickle
-        creds = pickle.loads(pickle_string)  # nosec
-    except UnpicklingError as pickle_read_exception:
-        logging.error("Error while loading pickle string: %s", pickle_read_exception)
-        raise UnpicklingError("Invalid pickle string") from pickle_read_exception
-
-    return build(service, version, credentials=creds)
+        creds_info = json.loads(creds_json)
+        creds = service_account.Credentials.from_service_account_info(creds_info)
+    except JSONDecodeError as json_decode_exception:
+        logging.error("Error while loading credentials JSON: %s", json_decode_exception)
+        raise JSONDecodeError(
+            msg="Invalid credentials JSON", doc="Credentials JSON", pos=0
+        ) from json_decode_exception
+    return build(service, version, credentials=creds, cache_discovery=False)
