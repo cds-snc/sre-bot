@@ -1,6 +1,6 @@
 import os
 
-from commands import utils
+from commands import utils, google_service
 
 from commands.helpers import geolocate_helper, incident_helper, webhook_helper
 
@@ -47,6 +47,8 @@ def sre_command(ack, command, logger, respond, client, body):
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
+        case "google-service":
+            google_service.google_service_command(client, body)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
