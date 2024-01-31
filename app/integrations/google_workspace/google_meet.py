@@ -20,7 +20,7 @@ def create_google_meet(title=None):
     # replace spaces with dashes
     title = title.replace(" ", "-")
     # remove any special characters
-    title = re.sub('[^0-9a-zA-Z]+', '-', title)
+    title = re.sub("[^0-9a-zA-Z]+", "-", title)
     title = title.strip("-")
 
     meeting_link = f"https://g.co/meet/{title}"

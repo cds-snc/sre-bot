@@ -60,7 +60,7 @@ def test_create_google_meet_with_title_special_characters():
 
 def test_create_google_meet_with_title_too_long_and_special_characters():
     """Test create_google_meet with a title that is too long
-      and has special characters."""
+    and has special characters."""
     title = (
         "Testing title that is much too long for google"
         " meet and it should be truncated !@#$%^&*()"
