@@ -1,7 +1,6 @@
 import json
 import pytest
 from unittest.mock import patch, MagicMock
-from google.oauth2 import service_account
 from integrations.google_workspace.google_service import get_google_service
 from json import JSONDecodeError
 

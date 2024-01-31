@@ -13,14 +13,14 @@ SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 def open_modal(client, body):
     folders = list_folders()
     folder_names = [i["name"] for i in folders]
-    blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": f"*{name}*"}} for name in folder_names]
+    blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": f"*{name}*"}}
+        for name in folder_names
+    ]
     view = {
         "type": "modal",
-        "title": {
-            "type": "plain_text",
-            "text": "Folder List"
-        },
-        "blocks": blocks
+        "title": {"type": "plain_text", "text": "Folder List"},
+        "blocks": blocks,
     }
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
