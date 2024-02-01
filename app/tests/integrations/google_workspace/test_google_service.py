@@ -66,7 +66,7 @@ def test_handle_google_api_errors_catches_http_error(capfd):
     assert result is None
     mock_func.assert_called_once()
     out, err = capfd.readouterr()
-    assert "An HTTP error occurred in function mock_func:" in out
+    assert "An HTTP error occurred in function 'mock_func':" in out
 
 
 def test_handle_google_api_errors_catches_error(capfd):
@@ -79,7 +79,7 @@ def test_handle_google_api_errors_catches_error(capfd):
     assert result is None
     mock_func.assert_called_once()
     out, err = capfd.readouterr()
-    assert "An error occurred in function mock_func:" in out
+    assert "An error occurred in function 'mock_func':" in out
 
 
 def test_handle_google_api_errors_passes_through_return_value():
