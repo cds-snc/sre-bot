@@ -26,11 +26,6 @@ def main(bot):
     APP_TOKEN = os.environ.get("APP_TOKEN")
     PREFIX = os.environ.get("PREFIX", "")
 
-    # Register Google Service command for dev purposes only
-    if os.getenv('PREFIX') == 'dev-':
-        bot.command(f"/{PREFIX}google-service")(google_service.google_service_command)
-        bot.view("google_service_view")(google_service.open_modal)
-
     # Register Roles commands
     bot.command(f"/{PREFIX}talent-role")(role.role_command)
     bot.view("role_view")(role.role_view_handler)
@@ -98,6 +93,11 @@ def main(bot):
         scheduled_tasks.init(bot)
         stop_run_continuously = scheduled_tasks.run_continuously()
         server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
+
+    # Register Google Service command for dev purposes only
+    if PREFIX == "dev-":
+        bot.command(f"/{PREFIX}google-service")(google_service.google_service_command)
+        bot.view("google_service_view")(google_service.open_modal)
 
 
 def get_bot():
