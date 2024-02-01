@@ -49,9 +49,9 @@ def sre_command(ack, command, logger, respond, client, body):
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
-        case "google-service":
+        case "google":
             if PREFIX == "dev-":
-                google_service.google_service_command(client, body)
+                google_service.google_service_command(client, body, respond)
             else:
                 respond("This command is only available in the dev environment.")
             return
