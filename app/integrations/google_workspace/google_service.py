@@ -68,10 +68,10 @@ def handle_google_api_errors(func):
         try:
             return func(*args, **kwargs)
         except HttpError as e:
-            print(f"An HTTP error occurred: {e}")
+            print(f"An HTTP error occurred in function {func.__name__}: {e}")
             return None
         except Error as e:
-            print(f"An error occurred: {e}")
+            print(f"An error occurred in function {func.__name__}: {e}")
             return None
 
     return wrapper
