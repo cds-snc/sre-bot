@@ -1,3 +1,4 @@
 {
     "python.pylintPath": "/usr/local/py-utils/bin/pylint",
+    "mypy-type-checker.cwd": "${workspaceFolder}/app",
 }
