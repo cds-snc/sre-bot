@@ -77,6 +77,25 @@ def delete_metadata(file_id, key):
 
 
 @handle_google_api_errors
+def list_metadata(file_id):
+    """List metadata of a file in Google Drive.
+
+    Args:
+        file_id (str): The file id of the file to list metadata from.
+
+    Returns:
+        dict: The file metadata.
+    """
+    service = get_google_service("drive", "v3")
+    result = (
+        service.files()
+        .get(fileId=file_id, fields="name, appProperties", supportsAllDrives=True)
+        .execute()
+    )
+    return result
+
+
+@handle_google_api_errors
 def create_folder(name, parent_folder):
     """Create a new folder in Google Drive.
 
@@ -203,6 +222,34 @@ def get_file_by_name(name, folder):
             q="trashed=false and name='{}'".format(name),
             driveId=folder,
             fields="files(appProperties, id, name)",
+        )
+        .execute()
+    )
+    return results.get("files", [])
+
+
+@handle_google_api_errors
+def list_folders_in_folder(folder):
+    """List all folders in a folder in Google Drive.
+
+    Args:
+        folder (str): The id of the folder to list.
+
+    Returns:
+        list: A list of folders in the folder.
+    """
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .list(
+            pageSize=25,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            corpora="user",
+            q="parents in '{}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false".format(
+                folder
+            ),
+            fields="nextPageToken, files(id, name)",
         )
         .execute()
     )

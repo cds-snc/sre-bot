@@ -36,6 +36,16 @@ def test_delete_metadata_returns_result(get_google_service_mock):
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
+def test_list_metadata_returns_result(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.get.return_value.execute.return_value = {
+        "name": "test_folder",
+        "appProperties": {"key": "value"},
+    }
+    result = google_drive.list_metadata("file_id")
+    assert result == {"name": "test_folder", "appProperties": {"key": "value"}}
+
+
+@patch("integrations.google_workspace.google_drive.get_google_service")
 def test_create_folder_returns_folder_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
         "id": "test_folder_id"
@@ -105,3 +115,13 @@ def test_copy_file_to_folder_returns_file_id(get_google_service_mock):
         )
         == "updated_file_id"
     )
+
+
+@patch("integrations.google_workspace.google_drive.get_google_service")
+def test_list_folders_returns_folder_names(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
+        "files": [{"name": "test_folder"}]
+    }
+    assert google_drive.list_folders_in_folder("parent_folder") == [{"name": "test_folder"}]
+
+
