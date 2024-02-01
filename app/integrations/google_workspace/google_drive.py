@@ -16,10 +16,14 @@ Functions:
     copy_file_to_folder(file_id: str, name: str, parent_folder_id: str, destination_folder_id: str) -> str:
         Copies a file to a new folder in Google Drive and returns the id of the new file.
 """
+import os
 from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
 )
+
+SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
+INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 
 
 @handle_google_api_errors
@@ -89,7 +93,7 @@ def list_metadata(file_id):
     service = get_google_service("drive", "v3")
     result = (
         service.files()
-        .get(fileId=file_id, fields="name, appProperties", supportsAllDrives=True)
+        .get(fileId=file_id, fields="id, name, appProperties", supportsAllDrives=True)
         .execute()
     )
     return result
@@ -293,3 +297,17 @@ def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
         .execute()
     )
     return updated_file["id"]
+
+
+@handle_google_api_errors
+def healthcheck():
+    """Check the health of the Google Drive API.
+
+    Returns:
+        bool: True if the API is healthy, False otherwise.
+    """
+    healthy = False
+    metadata = list_metadata(INCIDENT_TEMPLATE)
+    healthy = "id" in metadata
+
+    return healthy
