@@ -6,7 +6,7 @@ from integrations import google_drive
 from unittest.mock import patch
 
 # Constants for the test
-START_HEADING = "Detailed Timeline"
+START_HEADING = "DO NOT REMOVE this message as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
 
@@ -251,7 +251,6 @@ def test_extract_timeline_content(mock_service):
     # Mock document content
     content = [START_HEADING, "Timeline content", END_HEADING]
     mock_document = create_mock_document(content)
-    print("Mock document is ", mock_document)
     mock_service.return_value.documents().get().execute.return_value = mock_document
 
     result = google_drive.get_timeline_section("document_id")
