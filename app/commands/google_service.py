@@ -11,8 +11,9 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 
 
-def open_modal(client, body):
-    folders = list_folders()
+def open_modal(client, body, folders):
+    if not folders:
+        return
     folder_names = [i["name"] for i in folders]
     blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*{name}*"}}
@@ -26,9 +27,9 @@ def open_modal(client, body):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-def google_service_command(client, body):
-    open_modal(client, body)
-
-
-def list_folders():
-    return google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)
+def google_service_command(client, body, respond):
+    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)
+    if not folders:
+        respond("The folder ID is invalid. Please check the environment variables.")
+        return
+    open_modal(client, body, folders)
