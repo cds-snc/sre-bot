@@ -182,6 +182,34 @@ def create_new_file(name, folder, file_type):
 
 
 @handle_google_api_errors
+def get_file_by_name(name, folder):
+    """Get a file by name in Google Drive.
+
+    Args:
+        name (str): The name of the file to get.
+        folder (str): The id of the folder to search in.
+
+    Returns:
+        list: A list of files that match the name.
+    """
+    service = get_google_service("drive", "v3")
+    results = (
+        service.files()
+        .list(
+            pageSize=1,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+            corpora="drive",
+            q="trashed=false and name='{}'".format(name),
+            driveId=folder,
+            fields="files(appProperties, id, name)",
+        )
+        .execute()
+    )
+    return results.get("files", [])
+
+
+@handle_google_api_errors
 def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
     """Copy a file to a new folder in Google Drive.
 

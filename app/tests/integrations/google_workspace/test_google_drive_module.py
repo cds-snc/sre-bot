@@ -72,6 +72,26 @@ def test_create_new_file_from_template_returns_file_id(get_google_service_mock):
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
+def test_get_file_by_name_returns_object(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
+        "files": [
+            {
+                "name": "test_document",
+                "id": "test_document_id",
+                "appProperties": {},
+            },
+        ]
+    }
+    assert google_drive.get_file_by_name("test_file_name", "folder_id") == [
+        {
+            "name": "test_document",
+            "id": "test_document_id",
+            "appProperties": {},
+        }
+    ]
+
+
+@patch("integrations.google_workspace.google_drive.get_google_service")
 def test_copy_file_to_folder_returns_file_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.copy.return_value.execute.return_value = {
         "id": "file_id"
