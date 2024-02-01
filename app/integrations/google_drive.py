@@ -13,7 +13,7 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
-START_HEADING = "Detailed Timeline"
+START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
 PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
@@ -298,7 +298,6 @@ def get_timeline_section(document_id):
     service = get_google_service("docs", "v1")
     document = service.documents().get(documentId=document_id).execute()
     content = document.get("body").get("content")
-    print("In google, content is", content)
 
     timeline_content = ""
     record = False
@@ -354,8 +353,17 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                     break
 
     if start_index is not None and end_index is not None:
-        # Format new content with new lines for proper insertion
-        formatted_content = "\n" + new_content + "\n"
+        # Format new content with new lines for proper insertion. We need to make sure that the formatted string contains only one
+        # leading and trailing newline character
+        # Split the string into three parts: leading newlines, core content, and trailing newlines
+        leading_newlines = len(new_content) - len(new_content.lstrip("\n"))
+        trailing_newlines = len(new_content) - len(new_content.rstrip("\n"))
+        core_content = new_content[
+            leading_newlines : len(new_content) - trailing_newlines
+        ]
+
+        # Ensure only one newline at the start and one at the end, preserving internal newlines
+        formatted_content = "\n" + core_content + "\n"
         content_length = len(formatted_content)
 
         # Perform the replacement
@@ -395,7 +403,7 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
             {
                 "updateParagraphStyle": {
                     "range": {
-                        "startIndex": start_index + 1,
+                        "startIndex": start_index,
                         "endIndex": (
                             start_index + content_length
                         ),  # Adjust this index based on the length of the text

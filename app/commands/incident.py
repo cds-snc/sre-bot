@@ -28,7 +28,7 @@ i18n.set("fallback", "en-US")
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
-START_HEADING = "Detailed Timeline"
+START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
 
@@ -401,7 +401,6 @@ def handle_reaction_added(client, ack, body, logger):
                         )
                         if document_id == "":
                             logger.error("No incident document found for this channel.")
-
             for message in messages:
                 # convert the time which is now in epoch time to standard ET Time
                 message_date_time = convert_epoch_to_datetime_est(message["ts"])
@@ -476,7 +475,6 @@ def handle_reaction_removed(client, ack, body, logger):
                         )
                         if document_id == "":
                             logger.error("No incident document found for this channel.")
-
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
@@ -491,7 +489,7 @@ def handle_reaction_removed(client, ack, body, logger):
 
             # Remove the message
             if message_to_remove in content:
-                content = content.replace(message_to_remove, "")
+                content = content.replace(message_to_remove, "\n")
 
                 # Update the timeline content
                 result = replace_text_between_headings(
