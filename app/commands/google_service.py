@@ -9,6 +9,7 @@ load_dotenv()
 
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
+INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 
 
 def open_modal(client, body, folders):
@@ -28,6 +29,7 @@ def open_modal(client, body, folders):
 
 
 def google_service_command(client, body, respond):
+    respond(f"Healthcheck status: {google_drive.healthcheck()}")
     folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)
     if not folders:
         respond("The folder ID is invalid. Please check the environment variables.")
