@@ -1,14 +1,18 @@
+"""Unit Tests for the google_service module."""
 import json
-import pytest
 from unittest.mock import patch, MagicMock
-from integrations.google_workspace.google_service import get_google_service
 from json import JSONDecodeError
+import pytest
+from google.oauth2.service_account import Credentials
+from integrations.google_workspace.google_service import (
+    get_google_service,
+    handle_google_api_errors,
+)
+from googleapiclient.errors import HttpError, Error  # type: ignore
 
 
 @patch("integrations.google_workspace.google_service.build")
-@patch(
-    "integrations.google_workspace.google_service.service_account.Credentials.from_service_account_info"
-)
+@patch.object(Credentials, "from_service_account_info")
 def test_get_google_service_returns_build_object(credentials_mock, build_mock):
     """
     Test case to verify that the function returns a build object.
@@ -36,9 +40,7 @@ def test_get_google_service_raises_exception_if_credentials_json_not_set():
 
 
 @patch("integrations.google_workspace.google_service.build")
-@patch(
-    "integrations.google_workspace.google_service.service_account.Credentials.from_service_account_info"
-)
+@patch.object(Credentials, "from_service_account_info")
 def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
     credentials_mock, build_mock
 ):
@@ -50,3 +52,35 @@ def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
         with pytest.raises(JSONDecodeError) as e:
             get_google_service("drive", "v3")
         assert "Invalid credentials JSON" in str(e.value)
+
+
+def test_handle_google_api_errors_catches_http_error():
+    mock_resp = MagicMock()
+    mock_resp.status = "400"
+    mock_func = MagicMock(side_effect=HttpError(resp=mock_resp, content=b""))
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is None
+    mock_func.assert_called_once()
+
+
+def test_handle_google_api_errors_catches_error():
+    mock_func = MagicMock(side_effect=Error())
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is None
+    mock_func.assert_called_once()
+
+
+def test_handle_google_api_errors_passes_through_return_value():
+    mock_func = MagicMock(return_value="test")
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result == "test"
+    mock_func.assert_called_once()
