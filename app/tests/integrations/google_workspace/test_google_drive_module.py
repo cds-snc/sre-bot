@@ -122,6 +122,18 @@ def test_list_folders_returns_folder_names(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
         "files": [{"name": "test_folder"}]
     }
-    assert google_drive.list_folders_in_folder("parent_folder") == [{"name": "test_folder"}]
+    assert google_drive.list_folders_in_folder("parent_folder") == [
+        {"name": "test_folder"}
+    ]
 
 
+@patch("integrations.google_workspace.google_drive.list_metadata")
+def test_healthcheck_healthy(list_metadata_mock):
+    list_metadata_mock.return_value = {"id": "test_doc"}
+    assert google_drive.healthcheck() is True
+
+
+@patch("integrations.google_workspace.google_drive.list_metadata")
+def test_healthcheck_unhealthy(list_metadata_mock):
+    list_metadata_mock.return_value = None
+    assert google_drive.healthcheck() is False

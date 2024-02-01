@@ -308,6 +308,7 @@ def healthcheck():
     """
     healthy = False
     metadata = list_metadata(INCIDENT_TEMPLATE)
-    healthy = "id" in metadata
+    if metadata is not None:
+        healthy = "id" in metadata
 
     return healthy
