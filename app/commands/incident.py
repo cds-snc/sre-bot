@@ -401,7 +401,6 @@ def handle_reaction_added(client, ack, body, logger):
                         )
                         if document_id == "":
                             logger.error("No incident document found for this channel.")
-            
             for message in messages:
                 # convert the time which is now in epoch time to standard ET Time
                 message_date_time = convert_epoch_to_datetime_est(message["ts"])
@@ -476,7 +475,6 @@ def handle_reaction_removed(client, ack, body, logger):
                         )
                         if document_id == "":
                             logger.error("No incident document found for this channel.")
-                            
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
