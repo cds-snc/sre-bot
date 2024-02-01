@@ -6,7 +6,7 @@ from integrations import google_drive
 from unittest.mock import patch
 
 # Constants for the test
-START_HEADING = "DO NOT REMOVE this message as the SRE bot needs it as a placeholder."
+START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
 

@@ -13,7 +13,7 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
-START_HEADING = "DO NOT REMOVE this message as the SRE bot needs it as a placeholder."
+START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
 PICKLE_STRING = os.environ.get("PICKLE_STRING", False)
