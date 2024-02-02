@@ -21,6 +21,8 @@ help_text = """
 \n      - show the version of the SRE Bot
 \n      - montre la version du bot SRE"""
 
+PREFIX = os.environ.get("PREFIX", "")
+
 
 def sre_command(ack, command, logger, respond, client, body):
     ack()
@@ -47,8 +49,12 @@ def sre_command(ack, command, logger, respond, client, body):
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
-        case "google-service":
-            google_service.google_service_command(client, body)
+        case "google":
+            if PREFIX == "dev-":
+                google_service.google_service_command(client, body, respond)
+            else:
+                respond("This command is only available in the dev environment.")
+            return
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
