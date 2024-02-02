@@ -54,7 +54,7 @@ def test_create_folder_returns_folder_id(get_google_service_mock):
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
-def test_create_new_file_with_valid_type_returns_file_id(get_google_service_mock):
+def test_create_file_with_valid_type_returns_file_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
         "id": "test_document_id"
     }
@@ -62,15 +62,21 @@ def test_create_new_file_with_valid_type_returns_file_id(get_google_service_mock
     assert result == "test_document_id"
 
 
+@patch("logging.error")
 @patch("integrations.google_workspace.google_drive.get_google_service")
-def test_create_new_file_with_invalid_type_raises_value_error(get_google_service_mock):
-    with pytest.raises(ValueError) as e:
-        google_drive.create_file("test_document", "folder_id", "invalid_type")
-    assert "Invalid file_type: invalid_type" in str(e.value)
+def test_create_file_with_invalid_type_raises_value_error(
+    get_google_service_mock, mocked_logging_error
+):
+    result = google_drive.create_file("name", "folder", "invalid_file_type")
+
+    assert result is None
+    mocked_logging_error.assert_called_once_with(
+        "A ValueError occurred in function 'create_file': Invalid file_type: invalid_file_type"
+    )
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
-def test_create_new_file_from_template_returns_file_id(get_google_service_mock):
+def test_create_file_from_template_returns_file_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.copy.return_value.execute.return_value = {
         "id": "test_document_id"
     }
