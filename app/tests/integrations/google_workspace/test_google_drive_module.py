@@ -130,6 +130,18 @@ def test_list_folders_returns_folder_names(get_google_service_mock):
     ]
 
 
+@patch("integrations.google_workspace.google_drive.get_google_service")
+def test_list_folders_iterates_over_pages(get_google_service_mock):
+    get_google_service_mock.return_value.files.return_value.list.return_value.execute.side_effect = [
+        {"files": [{"name": "test_folder"}], "nextPageToken": "token"},
+        {"files": [{"name": "test_folder2"}]},
+    ]
+    assert google_drive.list_folders_in_folder("parent_folder") == [
+        {"name": "test_folder"},
+        {"name": "test_folder2"},
+    ]
+
+
 @patch("integrations.google_workspace.google_drive.list_metadata")
 def test_healthcheck_healthy(list_metadata_mock):
     list_metadata_mock.return_value = {"id": "test_doc"}
