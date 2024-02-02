@@ -4,10 +4,6 @@ from unittest.mock import patch
 
 import integrations.google_workspace.google_drive as google_drive
 
-# Constants for the test
-START_HEADING = "Detailed Timeline"
-END_HEADING = "Trigger"
-
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
 def test_add_metadata_returns_result(get_google_service_mock):
