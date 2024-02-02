@@ -1,7 +1,6 @@
 """Testing new google service (will be removed)"""
 import os
 
-# from integrations.google_workspace.google_service import get_google_service
 from integrations.google_workspace import google_drive
 from dotenv import load_dotenv
 
