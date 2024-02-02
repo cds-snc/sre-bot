@@ -12,7 +12,10 @@ Functions:
     get(document_id: str) -> dict:
         Gets a document from Google Docs and returns the document resource.
 """
-from integrations.google_workspace.google_service import (get_google_service, handle_google_api_errors)
+from integrations.google_workspace.google_service import (
+    get_google_service,
+    handle_google_api_errors,
+)
 
 
 @handle_google_api_errors
