@@ -41,8 +41,10 @@ def test_list_metadata_returns_result(get_google_service_mock):
         "name": "test_folder",
         "appProperties": {"key": "value"},
     }
-    result = google_drive.list_metadata("file_id")
-    assert result == {"name": "test_folder", "appProperties": {"key": "value"}}
+    assert google_drive.list_metadata("file_id") == {
+        "name": "test_folder",
+        "appProperties": {"key": "value"},
+    }
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
@@ -50,8 +52,9 @@ def test_create_folder_returns_folder_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
         "id": "test_folder_id"
     }
-    result = google_drive.create_folder("test_folder", "parent_folder")
-    assert result == "test_folder_id"
+    assert (
+        google_drive.create_folder("test_folder", "parent_folder") == "test_folder_id"
+    )
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
@@ -59,14 +62,14 @@ def test_create_new_file_with_valid_type_returns_file_id(get_google_service_mock
     get_google_service_mock.return_value.files.return_value.create.return_value.execute.return_value = {
         "id": "test_document_id"
     }
-    result = google_drive.create_new_file("test_document", "folder_id", "document")
+    result = google_drive.create_file("test_document", "folder_id", "document")
     assert result == "test_document_id"
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
 def test_create_new_file_with_invalid_type_raises_value_error(get_google_service_mock):
     with pytest.raises(ValueError) as e:
-        google_drive.create_new_file("test_document", "folder_id", "invalid_type")
+        google_drive.create_file("test_document", "folder_id", "invalid_type")
     assert "Invalid file_type: invalid_type" in str(e.value)
 
 
@@ -75,7 +78,7 @@ def test_create_new_file_from_template_returns_file_id(get_google_service_mock):
     get_google_service_mock.return_value.files.return_value.copy.return_value.execute.return_value = {
         "id": "test_document_id"
     }
-    result = google_drive.create_new_file_from_template(
+    result = google_drive.create_file_from_template(
         "test_document", "folder_id", "template_id"
     )
     assert result == "test_document_id"
