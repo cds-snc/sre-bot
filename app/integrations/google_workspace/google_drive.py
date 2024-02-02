@@ -278,11 +278,11 @@ def list_folders_in_folder(folder):
             )
             .execute()
         )
-        all_files.extend(results.get('files', []))
-        page_token = results.get('nextPageToken')
+        all_files.extend(results.get("files", []))
+        page_token = results.get("nextPageToken")
         if not page_token:
             break
-    return results.get("files", [])
+    return all_files
 
 
 @handle_google_api_errors
