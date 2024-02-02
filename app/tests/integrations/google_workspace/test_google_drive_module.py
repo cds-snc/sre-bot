@@ -1,5 +1,4 @@
 """Unit tests for google_drive module."""
-import pytest
 from unittest.mock import patch
 
 import integrations.google_workspace.google_drive as google_drive
