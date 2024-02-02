@@ -70,6 +70,9 @@ def handle_google_api_errors(func):
         except HttpError as e:
             logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
             return None
+        except ValueError as e:
+            logging.error(f"A ValueError occurred in function '{func.__name__}': {e}")
+            return None
         except Error as e:
             logging.error(f"An error occurred in function '{func.__name__}': {e}")
             return None
