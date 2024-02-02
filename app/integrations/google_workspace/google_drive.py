@@ -7,14 +7,32 @@ Functions:
     add_metadata(file_id: str, key: str, value: str) -> dict:
         Adds metadata to a file in Google Drive and returns the updated file metadata.
 
-    create_new_folder(name: str, parent_folder: str) -> str:
+    delete_metadata(file_id: str, key: str) -> dict:
+        Deletes metadata from a file in Google Drive and returns the updated file metadata.
+
+    list_metadata(file_id: str) -> dict:
+        Lists metadata of a file in Google Drive and returns the file metadata.
+
+    create_folder(name: str, parent_folder: str) -> str:
         Creates a new folder in Google Drive and returns the id of the new folder.
 
-    create_new_document_from_template(name: str, folder: str, template: str) -> str:
+    create_file_from_template(name: str, folder: str, template: str) -> str:
         Creates a new document in Google Drive from a template (Docs, Sheets, Slides, Forms, or Sites) and returns the id of the new document.
+
+    create_file(name: str, folder: str, file_type: str) -> str:
+        Creates a new file in Google Drive and returns the id of the new file.
+
+    get_file_by_name(name: str, folder: str) -> list:
+        Gets a file by name in Google Drive and returns a list of files that match the name.
+
+    list_folders_in_folder(folder: str) -> list:
+        Lists all folders in a folder in Google Drive and returns a list of folders in the folder.
 
     copy_file_to_folder(file_id: str, name: str, parent_folder_id: str, destination_folder_id: str) -> str:
         Copies a file to a new folder in Google Drive and returns the id of the new file.
+
+    healthcheck() -> bool:
+        Checks the health of the Google Drive API and returns True if the API is healthy, False otherwise.
 """
 import os
 from integrations.google_workspace.google_service import (
@@ -22,7 +40,6 @@ from integrations.google_workspace.google_service import (
     handle_google_api_errors,
 )
 
-SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 
 
@@ -131,7 +148,7 @@ def create_folder(name, parent_folder):
 
 
 @handle_google_api_errors
-def create_new_file_from_template(name, folder, template):
+def create_file_from_template(name, folder, template):
     """Create a new file in Google Drive from a template
      (Docs, Sheets, Slides, Forms, or Sites.)
 
@@ -159,7 +176,7 @@ def create_new_file_from_template(name, folder, template):
 
 
 @handle_google_api_errors
-def create_new_file(name, folder, file_type):
+def create_file(name, folder, file_type):
     """Create a new file in Google Drive.
         Options for 'file_type' are:
 
