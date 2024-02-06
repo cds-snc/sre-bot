@@ -277,3 +277,44 @@ def test_extract_googe_doc_id_empty_string():
 
 def test_extract_googe_doc_id_none_input():
     assert utils.extract_google_doc_id(None) is None
+
+
+def test_replace_user_id_with_valid_handle():
+    assert (
+        utils.replace_user_id_with_handle("@user", "Hello <@U12345>, how are you?")
+        == "Hello @user, how are you?"
+    )
+
+
+def test_replace_user_id_with_no_pattern_in_message():
+    assert (
+        utils.replace_user_id_with_handle("@user", "Hello user, how are you?")
+        == "Hello user, how are you?"
+    )
+
+
+def test_replace_user_id_with_empty_handle():
+    assert (
+        utils.replace_user_id_with_handle("", "Hello <@U12345>, how are you?") is None
+    )
+
+
+def test_replace_user_id_with_empty_message():
+    assert utils.replace_user_id_with_handle("@user", "") is None
+
+
+def test_replace_user_id_with_none_handle():
+    assert (
+        utils.replace_user_id_with_handle(None, "Hello <@U12345>, how are you?") is None
+    )
+
+
+def test_replace_user_id_with_none_message():
+    assert utils.replace_user_id_with_handle("@user", None) is None
+
+
+def test_replace_multiple_user_ids_in_message():
+    assert (
+        utils.replace_user_id_with_handle("@user", "Hi <@U12345>, meet <@U67890>")
+        == "Hi @user, meet @user"
+    )
