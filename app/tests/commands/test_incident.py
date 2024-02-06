@@ -985,12 +985,44 @@ def test_handle_reaction_added_adding_new_message_to_timeline():
     mock_client.users_profile_get.assert_called_once()
 
 
+def test_handle_reaction_added_adding_new_message_to_timeline_user_handle():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "<U123ABC456> says Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Make assertion that the function calls the correct functions
+    mock_client.conversations_history.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
+    mock_client.users_profile_get.assert_called_once()
+
+
 def test_handle_reaction_removed_successful_message_removal():
     # Mock the client and logger
     logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+    mock_client.users_profile_get.return_value = {
+        "profile": {"real_name": "John Doe", "display_name": "John"}
+    }
     mock_client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
@@ -1011,6 +1043,45 @@ def test_handle_reaction_removed_successful_message_removal():
                 "type": "message",
                 "user": "U123ABC456",
                 "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
+
+    incident.handle_reaction_removed(mock_client, lambda: None, body, logger)
+    mock_client.conversations_history.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
+    mock_client.users_profile_get.assert_called_once()
+
+
+def test_handle_reaction_removed_successful_message_removal_user_id():
+    # Mock the client and logger
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.users_profile_get.return_value = {
+        "profile": {"real_name": "John Doe", "display_name": "John"}
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
+    }
+    mock_client.get_timeline_section.return_value = "Sample test message"
+    mock_client.replace_text_between_headings.return_value = True
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "<U123ABC456> says Sample test message",
                 "ts": "1512085950.000216",
             }
         ],

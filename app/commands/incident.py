@@ -11,6 +11,7 @@ from commands.utils import (
     rearrange_by_datetime_ascending,
     convert_epoch_to_datetime_est,
     extract_google_doc_id,
+    replace_user_id_with_handle,
 )
 from integrations.google_drive import (
     get_timeline_section,
@@ -408,16 +409,17 @@ def handle_reaction_added(client, ack, body, logger):
                 user = client.users_profile_get(user=message["user"])
                 # get the full name of the user so that we include it into the timeline
                 user_full_name = user["profile"]["real_name"]
+                user_handle = "@" + user["profile"]["display_name"]
 
                 # get the current timeline section content
                 content = get_timeline_section(document_id)
 
+                message = replace_user_id_with_handle(user_handle, message["text"])
+
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
                     # append the new message to the content
-                    content += (
-                        f"{message_date_time} {user_full_name}: {message['text']}"
-                    )
+                    content += f"{message_date_time} {user_full_name}: {message}"
 
                     # if there is an image in the message, then add it to the timeline
                     if "files" in message:
@@ -462,6 +464,7 @@ def handle_reaction_removed(client, ack, body, logger):
             user = client.users_profile_get(user=message["user"])
             # get the user's full name
             user_full_name = user["profile"]["real_name"]
+            user_handle = "@" + user["profile"]["display_name"]
 
             # get the incident report document id from the incident channel
             # get and update the incident document
@@ -478,10 +481,10 @@ def handle_reaction_removed(client, ack, body, logger):
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
+            message = replace_user_id_with_handle(user_handle, message["text"])
+
             # Construct the message to remove
-            message_to_remove = (
-                f"\n{message_date_time} {user_full_name}: {message['text']}\n"
-            )
+            message_to_remove = f"\n{message_date_time} {user_full_name}: {message}\n"
             # if there is a file in the message, then add it to the message to remove
             if "files" in message:
                 image = message["files"][0]["url_private"]
