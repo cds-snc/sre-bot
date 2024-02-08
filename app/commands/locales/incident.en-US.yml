@@ -13,3 +13,7 @@ en-US:
     product: "Select a product"
     success: "Incident successfully created"
     user_added: "You have been added to the incident's conversation."
+    next_steps: "Wait! What's next?"
+    next_steps_instructions: "Ask yourself these questions:"
+    brief_up: ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber. This just means we send a summary of the incident (or initial findings and updates if incident is ongoing) to cyberincident@cyber.gc.ca and CC zztbscybers@tbs-sct.gc.ca, and security@cds-snc.ca! CCCS will reach out with a case number, and any questions if they need more information."
+    planned_testing: ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
