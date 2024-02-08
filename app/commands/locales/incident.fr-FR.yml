@@ -12,7 +12,7 @@ fr-FR:
     description: "Courte description (ex: trop d'erreurs 500)"
     product: "Choisissez un produit"
     success: "Incident créé avec succès"
-    user_added: "Vous avez ajouté à la discussion de cet incident:"
+    user_added: "Vous avez ajouté à la discussion de cet incident:\n"
     next_steps: "Attendez! Que faire ensuite?"
     next_steps_instructions: "Posez-vous ces questions:"
     brief_up: "S'agit-il d'un `incident de cybersécurité` (fuite de secrets/données, compromission de comptes, attaque) ?\nVeuillez lancer le processus de briefing pour le CCCS et l'OCIO Cyber du SCT.\nCela signifie que nous envoyons un résumé de l'incident (ou les premières conclusions et mises à jour si l'incident est en cours) à cyberincident@cyber.gc.ca et au CC zztbscybers@tbs-sct.gc.ca, et security@cds-snc.ca ! Le CCCS communiquera un numéro de dossier et posera des questions s'il a besoin de plus d'informations."
