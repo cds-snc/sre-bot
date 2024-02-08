@@ -1,3 +1,4 @@
+import os
 import i18n
 import requests
 import time
@@ -7,6 +8,14 @@ i18n.load_path.append("./commands/locales/")
 
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
+
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}secret")(secret_command)
+    bot.action("secret_change_locale")(handle_change_locale_button)
+    bot.view("secret_view")(secret_view_handler)
 
 
 def secret_command(client, ack, command, body):

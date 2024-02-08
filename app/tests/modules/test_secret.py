@@ -1,10 +1,10 @@
-from commands import secret
+from modules.secret import secret
 
 from unittest.mock import MagicMock, patch
 
 
-@patch("commands.secret.generate_secret_command_modal_view")
-@patch("commands.secret.get_user_locale")
+@patch("modules.secret.secret.generate_secret_command_modal_view")
+@patch("modules.secret.secret.get_user_locale")
 def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal_view):
     client = MagicMock()
     ack = MagicMock()
@@ -31,8 +31,8 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
     )
 
 
-@patch("commands.secret.requests")
-@patch("commands.secret.time")
+@patch("modules.secret.secret.requests")
+@patch("modules.secret.secret.time")
 def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
     ack = MagicMock()
     client = MagicMock()
@@ -89,8 +89,8 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
     )
 
 
-@patch("commands.secret.requests")
-@patch("commands.secret.time")
+@patch("modules.secret.secret.requests")
+@patch("modules.secret.secret.time")
 def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
     ack = MagicMock()
     client = MagicMock()
@@ -147,7 +147,7 @@ def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
     )
 
 
-@patch("commands.secret.generate_secret_command_modal_view")
+@patch("modules.secret.secret.generate_secret_command_modal_view")
 def test_handle_change_locale_button(mock_generate_secret_command_modal_view):
     ack = MagicMock()
     client = MagicMock()
