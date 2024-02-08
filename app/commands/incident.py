@@ -311,14 +311,6 @@ def submit(ack, view, say, body, client, logger):
     text = f":lapage: An incident report has been created at: {document_link}"
     say(text=text, channel=channel_id)
 
-    # # Reminder to brief up
-    # text = ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber. This just means we send a summary of the incident (or initial findings and updates if incident is ongoing) to cyberincident@cyber.gc.ca and CC zztbscybers@tbs-sct.gc.ca, and security@cds-snc.ca! CCCS will reach out with a case number, and any questions if they need more information."
-    # say(text=text, channel=channel_id)
-
-    # # Reminder to stop planned testing
-    # text = ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
-    # say(text=text, channel=channel_id)
-
     # Gather all user IDs in a list to ensure uniqueness
     users_to_invite = []
 
