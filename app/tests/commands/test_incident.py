@@ -449,7 +449,7 @@ def test_incident_submit_calls_ack(
 @patch("commands.incident.google_drive.create_new_incident")
 @patch("commands.incident.google_drive.list_metadata")
 @patch("commands.incident.log_to_sentinel")
-def test_incident_submit_calls_ack_with_response_action(
+def test_incident_submit_calls_views_open(
     _log_to_sentinel_mock,
     _mock_list_metadata,
     _mock_create_new_incident,
@@ -464,10 +464,8 @@ def test_incident_submit_calls_ack_with_response_action(
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
     incident.submit(ack, view, say, body, client, logger)
-    ack.assert_called_once_with(
-        response_action="update",
-        view=_mock_generate_success_modal(body),
-    )
+    ack.assert_called_once()
+    client.views_open.assert_called_once()
 
 
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
@@ -550,8 +548,9 @@ def test_incident_submit_adds_creator_to_channel(
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
-    body = {"user": {"id": "creator_user_id"}, "view": view}
+    body = {"user": {"id": "creator_user_id"}, "view": view, "trigger_id": "trigger_id"}
     client = MagicMock()
+    client.views_open.return_value = {"view": view}
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
