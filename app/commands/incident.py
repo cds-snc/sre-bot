@@ -204,10 +204,7 @@ def handle_change_locale_button(ack, client, body):
 
 
 def submit(ack, view, say, body, client, logger):
-    ack(
-        response_action="update",
-        view=generate_success_modal(body),
-    )
+    ack()
 
     errors = {}
 
@@ -251,7 +248,9 @@ def submit(ack, view, say, body, client, logger):
     channel_name = response["channel"]["name"]
     logger.info(f"Created conversation: {channel_name}")
 
-    channel_id = response["channel"]["id"]
+    view = generate_success_modal(body, channel_id, channel_name)
+    client.views_open(trigger_id=body["trigger_id"], view=view)
+
     channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
 
     # Set topic
@@ -312,14 +311,6 @@ def submit(ack, view, say, body, client, logger):
     text = f":lapage: An incident report has been created at: {document_link}"
     say(text=text, channel=channel_id)
 
-    # Reminder to brief up
-    text = ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)? Please initiate the briefing process for CCCS and TBS OCIO Cyber. This just means we send a summary of the incident (or initial findings and updates if incident is ongoing) to cyberincident@cyber.gc.ca and CC zztbscybers@tbs-sct.gc.ca, and security@cds-snc.ca! CCCS will reach out with a case number, and any questions if they need more information."
-    say(text=text, channel=channel_id)
-
-    # Reminder to stop planned testing
-    text = ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
-    say(text=text, channel=channel_id)
-
     # Gather all user IDs in a list to ensure uniqueness
     users_to_invite = []
 
@@ -346,7 +337,7 @@ def submit(ack, view, say, body, client, logger):
     say(text=text, channel=channel_id)
 
 
-def generate_success_modal(body):
+def generate_success_modal(body, channel_id, channel_name):
     locale = body["view"]["blocks"][0]["elements"][0]["value"]
     if locale != "fr-FR":
         locale = "en-US"
@@ -361,15 +352,44 @@ def generate_success_modal(body):
                 "text": {
                     "type": "plain_text",
                     "text": i18n.t("incident.modal.success"),
-                    "emoji": True,
                 },
             },
             {
                 "type": "section",
                 "text": {
+                    "type": "mrkdwn",
+                    "text": f"{i18n.t('incident.modal.user_added')} <#{channel_id}|{channel_name}>",
+                },
+            },
+            {
+                "type": "divider",
+            },
+            {
+                "type": "header",
+                "text": {
                     "type": "plain_text",
-                    "text": i18n.t("incident.modal.user_added"),
-                    "emoji": True,
+                    "text": i18n.t("incident.modal.next_steps"),
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.next_steps_instructions"),
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.brief_up"),
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.planned_testing"),
                 },
             },
         ],
