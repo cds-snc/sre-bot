@@ -327,12 +327,12 @@ def submit(ack, view, say, body, client, logger):
         if user["id"] != user_id:
             users_to_invite.append(user["id"])
 
-    # # Get users from the @security group
-    # response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
-    # if response.get("ok"):
-    #     for security_user in response["users"]:
-    #         if security_user != user_id:
-    #             users_to_invite.append(security_user)
+    # Get users from the @security group
+    response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
+    if response.get("ok"):
+        for security_user in response["users"]:
+            if security_user != user_id:
+                users_to_invite.append(security_user)
 
     # Invite all collected users to the channel in a single API call
     if users_to_invite:
