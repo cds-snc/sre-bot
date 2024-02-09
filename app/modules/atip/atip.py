@@ -11,6 +11,27 @@ i18n.load_path.append("./commands/locales/")
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    """
+    Registers the ATIP commands and events in the Slack Bot. Import the ATIP module in the main.py file and call the register function.
+
+    Example in main.py:
+    ```
+    from modules import atip
+
+    def main(bot):
+        atip.register(bot)
+    ```
+    """
+    bot.command(f"/{PREFIX}atip")(atip_command)
+    bot.command(f"/{PREFIX}aiprp")(atip_command)
+    bot.action("ati_search_width")(atip_width_action)
+    bot.view("atip_view")(atip_view_handler)
+    bot.action("atip_change_locale")(update_modal_locale)
+
 
 def atip_command(ack, command, logger, respond, client, body):
     ack()
