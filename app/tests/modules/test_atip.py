@@ -1,4 +1,4 @@
-from commands import atip
+from modules.atip import atip
 
 from unittest.mock import ANY, MagicMock, patch
 
@@ -134,7 +134,7 @@ def test_atip_command_handles_unknown_command_FR_client():
     )
 
 
-@patch("commands.atip.request_start_modal")
+@patch("modules.atip.atip.request_start_modal")
 def test_atip_command_handles_access_EN_command(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
@@ -147,7 +147,7 @@ def test_atip_command_handles_access_EN_command(request_start_modal):
     request_start_modal.assert_called_with(client, body, "en-US")
 
 
-@patch("commands.atip.request_start_modal")
+@patch("modules.atip.atip.request_start_modal")
 def test_atip_command_handles_access_FR_command(request_start_modal):
     ack = MagicMock()
     respond = MagicMock()
@@ -160,7 +160,7 @@ def test_atip_command_handles_access_FR_command(request_start_modal):
     request_start_modal.assert_called_with(client, body, "fr-FR")
 
 
-@patch("commands.atip.atip_modal_view")
+@patch("modules.atip.atip.atip_modal_view")
 def test_atip_action_update_locale_to_FR(atip_modal_view):
     ack = MagicMock()
     client = MagicMock()
@@ -171,7 +171,7 @@ def test_atip_action_update_locale_to_FR(atip_modal_view):
     atip_modal_view.assert_called_with("user_id", "", "fr-FR")
 
 
-@patch("commands.atip.atip_modal_view")
+@patch("modules.atip.atip.atip_modal_view")
 def test_atip_action_update_locale_to_EN(atip_modal_view):
     ack = MagicMock()
     client = MagicMock()
