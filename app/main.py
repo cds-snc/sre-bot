@@ -5,8 +5,8 @@ from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import atip, aws, incident, sre, role, google_service
-from modules import secret
+from commands import aws, incident, sre, role, google_service
+from modules import secret, atip
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -32,12 +32,8 @@ def main(bot):
     bot.view("role_view")(role.role_view_handler)
     bot.action("role_change_locale")(role.update_modal_locale)
 
-    # Register ATIP commands
-    bot.command(f"/{PREFIX}atip")(atip.atip_command)
-    bot.command(f"/{PREFIX}aiprp")(atip.atip_command)
-    bot.action("ati_search_width")(atip.atip_width_action)
-    bot.view("atip_view")(atip.atip_view_handler)
-    bot.action("atip_change_locale")(atip.update_modal_locale)
+    # Register ATIP module
+    atip.register(bot)
 
     # Register AWS commands
     bot.command(f"/{PREFIX}aws")(aws.aws_command)
