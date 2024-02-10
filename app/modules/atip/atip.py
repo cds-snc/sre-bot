@@ -1,8 +1,13 @@
-from commands import utils
-from integrations import trello
+"""ATIP Packages
+
+This module contains the ATIP commands and events for the Slack Bot.
+"""
 
 import os
-import i18n
+import i18n  # type: ignore
+
+from commands import utils
+from integrations import trello
 
 from datetime import datetime
 

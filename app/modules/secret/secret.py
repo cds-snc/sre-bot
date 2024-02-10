@@ -1,3 +1,8 @@
+"""Secret module.
+
+This module allows users to send encrypted messages to other users.
+"""
+
 import os
 import i18n
 import requests
