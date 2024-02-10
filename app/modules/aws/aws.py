@@ -1,14 +1,31 @@
-from commands import utils
+"""AWS Features
 
-from integrations import aws_sso, aws_account_health
+This module provides the following features:
+- Access to AWS accounts
+- Health check of AWS accounts
+
+"""
+
+import os
+
+from commands import utils
 from commands.utils import log_ops_message
+from integrations import aws_sso, aws_account_health
 from models import aws_access_requests
+
+PREFIX = os.environ.get("PREFIX", "")
 
 help_text = """
 \n `/aws access` - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
 \n `/aws health` - query the health of an AWS account | demander l'état de santé d'un compte AWS
 \n `/aws help` - show this help text | montre le dialogue d'aide
 """
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}aws")(aws_command)
+    bot.view("aws_access_view")(access_view_handler)
+    bot.view("aws_health_view")(health_view_handler)
 
 
 def aws_command(ack, command, logger, respond, client, body):
