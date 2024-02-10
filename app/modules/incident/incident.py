@@ -1,7 +1,7 @@
 import os
 import re
 import datetime
-import i18n
+import i18n  # type: ignore
 
 from integrations import google_drive, opsgenie
 from models import webhooks
@@ -17,6 +17,7 @@ from integrations.google_drive import (
     get_timeline_section,
     replace_text_between_headings,
 )
+from modules.incident import incident_helper
 
 from dotenv import load_dotenv
 
@@ -31,6 +32,45 @@ INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}incident")(open_modal)
+    bot.view("incident_view")(submit)
+    bot.action("handle_incident_action_buttons")(handle_incident_action_buttons)
+    bot.action("incident_change_locale")(handle_change_locale_button)
+
+    # Incident events
+    bot.action("add_folder_metadata")(incident_helper.add_folder_metadata)
+    bot.action("view_folder_metadata")(incident_helper.view_folder_metadata)
+    bot.view("view_folder_metadata_modal")(incident_helper.list_folders)
+    bot.view("add_metadata_view")(incident_helper.save_metadata)
+    bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
+    bot.action("archive_channel")(incident_helper.archive_channel_action)
+    bot.view("view_save_incident_roles")(incident_helper.save_incident_roles)
+    # Handle event subscriptions when it matches floppy_disk
+    bot.event("reaction_added", matchers=[is_floppy_disk])(
+        handle_reaction_added
+    )
+    bot.event("reaction_removed", matchers=[is_floppy_disk])(
+        handle_reaction_removed
+    )
+
+    # For all other reaction events that are not floppy_disk, just ack the event
+    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
+    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
+
+
+# Make sure that we are listening only on floppy disk reaction
+def is_floppy_disk(event: dict) -> bool:
+    return event["reaction"] == "floppy_disk"
+
+
+# We need to ack all other reactions so that they don't get processed
+def just_ack_the_rest_of_reaction_events():
+    pass
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
