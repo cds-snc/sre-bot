@@ -1,8 +1,9 @@
 import os
 
-from commands import utils, google_service
+from commands import utils
 
 from commands.helpers import geolocate_helper, incident_helper, webhook_helper
+from modules import google_service
 
 help_text = """
 \n `/sre help`

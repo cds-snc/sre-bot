@@ -5,8 +5,8 @@ from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import incident, sre, role, google_service
-from modules import secret, atip, aws
+from commands import incident, sre, role
+from modules import google_service, secret, atip, aws
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
