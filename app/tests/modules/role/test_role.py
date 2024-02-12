@@ -1,5 +1,5 @@
 import os
-from commands import role
+from modules import role
 
 from unittest.mock import ANY, MagicMock, patch, call
 
@@ -142,7 +142,7 @@ def test_role_command_handles_unknown_command_FR_client():
     )
 
 
-@patch("commands.role.request_start_modal")
+@patch("modules.role.role.request_start_modal")
 def test_role_command_handles_new_role_EN_command(request_start_modal):
     # test handling new command with English locale
     ack = MagicMock()
@@ -156,7 +156,7 @@ def test_role_command_handles_new_role_EN_command(request_start_modal):
     request_start_modal.assert_called_with(client, body, locale="en-US")
 
 
-@patch("commands.role.request_start_modal")
+@patch("modules.role.role.request_start_modal")
 def test_role_command_handles_new_role_FR_command(request_start_modal):
     # test handling role new command with French locale
     ack = MagicMock()
@@ -170,7 +170,7 @@ def test_role_command_handles_new_role_FR_command(request_start_modal):
     request_start_modal.assert_called_with(client, body, locale="fr-FR")
 
 
-@patch("commands.role.role_modal_view")
+@patch("modules.role.role.role_modal_view")
 def test_role_action_update_locale_to_FR(role_modal_view):
     # test updating the modal view to French
     ack = MagicMock()
@@ -182,7 +182,7 @@ def test_role_action_update_locale_to_FR(role_modal_view):
     role_modal_view.assert_called_with("fr-FR")
 
 
-@patch("commands.role.role_modal_view")
+@patch("modules.role.role.role_modal_view")
 def test_role_action_update_locale_to_EN(role_modal_view):
     # test updating the modal view to English
     ack = MagicMock()
@@ -236,7 +236,7 @@ def test_update_modal_locale_to_FR():
 
 
 @patch("integrations.google_drive.get_google_service")
-@patch("commands.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.create_new_folder")
 def test_create_new_folder(mock_create_new_folder, get_google_service_mock):
     # test creating a new folder
     ack = MagicMock()
@@ -251,8 +251,8 @@ def test_create_new_folder(mock_create_new_folder, get_google_service_mock):
     )
 
 
-@patch("commands.role.google_drive.create_new_folder")
-@patch("commands.role.google_drive.copy_file_to_folder")
+@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_copy_files_to_internal_talent_folder(
     mock_copy_file_to_folder, mock_create_new_folder
 ):
@@ -307,7 +307,7 @@ def test_copy_files_to_internal_talent_folder(
     )
 
 
-@patch("commands.role.i18n")
+@patch("modules.role.role.i18n")
 @patch("commands.utils.get_user_locale")
 def test_role_update_modal_locale_ack(mock_get_user_locale, mock_i18n):
     # test ack is called when modal is submitted
@@ -318,7 +318,7 @@ def test_role_update_modal_locale_ack(mock_get_user_locale, mock_i18n):
     ack.assert_called_once()
 
 
-@patch("commands.role.role_modal_view")
+@patch("modules.role.role.role_modal_view")
 def test_role_modal_view(mock_role_modal_view):
     # test role_modal_view is called when modal is submitted
     ack = MagicMock()
@@ -329,8 +329,8 @@ def test_role_modal_view(mock_role_modal_view):
     mock_role_modal_view.assert_called_once()
 
 
-@patch("commands.role.google_drive.create_new_folder")
-@patch("commands.role.google_drive.copy_file_to_folder")
+@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_role_creates_channel_and_sets_topic_and_announces_channel(
     mock_copy_file_to_folder, mock_create_new_folder
 ):
@@ -357,8 +357,8 @@ def test_role_creates_channel_and_sets_topic_and_announces_channel(
 
 
 # test that indicated users are invited to the channel
-@patch("commands.role.google_drive.create_new_folder")
-@patch("commands.role.google_drive.copy_file_to_folder")
+@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_role_add_invited_users_to_channel(
     mock_copy_file_to_folder, mock_create_new_folder
 ):

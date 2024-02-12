@@ -5,9 +5,9 @@ from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import incident, role
-from modules import google_service, secret, atip, aws, sre
-from commands.helpers import incident_helper, webhook_helper
+from commands import incident
+from modules import google_service, secret, atip, aws, sre, webhook_helper, role
+from commands.helpers import incident_helper
 from server import bot_middleware, server
 
 from jobs import scheduled_tasks
@@ -28,15 +28,22 @@ def main(bot):
     PREFIX = os.environ.get("PREFIX", "")
 
     # Register Roles commands
-    bot.command(f"/{PREFIX}talent-role")(role.role_command)
-    bot.view("role_view")(role.role_view_handler)
-    bot.action("role_change_locale")(role.update_modal_locale)
+    role.register(bot)
 
     # Register ATIP module
     atip.register(bot)
 
     # Register AWS commands
     aws.register(bot)
+
+    # Register Secret command
+    secret.register(bot)
+
+    # Register SRE events
+    sre.register(bot)
+
+    # Webhooks events
+    webhook_helper.register(bot)
 
     # Register incident events
     bot.command(f"/{PREFIX}incident")(incident.open_modal)
@@ -54,18 +61,6 @@ def main(bot):
     bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
     bot.action("archive_channel")(incident_helper.archive_channel_action)
     bot.view("view_save_incident_roles")(incident_helper.save_incident_roles)
-
-    # Register Secret command
-    secret.register(bot)
-
-    # Register SRE events
-    sre.register(bot)
-
-    # Webhooks events
-    bot.view("create_webhooks_view")(webhook_helper.create_webhook)
-    bot.action("toggle_webhook")(webhook_helper.toggle_webhook)
-    bot.action("reveal_webhook")(webhook_helper.reveal_webhook)
-    bot.action("next_page")(webhook_helper.next_page)
 
     # Handle event subscriptions when it matches floppy_disk
     bot.event("reaction_added", matchers=[is_floppy_disk])(

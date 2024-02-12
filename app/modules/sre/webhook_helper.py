@@ -1,3 +1,5 @@
+"""Webhook helper functions for the SRE Bot."""
+
 import re
 
 from models import webhooks
@@ -17,6 +19,13 @@ help_text = """
 # see 4 webhooks at a time. This is done to avoid hitting the 100 block size limit and for the view to be more managable to see.
 # has to be divisible by 4 since each webhook is 4 blocks
 MAX_BLOCK_SIZE = 16
+
+
+def register(bot):
+    bot.view("create_webhooks_view")(create_webhook)
+    bot.action("toggle_webhook")(toggle_webhook)
+    bot.action("reveal_webhook")(reveal_webhook)
+    bot.action("next_page")(next_page)
 
 
 def handle_webhook_command(args, client, body, respond):

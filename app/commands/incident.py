@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-i18n.load_path.append("./commands/locales/")
+i18n.load_path.append("./locales/")
 
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
