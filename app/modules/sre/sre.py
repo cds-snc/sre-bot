@@ -25,6 +25,10 @@ help_text = """
 PREFIX = os.environ.get("PREFIX", "")
 
 
+def register(bot):
+    bot.command(f"/{PREFIX}sre")(sre_command)
+
+
 def sre_command(ack, command, logger, respond, client, body):
     ack()
     logger.info("SRE command received: %s", command["text"])
