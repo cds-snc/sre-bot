@@ -1,4 +1,4 @@
-from modules.aws import aws
+from modules import aws
 
 from unittest.mock import ANY, MagicMock, patch
 
