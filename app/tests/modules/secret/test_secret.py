@@ -1,4 +1,4 @@
-from modules.secret import secret
+from modules import secret
 
 from unittest.mock import MagicMock, patch
 

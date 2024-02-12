@@ -1,8 +1,14 @@
+"""SRE Module
+
+This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
+"""
+
 import os
 
-from commands import utils, google_service
+from commands import utils
 
 from commands.helpers import geolocate_helper, incident_helper, webhook_helper
+from modules import google_service
 
 help_text = """
 \n `/sre help`
@@ -22,6 +28,10 @@ help_text = """
 \n      - montre la version du bot SRE"""
 
 PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}sre")(sre_command)
 
 
 def sre_command(ack, command, logger, respond, client, body):

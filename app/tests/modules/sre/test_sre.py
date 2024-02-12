@@ -1,6 +1,6 @@
 import os
 
-from commands import sre
+from modules import sre
 
 from unittest.mock import MagicMock, patch
 
@@ -64,7 +64,7 @@ def test_sre_command_with_geolocate_argument_and_no_ip():
     )
 
 
-@patch("commands.sre.geolocate_helper.geolocate")
+@patch("modules.sre.sre.geolocate_helper.geolocate")
 def test_sre_command_with_geolocate_argument_and_ip(geolocate_mock):
     respond = MagicMock()
     sre.sre_command(
@@ -78,7 +78,7 @@ def test_sre_command_with_geolocate_argument_and_ip(geolocate_mock):
     geolocate_mock.assert_called_once_with(["111.111.111.111"], respond)
 
 
-@patch("commands.sre.incident_helper.handle_incident_command")
+@patch("modules.sre.sre.incident_helper.handle_incident_command")
 def test_sre_command_with_incident_argument(command_runner):
     command_runner.return_value = "incident command help"
     clientMock = MagicMock()
@@ -96,7 +96,7 @@ def test_sre_command_with_incident_argument(command_runner):
     command_runner.assert_called_once_with([], clientMock, body, respond, ack)
 
 
-@patch("commands.sre.webhook_helper.handle_webhook_command")
+@patch("modules.sre.sre.webhook_helper.handle_webhook_command")
 def test_sre_command_with_webhooks_argument(command_runner):
     command_runner.return_value = "webhooks command help"
     clientMock = MagicMock()

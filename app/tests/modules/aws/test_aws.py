@@ -1,4 +1,4 @@
-from commands import aws
+from modules import aws
 
 from unittest.mock import ANY, MagicMock, patch
 
@@ -23,7 +23,7 @@ def test_aws_command_handles_help_command():
     assert respond.called_with(aws.help_text)
 
 
-@patch("commands.aws.request_access_modal")
+@patch("modules.aws.aws.request_access_modal")
 def test_aws_command_handles_access_command(request_access_modal):
     ack = MagicMock()
     respond = MagicMock()
@@ -35,7 +35,7 @@ def test_aws_command_handles_access_command(request_access_modal):
     assert request_access_modal.called_with(client, body)
 
 
-@patch("commands.aws.request_health_modal")
+@patch("modules.aws.aws.request_health_modal")
 def test_aws_command_handles_health_command(request_health_modal):
     ack = MagicMock()
     respond = MagicMock()
@@ -71,8 +71,8 @@ def test_access_view_handler_returns_errors_with_rational_over_2000_characters()
     )
 
 
-@patch("commands.aws.log_ops_message")
-@patch("commands.aws.aws_sso.get_user_id")
+@patch("modules.aws.aws.log_ops_message")
+@patch("modules.aws.aws.aws_sso.get_user_id")
 def test_access_view_handler_with_unknown_sso_user(
     get_user_id_mock, log_ops_message_mock
 ):
@@ -104,9 +104,9 @@ def test_access_view_handler_with_unknown_sso_user(
     )
 
 
-@patch("commands.aws.log_ops_message")
-@patch("commands.aws.aws_sso.get_user_id")
-@patch("commands.aws.aws_access_requests.already_has_access")
+@patch("modules.aws.aws.log_ops_message")
+@patch("modules.aws.aws.aws_sso.get_user_id")
+@patch("modules.aws.aws.aws_access_requests.already_has_access")
 def test_access_view_handler_with_existing_access(
     already_has_access_mock, get_user_id_mock, log_ops_message_mock
 ):
@@ -139,11 +139,11 @@ def test_access_view_handler_with_existing_access(
     )
 
 
-@patch("commands.aws.log_ops_message")
-@patch("commands.aws.aws_sso.get_user_id")
-@patch("commands.aws.aws_access_requests.already_has_access")
-@patch("commands.aws.aws_access_requests.create_aws_access_request")
-@patch("commands.aws.aws_sso.add_permissions_for_user")
+@patch("modules.aws.aws.log_ops_message")
+@patch("modules.aws.aws.aws_sso.get_user_id")
+@patch("modules.aws.aws.aws_access_requests.already_has_access")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@patch("modules.aws.aws.aws_sso.add_permissions_for_user")
 def test_access_view_handler_successful_access_request(
     add_permissions_for_user_mock,
     create_aws_access_request_mock,
@@ -182,11 +182,11 @@ def test_access_view_handler_successful_access_request(
     )
 
 
-@patch("commands.aws.log_ops_message")
-@patch("commands.aws.aws_sso.get_user_id")
-@patch("commands.aws.aws_access_requests.already_has_access")
-@patch("commands.aws.aws_access_requests.create_aws_access_request")
-@patch("commands.aws.aws_sso.add_permissions_for_user")
+@patch("modules.aws.aws.log_ops_message")
+@patch("modules.aws.aws.aws_sso.get_user_id")
+@patch("modules.aws.aws.aws_access_requests.already_has_access")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@patch("modules.aws.aws.aws_sso.add_permissions_for_user")
 def test_access_view_handler_failed_access_request(
     add_permissions_for_user_mock,
     create_aws_access_request_mock,
@@ -225,7 +225,7 @@ def test_access_view_handler_failed_access_request(
     )
 
 
-@patch("commands.aws.aws_account_health.get_account_health")
+@patch("modules.aws.aws.aws_account_health.get_account_health")
 def test_health_view_handler(get_account_health_mock):
     ack = MagicMock()
     body = {
@@ -255,7 +255,7 @@ def test_health_view_handler(get_account_health_mock):
     )
 
 
-@patch("commands.aws.aws_sso.get_accounts")
+@patch("modules.aws.aws.aws_sso.get_accounts")
 def test_request_access_modal(get_accounts_mock):
     get_accounts_mock.return_value = {"id": "name"}
 
@@ -269,7 +269,7 @@ def test_request_access_modal(get_accounts_mock):
     )
 
 
-@patch("commands.aws.aws_account_health.get_accounts")
+@patch("modules.aws.aws.aws_account_health.get_accounts")
 def test_request_health_modal(get_accounts_mocks):
     client = MagicMock()
     body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}

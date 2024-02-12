@@ -1,10 +1,16 @@
+"""ATIP Packages
+
+This module contains the ATIP commands and events for the Slack Bot.
+"""
+
+import os
+from datetime import datetime
+
+import i18n  # type: ignore
+
 from commands import utils
 from integrations import trello
 
-import os
-import i18n
-
-from datetime import datetime
 
 i18n.load_path.append("./commands/locales/")
 

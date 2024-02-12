@@ -5,5 +5,7 @@
     "pylint.path": [
         "[\"../../usr/local/py-utils/bin/pylint\"]"
     ],
-    "flake8.cwd": "${workspaceFolder}/app"
+    "flake8.cwd": "${workspaceFolder}/app",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/app"]
 }

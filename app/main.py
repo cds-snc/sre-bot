@@ -5,8 +5,8 @@ from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
-from commands import aws, incident, sre, role, google_service
-from modules import secret, atip
+from commands import incident, role
+from modules import google_service, secret, atip, aws, sre
 from commands.helpers import incident_helper, webhook_helper
 from server import bot_middleware, server
 
@@ -36,9 +36,7 @@ def main(bot):
     atip.register(bot)
 
     # Register AWS commands
-    bot.command(f"/{PREFIX}aws")(aws.aws_command)
-    bot.view("aws_access_view")(aws.access_view_handler)
-    bot.view("aws_health_view")(aws.health_view_handler)
+    aws.register(bot)
 
     # Register incident events
     bot.command(f"/{PREFIX}incident")(incident.open_modal)
@@ -61,7 +59,7 @@ def main(bot):
     secret.register(bot)
 
     # Register SRE events
-    bot.command(f"/{PREFIX}sre")(sre.sre_command)
+    sre.register(bot)
 
     # Webhooks events
     bot.view("create_webhooks_view")(webhook_helper.create_webhook)

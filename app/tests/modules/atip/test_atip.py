@@ -1,4 +1,4 @@
-from modules.atip import atip
+from modules import atip
 
 from unittest.mock import ANY, MagicMock, patch
 
