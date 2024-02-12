@@ -1,3 +1,5 @@
+"""Webhook helper functions for the SRE Bot."""
+
 import re
 
 from models import webhooks

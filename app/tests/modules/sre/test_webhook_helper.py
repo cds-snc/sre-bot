@@ -1,4 +1,4 @@
-from commands.helpers import webhook_helper
+from modules import webhook_helper
 
 
 from unittest.mock import ANY, MagicMock, patch
@@ -10,7 +10,7 @@ def test_handle_webhooks_command_with_empty_args():
     respond.assert_called_once_with(webhook_helper.help_text)
 
 
-@patch("commands.helpers.webhook_helper.create_webhook_modal")
+@patch("modules.sre.webhook_helper.create_webhook_modal")
 def test_handle_webhooks_command_with_create_command(create_webhook_modal_mock):
     client = MagicMock()
     body = MagicMock()
@@ -30,7 +30,7 @@ def test_handle_webhooks_command_with_help():
     respond.assert_called_once_with(webhook_helper.help_text)
 
 
-@patch("commands.helpers.webhook_helper.list_all_webhooks")
+@patch("modules.sre.webhook_helper.list_all_webhooks")
 def test_handle_webhooks_command_with_list_command(list_all_webhooks_mock):
     client = MagicMock()
     body = MagicMock()
@@ -40,7 +40,7 @@ def test_handle_webhooks_command_with_list_command(list_all_webhooks_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks")
+@patch("modules.sre.webhook_helper.get_webhooks")
 def test_get_webhooks_active(get_webhooks_mock):
     get_webhooks_mock.return_value = [
         helper_generate_webhook("name1", "channel1", "id1"),
@@ -53,7 +53,7 @@ def test_get_webhooks_active(get_webhooks_mock):
     ]
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks")
+@patch("modules.sre.webhook_helper.get_webhooks")
 def test_get_webhooks_disabled(get_webhooks_mock):
     get_webhooks_mock.return_value = [
         helper_generate_webhook("name1", "channel1", "id1"),
@@ -66,13 +66,13 @@ def test_get_webhooks_disabled(get_webhooks_mock):
     ]
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks")
+@patch("modules.sre.webhook_helper.get_webhooks")
 def test_get_webhooks_not_recognized_value(get_webhooks_mock):
     get_webhooks_mock.return_value = []
     assert webhook_helper.get_webhooks("test") == []
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks_list")
+@patch("modules.sre.webhook_helper.get_webhooks_list")
 def test_get_webhooks_list_all(get_webhooks_list_mock):
     webhooks_list = helper_generate_webhook("name1", "channel1", "id1")
     get_webhooks_list_mock.return_value = [webhooks_list]
@@ -82,7 +82,7 @@ def test_get_webhooks_list_all(get_webhooks_list_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks_button_block")
+@patch("modules.sre.webhook_helper.get_webhooks_button_block")
 def test_get_button_block_active(get_webhooks_button_block_mock):
     webhooks_list = helper_generate_webhook("name1", "channel1", "id1")
     get_webhooks_button_block_mock.return_value = [
@@ -108,7 +108,7 @@ def test_get_button_block_active(get_webhooks_button_block_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks_button_block")
+@patch("modules.sre.webhook_helper.get_webhooks_button_block")
 def test_get_button_block_disabled(get_webhooks_button_block_mock):
     webhooks_list = helper_generate_webhook("name1", "channel1", "id1")
     get_webhooks_button_block_mock.return_value = [
@@ -134,7 +134,7 @@ def test_get_button_block_disabled(get_webhooks_button_block_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks_button_block")
+@patch("modules.sre.webhook_helper.get_webhooks_button_block")
 def test_get_button_block_active_last_page(get_webhooks_button_block_mock):
     webhooks_list = helper_generate_webhook("name1", "channel1", "id1")
     get_webhooks_button_block_mock.return_value = [
@@ -160,7 +160,7 @@ def test_get_button_block_active_last_page(get_webhooks_button_block_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.get_webhooks_button_block")
+@patch("modules.sre.webhook_helper.get_webhooks_button_block")
 def test_get_button_block_empty(get_webhooks_button_block_mock):
     get_webhooks_button_block_mock.return_value = []
     webhooks_list = []
@@ -214,7 +214,7 @@ def test_create_webhook_with_long_name():
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.create_webhook")
+@patch("modules.sre.webhook_helper.webhooks.create_webhook")
 def test_create_webhook_with_existing_webhook(create_webhook_mock):
     create_webhook_mock.return_value = "id"
     ack = MagicMock()
@@ -252,7 +252,7 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.create_webhook")
+@patch("modules.sre.webhook_helper.webhooks.create_webhook")
 def test_create_webhook_with_creation_error(create_webhook_mock):
     create_webhook_mock.return_value = None
     ack = MagicMock()
@@ -290,7 +290,7 @@ def test_create_webhook_modal():
     client.views_open.assert_called()
 
 
-@patch("commands.helpers.webhook_helper.webhooks.list_all_webhooks")
+@patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
 def test_list_all_webhooks(list_all_webhooks_mock):
     list_all_webhooks_mock.return_value = [
         helper_generate_webhook("name1", "channel1", "id1"),
@@ -419,7 +419,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.list_all_webhooks")
+@patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
 def test_list_all_webhooks_empty(list_all_webhooks_mock):
     list_all_webhooks_mock.return_value = []
 
@@ -457,7 +457,7 @@ def test_list_all_webhooks_empty(list_all_webhooks_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.list_all_webhooks")
+@patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
 def test_list_all_webhooks_update(list_all_webhooks_mock):
     list_all_webhooks_mock.return_value = [
         helper_generate_webhook("name1", "channel1", "id1"),
@@ -471,7 +471,7 @@ def test_list_all_webhooks_update(list_all_webhooks_mock):
     client.views_update.assert_called_with(view_id="id", view=ANY)
 
 
-@patch("commands.helpers.webhook_helper.webhooks.get_webhook")
+@patch("modules.sre.webhook_helper.webhooks.get_webhook")
 def test_reveal_webhook(get_webhook_mock):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
@@ -489,9 +489,9 @@ def test_reveal_webhook(get_webhook_mock):
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.get_webhook")
-@patch("commands.helpers.webhook_helper.webhooks.toggle_webhook")
-@patch("commands.helpers.webhook_helper.list_all_webhooks")
+@patch("modules.sre.webhook_helper.webhooks.get_webhook")
+@patch("modules.sre.webhook_helper.webhooks.toggle_webhook")
+@patch("modules.sre.webhook_helper.list_all_webhooks")
 def test_toggle_webhook(list_all_webhooks_mock, toggle_webhook_mock, get_webhook_mock):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
@@ -516,7 +516,7 @@ def test_toggle_webhook(list_all_webhooks_mock, toggle_webhook_mock, get_webhook
     )
 
 
-@patch("commands.helpers.webhook_helper.webhooks.list_all_webhooks")
+@patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
 def test_button_next_page(list_all_webhooks_mock):
     client = MagicMock()
     ack = MagicMock()
