@@ -21,6 +21,13 @@ help_text = """
 MAX_BLOCK_SIZE = 16
 
 
+def register(bot):
+    bot.view("create_webhooks_view")(create_webhook)
+    bot.action("toggle_webhook")(toggle_webhook)
+    bot.action("reveal_webhook")(reveal_webhook)
+    bot.action("next_page")(next_page)
+
+
 def handle_webhook_command(args, client, body, respond):
     if len(args) == 0:
         respond(help_text)
