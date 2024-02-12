@@ -1,4 +1,4 @@
-"""AWS Features
+"""AWS Module
 
 This module provides the following features:
 - Access to AWS accounts

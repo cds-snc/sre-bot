@@ -1,3 +1,8 @@
+"""SRE Module
+
+This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
+"""
+
 import os
 
 from commands import utils
