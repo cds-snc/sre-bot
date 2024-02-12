@@ -7,11 +7,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-i18n.load_path.append("./commands/locales/")
+i18n.load_path.append("./locales/")
 
 # Set the locale
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-CA")
+
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}talent-role")(role_command)
+    bot.view("role_view")(role_view_handler)
+    bot.action("role_change_locale")(update_modal_locale)
 
 
 def update_locale(locale):
