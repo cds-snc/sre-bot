@@ -36,9 +36,6 @@ def main(bot):
     atip.register(bot)
 
     # Register AWS commands
-    # bot.command(f"/{PREFIX}aws")(aws.aws_command)
-    # bot.view("aws_access_view")(aws.access_view_handler)
-    # bot.view("aws_health_view")(aws.health_view_handler)
     aws.register(bot)
 
     # Register incident events
@@ -62,7 +59,7 @@ def main(bot):
     secret.register(bot)
 
     # Register SRE events
-    bot.command(f"/{PREFIX}sre")(sre.sre_command)
+    sre.register(bot)
 
     # Webhooks events
     bot.view("create_webhooks_view")(webhook_helper.create_webhook)
