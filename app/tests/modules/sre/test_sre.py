@@ -96,7 +96,7 @@ def test_sre_command_with_incident_argument(command_runner):
     command_runner.assert_called_once_with([], clientMock, body, respond, ack)
 
 
-@patch("modules.sre.sre.webhook_helper.handle_webhook_command")
+@patch("modules.sre.webhook_helper.handle_webhook_command")
 def test_sre_command_with_webhooks_argument(command_runner):
     command_runner.return_value = "webhooks command help"
     clientMock = MagicMock()
