@@ -7,7 +7,7 @@ import os
 
 from commands import utils
 
-from commands.helpers import incident_helper
+from modules.incident import incident_helper
 from modules import google_service
 from modules.sre import geolocate_helper, webhook_helper
 
