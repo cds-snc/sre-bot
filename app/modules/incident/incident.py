@@ -1,16 +1,15 @@
 import os
 import re
 import datetime
-import i18n
+import i18n  # type: ignore
 from integrations import google_drive, opsgenie
 from integrations.slack import users as slack_users
 from integrations.google_workspace import google_docs
 from models import webhooks
+from .handle_slack_message_reactions import rearrange_by_datetime_ascending, convert_epoch_to_datetime_est
 
 from commands.utils import (
     log_to_sentinel,
-    rearrange_by_datetime_ascending,
-    convert_epoch_to_datetime_est,
     replace_user_id_with_handle,
 )
 from integrations.google_drive import (
