@@ -22,31 +22,6 @@ def log_to_sentinel(event, message):
         logging.error(f"Sentinel event failed: {payload}")
 
 
-def parse_command(command):
-    """
-    Parses a command string into a list of arguments.
-    """
-    args = []
-    arg = ""
-    in_quote = False
-    for char in command:
-        if char == '"':
-            if in_quote:
-                args.append(arg)
-                arg = ""
-                in_quote = False
-            else:
-                in_quote = True
-        elif char == " " and not in_quote:
-            args.append(arg)
-            arg = ""
-        else:
-            arg += char
-    if arg:
-        args.append(arg)
-    return args
-
-
 def rearrange_by_datetime_ascending(text):
     # Split the text by lines
     lines = text.split("\n")
