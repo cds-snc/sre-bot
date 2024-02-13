@@ -30,6 +30,28 @@ INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}incident")(open_modal)
+    bot.view("incident_view")(submit)
+    bot.action("handle_incident_action_buttons")(handle_incident_action_buttons)
+    bot.action("incident_change_locale")(handle_change_locale_button)
+    bot.event("reaction_added", matchers=[is_floppy_disk])(handle_reaction_added)
+    bot.event("reaction_removed", matchers=[is_floppy_disk])(handle_reaction_removed)
+    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
+    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
+
+
+# Make sure that we are listening only on floppy disk reaction
+def is_floppy_disk(event: dict) -> bool:
+    return event["reaction"] == "floppy_disk"
+
+
+# We need to ack all other reactions so that they don't get processed
+def just_ack_the_rest_of_reaction_events():
+    pass
 
 
 def handle_incident_action_buttons(client, ack, body, logger):

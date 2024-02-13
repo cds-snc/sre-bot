@@ -54,33 +54,10 @@ def main(bot):
     webhook_helper.register(bot)
 
     # Register incident events
-    bot.command(f"/{PREFIX}incident")(incident.open_modal)
-    bot.view("incident_view")(incident.submit)
-    bot.action("handle_incident_action_buttons")(
-        incident.handle_incident_action_buttons
-    )
-    bot.action("incident_change_locale")(incident.handle_change_locale_button)
+    incident.register(bot)
 
     # Incident events
-    bot.action("add_folder_metadata")(incident_helper.add_folder_metadata)
-    bot.action("view_folder_metadata")(incident_helper.view_folder_metadata)
-    bot.view("view_folder_metadata_modal")(incident_helper.list_folders)
-    bot.view("add_metadata_view")(incident_helper.save_metadata)
-    bot.action("delete_folder_metadata")(incident_helper.delete_folder_metadata)
-    bot.action("archive_channel")(incident_helper.archive_channel_action)
-    bot.view("view_save_incident_roles")(incident_helper.save_incident_roles)
-
-    # Handle event subscriptions when it matches floppy_disk
-    bot.event("reaction_added", matchers=[is_floppy_disk])(
-        incident.handle_reaction_added
-    )
-    bot.event("reaction_removed", matchers=[is_floppy_disk])(
-        incident.handle_reaction_removed
-    )
-
-    # For all other reaction events that are not floppy_disk, just ack the event
-    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
-    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
+    incident_helper.register(bot)
 
     SocketModeHandler(bot, APP_TOKEN).connect()
 
@@ -108,13 +85,3 @@ bot = get_bot()
 if bot:
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
     server_app.add_event_handler("startup", partial(main, bot))
-
-
-# Make sure that we are listening only on floppy disk reaction
-def is_floppy_disk(event: dict) -> bool:
-    return event["reaction"] == "floppy_disk"
-
-
-# We need to ack all other reactions so that they don't get processed
-def just_ack_the_rest_of_reaction_events():
-    pass

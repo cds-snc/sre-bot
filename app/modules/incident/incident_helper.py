@@ -29,6 +29,16 @@ help_text = """
 """
 
 
+def register(bot):
+    bot.action("add_folder_metadata")(add_folder_metadata)
+    bot.action("view_folder_metadata")(view_folder_metadata)
+    bot.view("view_folder_metadata_modal")(list_folders)
+    bot.view("add_metadata_view")(save_metadata)
+    bot.action("delete_folder_metadata")(delete_folder_metadata)
+    bot.action("archive_channel")(archive_channel_action)
+    bot.view("view_save_incident_roles")(save_incident_roles)
+
+
 def handle_incident_command(args, client, body, respond, ack):
     if len(args) == 0:
         respond(help_text)
