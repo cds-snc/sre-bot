@@ -14,7 +14,10 @@ from integrations.google_drive import (
     replace_text_between_headings,
 )
 
-from .handle_slack_message_reactions import rearrange_by_datetime_ascending, convert_epoch_to_datetime_est
+from .handle_slack_message_reactions import (
+    rearrange_by_datetime_ascending,
+    convert_epoch_to_datetime_est,
+)
 
 load_dotenv()
 
@@ -430,7 +433,9 @@ def handle_reaction_added(client, ack, body, logger):
                 # get the current timeline section content
                 content = get_timeline_section(document_id)
 
-                message = slack_users.replace_user_id_with_handle(user_handle, message["text"])
+                message = slack_users.replace_user_id_with_handle(
+                    user_handle, message["text"]
+                )
 
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
@@ -497,7 +502,9 @@ def handle_reaction_removed(client, ack, body, logger):
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
-            message = slack_users.replace_user_id_with_handle(user_handle, message["text"])
+            message = slack_users.replace_user_id_with_handle(
+                user_handle, message["text"]
+            )
 
             # Construct the message to remove
             message_to_remove = f"\n{message_date_time} {user_full_name}: {message}\n"
