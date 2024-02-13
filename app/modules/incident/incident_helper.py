@@ -3,7 +3,7 @@ import logging
 from integrations import google_drive
 from integrations.google_workspace import google_docs
 from integrations.slack import channels as slack_channels
-from commands.utils import log_to_sentinel
+from integrations.sentinel import log_to_sentinel
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 

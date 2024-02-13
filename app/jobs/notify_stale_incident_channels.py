@@ -1,6 +1,6 @@
-from commands.utils import log_to_sentinel
-from integrations.slack import channels as slack_channels
 import logging
+from integrations.sentinel import log_to_sentinel
+from integrations.slack import channels as slack_channels
 
 logging.basicConfig(level=logging.INFO)
 

@@ -14,7 +14,8 @@ from pydantic import BaseModel, Extra
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from models import webhooks
-from commands.utils import log_ops_message, log_to_sentinel
+from commands.utils import log_ops_message
+from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
 from sns_message_validator import (

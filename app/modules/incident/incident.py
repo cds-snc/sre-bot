@@ -2,21 +2,19 @@ import os
 import re
 import datetime
 import i18n  # type: ignore
+from dotenv import load_dotenv
+
 from integrations import google_drive, opsgenie
 from integrations.slack import users as slack_users
 from integrations.google_workspace import google_docs
+from integrations.sentinel import log_to_sentinel
 from models import webhooks
-from .handle_slack_message_reactions import rearrange_by_datetime_ascending, convert_epoch_to_datetime_est
-
-from commands.utils import (
-    log_to_sentinel,
-)
 from integrations.google_drive import (
     get_timeline_section,
     replace_text_between_headings,
 )
 
-from dotenv import load_dotenv
+from .handle_slack_message_reactions import rearrange_by_datetime_ascending, convert_epoch_to_datetime_est
 
 load_dotenv()
 
