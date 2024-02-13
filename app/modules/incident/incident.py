@@ -4,13 +4,13 @@ import datetime
 import i18n
 from integrations import google_drive, opsgenie
 from integrations.slack import users as slack_users
+from integrations.google_workspace import google_docs
 from models import webhooks
 
 from commands.utils import (
     log_to_sentinel,
     rearrange_by_datetime_ascending,
     convert_epoch_to_datetime_est,
-    extract_google_doc_id,
     replace_user_id_with_handle,
 )
 from integrations.google_drive import (
@@ -417,7 +417,7 @@ def handle_reaction_added(client, ack, body, logger):
             if response["ok"]:
                 for item in range(len(response["bookmarks"])):
                     if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = extract_google_doc_id(
+                        document_id = google_docs.extract_google_doc_id(
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":
@@ -493,7 +493,7 @@ def handle_reaction_removed(client, ack, body, logger):
             if response["ok"]:
                 for item in range(len(response["bookmarks"])):
                     if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = extract_google_doc_id(
+                        document_id = google_docs.extract_google_doc_id(
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":

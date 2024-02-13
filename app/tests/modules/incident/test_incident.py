@@ -859,7 +859,8 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
-def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
+@patch("integrations.google_workspace.google_docs.extract_google_doc_id")
+def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(mock_extract_google_doc_id):
     logger = MagicMock()
     mock_client = MagicMock()
 
@@ -869,7 +870,12 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
         "messages": [{"ts": "123456", "user": "U123456"}]
     }
     mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
-
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {"title": "Incident report", "link": "https://docs.google.com/document/d/1"}
+        ],
+    }
     body = {
         "event": {
             "reaction": "floppy_disk",
@@ -881,6 +887,7 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
 
     # Assert the correct API calls were made
     mock_client.conversations_info.assert_called_once()
+    mock_extract_google_doc_id.assert_called_once()
 
 
 def test_handle_reaction_added_non_incident_channel():
