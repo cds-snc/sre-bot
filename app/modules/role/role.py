@@ -1,8 +1,7 @@
 import os
-import i18n
-from commands import utils
+import i18n  # type: ignore
 from integrations import google_drive
-from integrations.slack import users as slack_users
+from integrations.slack import users as slack_users, commands as slack_commands
 
 from dotenv import load_dotenv
 
@@ -47,7 +46,7 @@ def role_command(ack, command, logger, respond, client, body):
     if command["text"] == "":
         respond(i18n.t("role.help_text", command=command["command"]))
         return
-    action, *args = utils.parse_command(command["text"])
+    action, *args = slack_commands.parse_command(command["text"])
     match action:
         case "help":
             update_locale("en-US")
