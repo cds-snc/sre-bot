@@ -192,5 +192,6 @@ def test_get_messages_in_time_period_with_error():
     client = MagicMock()
     client.conversations_history.return_value = {"ok": False}
     assert (
-        channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1)) == []
+        channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1))
+        == []
     )
