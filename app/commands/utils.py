@@ -18,15 +18,3 @@ def log_to_sentinel(event, message):
         logging.info(f"Sentinel event sent: {payload}")
     else:
         logging.error(f"Sentinel event failed: {payload}")
-
-
-# Function to replace the user id with the user handle in a message:w
-def replace_user_id_with_handle(user_handle, message):
-    if not user_handle or not message:
-        logging.error("User handle or message is empty or None")
-        return None
-
-    user_id_pattern = r"<@\w+>"
-    if re.search(user_id_pattern, message):
-        message = re.sub(user_id_pattern, user_handle, message)
-    return message

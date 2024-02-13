@@ -3,6 +3,7 @@
 This module contains the user related functionality for the Slack integration.
 """
 import re
+import logging
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
@@ -45,3 +46,15 @@ def get_user_locale(client, user_id=None):
     if user_locale["ok"] and (user_locale["user"]["locale"] in supported_locales):
         return user_locale["user"]["locale"]
     return default_locale
+
+
+def replace_user_id_with_handle(user_handle, message):
+    """Function to replace the user id with the user handle in a message:w"""
+    if not user_handle or not message:
+        logging.error("User handle or message is empty or None")
+        return None
+
+    user_id_pattern = r"<@\w+>"
+    if re.search(user_id_pattern, message):
+        message = re.sub(user_id_pattern, user_handle, message)
+    return message
