@@ -2,7 +2,7 @@ import json
 import re
 import os
 import urllib.parse
-from commands.utils import log_ops_message
+from server.utils import log_ops_message
 from integrations import notify
 
 

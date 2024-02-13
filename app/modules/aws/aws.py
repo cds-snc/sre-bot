@@ -8,7 +8,7 @@ This module provides the following features:
 
 import os
 
-from commands.utils import log_ops_message
+from server.utils import log_ops_message
 from integrations import aws_sso, aws_account_health
 from integrations.slack import commands as slack_commands
 from models import aws_access_requests
