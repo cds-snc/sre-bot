@@ -860,7 +860,9 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 
 
 @patch("integrations.google_workspace.google_docs.extract_google_doc_id")
-def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(mock_extract_google_doc_id):
+def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(
+    mock_extract_google_doc_id,
+):
     logger = MagicMock()
     mock_client = MagicMock()
 
