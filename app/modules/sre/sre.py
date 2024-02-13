@@ -5,11 +5,10 @@ This module contains the main command for the SRE bot. It is responsible for han
 
 import os
 
-from commands import utils
-
-from commands.helpers import incident_helper
+from modules.incident import incident_helper
 from modules import google_service
 from modules.sre import geolocate_helper, webhook_helper
+from integrations.slack import commands as slack_commands
 
 help_text = """
 \n `/sre help`
@@ -45,7 +44,7 @@ def sre_command(ack, command, logger, respond, client, body):
         )
         return
 
-    action, *args = utils.parse_command(command["text"])
+    action, *args = slack_commands.parse_command(command["text"])
     match action:
         case "help":
             respond(help_text)

@@ -8,7 +8,7 @@ from datetime import datetime
 
 import i18n  # type: ignore
 
-from commands import utils
+from integrations.slack import users as slack_users, commands as slack_commands
 from integrations import trello
 
 
@@ -42,12 +42,12 @@ def register(bot):
 def atip_command(ack, command, logger, respond, client, body):
     ack()
     user_id = body["user_id"]
-    i18n.set("locale", utils.get_user_locale(user_id, client))
+    i18n.set("locale", slack_users.get_user_locale(client, user_id))
     logger.info("Atip command received: %s", command["text"])
     if command["text"] == "":
         respond(i18n.t("atip.help_text", command=command["command"]))
         return
-    action, *args = utils.parse_command(command["text"])
+    action, *args = slack_commands.parse_command(command["text"])
     match action:
         case "help":
             i18n.set("locale", "en-US")

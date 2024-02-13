@@ -1,6 +1,6 @@
 from integrations import aws_sso
 from models import aws_access_requests
-from commands.utils import log_ops_message
+from server.utils import log_ops_message
 import logging
 
 logging.basicConfig(level=logging.INFO)

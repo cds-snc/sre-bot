@@ -1,24 +1,23 @@
 import os
 import re
 import datetime
-import i18n
+import i18n  # type: ignore
+from dotenv import load_dotenv
 
 from integrations import google_drive, opsgenie
+from integrations.slack import users as slack_users
+from integrations.google_workspace import google_docs
+from integrations.sentinel import log_to_sentinel
 from models import webhooks
-from commands.utils import (
-    log_to_sentinel,
-    get_user_locale,
-    rearrange_by_datetime_ascending,
-    convert_epoch_to_datetime_est,
-    extract_google_doc_id,
-    replace_user_id_with_handle,
-)
 from integrations.google_drive import (
     get_timeline_section,
     replace_text_between_headings,
 )
 
-from dotenv import load_dotenv
+from .handle_slack_message_reactions import (
+    rearrange_by_datetime_ascending,
+    convert_epoch_to_datetime_est,
+)
 
 load_dotenv()
 
@@ -31,6 +30,28 @@ INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+PREFIX = os.environ.get("PREFIX", "")
+
+
+def register(bot):
+    bot.command(f"/{PREFIX}incident")(open_modal)
+    bot.view("incident_view")(submit)
+    bot.action("handle_incident_action_buttons")(handle_incident_action_buttons)
+    bot.action("incident_change_locale")(handle_change_locale_button)
+    bot.event("reaction_added", matchers=[is_floppy_disk])(handle_reaction_added)
+    bot.event("reaction_removed", matchers=[is_floppy_disk])(handle_reaction_removed)
+    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
+    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
+
+
+# Make sure that we are listening only on floppy disk reaction
+def is_floppy_disk(event: dict) -> bool:
+    return event["reaction"] == "floppy_disk"
+
+
+# We need to ack all other reactions so that they don't get processed
+def just_ack_the_rest_of_reaction_events():
+    pass
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
@@ -174,7 +195,7 @@ def open_modal(client, ack, command, body):
         user_id = body["user"]["id"]
     else:
         user_id = body["user_id"]
-    locale = get_user_locale(user_id, client)
+    locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     view = generate_incident_modal_view(command, options, locale)
     client.views_open(trigger_id=body["trigger_id"], view=view)
@@ -417,7 +438,7 @@ def handle_reaction_added(client, ack, body, logger):
             if response["ok"]:
                 for item in range(len(response["bookmarks"])):
                     if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = extract_google_doc_id(
+                        document_id = google_docs.extract_google_doc_id(
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":
@@ -434,7 +455,9 @@ def handle_reaction_added(client, ack, body, logger):
                 # get the current timeline section content
                 content = get_timeline_section(document_id)
 
-                message = replace_user_id_with_handle(user_handle, message["text"])
+                message = slack_users.replace_user_id_with_handle(
+                    user_handle, message["text"]
+                )
 
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
@@ -493,7 +516,7 @@ def handle_reaction_removed(client, ack, body, logger):
             if response["ok"]:
                 for item in range(len(response["bookmarks"])):
                     if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = extract_google_doc_id(
+                        document_id = google_docs.extract_google_doc_id(
                             response["bookmarks"][item]["link"]
                         )
                         if document_id == "":
@@ -501,7 +524,9 @@ def handle_reaction_removed(client, ack, body, logger):
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
-            message = replace_user_id_with_handle(user_handle, message["text"])
+            message = slack_users.replace_user_id_with_handle(
+                user_handle, message["text"]
+            )
 
             # Construct the message to remove
             message_to_remove = f"\n{message_date_time} {user_full_name}: {message}\n"

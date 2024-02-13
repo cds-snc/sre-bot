@@ -1,7 +1,11 @@
 import json
 import logging
 from integrations import google_drive
-from commands.utils import get_stale_channels, log_to_sentinel, extract_google_doc_id
+from integrations.google_workspace import google_docs
+from integrations.slack import channels as slack_channels
+from integrations.sentinel import log_to_sentinel
+
+INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -23,6 +27,16 @@ help_text = """
 \n      - lists all incidents older than 14 days with no activity
 \n      - lister tous les incidents plus vieux que 14 jours sans activité
 """
+
+
+def register(bot):
+    bot.action("add_folder_metadata")(add_folder_metadata)
+    bot.action("view_folder_metadata")(view_folder_metadata)
+    bot.view("view_folder_metadata_modal")(list_folders)
+    bot.view("add_metadata_view")(save_metadata)
+    bot.action("delete_folder_metadata")(delete_folder_metadata)
+    bot.action("archive_channel")(archive_channel_action)
+    bot.view("view_save_incident_roles")(save_incident_roles)
 
 
 def handle_incident_command(args, client, body, respond, ack):
@@ -303,7 +317,9 @@ def close_incident(client, body, ack):
     if response["ok"]:
         for item in range(len(response["bookmarks"])):
             if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = extract_google_doc_id(response["bookmarks"][item]["link"])
+                document_id = google_docs.extract_google_doc_id(
+                    response["bookmarks"][item]["link"]
+                )
     else:
         logging.warning(
             "No bookmark link for the incident document found for channel %s",
@@ -354,7 +370,10 @@ def stale_incidents(client, body, ack):
         trigger_id=body["trigger_id"], view=placeholder
     )
 
-    stale_channels = get_stale_channels(client)
+    # stale_channels = get_stale_channels(client)
+    stale_channels = slack_channels.get_stale_channels(
+        client, INCIDENT_CHANNELS_PATTERN
+    )
 
     blocks = {
         "type": "modal",

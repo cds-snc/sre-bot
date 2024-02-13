@@ -79,3 +79,20 @@ def test_post_data_failure(mock_requests):
     mock_requests.post.return_value.status_code = 400
 
     assert sentinel.post_data(customer_id, shared_key, body, log_type) is False
+
+
+@patch("integrations.sentinel.send_event")
+def test_log_to_sentinel(send_event_mock):
+    sentinel.log_to_sentinel("foo", {"bar": "baz"})
+    send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
+
+
+@patch("integrations.sentinel.send_event")
+@patch("integrations.sentinel.logging")
+def test_log_to_sentinel_logs_error(logging_mock, send_event_mock):
+    send_event_mock.return_value = False
+    sentinel.log_to_sentinel("foo", {"bar": "baz"})
+    send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
+    logging_mock.error.assert_called_with(
+        "Sentinel event failed: {'event': 'foo', 'message': {'bar': 'baz'}}"
+    )

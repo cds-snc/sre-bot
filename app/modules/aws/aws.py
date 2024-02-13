@@ -8,9 +8,9 @@ This module provides the following features:
 
 import os
 
-from commands import utils
-from commands.utils import log_ops_message
+from server.utils import log_ops_message
 from integrations import aws_sso, aws_account_health
+from integrations.slack import commands as slack_commands
 from models import aws_access_requests
 
 PREFIX = os.environ.get("PREFIX", "")
@@ -38,7 +38,7 @@ def aws_command(ack, command, logger, respond, client, body):
         )
         return
 
-    action, *args = utils.parse_command(command["text"])
+    action, *args = slack_commands.parse_command(command["text"])
     match action:
         case "help":
             respond(help_text)
