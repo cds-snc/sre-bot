@@ -1,10 +1,5 @@
 {
-    // "python.pylintPath": "/usr/local/py-utils/bin/pylint",
     "mypy-type-checker.cwd": "${workspaceFolder}/app",
-    // "pylint.cwd": "${workspaceFolder}/app",
-    // "pylint.path": [
-    //     "[\"../../usr/local/py-utils/bin/pylint\"]"
-    // ],
     "flake8.cwd": "${workspaceFolder}/app",
     "python.analysis.extraPaths": [
         "${workspaceFolder}/app"]
