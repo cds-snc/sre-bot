@@ -1,14 +1,14 @@
 import datetime
 
-from commands import incident
+from modules import incident
 
 from unittest.mock import call, MagicMock, patch, ANY
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
 
-@patch("commands.incident.open_modal")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.open_modal")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_call_incident(
     _log_to_sentinel_mock, open_modal_mock
 ):
@@ -29,8 +29,8 @@ def test_handle_incident_action_buttons_call_incident(
     open_modal_mock.assert_called_with(client, ack, {"text": "incident_id"}, body)
 
 
-@patch("commands.incident.webhooks.increment_acknowledged_count")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.webhooks.increment_acknowledged_count")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_ignore(
     _log_to_sentinel_mock, increment_acknowledged_count_mock
 ):
@@ -74,8 +74,8 @@ def test_handle_incident_action_buttons_ignore(
     )
 
 
-@patch("commands.incident.webhooks.increment_acknowledged_count")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.webhooks.increment_acknowledged_count")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_ignore_drop_richtext_block(
     _log_to_sentinel_mock,
     increment_acknowledged_count_mock,
@@ -133,8 +133,8 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
     )
 
 
-@patch("commands.incident.webhooks.increment_acknowledged_count")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.webhooks.increment_acknowledged_count")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
     _log_to_sentinel_mock,
     increment_acknowledged_count_mock,
@@ -206,8 +206,8 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
 # Test that the order of the ignore buttons are appended properly and the preview is moved up once the ignore button is clicked
 
 
-@patch("commands.incident.webhooks.increment_acknowledged_count")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.webhooks.increment_acknowledged_count")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_handle_incident_action_buttons_link_preview(
     _log_to_sentinel_mock, increment_acknowledged_count_mock
 ):
@@ -265,7 +265,7 @@ def test_handle_incident_action_buttons_link_preview(
     )
 
 
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_ack(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
@@ -290,8 +290,8 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     )
 
 
-@patch("commands.incident.generate_incident_modal_view")
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_generate_incident_modal_view(
     mock_list_folders, mock_generate_incident_modal_view
 ):
@@ -306,10 +306,10 @@ def test_incident_open_modal_calls_generate_incident_modal_view(
     mock_generate_incident_modal_view.assert_called_once()
 
 
-@patch("commands.incident.i18n.set")
-@patch("commands.incident.slack_users.get_user_locale")
-@patch("commands.incident.generate_incident_modal_view")
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.i18n.set")
+@patch("modules.incident.incident.slack_users.get_user_locale")
+@patch("modules.incident.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_open_modal_calls_i18n_set(
     mock_list_folders,
     mock_generate_incident_modal_view,
@@ -329,10 +329,10 @@ def test_incident_open_modal_calls_i18n_set(
     mock_i18n_set.assert_called_once_with("locale", "en-US")
 
 
-@patch("commands.incident.i18n")
-@patch("commands.incident.slack_users.get_user_locale")
-@patch("commands.incident.google_drive.list_folders")
-@patch("commands.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.i18n")
+@patch("modules.incident.incident.slack_users.get_user_locale")
+@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.generate_incident_modal_view")
 def test_incident_open_modal_calls_get_user_locale(
     mock_generate_incident_modal_view,
     mock_list_folders,
@@ -352,8 +352,8 @@ def test_incident_open_modal_calls_get_user_locale(
     mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "fr-FR")
 
 
-@patch("commands.incident.i18n")
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.i18n")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_i18n):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
@@ -366,9 +366,9 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
     mock_i18n.t.assert_called()
 
 
-@patch("commands.incident.i18n")
+@patch("modules.incident.incident.i18n")
 @patch("commands.utils.get_user_locale")
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_locale_button_calls_ack(
     mock_list_folders, mock_get_user_locale, mock_i18n
 ):
@@ -387,8 +387,8 @@ def test_incident_locale_button_calls_ack(
     ack.assert_called_once()
 
 
-@patch("commands.incident.generate_incident_modal_view")
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_locale_button_updates_view_modal_locale_value(
     mock_list_folders,
     mock_generate_incident_modal_view,
@@ -410,7 +410,7 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
 
 
-@patch("commands.incident.google_drive.list_folders")
+@patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_local_button_calls_views_update(mock_list_folders):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
@@ -428,11 +428,11 @@ def test_incident_local_button_calls_views_update(mock_list_folders):
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_calls_ack(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -450,12 +450,12 @@ def test_incident_submit_calls_ack(
     ack.assert_called()
 
 
-@patch("commands.incident.generate_success_modal")
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.generate_success_modal")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_calls_views_open(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -507,11 +507,11 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -539,11 +539,11 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_adds_creator_to_channel(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -573,11 +573,11 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_truncates_meet_link_if_too_long(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -612,11 +612,11 @@ def test_incident_submit_truncates_meet_link_if_too_long(
     assert len(kwargs["link"]) <= 78
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _log_to_sentinel_mock,
     _mock_list_metadata,
@@ -648,11 +648,11 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_a_document_and_announces_it(
     _log_to_sentinel_mock,
     mock_list_metadata,
@@ -689,12 +689,12 @@ def test_incident_submit_creates_a_document_and_announces_it(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.opsgenie.get_on_call_users")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_pulls_oncall_people_into_the_channel(
     _log_to_sentinel_mock,
     mock_get_on_call_users,
@@ -747,12 +747,12 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.opsgenie.get_on_call_users")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     _log_to_sentinel_mock,
     mock_get_on_call_users,
@@ -804,12 +804,12 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     )
 
 
-@patch("commands.incident.google_drive.update_incident_list")
-@patch("commands.incident.google_drive.merge_data")
-@patch("commands.incident.google_drive.create_new_incident")
-@patch("commands.incident.google_drive.list_metadata")
-@patch("commands.incident.opsgenie.get_on_call_users")
-@patch("commands.incident.log_to_sentinel")
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_does_not_invite_security_group_members_already_in_channel(
     _log_to_sentinel_mock,
     mock_get_on_call_users,
