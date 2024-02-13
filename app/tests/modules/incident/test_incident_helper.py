@@ -264,7 +264,7 @@ def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
     )
 
 
-@patch("modules.incident.incident_helper.get_stale_channels")
+@patch("modules.incident.incident_helper.slack_channels.get_stale_channels")
 def test_stale_incidents(get_stale_channels_mock):
     client = MagicMock()
     body = {"trigger_id": "foo"}

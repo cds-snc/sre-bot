@@ -1,7 +1,10 @@
 import json
 import logging
 from integrations import google_drive
-from commands.utils import get_stale_channels, log_to_sentinel, extract_google_doc_id
+from integrations.slack import channels as slack_channels
+from commands.utils import log_to_sentinel, extract_google_doc_id
+
+INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -354,7 +357,8 @@ def stale_incidents(client, body, ack):
         trigger_id=body["trigger_id"], view=placeholder
     )
 
-    stale_channels = get_stale_channels(client)
+    # stale_channels = get_stale_channels(client)
+    stale_channels = slack_channels.get_stale_channels(client, INCIDENT_CHANNELS_PATTERN)
 
     blocks = {
         "type": "modal",
