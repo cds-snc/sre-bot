@@ -127,23 +127,6 @@ def convert_epoch_to_datetime_est(epoch_time):
     return est_datetime.strftime("%Y-%m-%d %H:%M:%S") + " ET"
 
 
-def extract_google_doc_id(url):
-    # if the url is empty or None, then log an error
-    if not url:
-        logging.error("URL is empty or None")
-        return None
-
-    # Regular expression pattern to match Google Docs ID
-    pattern = r"https://docs.google.com/document/d/([a-zA-Z0-9_-]+)/"
-
-    # Search in the given text for all occurences of pattern
-    match = re.search(pattern, url)
-    if match:
-        return match.group(1)
-    else:
-        return None
-
-
 # Function to replace the user id with the user handle in a message:w
 def replace_user_id_with_handle(user_handle, message):
     if not user_handle or not message:

@@ -144,34 +144,6 @@ def test_convert_epoch_to_datetime_est_edge_cases():
     assert utils.convert_epoch_to_datetime_est(32503680000) == "2999-12-31 19:00:00 ET"
 
 
-def test_extract_googe_doc_id_valid_google_docs_url():
-    url = "https://docs.google.com/document/d/1aBcD_efGHI/edit"
-    assert utils.extract_google_doc_id(url) == "1aBcD_efGHI"
-
-
-def test_extract_googe_doc_id_oogle_docs_url_with_parameters():
-    url = "https://docs.google.com/document/d/1aBcD_efGHI/edit?usp=sharing"
-    assert utils.extract_google_doc_id(url) == "1aBcD_efGHI"
-
-
-def test_extract_googe_doc_id_non_google_docs_url():
-    url = "https://www.example.com/page/d/1aBcD_efGHI/other"
-    assert utils.extract_google_doc_id(url) is None
-
-
-def test_extract_googe_doc_id_invalid_url_format():
-    url = "https://docs.google.com/document/1aBcD_efGHI"
-    assert utils.extract_google_doc_id(url) is None
-
-
-def test_extract_googe_doc_id_empty_string():
-    assert utils.extract_google_doc_id("") is None
-
-
-def test_extract_googe_doc_id_none_input():
-    assert utils.extract_google_doc_id(None) is None
-
-
 def test_replace_user_id_with_valid_handle():
     assert (
         utils.replace_user_id_with_handle("@user", "Hello <@U12345>, how are you?")
