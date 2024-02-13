@@ -2,12 +2,12 @@ import os
 import re
 import datetime
 import i18n
-
 from integrations import google_drive, opsgenie
+from integrations.slack import users as slack_users
 from models import webhooks
+
 from commands.utils import (
     log_to_sentinel,
-    get_user_locale,
     rearrange_by_datetime_ascending,
     convert_epoch_to_datetime_est,
     extract_google_doc_id,
@@ -174,7 +174,7 @@ def open_modal(client, ack, command, body):
         user_id = body["user"]["id"]
     else:
         user_id = body["user_id"]
-    locale = get_user_locale(user_id, client)
+    locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     view = generate_incident_modal_view(command, options, locale)
     client.views_open(trigger_id=body["trigger_id"], view=view)

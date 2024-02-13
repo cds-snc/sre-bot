@@ -2,7 +2,7 @@ import datetime
 
 from commands import incident
 
-from unittest.mock import call, MagicMock, patch
+from unittest.mock import call, MagicMock, patch, ANY
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
@@ -306,12 +306,18 @@ def test_incident_open_modal_calls_generate_incident_modal_view(
     mock_generate_incident_modal_view.assert_called_once()
 
 
+@patch("commands.incident.i18n.set")
+@patch("commands.incident.slack_users.get_user_locale")
 @patch("commands.incident.generate_incident_modal_view")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_slash_command_calls_generate_incident_modal_view(
-    mock_list_folders, mock_generate_incident_modal_view
+def test_incident_open_modal_calls_i18n_set(
+    mock_list_folders,
+    mock_generate_incident_modal_view,
+    mock_get_user_locale,
+    mock_i18n_set,
 ):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_get_user_locale.return_value = "en-US"
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
@@ -320,27 +326,30 @@ def test_incident_slash_command_calls_generate_incident_modal_view(
     incident.open_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_generate_incident_modal_view.assert_called_once()
+    mock_i18n_set.assert_called_once_with("locale", "en-US")
 
 
+@patch("commands.incident.i18n")
+@patch("commands.incident.slack_users.get_user_locale")
 @patch("commands.incident.google_drive.list_folders")
-def test_incident_open_modal_calls_with_client_locale(mock_list_folders):
+@patch("commands.incident.generate_incident_modal_view")
+def test_incident_open_modal_calls_get_user_locale(
+    mock_generate_incident_modal_view,
+    mock_list_folders,
+    mock_get_user_locale,
+    mock_i18n,
+):
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_get_user_locale.return_value = "fr-FR"
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
-    args = client.views_open.call_args_list
-    _, kwargs = args[0]
     ack.assert_called_once()
-
-    locale = next(
-        (block for block in kwargs["view"]["blocks"] if block["block_id"] == "locale"),
-        None,
-    )["elements"][0]["value"]
-
-    assert locale == "en-US"
+    mock_get_user_locale.assert_called_once_with(client, "user_id")
+    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "fr-FR")
 
 
 @patch("commands.incident.i18n")
@@ -353,8 +362,6 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
     incident.open_modal(client, ack, command, body)
-    args = client.views_open.call_args_list
-    _, kwargs = args[0]
     ack.assert_called_once()
     mock_i18n.t.assert_called()
 
@@ -1150,17 +1157,11 @@ def helper_options():
     return [{"text": {"type": "plain_text", "text": "name"}, "value": "id"}]
 
 
-def helper_client_locale(locale=""):
-    if locale == "fr":
-        return {
-            "ok": True,
-            "user": {"id": "user_id", "locale": "fr-FR"},
-        }
-    else:
-        return {
-            "ok": True,
-            "user": {"id": "user_id", "locale": "en-US"},
-        }
+def helper_client_locale(locale="en-US"):
+    return {
+        "ok": True,
+        "user": {"id": "user_id", "locale": locale},
+    }
 
 
 def helper_generate_success_modal(channel_url="channel_url", locale="en-US"):
