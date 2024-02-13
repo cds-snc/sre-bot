@@ -77,7 +77,7 @@ def test_get_channels_with_pattern():
         ],
         "response_metadata": {"next_cursor": ""},
     }
-    pattern = r'^incident-\d{4}-'
+    pattern = r"^incident-\d{4}-"
     assert channels.get_channels(client, pattern) == [
         {
             "name": "incident-2022-channel",
