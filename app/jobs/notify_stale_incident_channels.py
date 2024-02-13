@@ -1,10 +1,9 @@
 import logging
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import channels as slack_channels
+from modules.incident.incident_helper import INCIDENT_CHANNELS_PATTERN
 
 logging.basicConfig(level=logging.INFO)
-
-INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 
 
 def notify_stale_incident_channels(client):
