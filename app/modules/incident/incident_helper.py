@@ -1,8 +1,9 @@
 import json
 import logging
 from integrations import google_drive
+from integrations.google_workspace import google_docs
 from integrations.slack import channels as slack_channels
-from commands.utils import log_to_sentinel, extract_google_doc_id
+from commands.utils import log_to_sentinel
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 
@@ -306,7 +307,9 @@ def close_incident(client, body, ack):
     if response["ok"]:
         for item in range(len(response["bookmarks"])):
             if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = extract_google_doc_id(response["bookmarks"][item]["link"])
+                document_id = google_docs.extract_google_doc_id(
+                    response["bookmarks"][item]["link"]
+                )
     else:
         logging.warning(
             "No bookmark link for the incident document found for channel %s",
@@ -358,7 +361,9 @@ def stale_incidents(client, body, ack):
     )
 
     # stale_channels = get_stale_channels(client)
-    stale_channels = slack_channels.get_stale_channels(client, INCIDENT_CHANNELS_PATTERN)
+    stale_channels = slack_channels.get_stale_channels(
+        client, INCIDENT_CHANNELS_PATTERN
+    )
 
     blocks = {
         "type": "modal",

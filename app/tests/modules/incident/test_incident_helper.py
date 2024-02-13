@@ -114,7 +114,7 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
 @patch(
-    "modules.incident.incident_helper.extract_google_doc_id",
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 @patch("modules.incident.incident_helper.log_to_sentinel")
@@ -416,7 +416,7 @@ def test_metadata_items():
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
 @patch(
-    "modules.incident.incident_helper.extract_google_doc_id",
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_document):
@@ -464,7 +464,9 @@ def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_doc
 @patch(
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
-@patch("modules.incident.incident_helper.extract_google_doc_id", return_value=None)
+@patch(
+    "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
+)
 def test_close_incident_no_bookmarks(
     mock_extract_id, mock_update_spreadsheet, mock_close_document
 ):
@@ -491,7 +493,9 @@ def test_close_incident_no_bookmarks(
 @patch(
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
-@patch("modules.incident.incident_helper.extract_google_doc_id", return_value=None)
+@patch(
+    "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
+)
 def test_close_incident_no_bookmarks_error(
     mock_extract_id, mock_update_spreadsheet, mock_close_document
 ):
@@ -548,7 +552,7 @@ def test_close_incident_not_incident_channel():
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
 @patch(
-    "modules.incident.incident_helper.extract_google_doc_id",
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_conversations_archive_fail(
@@ -594,7 +598,7 @@ def test_conversations_archive_fail(
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
 )
 @patch(
-    "modules.incident.incident_helper.extract_google_doc_id",
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_conversations_archive_fail_error_message(
@@ -659,27 +663,3 @@ def test_return_channel_name_empty_string():
 def test_return_channel_name_prefix_only():
     # Test the function with a string that is only the prefix.
     assert incident_helper.return_channel_name("incident-") == "#"
-
-
-def test_extract_google_doc_id_valid_url():
-    # Test the function with a valid Google Docs URL.
-    url = "https://docs.google.com/document/d/1XWvE5s_OeB_12345/edit"
-    assert incident_helper.extract_google_doc_id(url) == "1XWvE5s_OeB_12345"
-
-
-def test_extract_google_doc_id_invalid_url():
-    # Test the function with an invalid URL.
-    url = "https://www.example.com/page"
-    assert incident_helper.extract_google_doc_id(url) is None
-
-
-def test_extract_google_doc_id_url_with_no_id():
-    # Test the function with a Google Docs URL that has no ID.
-    url = "https://docs.google.com/document/d/"
-    assert incident_helper.extract_google_doc_id(url) is None
-
-
-def test_extract_google_doc_id_empty_string():
-    # Test the function with an empty string.
-    url = ""
-    assert incident_helper.extract_google_doc_id(url) is None
