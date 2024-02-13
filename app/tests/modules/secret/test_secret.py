@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 @patch("modules.secret.secret.generate_secret_command_modal_view")
-@patch("modules.secret.secret.get_user_locale")
+@patch("modules.secret.secret.slack_users.get_user_locale")
 def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal_view):
     client = MagicMock()
     ack = MagicMock()
@@ -20,7 +20,7 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
 
     secret.secret_command(client, ack, command, body)
 
-    mock_get_user_locale.assert_called_once_with("user_id", client)
+    mock_get_user_locale.assert_called_once_with(client, "user_id")
     mock_generate_secret_command_modal_view.assert_called_once_with(
         command, "user_id", "en-US"
     )

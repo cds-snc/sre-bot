@@ -1,113 +1,6 @@
 from commands import utils
-from datetime import timedelta
-from unittest.mock import ANY, MagicMock, patch
-
-
-def test_get_incident_channels():
-    client = MagicMock()
-    client.conversations_list.return_value = {
-        "ok": True,
-        "channels": [
-            {
-                "name": "channel_name",
-            },
-            {
-                "name": "incident-2022-channel",
-            },
-        ],
-        "response_metadata": {"next_cursor": ""},
-    }
-    assert utils.get_incident_channels(client) == [
-        {
-            "name": "incident-2022-channel",
-        },
-    ]
-
-
-# Test get_incident_channels with multiple pages of results
-def test_get_incident_channels_with_multiple_pages():
-    client = MagicMock()
-
-    # Define mock responses
-    mock_response_page_1 = {
-        "ok": True,
-        "channels": [
-            {"name": "incident-2021-alpha"},
-            {"name": "general"},
-            {"name": "incident-2020-beta"},
-        ],
-        "response_metadata": {"next_cursor": "cursor123"},
-    }
-    mock_response_page_2 = {
-        "ok": True,
-        "channels": [{"name": "random"}, {"name": "incident-2022-gamma"}],
-        "response_metadata": {"next_cursor": ""},
-    }
-
-    # Set the side_effect of the conversations_list method
-    client.conversations_list.side_effect = [mock_response_page_1, mock_response_page_2]
-
-    # Call the function
-    result = utils.get_incident_channels(client)
-
-    # Verify results
-    expected_channels = [
-        {"name": "incident-2021-alpha"},
-        {"name": "incident-2020-beta"},
-        {"name": "incident-2022-gamma"},
-    ]
-    assert result == expected_channels
-
-
-def test_get_messages_in_time_period():
-    client = MagicMock()
-    client.conversations_history.return_value = {
-        "ok": True,
-        "messages": [
-            {
-                "message": "message",
-            },
-            {
-                "message": "message",
-                "team": "team",
-            },
-        ],
-    }
-    assert utils.get_messages_in_time_period(
-        client, "channel_id", timedelta(days=1)
-    ) == [
-        {
-            "message": "message",
-            "team": "team",
-        }
-    ]
-    client.conversations_join.assert_called_with(channel="channel_id")
-    client.conversations_history.assert_called_with(
-        channel="channel_id", oldest=ANY, limit=10
-    )
-
-
-def test_get_messages_in_time_period_with_error():
-    client = MagicMock()
-    client.conversations_history.return_value = {"ok": False}
-    assert (
-        utils.get_messages_in_time_period(client, "channel_id", timedelta(days=1)) == []
-    )
-
-
-@patch("commands.utils.get_incident_channels")
-@patch("commands.utils.get_messages_in_time_period")
-def test_get_stale_channels(
-    get_messages_in_time_period_mock, get_incident_channels_mock
-):
-    client = MagicMock()
-    get_incident_channels_mock.return_value = [
-        {"id": "id", "name": "incident-2022-channel", "created": 0},
-    ]
-    get_messages_in_time_period_mock.return_value = []
-    assert utils.get_stale_channels(client) == [
-        {"id": "id", "name": "incident-2022-channel", "created": 0}
-    ]
+from integrations.slack import users as slack_users
+from unittest.mock import MagicMock, patch
 
 
 def test_log_ops_message():
@@ -163,7 +56,7 @@ def test_get_user_locale_supported_locale():
         "ok": True,
         "user": {"id": "U00AAAAAAA0", "locale": "fr-FR"},
     }
-    assert utils.get_user_locale(user_id, client) == "fr-FR"
+    assert slack_users.get_user_locale(client, user_id) == "fr-FR"
 
 
 def test_get_user_locale_unsupported_locale():
@@ -173,14 +66,14 @@ def test_get_user_locale_unsupported_locale():
         "ok": True,
         "user": {"id": "U00AAAAAAA0", "locale": "es-ES"},
     }
-    assert utils.get_user_locale(user_id, client) == "en-US"
+    assert slack_users.get_user_locale(client, user_id) == "en-US"
 
 
 def test_get_user_locale_without_locale():
     client = MagicMock()
     user_id = MagicMock()
     client.users_info.return_value = {"ok": False}
-    assert utils.get_user_locale(user_id, client) == "en-US"
+    assert slack_users.get_user_locale(client, user_id) == "en-US"
 
 
 def test_basic_functionality_rearrange_by_datetime_ascending():

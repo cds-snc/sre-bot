@@ -308,7 +308,7 @@ def test_copy_files_to_internal_talent_folder(
 
 
 @patch("modules.role.role.i18n")
-@patch("commands.utils.get_user_locale")
+@patch("integrations.slack.users.get_user_locale")
 def test_role_update_modal_locale_ack(mock_get_user_locale, mock_i18n):
     # test ack is called when modal is submitted
     ack = MagicMock()

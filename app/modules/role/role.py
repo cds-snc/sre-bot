@@ -2,6 +2,7 @@ import os
 import i18n
 from commands import utils
 from integrations import google_drive
+from integrations.slack import users as slack_users
 
 from dotenv import load_dotenv
 
@@ -37,7 +38,7 @@ def role_command(ack, command, logger, respond, client, body):
     # get the user id and set the locale for the user
     user_id = body["user_id"]
     # get the user locale from slack.
-    update_locale(utils.get_user_locale(user_id, client))
+    update_locale(slack_users.get_user_locale(client, user_id))
     logger.info("User locale: %s", i18n.get("locale"))
 
     logger.info("Role command received: %s", command["text"])

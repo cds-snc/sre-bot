@@ -7,7 +7,7 @@ import os
 import i18n
 import requests
 import time
-from commands.utils import get_user_locale
+from integrations.slack import users as slack_users
 
 i18n.load_path.append("./locales/")
 
@@ -29,7 +29,7 @@ def secret_command(client, ack, command, body):
         user_id = body["user"]["id"]
     else:
         user_id = body["user_id"]
-    locale = get_user_locale(user_id, client)
+    locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     view = generate_secret_command_modal_view(command, user_id, locale)
     client.views_open(trigger_id=body["trigger_id"], view=view)

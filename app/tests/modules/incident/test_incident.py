@@ -367,7 +367,7 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
 
 
 @patch("modules.incident.incident.i18n")
-@patch("commands.utils.get_user_locale")
+@patch("integrations.slack.users.get_user_locale")
 @patch("modules.incident.incident.google_drive.list_folders")
 def test_incident_locale_button_calls_ack(
     mock_list_folders, mock_get_user_locale, mock_i18n
