@@ -547,6 +547,48 @@ def test_close_incident_not_incident_channel():
     )
 
 
+# Test that the channel that the command is ran in,  is not an incident channel.
+def test_close_incident_cant_send_private_message(caplog):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+
+    # Mock the response of the private message to have been posted as expected
+    mock_client.chat_postEphemeral.return_value = {
+        "ok": False,
+        "error": "not_in_channel",
+    }
+
+    # mock the excpetion and exception message
+    exception_message = "not_in_channel"
+    mock_client.chat_postEphemeral.side_effect = Exception(exception_message)
+
+    # The test channel and user IDs
+    channel_id = "C12345"
+    user_id = "U12345"
+    channel_name = "general"  # Not an incident channel
+
+    # Prepare the request body
+    body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
+
+    # Use the caplog fixture to capture logging
+    with caplog.at_level(logging.ERROR):
+        # Call the function being tested
+        incident_helper.close_incident(client=mock_client, body=body, ack=mock_ack)
+
+        # Check that the expected error message was logged
+        assert caplog.records  # Ensure there is at least one log record
+
+        # Find the specific log message we're interested in
+        log_messages = [record.message for record in caplog.records]
+
+        expected_message = (
+            f"Could not post ephemeral message to user {user_id} due to not_in_channel."
+        )
+        assert (
+            expected_message in log_messages
+        ), "Expected error message not found in log records"
+
+
 @patch("modules.incident.incident_helper.google_drive.close_incident_document")
 @patch(
     "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
