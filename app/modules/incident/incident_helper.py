@@ -133,6 +133,7 @@ def archive_channel_action(client, body, ack):
         channel_info = {
             "channel_id": channel_id,
             "channel_name": body["channel"]["name"],
+            "user_id": user,
         }
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
         close_incident(client, channel_info, ack)
@@ -304,11 +305,17 @@ def close_incident(client, body, ack):
 
     if not channel_name.startswith("incident-"):
         user_id = body["user_id"]
-        client.chat_postEphemeral(
-            text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
-            channel=channel_id,
-            user=user_id,
-        )
+        try:
+            response = client.chat_postEphemeral(
+                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
+                channel=channel_id,
+                user=user_id,
+            )
+        except Exception as e:
+            logging.error(
+                f"Could not post ephemeral message to user %s due to {e}.",
+                user_id,
+            )
         return
 
     # get and update the incident document
