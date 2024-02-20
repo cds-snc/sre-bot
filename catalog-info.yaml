@@ -5,6 +5,7 @@ metadata:
   annotations:
     github.com/project-slug: cds-snc/sre-bot
 spec:
-  type: service
-  lifecycle: unknown
-  owner: group:cds-snc/internal-sre 
+  type: website
+  lifecycle: production
+  owner: group:cds-snc/internal-sre
+  domain: site-reliability-engineering
