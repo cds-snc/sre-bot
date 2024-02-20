@@ -1,5 +1,5 @@
 module "sre_bot_bucket" {
-  source      = "github.com/cds-snc/terraform-modules//s3?ref=v9.2.2"
+  source      = "github.com/cds-snc/terraform-modules//S3?ref=v9.2.2"
   bucket_name = "sre-bot-bucket"
   versioning = {
     enabled = true
