@@ -1,7 +1,7 @@
 """Testing new google service (will be removed)"""
 import os
 
-from integrations.google_workspace import google_drive
+from integrations.google_workspace import google_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,9 +28,23 @@ def open_modal(client, body, folders):
 
 
 def google_service_command(client, body, respond):
-    respond(f"Healthcheck status: {google_drive.healthcheck()}")
-    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)
-    if not folders:
-        respond("The folder ID is invalid. Please check the environment variables.")
+    # respond(f"Healthcheck status: {google_drive.healthcheck()}")
+    # folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)
+    # if not folders:
+    #     respond("The folder ID is invalid. Please check the environment variables.")
+    #     return
+    users = google_directory.list_users()
+    if not users:
+        respond("There was an error retrieving the users.")
         return
-    open_modal(client, body, folders)
+    respond(f"Found {len(users)} users.")
+    groups = google_directory.list_groups()
+    if not groups:
+        respond("There was an error retrieving the groups.")
+        return
+    respond(f"Found {len(groups)} groups.")
+    group_members = google_directory.list_group_members(groups[0]["id"])
+    if not group_members:
+        respond("There was an error retrieving the group members.")
+        return
+    respond(f"Found {len(group_members)} group members in group {groups[0]['name']}.")

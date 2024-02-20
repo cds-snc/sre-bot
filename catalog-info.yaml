@@ -5,6 +5,6 @@ metadata:
   annotations:
     github.com/project-slug: cds-snc/sre-bot
 spec:
-  type: other
+  type: service
   lifecycle: unknown
-  owner: sre 
+  owner: group:cds-snc/internal-sre 

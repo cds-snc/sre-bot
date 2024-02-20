@@ -4,11 +4,12 @@ from unittest.mock import patch, MagicMock
 from json import JSONDecodeError
 import pytest
 from google.oauth2.service_account import Credentials
+from googleapiclient.errors import HttpError, Error  # type: ignore
+from google.auth.exceptions import RefreshError  # type: ignore
 from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
 )
-from googleapiclient.errors import HttpError, Error  # type: ignore
 
 
 @patch("integrations.google_workspace.google_service.build")
@@ -98,6 +99,21 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "An error occurred in function 'mock_func': Error message"
+    )
+
+
+@patch("logging.error")
+def test_handle_google_api_errors_catches_refresh_error(mocked_logging_error):
+    mock_func = MagicMock(side_effect=RefreshError("RefreshError message"))
+    mock_func.__name__ = "mock_func"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is None
+    mock_func.assert_called_once()
+    mocked_logging_error.assert_called_once_with(
+        "A RefreshError occurred in function 'mock_func': RefreshError message"
     )
 
 
