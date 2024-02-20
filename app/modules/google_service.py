@@ -1,8 +1,7 @@
 """Testing new google service (will be removed)"""
 import os
-import json
 
-from integrations.google_workspace import google_drive, google_directory
+from integrations.google_workspace import google_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -44,12 +43,8 @@ def google_service_command(client, body, respond):
         respond("There was an error retrieving the groups.")
         return
     respond(f"Found {len(groups)} groups.")
-    respond(f"group 1: {json.dumps(groups[0], indent=2)}")
     group_members = google_directory.list_group_members(groups[0]["id"])
     if not group_members:
         respond("There was an error retrieving the group members.")
         return
-    respond(f"Found {len(group_members)} group members.")
-    respond(f"member 1: {json.dumps(group_members[0], indent=2)}")
-
-    # open_modal(client, body, folders)
+    respond(f"Found {len(group_members)} group members in group {groups[0]['name']}.")
