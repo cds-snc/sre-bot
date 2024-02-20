@@ -78,3 +78,30 @@ resource "aws_iam_role_policy_attachment" "secrets_manager" {
   role       = aws_iam_role.sre-bot.name
   policy_arn = aws_iam_policy.sre-bot_secrets_manager.arn
 }
+
+# SRE Bot's S3 bucket policy
+
+data "aws_iam_policy_document" "sre_bot_bucket" {
+  statement {
+    actions = [
+      "s3:ListBucket",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = [
+      "arn:aws:s3:::sre-bot-bucket",
+      "arn:aws:s3:::sre-bot-bucket/*",
+    ]
+  }
+}
+
+resource "aws_iam_policy" "sre_bot_bucket" {
+  name        = "sre_bot_bucket"
+  description = "Allows access to the sre-bot-bucket"
+  policy      = data.aws_iam_policy_document.sre_bot_bucket.json
+}
+
+resource "aws_iam_role_policy_attachment" "sre_bot_bucket" {
+  role       = aws_iam_role.sre-bot.name
+  policy_arn = aws_iam_policy.sre_bot_bucket.arn
+}
