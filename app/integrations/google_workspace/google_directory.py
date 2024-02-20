@@ -61,7 +61,7 @@ def list_users():
                 customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
                 maxResults=500,
                 orderBy="email",
-                page_token=page_token,
+                pageToken=page_token,
             )
             .execute()
         )
@@ -100,7 +100,7 @@ def list_groups():
                 customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
                 maxResults=500,
                 orderBy="email",
-                page_token=page_token,
+                pageToken=page_token,
             )
             .execute()
         )
@@ -139,8 +139,7 @@ def list_group_members(group_key):
             .list(
                 groupKey=group_key,
                 maxResults=500,
-                orderBy="email",
-                page_token=page_token,
+                pageToken=page_token,
             )
             .execute()
         )
