@@ -1,7 +1,7 @@
 """Testing new google service (will be removed)"""
 import os
 
-from integrations.google_workspace import google_drive
+from integrations.google_workspace import google_drive, google_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,4 +33,9 @@ def google_service_command(client, body, respond):
     if not folders:
         respond("The folder ID is invalid. Please check the environment variables.")
         return
-    open_modal(client, body, folders)
+    users = google_directory.list_users()
+    if not users:
+        respond("There was an error retrieving the users.")
+        return
+    respond(f"Found {len(users)} users.")
+    # open_modal(client, body, folders)
