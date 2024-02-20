@@ -33,6 +33,8 @@ def get_google_service(service, version, delegated_user_email=None, scopes=None)
     Args:
         service (str): The Google service to get.
         version (str): The version of the service to get.
+        delegated_user_email (str): The email address of the user to impersonate.
+        scopes (list): The list of scopes to request.
 
     Returns:
         The authenticated Google service resource.
