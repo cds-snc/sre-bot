@@ -21,6 +21,7 @@ from functools import wraps
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError, Error  # type: ignore
+from google.auth.exceptions import RefreshError  # type: ignore
 
 load_dotenv()
 
@@ -76,6 +77,9 @@ def handle_google_api_errors(func):
             return None
         except ValueError as e:
             logging.error(f"A ValueError occurred in function '{func.__name__}': {e}")
+            return None
+        except RefreshError as e:
+            logging.error(f"A RefreshError occurred in function '{func.__name__}': {e}")
             return None
         except Error as e:
             logging.error(f"An error occurred in function '{func.__name__}': {e}")
