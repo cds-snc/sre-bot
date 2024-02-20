@@ -25,7 +25,7 @@ from googleapiclient.errors import HttpError, Error  # type: ignore
 load_dotenv()
 
 
-def get_google_service(service, version):
+def get_google_service(service, version, delegated_user_email=None, scopes=None):
     """
     Get an authenticated Google service.
 
@@ -45,6 +45,10 @@ def get_google_service(service, version):
     try:
         creds_info = json.loads(creds_json)
         creds = service_account.Credentials.from_service_account_info(creds_info)
+        if delegated_user_email:
+            creds = creds.with_subject(delegated_user_email)
+        if scopes:
+            creds = creds.with_scopes(scopes)
     except JSONDecodeError as json_decode_exception:
         logging.error("Error while loading credentials JSON: %s", json_decode_exception)
         raise JSONDecodeError(
