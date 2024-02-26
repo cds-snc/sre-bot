@@ -88,8 +88,15 @@ def post_data(customer_id, shared_key, body, log_type):
 
 
 def log_to_sentinel(event, message):
+    is_event_sent = False
     payload = {"event": event, "message": message}
-    if send_event(payload):
+
+    try:
+        is_event_sent = send_event(payload)
+    except Exception as e:
+        logging.error(e)
+
+    if is_event_sent:
         logging.info(f"Sentinel event sent: {payload}")
     else:
         logging.error(f"Sentinel event failed: {payload}")
