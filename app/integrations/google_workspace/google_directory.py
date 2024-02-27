@@ -149,3 +149,69 @@ def list_group_members(group_key):
             break
 
     return all_group_members
+
+
+@handle_google_api_errors
+def get_group(group_key):
+    """Get a group by group ID in the Google Workspace domain.
+
+    Args:
+        group_key (str): The group's email address, group alias, or the unique group ID.
+
+    Returns:
+        dict: A group object.
+    """
+    scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
+
+    service = get_google_service(
+        "admin",
+        "directory_v1",
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=scopes,
+    )
+    group = service.groups().get(groupKey=group_key).execute()
+    return group
+
+
+@handle_google_api_errors
+def list_google_cloud_groups():
+    scopes = ["https://www.googleapis.com/auth/cloud-identity.groups.readonly"]
+
+    service = get_google_service(
+        "cloudidentity",
+        "v1",
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=scopes,
+    )
+    all_groups = []
+    page_token = None
+
+    while True:
+        results = (
+            service.groups()
+            .list(
+                parent=f"customers/{GOOGLE_WORKSPACE_CUSTOMER_ID}",
+                pageToken=page_token,
+            )
+            .execute()
+        )
+        all_groups.extend(results.get("groups", []))
+        page_token = results.get("nextPageToken")
+        if not page_token:
+            break
+
+    return all_groups
+
+
+@handle_google_api_errors
+def get_google_cloud_group(group_name):
+    scopes = ["https://www.googleapis.com/auth/cloud-identity.groups.readonly"]
+
+    service = get_google_service(
+        "cloudidentity",
+        "v1",
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=scopes,
+    )
+    group = service.groups().get(name=group_name).execute()
+    return group
