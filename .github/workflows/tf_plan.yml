@@ -35,14 +35,14 @@ jobs:
         uses: cds-snc/terraform-tools-setup@v1
 
       - name: configure aws credentials using OIDC
-        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
           role-to-assume: arn:aws:iam::283582579564:role/sre-bot-plan
           role-session-name: TFPlan
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform plan
-        uses: cds-snc/terraform-plan@b84f6e89f3e7b5ecf648a2c036c043c73d82da59 # v3.1.0
+        uses: cds-snc/terraform-plan@32db69c102392f5a91828307d29cd7619cd180c0 # v3.2.1
         with:
           comment-delete: true
           comment-title: "Production: ${{ matrix.module }}"
