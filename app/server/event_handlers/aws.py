@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import os
 import urllib.parse
@@ -23,6 +24,9 @@ def parse(payload, client):
         blocks = format_new_iam_user(payload)
     elif isinstance(msg, str) and "API Key with value token=" in msg:
         blocks = format_api_key_detected(payload, client)
+    elif isinstance(msg, dict) and {"previousBudgetLimit", "currentBudgetLimit"} <= msg.keys():
+        logging.info(f"Budget auto-adjustment event received: {payload.Message}")
+        blocks = []
     else:
         blocks = []
         log_ops_message(
