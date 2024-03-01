@@ -17,6 +17,19 @@ def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mo
     )
 
 
+@patch("server.event_handlers.aws.log_ops_message")
+def test_parse_returns_empty_block_if_budget_auto_adjustment_event(
+    log_ops_message_mock,
+):
+    client = MagicMock()
+    payload = MagicMock(
+        Message='{"previousBudgetLimit": "1", "currentBudgetLimit": "2"}'
+    )
+    response = aws.parse(payload, client)
+    assert response == []
+    log_ops_message_mock.assert_not_called()
+
+
 @patch("server.event_handlers.aws.format_cloudwatch_alarm")
 def test_parse_returns_blocks_if_AlarmArn_in_msg(format_cloudwatch_alarm_mock):
     client = MagicMock()
