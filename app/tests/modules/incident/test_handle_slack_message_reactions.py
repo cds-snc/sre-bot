@@ -54,7 +54,7 @@ def test_entries_out_of_order_rearrange_by_datetime_ascending():
 
 def test_invalid_entries_rearrange_by_datetime_ascending():
     input_text = """
-    ➡️ Invalid Entry 
+    ➡️ Invalid Entry
     ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
     """
     expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n"

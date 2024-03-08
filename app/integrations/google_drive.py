@@ -351,7 +351,6 @@ def find_heading_indices(content, start_heading, end_heading):
     return start_index, end_index
 
 
-
 # Replace the text between the headings
 def replace_text_between_headings(doc_id, new_content, start_heading, end_heading):
     # Setup the service
