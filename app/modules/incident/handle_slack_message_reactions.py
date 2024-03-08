@@ -4,55 +4,37 @@ import pytz
 
 
 def rearrange_by_datetime_ascending(text):
-    # Split the text by lines
     lines = text.split("\n")
-
-    # Temporary storage for multiline entries
     entries = []
-    current_entry = []
 
-    # Iterate over each line
+    pattern = r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+)\)\s([\w\s]+):\s"
+
+    current_message = []
     for line in lines:
-        # Check if the line starts with a datetime format including 'ET'
-        if re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ET", line):
-            if current_entry:
-                # Combine the lines in current_entry and add to entries
-                entries.append("\n".join(current_entry))
-                current_entry = [line]
-            else:
-                current_entry.append(line)
-        else:
-            # If not a datetime, it's a continuation of the previous message
-            current_entry.append(line)
-
-    # Add the last entry
-    if current_entry:
-        if current_entry.__len__() > 1:
-            # that means we have a multiline entry
-            joined_current_entry = "\n".join(current_entry)
-            entries.append(joined_current_entry)
-        else:
-            entries.append("\n".join(current_entry))
-
-    # Now extract date, time, and message from each entry
-    dated_entries = []
-    for entry in entries:
-        match = re.match(
-            r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} ET):?[\s,]*(.*)", entry, re.DOTALL
-        )
+        match = re.match(pattern, line)
         if match:
-            date_str, msg = match.groups()
-            # Parse the datetime string (ignoring 'ET' for parsing)
-            dt = datetime.strptime(date_str[:-3].strip(), "%Y-%m-%d %H:%M:%S")
-            dated_entries.append((dt, msg))
+            if (
+                current_message
+            ):  # If there's a current message, finalize it before starting a new one
+                entries.append(current_message)
+                current_message = []
+            date_str, url, name = match.groups()
+            dt = datetime.strptime(date_str.strip(), "%Y-%m-%d %H:%M:%S")
+            msg_start = line[match.end() :].strip(" ")
+            current_message = [dt, url, f"{name}:", msg_start]
+        elif current_message:  # If it's a continuation of the current message
+            current_message[-1] += "\n" + f"{line.strip()}"
+
+    if current_message:  # Don't forget to append the last message
+        entries.append(current_message)
 
     # Sort the entries by datetime in ascending order
-    sorted_entries = sorted(dated_entries, key=lambda x: x[0], reverse=False)
+    sorted_entries = sorted(entries, key=lambda x: x[0])
 
-    # Reformat the entries back into strings, including 'ET'
-    sorted_text = "\n".join(
+    # Reformat the entries back into strings, including 'ET' and the full message
+    sorted_text = "\n\n".join(
         [
-            f"{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET {entry[1]}"
+            f"➡️ [{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET]({entry[1]}) {entry[2]} {entry[3]}"
             for entry in sorted_entries
         ]
     )
