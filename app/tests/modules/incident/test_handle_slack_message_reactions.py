@@ -2,46 +2,62 @@ from unittest.mock import MagicMock
 from modules.incident import handle_slack_message_reactions
 
 
-def test_basic_functionality_rearrange_by_datetime_ascending():
-    input_text = "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
-    expected_output = (
-        "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
-    )
+def test_multiline_entries_rearrange_by_datetime_ascending():
+    input_text = """
+    ➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one
+    ➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two
+    """
+    expected_output = "➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one"
     assert (
-        handle_slack_message_reactions.rearrange_by_datetime_ascending(input_text)
+        handle_slack_message_reactions.rearrange_by_datetime_ascending(
+            input_text
+        ).strip()
         == expected_output
     )
 
 
-def test_multiline_entries_rearrange_by_datetime_ascending():
-    input_text = (
-        "2024-01-01 10:00:00 ET Message A\nContinued\n"
-        "2024-01-02 11:00:00 ET Message B"
-    )
-    expected_output = (
-        "2024-01-01 10:00:00 ET Message A\nContinued\n"
-        "2024-01-02 11:00:00 ET Message B"
-    )
+def test_rearrange_single_entry():
+    input_text = "➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Only one message"
+    expected_output = "➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Only one message"
     assert (
-        handle_slack_message_reactions.rearrange_by_datetime_ascending(input_text)
+        handle_slack_message_reactions.rearrange_by_datetime_ascending(
+            input_text
+        ).strip()
+        == expected_output
+    )
+
+
+def test_rearrange_no_entries():
+    input_text = ""
+    expected_output = ""
+    assert (
+        handle_slack_message_reactions.rearrange_by_datetime_ascending(
+            input_text
+        ).strip()
         == expected_output
     )
 
 
 def test_entries_out_of_order_rearrange_by_datetime_ascending():
-    input_text = "2024-01-02 11:00:00 ET Message B\n" "2024-01-01 10:00:00 ET Message A"
-    expected_output = (
-        "2024-01-01 10:00:00 ET Message A\n" "2024-01-02 11:00:00 ET Message B"
-    )
+    input_text = """
+    ➡️ [2024-03-07 11:00:00 ET](https://example.com/link1) John Doe: Message one
+    ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
+    """
+    expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 11:00:00 ET](https://example.com/link1) John Doe: Message one"
     assert (
-        handle_slack_message_reactions.rearrange_by_datetime_ascending(input_text)
+        handle_slack_message_reactions.rearrange_by_datetime_ascending(
+            input_text
+        ).strip()
         == expected_output
     )
 
 
 def test_invalid_entries_rearrange_by_datetime_ascending():
-    input_text = "Invalid Entry\n" "2024-01-01 10:00:00 ET Message A"
-    expected_output = "2024-01-01 10:00:00 ET Message A"
+    input_text = """
+    ➡️ Invalid Entry
+    ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
+    """
+    expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n"
     assert (
         handle_slack_message_reactions.rearrange_by_datetime_ascending(input_text)
         == expected_output

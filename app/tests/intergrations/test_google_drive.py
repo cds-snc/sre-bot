@@ -569,6 +569,92 @@ def test_replace_text_between_headings_neither_heading_not_found(mock_service):
     assert not mock_service.return_value.documents().batchUpdate.called
 
 
+def test_no_headings_present_find_heading_indices():
+    content = [
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "startIndex": 1,
+                        "endIndex": 10,
+                        "textRun": {"content": "Some text"},
+                    }
+                ]
+            }
+        }
+    ]
+    assert google_drive.find_heading_indices(content, START_HEADING, END_HEADING) == (
+        None,
+        None,
+    )
+
+
+def test_only_start_heading_present_find_heading_indices():
+    content = [
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "startIndex": 1,
+                        "endIndex": 13,
+                        "textRun": {"content": START_HEADING},
+                    }
+                ]
+            }
+        }
+    ]
+    assert google_drive.find_heading_indices(content, START_HEADING, END_HEADING) == (
+        13,
+        None,
+    )
+
+
+def test_both_headings_present_find_heading_indices():
+    content = [
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "startIndex": 1,
+                        "endIndex": 14,
+                        "textRun": {"content": START_HEADING, "endIndex": 13},
+                    }
+                ]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "startIndex": 17,
+                        "endIndex": 24,
+                        "textRun": {"content": "Some text", "endIndex": 22},
+                    }
+                ]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "startIndex": 25,
+                        "endIndex": 34,
+                        "textRun": {
+                            "content": END_HEADING,
+                            "startIndex": 23,
+                            "endIndex": 33,
+                        },
+                    }
+                ]
+            }
+        },
+    ]
+    assert google_drive.find_heading_indices(content, START_HEADING, END_HEADING) == (
+        14,
+        25,
+    )
+
+
 @patch("integrations.google_drive.list_metadata")
 def test_healthcheck_healthy(mock_list_metadata):
     mock_list_metadata.return_value = {"id": "test_doc"}

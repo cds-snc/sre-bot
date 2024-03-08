@@ -443,9 +443,19 @@ def handle_reaction_added(client, ack, body, logger):
                         )
                         if document_id == "":
                             logger.error("No incident document found for this channel.")
+
             for message in messages:
+                # get the message ts time
+                message_ts = message["ts"]
+
                 # convert the time which is now in epoch time to standard ET Time
-                message_date_time = convert_epoch_to_datetime_est(message["ts"])
+                message_date_time = convert_epoch_to_datetime_est(message_ts)
+
+                # get a link to the message
+                link = client.chat_getPermalink(
+                    channel=channel_id, message_ts=message_ts
+                )["permalink"]
+
                 # get the user name from the message
                 user = client.users_profile_get(user=message["user"])
                 # get the full name of the user so that we include it into the timeline
@@ -462,7 +472,9 @@ def handle_reaction_added(client, ack, body, logger):
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
                     # append the new message to the content
-                    content += f"{message_date_time} {user_full_name}: {message}"
+                    content += (
+                        f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
+                    )
 
                     # if there is an image in the message, then add it to the timeline
                     if "files" in message:
@@ -500,8 +512,11 @@ def handle_reaction_removed(client, ack, body, logger):
             # get the message we want to delete
             message = messages[0]
 
+            # get the message ts time
+            message_ts = message["ts"]
+
             # convert the epoch time to standard ET day/time
-            message_date_time = convert_epoch_to_datetime_est(message["ts"])
+            message_date_time = convert_epoch_to_datetime_est(message_ts)
 
             # get the user of the person that send the message
             user = client.users_profile_get(user=message["user"])
@@ -528,8 +543,16 @@ def handle_reaction_removed(client, ack, body, logger):
                 user_handle, message["text"]
             )
 
+            # get a link to the message
+            link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)[
+                "permalink"
+            ]
+
             # Construct the message to remove
-            message_to_remove = f"\n{message_date_time} {user_full_name}: {message}\n"
+            message_to_remove = (
+                f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
+            )
+
             # if there is a file in the message, then add it to the message to remove
             if "files" in message:
                 image = message["files"][0]["url_private"]
