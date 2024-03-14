@@ -3,7 +3,6 @@
 This module contains the user related functionality for the Slack integration.
 """
 import re
-import logging
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
@@ -48,13 +47,18 @@ def get_user_locale(client, user_id=None):
     return default_locale
 
 
-def replace_user_id_with_handle(user_handle, message):
-    """Function to replace the user id with the user handle in a message:w"""
-    if not user_handle or not message:
-        logging.error("User handle or message is empty or None")
-        return None
+def replace_user_id_with_handle(client, message):
+    """Function to replace the user id with the user handle in a message."""
+    user_id_pattern = r"<@(\w+)>"
 
-    user_id_pattern = r"<@\w+>"
-    if re.search(user_id_pattern, message):
-        message = re.sub(user_id_pattern, user_handle, message)
-    return message
+    # Callback function to process each match
+    def replace_with_handle(match):
+        user_id = match.group(1)  # Extract the actual user ID without <@ and >
+        # Fetch user details using the provided client; adjust this to fit your actual method
+        user = client.users_profile_get(user=user_id)
+        user_handle = "@" + user["profile"]["display_name"]  # Construct user handle
+        return user_handle  # Return the user handle to replace the original match
+
+    # Use re.sub() with the callback function to replace all matches
+    updated_message = re.sub(user_id_pattern, replace_with_handle, message)
+    return updated_message

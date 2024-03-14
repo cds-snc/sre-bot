@@ -62,41 +62,68 @@ def test_get_user_locale_without_user_id():
 
 
 def test_replace_user_id_with_valid_handle():
+    client = MagicMock()
+    client.users_profile_get.return_value = {"profile": {"display_name": "user"}}
     assert (
-        users.replace_user_id_with_handle("@user", "Hello <@U12345>, how are you?")
+        users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?")
         == "Hello @user, how are you?"
     )
 
 
 def test_replace_user_id_with_no_pattern_in_message():
+    client = MagicMock()
+    client.users_profile_get.return_value = {"profile": {"display_name": "user"}}
     assert (
-        users.replace_user_id_with_handle("@user", "Hello user, how are you?")
+        users.replace_user_id_with_handle(client, "Hello user, how are you?")
         == "Hello user, how are you?"
     )
 
 
 def test_replace_user_id_with_empty_handle():
+    client = MagicMock()
+    client.users_profile_get.return_value = {"profile": {"display_name": ""}}
     assert (
-        users.replace_user_id_with_handle("", "Hello <@U12345>, how are you?") is None
+        users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?")
+        == "Hello @, how are you?"
     )
 
 
 def test_replace_user_id_with_empty_message():
-    assert users.replace_user_id_with_handle("@user", "") is None
+    client = MagicMock()
+    assert users.replace_user_id_with_handle(client, "") == ""
 
 
-def test_replace_user_id_with_none_handle():
-    assert (
-        users.replace_user_id_with_handle(None, "Hello <@U12345>, how are you?") is None
-    )
+def test_replace_user_id_with_two_users():
+    client = MagicMock()
+
+    def users_profile_get(user):
+        if user == "U1234":
+            return {"profile": {"display_name": "john_doe"}}
+        elif user == "U5678":
+            return {"profile": {"display_name": "jane_smith"}}
+
+    client.users_profile_get.side_effect = users_profile_get
+
+    message = "Hello, <@U1234> and <@U5678>! Welcome to the team."
+    expected_message = "Hello, @john_doe and @jane_smith! Welcome to the team."
+    assert users.replace_user_id_with_handle(client, message) == expected_message
 
 
-def test_replace_user_id_with_none_message():
-    assert users.replace_user_id_with_handle("@user", None) is None
+def test_replace_user_id_with_multiple_users():
+    client = MagicMock()
 
+    def users_profile_get(user):
+        if user == "U1234":
+            return {"profile": {"display_name": "john_doe"}}
+        elif user == "U5678":
+            return {"profile": {"display_name": "jane_smith"}}
+        elif user == "U9101":
+            return {"profile": {"display_name": "joe_smith"}}
+        elif user == "U1121":
+            return {"profile": {"display_name": "jenn_smith"}}
 
-def test_replace_multiple_user_ids_in_message():
-    assert (
-        users.replace_user_id_with_handle("@user", "Hi <@U12345>, meet <@U67890>")
-        == "Hi @user, meet @user"
-    )
+    client.users_profile_get.side_effect = users_profile_get
+
+    message = "Hello, <@U1234> and <@U5678>! Welcome to the team. Also welcome <@U9101> and <@U1121>."
+    expected_message = "Hello, @john_doe and @jane_smith! Welcome to the team. Also welcome @joe_smith and @jenn_smith."
+    assert users.replace_user_id_with_handle(client, message) == expected_message
