@@ -460,13 +460,13 @@ def handle_reaction_added(client, ack, body, logger):
                 user = client.users_profile_get(user=message["user"])
                 # get the full name of the user so that we include it into the timeline
                 user_full_name = user["profile"]["real_name"]
-                user_handle = "@" + user["profile"]["display_name"]
 
                 # get the current timeline section content
                 content = get_timeline_section(document_id)
 
+                # if the message contains mentions to other slack users, replace those mentions with their name
                 message = slack_users.replace_user_id_with_handle(
-                    user_handle, message["text"]
+                    client, message["text"]
                 )
 
                 # if the message already exists in the timeline, then don't put it there again
@@ -522,7 +522,6 @@ def handle_reaction_removed(client, ack, body, logger):
             user = client.users_profile_get(user=message["user"])
             # get the user's full name
             user_full_name = user["profile"]["real_name"]
-            user_handle = "@" + user["profile"]["display_name"]
 
             # get the incident report document id from the incident channel
             # get and update the incident document
@@ -539,9 +538,8 @@ def handle_reaction_removed(client, ack, body, logger):
             # Retrieve the current content of the timeline
             content = get_timeline_section(document_id)
 
-            message = slack_users.replace_user_id_with_handle(
-                user_handle, message["text"]
-            )
+            # if the message contains mentions to other slack users, replace those mentions with their name
+            message = slack_users.replace_user_id_with_handle(client, message["text"])
 
             # get a link to the message
             link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)[
