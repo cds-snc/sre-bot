@@ -3,5 +3,5 @@ coverage==6.5.0
 flake8==6.1.0
 freezegun==1.4.0
 pytest==7.4.4
-pytest-asyncio==0.23.5.post1
+pytest-asyncio==0.23.6
 pytest-env==0.8.2
