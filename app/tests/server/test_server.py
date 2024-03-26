@@ -35,15 +35,18 @@ def test_geolocate_failure(mock_geolocate):
 
 @patch("server.server.append_incident_buttons")
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_to_sentinel")
 def test_handle_webhook_found(
     _log_to_sentinel_mock,
     increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
     append_incident_buttons_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = {"channel": "channel"}
     append_incident_buttons_mock.return_value.json.return_value = "[]"
     response = client.post("/hook/id", json=payload)
@@ -54,13 +57,42 @@ def test_handle_webhook_found(
     assert append_incident_buttons_mock.call_count == 1
 
 
+@patch("server.server.append_incident_buttons")
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.log_to_sentinel")
+def test_handle_webhook_disabled(
+    _log_to_sentinel_mock,
+    increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
+    append_incident_buttons_mock,
+):
+    is_active_mock.return_value = False
+    get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    payload = {"channel": "channel"}
+    append_incident_buttons_mock.return_value.json.return_value = "[]"
+    response = client.post("/hook/id", json=payload)
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Webhook not active"}
+    assert get_webhook_mock.call_count == 1
+    assert increment_invocation_count_mock.call_count == 0
+    assert append_incident_buttons_mock.call_count == 0
+
+
+@patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_with_invalid_aws_json_payload(
-    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+    _log_ops_message_mock,
+    _increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = "not a json payload"
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 500
@@ -68,12 +100,17 @@ def test_handle_webhook_with_invalid_aws_json_payload(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_with_bad_aws_signature(
-    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+    _log_ops_message_mock,
+    _increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "foo"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 500
@@ -81,12 +118,17 @@ def test_handle_webhook_with_bad_aws_signature(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_with_bad_aws_message_type(
-    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+    _log_ops_message_mock,
+    _increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "foo"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 500
@@ -96,12 +138,17 @@ def test_handle_webhook_with_bad_aws_message_type(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_with_bad_aws_invalid_cert_version(
-    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+    _log_ops_message_mock,
+    _increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = (
         '{"Type": "Notification", "SignatureVersion": "foo", "SigningCertURL": "foo"}'
     )
@@ -113,12 +160,17 @@ def test_handle_webhook_with_bad_aws_invalid_cert_version(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_with_bad_aws_invalid_signature_version(
-    _log_ops_message_mock, _increment_invocation_count_mock, get_webhook_mock
+    _log_ops_message_mock,
+    _increment_invocation_count_mock,
+    is_active_mock,
+    get_webhook_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type":"Notification", "SigningCertURL":"https://foo.pem", "SignatureVersion":"1"}'
     response = client.post("/hook/id", json=payload)
 
@@ -129,6 +181,7 @@ def test_handle_webhook_with_bad_aws_invalid_signature_version(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 @patch("server.server.sns_message_validator.validate_message")
@@ -138,10 +191,12 @@ def test_handle_webhook_with_SubscriptionConfirmation_payload(
     validate_message_mock,
     log_ops_message_mock,
     _increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
 ):
     validate_message_mock.return_value = True
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "SubscriptionConfirmation", "SubscribeURL": "SubscribeURL", "TopicArn": "TopicArn"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
@@ -150,6 +205,7 @@ def test_handle_webhook_with_SubscriptionConfirmation_payload(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.sns_message_validator.validate_message")
 @patch("server.server.log_ops_message")
@@ -157,10 +213,12 @@ def test_handle_webhook_with_UnsubscribeConfirmation_payload(
     log_ops_message_mock,
     validate_message_mock,
     _increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
 ):
     validate_message_mock.return_value = True
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "UnsubscribeConfirmation"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
@@ -169,6 +227,7 @@ def test_handle_webhook_with_UnsubscribeConfirmation_payload(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.sns_message_validator.validate_message")
 @patch("server.server.aws.parse")
@@ -178,11 +237,13 @@ def test_handle_webhook_with_Notification_payload(
     parse_mock,
     validate_message_mock,
     _increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
 ):
     validate_message_mock.return_value = True
     parse_mock.return_value = ["foo", "bar"]
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "Notification"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200
@@ -191,15 +252,18 @@ def test_handle_webhook_with_Notification_payload(
 
 @patch("server.server.append_incident_buttons")
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.log_ops_message")
 def test_handle_webhook_found_but_exception(
     log_ops_message_mock,
     increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
     append_incident_buttons_mock,
 ):
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = MagicMock()
     append_incident_buttons_mock.return_value.json.return_value = "[]"
     request = MagicMock()
@@ -210,6 +274,7 @@ def test_handle_webhook_found_but_exception(
 
 
 @patch("server.server.webhooks.get_webhook")
+@patch("server.server.webhooks.is_active")
 @patch("server.server.webhooks.increment_invocation_count")
 @patch("server.server.sns_message_validator.validate_message")
 @patch("server.server.aws.parse")
@@ -219,12 +284,14 @@ def test_handle_webhook_with_empty_text_for_payload(
     parse_mock,
     validate_message_mock,
     _increment_invocation_count_mock,
+    is_active_mock,
     get_webhook_mock,
 ):
     # Test that we don't post to slack if we have an empty message
     validate_message_mock.return_value = True
     parse_mock.return_value = []
     get_webhook_mock.return_value = {"channel": {"S": "channel"}}
+    is_active_mock.return_value = True
     payload = '{"Type": "Notification", "Message": "{}"}'
     response = client.post("/hook/id", json=payload)
     assert response.status_code == 200

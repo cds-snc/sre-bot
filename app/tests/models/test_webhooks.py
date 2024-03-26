@@ -166,6 +166,46 @@ def test_revoke_webhook(client_mock):
 
 
 @patch("models.webhooks.client")
+def test_is_active_returns_true(client_mock):
+    client_mock.get_item.return_value = {
+        "Item": {
+            "id": {"S": "test_id"},
+            "channel": {"S": "test_channel"},
+            "name": {"S": "test_name"},
+            "created_at": {"S": "test_created_at"},
+            "active": {"BOOL": True},
+            "user_id": {"S": "test_user_id"},
+            "invocation_count": {"N": "0"},
+            "acknowledged_count": {"N": "0"},
+        }
+    }
+    assert webhooks.is_active("test_id") is True
+
+
+@patch("models.webhooks.client")
+def test_is_active_returns_false(client_mock):
+    client_mock.get_item.return_value = {
+        "Item": {
+            "id": {"S": "test_id"},
+            "channel": {"S": "test_channel"},
+            "name": {"S": "test_name"},
+            "created_at": {"S": "test_created_at"},
+            "active": {"BOOL": False},
+            "user_id": {"S": "test_user_id"},
+            "invocation_count": {"N": "0"},
+            "acknowledged_count": {"N": "0"},
+        }
+    }
+    assert webhooks.is_active("test_id") is False
+
+
+@patch("models.webhooks.client")
+def test_is_active_not_found(client_mock):
+    client_mock.get_item.return_value = {}
+    assert webhooks.is_active("test_id") is False
+
+
+@patch("models.webhooks.client")
 @patch("models.webhooks.get_webhook")
 def test_toggle_webhook(get_webhook_mock, client_mock):
     client_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}

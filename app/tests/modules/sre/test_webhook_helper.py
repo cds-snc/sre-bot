@@ -505,11 +505,11 @@ def test_toggle_webhook(list_all_webhooks_mock, toggle_webhook_mock, get_webhook
     webhook_helper.toggle_webhook(ack, body, logger, client)
     ack.assert_called()
     toggle_webhook_mock.assert_called_with("id")
-    logger.info.assert_called_with("Webhook name has been enabled by <@username>")
+    logger.info.assert_called_with("Webhook name has been disabled by <@username>")
     client.chat_postMessage.assert_called_with(
         channel="channel",
         user="user_id",
-        text="Webhook name has been enabled by <@username>",
+        text="Webhook name has been disabled by <@username>",
     )
     list_all_webhooks_mock.assert_called_with(
         client, body, 0, webhook_helper.MAX_BLOCK_SIZE, "all", update=True

@@ -320,7 +320,7 @@ def toggle_webhook(ack, body, logger, client):
     channel = hook["channel"]["S"]
 
     webhooks.toggle_webhook(id)
-    message = f"Webhook {name} has been {'enabled' if hook['active']['BOOL'] else 'disabled'} by <@{username}>"
+    message = f"Webhook {name} has been {'disabled' if hook['active']['BOOL'] else 'enabled'} by <@{username}>"
     logger.info(message)
     client.chat_postMessage(
         channel=channel,
