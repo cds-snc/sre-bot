@@ -302,9 +302,9 @@ def close_incident(client, body, ack):
     # get the current chanel id and name
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
+    user_id = body["user_id"]
 
     if not channel_name.startswith("incident-"):
-        user_id = body["user_id"]
         try:
             response = client.chat_postEphemeral(
                 text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
@@ -351,6 +351,12 @@ def close_incident(client, body, ack):
     if not response["ok"]:
         logging.error(
             "Could not archive the channel %s - %s", channel_name, response["error"]
+        )
+    else:
+        # post a message that the channel has been archived by the user
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"<@{user_id}> has archived this channel 👋",
         )
 
 
