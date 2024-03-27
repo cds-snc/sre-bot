@@ -360,7 +360,9 @@ def close_incident(client, body, ack):
         )
     else:
         # Log the message that the user has archived the channel.
-        logging.info(f"<@{user_id}> has archived this channel")
+        logging.info(
+            "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
+        )
 
 
 def stale_incidents(client, body, ack):
