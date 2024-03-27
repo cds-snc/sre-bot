@@ -440,7 +440,11 @@ def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_doc
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
-        {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
         mock_ack,
     )
 
@@ -479,7 +483,11 @@ def test_close_incident_no_bookmarks(
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
-        {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
         mock_ack,
     )
 
@@ -508,7 +516,11 @@ def test_close_incident_no_bookmarks_error(
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
-        {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
         mock_ack,
     )
 
@@ -622,7 +634,11 @@ def test_conversations_archive_fail(
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
-        {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
         mock_ack,
     )
 
@@ -669,7 +685,11 @@ def test_conversations_archive_fail_error_message(
         # Call close_incident
         incident_helper.close_incident(
             mock_client,
-            {"channel_id": "C12345", "channel_name": "incident-2024-01-12-test"},
+            {
+                "channel_id": "C12345",
+                "channel_name": "incident-2024-01-12-test",
+                "user_id": "U12345",
+            },
             mock_ack,
         )
 
@@ -684,6 +704,52 @@ def test_conversations_archive_fail_error_message(
     assert (
         "Could not archive the channel incident-2024-01-12-test - not_in_channel"
         not in caplog.text
+    )
+
+
+@patch("modules.incident.incident_helper.google_drive.close_incident_document")
+@patch(
+    "modules.incident.incident_helper.google_drive.update_spreadsheet_close_incident"
+)
+@patch(
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
+    return_value="dummy_document_id",
+)
+def test_conversations_archive_succeeds_post_message_who_archived(
+    mock_extract_id, mock_update_spreadsheet, mock_close_document, caplog
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-channel_name",
+        "user_id": "user_id",
+    }
+    incident_helper.close_incident(mock_client, body, mock_ack)
+
+    # Mock the response of client.bookmarks_list with a valid bookmark
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    # Mock the response of client.conversations_archive to indicate success
+    mock_client.conversations_archive.return_value = {
+        "ok": True,
+    }
+
+    # assert that the channel was archived
+    mock_client.conversations_archive.assert_called_once_with(channel="channel_id")
+
+    # assert message was posted to archived channel.
+    mock_client.chat_postMessage.assert_any_call(
+        text="<@user_id> has archived this channel 👋",
+        channel="channel_id",
     )
 
 
