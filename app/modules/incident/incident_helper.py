@@ -344,6 +344,12 @@ def close_incident(client, body, ack):
     # Update the spreadsheet with the current incident with status = closed
     google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
 
+    # Need to post the message before the channe is archived so that the message can be delivered.
+    client.chat_postMessage(
+        channel=channel_id,
+        text=f"<@{user_id}> has archived this channel 👋",
+    )
+
     # archive the channel
     response = client.conversations_archive(channel=channel_id)
 
@@ -353,11 +359,8 @@ def close_incident(client, body, ack):
             "Could not archive the channel %s - %s", channel_name, response["error"]
         )
     else:
-        # post a message that the channel has been archived by the user
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"<@{user_id}> has archived this channel 👋",
-        )
+        # Log the message that the user has archived the channel.
+        logging.info(f"<@{user_id}> has archived this channel")
 
 
 def stale_incidents(client, body, ack):
