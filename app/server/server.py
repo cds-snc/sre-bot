@@ -186,102 +186,106 @@ def geolocate(ip):
 def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     webhook = webhooks.get_webhook(id)
     if webhook:
-        webhooks.increment_invocation_count(id)
+        # if the webhook is active, then send forward the response to the webhook
+        if webhooks.is_active(id):
+            webhooks.increment_invocation_count(id)
+            if isinstance(payload, str):
+                try:
+                    payload = AwsSnsPayload.parse_raw(payload)
+                    sns_message_validator.validate_message(message=payload.dict())
+                except InvalidMessageTypeException as e:
+                    logging.error(e)
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Invalid message type ```{payload.Type}``` in message: ```{payload}```",
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
+                except InvalidSignatureVersionException as e:
+                    logging.error(e)
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
+                except SignatureVerificationFailureException as e:
+                    logging.error(e)
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
+                except InvalidCertURLException as e:
+                    logging.error(e)
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
+                except Exception as e:
+                    logging.error(e)
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{payload}```",
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
+                if payload.Type == "SubscriptionConfirmation":
+                    requests.get(payload.SubscribeURL, timeout=60)
+                    logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"Subscribed webhook {id} to topic {payload.TopicArn}",
+                    )
+                    return {"ok": True}
 
-        if isinstance(payload, str):
+                if payload.Type == "UnsubscribeConfirmation":
+                    log_ops_message(
+                        request.state.bot.client,
+                        f"{payload.TopicArn} unsubscribed from webhook {id}",
+                    )
+                    return {"ok": True}
+
+                if payload.Type == "Notification":
+                    blocks = aws.parse(payload, request.state.bot.client)
+                    # if we have an empty message, log that we have an empty
+                    # message and return without posting to slack
+                    if not blocks:
+                        logging.info("No blocks to post, returning")
+                        return
+                    payload = WebhookPayload(blocks=blocks)
+            payload.channel = webhook["channel"]["S"]
+            payload = append_incident_buttons(payload, id)
             try:
-                payload = AwsSnsPayload.parse_raw(payload)
-                sns_message_validator.validate_message(message=payload.dict())
-            except InvalidMessageTypeException as e:
-                logging.error(e)
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Invalid message type ```{payload.Type}``` in message: ```{payload}```",
+                message = json.loads(payload.json(exclude_none=True))
+                request.state.bot.client.api_call("chat.postMessage", json=message)
+                log_to_sentinel(
+                    "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
                 )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                )
-            except InvalidSignatureVersionException as e:
-                logging.error(e)
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                )
-            except SignatureVerificationFailureException as e:
-                logging.error(e)
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                )
-            except InvalidCertURLException as e:
-                logging.error(e)
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                )
+                return {"ok": True}
             except Exception as e:
                 logging.error(e)
+                body = payload.json(exclude_none=True)
                 log_ops_message(
-                    request.state.bot.client,
-                    f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{payload}```",
+                    request.state.bot.client, f"Error posting message: ```{body}```"
                 )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                )
-            if payload.Type == "SubscriptionConfirmation":
-                requests.get(payload.SubscribeURL, timeout=60)
-                logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Subscribed webhook {id} to topic {payload.TopicArn}",
-                )
-                return {"ok": True}
-
-            if payload.Type == "UnsubscribeConfirmation":
-                log_ops_message(
-                    request.state.bot.client,
-                    f"{payload.TopicArn} unsubscribed from webhook {id}",
-                )
-                return {"ok": True}
-
-            if payload.Type == "Notification":
-                blocks = aws.parse(payload, request.state.bot.client)
-                # if we have an empty message, log that we have an empty
-                # message and return without posting to slack
-                if not blocks:
-                    logging.info("No blocks to post, returning")
-                    return
-                payload = WebhookPayload(blocks=blocks)
-        payload.channel = webhook["channel"]["S"]
-        payload = append_incident_buttons(payload, id)
-        try:
-            message = json.loads(payload.json(exclude_none=True))
-            request.state.bot.client.api_call("chat.postMessage", json=message)
-            log_to_sentinel(
-                "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
-            )
-            return {"ok": True}
-        except Exception as e:
-            logging.error(e)
-            body = payload.json(exclude_none=True)
-            log_ops_message(
-                request.state.bot.client, f"Error posting message: ```{body}```"
-            )
-            raise HTTPException(status_code=500, detail="Failed to send message")
+                raise HTTPException(status_code=500, detail="Failed to send message")
+        else:
+            logging.info(f"Webhook id {id} is not active")
+            raise HTTPException(status_code=404, detail="Webhook not active")
     else:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
