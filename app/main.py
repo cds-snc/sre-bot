@@ -70,6 +70,7 @@ def main(bot):
     # Register Google Service command for dev purposes only
     if PREFIX == "dev-":
         bot.command(f"/{PREFIX}google")(google_service.google_service_command)
+        # bot.command(f"/{PREFIX}google")(google_service.google_schedule_command)
         bot.view("google_service_view")(google_service.open_modal)
 
 
