@@ -1,7 +1,8 @@
+import os
 import json
 import logging
 from integrations import google_drive
-from integrations.google_workspace import google_docs
+from integrations.google_workspace import google_docs, google_calendar
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
 
@@ -20,6 +21,9 @@ help_text = """
 \n `/sre incident roles`
 \n      - manages roles in an incident channel
 \n      - gérer les rôles dans un canal d'incident
+\n  `/sre incident schedule`
+\n      - schedules a 30 minute meeting a week into the future in everyone's calendars for the incident post mortem process.
+\n      - planifie une réunion de 30 minutes une semaine dans le futur dans les calendriers de tout le monde pour le processus de post-mortem de l'incident.
 \n `/sre incident close`
 \n      - close the incident, archive the channel and update the incident spreadsheet and document
 \n      - clôturer l'incident, archiver le canal et mettre à jour la feuille de calcul et le document de l'incident
@@ -37,6 +41,8 @@ def register(bot):
     bot.action("delete_folder_metadata")(delete_folder_metadata)
     bot.action("archive_channel")(archive_channel_action)
     bot.view("view_save_incident_roles")(save_incident_roles)
+    bot.view("view_save_event")(save_incident_retro)
+    bot.action("confirm_click")(confirm_click)
 
 
 def handle_incident_command(args, client, body, respond, ack):
@@ -59,6 +65,8 @@ def handle_incident_command(args, client, body, respond, ack):
             close_incident(client, body, ack)
         case "stale":
             stale_incidents(client, body, ack)
+        case "schedule":
+            schedule_incident_retro(client, body, ack)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -406,6 +414,177 @@ def stale_incidents(client, body, ack):
     }
 
     client.views_update(view_id=placeholder_modal["view"]["id"], view=blocks)
+
+
+# Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
+# that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
+# submit button is clicked.
+def schedule_incident_retro(client, body, ack):
+    ack()
+    channel_id = body["channel_id"]
+    channel_name = body["channel_name"]
+    user_id = body["user_id"]
+
+    # if we are not in an incident channel, then we need to display a message to the user that they need to use this command in an incident channel
+    if not channel_name.startswith("incident-"):
+        try:
+            response = client.chat_postEphemeral(
+                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
+                channel=channel_id,
+                user=user_id,
+            )
+        except Exception as e:
+            logging.error(
+                f"Could not post ephemeral message to user %s due to {e}.",
+                user_id,
+            )
+        return
+
+    # Get security group members. We want to exclude them from the list of people to schedule the event for
+    security_group_users = client.usergroups_users_list(
+        usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID")
+    )["users"]
+    print("Security group users: ", security_group_users)
+
+    # get all users in a channel
+    users = client.conversations_members(channel=channel_id)["members"]
+
+    # Get the channel topic
+    channel_topic = client.conversations_info(channel=channel_id)["channel"]["topic"][
+        "value"
+    ]
+    # If for some reason the channel topic is empty, set it to "Incident Retro"
+    if channel_topic == "":
+        channel_topic = "Incident Retro"
+        logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
+
+    user_emails = []
+
+    # get the email addresses of all the users in the channel, except security group members and any apps/bots in the channel, since bots don't have an email address associated with them.
+    for user in users:
+        if user not in security_group_users:
+            response = client.users_info(user=user)["user"]["profile"]
+            # don't include bots in the list of users
+            if "bot_id" not in response:
+                user_emails.append(response["email"])
+
+    # convert the data to string so that we can send it as private metadata
+    data_to_send = json.dumps({"emails": user_emails, "topic": channel_topic})
+
+    blocks = {
+        "type": "modal",
+        "callback_id": "view_save_event",
+        "private_metadata": data_to_send,
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "submit": {"type": "plain_text", "text": "Schedule"},
+        "blocks": (
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting 3 calendar days from now.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "2. A proposed event will be added to everyone's calendar that is part of this channel (except Security team).",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+                    },
+                },
+            ]
+        ),
+    }
+    # Open the modal window
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view=blocks,
+    )
+
+
+# Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
+# a message is displayed to the user that the event could not be scheduled.
+def save_incident_retro(client, ack, body, view):
+    ack()
+
+    # pass the data using the view["private_metadata"] to the schedule_event function
+    event_link = google_calendar.schedule_event(view["private_metadata"])
+    # if we could not schedule the event, display a message to the user that the event could not be scheduled
+    if event_link is None:
+        blocks = {
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+            "blocks": (
+                [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Could not schedule event - no free time was found!*",
+                        },
+                    }
+                ]
+            ),
+        }
+    # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
+    else:
+        blocks = {
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+            "blocks": (
+                [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Successfully schduled calender event!*",
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "View Calendar Event",
+                            },
+                            "value": "view_event",
+                            "url": f"{event_link}",
+                            "action_id": "confirm_click",
+                        },
+                    },
+                ]
+            ),
+        }
+    # Open the modal and log that the event was scheduled successfully
+    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+    logging.info("Event has been scheduled successfully. Link: %s", event_link)
+
+
+# We just need to handle the action here and record who clicked on it
+def confirm_click(ack, body, client):
+    ack()
+    username = body["user"]["username"]
+    logging.info(f"User {username} viewed the calendar event.")
 
 
 def view_folder_metadata(client, body, ack):

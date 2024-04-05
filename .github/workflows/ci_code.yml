@@ -56,3 +56,4 @@ jobs:
           NOTIFY_SRE_USER_NAME: ${{ secrets.NOTIFY_SRE_USER_NAME }}
           NOTIFY_SRE_CLIENT_SECRET: ${{ secrets.NOTIFY_SRE_CLIENT_SECRET }}
           NOTIFY_OPS_CHANNEL_ID: ${{ secrets.NOTIFY_OPS_CHANNEL_ID }}
+          SRE_BOT_EMAIL: ${{ secrets.SRE_BOT_EMAIL }}

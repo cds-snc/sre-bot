@@ -9,6 +9,8 @@ geoip2==4.8.0
 google-api-python-client==2.122.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==0.8.0
+google-api-core==2.12.0
+google-auth==2.23.3
 httpx==0.27.0
 itsdangerous==2.1.2
 Jinja2==3.1.3

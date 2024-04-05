@@ -357,6 +357,9 @@ def submit(ack, view, say, body, client, logger):
     text = "Run `/sre incident close` to update the status of the incident document and incident spreadsheet to closed and to archive the channel"
     say(text=text, channel=channel_id)
 
+    text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
+    say(text=text, channel=channel_id)
+
 
 def generate_success_modal(body, channel_id, channel_name):
     locale = body["view"]["blocks"][0]["elements"][0]["value"]
