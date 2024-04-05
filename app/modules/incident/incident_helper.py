@@ -425,6 +425,7 @@ def schedule_incident_retro(client, body, ack):
     channel_name = body["channel_name"]
     user_id = body["user_id"]
 
+    # if we are not in an incident channel, then we need to display a message to the user that they need to use this command in an incident channel
     if not channel_name.startswith("incident-"):
         try:
             response = client.chat_postEphemeral(
