@@ -1,7 +1,7 @@
 """Testing new google service (will be removed)"""
 import os
 
-from integrations.google_workspace import google_directory, google_calendar
+from integrations.google_workspace import google_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,9 +26,7 @@ def open_modal(client, body, folders):
     }
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
-# def google_schedule_command(client, body, respond):
-#     google_calendar.schedule_event()
-    
+
 def google_service_command(client, body, respond):
     # respond(f"Healthcheck status: {google_drive.healthcheck()}")
     # folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER)

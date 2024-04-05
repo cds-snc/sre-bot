@@ -416,23 +416,50 @@ def stale_incidents(client, body, ack):
     client.views_update(view_id=placeholder_modal["view"]["id"], view=blocks)
 
 
+# Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
+# that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
+# submit button is clicked.
 def schedule_incident_retro(client, body, ack):
-    print("Scheduling incident retro")
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
     user_id = body["user_id"]
-    print("Channel name: ", channel_name)
-    
-    # Get security group members
-    security_group_users = client.usergroups_users_list(usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID"))["users"]
-    
+
+    if not channel_name.startswith("incident-"):
+        try:
+            response = client.chat_postEphemeral(
+                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
+                channel=channel_id,
+                user=user_id,
+            )
+        except Exception as e:
+            logging.error(
+                f"Could not post ephemeral message to user %s due to {e}.",
+                user_id,
+            )
+        return
+
+    # Get security group members. We want to exclude them from the list of people to schedule the event for
+    security_group_users = client.usergroups_users_list(
+        usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID")
+    )["users"]
+    print("Security group users: ", security_group_users)
+
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
-    
-    channel_topic = client.conversations_info(channel=channel_id)["channel"]["topic"]["value"]
+
+    # Get the channel topic
+    channel_topic = client.conversations_info(channel=channel_id)["channel"]["topic"][
+        "value"
+    ]
+    # If for some reason the channel topic is empty, set it to "Incident Retro"
+    if channel_topic == "":
+        channel_topic = "Incident Retro"
+        logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
+
     user_emails = []
 
+    # get the email addresses of all the users in the channel, except security group members and any apps/bots in the channel, since bots don't have an email address associated with them.
     for user in users:
         if user not in security_group_users:
             response = client.users_info(user=user)["user"]["profile"]
@@ -440,71 +467,72 @@ def schedule_incident_retro(client, body, ack):
             if "bot_id" not in response:
                 user_emails.append(response["email"])
 
-    print("User emails: ", user_emails)
-    user_emails_string = ', '.join(user_emails)
+    # convert the data to string so that we can send it as private metadata
     data_to_send = json.dumps({"emails": user_emails, "topic": channel_topic})
-    
+
     blocks = {
         "type": "modal",
         "callback_id": "view_save_event",
-        #"private_metadata":user_emails_string,
-        "private_metadata":data_to_send,
+        "private_metadata": data_to_send,
         "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
         "submit": {"type": "plain_text", "text": "Schedule"},
         "blocks": (
             [
                 {
-			        "type": "section",
-			        "text": {
+                    "type": "section",
+                    "text": {
                         "type": "mrkdwn",
-                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:"
-                    }
+                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
+                    },
                 },
                 {
-					"type": "section",
-                    "text":
-					{
-						"type": "mrkdwn",
-						"text": "1. The event will be scheduled for the first available 30 minute timeslot starting 3 calendar days from now."
-					}
-				},
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting 3 calendar days from now.",
+                    },
+                },
                 {
-					"type": "section",
-                    "text":
-					{
-						"type": "mrkdwn",
-						"text": "2. A proposed event will be added to everyone's calendar that is part of this channel (except Security team)."
-					}
-				},
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "2. A proposed event will be added to everyone's calendar that is part of this channel (except Security team).",
+                    },
+                },
                 {
-					"type": "section",
-                    "text":
-					{
-						"type": "mrkdwn",
-						"text": "3. The retro will be scheduled only between 1:00pm and 3:00pm to accomodate all time differences." 
-					}
-				},
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
+                    },
+                },
                 {
-					"type": "section",
-                    "text":
-					{
-						"type": "mrkdwn",
-						"text": "4. If no free time exists for the next 2 months, the event will not be scheduled." 
-					}
-				},
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+                    },
+                },
             ]
         ),
     }
-    client.views_open(trigger_id=body["trigger_id"], view=blocks, )
-    
-       
+    # Open the modal window
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view=blocks,
+    )
+
+
+# Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
+# a message is displayed to the user that the event could not be scheduled.
 def save_incident_retro(client, ack, body, view):
     ack()
 
     # pass the data using the view["private_metadata"] to the schedule_event function
     event_link = google_calendar.schedule_event(view["private_metadata"])
+    # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if event_link is None:
-         blocks = {
+        blocks = {
             "type": "modal",
             "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
             "blocks": (
@@ -513,12 +541,13 @@ def save_incident_retro(client, ack, body, view):
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Could not schedule event - no free time was found!*", 
+                            "text": "*Could not schedule event - no free time was found!*",
                         },
                     }
                 ]
             ),
         }
+    # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
     else:
         blocks = {
             "type": "modal",
@@ -529,7 +558,7 @@ def save_incident_retro(client, ack, body, view):
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Successfully schduled calender event!*" 
+                            "text": "*Successfully schduled calender event!*",
                         },
                         "accessory": {
                             "type": "button",
@@ -539,21 +568,24 @@ def save_incident_retro(client, ack, body, view):
                             },
                             "value": "view_event",
                             "url": f"{event_link}",
-                            "action_id": "confirm_click"
-                        }
-                },
+                            "action_id": "confirm_click",
+                        },
+                    },
                 ]
             ),
         }
+    # Open the modal and log that the event was scheduled successfully
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
     logging.info("Event has been scheduled successfully. Link: %s", event_link)
+
 
 # We just need to handle the action here and record who clicked on it
 def confirm_click(ack, body, client):
     ack()
     username = body["user"]["username"]
     logging.info(f"User {username} viewed the calendar event.")
-    
+
+
 def view_folder_metadata(client, body, ack):
     ack()
     folder_id = body["actions"][0]["value"]
@@ -687,14 +719,3 @@ def return_channel_name(input_str):
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str
-
-def get_users_in_channel(client, channel_id):
-    users = []
-    try:
-        response = client.conversations_members(channel_id)
-        users.extend(response['members'])
-    except Exception as e:
-        logging.error(f"Could not get users in the channel due to {e}") 
-    return users
-
-    

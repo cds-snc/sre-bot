@@ -6,7 +6,6 @@ import datetime
 import re
 
 from dotenv import load_dotenv
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 load_dotenv()
