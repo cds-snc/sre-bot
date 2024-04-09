@@ -8,3 +8,14 @@ resource "aws_ssm_parameter" "google_oauth_pickle_string" {
     Terraform  = true
   }
 }
+
+resource "aws_ssm_parameter" "gcp_sre_service_account_key" {
+  name  = "gcp_sre_service_account_key"
+  type  = "SecureString"
+  value = var.gcp_sre_service_account_key
+
+  tags = {
+    CostCentre = var.billing_code
+    Terraform  = true
+  }
+}

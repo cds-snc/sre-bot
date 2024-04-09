@@ -11,6 +11,7 @@ env:
   TERRAGRUNT_VERSION: 0.31.1
   TF_VAR_google_oauth_pickle_string: "${{ secrets.GOOGLE_PICKLE_STRING }}"
   TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+  TF_VAR_gcp_sre_service_account_key: ${{ secrets.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE }}
 
   
 permissions:
