@@ -39,7 +39,9 @@ def test_list_users_returns_users(get_google_service_mock):
     # Mock the list method to return the first page of results
     list_mock = MagicMock()
     list_mock.execute.return_value = first_page
-    get_google_service_mock.return_value.users.return_value.list.return_value = list_mock
+    get_google_service_mock.return_value.users.return_value.list.return_value = (
+        list_mock
+    )
 
     # Mock the list_next method to return a new request that returns the second page of results the first time it's called,
     # and None the second time it's called
@@ -56,30 +58,34 @@ def test_list_users_returns_users(get_google_service_mock):
 
 @patch("integrations.google_workspace.google_directory.get_google_service")
 def test_list_groups_returns_groups(get_google_service_mock):
-    get_google_service_mock.return_value.groups.return_value.list.return_value.execute.return_value = {
+    # Mock the first page of results
+    first_page = {
         "groups": [
             {"id": "test_group_id", "name": "test_group"},
+        ],
+        "nextPageToken": "token",
+    }
+
+    # Mock the second page of results
+    second_page = {
+        "groups": [
             {"id": "test_group_id2", "name": "test_group2"},
         ]
     }
 
-    assert google_directory.list_groups() == [
-        {"id": "test_group_id", "name": "test_group"},
-        {"id": "test_group_id2", "name": "test_group2"},
-    ]
+    # Mock the list method to return the first page of results
+    list_mock = MagicMock()
+    list_mock.execute.return_value = first_page
+    get_google_service_mock.return_value.groups.return_value.list.return_value = (
+        list_mock
+    )
 
-
-@patch("integrations.google_workspace.google_directory.get_google_service")
-def test_list_groups_iterates_over_pages(get_google_service_mock):
-    get_google_service_mock.return_value.groups.return_value.list.return_value.execute.side_effect = [
-        {
-            "groups": [{"id": "test_group_id", "name": "test_group"}],
-            "nextPageToken": "token",
-        },
-        {
-            "groups": [{"id": "test_group_id2", "name": "test_group2"}],
-        },
-    ]
+    # Mock the list_next method to return a new request that returns the second page of results the first time it's called,
+    # and None the second time it's called
+    second_page_request = MagicMock()
+    second_page_request.execute.return_value = second_page
+    list_next_mock = MagicMock(side_effect=[second_page_request, None])
+    get_google_service_mock.return_value.groups.return_value.list_next = list_next_mock
 
     assert google_directory.list_groups() == [
         {"id": "test_group_id", "name": "test_group"},

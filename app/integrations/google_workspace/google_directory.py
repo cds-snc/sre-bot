@@ -82,23 +82,14 @@ def list_groups():
         scopes=scopes,
     )
     all_groups = []
-    page_token = None
 
-    while True:
-        results = (
-            service.groups()
-            .list(
-                customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
-                maxResults=500,
-                orderBy="email",
-                pageToken=page_token,
-            )
-            .execute()
-        )
+    request = service.groups().list(
+        customer=GOOGLE_WORKSPACE_CUSTOMER_ID, maxResults=500, orderBy="email"
+    )
+    while request is not None:
+        results = request.execute()
         all_groups.extend(results.get("groups", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
+        request = service.groups().list_next(request, results)
 
     return all_groups
 
