@@ -92,6 +92,7 @@ def test_list_groups_returns_groups(get_google_service_mock):
         {"id": "test_group_id2", "name": "test_group2"},
     ]
 
+
 @patch("integrations.google_workspace.google_directory.get_google_service")
 def test_list_group_members_returns_group_members(get_google_service_mock):
     # Mock the first page of results
