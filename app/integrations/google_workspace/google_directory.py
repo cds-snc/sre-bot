@@ -52,23 +52,14 @@ def list_users():
         delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
         scopes=scopes,
     )
-    page_token = None
     all_users = []
-    while True:
-        results = (
-            service.users()
-            .list(
-                customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
-                maxResults=500,
-                orderBy="email",
-                pageToken=page_token,
-            )
-            .execute()
-        )
+    request = service.users().list(
+        customer=GOOGLE_WORKSPACE_CUSTOMER_ID, maxResults=500, orderBy="email"
+    )
+    while request is not None:
+        results = request.execute()
         all_users.extend(results.get("users", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
+        request = service.users().list_next(request, results)
     return all_users
 
 
