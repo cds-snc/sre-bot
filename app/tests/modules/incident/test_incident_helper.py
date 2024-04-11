@@ -137,27 +137,19 @@ def test_archive_channel_action_archive(
 
 
 @patch("modules.incident.incident_helper.log_to_sentinel")
-def test_archive_channel_action_schedule_incident(
-    mock_log_to_sentinel
-):
+def test_archive_channel_action_schedule_incident(mock_log_to_sentinel):
     client = MagicMock()
-    body = {
-        "actions": [{"value": "schedule_retro"}],
-        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
-        "message_ts": "message_ts",
-        "user": {"id": "user_id"},
-    }
     channel_info = {
-            "channel_id": "channel_id",
-            "channel_name": "channel_name",
-            "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
-            "user_id": "user_id",
-        }
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "user_id": "user_id",
+    }
     ack = MagicMock()
     incident_helper.schedule_incident_retro(client, channel_info, ack)
     assert ack.call_count == 1
-    
-    
+
+
 @patch("modules.incident.incident_helper.google_drive.delete_metadata")
 @patch("modules.incident.incident_helper.view_folder_metadata")
 def test_delete_folder_metadata(view_folder_metadata_mock, delete_metadata_mock):

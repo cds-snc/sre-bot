@@ -15,7 +15,7 @@ def notify_stale_incident_channels(client):
         Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
     attachments = [
         {
-            "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver la chaîne maintenant ou programmer une rétro?", 
+            "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver la chaîne maintenant ou programmer une rétro?",
             "fallback": "You are unable to archive the channel | Vous ne pouvez pas archiver ce canal",
             "callback_id": "archive_channel",
             "color": "#3AA3E3",
@@ -47,6 +47,5 @@ def notify_stale_incident_channels(client):
     for channel in channels:
         log_to_sentinel("sent_stale_channel_notification", {"channel": channel})
         client.chat_postMessage(
-            #channel=channel["id"], text=text, attachments=attachments
-            channel="C06TVP0V5AR", text=text, attachments=attachments
+            channel=channel["id"], text=text, attachments=attachments
         )

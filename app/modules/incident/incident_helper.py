@@ -135,13 +135,14 @@ def archive_channel_action(client, body, ack):
     # get the current chanel id and name and make up the body with those 2 values
     channel_info = {
         "channel_id": channel_id,
-        "channel_name": channel_name, 
+        "channel_name": channel_name,
         "user_id": user,
-        "trigger_id": body["trigger_id"],
     }
-        
+
     if action == "ignore":
-        msg = f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
+        msg = (
+            f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
+        )
         client.chat_update(
             channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
         )
@@ -152,6 +153,7 @@ def archive_channel_action(client, body, ack):
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
+        channel_info["trigger_id"] = body["trigger_id"]
         schedule_incident_retro(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)

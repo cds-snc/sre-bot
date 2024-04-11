@@ -14,7 +14,7 @@ def test_notify_stale_incident_channels(_log_to_sentinel_mock, get_stale_channel
         text="👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.\n\n        Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver.",
         attachments=[
             {
-                "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver la chaîne maintenant ou programmer une rétro?", 
+                "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver la chaîne maintenant ou programmer une rétro?",
                 "fallback": "You are unable to archive the channel | Vous ne pouvez pas archiver ce canal",
                 "callback_id": "archive_channel",
                 "color": "#3AA3E3",
@@ -31,7 +31,7 @@ def test_notify_stale_incident_channels(_log_to_sentinel_mock, get_stale_channel
                         "name": "schedule_retro",
                         "text": "Schedule Retro | Calendrier rétro",
                         "type": "button",
-                        "value": "archive",
+                        "value": "schedule_retro",
                         "style": "primary",
                     },
                     {
