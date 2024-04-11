@@ -129,24 +129,32 @@ def archive_channel_action(client, body, ack):
     ack()
     channel_id = body["channel"]["id"]
     action = body["actions"][0]["value"]
+    channel_name = body["channel"]["name"]
     user = body["user"]["id"]
+
+    # get the current chanel id and name and make up the body with those 2 values
+    channel_info = {
+        "channel_id": channel_id,
+        "channel_name": channel_name, 
+        "user_id": user,
+        "trigger_id": body["trigger_id"],
+    }
+        
     if action == "ignore":
-        msg = f"<@{user}> has delayed archiving this channel for 14 days."
+        msg = f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
         client.chat_update(
             channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
         )
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
-        # get the current chanel id and name and make up the body with those 2 values
-        channel_info = {
-            "channel_id": channel_id,
-            "channel_name": body["channel"]["name"],
-            "user_id": user,
-        }
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
         close_incident(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
+    elif action == "schedule_retro":
+        schedule_incident_retro(client, channel_info, ack)
+        # log the event to sentinel
+        log_to_sentinel("incident_retro_scheduled", body)
 
 
 def delete_folder_metadata(client, body, ack):
