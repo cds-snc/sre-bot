@@ -54,32 +54,6 @@ def test_list_users_returns_users(get_google_service_mock):
     ]
 
 
-# @patch("integrations.google_workspace.google_directory.get_google_service")
-# def test_list_users_iterates_over_pages(get_google_service_mock):
-#     get_google_service_mock.return_value.users.return_value.list.return_value.execute.side_effect = [
-#         {
-#             "users": [
-#                 {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"}
-#             ],
-#             "nextPageToken": "token",
-#         },
-#         {
-#             "users": [
-#                 {
-#                     "id": "test_user_id2",
-#                     "name": "test_user2",
-#                     "email": "email2@domain.com",
-#                 }
-#             ]
-#         },
-#     ]
-
-#     assert google_directory.list_users() == [
-#         {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
-#         {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
-#     ]
-
-
 @patch("integrations.google_workspace.google_directory.get_google_service")
 def test_list_groups_returns_groups(get_google_service_mock):
     get_google_service_mock.return_value.groups.return_value.list.return_value.execute.return_value = {
