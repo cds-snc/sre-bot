@@ -113,21 +113,13 @@ def list_group_members(group_key):
         scopes=scopes,
     )
     all_group_members = []
-    page_token = None
+    request = service.members().list(
+        groupKey=group_key, maxResults=500, orderBy="email"
+    )
 
-    while True:
-        results = (
-            service.members()
-            .list(
-                groupKey=group_key,
-                maxResults=500,
-                pageToken=page_token,
-            )
-            .execute()
-        )
+    while request is not None:
+        results = request.execute()
         all_group_members.extend(results.get("members", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
+        request = service.members().list_next(request, results)
 
     return all_group_members
