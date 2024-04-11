@@ -1,5 +1,5 @@
 """Unit tests for google_drive module."""
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import integrations.google_workspace.google_drive as google_drive
 
@@ -122,24 +122,39 @@ def test_copy_file_to_folder_returns_file_id(get_google_service_mock):
 
 
 @patch("integrations.google_workspace.google_drive.get_google_service")
-def test_list_folders_returns_folder_names(get_google_service_mock):
-    get_google_service_mock.return_value.files.return_value.list.return_value.execute.return_value = {
-        "files": [{"name": "test_folder"}]
+def test_list_folders_in_folder_returns_folders(get_google_service_mock):
+    # Mock the first page of results
+    first_page = {
+        "files": [
+            {"id": "test_folder_id", "name": "test_folder"},
+        ],
+        "nextPageToken": "token",
     }
-    assert google_drive.list_folders_in_folder("parent_folder") == [
-        {"name": "test_folder"}
-    ]
 
+    # Mock the second page of results
+    second_page = {
+        "files": [
+            {"id": "test_folder_id2", "name": "test_folder2"},
+        ]
+    }
 
-@patch("integrations.google_workspace.google_drive.get_google_service")
-def test_list_folders_iterates_over_pages(get_google_service_mock):
-    get_google_service_mock.return_value.files.return_value.list.return_value.execute.side_effect = [
-        {"files": [{"name": "test_folder"}], "nextPageToken": "token"},
-        {"files": [{"name": "test_folder2"}]},
-    ]
+    # Mock the list method to return the first page of results
+    list_mock = MagicMock()
+    list_mock.execute.return_value = first_page
+    get_google_service_mock.return_value.files.return_value.list.return_value = (
+        list_mock
+    )
+
+    # Mock the list_next method to return a new request that returns the second page of results the first time it's called,
+    # and None the second time it's called
+    second_page_request = MagicMock()
+    second_page_request.execute.return_value = second_page
+    list_next_mock = MagicMock(side_effect=[second_page_request, None])
+    get_google_service_mock.return_value.files.return_value.list_next = list_next_mock
+
     assert google_drive.list_folders_in_folder("parent_folder") == [
-        {"name": "test_folder"},
-        {"name": "test_folder2"},
+        {"id": "test_folder_id", "name": "test_folder"},
+        {"id": "test_folder_id2", "name": "test_folder2"},
     ]
 
 

@@ -260,28 +260,22 @@ def list_folders_in_folder(folder):
         list: A list of folders in the folder.
     """
     service = get_google_service("drive", "v3")
-    page_token = None
     all_files = []
-    while True:
-        results = (
-            service.files()
-            .list(
-                pageSize=25,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-                corpora="user",
-                q="parents in '{}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false".format(
-                    folder
-                ),
-                fields="nextPageToken, files(id, name)",
-                pageToken=page_token,
-            )
-            .execute()
-        )
+    request = service.files().list(
+        pageSize=25,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+        corpora="user",
+        q="parents in '{}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false".format(
+            folder
+        ),
+        fields="files(id, name)",
+    )
+
+    while request is not None:
+        results = request.execute()
         all_files.extend(results.get("files", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
+        request = service.files().list_next(request, results)
     return all_files
 
 
