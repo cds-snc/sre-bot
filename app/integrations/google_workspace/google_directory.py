@@ -215,3 +215,37 @@ def get_google_cloud_group(group_name):
     )
     group = service.groups().get(name=group_name).execute()
     return group
+
+
+@handle_google_api_errors
+def get_org_unit(org_unit_path):
+    scopes = ["https://www.googleapis.com/auth/admin.directory.orgunit.readonly"]
+
+    service = get_google_service(
+        "admin",
+        "directory_v1",
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=scopes,
+    )
+    org_unit = (
+        service.orgunits()
+        .get(customerId=GOOGLE_WORKSPACE_CUSTOMER_ID, orgUnitPath=org_unit_path)
+        .execute()
+    )
+    return org_unit
+
+
+@handle_google_api_errors
+def list_org_units():
+    scopes = ["https://www.googleapis.com/auth/admin.directory.orgunit.readonly"]
+
+    service = get_google_service(
+        "admin",
+        "directory_v1",
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=scopes,
+    )
+    org_units = (
+        service.orgunits().list(customerId=GOOGLE_WORKSPACE_CUSTOMER_ID).execute()
+    )
+    return org_units
