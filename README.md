@@ -31,3 +31,26 @@ cd app && pip install --no-cache-dir -r requirements.txt
 5. Launch the dev bot with ```make dev```
 6. Test your development in the dedicated channel (SRE team will confirm which channel to point to)
 
+## Refactoring
+
+The bot is currently being refactored to separate the integration concerns from the bot's features and commands. The goal is to make the bot more modular and easier to maintain.
+
+### Integrations
+
+The `app/integrations` will contain the bot's interactions with external services (e.g. Google Workspace, Slack, etc.)
+
+The integrations will be responsible for handling the bot's interactions with the external services. They will be responsible for sending and receiving messages, and handling any other interactions with the external services.
+
+From a design perspective, they should be as simple as possible, and should not contain any business logic. They should be responsible for handling the interactions with the external services, and should delegate any business logic to the features.
+
+### Features (aka modules)
+
+The `app/modules` will contain the bot's features and commands. Each feature will have its own directory and will be responsible for handling the bot's interactions with the user.
+
+The features may end up needing to interact with the integrations to perform their tasks.
+
+### Jobs
+
+The `app/jobs` will contain the bot's scheduled jobs. Each job will have its own directory and will be responsible for handling the bot's scheduled tasks.
+
+Examples may include sending daily reminders, checking the status of a service, etc.
