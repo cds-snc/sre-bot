@@ -490,10 +490,10 @@ def schedule_incident_retro(client, body, ack):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "How many days from now should I start checking the calendar for availability?"
-                    }
+                        "text": "How many days from now should I start checking the calendar for availability?",
+                    },
                 },
-                { "type": "divider"},
+                {"type": "divider"},
                 {
                     "type": "section",
                     "text": {
@@ -529,7 +529,6 @@ def schedule_incident_retro(client, body, ack):
                         "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
                     },
                 },
-               
             ]
         ),
     }
