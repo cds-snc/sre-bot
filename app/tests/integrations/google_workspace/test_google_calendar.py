@@ -88,9 +88,10 @@ def test_schedule_event_successful(
         (datetime.utcnow() + timedelta(hours=1)).isoformat(),
     )
     book_calendar_event_mock.return_value = "https://calendar.link"
+    mock_days = 1
 
     # Call the function under test
-    event_link = google_calendar.schedule_event(event_details)
+    event_link = google_calendar.schedule_event(event_details, mock_days)
 
     # Assertions
     get_google_service_mock.assert_called_once_with(
@@ -116,9 +117,10 @@ def test_schedule_event_no_available_slots(
     # Set up the mock return values
     get_google_service_mock.return_value = google_service_mock
     find_first_available_slot_mock.return_value = (None, None)
+    mock_days = 1
 
     # Call the function under test
-    event_link = google_calendar.schedule_event(event_details)
+    event_link = google_calendar.schedule_event(event_details, mock_days)
 
     # Assertions
     assert event_link is None

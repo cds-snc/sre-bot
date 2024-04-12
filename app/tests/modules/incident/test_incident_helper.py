@@ -1035,7 +1035,10 @@ def test_save_incident_retro_success(schedule_event_mock):
     mock_ack = MagicMock()
     schedule_event_mock.return_value = "http://example.com/event"
     body_mock = {"trigger_id": "some_trigger_id"}
-    view_mock_with_link = {"private_metadata": "event details for scheduling"}
+    view_mock_with_link = {
+        "private_metadata": "event details for scheduling",
+        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+    }
 
     # Call the function
     incident_helper.save_incident_retro(
@@ -1059,7 +1062,10 @@ def test_save_incident_retro_failure(schedule_event_mock):
     mock_ack = MagicMock()
     schedule_event_mock.return_value = None
     body_mock = {"trigger_id": "some_trigger_id"}
-    view_mock_with_link = {"private_metadata": "event details for scheduling"}
+    view_mock_with_link = {
+        "private_metadata": "event details for scheduling",
+        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+    }
 
     # Call the function
     incident_helper.save_incident_retro(
