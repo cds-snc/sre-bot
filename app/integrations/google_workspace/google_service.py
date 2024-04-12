@@ -127,9 +127,10 @@ def execute_google_api_call(
         request = api_method(**kwargs)
         while request is not None:
             results = request.execute()
-            all_results.extend(
-                results.get(resource, [])
-            )  # Use the resource name instead of "users"
+            if results is not None:
+                all_results.extend(
+                    results.get(resource, [])
+                )  # Use the resource name instead of "users"
             request = getattr(resource_obj, method + "_next")(request, results)
         return all_results
     else:
