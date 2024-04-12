@@ -1,7 +1,7 @@
 """
 Google Service Module.
 
-This module provides a function to get an authenticated Google service and a decorator to handle Google API errors.
+This module provides a function to get an authenticated Google service, a decorator to handle Google API errors, and a generic function to execute the Google API call.
 
 Functions:
     get_google_service(service: str, version: str) -> googleapiclient.discovery.Resource:
@@ -22,6 +22,10 @@ from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from googleapiclient.errors import HttpError, Error  # type: ignore
 from google.auth.exceptions import RefreshError  # type: ignore
+
+# Define the default arguments
+DEFAULT_DELEGATED_ADMIN_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
+DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER_ID")
 
 load_dotenv()
 
@@ -88,3 +92,45 @@ def handle_google_api_errors(func):
             return None
 
     return wrapper
+
+
+def execute_google_api_call(
+    service_name,
+    version,
+    resource,
+    method,
+    scopes=None,
+    delegated_user_email=None,
+    paginate=False,
+    **kwargs,
+):
+    """Execute a Google API call.
+
+    Args:
+        service_name (str): The name of the Google service.
+        version (str): The version of the Google service.
+        resource (str): The resource to access.
+        method (str): The method to call on the resource.
+        scopes (list, optional): The scopes for the Google service.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
+        paginate (bool, optional): Whether to paginate the API call.
+        **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        dict or list: The result of the API call. If paginate is True, returns a list of all results.
+    """
+    service = get_google_service(service_name, version, delegated_user_email, scopes)
+    resource_obj = getattr(service, resource)()
+    api_method = getattr(resource_obj, method)
+    if paginate:
+        all_results = []
+        request = api_method(**kwargs)
+        while request is not None:
+            results = request.execute()
+            all_results.extend(
+                results.get(resource, [])
+            )  # Use the resource name instead of "users"
+            request = getattr(resource_obj, method + "_next")(request, results)
+        return all_results
+    else:
+        return api_method(**kwargs).execute()
