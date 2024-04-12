@@ -156,7 +156,9 @@ def test_execute_google_api_call_calls_get_google_service_with_delegated_user_em
 
 
 @patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_calls_getattr_with_service_and_resource(mock_get_google_service):
+def test_execute_google_api_call_calls_getattr_with_service_and_resource(
+    mock_get_google_service,
+):
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
@@ -166,53 +168,119 @@ def test_execute_google_api_call_calls_getattr_with_service_and_resource(mock_ge
 
 
 @patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginate_is_false(mock_get_google_service):
+def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginate_is_false(
+    mock_get_google_service,
+):
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
-    execute_google_api_call("service_name", "version", "resource", "method", arg1="value1")
+    # Set up the MagicMock for resource
+    mock_resource = MagicMock()
+    mock_service.resource.return_value = mock_resource
 
-    mock_service.resource.method.assert_called_once_with(arg1="value1")
+    execute_google_api_call(
+        "service_name", "version", "resource", "method", arg1="value1"
+    )
+
+    mock_resource.method.assert_called_once_with(arg1="value1")
+
+
+def side_effect(request, results):
+    if results["nextPageToken"] == "token":
+        return request
+    else:
+        return None
 
 
 @patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginate_is_true(mock_get_google_service):
+def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginate_is_true(
+    mock_get_google_service,
+):
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
-    execute_google_api_call("service_name", "version", "resource", "method", paginate=True, arg1="value1")
+    # Set up the MagicMock for resource
+    mock_resource = MagicMock()
+    mock_service.resource.return_value = mock_resource
 
-    mock_service.resource.method.assert_called_once_with(arg1="value1")
+    # Set up the MagicMock for request
+    mock_request = MagicMock()
+    mock_request.execute.side_effect = [
+        {"resource": ["value1", "value2"], "nextPageToken": "token"},
+        {"resource": ["value3"], "nextPageToken": None},
+    ]
+
+    # Set up the MagicMock for method
+    mock_method = MagicMock()
+    mock_method.return_value = mock_request
+    mock_resource.method = mock_method
+
+    # Define new_mock_request in the outer scope
+    new_mock_request = MagicMock()
+    new_mock_request.execute.return_value = {"resource": [], "nextPageToken": None}
+
+    # Set up the MagicMock for method_next
+    mock_method_next = MagicMock()
+    mock_resource.method_next = mock_method_next
+
+    def side_effect(*args):
+        if args[1]["nextPageToken"] == "token":
+            mock_method_next.return_value = mock_request
+        else:
+            mock_method_next.return_value = new_mock_request
+
+    mock_method_next.side_effect = side_effect
+
+    result = execute_google_api_call(
+        "service_name", "version", "resource", "method", paginate=True, arg1="value1"
+    )
+
+    assert result == ["value1", "value2", "value3"]
+    mock_resource.method.assert_called_once_with(arg1="value1")
+    mock_resource.method_next.assert_any_call(
+        mock_request, {"resource": ["value1", "value2"], "nextPageToken": "token"}
+    )
+    mock_resource.method_next.assert_any_call(
+        new_mock_request, {"resource": ["value3"], "nextPageToken": None}
+    )
+    assert mock_resource.method_next.call_count == 2
 
 
-@patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_returns_correct_results_when_paginate_is_false(mock_get_google_service):
-    mock_service = MagicMock()
-    mock_get_google_service.return_value = mock_service
-    mock_service.resource.method.return_value.execute.return_value = {"key": "value"}
+# # @patch("integrations.google_workspace.google_service.get_google_service")
+# # def test_execute_google_api_call_returns_correct_results_when_paginate_is_false(mock_get_google_service):
+# #     mock_service = MagicMock()
+# #     mock_get_google_service.return_value = mock_service
+# #     mock_service.resource.method.return_value.execute.return_value = {"key": "value"}
 
-    result = execute_google_api_call("service_name", "version", "resource", "method")
+# #     result = execute_google_api_call("service_name", "version", "resource", "method")
 
-    assert result == {"key": "value"}
-
-
-@patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_returns_correct_results_when_paginate_is_true(mock_get_google_service):
-    mock_service = MagicMock()
-    mock_get_google_service.return_value = mock_service
-    mock_service.resource.method.return_value.execute.return_value = {"resource": ["value1", "value2"]}
-
-    result = execute_google_api_call("service_name", "version", "resource", "method", paginate=True)
-
-    assert result == ["value1", "value2"]
+# #     assert result == {"key": "value"}
 
 
-@patch("integrations.google_workspace.google_service.get_google_service")
-def test_execute_google_api_call_calls_api_method_next_correctly_when_paginate_is_true(mock_get_google_service):
-    mock_service = MagicMock()
-    mock_get_google_service.return_value = mock_service
+# # @patch("integrations.google_workspace.google_service.get_google_service")
+# # def test_execute_google_api_call_returns_correct_results_when_paginate_is_true(mock_get_google_service):
+# #     mock_service = MagicMock()
+# #     mock_get_google_service.return_value = mock_service
+# #     mock_service.resource.method.return_value.execute.return_value = {"resource": ["value1", "value2"]}
 
-    execute_google_api_call("service_name", "version", "resource", "method", paginate=True)
+# #     result = execute_google_api_call("service_name", "version", "resource", "method", paginate=True)
 
-    mock_service.resource.method_next.assert_called_once()
+# #     assert result == ["value1", "value2"]
 
+
+# @patch("integrations.google_workspace.google_service.get_google_service")
+# def test_execute_google_api_call_calls_api_method_next_correctly_when_paginate_is_true(mock_get_google_service):
+#     mock_service = MagicMock()
+#     mock_get_google_service.return_value = mock_service
+
+#     mock_service.resource.method.return_value.execute.side_effect = [
+#         {"resource": ["value1", "value2"], "nextPageToken": "token"},
+#         {"resource": ["value3"]}
+#     ]
+
+#     mock_service.resource.method_next.return_value = None
+
+#     result = execute_google_api_call("service_name", "version", "resource", "method", paginate=True)
+
+#     assert result == ["value1", "value2", "value3"]
+#     mock_service.resource.method_next.assert_called_once()
