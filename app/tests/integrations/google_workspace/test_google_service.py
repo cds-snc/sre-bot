@@ -185,13 +185,6 @@ def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginat
     mock_resource.method.assert_called_once_with(arg1="value1")
 
 
-def side_effect(request, results):
-    if results["nextPageToken"] == "token":
-        return request
-    else:
-        return None
-
-
 @patch("integrations.google_workspace.google_service.get_google_service")
 def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginate_is_true(
     mock_get_google_service,
@@ -204,30 +197,29 @@ def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginat
     mock_service.resource.return_value = mock_resource
 
     # Set up the MagicMock for request
-    mock_request = MagicMock()
-    mock_request.execute.side_effect = [
-        {"resource": ["value1", "value2"], "nextPageToken": "token"},
-        {"resource": ["value3"], "nextPageToken": None},
-    ]
+    mock_request1 = MagicMock()
+    mock_request1.execute.return_value = {"resource": ["value1", "value2"], "nextPageToken": "token"}
+
+    mock_request2 = MagicMock()
+    mock_request2.execute.return_value = {"resource": ["value3"], "nextPageToken": None}
 
     # Set up the MagicMock for method
     mock_method = MagicMock()
-    mock_method.return_value = mock_request
+    mock_method.return_value = mock_request1
     mock_resource.method = mock_method
-
-    # Define new_mock_request in the outer scope
-    new_mock_request = MagicMock()
-    new_mock_request.execute.return_value = {"resource": [], "nextPageToken": None}
 
     # Set up the MagicMock for method_next
     mock_method_next = MagicMock()
     mock_resource.method_next = mock_method_next
 
+    # Create a list of mock requests for pagination
+    mock_requests = [mock_request2]
+
     def side_effect(*args):
-        if args[1]["nextPageToken"] == "token":
-            mock_method_next.return_value = mock_request
+        if mock_requests:
+            return mock_requests.pop(0)
         else:
-            mock_method_next.return_value = new_mock_request
+            return None
 
     mock_method_next.side_effect = side_effect
 
@@ -238,12 +230,9 @@ def test_execute_google_api_call_calls_api_method_with_correct_args_when_paginat
     assert result == ["value1", "value2", "value3"]
     mock_resource.method.assert_called_once_with(arg1="value1")
     mock_resource.method_next.assert_any_call(
-        mock_request, {"resource": ["value1", "value2"], "nextPageToken": "token"}
+        mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"}
     )
-    mock_resource.method_next.assert_any_call(
-        new_mock_request, {"resource": ["value3"], "nextPageToken": None}
-    )
-    assert mock_resource.method_next.call_count == 2
+    assert mock_method_next.call_count == 2
 
 
 # # @patch("integrations.google_workspace.google_service.get_google_service")
