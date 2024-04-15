@@ -1,7 +1,6 @@
 """Unit tests for google_directory module."""
-from unittest.mock import patch, MagicMock
-
-import integrations.google_workspace.google_directory as google_directory
+from unittest.mock import patch
+from integrations.google_workspace import google_directory
 
 
 @patch(
