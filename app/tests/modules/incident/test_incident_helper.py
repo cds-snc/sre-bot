@@ -93,7 +93,7 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     client = MagicMock()
     body = {
         "actions": [{"value": "ignore"}],
-        "channel": {"id": "channel_id"},
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
         "message_ts": "message_ts",
         "user": {"id": "user_id"},
     }
@@ -134,6 +134,20 @@ def test_archive_channel_action_archive(
     incident_helper.archive_channel_action(client, body, ack)
     assert ack.call_count == 2
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
+
+
+@patch("modules.incident.incident_helper.log_to_sentinel")
+def test_archive_channel_action_schedule_incident(mock_log_to_sentinel):
+    client = MagicMock()
+    channel_info = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "user_id": "user_id",
+    }
+    ack = MagicMock()
+    incident_helper.schedule_incident_retro(client, channel_info, ack)
+    assert ack.call_count == 1
 
 
 @patch("modules.incident.incident_helper.google_drive.delete_metadata")
@@ -1035,7 +1049,10 @@ def test_save_incident_retro_success(schedule_event_mock):
     mock_ack = MagicMock()
     schedule_event_mock.return_value = "http://example.com/event"
     body_mock = {"trigger_id": "some_trigger_id"}
-    view_mock_with_link = {"private_metadata": "event details for scheduling"}
+    view_mock_with_link = {
+        "private_metadata": "event details for scheduling",
+        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+    }
 
     # Call the function
     incident_helper.save_incident_retro(
@@ -1059,7 +1076,10 @@ def test_save_incident_retro_failure(schedule_event_mock):
     mock_ack = MagicMock()
     schedule_event_mock.return_value = None
     body_mock = {"trigger_id": "some_trigger_id"}
-    view_mock_with_link = {"private_metadata": "event details for scheduling"}
+    view_mock_with_link = {
+        "private_metadata": "event details for scheduling",
+        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+    }
 
     # Call the function
     incident_helper.save_incident_retro(

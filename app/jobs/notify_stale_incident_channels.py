@@ -11,11 +11,11 @@ def notify_stale_incident_channels(client):
     channels = slack_channels.get_stale_channels(
         client, pattern=INCIDENT_CHANNELS_PATTERN
     )
-    text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider archiving it.\n
-        Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Vous pouvez considérer l'archiver."""
+    text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.\n
+        Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
     attachments = [
         {
-            "text": "Would you like to archive the channel now? | Voulez-vous archiver ce canal maintenant?",
+            "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver le canal maintenant ou planifier une rétro?",
             "fallback": "You are unable to archive the channel | Vous ne pouvez pas archiver ce canal",
             "callback_id": "archive_channel",
             "color": "#3AA3E3",
@@ -23,14 +23,21 @@ def notify_stale_incident_channels(client):
             "actions": [
                 {
                     "name": "archive",
-                    "text": "Yes | Oui",
+                    "text": "Archive channel | Canal d'archives",
                     "type": "button",
                     "value": "archive",
                     "style": "danger",
                 },
                 {
+                    "name": "schedule_retro",
+                    "text": "Schedule Retro | Calendrier rétro",
+                    "type": "button",
+                    "value": "schedule_retro",
+                    "style": "primary",
+                },
+                {
                     "name": "ignore",
-                    "text": "No | Non",
+                    "text": "Ignore | Ignorer",
                     "type": "button",
                     "value": "ignore",
                 },

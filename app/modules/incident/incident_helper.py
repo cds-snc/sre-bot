@@ -129,24 +129,34 @@ def archive_channel_action(client, body, ack):
     ack()
     channel_id = body["channel"]["id"]
     action = body["actions"][0]["value"]
+    channel_name = body["channel"]["name"]
     user = body["user"]["id"]
+
+    # get the current chanel id and name and make up the body with those 2 values
+    channel_info = {
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "user_id": user,
+    }
+
     if action == "ignore":
-        msg = f"<@{user}> has delayed archiving this channel for 14 days."
+        msg = (
+            f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
+        )
         client.chat_update(
             channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
         )
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
-        # get the current chanel id and name and make up the body with those 2 values
-        channel_info = {
-            "channel_id": channel_id,
-            "channel_name": body["channel"]["name"],
-            "user_id": user,
-        }
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
         close_incident(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
+    elif action == "schedule_retro":
+        channel_info["trigger_id"] = body["trigger_id"]
+        schedule_incident_retro(client, channel_info, ack)
+        # log the event to sentinel
+        log_to_sentinel("incident_retro_scheduled", body)
 
 
 def delete_folder_metadata(client, body, ack):
@@ -444,7 +454,6 @@ def schedule_incident_retro(client, body, ack):
     security_group_users = client.usergroups_users_list(
         usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID")
     )["users"]
-    print("Security group users: ", security_group_users)
 
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
@@ -480,6 +489,22 @@ def schedule_incident_retro(client, body, ack):
         "blocks": (
             [
                 {
+                    "type": "input",
+                    "block_id": "number_of_days",
+                    "element": {
+                        "type": "number_input",
+                        "is_decimal_allowed": False,
+                        "min_value": "1",
+                        "max_value": "60",
+                        "action_id": "number_of_days",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "How many days from now should I start checking the calendar for availability?",
+                    },
+                },
+                {"type": "divider"},
+                {
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
@@ -490,7 +515,7 @@ def schedule_incident_retro(client, body, ack):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting 3 calendar days from now.",
+                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
                     },
                 },
                 {
@@ -529,8 +554,11 @@ def schedule_incident_retro(client, body, ack):
 def save_incident_retro(client, ack, body, view):
     ack()
 
+    # get the number of days data from the view and convert to an integer
+    days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
+
     # pass the data using the view["private_metadata"] to the schedule_event function
-    event_link = google_calendar.schedule_event(view["private_metadata"])
+    event_link = google_calendar.schedule_event(view["private_metadata"], days)
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if event_link is None:
         blocks = {

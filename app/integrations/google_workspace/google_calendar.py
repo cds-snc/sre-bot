@@ -19,7 +19,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
 @handle_google_api_errors
-def schedule_event(event_details):
+def schedule_event(event_details, days):
     # initialize the google service
     service = get_google_service(
         "calendar", "v3", delegated_user_email=SRE_BOT_EMAIL, scopes=SCOPES
@@ -27,8 +27,9 @@ def schedule_event(event_details):
 
     # Define the time range for the query
     now = datetime.utcnow()
-    time_min = now.isoformat() + "Z"  # 'Z' indicates UTC time
-    time_max = (now + timedelta(days=60)).isoformat() + "Z"
+    # time_min is the current time + days and time_max is the current time + 60 days + days
+    time_min = (now + timedelta(days=days)).isoformat() + "Z"  # 'Z' indicates UTC time
+    time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
 
     # Construct the items array
     items = []
@@ -50,7 +51,7 @@ def schedule_event(event_details):
 
     # return the first available slot to book the event
     first_available_start, first_available_end = find_first_available_slot(
-        freebusy_result
+        freebusy_result, days
     )
 
     # If there are no available slots, return None
@@ -112,7 +113,7 @@ def book_calendar_event(service, start, end, emails, incident_name):
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
 # days in the future, ignoring weekends
 def find_first_available_slot(
-    freebusy_response, duration_minutes=30, days_in_future=3, search_days_limit=60
+    freebusy_response, days_in_future, duration_minutes=30, search_days_limit=60
 ):
     # EST timezone
     est = pytz.timezone("US/Eastern")
