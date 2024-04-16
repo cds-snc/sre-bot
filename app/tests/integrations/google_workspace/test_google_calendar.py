@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 import pytest
 import pytz
-import integrations.google_workspace.google_calendar as google_calendar
+from integrations.google_workspace import google_calendar
 
 # Mocked dependencies
 SRE_BOT_EMAIL = "sre-bot@cds-snc.ca"
@@ -68,6 +68,77 @@ def mock_datetime_now(est_timezone):
             *args, **kw
         )
         yield mock_datetime
+
+
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+def test_get_freebusy_required_args_only(mock_execute):
+    mock_execute.return_value = {}
+    time_min = "2022-01-01T00:00:00Z"
+    time_max = "2022-01-02T00:00:00Z"
+    items = ["calendar1", "calendar2"]
+
+    google_calendar.get_freebusy(time_min, time_max, items)
+
+    mock_execute.assert_called_once_with(
+        "calendar",
+        "v3",
+        "freebusy",
+        "query",
+        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        body={
+            "timeMin": time_min,
+            "timeMax": time_max,
+            "items": items,
+        },
+    )
+
+
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+def test_get_freebusy_optional_args(mock_execute):
+    mock_execute.return_value = {}
+    time_min = "2022-01-01T00:00:00Z"
+    time_max = "2022-01-02T00:00:00Z"
+    items = ["calendar1", "calendar2"]
+    time_zone = "America/Los_Angeles"
+    calendar_expansion_max = 20
+    group_expansion_max = 30
+
+    google_calendar.get_freebusy(
+        time_min,
+        time_max,
+        items,
+        time_zone=time_zone,
+        calendar_expansion_max=calendar_expansion_max,
+        group_expansion_max=group_expansion_max,
+    )
+
+    mock_execute.assert_called_once_with(
+        "calendar",
+        "v3",
+        "freebusy",
+        "query",
+        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        body={
+            "timeMin": time_min,
+            "timeMax": time_max,
+            "items": items,
+            "timeZone": time_zone,
+            "calendarExpansionMax": calendar_expansion_max,
+            "groupExpansionMax": group_expansion_max,
+        },
+    )
+
+
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+def test_get_freebusy_returns_object(mock_execute):
+    mock_execute.return_value = {}
+    time_min = "2022-01-01T00:00:00Z"
+    time_max = "2022-01-02T00:00:00Z"
+    items = ["calendar1", "calendar2"]
+
+    result = google_calendar.get_freebusy(time_min, time_max, items)
+
+    assert isinstance(result, dict)
 
 
 # Test out the schedule_event function is successful

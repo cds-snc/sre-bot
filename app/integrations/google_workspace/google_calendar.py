@@ -8,6 +8,7 @@ import json
 from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
+    execute_google_api_call,
 )
 
 # Get the email for the SRE bot
@@ -17,9 +18,47 @@ SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
+@handle_google_api_errors
+def get_freebusy(time_min, time_max, items, **kwargs):
+    """Returns free/busy information for a set of calendars.
+
+    Args:
+        time_min (str): The start of the interval for the query.
+        time_max (str): The end of the interval for the query.
+        items (list): The list of calendars and/or groups to query.
+        time_zone (str, optional): The time zone for the query.
+        calendar_expansion_max (int, optional): The maximum number of calendar identifiers to be provided for a single group. Maximum value is 50.
+        group_expansion_max (int, optional): The maximum number of group members to return for a single group. Maximum value is 100.
+
+    Returns:
+        dict: The free/busy response for the calendars and/or groups provided.
+    """
+
+    body = {
+        "timeMin": time_min,
+        "timeMax": time_max,
+        "items": items,
+    }
+    if "time_zone" in kwargs:
+        body["timeZone"] = kwargs["time_zone"]
+    if "calendar_expansion_max" in kwargs:
+        body["calendarExpansionMax"] = kwargs["calendar_expansion_max"]
+    if "group_expansion_max" in kwargs:
+        body["groupExpansionMax"] = kwargs["group_expansion_max"]
+
+    return execute_google_api_call(
+        "calendar",
+        "v3",
+        "freebusy",
+        "query",
+        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        body=body,
+    )
+
+
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
 @handle_google_api_errors
-def schedule_event(event_details, days):
+def schedule_event(event_details):
     # initialize the google service
     service = get_google_service(
         "calendar", "v3", delegated_user_email=SRE_BOT_EMAIL, scopes=SCOPES
@@ -27,9 +66,8 @@ def schedule_event(event_details, days):
 
     # Define the time range for the query
     now = datetime.utcnow()
-    # time_min is the current time + days and time_max is the current time + 60 days + days
-    time_min = (now + timedelta(days=days)).isoformat() + "Z"  # 'Z' indicates UTC time
-    time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
+    time_min = now.isoformat() + "Z"  # 'Z' indicates UTC time
+    time_max = (now + timedelta(days=60)).isoformat() + "Z"
 
     # Construct the items array
     items = []
@@ -40,18 +78,19 @@ def schedule_event(event_details, days):
         items.append({"id": email})
 
     # Construct the request body
-    freebusy_query = {
-        "timeMin": time_min,
-        "timeMax": time_max,
-        "items": items,
-    }
+    # freebusy_query = {
+    #     "timeMin": time_min,
+    #     "timeMax": time_max,
+    #     "items": items,
+    # }
 
     # Execute the query to find all the busy times for all the participants
-    freebusy_result = service.freebusy().query(body=freebusy_query).execute()
+    # freebusy_result = service.freebusy().query(body=freebusy_query).execute()
+    freebusy_result = get_freebusy(time_min, time_max, items)
 
     # return the first available slot to book the event
     first_available_start, first_available_end = find_first_available_slot(
-        freebusy_result, days
+        freebusy_result
     )
 
     # If there are no available slots, return None
@@ -113,7 +152,7 @@ def book_calendar_event(service, start, end, emails, incident_name):
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
 # days in the future, ignoring weekends
 def find_first_available_slot(
-    freebusy_response, days_in_future, duration_minutes=30, search_days_limit=60
+    freebusy_response, duration_minutes=30, days_in_future=3, search_days_limit=60
 ):
     # EST timezone
     est = pytz.timezone("US/Eastern")
