@@ -1,7 +1,7 @@
 """Unit tests for google_drive module."""
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, call
 
-import integrations.google_workspace.google_drive as google_drive
+from integrations.google_workspace import google_drive
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
@@ -68,9 +68,7 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
 def test_create_folder_returns_folder_id(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {
-        "id": "test_folder_id"
-    }
+    execute_google_api_call_mock.return_value = {"id": "test_folder_id"}
     assert (
         google_drive.create_folder("test_folder", "parent_folder") == "test_folder_id"
     )
@@ -91,9 +89,7 @@ def test_create_folder_returns_folder_id(execute_google_api_call_mock):
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
 def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {
-        "id": "test_document_id"
-    }
+    execute_google_api_call_mock.return_value = {"id": "test_document_id"}
     result = google_drive.create_file("test_document", "folder_id", "document")
     assert result == "test_document_id"
     execute_google_api_call_mock.assert_called_once_with(
@@ -116,7 +112,9 @@ def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_moc
 def test_create_file_with_invalid_type_raises_value_error(
     execute_google_api_call_mock, mocked_logging_error
 ):
-    execute_google_api_call_mock.side_effect = ValueError("Invalid file_type: invalid_file_type")
+    execute_google_api_call_mock.side_effect = ValueError(
+        "Invalid file_type: invalid_file_type"
+    )
     result = google_drive.create_file("name", "folder", "invalid_file_type")
 
     assert result is None
@@ -127,10 +125,10 @@ def test_create_file_with_invalid_type_raises_value_error(
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
 def test_create_file_from_template_returns_file_id(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {
-        "id": "test_document_id"
-    }
-    result = google_drive.create_file_from_template("test_document", "folder_id", "template_id")
+    execute_google_api_call_mock.return_value = {"id": "test_document_id"}
+    result = google_drive.create_file_from_template(
+        "test_document", "folder_id", "template_id"
+    )
     assert result == "test_document_id"
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
@@ -178,7 +176,9 @@ def test_get_file_by_name_with_folder_id_returns_object(execute_google_api_call_
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_without_folder_id_returns_object(execute_google_api_call_mock):
+def test_get_file_by_name_without_folder_id_returns_object(
+    execute_google_api_call_mock,
+):
     execute_google_api_call_mock.return_value = [
         {
             "name": "test_document",
@@ -211,7 +211,9 @@ def test_get_file_by_name_without_folder_id_returns_object(execute_google_api_ca
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_with_empty_folder_id_returns_object(execute_google_api_call_mock):
+def test_get_file_by_name_with_empty_folder_id_returns_object(
+    execute_google_api_call_mock,
+):
     execute_google_api_call_mock.return_value = [
         {
             "name": "test_document",
@@ -244,7 +246,9 @@ def test_get_file_by_name_with_empty_folder_id_returns_object(execute_google_api
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_no_file_found_returns_empty_list(execute_google_api_call_mock):
+def test_get_file_by_name_no_file_found_returns_empty_list(
+    execute_google_api_call_mock,
+):
     execute_google_api_call_mock.return_value = []
     result = google_drive.get_file_by_name("test_file_name", "folder_id")
     assert result == []
@@ -354,7 +358,7 @@ def test_list_files_in_folder_returns_files(execute_google_api_call_mock):
         supportsAllDrives=True,
         includeItemsFromAllDrives=True,
         corpora="user",
-        q=f"parents in 'parent_folder' and mimeType != 'application/vnd.google-apps.folder' and trashed=false",
+        q="parents in 'parent_folder' and mimeType != 'application/vnd.google-apps.folder' and trashed=false",
         fields="files(id, name)",
     )
 
