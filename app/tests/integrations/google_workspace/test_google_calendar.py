@@ -154,8 +154,8 @@ def test_insert_event_no_kwargs_no_delegated_email(
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         delegated_user_email="test_email",
         body={
-            "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
-            "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+            "start": {"dateTime": start, "timeZone": "America/New_York"},
+            "end": {"dateTime": end, "timeZone": "America/New_York"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
         },
@@ -193,8 +193,8 @@ def test_insert_event_with_kwargs(
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         delegated_user_email="test_custom_email",
         body={
-            "start": {"dateTime": start.isoformat(), "timeZone": "Magic/Time_Zone"},
-            "end": {"dateTime": end.isoformat(), "timeZone": "Magic/Time_Zone"},
+            "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
+            "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             **kwargs,

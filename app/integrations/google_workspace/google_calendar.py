@@ -64,13 +64,13 @@ def insert_event(start, end, emails, title, **kwargs):
     """
     time_zone = kwargs.get("time_zone", "America/New_York")
     body = {
-        "start": {"dateTime": start.isoformat(), "timeZone": time_zone},
-        "end": {"dateTime": end.isoformat(), "timeZone": time_zone},
+        "start": {"dateTime": start, "timeZone": time_zone},
+        "end": {"dateTime": end, "timeZone": time_zone},
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
     }
     body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
-    if "delegated_user_email" in kwargs:
+    if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
     else:
         delegated_user_email = os.environ.get("SRE_BOT_EMAIL")
