@@ -142,51 +142,47 @@ def test_get_freebusy_returns_object(mock_execute):
 
 
 # Test out the schedule_event function is successful
-@patch("integrations.google_workspace.google_calendar.get_google_service")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.find_first_available_slot")
-@patch("integrations.google_workspace.google_calendar.book_calendar_event")
+@patch("integrations.google_workspace.google_calendar.insert_event")
 def test_schedule_event_successful(
-    book_calendar_event_mock,
+    insert_event_mock,
     find_first_available_slot_mock,
-    get_google_service_mock,
+    execute_google_api_call_mock,
     event_details,
-    google_service_mock,
 ):
     # Set up the mock return values
-    get_google_service_mock.return_value = google_service_mock
+    execute_google_api_call_mock.return_value = {
+        "result": "Mocked FreeBusy Query Result"
+    }
     find_first_available_slot_mock.return_value = (
         datetime.utcnow().isoformat(),
         (datetime.utcnow() + timedelta(hours=1)).isoformat(),
     )
-    book_calendar_event_mock.return_value = "https://calendar.link"
+    insert_event_mock.return_value = "https://calendar.link"
     mock_days = 1
 
     # Call the function under test
     event_link = google_calendar.schedule_event(event_details, mock_days)
 
     # Assertions
-    get_google_service_mock.assert_called_once_with(
-        "calendar", "v3", delegated_user_email=SRE_BOT_EMAIL, scopes=SCOPES
-    )
-    assert google_service_mock.freebusy().query().execute.call_count == 1
+    execute_google_api_call_mock.assert_called_once()
     find_first_available_slot_mock.assert_called_once()
-    book_calendar_event_mock.assert_called_once()
+    insert_event_mock.assert_called_once()
     assert event_link == "https://calendar.link"
 
 
 # Test out the schedule_event function when no available slots are found
-@patch("integrations.google_workspace.google_calendar.get_google_service")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.find_first_available_slot")
-@patch("integrations.google_workspace.google_calendar.book_calendar_event")
+@patch("integrations.google_workspace.google_calendar.insert_event")
 def test_schedule_event_no_available_slots(
-    book_calendar_event_mock,
+    insert_event_mock,
     find_first_available_slot_mock,
-    get_google_service_mock,
+    execute_google_api_call_mock,
     event_details,
-    google_service_mock,
 ):
     # Set up the mock return values
-    get_google_service_mock.return_value = google_service_mock
     find_first_available_slot_mock.return_value = (None, None)
     mock_days = 1
 
@@ -195,7 +191,8 @@ def test_schedule_event_no_available_slots(
 
     # Assertions
     assert event_link is None
-    book_calendar_event_mock.assert_not_called()
+    insert_event_mock.assert_not_called()
+    execute_google_api_call_mock.assert_called_once()
 
 
 # Test out the book_calendar_event function is successful
