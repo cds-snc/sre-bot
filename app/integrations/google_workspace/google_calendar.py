@@ -1,113 +1,91 @@
 import os
-import logging
 from datetime import datetime, timedelta
 
 import pytz
-import json
 
 from integrations.google_workspace.google_service import (
-    get_google_service,
     handle_google_api_errors,
+    execute_google_api_call,
+    convert_to_camel_case,
 )
 
 # Get the email for the SRE bot
 SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
 
-# If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-
-# Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
 @handle_google_api_errors
-def schedule_event(event_details, days):
-    # initialize the google service
-    service = get_google_service(
-        "calendar", "v3", delegated_user_email=SRE_BOT_EMAIL, scopes=SCOPES
-    )
+def get_freebusy(time_min, time_max, items, **kwargs):
+    """Returns free/busy information for a set of calendars.
 
-    # Define the time range for the query
-    now = datetime.utcnow()
-    # time_min is the current time + days and time_max is the current time + 60 days + days
-    time_min = (now + timedelta(days=days)).isoformat() + "Z"  # 'Z' indicates UTC time
-    time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
+    Args:
+        time_min (str): The start of the interval for the query.
+        time_max (str): The end of the interval for the query.
+        items (list): The list of calendars and/or groups to query.
+        time_zone (str, optional): The time zone for the query. Default is 'UTC'.
+        calendar_expansion_max (int, optional): The maximum number of calendar identifiers to be provided for a single group. Maximum value is 50.
+        group_expansion_max (int, optional): The maximum number of group members to return for a single group. Maximum value is 100.
 
-    # Construct the items array
-    items = []
-    emails = json.loads(event_details).get("emails")
-    incident_name = json.loads(event_details).get("topic")
-    for email in emails:
-        email = email.strip()
-        items.append({"id": email})
+    Returns:
+        dict: The free/busy response for the calendars and/or groups provided.
+    """
 
-    # Construct the request body
-    freebusy_query = {
+    body = {
         "timeMin": time_min,
         "timeMax": time_max,
         "items": items,
     }
+    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
 
-    # Execute the query to find all the busy times for all the participants
-    freebusy_result = service.freebusy().query(body=freebusy_query).execute()
-
-    # return the first available slot to book the event
-    first_available_start, first_available_end = find_first_available_slot(
-        freebusy_result, days
+    return execute_google_api_call(
+        "calendar",
+        "v3",
+        "freebusy",
+        "query",
+        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        body=body,
     )
 
-    # If there are no available slots, return None
-    if first_available_start is None and first_available_end is None:
-        logging.info("No available slots found")
-        return None
 
-    # Crete the event in everyone's calendar
-    event_link = book_calendar_event(
-        service, first_available_start, first_available_end, emails, incident_name
-    )
+@handle_google_api_errors
+def insert_event(start, end, emails, title, **kwargs):
+    """Creates a new event in the specified calendars.
 
-    return event_link
+    Args:
+        start (datetime): The start time of the event. Must be in ISO 8601 format (e.g., '2023-04-10T10:00:00-04:00')
+        end (datetime): The end time of the event.
+        emails (list): The list of email addresses of the attendees.
+        title (str): The title of the event.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
+        Any additional kwargs will be added to the event body. For a full list of possible kwargs, refer to the Google Calendar API documentation:
+        https://developers.google.com/calendar/v3/reference/events/insert
 
-
-# Create a calendar event in everyone's calendar
-def book_calendar_event(service, start, end, emails, incident_name):
-    # Build the attendees array
-    attendees = []
-    for email in emails:
-        attendees.append({"email": email.strip()})
-
-    # Create the event
-    event = {
-        "summary": "Retro " + incident_name,
-        "description": "This is a retro meeting to discuss incident: " + incident_name,
-        "start": {"dateTime": start.isoformat()},
-        "end": {"dateTime": end.isoformat()},
-        "attendees": attendees,
-        "conferenceData": {
-            "createRequest": {
-                "requestId": f"{start.timestamp()}",  # Unique ID per event to avoid collisions
-                "conferenceSolutionKey": {
-                    "type": "hangoutsMeet"  # This automatically generates a Google Meet link
-                },
-            }
-        },
-        "reminders": {
-            "useDefault": False,
-            "overrides": [
-                {"method": "popup", "minutes": 10},
-            ],
-        },
+    Returns:
+        str: The link to the created event.
+    """
+    time_zone = kwargs.get("time_zone", "America/New_York")
+    body = {
+        "start": {"dateTime": start.isoformat(), "timeZone": time_zone},
+        "end": {"dateTime": end.isoformat(), "timeZone": time_zone},
+        "attendees": [{"email": email.strip()} for email in emails],
+        "summary": title,
     }
+    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
+    if "delegated_user_email" in kwargs:
+        delegated_user_email = kwargs["delegated_user_email"]
+    else:
+        delegated_user_email = os.environ.get("SRE_BOT_EMAIL")
 
-    # call the google calendar API to create the event and send an email to all attendees
-    event = (
-        service.events()
-        .insert(
-            calendarId="primary", body=event, conferenceDataVersion=1, sendUpdates="all"
-        )
-        .execute()
+    result = execute_google_api_call(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email=delegated_user_email,
+        body=body,
+        calendarId="primary",
     )
-
-    # Return the link to the calendar event
-    return event.get("htmlLink")
+    return result.get("htmlLink")
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3

@@ -2,9 +2,10 @@ import os
 import json
 import logging
 from integrations import google_drive
-from integrations.google_workspace import google_docs, google_calendar
+from integrations.google_workspace import google_docs
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
+from modules.incident import schedule_retro
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 
@@ -558,7 +559,7 @@ def save_incident_retro(client, ack, body, view):
     days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
 
     # pass the data using the view["private_metadata"] to the schedule_event function
-    event_link = google_calendar.schedule_event(view["private_metadata"], days)
+    event_link = schedule_retro.schedule_event(view["private_metadata"], days)
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if event_link is None:
         blocks = {
