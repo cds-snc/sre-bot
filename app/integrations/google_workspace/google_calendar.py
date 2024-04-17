@@ -8,7 +8,7 @@ import json
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
-    convert_to_camel_case
+    convert_to_camel_case,
 )
 
 # Get the email for the SRE bot
@@ -139,6 +139,7 @@ def insert_event(start, end, emails, title, **kwargs):
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         delegated_user_email=delegated_user_email,
         body=body,
+        calendarId="primary",
     )
     return result.get("htmlLink")
 

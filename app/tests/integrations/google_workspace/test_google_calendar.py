@@ -1,7 +1,7 @@
 """Unit tests for google_calendar module."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import ANY, patch, MagicMock
 from datetime import datetime, timedelta
 import pytest
 import pytz
@@ -23,12 +23,12 @@ def event_details():
     )
 
 
-# Fixture to mock the Google service object
-@pytest.fixture
-def google_service_mock():
-    service = MagicMock()
-    service.freebusy().query().execute.return_value = "Mocked FreeBusy Query Result"
-    return service
+# # Fixture to mock the Google service object
+# @pytest.fixture
+# def google_service_mock():
+#     service = MagicMock()
+#     service.freebusy().query().execute.return_value = "Mocked FreeBusy Query Result"
+#     return service
 
 
 # Fixture to mock the calendar service object
@@ -142,17 +142,17 @@ def test_get_freebusy_returns_object(mock_execute):
 
 
 # Test out the schedule_event function is successful
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.get_freebusy")
 @patch("integrations.google_workspace.google_calendar.find_first_available_slot")
 @patch("integrations.google_workspace.google_calendar.insert_event")
 def test_schedule_event_successful(
     insert_event_mock,
     find_first_available_slot_mock,
-    execute_google_api_call_mock,
+    get_freebusy_mock,
     event_details,
 ):
     # Set up the mock return values
-    execute_google_api_call_mock.return_value = {
+    get_freebusy_mock.return_value = {
         "result": "Mocked FreeBusy Query Result"
     }
     find_first_available_slot_mock.return_value = (
@@ -162,13 +162,30 @@ def test_schedule_event_successful(
     insert_event_mock.return_value = "https://calendar.link"
     mock_days = 1
 
+    # Parse event details
+    event_details_dict = json.loads(event_details)
+    emails = event_details_dict["emails"]
+    topic = event_details_dict["topic"]
+
     # Call the function under test
     event_link = google_calendar.schedule_event(event_details, mock_days)
 
     # Assertions
-    execute_google_api_call_mock.assert_called_once()
-    find_first_available_slot_mock.assert_called_once()
-    insert_event_mock.assert_called_once()
+    get_freebusy_mock.assert_called_once_with(
+        ANY,  # Replace with expected arguments
+        ANY,  # Replace with expected arguments
+        ANY,  # Replace with expected arguments
+    )
+    find_first_available_slot_mock.assert_called_once_with(
+        {"result": "Mocked FreeBusy Query Result"}, mock_days
+    )
+    insert_event_mock.assert_called_once_with(
+        find_first_available_slot_mock.return_value[0],
+        find_first_available_slot_mock.return_value[1],
+        emails,
+        topic,
+    )
+
     assert event_link == "https://calendar.link"
 
 
