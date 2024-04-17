@@ -39,12 +39,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "timeMax": time_max,
         "items": items,
     }
-    if "time_zone" in kwargs:
-        body["timeZone"] = kwargs["time_zone"]
-    if "calendar_expansion_max" in kwargs:
-        body["calendarExpansionMax"] = kwargs["calendar_expansion_max"]
-    if "group_expansion_max" in kwargs:
-        body["groupExpansionMax"] = kwargs["group_expansion_max"]
+    body.update(kwargs)
 
     return execute_google_api_call(
         "calendar",
