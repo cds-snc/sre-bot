@@ -12,9 +12,6 @@ from integrations.google_workspace.google_service import (
 # Get the email for the SRE bot
 SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
 
-# If modifying these scopes, delete the file token.json.
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
-
 
 @handle_google_api_errors
 def get_freebusy(time_min, time_max, items, **kwargs):
