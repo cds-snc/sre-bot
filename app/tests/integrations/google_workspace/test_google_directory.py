@@ -150,7 +150,7 @@ def test_list_groups_calls_execute_google_api_call_with_correct_args(
         "default_delegated_admin_email",
         paginate=True,
         customer="default_google_workspace_customer_id",
-        maxResults=100,
+        maxResults=200,
         orderBy="email",
     )
 
@@ -184,7 +184,7 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
         custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
-        maxResults=100,
+        maxResults=200,
         orderBy="email",
     )
 
@@ -208,6 +208,7 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
         "default_delegated_admin_email",
         paginate=True,
         groupKey=group_key,
+        maxResults=200,
     )
 
 
@@ -240,4 +241,5 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         custom_delegated_user_email,
         paginate=True,
         groupKey=group_key,
+        maxResults=200,
     )

@@ -91,7 +91,7 @@ def list_groups(
         delegated_user_email,
         paginate=True,
         customer=customer,
-        maxResults=100,
+        maxResults=200,
         orderBy="email",
     )
 
@@ -118,4 +118,5 @@ def list_group_members(group_key, delegated_user_email=None):
         delegated_user_email,
         paginate=True,
         groupKey=group_key,
+        maxResults=200,
     )
