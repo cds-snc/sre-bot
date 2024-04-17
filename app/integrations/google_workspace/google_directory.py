@@ -60,7 +60,7 @@ def list_users(
         delegated_user_email,
         paginate=True,
         customer=customer,
-        maxResults=10,
+        maxResults=500,
         orderBy="email",
     )
 
