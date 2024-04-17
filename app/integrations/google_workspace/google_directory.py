@@ -1,21 +1,20 @@
-"""Google Directory module for interacting with the Google Workspace Directory API."""
+"""Google Directory module to interact with the Google Workspace Directory API."""
 
-import os
 from integrations.google_workspace.google_service import (
-    get_google_service,
     handle_google_api_errors,
+    execute_google_api_call,
+    DEFAULT_DELEGATED_ADMIN_EMAIL,
+    DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
-
-GOOGLE_DELEGATED_ADMIN_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
-GOOGLE_WORKSPACE_CUSTOMER_ID = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER_ID")
 
 
 @handle_google_api_errors
-def get_user(user_key):
+def get_user(user_key, delegated_user_email=None):
     """Get a user by user key in the Google Workspace domain.
 
     Args:
         user_key (str): The user's primary email address, alias email address, or unique user ID.
+        delegated_user_email (str): The email address of the user to impersonate. (default: must be defined in .env)
 
     Returns:
         dict: A user object.
@@ -23,57 +22,54 @@ def get_user(user_key):
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/get
     """
 
+    if not delegated_user_email:
+        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
-
-    service = get_google_service(
+    return execute_google_api_call(
         "admin",
         "directory_v1",
-        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
-        scopes=scopes,
+        "users",
+        "get",
+        scopes,
+        delegated_user_email,
+        userKey=user_key,
     )
-    user = service.users().get(userKey=user_key).execute()
-    return user
 
 
 @handle_google_api_errors
-def list_users():
+def list_users(
+    delegated_user_email=None,
+    customer=None,
+):
     """List all users in the Google Workspace domain.
 
     Returns:
         list: A list of user objects.
-
-    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/list
     """
-
+    if not delegated_user_email:
+        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+    if not customer:
+        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
-    service = get_google_service(
+    return execute_google_api_call(
         "admin",
         "directory_v1",
-        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
-        scopes=scopes,
+        "users",
+        "list",
+        scopes,
+        delegated_user_email,
+        paginate=True,
+        customer=customer,
+        maxResults=10,
+        orderBy="email",
     )
-    page_token = None
-    all_users = []
-    while True:
-        results = (
-            service.users()
-            .list(
-                customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
-                maxResults=500,
-                orderBy="email",
-                pageToken=page_token,
-            )
-            .execute()
-        )
-        all_users.extend(results.get("users", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
-    return all_users
 
 
 @handle_google_api_errors
-def list_groups():
+def list_groups(
+    delegated_user_email=None,
+    customer=None,
+):
     """List all groups in the Google Workspace domain.
 
     Returns:
@@ -81,39 +77,27 @@ def list_groups():
 
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/list
     """
-
+    if not delegated_user_email:
+        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+    if not customer:
+        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
-
-    service = get_google_service(
+    return execute_google_api_call(
         "admin",
         "directory_v1",
-        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
-        scopes=scopes,
+        "groups",
+        "list",
+        scopes,
+        delegated_user_email,
+        paginate=True,
+        customer=customer,
+        maxResults=100,
+        orderBy="email",
     )
-    all_groups = []
-    page_token = None
-
-    while True:
-        results = (
-            service.groups()
-            .list(
-                customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
-                maxResults=500,
-                orderBy="email",
-                pageToken=page_token,
-            )
-            .execute()
-        )
-        all_groups.extend(results.get("groups", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
-
-    return all_groups
 
 
 @handle_google_api_errors
-def list_group_members(group_key):
+def list_group_members(group_key, delegated_user_email=None):
     """List all group members in the Google Workspace domain.
 
     Returns:
@@ -122,30 +106,16 @@ def list_group_members(group_key):
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/list
     """
 
+    if not delegated_user_email:
+        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"]
-
-    service = get_google_service(
+    return execute_google_api_call(
         "admin",
         "directory_v1",
-        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
-        scopes=scopes,
+        "members",
+        "list",
+        scopes,
+        delegated_user_email,
+        paginate=True,
+        groupKey=group_key,
     )
-    all_group_members = []
-    page_token = None
-
-    while True:
-        results = (
-            service.members()
-            .list(
-                groupKey=group_key,
-                maxResults=500,
-                pageToken=page_token,
-            )
-            .execute()
-        )
-        all_group_members.extend(results.get("members", []))
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
-
-    return all_group_members
