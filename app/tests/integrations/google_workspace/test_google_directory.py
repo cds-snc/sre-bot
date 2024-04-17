@@ -123,7 +123,7 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
         custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
-        maxResults=10,
+        maxResults=500,
         orderBy="email",
     )
 
