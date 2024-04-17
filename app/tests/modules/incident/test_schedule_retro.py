@@ -1,17 +1,13 @@
 """Unit tests for schedule_retro module in Incident management proces."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timedelta
 import pytest
 import pytz
 
 # from integrations.google_workspace import google_calendar
 from modules.incident import schedule_retro
-
-# Mocked dependencies
-SRE_BOT_EMAIL = "sre-bot@cds-snc.ca"
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 # Fixture to mock the event details JSON string
@@ -23,20 +19,6 @@ def event_details():
             "topic": "Incident Response Meeting",
         }
     )
-
-
-# Fixture to mock the calendar service object
-@pytest.fixture
-def calendar_service_mock():
-    # Mock for the Google Calendar service object
-    service_mock = MagicMock()
-
-    # Properly set the return value for the execute method to return the expected dictionary directly
-    service_mock.events.return_value.insert.return_value.execute.return_value = {
-        "htmlLink": "https://calendar.google.com/event_link"
-    }
-
-    return service_mock
 
 
 # Fixture to mock the timezone
@@ -60,12 +42,6 @@ def mock_datetime_now(est_timezone):
             *args, **kw
         )
         yield mock_datetime
-
-
-# Fixture to mock the list of calendars
-@pytest.fixture
-def items():
-    return [{"id": "calendar1"}, {"id": "calendar2"}]
 
 
 # Test out the schedule_event function is successful
