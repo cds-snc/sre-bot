@@ -264,7 +264,11 @@ def submit(ack, view, say, body, client, logger):
     slug = f"{date} {name}".replace(" ", "-").lower()
 
     # Create channel
-    response = client.conversations_create(name=f"incident-{slug}")
+    # if we are testing ie PREFIX is "dev" then create the channel with name incident-dev-{slug}. Otherwisse create the channel with name incident-{slug}
+    if PREFIX == "dev-":
+        response = client.conversations_create(name=f"incident-dev-{slug}")
+    else:
+        response = client.conversations_create(name=f"incident-{slug}")
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
     logger.info(f"Created conversation: {channel_name}")

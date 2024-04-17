@@ -15,8 +15,8 @@ def schedule_event(event_details, days):
     # Define the time range for the query
     now = datetime.now(timezone.utc)
     # time_min is the current time + days and time_max is the current time + 60 days + days
-    time_min = (now + timedelta(days=days)).isoformat() + "Z"  # 'Z' indicates UTC time
-    time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
+    time_min = (now + timedelta(days=days)).isoformat()
+    time_max = (now + timedelta(days=(60 + days))).isoformat()
 
     # Construct the items array
     items = []
