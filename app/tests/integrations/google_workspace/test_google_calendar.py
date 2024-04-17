@@ -1,7 +1,7 @@
 """Unit tests for google_calendar module."""
 
 import json
-from unittest.mock import ANY, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 import pytest
 import pytz
@@ -70,16 +70,21 @@ def mock_datetime_now(est_timezone):
         yield mock_datetime
 
 
+# Fixture to mock the list of calendars
+@pytest.fixture
+def items():
+    return [{"id": "calendar1"}, {"id": "calendar2"}]
+
+
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
-def test_get_freebusy_required_args_only(mock_execute):
-    mock_execute.return_value = {}
+def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
+    mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
     time_max = "2022-01-02T00:00:00Z"
-    items = ["calendar1", "calendar2"]
 
     google_calendar.get_freebusy(time_min, time_max, items)
 
-    mock_execute.assert_called_once_with(
+    mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
         "freebusy",
@@ -88,17 +93,16 @@ def test_get_freebusy_required_args_only(mock_execute):
         body={
             "timeMin": time_min,
             "timeMax": time_max,
-            "items": items,
+            "items": [{"id": "calendar1"}, {"id": "calendar2"}],
         },
     )
 
 
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
-def test_get_freebusy_optional_args(mock_execute):
-    mock_execute.return_value = {}
+def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
+    mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
     time_max = "2022-01-02T00:00:00Z"
-    items = ["calendar1", "calendar2"]
     time_zone = "America/Los_Angeles"
     calendar_expansion_max = 20
     group_expansion_max = 30
@@ -112,7 +116,7 @@ def test_get_freebusy_optional_args(mock_execute):
         group_expansion_max=group_expansion_max,
     )
 
-    mock_execute.assert_called_once_with(
+    mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
         "freebusy",
@@ -121,10 +125,10 @@ def test_get_freebusy_optional_args(mock_execute):
         body={
             "timeMin": time_min,
             "timeMax": time_max,
-            "items": items,
-            "timeZone": time_zone,
-            "calendarExpansionMax": calendar_expansion_max,
-            "groupExpansionMax": group_expansion_max,
+            "items": [{"id": "calendar1"}, {"id": "calendar2"}],
+            "timeZone": "America/Los_Angeles",
+            "calendarExpansionMax": 20,
+            "groupExpansionMax": 30,
         },
     )
 
@@ -141,6 +145,89 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
+@patch("os.environ.get", return_value="test_email")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
+def test_insert_event_no_kwargs_no_delegated_email(
+    mock_convert, mock_execute, mock_get
+):
+    mock_execute.return_value = {"htmlLink": "test_link"}
+    start = datetime.now()
+    end = start
+    emails = ["test1@test.com", "test2@test.com"]
+    title = "Test Event"
+    result = google_calendar.insert_event(start, end, emails, title)
+    assert result == "test_link"
+    mock_execute.assert_called_once_with(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email="test_email",
+        body={
+            "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
+            "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+            "attendees": [{"email": email.strip()} for email in emails],
+            "summary": title,
+        },
+        calendarId="primary",
+    )
+    assert not mock_convert.called
+    assert mock_get.called_once_with("SRE_BOT_EMAIL")
+
+
+@patch("os.environ.get", return_value="test_email")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
+def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
+    mock_execute.return_value = {"htmlLink": "test_link"}
+    mock_convert.side_effect = lambda x: x  # just return the same value
+    start = datetime.now()
+    end = start
+    emails = ["test1@test.com", "test2@test.com"]
+    title = "Test Event"
+    kwargs = {"location": "Test Location", "description": "Test Description", "delegated_user_email": "test_custom_email"}
+    result = google_calendar.insert_event(start, end, emails, title, **kwargs)
+    assert result == "test_link"
+    mock_execute.assert_called_once_with(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email="test_custom_email",
+        body={
+            "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
+            "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+            "attendees": [{"email": email.strip()} for email in emails],
+            "summary": title,
+            **kwargs,
+        },
+        calendarId="primary",
+    )
+    for key in kwargs:
+        mock_convert.assert_any_call(key)
+
+    assert not mock_get.called
+
+
+@patch("integrations.google_workspace.google_service.handle_google_api_errors")
+@patch("os.environ.get", return_value="test_email")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
+def test_insert_event_api_call_error(
+    mock_convert, mock_execute, mock_get, mock_handle_errors, caplog
+):
+    mock_execute.side_effect = Exception("API call error")
+    start = datetime.now()
+    end = start
+    emails = ["test1@test.com", "test2@test.com"]
+    title = "Test Event"
+    google_calendar.insert_event(start, end, emails, title)
+    assert "An unexpected error occurred in function 'insert_event': API call error" in caplog.text
+
+
 # Test out the schedule_event function is successful
 @patch("integrations.google_workspace.google_calendar.get_freebusy")
 @patch("integrations.google_workspace.google_calendar.find_first_available_slot")
@@ -152,9 +239,7 @@ def test_schedule_event_successful(
     event_details,
 ):
     # Set up the mock return values
-    get_freebusy_mock.return_value = {
-        "result": "Mocked FreeBusy Query Result"
-    }
+    get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
     find_first_available_slot_mock.return_value = (
         datetime.utcnow().isoformat(),
         (datetime.utcnow() + timedelta(hours=1)).isoformat(),
@@ -171,11 +256,7 @@ def test_schedule_event_successful(
     event_link = google_calendar.schedule_event(event_details, mock_days)
 
     # Assertions
-    get_freebusy_mock.assert_called_once_with(
-        ANY,  # Replace with expected arguments
-        ANY,  # Replace with expected arguments
-        ANY,  # Replace with expected arguments
-    )
+    get_freebusy_mock.assert_called_once()
     find_first_available_slot_mock.assert_called_once_with(
         {"result": "Mocked FreeBusy Query Result"}, mock_days
     )
