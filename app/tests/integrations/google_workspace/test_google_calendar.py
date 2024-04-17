@@ -187,7 +187,11 @@ def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
-    kwargs = {"location": "Test Location", "description": "Test Description", "delegated_user_email": "test_custom_email"}
+    kwargs = {
+        "location": "Test Location",
+        "description": "Test Description",
+        "delegated_user_email": "test_custom_email",
+    }
     result = google_calendar.insert_event(start, end, emails, title, **kwargs)
     assert result == "test_link"
     mock_execute.assert_called_once_with(
@@ -225,7 +229,10 @@ def test_insert_event_api_call_error(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     google_calendar.insert_event(start, end, emails, title)
-    assert "An unexpected error occurred in function 'insert_event': API call error" in caplog.text
+    assert (
+        "An unexpected error occurred in function 'insert_event': API call error"
+        in caplog.text
+    )
 
 
 # Test out the schedule_event function is successful

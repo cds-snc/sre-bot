@@ -66,7 +66,9 @@ def test_get_google_service_with_scopes(credentials_mock, build_mock):
         {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
     ):
         get_google_service("drive", "v3", scopes=["scope1", "scope2"])
-    credentials_mock.return_value.with_scopes.assert_called_once_with(["scope1", "scope2"])
+    credentials_mock.return_value.with_scopes.assert_called_once_with(
+        ["scope1", "scope2"]
+    )
 
 
 def test_get_google_service_raises_exception_if_credentials_json_not_set():
