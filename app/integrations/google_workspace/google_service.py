@@ -86,16 +86,15 @@ def handle_google_api_errors(func):
             return func(*args, **kwargs)
         except HttpError as e:
             logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
-            return None
         except ValueError as e:
             logging.error(f"A ValueError occurred in function '{func.__name__}': {e}")
-            return None
         except RefreshError as e:
             logging.error(f"A RefreshError occurred in function '{func.__name__}': {e}")
-            return None
         except Error as e:
             logging.error(f"An error occurred in function '{func.__name__}': {e}")
-            return None
+        except Exception as e:  # Catch-all for any other types of exceptions
+            logging.error(f"An unexpected error occurred in function '{func.__name__}': {e}")
+        return None
 
     return wrapper
 
