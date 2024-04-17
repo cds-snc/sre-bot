@@ -6,7 +6,6 @@ import pytz
 import json
 
 from integrations.google_workspace.google_service import (
-    get_google_service,
     handle_google_api_errors,
     execute_google_api_call,
 )
