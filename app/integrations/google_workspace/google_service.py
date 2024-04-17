@@ -93,7 +93,9 @@ def handle_google_api_errors(func):
         except Error as e:
             logging.error(f"An error occurred in function '{func.__name__}': {e}")
         except Exception as e:  # Catch-all for any other types of exceptions
-            logging.error(f"An unexpected error occurred in function '{func.__name__}': {e}")
+            logging.error(
+                f"An unexpected error occurred in function '{func.__name__}': {e}"
+            )
         return None
 
     return wrapper
