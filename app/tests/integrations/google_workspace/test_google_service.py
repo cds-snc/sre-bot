@@ -39,6 +39,36 @@ def test_get_google_service_returns_build_object(credentials_mock, build_mock):
     )
 
 
+@patch("integrations.google_workspace.google_service.build")
+@patch.object(Credentials, "from_service_account_info")
+def test_get_google_service_with_delegated_user_email(credentials_mock, build_mock):
+    """
+    Test case to verify that the function works correctly with a delegated user email.
+    """
+    credentials_mock.return_value = MagicMock()
+    with patch.dict(
+        "os.environ",
+        {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
+    ):
+        get_google_service("drive", "v3", delegated_user_email="test@test.com")
+    credentials_mock.return_value.with_subject.assert_called_once_with("test@test.com")
+
+
+@patch("integrations.google_workspace.google_service.build")
+@patch.object(Credentials, "from_service_account_info")
+def test_get_google_service_with_scopes(credentials_mock, build_mock):
+    """
+    Test case to verify that the function works correctly with scopes.
+    """
+    credentials_mock.return_value = MagicMock()
+    with patch.dict(
+        "os.environ",
+        {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
+    ):
+        get_google_service("drive", "v3", scopes=["scope1", "scope2"])
+    credentials_mock.return_value.with_scopes.assert_called_once_with(["scope1", "scope2"])
+
+
 def test_get_google_service_raises_exception_if_credentials_json_not_set():
     """
     Test case to verify that the function raises an exception if:
@@ -109,6 +139,21 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "An error occurred in function 'mock_func': Error message"
+    )
+
+
+@patch("logging.error")
+def test_handle_google_api_errors_catches_exception(mocked_logging_error):
+    mock_func = MagicMock(side_effect=Exception("Exception message"))
+    mock_func.__name__ = "mock_func"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is None
+    mock_func.assert_called_once()
+    mocked_logging_error.assert_called_once_with(
+        "An unexpected error occurred in function 'mock_func': Exception message"
     )
 
 

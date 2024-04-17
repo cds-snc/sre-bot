@@ -26,7 +26,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         time_min (str): The start of the interval for the query.
         time_max (str): The end of the interval for the query.
         items (list): The list of calendars and/or groups to query.
-        time_zone (str, optional): The time zone for the query.
+        time_zone (str, optional): The time zone for the query. Default is 'UTC'.
         calendar_expansion_max (int, optional): The maximum number of calendar identifiers to be provided for a single group. Maximum value is 50.
         group_expansion_max (int, optional): The maximum number of group members to return for a single group. Maximum value is 100.
 
@@ -49,6 +49,48 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         body=body,
     )
+
+
+@handle_google_api_errors
+def insert_event(start, end, emails, title, **kwargs):
+    """Creates a new event in the specified calendars.
+
+    Args:
+        start (datetime): The start time of the event.
+        end (datetime): The end time of the event.
+        emails (list): The list of email addresses of the attendees.
+        title (str): The title of the event.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
+        Any additional kwargs will be added to the event body. For a full list of possible kwargs, refer to the Google Calendar API documentation:
+        https://developers.google.com/calendar/v3/reference/events/insert
+
+    Returns:
+        str: The link to the created event.
+    """
+
+    body = {
+        "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
+        "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+        "attendees": [{"email": email.strip()} for email in emails],
+        "summary": title,
+    }
+    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
+    if "delegated_user_email" in kwargs:
+        delegated_user_email = kwargs["delegated_user_email"]
+    else:
+        delegated_user_email = os.environ.get("SRE_BOT_EMAIL")
+
+    result = execute_google_api_call(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email=delegated_user_email,
+        body=body,
+        calendarId="primary",
+    )
+    return result.get("htmlLink")
 
 
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
@@ -103,45 +145,6 @@ def schedule_event(event_details, days):
     )
 
     return event_link
-
-
-def insert_event(start, end, emails, title, **kwargs):
-    """Creates a new event in the specified calendars.
-
-    Args:
-        start (datetime): The start time of the event.
-        end (datetime): The end time of the event.
-        emails (list): The list of email addresses of the attendees.
-        title (str): The title of the event.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
-        Any additional kwargs will be added to the event body. For a full list of possible kwargs, refer to the Google Calendar API documentation:
-        https://developers.google.com/calendar/v3/reference/events/insert
-
-    Returns:
-        str: The link to the created event.
-    """
-
-    body = {
-        "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
-        "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
-        "attendees": [{"email": email.strip()} for email in emails],
-        "summary": title,
-    }
-    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
-    delegated_user_email = kwargs.get(
-        "delegated_user_email", os.environ.get("SRE_BOT_EMAIL")
-    )
-    result = execute_google_api_call(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email=delegated_user_email,
-        body=body,
-        calendarId="primary",
-    )
-    return result.get("htmlLink")
 
 
 # Create a calendar event in everyone's calendar
