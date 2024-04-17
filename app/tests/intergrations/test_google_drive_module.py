@@ -1,3 +1,4 @@
+"""NOTE: this module requires a suffix while the intergration/google_drive.py still exists. It should be removed after the integration/google_drive.py is properly refactored with the new google_workspace integration."""
 import os
 import pytest
 

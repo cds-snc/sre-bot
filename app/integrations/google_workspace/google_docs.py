@@ -1,22 +1,12 @@
 """Google Docs module.
 
 This module provides functions to create and manipulate Google Docs.
-
-Functions:
-    create(title: str) -> str:
-        Creates a new document in Google Docs and returns the id of the new document.
-
-    batch_update(document_id: str, requests: list) -> None:
-        Applies a list of updates to a document in Google Docs.
-
-    get(document_id: str) -> dict:
-        Gets a document from Google Docs and returns the document resource.
 """
 import logging
 import re
 from integrations.google_workspace.google_service import (
-    get_google_service,
     handle_google_api_errors,
+    execute_google_api_call,
 )
 
 
@@ -30,9 +20,14 @@ def create(title: str) -> str:
     Returns:
         str: The id of the new document.
     """
-    # pylint: disable=no-member
-    service = get_google_service("docs", "v1")
-    result = service.documents().create(body={"title": title}).execute()
+    result = execute_google_api_call(
+        "docs",
+        "v1",
+        "documents",
+        "create",
+        scopes=["https://www.googleapis.com/auth/documents"],
+        body={"title": title},
+    )
     return result["documentId"]
 
 
@@ -47,12 +42,15 @@ def batch_update(document_id: str, requests: list) -> None:
     Returns:
         None
     """
-    # pylint: disable=no-member
-    service = get_google_service("docs", "v1")
-    service.documents().batchUpdate(
+    execute_google_api_call(
+        "docs",
+        "v1",
+        "documents",
+        "batchUpdate",
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId=document_id,
         body={"requests": requests},
-    ).execute()
+    )
 
 
 @handle_google_api_errors
@@ -65,10 +63,14 @@ def get(document_id: str) -> dict:
     Returns:
         dict: The document resource.
     """
-    # pylint: disable=no-member
-    service = get_google_service("docs", "v1")
-    result = service.documents().get(documentId=document_id).execute()
-    return result
+    return execute_google_api_call(
+        "docs",
+        "v1",
+        "documents",
+        "get",
+        scopes=["https://www.googleapis.com/auth/documents.readonly"],
+        documentId=document_id,
+    )
 
 
 def extract_google_doc_id(url):
