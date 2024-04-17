@@ -1043,7 +1043,7 @@ def test_schedule_incident_retro_with_no_topic():
     )
 
 
-@patch("integrations.google_workspace.google_calendar.schedule_event")
+@patch("modules.incident.schedule_retro.schedule_event")
 def test_save_incident_retro_success(schedule_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -1070,7 +1070,7 @@ def test_save_incident_retro_success(schedule_event_mock):
     )
 
 
-@patch("integrations.google_workspace.google_calendar.schedule_event")
+@patch("modules.incident.schedule_retro.schedule_event")
 def test_save_incident_retro_failure(schedule_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
