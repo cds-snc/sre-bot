@@ -89,7 +89,7 @@ def test_list_users_returns_users(execute_google_api_call_mock):
         "default_delegated_admin_email",
         paginate=True,
         customer="default_google_workspace_customer_id",
-        maxResults=10,
+        maxResults=500,
         orderBy="email",
     )
 
