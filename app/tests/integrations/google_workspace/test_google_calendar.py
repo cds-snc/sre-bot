@@ -137,16 +137,16 @@ def test_get_freebusy_returns_object(mock_execute):
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
 def test_insert_event_no_kwargs_no_delegated_email(
-    mock_convert, mock_execute, mock_get
+    mock_convert_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
 ):
-    mock_execute.return_value = {"htmlLink": "test_link"}
+    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     result = google_calendar.insert_event(start, end, emails, title)
     assert result == "test_link"
-    mock_execute.assert_called_once_with(
+    mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
         "events",
@@ -161,16 +161,18 @@ def test_insert_event_no_kwargs_no_delegated_email(
         },
         calendarId="primary",
     )
-    assert not mock_convert.called
-    assert mock_get.called_once_with("SRE_BOT_EMAIL")
+    assert not mock_convert_to_camel_case.called
+    assert mock_os_environ_get.called_once_with("SRE_BOT_EMAIL")
 
 
 @patch("os.environ.get", return_value="test_email")
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
-def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
-    mock_execute.return_value = {"htmlLink": "test_link"}
-    mock_convert.side_effect = lambda x: x  # just return the same value
+def test_insert_event_with_kwargs(
+    mock_convert_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
+):
+    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_convert_to_camel_case.side_effect = lambda x: x  # just return the same value
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
@@ -179,10 +181,11 @@ def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
         "location": "Test Location",
         "description": "Test Description",
         "delegated_user_email": "test_custom_email",
+        "time_zone": "Magic/Time_Zone",
     }
     result = google_calendar.insert_event(start, end, emails, title, **kwargs)
     assert result == "test_link"
-    mock_execute.assert_called_once_with(
+    mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
         "events",
@@ -190,8 +193,8 @@ def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         delegated_user_email="test_custom_email",
         body={
-            "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
-            "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+            "start": {"dateTime": start.isoformat(), "timeZone": "Magic/Time_Zone"},
+            "end": {"dateTime": end.isoformat(), "timeZone": "Magic/Time_Zone"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             **kwargs,
@@ -199,9 +202,9 @@ def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
         calendarId="primary",
     )
     for key in kwargs:
-        mock_convert.assert_any_call(key)
+        mock_convert_to_camel_case.assert_any_call(key)
 
-    assert not mock_get.called
+    assert not mock_os_environ_get.called
 
 
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
@@ -209,9 +212,13 @@ def test_insert_event_with_kwargs(mock_convert, mock_execute, mock_get):
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_to_camel_case")
 def test_insert_event_api_call_error(
-    mock_convert, mock_execute, mock_get, mock_handle_errors, caplog
+    mock_convert_to_camel_case,
+    mock_execute_google_api_call,
+    mock_os_environ_get,
+    mock_handle_errors,
+    caplog,
 ):
-    mock_execute.side_effect = Exception("API call error")
+    mock_execute_google_api_call.side_effect = Exception("API call error")
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
@@ -221,6 +228,9 @@ def test_insert_event_api_call_error(
         "An unexpected error occurred in function 'insert_event': API call error"
         in caplog.text
     )
+    assert not mock_convert_to_camel_case.called
+    assert mock_os_environ_get.called
+    assert not mock_handle_errors.called
 
 
 # Test out the find_first_available_slot function on the first available weekday

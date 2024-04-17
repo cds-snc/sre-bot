@@ -1,9 +1,7 @@
 import os
-import logging
 from datetime import datetime, timedelta
 
 import pytz
-import json
 
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
@@ -56,7 +54,7 @@ def insert_event(start, end, emails, title, **kwargs):
     """Creates a new event in the specified calendars.
 
     Args:
-        start (datetime): The start time of the event.
+        start (datetime): The start time of the event. Must be in ISO 8601 format (e.g., '2023-04-10T10:00:00-04:00')
         end (datetime): The end time of the event.
         emails (list): The list of email addresses of the attendees.
         title (str): The title of the event.
@@ -67,10 +65,10 @@ def insert_event(start, end, emails, title, **kwargs):
     Returns:
         str: The link to the created event.
     """
-
+    time_zone = kwargs.get("time_zone", "America/New_York")
     body = {
-        "start": {"dateTime": start.isoformat(), "timeZone": "America/New_York"},
-        "end": {"dateTime": end.isoformat(), "timeZone": "America/New_York"},
+        "start": {"dateTime": start.isoformat(), "timeZone": time_zone},
+        "end": {"dateTime": end.isoformat(), "timeZone": time_zone},
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
     }
