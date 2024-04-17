@@ -8,6 +8,7 @@ import json
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
+    convert_to_camel_case
 )
 
 # Get the email for the SRE bot
@@ -38,7 +39,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "timeMax": time_max,
         "items": items,
     }
-    body.update(kwargs)
+    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
 
     return execute_google_api_call(
         "calendar",
@@ -126,7 +127,7 @@ def insert_event(start, end, emails, title, **kwargs):
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
     }
-    body.update(kwargs)
+    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
     delegated_user_email = kwargs.get(
         "delegated_user_email", os.environ.get("SRE_BOT_EMAIL")
     )
