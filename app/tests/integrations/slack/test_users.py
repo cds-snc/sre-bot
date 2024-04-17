@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 from integrations.slack import users
+from slack_sdk import WebClient
 
 
 def test_get_user_id_from_request_with_user_id():
@@ -127,3 +128,25 @@ def test_replace_user_id_with_multiple_users():
     message = "Hello, <@U1234> and <@U5678>! Welcome to the team. Also welcome <@U9101> and <@U1121>."
     expected_message = "Hello, @john_doe and @jane_smith! Welcome to the team. Also welcome @joe_smith and @jenn_smith."
     assert users.replace_user_id_with_handle(client, message) == expected_message
+
+
+def test_get_user_email():
+    # Mock the WebClient
+    client = MagicMock(spec=WebClient)
+
+    # Test when the user ID is found in the request body and the users_info call is successful
+    client.users_info.return_value = {
+        "ok": True,
+        "user": {"profile": {"email": "test@example.com"}},
+    }
+    body = {"user_id": "U1234"}
+    assert users.get_user_email(client, body) == "test@example.com"
+
+    # Test when the user ID is not found in the request body
+    body = {}
+    assert users.get_user_email(client, body) is None
+
+    # Test when the users_info call is not successful
+    client.users_info.return_value = {"ok": False}
+    body = {"user_id": "U1234"}
+    assert users.get_user_email(client, body) is None

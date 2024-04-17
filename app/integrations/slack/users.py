@@ -3,6 +3,7 @@
 This module contains the user related functionality for the Slack integration.
 """
 import re
+from slack_sdk import WebClient
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
@@ -33,7 +34,22 @@ def get_user_id_from_request(body):
             return match.group(0)
 
 
-def get_user_locale(client, user_id=None):
+def get_user_email(client: WebClient, body):
+    """
+    Returns the user email from the body of a request, otherwise None.
+      Supports the following formats:
+    - user_id (Slack slash command)
+    - user (Slack Message, Modal, Block)
+    - event.user (Slack Event)
+    """
+    user_id = get_user_id_from_request(body)
+    if user_id:
+        user_info = client.users_info(user=user_id)
+        if user_info["ok"]:
+            return user_info["user"]["profile"]["email"]
+
+
+def get_user_locale(client: WebClient, user_id=None):
     """
     Returns the user locale from a command's user_id if valid, "en-US" as default otherwise
     """
