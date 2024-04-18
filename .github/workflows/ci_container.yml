@@ -8,6 +8,10 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,12 +26,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
+      - name: Configure aws credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-plan
+          role-session-name: SREBotGitHubActions
+          aws-region: "ca-central-1"
+
+      - name: Download GeoDB from S3
+        run: |
+          aws s3 cp s3://${{ secrets.GEO_DB_BUCKET }}/GeoLite2-City.tar.gz ./app/geodb/GeoLite2-City.tar.gz
+
       - name: Build container
         working-directory: ./
         run: |
           docker build \
           --build-arg git_sha=$GITHUB_SHA \
-          --build-arg LICENSE_KEY=${{ secrets.MAXMIND_LICENSE }} \
           -t sre-bot:latest \
           -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
           -t $REGISTRY/sre-bot:latest .
