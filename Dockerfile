@@ -23,9 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ .
 
-COPY app/geodb/GeoLite2-City.tar.gz /app/geodb/GeoLite2-City.tar.gz
+COPY GeoLite2-City.tar.gz /app/geodb/GeoLite2-City.tar.gz
 
-RUN tar -xzvf /app/geodb/GeoLite2-City.tar.gz -C .
+RUN tar -xzvf /app/geodb/GeoLite2-City.tar.gz -C /app/geodb
 RUN rm /app/geodb/GeoLite2-City.tar.gz
 
 COPY app/bin/entry.sh /app/entry.sh
