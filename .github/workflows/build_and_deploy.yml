@@ -37,7 +37,7 @@ jobs:
 
       - name: Download GeoDB from S3
         run: |
-          aws s3 cp s3://${{ secrets.GEO_DB_BUCKET }}/GeoLite2-City.tar.gz ./app/geodb/GeoLite2-City.tar.gz
+          aws s3 cp s3://${{ secrets.GEO_DB_BUCKET }}/GeoLite2-City.tar.gz ./GeoLite2-City.tar.gz
 
       - name: Login to Amazon ECR
         id: login-ecr
