@@ -8,6 +8,10 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   REGISTRY: 283582579564.dkr.ecr.ca-central-1.amazonaws.com/sre-bot
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
