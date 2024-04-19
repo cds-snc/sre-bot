@@ -6,8 +6,8 @@ import pytz
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
-    convert_to_camel_case,
 )
+from integrations.utils.api import convert_string_to_camel_case
 
 # Get the email for the SRE bot
 SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
@@ -34,7 +34,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "timeMax": time_max,
         "items": items,
     }
-    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
+    body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
 
     return execute_google_api_call(
         "calendar",
@@ -69,7 +69,7 @@ def insert_event(start, end, emails, title, **kwargs):
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
     }
-    body.update({convert_to_camel_case(k): v for k, v in kwargs.items()})
+    body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
     else:

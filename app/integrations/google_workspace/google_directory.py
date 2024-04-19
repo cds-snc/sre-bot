@@ -3,10 +3,10 @@
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
-    convert_to_camel_case,
     DEFAULT_DELEGATED_ADMIN_EMAIL,
     DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
+from integrations.utils.api import convert_string_to_camel_case
 
 
 @handle_google_api_errors
@@ -85,7 +85,7 @@ def list_groups(
     if not customer:
         customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
 
-    kwargs = {convert_to_camel_case(k): v for k, v in kwargs.items()}
+    kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
     return execute_google_api_call(
         "admin",

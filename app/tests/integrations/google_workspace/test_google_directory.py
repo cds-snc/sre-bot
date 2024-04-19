@@ -163,12 +163,12 @@ def test_list_groups_calls_execute_google_api_call(
     "integrations.google_workspace.google_directory.DEFAULT_DELEGATED_ADMIN_EMAIL",
     new="default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.convert_to_camel_case")
+@patch("integrations.google_workspace.google_directory.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_directory.execute_google_api_call")
 def test_list_groups_calls_execute_google_api_call_with_kwargs(
-    mock_execute_google_api_call, mock_convert_to_camel_case
+    mock_execute_google_api_call, mock_convert_string_to_camel_case
 ):
-    mock_convert_to_camel_case.return_value = "customArgument"
+    mock_convert_string_to_camel_case.return_value = "customArgument"
     google_directory.list_groups(custom_argument="test_customer_id")
     mock_execute_google_api_call.assert_called_once_with(
         "admin",
@@ -183,7 +183,7 @@ def test_list_groups_calls_execute_google_api_call_with_kwargs(
         orderBy="email",
         customArgument="test_customer_id",
     )
-    assert mock_convert_to_camel_case.called_once
+    assert mock_convert_string_to_camel_case.called_once
 
 
 @patch("integrations.google_workspace.google_directory.execute_google_api_call")

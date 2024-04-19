@@ -10,16 +10,7 @@ from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
     execute_google_api_call,
-    convert_to_camel_case,
 )
-
-
-def test_convert_to_camel_case():
-    assert convert_to_camel_case("snake_case") == "snakeCase"
-    assert convert_to_camel_case("longer_snake_case_string") == "longerSnakeCaseString"
-    assert convert_to_camel_case("alreadyCamelCase") == "alreadyCamelCase"
-    assert convert_to_camel_case("singleword") == "singleword"
-    assert convert_to_camel_case("with_numbers_123") == "withNumbers123"
 
 
 @patch("integrations.google_workspace.google_service.build")

@@ -4,14 +4,13 @@ from integrations.aws import identity_store
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.utils.api.convert_string_to_camel_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
-def test_list_users(mock_execute_aws_api_call):
+def test_list_users(mock_execute_aws_api_call, mock_convert_string_to_camel_case):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
 
-    # Call the function with no arguments
     result = identity_store.list_users()
 
-    # Check that execute_aws_api_call was called with the correct arguments
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
         "list_users",
@@ -19,17 +18,18 @@ def test_list_users(mock_execute_aws_api_call):
         keys=["Users"],
         IdentityStoreId="test_instance_id",
     )
-
-    # Check that the function returned the correct result
     assert result == ["User1", "User2"]
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.utils.api.convert_string_to_camel_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
-def test_list_users_with_identity_store_id(mock_execute_aws_api_call):
+def test_list_users_with_identity_store_id(
+    mock_execute_aws_api_call, mock_convert_string_to_camel_case
+):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
 
-    result = identity_store.list_users(IdentityStoreId="custom_instance_id")
+    result = identity_store.list_users(identity_store_id="custom_instance_id")
 
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
@@ -54,7 +54,7 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
         paginated=True,
         keys=["Users"],
         IdentityStoreId="test_instance_id",
-        custom_param="custom_value",
+        customParam="custom_value",
     )
     assert result == ["User1", "User2"]
 
@@ -135,7 +135,7 @@ def test_list_group_memberships(mock_execute_aws_api_call):
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 @patch("integrations.aws.identity_store.list_group_memberships")
-def test_list_groups_with_membership(
+def test_list_groups_with_memberships(
     mock_list_group_memberships, mock_execute_aws_api_call
 ):
     mock_execute_aws_api_call.return_value = [
@@ -144,7 +144,7 @@ def test_list_groups_with_membership(
     ]
     mock_list_group_memberships.side_effect = [["Membership1"], ["Membership2"]]
 
-    result = identity_store.list_groups_with_membership()
+    result = identity_store.list_groups_with_memberships()
 
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
