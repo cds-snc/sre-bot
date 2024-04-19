@@ -26,6 +26,8 @@ COPY app/ .
 COPY GeoLite2-City.tar.gz /app/geodb/GeoLite2-City.tar.gz
 
 RUN tar -xzvf /app/geodb/GeoLite2-City.tar.gz -C /app/geodb
+RUN cp /app/geodb/GeoLite2-City_*/GeoLite2-City.mmdb /app/geodb/GeoLite2-City.mmdb
+RUN rm -rf /app/geodb/GeoLite2-City_*
 RUN rm /app/geodb/GeoLite2-City.tar.gz
 
 COPY app/bin/entry.sh /app/entry.sh
