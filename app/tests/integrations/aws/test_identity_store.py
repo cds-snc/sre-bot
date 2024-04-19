@@ -1,6 +1,26 @@
 import os
 from unittest.mock import call, patch  # type: ignore
+import pytest
 from integrations.aws import identity_store
+
+
+@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+def test_resolve_identity_store_id():
+    assert identity_store.resolve_identity_store_id({}) == {
+        "IdentityStoreId": "test_instance_id"
+    }
+    assert identity_store.resolve_identity_store_id(
+        {"identity_store_id": "test_id"}
+    ) == {"IdentityStoreId": "test_id"}
+    assert identity_store.resolve_identity_store_id({"IdentityStoreId": "test_id"}) == {
+        "IdentityStoreId": "test_id"
+    }
+
+
+@patch.dict(os.environ, clear=True)
+def test_resolve_identity_store_id_no_env():
+    with pytest.raises(ValueError):
+        identity_store.resolve_identity_store_id({})
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
@@ -54,7 +74,7 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
         paginated=True,
         keys=["Users"],
         IdentityStoreId="test_instance_id",
-        customParam="custom_value",
+        custom_param="custom_value",
     )
     assert result == ["User1", "User2"]
 
@@ -71,6 +91,7 @@ def test_list_groups(mock_execute_aws_api_call):
         "list_groups",
         paginated=True,
         keys=["Groups"],
+        IdentityStoreId="test_instance_id",
     )
 
     assert result == ["Group1", "Group2"]
@@ -127,6 +148,27 @@ def test_list_group_memberships(mock_execute_aws_api_call):
         "list_group_memberships",
         ["GroupMemberships"],
         GroupId="test_group_id",
+        IdentityStoreId="test_instance_id",
+    )
+
+    assert result == ["Membership1", "Membership2"]
+
+
+@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = ["Membership1", "Membership2"]
+
+    result = identity_store.list_group_memberships(
+        "test_group_id", IdentityStoreId="custom_instance_id"
+    )
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "list_group_memberships",
+        ["GroupMemberships"],
+        GroupId="test_group_id",
+        IdentityStoreId="custom_instance_id",
     )
 
     assert result == ["Membership1", "Membership2"]
@@ -151,6 +193,7 @@ def test_list_groups_with_memberships(
         "list_groups",
         paginated=True,
         keys=["Groups"],
+        IdentityStoreId="test_instance_id",
     )
 
     mock_list_group_memberships.assert_has_calls(
