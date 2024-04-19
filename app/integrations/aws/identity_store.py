@@ -140,7 +140,9 @@ def create_group_membership(group_id, user_id, **kwargs):
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"GroupId": group_id, "UserId": user_id})
-    response = execute_aws_api_call("identitystore", "create_group_membership", **kwargs)
+    response = execute_aws_api_call(
+        "identitystore", "create_group_membership", **kwargs
+    )
     return response["MembershipId"] if response else False
 
 
@@ -157,7 +159,9 @@ def delete_group_membership(membership_id, **kwargs):
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"MembershipId": membership_id})
-    response = execute_aws_api_call("identitystore", "delete_group_membership", **kwargs)
+    response = execute_aws_api_call(
+        "identitystore", "delete_group_membership", **kwargs
+    )
     return True if response == {} else False
 
 
