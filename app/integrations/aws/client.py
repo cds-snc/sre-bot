@@ -36,7 +36,13 @@ def handle_aws_api_errors(func):
                 f"A BotoCore error occurred in function '{func.__name__}': {e}"
             )
         except ClientError as e:
-            logger.error(f"A ClientError occurred in function '{func.__name__}': {e}")
+            if e.response["Error"]["Code"] == "ResourceNotFoundException":
+                logger.info(f"Resource not found in function '{func.__name__}': {e}")
+                return False
+            else:
+                logger.error(
+                    f"A ClientError occurred in function '{func.__name__}': {e}"
+                )
         except Exception as e:  # Catch-all for any other types of exceptions
             logger.error(
                 f"An unexpected error occurred in function '{func.__name__}': {e}"
@@ -46,6 +52,7 @@ def handle_aws_api_errors(func):
     return wrapper
 
 
+@handle_aws_api_errors
 def assume_role_client(service_name, role_arn):
     """Assume an AWS IAM role and return a service client.
 
@@ -55,26 +62,19 @@ def assume_role_client(service_name, role_arn):
 
     Returns:
         botocore.client.BaseClient: The service client.
-
-    Raises:
-        botocore.exceptions.BotoCoreError: If any errors occur when assuming the role or creating the client.
     """
-    try:
-        sts_client = boto3.client("sts")
-        assumed_role_object = sts_client.assume_role(
-            RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
-        )
-        credentials = assumed_role_object["Credentials"]
-        client = boto3.client(
-            service_name,
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-        )
-        return client
-    except (BotoCoreError, ClientError) as error:
-        logger.error(f"An error occurred: {error}")
-        raise
+    sts_client = boto3.client("sts")
+    assumed_role_object = sts_client.assume_role(
+        RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
+    )
+    credentials = assumed_role_object["Credentials"]
+    client = boto3.client(
+        service_name,
+        aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"],
+        aws_session_token=credentials["SessionToken"],
+    )
+    return client
 
 
 def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
