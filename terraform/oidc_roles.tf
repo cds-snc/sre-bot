@@ -37,9 +37,9 @@ data "aws_iam_policy_document" "publish_techdocs" {
 }
 
 resource "aws_iam_policy" "geodb_refresh_policy" {
-  name   = "geodb_refresh_policy"
+  name        = "geodb_refresh_policy"
   description = "Policy to allow the Geodb Refresh role to publish to the target bucket"
-  policy = data.aws_iam_policy_document.publish_techdocs.json
+  policy      = data.aws_iam_policy_document.publish_techdocs.json
 }
 
 resource "aws_iam_role_policy_attachment" "geodb_refresh_attachment" {
