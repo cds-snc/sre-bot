@@ -274,6 +274,103 @@ def test_list_groups_with_kwargs(mock_execute_aws_api_call):
     assert result == ["Group1", "Group2"]
 
 
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_create_group_membership(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {
+        "MembershipId": "test_membership_id",
+        "IdentityStoreId": "test_instance_id",
+    }
+    group_id = "test_group_id"
+    user_id = "test_user_id"
+
+    # Act
+    result = identity_store.create_group_membership(group_id, user_id)
+
+    # Assert
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "create_group_membership",
+        IdentityStoreId="test_instance_id",
+        GroupId=group_id,
+        UserId=user_id,
+    )
+    assert result == "test_membership_id"
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_create_group_membership_unsuccessful(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    group_id = "test_group_id"
+    user_id = "test_user_id"
+
+    result = identity_store.create_group_membership(group_id, user_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "create_group_membership",
+        IdentityStoreId="test_instance_id",
+        GroupId=group_id,
+        UserId=user_id,
+    )
+    assert result is False
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_delete_group_membership(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {}
+    membership_id = "test_membership_id"
+
+    result = identity_store.delete_group_membership(membership_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "delete_group_membership",
+        IdentityStoreId="test_instance_id",
+        MembershipId=membership_id,
+    )
+    assert result is True
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_delete_group_membership_resource_not_found(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    membership_id = "nonexistent_membership_id"
+
+    result = identity_store.delete_group_membership(membership_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "delete_group_membership",
+        IdentityStoreId="test_instance_id",
+        MembershipId=membership_id,
+    )
+    assert result is False
+
+
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_group_memberships(mock_execute_aws_api_call):

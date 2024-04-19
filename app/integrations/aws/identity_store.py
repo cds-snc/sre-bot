@@ -58,8 +58,8 @@ def delete_user(user_id, **kwargs):
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"UserId": user_id})
-    result = execute_aws_api_call("identitystore", "delete_user", **kwargs)
-    return True if result == {} else False
+    response = execute_aws_api_call("identitystore", "delete_user", **kwargs)
+    return True if response == {} else False
 
 
 @handle_aws_api_errors
@@ -81,8 +81,8 @@ def get_user_id(user_name, **kwargs):
             }
         }
     )
-    result = execute_aws_api_call("identitystore", "get_user_id", **kwargs)
-    return result["UserId"] if result else False
+    response = execute_aws_api_call("identitystore", "get_user_id", **kwargs)
+    return response["UserId"] if response else False
 
 
 @handle_aws_api_errors
@@ -101,6 +101,41 @@ def list_groups(**kwargs):
     return execute_aws_api_call(
         "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
     )
+
+
+@handle_aws_api_errors
+def create_group_membership(group_id, user_id, **kwargs):
+    """Creates a group membership in the AWS Identity Center (identitystore)
+
+    Args:
+        group_id (str): The group ID of the group.
+        user_id (str): The user ID of the user.
+        **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        str: The membership ID of the created group membership.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update({"GroupId": group_id, "UserId": user_id})
+    response = execute_aws_api_call("identitystore", "create_group_membership", **kwargs)
+    return response["MembershipId"] if response else False
+
+
+@handle_aws_api_errors
+def delete_group_membership(membership_id, **kwargs):
+    """Deletes a group membership from the AWS Identity Center (identitystore)
+
+    Args:
+        membership_id (str): The membership ID of the group membership, which is the unique identifier representing the assignment of a user to a group.
+        **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        bool: True if the group membership was deleted successfully, False otherwise.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update({"MembershipId": membership_id})
+    response = execute_aws_api_call("identitystore", "delete_group_membership", **kwargs)
+    return True if response == {} else False
 
 
 @handle_aws_api_errors
