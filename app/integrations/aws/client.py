@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN", "")
+ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN", None)
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
@@ -30,7 +30,9 @@ def handle_aws_api_errors(func):
         try:
             return func(*args, **kwargs)
         except BotoCoreError as e:
-            logging.error(f"A BotoCore error occurred in function '{func.__name__}': {e}")
+            logging.error(
+                f"A BotoCore error occurred in function '{func.__name__}': {e}"
+            )
         except ClientError as e:
             logging.error(f"A ClientError occurred in function '{func.__name__}': {e}")
         except Exception as e:  # Catch-all for any other types of exceptions
@@ -40,19 +42,6 @@ def handle_aws_api_errors(func):
         return None
 
     return wrapper
-
-
-def paginate(client, operation, keys, **kwargs):
-    """Generic paginator for AWS operations"""
-    paginator = client.get_paginator(operation)
-    results = []
-
-    for page in paginator.paginate(**kwargs):
-        for key in keys:
-            if key in page:
-                results.extend(page[key])
-
-    return results
 
 
 def assume_role_client(service_name, role_arn):
@@ -98,9 +87,14 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     Returns:
         list: The result of the API call. If paginate is True, returns a list of all results.
     """
-    if "role_arn" not in kwargs:
-        role_arn = ROLE_ARN
+
+    role_arn = kwargs.get("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
+    if role_arn is None:
+        raise ValueError(
+            "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
+        )
     client = assume_role_client(service_name, role_arn)
+    kwargs.pop("role_arn", None)
     api_method = getattr(client, method)
     if paginated:
         return paginator(client, method, **kwargs)
