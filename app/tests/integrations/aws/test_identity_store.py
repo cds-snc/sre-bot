@@ -219,6 +219,50 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
+def test_get_group_id(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = {"GroupId": "test_group_id"}
+    group_name = "test_group_name"
+
+    result = identity_store.get_group_id(group_name)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_group_id",
+        IdentityStoreId="test_instance_id",
+        AlternateIdentifier={
+            "UniqueAttribute": {
+                "AttributePath": "displayName",
+                "AttributeValue": group_name,
+            },
+        },
+    )
+    assert result == "test_group_id"
+
+
+@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+def test_get_group_id_no_group(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = False
+    group_name = "nonexistent_group"
+
+    result = identity_store.get_group_id(group_name)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_group_id",
+        IdentityStoreId="test_instance_id",
+        AlternateIdentifier={
+            "UniqueAttribute": {
+                "AttributePath": "displayName",
+                "AttributeValue": group_name,
+            },
+        },
+    )
+    assert result is False
+
+
+@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_groups(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["Group1", "Group2"]
 

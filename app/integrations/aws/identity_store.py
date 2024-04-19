@@ -95,6 +95,29 @@ def list_users(**kwargs):
 
 
 @handle_aws_api_errors
+def get_group_id(group_name, **kwargs):
+    """Retrieves the group ID of the group
+
+    Args:
+        group_name (str): The name of the group.
+        **kwargs: Additional keyword arguments for the API call.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update(
+        {
+            "AlternateIdentifier": {
+                "UniqueAttribute": {
+                    "AttributePath": "displayName",
+                    "AttributeValue": group_name,
+                },
+            }
+        }
+    )
+    response = execute_aws_api_call("identitystore", "get_group_id", **kwargs)
+    return response["GroupId"] if response else False
+
+
+@handle_aws_api_errors
 def list_groups(**kwargs):
     """Retrieves all groups from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
