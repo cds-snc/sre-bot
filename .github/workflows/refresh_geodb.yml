@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: "0 */4 * * *"
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   s3-backup:
     runs-on: ubuntu-latest
