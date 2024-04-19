@@ -23,6 +23,144 @@ def test_resolve_identity_store_id_no_env():
         identity_store.resolve_identity_store_id({})
 
 
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_create_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {"UserId": "test_user_id"}
+    email = "test@example.com"
+    first_name = "Test"
+    family_name = "User"
+
+    # Act
+    result = identity_store.create_user(email, first_name, family_name)
+
+    # Assert
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "create_user",
+        IdentityStoreId="test_instance_id",
+        UserName=email,
+        Emails=[{"Value": email, "Type": "WORK", "Primary": True}],
+        Name={"GivenName": first_name, "FamilyName": family_name},
+        DisplayName=f"{first_name} {family_name}",
+    )
+    assert result == "test_user_id"
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_get_user_id(mock_resolve_identity_store_id, mock_execute_aws_api_call):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {"UserId": "test_user_id"}
+    email = "test@example.com"
+    user_name = email
+    request = {
+        "AlternateIdentifier": {
+            "UniqueAttribute": {
+                "AttributePath": "userName",
+                "AttributeValue": user_name,
+            },
+        },
+    }
+
+    # Act
+    result = identity_store.get_user_id(user_name)
+
+    # Assert
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_user_id",
+        IdentityStoreId="test_instance_id",
+        **request,
+    )
+    assert result == "test_user_id"
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_get_user_id_user_not_found(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    # Arrange
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    user_name = "nonexistent_user"
+
+    # Act
+    result = identity_store.get_user_id(user_name)
+
+    # Assert
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_user_id",
+        IdentityStoreId="test_instance_id",
+        AlternateIdentifier={
+            "UniqueAttribute": {
+                "AttributePath": "userName",
+                "AttributeValue": user_name,
+            },
+        },
+    )
+    assert result is False
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_delete_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {}
+    user_id = "test_user_id"
+
+    result = identity_store.delete_user(user_id)
+
+    mock_execute_aws_api_call.assert_has_calls(
+        [
+            call(
+                "identitystore",
+                "delete_user",
+                IdentityStoreId="test_instance_id",
+                UserId=user_id,
+            )
+        ]
+    )
+    assert result is True
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_delete_user_not_found(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    user_id = "nonexistent_user_id"
+
+    result = identity_store.delete_user(user_id)
+
+    mock_execute_aws_api_call.assert_has_calls(
+        [
+            call(
+                "identitystore",
+                "delete_user",
+                IdentityStoreId="test_instance_id",
+                UserId=user_id,
+            )
+        ]
+    )
+    assert result is False
+
+
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.utils.api.convert_string_to_camel_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
