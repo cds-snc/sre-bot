@@ -17,7 +17,6 @@ module "gh_oidc_roles" {
 
 }
 
-# policy to allow publishing techdocs to S3 bucket
 data "aws_iam_policy_document" "publish_techdocs" {
   statement {
     effect = "Allow"
@@ -35,4 +34,15 @@ data "aws_iam_policy_document" "publish_techdocs" {
       "${module.sre_bot_bucket.s3_bucket_arn}"
     ]
   }
+}
+
+resource "aws_iam_policy" "geodb_refresh_policy" {
+  name        = "geodb_refresh_policy"
+  description = "Policy to allow the Geodb Refresh role to publish to the target bucket"
+  policy      = data.aws_iam_policy_document.publish_techdocs.json
+}
+
+resource "aws_iam_role_policy_attachment" "geodb_refresh_attachment" {
+  role       = local.geodb_name
+  policy_arn = aws_iam_policy.geodb_refresh_policy.arn
 }
