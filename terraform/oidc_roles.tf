@@ -13,7 +13,7 @@ module "gh_oidc_roles" {
     }
   ]
 
-  billing_tag_value = var.billing_tag_value
+  billing_tag_value = var.billing_code
 
 }
 
