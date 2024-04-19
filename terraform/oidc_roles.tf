@@ -36,13 +36,13 @@ data "aws_iam_policy_document" "publish_techdocs" {
   }
 }
 
-resource "aws_iam_role_policy" "geodb_refresh_policy" {
+resource "aws_iam_policy" "geodb_refresh_policy" {
   name   = "geodb_refresh_policy"
-  role   = module.gh_oidc_roles.roles[local.geodb_name].role_name
+  description = "Policy to allow the Geodb Refresh role to publish to the target bucket"
   policy = data.aws_iam_policy_document.publish_techdocs.json
 }
 
 resource "aws_iam_role_policy_attachment" "geodb_refresh_attachment" {
   role       = module.gh_oidc_roles.roles[local.geodb_name].role_name
-  policy_arn = aws_iam_role_policy.geodb_refresh_policy.arn
+  policy_arn = aws_iam_policy.geodb_refresh_policy.arn
 }
