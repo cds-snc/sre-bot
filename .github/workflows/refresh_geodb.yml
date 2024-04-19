@@ -7,10 +7,9 @@ on:
 
 permissions:
   id-token: write
-  contents: write
 
 jobs:
-  s3-backup:
+  refresh-geodb:
     runs-on: ubuntu-latest
     steps:
 
