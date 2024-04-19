@@ -10,7 +10,9 @@ ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN", "")
 def list_users(**kwargs):
     """Retrieves all users from the AWS Identity Center (identitystore)"""
     if "IdentityStoreId" not in kwargs:
-        kwargs["IdentityStoreId"] = INSTANCE_ID
+        kwargs["IdentityStoreId"] = kwargs.get(
+            "identity_store_id", os.environ.get("AWS_SSO_INSTANCE_ID", None)
+        )
     return execute_aws_api_call(
         "identitystore", "list_users", paginated=True, keys=["Users"], **kwargs
     )
@@ -19,8 +21,6 @@ def list_users(**kwargs):
 @handle_aws_api_errors
 def list_groups(**kwargs):
     """Retrieves all groups from the AWS Identity Center (identitystore)"""
-    if "IdentityStoreId" not in kwargs:
-        kwargs["IdentityStoreId"] = INSTANCE_ID
     return execute_aws_api_call(
         "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
     )
@@ -29,8 +29,6 @@ def list_groups(**kwargs):
 @handle_aws_api_errors
 def list_group_memberships(group_id, **kwargs):
     """Retrieves all group memberships from the AWS Identity Center  (identitystore)"""
-    if "IdentityStoreId" not in kwargs:
-        kwargs["IdentityStoreId"] = INSTANCE_ID
     return execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
@@ -45,8 +43,6 @@ def list_groups_with_membership():
     """Retrieves all groups with their members from the AWS Identity Center (identitystore)"""
     groups = list_groups()
     for group in groups:
-        group["GroupMemberships"] = list_group_memberships(
-            group["GroupId"]
-        )
+        group["GroupMemberships"] = list_group_memberships(group["GroupId"])
 
     return groups
