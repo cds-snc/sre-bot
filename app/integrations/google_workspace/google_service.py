@@ -30,12 +30,6 @@ DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER
 load_dotenv()
 
 
-def convert_to_camel_case(snake_str):
-    """Convert a snake_case string to camelCase."""
-    components = snake_str.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
-
-
 def get_google_service(service, version, delegated_user_email=None, scopes=None):
     """
     Get an authenticated Google service.

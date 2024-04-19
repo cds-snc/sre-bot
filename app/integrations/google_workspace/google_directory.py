@@ -6,6 +6,7 @@ from integrations.google_workspace.google_service import (
     DEFAULT_DELEGATED_ADMIN_EMAIL,
     DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
+from integrations.utils.api import convert_string_to_camel_case
 
 
 @handle_google_api_errors
@@ -40,6 +41,7 @@ def get_user(user_key, delegated_user_email=None):
 def list_users(
     delegated_user_email=None,
     customer=None,
+    **kwargs,
 ):
     """List all users in the Google Workspace domain.
 
@@ -69,6 +71,7 @@ def list_users(
 def list_groups(
     delegated_user_email=None,
     customer=None,
+    **kwargs,
 ):
     """List all groups in the Google Workspace domain.
 
@@ -81,6 +84,8 @@ def list_groups(
         delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
     if not customer:
         customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
+
+    kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
     return execute_google_api_call(
         "admin",
@@ -93,6 +98,7 @@ def list_groups(
         customer=customer,
         maxResults=200,
         orderBy="email",
+        **kwargs,
     )
 
 
