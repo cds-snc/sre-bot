@@ -6,6 +6,7 @@ import pytz
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
+    DEFAULT_DELEGATED_ADMIN_EMAIL,
 )
 from integrations.utils.api import convert_string_to_camel_case
 
@@ -35,13 +36,13 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "items": items,
     }
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
-
     return execute_google_api_call(
         "calendar",
         "v3",
         "freebusy",
         "query",
-        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        delegated_user_email=DEFAULT_DELEGATED_ADMIN_EMAIL,
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body=body,
     )
 
