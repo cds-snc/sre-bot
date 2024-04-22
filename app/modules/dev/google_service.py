@@ -1,10 +1,7 @@
 """Testing new google service (will be removed)"""
 import os
-import json
 from datetime import datetime, timedelta, timezone
 from integrations.google_workspace import (
-    google_directory,
-    google_drive,
     google_calendar,
 )
 from dotenv import load_dotenv
@@ -68,8 +65,10 @@ def google_service_command(ack, client, body, respond):
     time_max = (now + timedelta(days=(60 + days))).isoformat()
     freebusy_results = google_calendar.get_freebusy(time_min, time_max, items)
     # respond(freebusy_results)
-    first_available_start, first_available_end = google_calendar.find_first_available_slot(
-        freebusy_results, days)
+    (
+        first_available_start,
+        first_available_end,
+    ) = google_calendar.find_first_available_slot(freebusy_results, days)
     respond(f"First available slot: {first_available_start} to {first_available_end}")
 
     # respond(f"Healthcheck status: {google_drive.healthcheck()}")
