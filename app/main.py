@@ -6,7 +6,6 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
 from dotenv import load_dotenv
 from modules import (
-    google_service,
     secret,
     atip,
     aws,
@@ -66,11 +65,6 @@ def main(bot):
         scheduled_tasks.init(bot)
         stop_run_continuously = scheduled_tasks.run_continuously()
         server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
-
-    # Register Google Service command for dev purposes only
-    if PREFIX == "dev-":
-        bot.command(f"/{PREFIX}google")(google_service.google_service_command)
-        bot.view("google_service_view")(google_service.open_modal)
 
 
 def get_bot():
