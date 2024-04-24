@@ -20,7 +20,7 @@ def get_nested_value(dictionary, key):
 
 
 def get_unique_users_from_groups(groups, key):
-    """Get the unique users from a list of groups or a single group dict.
+    """Get the unique users from a list of groups or a single group dict. Considers the whole object for uniqueness, not specific keys.
 
     Args:
         groups (list or dict): A list of groups or a single group.
