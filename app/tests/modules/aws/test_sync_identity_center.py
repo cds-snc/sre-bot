@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, call
 from pytest import fixture
 from modules.aws import sync_identity_center
 
@@ -53,6 +53,48 @@ def google_groups_w_users():
 
 
 @fixture
+def google_groups_unique_users():
+    return [
+        {
+            "email": "user1.test@test.com",
+            "id": "user1_id",
+            "name": {
+                "displayName": "User1 Test",
+                "givenName": "User1",
+                "familyName": "Test",
+            },
+        },
+        {
+            "email": "user2.test@test.com",
+            "id": "user2_id",
+            "name": {
+                "displayName": "User2 Test",
+                "givenName": "User2",
+                "familyName": "Test",
+            },
+        },
+        {
+            "email": "user3.test@test.com",
+            "id": "user3_id",
+            "name": {
+                "displayName": "User3 Test",
+                "givenName": "User3",
+                "familyName": "Test",
+            },
+        },
+        {
+            "email": "user9.test@external.com",
+            "id": "user9_external_id",
+            "name": {
+                "displayName": "User9 External",
+                "givenName": "User9",
+                "familyName": "External",
+            },
+        },
+    ]
+
+
+@fixture
 def aws_groups():
     return [
         {
@@ -80,6 +122,117 @@ def aws_users():
             "Name": {"GivenName": "User2", "FamilyName": "Test"},
         },
     ]
+
+
+@fixture
+def aws_missing_users():
+    return [
+        {
+            "UserName": "user4.test@test.com",
+            "UserId": "user4_id",
+            "Name": {"GivenName": "User4", "FamilyName": "Test"},
+        },
+        {
+            "UserName": "user5.test@test.com",
+            "UserId": "user5_id",
+            "Name": {"GivenName": "User5", "FamilyName": "Test"},
+        },
+    ]
+
+
+@patch("modules.aws.sync_identity_center.sync_aws_groups_members")
+@patch("modules.aws.sync_identity_center.sync_aws_users")
+@patch("modules.aws.sync_identity_center.get_source_groups_with_users")
+@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.identity_store.list_users")
+@patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
+def test_synchronize_with_defaults(
+    mock_identity_store_list_groups_with_memberships,
+    mock_identity_store_list_users,
+    mock_get_unique_users_from_groups,
+    mock_get_source_groups_with_users,
+    mock_sync_aws_users,
+    mock_sync_aws_groups_members,
+):
+    result = sync_identity_center.synchronize()
+
+    assert result == (None, None)
+
+    assert mock_identity_store_list_groups_with_memberships.not_called
+    assert mock_identity_store_list_users.not_called
+    assert mock_get_unique_users_from_groups.not_called
+    assert mock_get_source_groups_with_users.called
+    assert mock_sync_aws_users.not_called
+    assert mock_sync_aws_groups_members.not_called
+
+
+@patch("modules.aws.sync_identity_center.sync_aws_groups_members")
+@patch("modules.aws.sync_identity_center.sync_aws_users")
+@patch("modules.aws.sync_identity_center.get_source_groups_with_users")
+@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.identity_store.list_users")
+@patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
+def test_synchronize_with_sync_users_true(
+    mock_identity_store_list_groups_with_memberships,
+    mock_identity_store_list_users,
+    mock_get_unique_users_from_groups,
+    mock_get_source_groups_with_users,
+    mock_sync_aws_users,
+    mock_sync_aws_groups_members,
+    google_groups_w_users,
+    google_groups_unique_users,
+    aws_users,
+):
+    mock_get_source_groups_with_users.return_value = google_groups_w_users
+    mock_get_unique_users_from_groups.return_value = google_groups_unique_users
+    mock_identity_store_list_users.return_value = aws_users
+    mock_sync_aws_users.return_value = "users_sync_status"
+    result = sync_identity_center.synchronize(sync_users=True)
+
+    assert result == ("users_sync_status", None)
+
+    assert mock_identity_store_list_groups_with_memberships.not_called
+    assert mock_identity_store_list_users.called
+    assert mock_get_unique_users_from_groups.called_with(
+        google_groups_w_users, "members"
+    )
+    assert mock_get_source_groups_with_users.called_with("email:aws-*")
+    assert mock_sync_aws_users.called_with(google_groups_unique_users, aws_users)
+    assert mock_sync_aws_groups_members.not_called
+
+
+@patch("modules.aws.sync_identity_center.sync_aws_groups_members")
+@patch("modules.aws.sync_identity_center.sync_aws_users")
+@patch("modules.aws.sync_identity_center.get_source_groups_with_users")
+@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.identity_store.list_users")
+@patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
+def test_synchronize_with_sync_groups_true(
+    mock_identity_store_list_groups_with_memberships,
+    mock_identity_store_list_users,
+    mock_get_unique_users_from_groups,
+    mock_get_source_groups_with_users,
+    mock_sync_aws_users,
+    mock_sync_aws_groups_members,
+    google_groups_w_users,
+    google_groups_unique_users,
+    aws_users,
+    aws_groups,
+):
+    mock_get_source_groups_with_users.return_value = google_groups_w_users
+    mock_get_unique_users_from_groups.return_value = google_groups_unique_users
+    mock_identity_store_list_users.return_value = aws_users
+    mock_sync_aws_groups_members.return_value = "groups_sync_status"
+    result = sync_identity_center.synchronize(sync_groups=True)
+
+    assert result == (None, "groups_sync_status")
+
+    assert mock_identity_store_list_groups_with_memberships.called
+    assert mock_identity_store_list_users.not_called
+    assert mock_get_unique_users_from_groups.not_called
+    assert mock_get_source_groups_with_users.called_with("email:aws-*")
+    assert mock_sync_aws_users.not_called
+    assert mock_sync_aws_groups_members.called_with(google_groups_w_users, aws_groups)
 
 
 @patch("modules.aws.sync_identity_center.google_directory.list_groups")
@@ -130,11 +283,37 @@ def test_get_source_groups_with_users(
     assert mock_add_users_to_group.call_count == 3
 
 
-# def test_filter_users_by_condition(google_groups):
-#     condition = []
-#     result = sync_identity_center.filter_users_by_condition(
-#         google_groups[1]["members"], condition
-#     )
+@patch("modules.aws.sync_identity_center.identity_store.create_user")
+@patch("modules.aws.sync_identity_center.logger")
+def test_create_users_with_users_list(
+    mock_logger, mock_create_user, google_groups_unique_users
+):
+    mock_create_user.side_effect = [
+        "user1_id",
+        "user2_id",
+        "user3_id",
+        "user9_external_id",
+    ]
+    response = sync_identity_center.create_aws_users(google_groups_unique_users)
+
+    assert response == ["user1_id", "user2_id", "user3_id", "user9_external_id"]
+
+    assert mock_create_user.call_count == 4
+    assert mock_logger.info.call_count == 4
+    assert mock_logger.info.call_args_list == [
+        call("Creating user User1 Test"),
+        call("Creating user User2 Test"),
+        call("Creating user User3 Test"),
+        call("Creating user User9 External"),
+    ]
+
+
+@patch("modules.aws.sync_identity_center.identity_store.create_user")
+def test_create_users_with_empty_users_list(mock_create_user):
+    result = sync_identity_center.create_aws_users([])
+    assert result == []
+
+    assert mock_create_user.call_count == 0
 
 
 # @patch("modules.aws.sync_identity_center.identity_store.create_user")
