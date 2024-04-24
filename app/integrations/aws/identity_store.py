@@ -34,7 +34,7 @@ def create_user(email, first_name, family_name, **kwargs):
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
-        str: The user ID of the created user.
+        str: The unique ID of the user created.
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update(
@@ -83,6 +83,19 @@ def get_user_id(user_name, **kwargs):
     )
     response = execute_aws_api_call("identitystore", "get_user_id", **kwargs)
     return response["UserId"] if response else False
+
+
+@handle_aws_api_errors
+def describe_user(user_id, **kwargs):
+    """Retrieves the user details of the user
+
+    Args:
+        user_id (str): The user ID of the user.
+        **kwargs: Additional keyword arguments for the API call.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update({"UserId": user_id})
+    return execute_aws_api_call("identitystore", "describe_user", **kwargs)
 
 
 @handle_aws_api_errors
@@ -172,17 +185,26 @@ def list_group_memberships(group_id, **kwargs):
     return execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
-        ["GroupMemberships"],
         GroupId=group_id,
         **kwargs,
-    )
+    )["GroupMemberships"]
 
 
 @handle_aws_api_errors
-def list_groups_with_memberships():
-    """Retrieves all groups with their members from the AWS Identity Center (identitystore)"""
+def list_groups_with_memberships(filters=None):
+    """Retrieves groups with their members from the AWS Identity Center (identitystore)
+
+    Args:
+        filters (list): Filters to apply to the groups. Optional, uses format AttributePath and AttributeValue.
+
+    Returns:
+        list: A list of group objects with their members.
+    """
     groups = list_groups()
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
+        if group["GroupMemberships"]:
+            for membership in group["GroupMemberships"]:
+                membership["MemberId"] = describe_user(membership["MemberId"]["UserId"])
 
     return groups
