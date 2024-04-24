@@ -20,21 +20,37 @@ def get_nested_value(dictionary, key):
 
 
 def get_unique_users_from_groups(groups, key):
+    """Get the unique users from a list of groups or a single group dict.
+
+    Args:
+        groups (list or dict): A list of groups or a single group.
+        key (str): The key to get the users from the groups.
+
+    Returns:
+        list: A list of unique users from the groups
+    """
     users = set()
-    for group in groups:
-        group_users = get_nested_value(group, key)
+    if isinstance(groups, list):
+        for group in groups:
+            group_users = get_nested_value(group, key)
+            if group_users:
+                users.update(tuple(user.items()) for user in group_users)
+
+    elif isinstance(groups, dict):
+        group_users = get_nested_value(groups, key)
         if group_users:
             users.update(tuple(user.items()) for user in group_users)
+
     return [dict(user) for user in users]
 
 
 def sync_users(source, target, **kwargs):
     """
-    Sync users from source to target systems. The function compares the users in the source and target systems and returns the users to create and the users to delete in the target system.
+    Sync users from source to target groups. The function compares the users in the source and target lists and returns the users to add/create and the users to remove/delete in the target list.
 
-    Users to create are the ones that are in the source system but not in the target system.
+    Users to create are the ones that are in the source list but not in the target list.
 
-    Users to delete are the ones that are in the target system but not in the source system.
+    Users to delete are the ones that are in the target list but not in the source list.
 
     Args:
         source (dict): Source system data. Must contain the keys 'users' (list) and 'key' (string).
@@ -61,34 +77,34 @@ def sync_users(source, target, **kwargs):
     if not source_key or not target_key or not source_users:
         return [], []
 
-    users_to_create = source_users.copy()
+    users_to_add = source_users.copy()
 
     logger.info(
         f"Syncing users from source ({len(source_users)}) to target ({len(target_users)})."
     )
     filters = kwargs.get("filters", [])
     for filter in filters:
-        users_to_create = filter_by_condition(users_to_create, filter)
+        users_to_add = filter_by_condition(users_to_add, filter)
 
     target_users_keys = set(
         [get_nested_value(user, target_key) for user in target_users]
     )
 
-    users_to_create = filter_by_condition(
-        users_to_create,
+    users_to_add = filter_by_condition(
+        users_to_add,
         lambda user: get_nested_value(user, source_key) not in target_users_keys,
     )
 
-    users_to_create_keys = set(
-        [get_nested_value(user, source_key) for user in users_to_create]
+    users_to_add_keys = set(
+        [get_nested_value(user, source_key) for user in users_to_add]
     )
 
-    users_to_delete = filter_by_condition(
+    users_to_remove = filter_by_condition(
         target_users,
-        lambda user: get_nested_value(user, target_key) in users_to_create_keys,
+        lambda user: get_nested_value(user, target_key) in users_to_add_keys,
     )
 
     if not enable_delete:
-        users_to_delete = []
+        users_to_remove = []
 
-    return users_to_create, users_to_delete
+    return users_to_add, users_to_remove

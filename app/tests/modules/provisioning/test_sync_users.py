@@ -211,6 +211,46 @@ def test_get_unique_users_from_groups(source_groups):
     )
 
 
+def test_get_unique_users_from_groups_with_empty_groups():
+    groups = []
+    users = sync_users.get_unique_users_from_groups(groups, "members")
+    assert users == []
+
+
+def test_get_unique_users_from_dict_group(source_groups):
+    users = sync_users.get_unique_users_from_groups(source_groups[0], "members")
+    expected_users = [
+        {"email": "user1.test@test.com", "id": "user1_id"},
+        {"email": "user2.test@test.com", "id": "user2_id"},
+        {"email": "user3.test@test.com", "id": "user3_id"},
+    ]
+    assert sorted(users, key=lambda user: user["id"]) == sorted(
+        expected_users, key=lambda user: user["id"]
+    )
+
+
+def test_get_unique_users_from_dict_group_with_duplicate_key():
+    group = {
+        "id": "source_group_id1",
+        "name": "SOURCE-group1",
+        "email": "SOURCE-group1@test.com",
+        "members": [
+            {"email": "user1.test@test.com", "id": "user1_id", "username": "user1"},
+            {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
+            {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
+        ],
+    }
+    users = sync_users.get_unique_users_from_groups(group, "members")
+    expected_users = [
+        {"email": "user1.test@test.com", "id": "user1_id", "username": "user1"},
+        {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
+        {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
+    ]
+    assert sorted(users, key=lambda user: user["id"]) == sorted(
+        expected_users, key=lambda user: user["id"]
+    )
+
+
 def test_sync_users_without_filters(source_users, target_users):
     users_to_create, users_to_delete = sync_users.sync_users(source_users, target_users)
 
