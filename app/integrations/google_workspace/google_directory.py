@@ -139,5 +139,7 @@ def add_users_to_group(group, group_key):
 
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/insert
     """
-    group["members"] = list_group_members(group_key)
+    result = list_group_members(group_key)
+    if result:
+        group["members"] = result
     return group
