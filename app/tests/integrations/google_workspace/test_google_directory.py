@@ -274,3 +274,20 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         groupKey=group_key,
         maxResults=200,
     )
+
+
+@patch("integrations.google_workspace.google_directory.list_group_members")
+def test_add_users_to_group_calls_list_group_members(mock_list_group_members):
+    group = {"id": "test_group_id"}
+    group_key = "test_group_id"
+    google_directory.add_users_to_group(group, group_key)
+    mock_list_group_members.assert_called_once_with(group_key)
+
+
+@patch("integrations.google_workspace.google_directory.list_group_members")
+def test_add_users_to_group_calls_adds_members(mock_list_group_members):
+    mock_list_group_members.return_value = [{"id": "test_member_id"}]
+    group = {"id": "test_group_id", "members": [{"id": "test_member_id"}]}
+    group_key = "test_group_id"
+    google_directory.add_users_to_group(group, group_key)
+    assert group["members"] == [{"id": "test_member_id"}]

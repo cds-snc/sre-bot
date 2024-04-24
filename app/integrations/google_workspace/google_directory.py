@@ -73,7 +73,7 @@ def list_groups(
     customer=None,
     **kwargs,
 ):
-    """List all groups in the Google Workspace domain.
+    """List all groups in the Google Workspace domain. A query can be provided to filter the results (e.g. query="email:prefix-*" will filter for all groups where the email starts with 'prefix-').
 
     Returns:
         list: A list of group objects.
@@ -126,3 +126,18 @@ def list_group_members(group_key, delegated_user_email=None):
         groupKey=group_key,
         maxResults=200,
     )
+
+
+def add_users_to_group(group, group_key):
+    """Add users to a group in the Google Workspace domain.
+
+    Args:
+        group_key (str): The group's email address or unique group ID.
+
+    Returns:
+        list: A list of user objects.
+
+    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/insert
+    """
+    group["members"] = list_group_members(group_key)
+    return group
