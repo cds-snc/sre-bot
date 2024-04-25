@@ -352,7 +352,10 @@ def test_list_groups_with_members_without_details(
     mock_list_group_members.side_effect = group_members
     mock_get_user.side_effect = users
 
-    assert google_directory.list_groups_with_members(members_details=False) == groups_with_users
+    assert (
+        google_directory.list_groups_with_members(members_details=False)
+        == groups_with_users
+    )
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")
