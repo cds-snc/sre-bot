@@ -174,7 +174,6 @@ def test_get_source_groups(
 
 
 @patch("modules.aws.sync_identity_center.filter_tools.filter_by_condition")
-
 @patch("modules.aws.sync_identity_center.google_directory.list_groups_with_members")
 def test_get_source_groups_with_users(
     mock_list_groups_with_members,
