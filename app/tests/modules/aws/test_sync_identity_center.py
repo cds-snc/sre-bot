@@ -52,7 +52,7 @@ def aws_missing_users():
 @patch("modules.aws.sync_identity_center.sync_aws_groups_members")
 @patch("modules.aws.sync_identity_center.sync_aws_users")
 @patch("modules.aws.sync_identity_center.get_source_groups_with_users")
-@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.users.get_unique_users_from_groups")
 @patch("modules.aws.sync_identity_center.identity_store.list_users")
 @patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
 def test_synchronize_with_defaults(
@@ -78,7 +78,7 @@ def test_synchronize_with_defaults(
 @patch("modules.aws.sync_identity_center.sync_aws_groups_members")
 @patch("modules.aws.sync_identity_center.sync_aws_users")
 @patch("modules.aws.sync_identity_center.get_source_groups_with_users")
-@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.users.get_unique_users_from_groups")
 @patch("modules.aws.sync_identity_center.identity_store.list_users")
 @patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
 def test_synchronize_with_sync_users_true(
@@ -115,7 +115,7 @@ def test_synchronize_with_sync_users_true(
 @patch("modules.aws.sync_identity_center.sync_aws_groups_members")
 @patch("modules.aws.sync_identity_center.sync_aws_users")
 @patch("modules.aws.sync_identity_center.get_source_groups_with_users")
-@patch("modules.aws.sync_identity_center.get_unique_users_from_groups")
+@patch("modules.aws.sync_identity_center.users.get_unique_users_from_groups")
 @patch("modules.aws.sync_identity_center.identity_store.list_users")
 @patch("modules.aws.sync_identity_center.identity_store.list_groups_with_memberships")
 def test_synchronize_with_sync_groups_true(
@@ -155,7 +155,7 @@ def test_synchronize_with_sync_groups_true(
 
 
 @patch("modules.aws.sync_identity_center.google_directory.list_groups")
-@patch("modules.aws.sync_identity_center.filter_by_condition")
+@patch("modules.utils.filters.filter_by_condition")
 def test_get_source_groups(
     mock_filter_by_condition,
     mock_google_directory_list_groups,
@@ -173,7 +173,7 @@ def test_get_source_groups(
     )
 
 
-@patch("modules.aws.sync_identity_center.filter_by_condition")
+@patch("modules.utils.filters.filter_by_condition")
 @patch("modules.aws.sync_identity_center.google_directory.list_groups_with_members")
 def test_get_source_groups_with_users(
     mock_list_groups_with_members,

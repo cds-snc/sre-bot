@@ -1,12 +1,8 @@
-import json
 from logging import getLogger
 from integrations.aws import identity_store
 from integrations.google_workspace import google_directory
-from modules.provisioning.sync_users import (
-    sync_users,
-    filter_by_condition,
-    get_unique_users_from_groups,
-)
+from modules.provisioning import users, groups
+from modules.utils import filters as filter_tools
 
 
 logger = getLogger(__name__)
@@ -24,7 +20,7 @@ def synchronize(**kwargs):
     target_groups = []
 
     if sync_users:
-        source_users = get_unique_users_from_groups(source_groups, "members")
+        source_users = users.get_unique_users_from_groups(source_groups, "members")
         target_users = identity_store.list_users()
         users_sync_status = sync_aws_users(source_users, target_users)
     else:
@@ -42,7 +38,7 @@ def synchronize(**kwargs):
 def get_source_groups(query="email:aws-*", name_filter="AWS-"):
     """Get the source groups."""
     source_groups = google_directory.list_groups(query=query)
-    source_groups = filter_by_condition(
+    source_groups = filter_tools.filter_by_condition(
         source_groups, lambda group: name_filter in group["name"]
     )
     return source_groups
@@ -51,7 +47,7 @@ def get_source_groups(query="email:aws-*", name_filter="AWS-"):
 def get_source_groups_with_users(query="email:aws-*", name_filter="AWS-"):
     """Get the source groups with their users."""
     source_groups = google_directory.list_groups_with_members(query=query)
-    source_groups = filter_by_condition(
+    source_groups = filter_tools.filter_by_condition(
         source_groups, lambda group: name_filter in group["name"]
     )
     return source_groups
@@ -121,9 +117,9 @@ def sync_aws_users(
     filters = []
     filters.extend(
         [
-            lambda user: "+" not in user["email"],
+            lambda user: "+" not in user["primaryEmail"],
             # lambda user: "admin" not in user["email"],
-            lambda user: "cds-snc.ca" in user["email"],
+            lambda user: "cds-snc.ca" in user["primaryEmail"],
         ]
     )
 
@@ -132,7 +128,7 @@ def sync_aws_users(
         {
             "id": user["id"],
             "primaryEmail": user["primaryEmail"],
-            "name": google_directory.get_user(user["email"])["name"],
+            "name": google_directory.get_user(user["primaryEmail"])["name"],
         }
         for user in source_users
     ]
@@ -142,8 +138,8 @@ def sync_aws_users(
         i for n, i in enumerate(source_users) if i not in source_users[n + 1 :]
     ]
 
-    users_to_create, users_to_delete = sync_users(
-        {"users": source_users, "key": "email"},
+    users_to_create, users_to_delete = users.sync(
+        {"users": source_users, "key": "primaryEmail"},
         {"users": target_users, "key": "UserName"},
         filters=filters,
         enable_delete=enable_delete,
@@ -170,11 +166,11 @@ def get_matching_groups(source_groups, target_groups):
 
     matching_groups = set(target_groups_names).intersection(source_groups_names)
 
-    filtered_target_groups = filter_by_condition(
+    filtered_target_groups = filter_tools.filter_by_condition(
         target_groups, lambda group: group["DisplayName"] in matching_groups
     ).sort(key=lambda group: group["DisplayName"])
 
-    filtered_source_groups = filter_by_condition(
+    filtered_source_groups = filter_tools.filter_by_condition(
         source_groups, lambda group: group["DisplayName"] in matching_groups
     ).sort(key=lambda group: group["DisplayName"])
 
@@ -187,7 +183,7 @@ def sync_aws_groups_members(source_groups, target_groups):
     )
 
     for i in range(len(source_groups_to_sync)):
-        users_to_add, users_to_remove = sync_users(
+        users_to_add, users_to_remove = users.sync(
             {"users": source_groups_to_sync[i], "key": "email"},
             {"users": target_groups_to_sync[i], "key": "UserName"},
             filters=[lambda user: "+" not in user["email"]],
