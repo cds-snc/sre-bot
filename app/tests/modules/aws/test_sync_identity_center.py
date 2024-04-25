@@ -93,7 +93,8 @@ def test_synchronize_with_sync_users_true(
     aws_users,
 ):
     users = google_users(3, "user")
-    mock_get_source_groups_with_users.return_value = google_groups_w_users
+    google_groups_with_users = google_groups_w_users(3, 3, "group")
+    mock_get_source_groups_with_users.return_value = google_groups_with_users
     mock_get_unique_users_from_groups.return_value = users
     mock_identity_store_list_users.return_value = aws_users
     mock_sync_aws_users.return_value = "users_sync_status"
