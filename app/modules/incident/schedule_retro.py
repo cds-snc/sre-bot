@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import json
 
@@ -13,10 +13,10 @@ from integrations.google_workspace.google_calendar import (
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
 def schedule_event(event_details, days):
     # Define the time range for the query
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     # time_min is the current time + days and time_max is the current time + 60 days + days
-    time_min = (now + timedelta(days=days)).isoformat()
-    time_max = (now + timedelta(days=(60 + days))).isoformat()
+    time_min = (now + timedelta(days=days)).isoformat() + "Z"
+    time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
 
     # Construct the items array
     items = []

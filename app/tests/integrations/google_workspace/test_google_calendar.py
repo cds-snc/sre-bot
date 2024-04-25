@@ -64,6 +64,10 @@ def items():
     return [{"id": "calendar1"}, {"id": "calendar2"}]
 
 
+@patch(
+    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
+    "test_email",
+)
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
@@ -77,7 +81,8 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
         "v3",
         "freebusy",
         "query",
-        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        delegated_user_email="test_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
             "timeMax": time_max,
@@ -86,6 +91,10 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     )
 
 
+@patch(
+    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
+    "test_email",
+)
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
@@ -109,7 +118,8 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
         "v3",
         "freebusy",
         "query",
-        scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        delegated_user_email="test_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
             "timeMax": time_max,
@@ -158,6 +168,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
             "end": {"dateTime": end, "timeZone": "America/New_York"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
+            "guestsCanModify": True,
         },
         calendarId="primary",
     )
@@ -199,6 +210,7 @@ def test_insert_event_with_kwargs(
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
+            "guestsCanModify": True,
             **kwargs,
         },
         calendarId="primary",
