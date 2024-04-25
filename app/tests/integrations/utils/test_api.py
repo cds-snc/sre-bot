@@ -143,9 +143,7 @@ def test_convert_string_to_pascal_case_with_non_string_input():
         convert_string_to_pascal_case(123)
 
 
-def test_convert_dict_to_pascal_case(
-        kwargs
-):
+def test_convert_dict_to_pascal_case(kwargs):
     kwargs[0].pop("nested_list")
     dict = kwargs[0]
 

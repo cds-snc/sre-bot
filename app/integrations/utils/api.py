@@ -1,6 +1,4 @@
 """Utilities for API integrations."""
-
-
 import re
 
 
@@ -41,8 +39,8 @@ def convert_string_to_pascal_case(snake_str):
     if not isinstance(snake_str, str):
         raise TypeError("Input must be a string")
     # Convert camelCase to snake_case
-    snake_str = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', snake_str)
-    snake_str = re.sub('([a-z0-9])([A-Z])', r'\1_\2', snake_str).lower()
+    snake_str = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", snake_str)
+    snake_str = re.sub("([a-z0-9])([A-Z])", r"\1_\2", snake_str).lower()
 
     components = snake_str.split("_")
     if len(components) == 1 and components[0] != "":
