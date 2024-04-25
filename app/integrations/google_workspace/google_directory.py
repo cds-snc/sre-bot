@@ -151,12 +151,14 @@ def list_groups_with_members(**kwargs):
     Returns:
         list: A list of group objects with members.
     """
+    members_details = kwargs.get("members_details", True)
+    kwargs.pop("members_details", None)
     groups = list_groups(**kwargs)
     if not groups:
         return []
     for group in range(len(groups)):
         members = list_group_members(groups[group]["email"])
-        if members:
+        if members and members_details:
             groups[group]["members"] = members
 
             for member in range(len(groups[group]["members"])):
