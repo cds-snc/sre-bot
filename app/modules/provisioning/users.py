@@ -42,7 +42,11 @@ def sync(source, target, **kwargs):
     Args:
         source (dict): Source system data. Must contain the keys 'users' (list) and 'key' (string).
         target (dict): Target system data. Must contain the keys 'users' (list) and 'key' (string).
-        filters (list): List of filters to apply to the users.
+        **kwargs: Additional keyword arguments. Supported arguments are:
+
+            - filters (list): List of filters to apply to the users.
+            - enable_delete (bool): Enable the deletion of users in the target system.
+            - delete_target_all (bool): Mark all target system users for deletion.
 
     Returns:
         tuple: A tuple containing the users to create and the users to delete in the target system.
