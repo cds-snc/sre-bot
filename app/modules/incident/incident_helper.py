@@ -478,8 +478,30 @@ def schedule_incident_retro(client, body, ack):
             if "bot_id" not in response:
                 user_emails.append(response["email"])
 
+    # get the incident document
+    # get and update the incident document
+    document_id = ""
+    response = client.bookmarks_list(channel_id=channel_id)
+    if response["ok"]:
+        for item in range(len(response["bookmarks"])):
+            if response["bookmarks"][item]["title"] == "Incident report":
+                document_id = google_docs.extract_google_doc_id(
+                    response["bookmarks"][item]["link"]
+                )
+    else:
+        logging.warning(
+            "No bookmark link for the incident document found for channel %s",
+            channel_name,
+        )
+
     # convert the data to string so that we can send it as private metadata
-    data_to_send = json.dumps({"emails": user_emails, "topic": channel_topic})
+    data_to_send = json.dumps(
+        {
+            "emails": user_emails,
+            "topic": channel_topic,
+            "incident_document": document_id,
+        }
+    )
 
     blocks = {
         "type": "modal",

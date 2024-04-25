@@ -801,6 +801,15 @@ def test_schedule_incident_retro_successful_no_bots():
         {"user": {"profile": {"email": "user1@example.com"}}},
         {"user": {"profile": {"email": "user2@example.com"}}},
     ]
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
 
     body = {
         "channel_id": "C1234567890",
@@ -828,7 +837,7 @@ def test_schedule_incident_retro_successful_no_bots():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic"}
+        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -852,6 +861,15 @@ def test_schedule_incident_retro_successful_bots():
             "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
         },  # This simulates a bot user
     ]
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
 
     body = {
         "channel_id": "C1234567890",
@@ -879,7 +897,7 @@ def test_schedule_incident_retro_successful_bots():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic"}
+        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -902,6 +920,15 @@ def test_schedule_incident_retro_successful_security_group():
             "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
         },  # This simulates a bot user
     ]
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
 
     body = {
         "channel_id": "C1234567890",
@@ -929,7 +956,7 @@ def test_schedule_incident_retro_successful_security_group():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user2@example.com"], "topic": "Retro Topic"}
+        {"emails": ["user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -953,6 +980,15 @@ def test_schedule_incident_retro_successful_no_security_group():
             "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
         },  # This simulates a bot user
     ]
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
 
     body = {
         "channel_id": "C1234567890",
@@ -980,7 +1016,7 @@ def test_schedule_incident_retro_successful_no_security_group():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic"}
+        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -995,6 +1031,15 @@ def test_schedule_incident_retro_with_no_users():
         "channel": {"topic": {"value": "Retro Topic"}}
     }
     mock_client.users_info.side_effect = []
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
 
     # Adjust the mock to simulate no users in the channel
     mock_client.conversations_members.return_value = {"members": []}
@@ -1009,7 +1054,7 @@ def test_schedule_incident_retro_with_no_users():
     incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
 
     # construct the expected data object
-    expected_data = json.dumps({"emails": [], "topic": "Retro Topic"})
+    expected_data = json.dumps({"emails": [], "topic": "Retro Topic", "incident_document": "dummy_document_id"})
     # Assertions to validate behavior when no users are present in the channel
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -1021,6 +1066,15 @@ def test_schedule_incident_retro_with_no_topic():
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
     mock_client.conversations_info.return_value = {"channel": {"topic": {"value": ""}}}
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
     mock_client.users_info.side_effect = []
 
     # Adjust the mock to simulate no users in the channel
@@ -1036,7 +1090,7 @@ def test_schedule_incident_retro_with_no_topic():
     incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
 
     # construct the expected data object and set the topic to a default one
-    expected_data = json.dumps({"emails": [], "topic": "Incident Retro"})
+    expected_data = json.dumps({"emails": [], "topic": "Incident Retro", "incident_document": "dummy_document_id"})
     # Assertions to validate behavior when no users are present in the channel
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
