@@ -4,7 +4,7 @@ from functools import wraps
 import boto3  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from dotenv import load_dotenv
-from integrations.utils.api import convert_kwargs_to_camel_case
+from integrations.utils.api import convert_kwargs_to_pascal_case
 
 load_dotenv()
 
@@ -104,7 +104,7 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     client = assume_role_client(service_name, role_arn)
     kwargs.pop("role_arn", None)
     if kwargs:
-        kwargs = convert_kwargs_to_camel_case(kwargs)
+        kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
     if paginated:
         return paginator(client, method, **kwargs)

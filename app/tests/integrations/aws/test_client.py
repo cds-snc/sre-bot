@@ -215,14 +215,14 @@ def test_assume_role_client(mock_boto3_client):
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_camel_case")
+@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.assume_role_client")
 def test_execute_aws_api_call_non_paginated(
-    mock_assume_role_client, mock_convert_kwargs_to_camel_case, mock_paginator
+    mock_assume_role_client, mock_convert_kwargs_to_pascal_case, mock_paginator
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -234,20 +234,20 @@ def test_execute_aws_api_call_non_paginated(
     mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
     mock_method.assert_called_once_with(arg1="value1")
     assert result == {"key": "value"}
-    mock_convert_kwargs_to_camel_case.assert_called_once_with({"arg1": "value1"})
+    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
     mock_paginator.assert_not_called()
 
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
-@patch("integrations.aws.client.convert_kwargs_to_camel_case")
+@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.assume_role_client")
 @patch("integrations.aws.client.paginator")
 def test_execute_aws_api_call_paginated(
-    mock_paginator, mock_assume_role_client, mock_convert_kwargs_to_camel_case
+    mock_paginator, mock_assume_role_client, mock_convert_kwargs_to_pascal_case
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
     mock_paginator.return_value = ["value1", "value2", "value3"]
 
     result = aws_client.execute_aws_api_call(
@@ -260,14 +260,14 @@ def test_execute_aws_api_call_paginated(
 
 
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_camel_case")
+@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.assume_role_client")
 def test_execute_aws_api_call_with_role_arn(
-    mock_assume_role_client, mock_convert_kwargs_to_camel_case, mock_paginator
+    mock_assume_role_client, mock_convert_kwargs_to_pascal_case, mock_paginator
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -284,10 +284,10 @@ def test_execute_aws_api_call_with_role_arn(
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_camel_case")
+@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.assume_role_client")
 def test_execute_aws_api_call_raises_exception_assume_role_on_error(
-    mock_assume_role, mock_convert_kwargs_to_camel_case, mock_paginator
+    mock_assume_role, mock_convert_kwargs_to_pascal_case, mock_paginator
 ):
     with pytest.raises(ValueError):
         aws_client.execute_aws_api_call(None, "some_method", role_arn="test_role_arn")
@@ -296,15 +296,15 @@ def test_execute_aws_api_call_raises_exception_assume_role_on_error(
         aws_client.execute_aws_api_call("service_name", None, role_arn="test_role_arn")
 
     mock_assume_role.assert_not_called()
-    mock_convert_kwargs_to_camel_case.assert_not_called()
+    mock_convert_kwargs_to_pascal_case.assert_not_called()
     mock_paginator.assert_not_called()
 
 
 @patch.dict(os.environ, clear=True)
-@patch("integrations.aws.client.convert_kwargs_to_camel_case")
+@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.assume_role_client")
 def test_execute_aws_api_call_raises_exception_when_role_arn_not_provided(
-    mock_assume_role, mock_convert_kwargs_to_camel_case
+    mock_assume_role, mock_convert_kwargs_to_pascal_case
 ):
     with pytest.raises(ValueError) as exc_info:
         aws_client.execute_aws_api_call("service_name", "some_method", arg1="value1")
@@ -314,4 +314,4 @@ def test_execute_aws_api_call_raises_exception_when_role_arn_not_provided(
         == "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
     )
     mock_assume_role.assert_not_called()
-    mock_convert_kwargs_to_camel_case.assert_not_called()
+    mock_convert_kwargs_to_pascal_case.assert_not_called()
