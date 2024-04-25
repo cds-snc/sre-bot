@@ -143,3 +143,25 @@ def add_users_to_group(group, group_key):
     if result:
         group["members"] = result
     return group
+
+
+def list_groups_with_members(**kwargs):
+    """List all groups in the Google Workspace domain with their members.
+
+    Returns:
+        list: A list of group objects with members.
+    """
+    groups = list_groups(**kwargs)
+    if not groups:
+        return []
+    for group in range(len(groups)):
+        members = list_group_members(groups[group]["email"])
+        if members:
+            groups[group]["members"] = members
+
+            for member in range(len(groups[group]["members"])):
+                groups[group]["members"][member] = get_user(
+                    groups[group]["members"][member]["email"]
+                )
+
+    return groups
