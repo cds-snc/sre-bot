@@ -2,7 +2,7 @@ from logging import getLogger
 from integrations.aws import identity_store
 from integrations.google_workspace import google_directory
 from modules.provisioning import users, groups
-from modules.utils import filters as filter_tools
+from utils import filters as filter_tools
 
 
 logger = getLogger(__name__)

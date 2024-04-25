@@ -155,7 +155,7 @@ def test_synchronize_with_sync_groups_true(
 
 
 @patch("modules.aws.sync_identity_center.google_directory.list_groups")
-@patch("modules.utils.filters.filter_by_condition")
+@patch("modules.aws.sync_identity_center.filter_tools.filter_by_condition")
 def test_get_source_groups(
     mock_filter_by_condition,
     mock_google_directory_list_groups,
@@ -173,7 +173,8 @@ def test_get_source_groups(
     )
 
 
-@patch("modules.utils.filters.filter_by_condition")
+@patch("modules.aws.sync_identity_center.filter_tools.filter_by_condition")
+
 @patch("modules.aws.sync_identity_center.google_directory.list_groups_with_members")
 def test_get_source_groups_with_users(
     mock_list_groups_with_members,
