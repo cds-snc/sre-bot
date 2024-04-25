@@ -114,7 +114,7 @@ def aws_users():
 
 @pytest.fixture
 def aws_groups():
-    def _aws_groups(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
+    def _aws_groups(n=3, prefix="", store_id="d-123412341234"):
         return {
             "Groups": [
                 {
@@ -132,9 +132,7 @@ def aws_groups():
 
 @pytest.fixture
 def aws_groups_memberships():
-    def _aws_groups_memberships(
-        n=3, prefix="", domain="test.com", store_id="d-123412341234"
-    ):
+    def _aws_groups_memberships(n=3, prefix="", store_id="d-123412341234"):
         return {
             "GroupMemberships": [
                 {
