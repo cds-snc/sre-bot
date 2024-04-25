@@ -168,6 +168,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
             "end": {"dateTime": end, "timeZone": "America/New_York"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
+            "guestsCanModify": True,
         },
         calendarId="primary",
     )
@@ -209,6 +210,7 @@ def test_insert_event_with_kwargs(
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
+            "guestsCanModify": True,
             **kwargs,
         },
         calendarId="primary",
