@@ -1,7 +1,7 @@
 from logging import getLogger
 from integrations.aws import identity_store
 from integrations.google_workspace import google_directory
-from modules.provisioning import users, groups
+from modules.provisioning import users
 from utils import filters as filter_tools
 
 
