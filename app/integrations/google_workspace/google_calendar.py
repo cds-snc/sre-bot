@@ -69,6 +69,7 @@ def insert_event(start, end, emails, title, **kwargs):
         "end": {"dateTime": end, "timeZone": time_zone},
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
+        "guestsCanModify": True,
     }
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
