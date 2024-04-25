@@ -179,6 +179,23 @@ def delete_group_membership(membership_id, **kwargs):
 
 
 @handle_aws_api_errors
+def get_group_membership_id(group_id, user_id, **kwargs):
+    """Retrieves the group membership ID of the group membership
+
+    Args:
+        group_id (str): The group ID of the group.
+        user_id (str): The user ID of the user.
+        **kwargs: Additional keyword arguments for the API call.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    response = execute_aws_api_call(
+        "identitystore", "get_group_membership_id", **kwargs
+    )
+    return response["MembershipId"] if response else False
+
+
+@handle_aws_api_errors
 def list_group_memberships(group_id, **kwargs):
     """Retrieves all group memberships from the AWS Identity Center  (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
