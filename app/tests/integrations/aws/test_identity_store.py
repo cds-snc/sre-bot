@@ -1,7 +1,39 @@
 import os
 from unittest.mock import call, patch  # type: ignore
 import pytest
+from pytest import fixture
 from integrations.aws import identity_store
+
+
+@fixture
+def user_number():
+    return 1
+
+
+@fixture
+def user(user_number):
+    number = user_number
+    return {
+        "UserName": f"test_user_{number}",
+        "UserId": f"test_user_id_{number}",
+        "ExternalIds": [
+            {"Issuer": f"test_issuer_{number}", "Id": f"test_id_{number}"},
+        ],
+        "Name": {
+            "Formatted": f"Test User {number}",
+            "FamilyName": "User",
+            "GivenName": "Test",
+            "MiddleName": "T",
+        },
+        "DisplayName": f"Test User {number}",
+        "Emails": [
+            {
+                "Value": f"test_user_{number}@example.com",
+                "Type": "work",
+                "Primary": True,
+            },
+        ],
+    }
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
@@ -113,6 +145,69 @@ def test_get_user_id_user_not_found(
 
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 @patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_describe_user(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call, aws_users
+):
+    user = aws_users(1)[0]
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = user
+    user_id = "test_user_id1"
+
+    expected = {
+        "UserName": "_email_0@test.com",
+        "UserId": "_id_0",
+        "Name": {
+            "FamilyName": "Family_name_0",
+            "GivenName": "Given_name_0",
+        },
+        "DisplayName": "Given_name_0 Family_name_0",
+        "Emails": [
+            {
+                "Value": "_email_0@test.com",
+                "Type": "work",
+                "Primary": True,
+            }
+        ],
+        "IdentityStoreId": "d-123412341234",
+    }
+
+    result = identity_store.describe_user(user_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "describe_user",
+        IdentityStoreId="test_instance_id",
+        UserId=user_id,
+    )
+    assert result == expected
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_describe_user_returns_false_if_not_found(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call, aws_users
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    user_id = "nonexistent_user_id"
+
+    result = identity_store.describe_user(user_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "describe_user",
+        IdentityStoreId="test_instance_id",
+        UserId=user_id,
+    )
+    assert result is False
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
 def test_delete_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
@@ -162,9 +257,8 @@ def test_delete_user_not_found(
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
-@patch("integrations.utils.api.convert_string_to_camel_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
-def test_list_users(mock_execute_aws_api_call, mock_convert_string_to_camel_case):
+def test_list_users(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
 
     result = identity_store.list_users()
@@ -180,10 +274,10 @@ def test_list_users(mock_execute_aws_api_call, mock_convert_string_to_camel_case
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
-@patch("integrations.utils.api.convert_string_to_camel_case")
+@patch("integrations.utils.api.convert_string_to_pascal_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_users_with_identity_store_id(
-    mock_execute_aws_api_call, mock_convert_string_to_camel_case
+    mock_execute_aws_api_call, mock_convert_string_to_pascal_case
 ):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
 
@@ -281,6 +375,24 @@ def test_list_groups(mock_execute_aws_api_call):
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
+def test_list_groups_returns_empty_array_if_no_groups(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = False
+
+    result = identity_store.list_groups()
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "list_groups",
+        paginated=True,
+        keys=["Groups"],
+        IdentityStoreId="test_instance_id",
+    )
+
+    assert result == []
+
+
+@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_groups_custom_identity_store_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["Group1", "Group2"]
 
@@ -373,6 +485,57 @@ def test_create_group_membership_unsuccessful(
 
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 @patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_get_group_membership_id(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = {
+        "MembershipId": "test_membership_id",
+        "IdentityStoreId": "test_instance_id",
+    }
+    group_id = "test_group_id"
+    user_id = "test_user_id"
+
+    result = identity_store.get_group_membership_id(group_id, user_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_group_membership_id",
+        IdentityStoreId="test_instance_id",
+        GroupId=group_id,
+        MemberId={"UserId": user_id},
+    )
+    assert result == "test_membership_id"
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_get_group_membership_id_returns_false_if_not_found(
+    mock_resolve_identity_store_id, mock_execute_aws_api_call
+):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    group_id = "test_group_id"
+    user_id = "test_user_id"
+
+    result = identity_store.get_group_membership_id(group_id, user_id)
+
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "get_group_membership_id",
+        IdentityStoreId="test_instance_id",
+        GroupId=group_id,
+        MemberId={"UserId": user_id},
+    )
+    assert result is False
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
 def test_delete_group_membership(
     mock_resolve_identity_store_id, mock_execute_aws_api_call
 ):
@@ -418,26 +581,67 @@ def test_delete_group_membership_resource_not_found(
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_group_memberships(mock_execute_aws_api_call):
-    mock_execute_aws_api_call.return_value = ["Membership1", "Membership2"]
+    mock_execute_aws_api_call.return_value = mock_execute_aws_api_call.return_value = {
+        "GroupMemberships": [
+            {
+                "IdentityStoreId": "test_instance_id",
+                "MembershipId": "Membership1",
+                "GroupId": "test_group_id",
+                "MemberId": {"UserId": "User1"},
+            },
+            {
+                "IdentityStoreId": "test_instance_id",
+                "MembershipId": "Membership2",
+                "GroupId": "test_group_id",
+                "MemberId": {"UserId": "User2"},
+            },
+        ],
+    }
 
     result = identity_store.list_group_memberships("test_group_id")
 
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
         "list_group_memberships",
-        ["GroupMemberships"],
         GroupId="test_group_id",
         IdentityStoreId="test_instance_id",
     )
 
-    assert result == ["Membership1", "Membership2"]
+    assert result == [
+        {
+            "IdentityStoreId": "test_instance_id",
+            "MembershipId": "Membership1",
+            "GroupId": "test_group_id",
+            "MemberId": {"UserId": "User1"},
+        },
+        {
+            "IdentityStoreId": "test_instance_id",
+            "MembershipId": "Membership2",
+            "GroupId": "test_group_id",
+            "MemberId": {"UserId": "User2"},
+        },
+    ]
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):
-    mock_execute_aws_api_call.return_value = ["Membership1", "Membership2"]
-
+    mock_execute_aws_api_call.return_value = {
+        "GroupMemberships": [
+            {
+                "IdentityStoreId": "test_instance_id",
+                "MembershipId": "Membership1",
+                "GroupId": "test_group_id",
+                "MemberId": {"UserId": "User1"},
+            },
+            {
+                "IdentityStoreId": "test_instance_id",
+                "MembershipId": "Membership2",
+                "GroupId": "test_group_id",
+                "MemberId": {"UserId": "User2"},
+            },
+        ],
+    }
     result = identity_store.list_group_memberships(
         "test_group_id", IdentityStoreId="custom_instance_id"
     )
@@ -445,44 +649,113 @@ def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
         "list_group_memberships",
-        ["GroupMemberships"],
         GroupId="test_group_id",
         IdentityStoreId="custom_instance_id",
     )
 
-    assert result == ["Membership1", "Membership2"]
+    assert result == [
+        {
+            "IdentityStoreId": "test_instance_id",
+            "MembershipId": "Membership1",
+            "GroupId": "test_group_id",
+            "MemberId": {"UserId": "User1"},
+        },
+        {
+            "IdentityStoreId": "test_instance_id",
+            "MembershipId": "Membership2",
+            "GroupId": "test_group_id",
+            "MemberId": {"UserId": "User2"},
+        },
+    ]
 
 
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
-@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.list_groups")
 @patch("integrations.aws.identity_store.list_group_memberships")
+@patch("integrations.aws.identity_store.describe_user")
 def test_list_groups_with_memberships(
-    mock_list_group_memberships, mock_execute_aws_api_call
+    mock_describe_user,
+    mock_list_group_memberships,
+    mock_list_groups,
+    aws_groups,
+    aws_groups_memberships,
+    aws_users,
 ):
-    mock_execute_aws_api_call.return_value = [
-        {"GroupId": "Group1"},
-        {"GroupId": "Group2"},
+    # groups = aws_groups_w_users(2, 3, prefix="test", domain="test.com")
+    groups = aws_groups(2, prefix="test")["Groups"]
+    memberships = [[], aws_groups_memberships(2, prefix="test")["GroupMemberships"]]
+    users = aws_users(2, prefix="test", domain="test.com")
+    expected_output = [
+        {
+            "IdentityStoreId": "d-123412341234",
+            "GroupId": "test_aws-group_id1",
+            "DisplayName": "AWS-group1",
+            "Description": "A group to test resolving AWS-group1 memberships",
+            "GroupMemberships": [],
+        },
+        {
+            "IdentityStoreId": "d-123412341234",
+            "GroupId": "test_aws-group_id2",
+            "DisplayName": "AWS-group2",
+            "Description": "A group to test resolving AWS-group2 memberships",
+            "GroupMemberships": [
+                {
+                    "IdentityStoreId": "d-123412341234",
+                    "MembershipId": "test_membership_id_1",
+                    "GroupId": "test_aws-group_id1",
+                    "MemberId": {
+                        "UserName": "test_email_0@test.com",
+                        "UserId": "test_id_0",
+                        "Name": {
+                            "FamilyName": "Family_name_0",
+                            "GivenName": "Given_name_0",
+                        },
+                        "DisplayName": "Given_name_0 Family_name_0",
+                        "Emails": [
+                            {
+                                "Value": "test_email_0@test.com",
+                                "Type": "work",
+                                "Primary": True,
+                            }
+                        ],
+                        "IdentityStoreId": "d-123412341234",
+                    },
+                },
+                {
+                    "IdentityStoreId": "d-123412341234",
+                    "MembershipId": "test_membership_id_2",
+                    "GroupId": "test_aws-group_id2",
+                    "MemberId": {
+                        "UserName": "test_email_1@test.com",
+                        "UserId": "test_id_1",
+                        "Name": {
+                            "FamilyName": "Family_name_1",
+                            "GivenName": "Given_name_1",
+                        },
+                        "DisplayName": "Given_name_1 Family_name_1",
+                        "Emails": [
+                            {
+                                "Value": "test_email_1@test.com",
+                                "Type": "work",
+                                "Primary": True,
+                            }
+                        ],
+                        "IdentityStoreId": "d-123412341234",
+                    },
+                },
+            ],
+        },
     ]
-    mock_list_group_memberships.side_effect = [["Membership1"], ["Membership2"]]
+    mock_list_groups.return_value = groups
+
+    mock_list_group_memberships.side_effect = memberships
+
+    user_side_effect = []
+    for user in users:
+        user_side_effect.append(user)
+
+    mock_describe_user.side_effect = user_side_effect
 
     result = identity_store.list_groups_with_memberships()
 
-    mock_execute_aws_api_call.assert_called_once_with(
-        "identitystore",
-        "list_groups",
-        paginated=True,
-        keys=["Groups"],
-        IdentityStoreId="test_instance_id",
-    )
-
-    mock_list_group_memberships.assert_has_calls(
-        [
-            call("Group1"),
-            call("Group2"),
-        ]
-    )
-
-    assert result == [
-        {"GroupId": "Group1", "GroupMemberships": ["Membership1"]},
-        {"GroupId": "Group2", "GroupMemberships": ["Membership2"]},
-    ]
+    assert result == expected_output
