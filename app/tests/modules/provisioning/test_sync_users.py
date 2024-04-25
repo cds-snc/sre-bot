@@ -1,7 +1,7 @@
 # from unittest.mock import patch
 from pytest import fixture
 
-from modules.provisioning import sync_users
+from modules.provisioning import users
 
 
 @fixture
@@ -118,85 +118,6 @@ def target_users():
     }
 
 
-def test_filter_by_condition():
-    list = [1, 2, 3, 4, 5]
-
-    def condition(x):
-        return x % 2 == 0
-
-    assert sync_users.filter_by_condition(list, condition) == [2, 4]
-
-
-def test_filter_by_condition_with_dict_list():
-    list = [
-        {"name": "User1", "username": "username1"},
-        {"name": "User2", "username": "username2"},
-    ]
-    assert sync_users.filter_by_condition(list, lambda x: x["name"] == "User1") == [
-        {"name": "User1", "username": "username1"}
-    ]
-
-
-def test_filter_by_condition_filters_out_on_empty_list():
-    list = []
-    assert sync_users.filter_by_condition(list, lambda x: x["name"] == "User1") == []
-
-
-def test_filter_by_condition_filters_against_key_list_values():
-    list = [
-        {"name": "User1", "username": "username1"},
-        {"name": "User2", "username": "username2"},
-        {"name": "User3", "username": "username3"},
-        {"name": "User4", "username": "username4"},
-        {"name": "User5", "username": "username5"},
-    ]
-    values = ["User1", "User3", "User5"]
-    assert sync_users.filter_by_condition(list, lambda x: x["name"] in values) == [
-        {"name": "User1", "username": "username1"},
-        {"name": "User3", "username": "username3"},
-        {"name": "User5", "username": "username5"},
-    ]
-
-
-def test_filter_by_condition_filters_out_against_key_list_values():
-    list = [
-        {"name": "User1", "username": "username1"},
-        {"name": "User2", "username": "username2"},
-        {"name": "User3", "username": "username3"},
-        {"name": "User4", "username": "username4"},
-        {"name": "User5", "username": "username5"},
-    ]
-    values = ["User1", "User3", "User5"]
-    assert sync_users.filter_by_condition(list, lambda x: x["name"] not in values) == [
-        {"name": "User2", "username": "username2"},
-        {"name": "User4", "username": "username4"},
-    ]
-
-
-def test_get_nested_value():
-    user = {"name": {"givenName": "User1", "familyName": "Test"}}
-    assert sync_users.get_nested_value(user, "name.givenName") == "User1"
-
-
-def test_get_nested_value_with_empty_key():
-    user = {"name": {"givenName": "User1", "familyName": "Test"}}
-    assert sync_users.get_nested_value(user, "") is None
-
-
-def test_get_nested_value_with_empty_dict():
-    user = {}
-    assert sync_users.get_nested_value(user, "name.givenName") is None
-
-
-def test_get_nested_value_with_nested_list():
-    user = {
-        "name": {"givenName": "User1", "familyName": "Test"},
-        "emails": [{"value": "test@test.com", "type": "work", "primary": True}],
-    }
-
-    assert sync_users.get_nested_value(user, "name.emails.1.value") is None
-
-
 def test_get_unique_users_from_groups(google_groups_w_users):
     groups = google_groups_w_users()
     unique_users = []
@@ -204,27 +125,24 @@ def test_get_unique_users_from_groups(google_groups_w_users):
         for user in group["members"]:
             if user not in unique_users:
                 unique_users.append(user)
-    users = sync_users.get_unique_users_from_groups(groups, "members")
+    users_from_groups = users.get_unique_users_from_groups(groups, "members")
 
-    assert sorted(users, key=lambda user: user["id"]) == sorted(
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
         unique_users, key=lambda user: user["id"]
     )
 
 
 def test_get_unique_users_from_groups_with_empty_groups():
     groups = []
-    users = sync_users.get_unique_users_from_groups(groups, "members")
-    assert users == []
+    users_from_groups = users.get_unique_users_from_groups(groups, "members")
+    assert users_from_groups == []
 
 
-def test_get_unique_users_from_dict_group(source_groups):
-    users = sync_users.get_unique_users_from_groups(source_groups[0], "members")
-    expected_users = [
-        {"email": "user1.test@test.com", "id": "user1_id"},
-        {"email": "user2.test@test.com", "id": "user2_id"},
-        {"email": "user3.test@test.com", "id": "user3_id"},
-    ]
-    assert sorted(users, key=lambda user: user["id"]) == sorted(
+def test_get_unique_users_from_dict_group(google_groups_w_users):
+    source_group = google_groups_w_users()[0]
+    users_from_groups = users.get_unique_users_from_groups(source_group, "members")
+    expected_users = source_group["members"]
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
         expected_users, key=lambda user: user["id"]
     )
 
@@ -240,19 +158,19 @@ def test_get_unique_users_from_dict_group_with_duplicate_key():
             {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
         ],
     }
-    users = sync_users.get_unique_users_from_groups(group, "members")
+    users_from_groups = users.get_unique_users_from_groups(group, "members")
     expected_users = [
         {"email": "user1.test@test.com", "id": "user1_id", "username": "user1"},
         {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
         {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
     ]
-    assert sorted(users, key=lambda user: user["id"]) == sorted(
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
         expected_users, key=lambda user: user["id"]
     )
 
 
-def test_sync_users_without_filters(source_users, target_users):
-    users_to_create, users_to_delete = sync_users.sync_users(source_users, target_users)
+def test_users_without_filters(source_users, target_users):
+    users_to_create, users_to_delete = users.sync(source_users, target_users)
 
     assert users_to_create == [
         {
@@ -286,50 +204,43 @@ def test_sync_users_without_filters(source_users, target_users):
     assert users_to_delete == []
 
 
-def test_sync_users_with_filters(source_users, target_users):
-    filters = [lambda user: "@test.com" in user["email"]]
-    users_to_create, users_to_delete = sync_users.sync_users(
+def test_users_with_filters(google_users, aws_users):
+    source_users_to_include = google_users(4, "user", "test.com")
+    non_matching_users = google_users(3, "user", "external.com")
+    source_users = {
+        "users": source_users_to_include + non_matching_users,
+        "key": "primaryEmail",
+    }
+    matching_aws_users = aws_users(3, "user", "test.com")
+    non_matching_aws_users = aws_users(3, "else", "test_outside.com")
+    target_users = {
+        "users": matching_aws_users + non_matching_aws_users,
+        "key": "UserName",
+    }
+    filters = [lambda user: "@test.com" in user["primaryEmail"]]
+    users_to_create, users_to_delete = users.sync(
         source_users, target_users, filters=filters
     )
-    assert users_to_create == [
-        {
-            "email": "user2.test@test.com",
-            "id": "user2_id",
-            "name": {
-                "givenName": "User2",
-                "familyName": "Test",
-                "fullName": "User2 Test",
-            },
-        },
-        {
-            "email": "user3.test@test.com",
-            "id": "user3_id",
-            "name": {
-                "givenName": "User3",
-                "familyName": "Test",
-                "fullName": "User3 Test",
-            },
-        },
-    ]
+    assert users_to_create == [source_users_to_include[3]]
     assert users_to_delete == []
 
 
-def test_sync_users_with_empty_source(source_users, target_users):
+def test_users_with_empty_source(source_users, target_users):
     source_users["users"] = []
-    users_to_create, users_to_delete = sync_users.sync_users(source_users, target_users)
+    users_to_create, users_to_delete = users.sync(source_users, target_users)
     assert users_to_create == []
     assert users_to_delete == []
 
 
-def test_sync_users_with_empty_target(source_users, target_users):
+def test_users_with_empty_target(source_users, target_users):
     target_users["users"] = []
-    users_to_create, users_to_delete = sync_users.sync_users(source_users, target_users)
+    users_to_create, users_to_delete = users.sync(source_users, target_users)
     assert users_to_create == source_users["users"]
     assert users_to_delete == []
 
 
-def test_sync_users_with_delete_target_all(source_users, target_users):
-    users_to_create, users_to_delete = sync_users.sync_users(
+def test_users_with_delete_target_all(source_users, target_users):
+    users_to_create, users_to_delete = users.sync(
         source_users, target_users, delete_target_all=True
     )
     assert users_to_create == []
