@@ -34,7 +34,7 @@ def create_user(email, first_name, family_name, **kwargs):
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
-        str: The user ID of the created user.
+        str: The unique ID of the user created.
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update(
@@ -86,6 +86,23 @@ def get_user_id(user_name, **kwargs):
 
 
 @handle_aws_api_errors
+def describe_user(user_id, **kwargs):
+    """Retrieves the user details of the user
+
+    Args:
+        user_id (str): The user ID of the user.
+        **kwargs: Additional keyword arguments for the API call.
+    """
+    kwargs = resolve_identity_store_id(kwargs)
+    kwargs.update({"UserId": user_id})
+    response = execute_aws_api_call("identitystore", "describe_user", **kwargs)
+    if not response:
+        return False
+    response.pop("ResponseMetadata", None)
+    return response
+
+
+@handle_aws_api_errors
 def list_users(**kwargs):
     """Retrieves all users from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
@@ -121,9 +138,10 @@ def get_group_id(group_name, **kwargs):
 def list_groups(**kwargs):
     """Retrieves all groups from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
-    return execute_aws_api_call(
+    response = execute_aws_api_call(
         "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
     )
+    return response if response else []
 
 
 @handle_aws_api_errors
@@ -166,23 +184,59 @@ def delete_group_membership(membership_id, **kwargs):
 
 
 @handle_aws_api_errors
-def list_group_memberships(group_id, **kwargs):
-    """Retrieves all group memberships from the AWS Identity Center  (identitystore)"""
+def get_group_membership_id(group_id, user_id, **kwargs):
+    """Retrieves the group membership ID of the group membership
+
+    Args:
+        group_id (str): The group ID of the group.
+        user_id (str): The user ID of the user.
+        **kwargs: Additional keyword arguments for the API call.
+    """
     kwargs = resolve_identity_store_id(kwargs)
-    return execute_aws_api_call(
-        "identitystore",
-        "list_group_memberships",
-        ["GroupMemberships"],
-        GroupId=group_id,
-        **kwargs,
+    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    response = execute_aws_api_call(
+        "identitystore", "get_group_membership_id", **kwargs
     )
+    return response["MembershipId"] if response else False
 
 
 @handle_aws_api_errors
-def list_groups_with_memberships():
-    """Retrieves all groups with their members from the AWS Identity Center (identitystore)"""
-    groups = list_groups()
+def list_group_memberships(group_id, **kwargs):
+    """Retrieves all group memberships from the AWS Identity Center  (identitystore)
+
+    Args:
+        group_id (str): The group ID of the group.
+        **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        list: A list of group membership objects."""
+    kwargs = resolve_identity_store_id(kwargs)
+    response = execute_aws_api_call(
+        "identitystore",
+        "list_group_memberships",
+        GroupId=group_id,
+        **kwargs,
+    )
+    return response["GroupMemberships"] if response else []
+
+
+@handle_aws_api_errors
+def list_groups_with_memberships(**kwargs):
+    """Retrieves groups with their members from the AWS Identity Center (identitystore)
+
+    Args:
+        **kwargs: Additional keyword arguments for the API call. (passed to list_groups)
+
+    Returns:
+        list: A list of group objects with their members.
+    """
+    members_details = kwargs.get("members_details", True)
+    kwargs.pop("members_details", None)
+    groups = list_groups(**kwargs)
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
+        if group["GroupMemberships"] and members_details:
+            for membership in group["GroupMemberships"]:
+                membership["MemberId"] = describe_user(membership["MemberId"]["UserId"])
 
     return groups
