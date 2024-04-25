@@ -95,7 +95,11 @@ def describe_user(user_id, **kwargs):
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"UserId": user_id})
-    return execute_aws_api_call("identitystore", "describe_user", **kwargs)
+    response = execute_aws_api_call("identitystore", "describe_user", **kwargs)
+    if not response:
+        return False
+    response.pop("ResponseMetadata", None)
+    return response
 
 
 @handle_aws_api_errors
@@ -134,9 +138,10 @@ def get_group_id(group_name, **kwargs):
 def list_groups(**kwargs):
     """Retrieves all groups from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
-    return execute_aws_api_call(
+    response = execute_aws_api_call(
         "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
     )
+    return response if response else []
 
 
 @handle_aws_api_errors
@@ -197,30 +202,40 @@ def get_group_membership_id(group_id, user_id, **kwargs):
 
 @handle_aws_api_errors
 def list_group_memberships(group_id, **kwargs):
-    """Retrieves all group memberships from the AWS Identity Center  (identitystore)"""
+    """Retrieves all group memberships from the AWS Identity Center  (identitystore)
+
+    Args:
+        group_id (str): The group ID of the group.
+        **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        list: A list of group membership objects."""
     kwargs = resolve_identity_store_id(kwargs)
-    return execute_aws_api_call(
+    response = execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
         GroupId=group_id,
         **kwargs,
-    )["GroupMemberships"]
+    )
+    return response["GroupMemberships"] if response else []
 
 
 @handle_aws_api_errors
-def list_groups_with_memberships(filters=None):
+def list_groups_with_memberships(**kwargs):
     """Retrieves groups with their members from the AWS Identity Center (identitystore)
 
     Args:
-        filters (list): Filters to apply to the groups. Optional, uses format AttributePath and AttributeValue.
+        **kwargs: Additional keyword arguments for the API call. (passed to list_groups)
 
     Returns:
         list: A list of group objects with their members.
     """
-    groups = list_groups()
+    members_details = kwargs.get("members_details", True)
+    kwargs.pop("members_details", None)
+    groups = list_groups(**kwargs)
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
-        if group["GroupMemberships"]:
+        if group["GroupMemberships"] and members_details:
             for membership in group["GroupMemberships"]:
                 membership["MemberId"] = describe_user(membership["MemberId"]["UserId"])
 
