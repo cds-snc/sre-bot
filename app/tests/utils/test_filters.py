@@ -1,4 +1,4 @@
-from modules.utils import filters
+from utils import filters
 
 
 def test_filter_by_condition():
