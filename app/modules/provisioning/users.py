@@ -3,24 +3,8 @@ from logging import getLogger
 
 from modules.utils import filters as filter_tools
 
-# from integrations.google_workspace import google_directory
-# from integrations.aws import identity_store
-
 
 logger = getLogger(__name__)
-
-
-# def filter_by_condition(list, condition):
-#     """Filter a list by a condition, keeping only the items that satisfy the condition."""
-#     return [item for item in list if condition(item)]
-
-
-# def get_nested_value(dictionary, key):
-#     try:
-#         return reduce(dict.get, key.split("."), dictionary)
-#     except TypeError:
-#         logger.error(f"Error getting nested value for key: {key}")
-#         return None
 
 
 def get_unique_users_from_groups(groups, key):
