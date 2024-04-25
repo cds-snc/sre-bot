@@ -1,6 +1,6 @@
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store
-from modules.utils import filters as filter_tools
+from utils import filters as filter_tools
 
 
 def get_groups_with_members_from_integration(integration_source, **kwargs):

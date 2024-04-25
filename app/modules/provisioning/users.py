@@ -1,7 +1,7 @@
 import json
 from logging import getLogger
 
-from modules.utils import filters as filter_tools
+from utils import filters as filter_tools
 
 
 logger = getLogger(__name__)
