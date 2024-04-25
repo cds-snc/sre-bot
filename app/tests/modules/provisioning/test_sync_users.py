@@ -197,17 +197,17 @@ def test_get_nested_value_with_nested_list():
     assert sync_users.get_nested_value(user, "name.emails.1.value") is None
 
 
-def test_get_unique_users_from_groups(source_groups):
-    users = sync_users.get_unique_users_from_groups(source_groups, "members")
-    expected_users = [
-        {"email": "user1.test@test.com", "id": "user1_id"},
-        {"email": "user2.test@test.com", "id": "user2_id"},
-        {"email": "user3.test@test.com", "id": "user3_id"},
-        {"email": "user9.test@external.com", "id": "user9_external_id"},
-    ]
+def test_get_unique_users_from_groups(google_groups_w_users):
+    groups = google_groups_w_users()
+    unique_users = []
+    for group in groups:
+        for user in group["members"]:
+            if user not in unique_users:
+                unique_users.append(user)
+    users = sync_users.get_unique_users_from_groups(groups, "members")
 
     assert sorted(users, key=lambda user: user["id"]) == sorted(
-        expected_users, key=lambda user: user["id"]
+        unique_users, key=lambda user: user["id"]
     )
 
 

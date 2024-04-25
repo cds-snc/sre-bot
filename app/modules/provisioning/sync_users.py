@@ -35,14 +35,12 @@ def get_unique_users_from_groups(groups, key):
         for group in groups:
             group_users = get_nested_value(group, key)
             if group_users:
-                users.update(tuple(user.items()) for user in group_users)
-
+                users.update(str(user) for user in group_users)
     elif isinstance(groups, dict):
         group_users = get_nested_value(groups, key)
         if group_users:
-            users.update(tuple(user.items()) for user in group_users)
-
-    return [dict(user) for user in users]
+            users.update(str(user) for user in group_users)
+    return [eval(user) for user in users]
 
 
 def sync_users(source, target, **kwargs):
