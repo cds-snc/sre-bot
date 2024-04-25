@@ -1,27 +1,31 @@
-from functools import reduce
-
+import json
 from logging import getLogger
+
+from modules.utils import filters as filter_tools
+
+# from integrations.google_workspace import google_directory
+# from integrations.aws import identity_store
 
 
 logger = getLogger(__name__)
 
 
-def filter_by_condition(list, condition):
-    """Filter a list by a condition, keeping only the items that satisfy the condition."""
-    return [item for item in list if condition(item)]
+# def filter_by_condition(list, condition):
+#     """Filter a list by a condition, keeping only the items that satisfy the condition."""
+#     return [item for item in list if condition(item)]
 
 
-def get_nested_value(dictionary, key):
-    try:
-        return reduce(dict.get, key.split("."), dictionary)
-    except TypeError:
-        logger.error(f"Error getting nested value for key: {key}")
-        return None
+# def get_nested_value(dictionary, key):
+#     try:
+#         return reduce(dict.get, key.split("."), dictionary)
+#     except TypeError:
+#         logger.error(f"Error getting nested value for key: {key}")
+#         return None
 
 
 def get_unique_users_from_groups(groups, key):
-    """Get the unique users from a list of groups or a single group dict.
-        Considers the whole object for uniqueness, not specific keys.
+    """Get the unique users from a list of groups with the same data schema or a single group dict.
+    Considers the whole object for uniqueness, not specific keys.
 
     Args:
         groups (list or dict): A list of groups or a single group.
@@ -33,17 +37,17 @@ def get_unique_users_from_groups(groups, key):
     users = set()
     if isinstance(groups, list):
         for group in groups:
-            group_users = get_nested_value(group, key)
+            group_users = filter_tools.get_nested_value(group, key)
             if group_users:
                 users.update(str(user) for user in group_users)
     elif isinstance(groups, dict):
-        group_users = get_nested_value(groups, key)
+        group_users = filter_tools.get_nested_value(groups, key)
         if group_users:
             users.update(str(user) for user in group_users)
     return [eval(user) for user in users]
 
 
-def sync_users(source, target, **kwargs):
+def sync(source, target, **kwargs):
     """
     Sync users from source to target groups. The function compares the users in the source and target lists and returns the users to add/create and the users to remove/delete in the target list.
 
@@ -67,6 +71,10 @@ def sync_users(source, target, **kwargs):
     enable_delete = kwargs.get("enable_delete", False)
     delete_target_all = kwargs.get("delete_target_all", False)
 
+    logger.info(
+        f"Syncing users from source to target.\nSource: {json.dumps(source, indent=2)}\nTarget: {json.dumps(target, indent=2)}"
+    )
+
     # specifically handle the case where all the target system users should be deleted
     if delete_target_all:
         logger.warning("Marking all target system users for deletion.")
@@ -83,24 +91,26 @@ def sync_users(source, target, **kwargs):
     )
     filters = kwargs.get("filters", [])
     for filter in filters:
-        users_to_add = filter_by_condition(users_to_add, filter)
+        users_to_add = filter_tools.filter_by_condition(users_to_add, filter)
 
     target_users_keys = set(
-        [get_nested_value(user, target_key) for user in target_users]
+        [filter_tools.get_nested_value(user, target_key) for user in target_users]
     )
 
-    users_to_add = filter_by_condition(
+    users_to_add = filter_tools.filter_by_condition(
         users_to_add,
-        lambda user: get_nested_value(user, source_key) not in target_users_keys,
+        lambda user: filter_tools.get_nested_value(user, source_key)
+        not in target_users_keys,
     )
 
     users_to_add_keys = set(
-        [get_nested_value(user, source_key) for user in users_to_add]
+        [filter_tools.get_nested_value(user, source_key) for user in users_to_add]
     )
 
-    users_to_remove = filter_by_condition(
+    users_to_remove = filter_tools.filter_by_condition(
         target_users,
-        lambda user: get_nested_value(user, target_key) in users_to_add_keys,
+        lambda user: filter_tools.get_nested_value(user, target_key)
+        in users_to_add_keys,
     )
 
     if not enable_delete:
