@@ -40,22 +40,20 @@ def synchronize(**kwargs):
 
 
 def get_source_groups(query="email:aws-*", name_filter="AWS-"):
+    """Get the source groups."""
     source_groups = google_directory.list_groups(query=query)
     source_groups = filter_by_condition(
         source_groups, lambda group: name_filter in group["name"]
     )
-
     return source_groups
 
 
 def get_source_groups_with_users(query="email:aws-*", name_filter="AWS-"):
     """Get the source groups with their users."""
-    source_groups = get_source_groups(query=query, name_filter=name_filter)
-    for i in range(len(source_groups)):
-        source_groups[i] = google_directory.add_users_to_group(
-            source_groups[i], source_groups[i]["id"]
-        )
-
+    source_groups = google_directory.list_groups_with_members(query=query)
+    source_groups = filter_by_condition(
+        source_groups, lambda group: name_filter in group["name"]
+    )
     return source_groups
 
 
@@ -76,7 +74,7 @@ def create_aws_users(users_to_create):
             f"Creating user {user['name']['givenName']} {user['name']['familyName']}"
         )
         response = identity_store.create_user(
-            user["email"], user["name"]["givenName"], user["name"]["familyName"]
+            user["primaryEmail"], user["name"]["givenName"], user["name"]["familyName"]
         )
         if response:
             users_created.append(response)
@@ -96,10 +94,18 @@ def delete_aws_users(users_to_delete):
     return users_deleted
 
 
+def delete_group_memberships(group_id, users_to_remove):
+    for user in users_to_remove:
+        membership_id = identity_store.get_group_membership_id(group_id, user["UserId"])
+        if membership_id:
+            identity_store.delete_group_membership(membership_id)
+        logger.info(f"Deleting membership with ID {membership_id}")
+        # identity_store.delete_group_membership(membership_id)
+
+
 def sync_aws_users(
     source_users,
     target_users,
-    query="email:aws-*",
     enable_delete=True,
     delete_target_all=False,
 ):
@@ -121,25 +127,20 @@ def sync_aws_users(
         ]
     )
 
-    # source_groups = get_source_groups_with_users(query=query)
-
-    # source_users = get_unique_users_from_groups(source_groups, "members")
-
     # strip unused fields
     source_users = [
         {
             "id": user["id"],
-            "email": user["email"],
+            "primaryEmail": user["primaryEmail"],
             "name": google_directory.get_user(user["email"])["name"],
         }
         for user in source_users
     ]
 
-    logger.info(json.dumps(source_users, indent=2))
-    # # remove duplicate values from the list of users
-    # source_users = [dict(t) for t in {tuple(d.items()) for d in source_users}]
-
-    # target_users = identity_store.list_users()
+    # remove duplicate values from the list of users
+    source_users = [
+        i for n, i in enumerate(source_users) if i not in source_users[n + 1 :]
+    ]
 
     users_to_create, users_to_delete = sync_users(
         {"users": source_users, "key": "email"},
@@ -196,9 +197,14 @@ def sync_aws_groups_members(source_groups, target_groups):
             logger.info(
                 f"Adding {len(users_to_add)} users to group {target_groups_to_sync['DisplayName']}"
             )
+            for user in users_to_add:
+                identity_store.create_group_membership(
+                    target_groups_to_sync["GroupId"], user["UserId"]
+                )
         if users_to_remove:
             logger.info(
                 f"Removing {len(users_to_remove)} users from group {target_groups_to_sync['DisplayName']}"
             )
+            delete_group_memberships(target_groups_to_sync["GroupId"], users_to_remove)
 
     return users_to_add, users_to_remove
