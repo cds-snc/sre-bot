@@ -171,15 +171,15 @@ def test_insert_event_no_kwargs_no_delegated_email(
             "summary": title,
             "guestsCanModify": True,
             "attachments": [
-            {
-                "fileUrl": f"https://docs.google.com/document/d/{document_id}",
-                "mimeType": "application/vnd.google-apps.document",
-                "title": "Incident Document",
-            }
+                {
+                    "fileUrl": f"https://docs.google.com/document/d/{document_id}",
+                    "mimeType": "application/vnd.google-apps.document",
+                    "title": "Incident Document",
+                }
             ],
         },
         calendarId="primary",
-        supportsAttachments=True
+        supportsAttachments=True,
     )
     assert not mock_convert_string_to_camel_case.called
     assert mock_os_environ_get.called_once_with("SRE_BOT_EMAIL")
@@ -205,9 +205,17 @@ def test_insert_event_with_kwargs(
         "description": "Test Description",
         "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
-        "attachments": [{"fileUrl": "https://docs.google.com/document/d/test_document_id", "mimeType": "application/vnd.google-apps.document", "title": "Incident Document"}]
+        "attachments": [
+            {
+                "fileUrl": "https://docs.google.com/document/d/test_document_id",
+                "mimeType": "application/vnd.google-apps.document",
+                "title": "Incident Document",
+            }
+        ],
     }
-    result = google_calendar.insert_event(start, end, emails, title, document_id, **kwargs)
+    result = google_calendar.insert_event(
+        start, end, emails, title, document_id, **kwargs
+    )
     assert result == "test_link"
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
@@ -225,12 +233,13 @@ def test_insert_event_with_kwargs(
             **kwargs,
         },
         calendarId="primary",
-        supportsAttachments=True
+        supportsAttachments=True,
     )
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
     assert not mock_os_environ_get.called
+
 
 @patch("os.environ.get", return_value="test_email")
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
@@ -246,14 +255,16 @@ def test_insert_event_with_no_document(
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
-    document_id = "" 
+    document_id = ""
     kwargs = {
         "location": "Test Location",
         "description": "Test Description",
         "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
     }
-    result = google_calendar.insert_event(start, end, emails, title, document_id, **kwargs)
+    result = google_calendar.insert_event(
+        start, end, emails, title, document_id, **kwargs
+    )
     assert result == "test_link"
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
@@ -271,12 +282,13 @@ def test_insert_event_with_no_document(
             **kwargs,
         },
         calendarId="primary",
-        supportsAttachments=True
+        supportsAttachments=True,
     )
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
     assert not mock_os_environ_get.called
+
 
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
 @patch("os.environ.get", return_value="test_email")

@@ -837,7 +837,11 @@ def test_schedule_incident_retro_successful_no_bots():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+        {
+            "emails": ["user1@example.com", "user2@example.com"],
+            "topic": "Retro Topic",
+            "incident_document": "dummy_document_id",
+        }
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -897,7 +901,11 @@ def test_schedule_incident_retro_successful_bots():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+        {
+            "emails": ["user1@example.com", "user2@example.com"],
+            "topic": "Retro Topic",
+            "incident_document": "dummy_document_id",
+        }
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -956,7 +964,11 @@ def test_schedule_incident_retro_successful_security_group():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+        {
+            "emails": ["user2@example.com"],
+            "topic": "Retro Topic",
+            "incident_document": "dummy_document_id",
+        }
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -1016,7 +1028,11 @@ def test_schedule_incident_retro_successful_no_security_group():
 
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
-        {"emails": ["user1@example.com", "user2@example.com"], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+        {
+            "emails": ["user1@example.com", "user2@example.com"],
+            "topic": "Retro Topic",
+            "incident_document": "dummy_document_id",
+        }
     )
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -1054,7 +1070,9 @@ def test_schedule_incident_retro_with_no_users():
     incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
 
     # construct the expected data object
-    expected_data = json.dumps({"emails": [], "topic": "Retro Topic", "incident_document": "dummy_document_id"})
+    expected_data = json.dumps(
+        {"emails": [], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+    )
     # Assertions to validate behavior when no users are present in the channel
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
@@ -1090,7 +1108,13 @@ def test_schedule_incident_retro_with_no_topic():
     incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
 
     # construct the expected data object and set the topic to a default one
-    expected_data = json.dumps({"emails": [], "topic": "Incident Retro", "incident_document": "dummy_document_id"})
+    expected_data = json.dumps(
+        {
+            "emails": [],
+            "topic": "Incident Retro",
+            "incident_document": "dummy_document_id",
+        }
+    )
     # Assertions to validate behavior when no users are present in the channel
     assert (
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data

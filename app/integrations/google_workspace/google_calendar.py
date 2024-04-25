@@ -82,8 +82,10 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
     else:
         # Optionally handle the case where 'incident_document' is None or empty
         # For example, remove 'attachments' from 'body' if it shouldn't exist without a valid document
-        body.pop("attachments", None)  # This removes 'attachments' if it exists, does nothing if it doesn't
-    
+        body.pop(
+            "attachments", None
+        )  # This removes 'attachments' if it exists, does nothing if it doesn't
+
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
