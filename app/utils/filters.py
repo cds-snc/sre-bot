@@ -63,21 +63,21 @@ def compare_lists(source, target, mode="sync", **kwargs):
         if delete_target_all:
             return [], target_values
 
-        users_to_add = [
+        values_to_add = [
             filtered_source_values[key]
             for key in filtered_source_values
             if key not in filtered_target_values
         ]
-        users_to_remove = [
+        values_to_remove = [
             filtered_target_values[key]
             for key in filtered_target_values
             if key not in filtered_source_values
         ]
 
         if not enable_delete:
-            users_to_remove = []
+            values_to_remove = []
 
-        return users_to_add, users_to_remove
+        return values_to_add, values_to_remove
 
     elif mode == "match":
         matching_values = set(filtered_source_values.keys()) & set(
