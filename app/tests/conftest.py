@@ -10,9 +10,9 @@ def google_groups():
     def _google_groups(n=3, prefix="", domain="test.com"):
         return [
             {
-                "id": f"{prefix}_google_group_id{i+1}",
-                "name": f"AWS-group{i+1}",
-                "email": f"{prefix}_aws-group{i+1}@{domain}",
+                "id": f"{prefix}google_group_id{i+1}",
+                "name": f"{prefix}group-name{i+1}",
+                "email": f"{prefix}group-name{i+1}@{domain}",
             }
             for i in range(n)
         ]
@@ -26,21 +26,21 @@ def google_users():
         users = []
         for i in range(n):
             user = {
-                "id": f"{prefix}_id_{i}",
-                "primaryEmail": f"{prefix}_email_{i}@{domain}",
+                "id": f"{prefix}user_id{i+1}",
+                "primaryEmail": f"{prefix}user-email{i+1}@{domain}",
                 "emails": [
                     {
-                        "address": f"{prefix}_email_{i}@{domain}",
+                        "address": f"{prefix}user-email{i+1}@{domain}",
                         "primary": True,
                         "type": "work",
                     }
                 ],
                 "suspended": False,
                 "name": {
-                    "fullName": f"Given_name_{i} Family_name_{i}",
-                    "familyName": f"Family_name_{i}",
-                    "givenName": f"Given_name_{i}",
-                    "displayName": f"Given_name_{i} Family_name_{i}",
+                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
+                    "familyName": f"Family_name_{i+1}",
+                    "givenName": f"Given_name_{i+1}",
+                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
                 },
             }
             users.append(user)
@@ -90,16 +90,16 @@ def aws_users():
         users = []
         for i in range(n):
             user = {
-                "UserName": f"{prefix}_email_{i}@{domain}",
-                "UserId": f"{prefix}_id_{i}",
+                "UserName": f"{prefix}user-email{i+1}@{domain}",
+                "UserId": f"{prefix}user_id{i+1}",
                 "Name": {
-                    "FamilyName": f"Family_name_{i}",
-                    "GivenName": f"Given_name_{i}",
+                    "FamilyName": f"Family_name_{i+1}",
+                    "GivenName": f"Given_name_{i+1}",
                 },
-                "DisplayName": f"Given_name_{i} Family_name_{i}",
+                "DisplayName": f"Given_name_{i+1} Family_name_{i+1}",
                 "Emails": [
                     {
-                        "Value": f"{prefix}_email_{i}@{domain}",
+                        "Value": f"{prefix}user-email{i+1}@{domain}",
                         "Type": "work",
                         "Primary": True,
                     }
@@ -118,8 +118,8 @@ def aws_groups():
         return {
             "Groups": [
                 {
-                    "GroupId": f"{prefix}_aws-group_id{i+1}",
-                    "DisplayName": f"AWS-group{i+1}",
+                    "GroupId": f"{prefix}aws-group_id{i+1}",
+                    "DisplayName": f"{prefix}group-name{i+1}",
                     "Description": f"A group to test resolving AWS-group{i+1} memberships",
                     "IdentityStoreId": f"{store_id}",
                 }
@@ -137,10 +137,10 @@ def aws_groups_memberships():
             "GroupMemberships": [
                 {
                     "IdentityStoreId": f"{store_id}",
-                    "MembershipId": f"{prefix}_membership_id_{i+1}",
-                    "GroupId": f"{prefix}_aws-group_id{i+1}",
+                    "MembershipId": f"{prefix}membership_id_{i+1}",
+                    "GroupId": f"{prefix}aws-group_id{i+1}",
                     "MemberId": {
-                        "UserId": f"{prefix}_id_{i}",
+                        "UserId": f"{prefix}user_id{i+1}",
                     },
                 }
                 for i in range(n)
@@ -155,9 +155,9 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
     def _aws_groups_w_users(
         n_groups=1, n_users=3, prefix="", domain="test.com", store_id="d-123412341234"
     ):
-        groups = aws_groups(n_groups, prefix, domain, store_id)["Groups"]
+        groups = aws_groups(n_groups, prefix, store_id)["Groups"]
         users = aws_users(n_users, prefix, domain, store_id)
-        memberships = aws_groups_memberships(n_groups, prefix, domain, store_id)[
+        memberships = aws_groups_memberships(n_groups, prefix, store_id)[
             "GroupMemberships"
         ]
         for group, membership in zip(groups, memberships):

@@ -274,3 +274,91 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         groupKey=group_key,
         maxResults=200,
     )
+
+
+@patch("integrations.google_workspace.google_directory.list_group_members")
+def test_add_users_to_group_calls_list_group_members(mock_list_group_members):
+    group = {"id": "test_group_id"}
+    group_key = "test_group_id"
+    google_directory.add_users_to_group(group, group_key)
+    mock_list_group_members.assert_called_once_with(group_key)
+
+
+@patch("integrations.google_workspace.google_directory.list_group_members")
+def test_add_users_to_group_adds_members(mock_list_group_members):
+    mock_list_group_members.return_value = [{"id": "test_member_id"}]
+    group = {"id": "test_group_id"}
+    group_key = "test_group_id"
+    google_directory.add_users_to_group(group, group_key)
+    assert group["members"] == [{"id": "test_member_id"}]
+
+
+@patch("integrations.google_workspace.google_directory.list_group_members")
+def test_add_users_to_group_skips_when_no_members(mock_list_group_members):
+    mock_list_group_members.return_value = []
+    group = {"id": "test_group_id"}
+    group_key = "test_group_id"
+    google_directory.add_users_to_group(group, group_key)
+    assert group.get("members") is None
+
+
+@patch("integrations.google_workspace.google_directory.list_groups")
+@patch("integrations.google_workspace.google_directory.list_group_members")
+@patch("integrations.google_workspace.google_directory.get_user")
+def test_list_groups_with_members(
+    mock_get_user,
+    mock_list_group_members,
+    mock_list_groups,
+    google_groups,
+    google_group_members,
+    google_users,
+    google_groups_w_users,
+):
+    groups = google_groups(2)
+    group_members = [[], google_group_members(2)]
+    users = google_users(2)
+    groups_with_users = google_groups_w_users(2, 2)
+
+    groups_with_users[0].pop("members", None)
+
+    mock_list_groups.return_value = groups
+    mock_list_group_members.side_effect = group_members
+    mock_get_user.side_effect = users
+
+    assert google_directory.list_groups_with_members() == groups_with_users
+
+
+@patch("integrations.google_workspace.google_directory.list_groups")
+@patch("integrations.google_workspace.google_directory.list_group_members")
+@patch("integrations.google_workspace.google_directory.get_user")
+def test_list_groups_with_members_without_details(
+    mock_get_user,
+    mock_list_group_members,
+    mock_list_groups,
+    google_groups,
+    google_group_members,
+    google_users,
+    google_groups_w_users,
+):
+    groups = google_groups(2)
+    group_members = [[], google_group_members(2)]
+    users = google_users(2)
+    groups_with_users = google_groups_w_users(2, 2)
+
+    groups_with_users[0].pop("members", None)
+    groups_with_users[1].pop("members", None)
+
+    mock_list_groups.return_value = groups
+    mock_list_group_members.side_effect = group_members
+    mock_get_user.side_effect = users
+
+    assert (
+        google_directory.list_groups_with_members(members_details=False)
+        == groups_with_users
+    )
+
+
+@patch("integrations.google_workspace.google_directory.list_groups")
+def test_list_groups_with_members_skips_when_no_groups(mock_list_groups):
+    mock_list_groups.return_value = []
+    assert google_directory.list_groups_with_members() == []
