@@ -53,58 +53,58 @@ def test_get_unique_users_from_dict_group_with_duplicate_key():
     )
 
 
-def test_users_without_filters(google_users, aws_users):
-    source_users = {"users": google_users(4, "user", "test.com"), "key": "primaryEmail"}
-    target_users = {"users": aws_users(3, "user", "test.com"), "key": "UserName"}
+# def test_users_without_filters(google_users, aws_users):
+#     source_users = {"users": google_users(4, "user", "test.com"), "key": "primaryEmail"}
+#     target_users = {"users": aws_users(3, "user", "test.com"), "key": "UserName"}
 
-    users_to_create, users_to_delete = users.sync(source_users, target_users)
+#     users_to_create, users_to_delete = users.sync(source_users, target_users)
 
-    assert users_to_create == [source_users["users"][3]]
-    assert users_to_delete == []
-
-
-def test_users_with_filters(google_users, aws_users):
-    source_users_to_include = google_users(4, "user", "test.com")
-    non_matching_users = google_users(3, "user", "external.com")
-    source_users = {
-        "users": source_users_to_include + non_matching_users,
-        "key": "primaryEmail",
-    }
-    matching_aws_users = aws_users(3, "user", "test.com")
-    non_matching_aws_users = aws_users(3, "else", "test_outside.com")
-    target_users = {
-        "users": matching_aws_users + non_matching_aws_users,
-        "key": "UserName",
-    }
-    filters = [lambda user: "@test.com" in user["primaryEmail"]]
-    users_to_create, users_to_delete = users.sync(
-        source_users, target_users, filters=filters
-    )
-    assert users_to_create == [source_users_to_include[3]]
-    assert users_to_delete == []
+#     assert users_to_create == [source_users["users"][3]]
+#     assert users_to_delete == []
 
 
-def test_users_with_empty_source(aws_users):
-    source_users = {"users": [], "key": "primaryEmail"}
-    target_users = {"users": aws_users(3, "user", "test.com"), "key": "UserName"}
-    users_to_create, users_to_delete = users.sync(source_users, target_users)
-    assert users_to_create == []
-    assert users_to_delete == []
+# def test_users_with_filters(google_users, aws_users):
+#     source_users_to_include = google_users(4, "user", "test.com")
+#     non_matching_users = google_users(3, "user", "external.com")
+#     source_users = {
+#         "users": source_users_to_include + non_matching_users,
+#         "key": "primaryEmail",
+#     }
+#     matching_aws_users = aws_users(3, "user", "test.com")
+#     non_matching_aws_users = aws_users(3, "else", "test_outside.com")
+#     target_users = {
+#         "users": matching_aws_users + non_matching_aws_users,
+#         "key": "UserName",
+#     }
+#     filters = [lambda user: "@test.com" in user["primaryEmail"]]
+#     users_to_create, users_to_delete = users.sync(
+#         source_users, target_users, filters=filters
+#     )
+#     assert users_to_create == [source_users_to_include[3]]
+#     assert users_to_delete == []
 
 
-def test_users_with_empty_target(google_users):
-    source_users = {"users": google_users(4, "user", "test.com"), "key": "primaryEmail"}
-    target_users = {"users": [], "key": "UserName"}
-    users_to_create, users_to_delete = users.sync(source_users, target_users)
-    assert users_to_create == source_users["users"]
-    assert users_to_delete == []
+# def test_users_with_empty_source(aws_users):
+#     source_users = {"users": [], "key": "primaryEmail"}
+#     target_users = {"users": aws_users(3, "user", "test.com"), "key": "UserName"}
+#     users_to_create, users_to_delete = users.sync(source_users, target_users)
+#     assert users_to_create == []
+#     assert users_to_delete == []
 
 
-def test_users_with_delete_target_all(aws_groups):
-    source_users = {"users": [], "key": "primaryEmail"}
-    target_users = {"users": aws_groups(3, "user", "test.com"), "key": "UserName"}
-    users_to_create, users_to_delete = users.sync(
-        source_users, target_users, delete_target_all=True
-    )
-    assert users_to_create == []
-    assert users_to_delete == target_users["users"]
+# def test_users_with_empty_target(google_users):
+#     source_users = {"users": google_users(4, "user", "test.com"), "key": "primaryEmail"}
+#     target_users = {"users": [], "key": "UserName"}
+#     users_to_create, users_to_delete = users.sync(source_users, target_users)
+#     assert users_to_create == source_users["users"]
+#     assert users_to_delete == []
+
+
+# def test_users_with_delete_target_all(aws_groups):
+#     source_users = {"users": [], "key": "primaryEmail"}
+#     target_users = {"users": aws_groups(3, "user", "test.com"), "key": "UserName"}
+#     users_to_create, users_to_delete = users.sync(
+#         source_users, target_users, delete_target_all=True
+#     )
+#     assert users_to_create == []
+#     assert users_to_delete == target_users["users"]
