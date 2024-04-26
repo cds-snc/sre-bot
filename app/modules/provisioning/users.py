@@ -1,4 +1,3 @@
-import json
 from logging import getLogger
 
 from utils import filters as filter_tools

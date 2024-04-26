@@ -1,4 +1,3 @@
-import json
 import os
 from unittest.mock import call, patch  # type: ignore
 import pytest
