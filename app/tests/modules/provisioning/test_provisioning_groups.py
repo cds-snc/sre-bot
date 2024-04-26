@@ -39,7 +39,9 @@ def test_get_groups_with_members_from_integration_google_query(
     mock_google_list_groups_with_members.return_value = google_groups[:3]
 
     query = "email:aws-*"
-    response = groups.get_groups_with_members_from_integration("google_groups", query=query)
+    response = groups.get_groups_with_members_from_integration(
+        "google_groups", query=query
+    )
 
     assert response == google_groups[:3]
 
@@ -143,10 +145,11 @@ def test_get_groups_with_members_from_integration_filters_applied(
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called
 
+
 @patch("modules.provisioning.groups.filter_tools.filter_by_condition")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
 @patch("modules.provisioning.groups.google_directory.list_groups_with_members")
-def test_get_groups_with_members_from_integration_filters_applied(
+def test_get_groups_with_members_from_integration_filters_returns_subset(
     mock_google_list_groups_with_members,
     mock_aws_list_groups_with_memberships,
     mock_filter_tools,
@@ -213,7 +216,9 @@ def test_get_matching_groups_returns_empty_lists_no_target(mock_get_nested_value
 
 @patch("modules.provisioning.groups.filter_tools.get_nested_value")
 def test_get_matching_groups_returns_empty_lists_key_not_found(mock_get_nested_value):
-    source_groups = [{"wrong_key": "value", "name": "group1", "display_name": "Group 1"}]
+    source_groups = [
+        {"wrong_key": "value", "name": "group1", "display_name": "Group 1"}
+    ]
     target_groups = [
         {"another_key": "value", "some_value": "value", "another_group_name": "Group 1"}
     ]
