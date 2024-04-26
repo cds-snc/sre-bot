@@ -1,3 +1,4 @@
+import json
 import os
 from unittest.mock import call, patch  # type: ignore
 import pytest
@@ -156,16 +157,16 @@ def test_describe_user(
     user_id = "test_user_id1"
 
     expected = {
-        "UserName": "_email_0@test.com",
-        "UserId": "_id_0",
+        "UserName": "user-email1@test.com",
+        "UserId": "user_id1",
         "Name": {
-            "FamilyName": "Family_name_0",
-            "GivenName": "Given_name_0",
+            "FamilyName": "Family_name_1",
+            "GivenName": "Given_name_1",
         },
-        "DisplayName": "Given_name_0 Family_name_0",
+        "DisplayName": "Given_name_1 Family_name_1",
         "Emails": [
             {
-                "Value": "_email_0@test.com",
+                "Value": "user-email1@test.com",
                 "Type": "work",
                 "Primary": True,
             }
@@ -683,37 +684,37 @@ def test_list_groups_with_memberships(
 ):
     # groups = aws_groups_w_users(2, 3, prefix="test", domain="test.com")
     groups = aws_groups(2, prefix="test")["Groups"]
-    memberships = [[], aws_groups_memberships(2, prefix="test")["GroupMemberships"]]
-    users = aws_users(2, prefix="test", domain="test.com")
+    memberships = [[], aws_groups_memberships(2, prefix="test-")["GroupMemberships"]]
+    users = aws_users(2, prefix="test-", domain="test.com")
     expected_output = [
         {
-            "IdentityStoreId": "d-123412341234",
-            "GroupId": "test_aws-group_id1",
-            "DisplayName": "AWS-group1",
+            "GroupId": "testaws-group_id1",
+            "DisplayName": "testgroup-name1",
             "Description": "A group to test resolving AWS-group1 memberships",
+            "IdentityStoreId": "d-123412341234",
             "GroupMemberships": [],
         },
         {
-            "IdentityStoreId": "d-123412341234",
-            "GroupId": "test_aws-group_id2",
-            "DisplayName": "AWS-group2",
+            "GroupId": "testaws-group_id2",
+            "DisplayName": "testgroup-name2",
             "Description": "A group to test resolving AWS-group2 memberships",
+            "IdentityStoreId": "d-123412341234",
             "GroupMemberships": [
                 {
                     "IdentityStoreId": "d-123412341234",
-                    "MembershipId": "test_membership_id_1",
-                    "GroupId": "test_aws-group_id1",
+                    "MembershipId": "test-membership_id_1",
+                    "GroupId": "test-aws-group_id1",
                     "MemberId": {
-                        "UserName": "test_email_0@test.com",
-                        "UserId": "test_id_0",
+                        "UserName": "test-user-email1@test.com",
+                        "UserId": "test-user_id1",
                         "Name": {
-                            "FamilyName": "Family_name_0",
-                            "GivenName": "Given_name_0",
+                            "FamilyName": "Family_name_1",
+                            "GivenName": "Given_name_1",
                         },
-                        "DisplayName": "Given_name_0 Family_name_0",
+                        "DisplayName": "Given_name_1 Family_name_1",
                         "Emails": [
                             {
-                                "Value": "test_email_0@test.com",
+                                "Value": "test-user-email1@test.com",
                                 "Type": "work",
                                 "Primary": True,
                             }
@@ -723,19 +724,19 @@ def test_list_groups_with_memberships(
                 },
                 {
                     "IdentityStoreId": "d-123412341234",
-                    "MembershipId": "test_membership_id_2",
-                    "GroupId": "test_aws-group_id2",
+                    "MembershipId": "test-membership_id_2",
+                    "GroupId": "test-aws-group_id2",
                     "MemberId": {
-                        "UserName": "test_email_1@test.com",
-                        "UserId": "test_id_1",
+                        "UserName": "test-user-email2@test.com",
+                        "UserId": "test-user_id2",
                         "Name": {
-                            "FamilyName": "Family_name_1",
-                            "GivenName": "Given_name_1",
+                            "FamilyName": "Family_name_2",
+                            "GivenName": "Given_name_2",
                         },
-                        "DisplayName": "Given_name_1 Family_name_1",
+                        "DisplayName": "Given_name_2 Family_name_2",
                         "Emails": [
                             {
-                                "Value": "test_email_1@test.com",
+                                "Value": "test-user-email2@test.com",
                                 "Type": "work",
                                 "Primary": True,
                             }
@@ -757,5 +758,5 @@ def test_list_groups_with_memberships(
     mock_describe_user.side_effect = user_side_effect
 
     result = identity_store.list_groups_with_memberships()
-
+    # print(json.dumps(result, indent=4))
     assert result == expected_output
