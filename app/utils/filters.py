@@ -91,4 +91,7 @@ def compare_lists(source, target, mode="sync", **kwargs):
             filtered_target_values[value] for value in matching_values
         ]
 
+        filtered_source_groups.sort(key=lambda x: x[source_key])
+        filtered_target_groups.sort(key=lambda x: x[target_key])
+
         return filtered_source_groups, filtered_target_groups
