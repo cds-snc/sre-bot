@@ -155,9 +155,9 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
     def _aws_groups_w_users(
         n_groups=1, n_users=3, prefix="", domain="test.com", store_id="d-123412341234"
     ):
-        groups = aws_groups(n_groups, prefix, domain, store_id)["Groups"]
+        groups = aws_groups(n_groups, prefix, store_id)["Groups"]
         users = aws_users(n_users, prefix, domain, store_id)
-        memberships = aws_groups_memberships(n_groups, prefix, domain, store_id)[
+        memberships = aws_groups_memberships(n_groups, prefix, store_id)[
             "GroupMemberships"
         ]
         for group, membership in zip(groups, memberships):
