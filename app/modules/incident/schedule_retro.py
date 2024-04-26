@@ -26,6 +26,9 @@ def schedule_event(event_details, days):
         email = email.strip()
         items.append({"id": email})
 
+    # get the incident document link
+    incident_document = json.loads(event_details).get("incident_document")
+
     # Execute the query to find all the busy times for all the participants
     freebusy_result = get_freebusy(time_min, time_max, items)
 
@@ -62,6 +65,7 @@ def schedule_event(event_details, days):
         first_available_end.isoformat(),
         emails,
         "Retro " + incident_name,
+        incident_document,
         **event_config,
     )
 

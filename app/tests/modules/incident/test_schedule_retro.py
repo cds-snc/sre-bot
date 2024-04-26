@@ -68,6 +68,7 @@ def test_schedule_event_successful(
     event_details_dict = json.loads(event_details)
     emails = event_details_dict["emails"]
     topic = event_details_dict["topic"]
+    document_id = event_details_dict.get("incident_document")
 
     # Call the function under test
     event_link = schedule_retro.schedule_event(event_details, mock_days)
@@ -82,6 +83,7 @@ def test_schedule_event_successful(
         find_first_available_slot_mock.return_value[1].isoformat(),
         emails,
         "Retro " + topic,
+        document_id,
         description="This is a retro meeting to discuss incident: " + topic,
         conferenceData={
             "createRequest": {

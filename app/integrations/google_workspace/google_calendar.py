@@ -48,7 +48,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
 
 
 @handle_google_api_errors
-def insert_event(start, end, emails, title, **kwargs):
+def insert_event(start, end, emails, title, incident_document, **kwargs):
     """Creates a new event in the specified calendars.
 
     Args:
@@ -71,6 +71,21 @@ def insert_event(start, end, emails, title, **kwargs):
         "summary": title,
         "guestsCanModify": True,
     }
+    if incident_document:
+        body["attachments"] = [
+            {
+                "fileUrl": f"https://docs.google.com/document/d/{incident_document}",
+                "mimeType": "application/vnd.google-apps.document",
+                "title": "Incident Document",
+            }
+        ]
+    else:
+        # Optionally handle the case where 'incident_document' is None or empty
+        # For example, remove 'attachments' from 'body' if it shouldn't exist without a valid document
+        body.pop(
+            "attachments", None
+        )  # This removes 'attachments' if it exists, does nothing if it doesn't
+
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
@@ -86,6 +101,7 @@ def insert_event(start, end, emails, title, **kwargs):
         delegated_user_email=delegated_user_email,
         body=body,
         calendarId="primary",
+        supportsAttachments=True,
     )
     return result.get("htmlLink")
 
