@@ -12,7 +12,7 @@ def google_groups():
             {
                 "id": f"{prefix}google_group_id{i+1}",
                 "name": f"{prefix}group-name{i+1}",
-                "email": f"{prefix}group-email{i+1}@{domain}",
+                "email": f"{prefix}group-name{i+1}@{domain}",
             }
             for i in range(n)
         ]
