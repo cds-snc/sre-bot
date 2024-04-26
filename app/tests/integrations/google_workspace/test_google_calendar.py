@@ -2,7 +2,7 @@
 
 import json
 from unittest.mock import patch, MagicMock
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytest
 import pytz
 from integrations.google_workspace import google_calendar
@@ -37,6 +37,12 @@ def calendar_service_mock():
 @pytest.fixture
 def est_timezone():
     return pytz.timezone("US/Eastern")
+
+
+@pytest.fixture
+def fixed_utc_now():
+    # Return a fixed UTC datetime
+    return datetime(2023, 4, 10, 12, 0)  # This is a Monday
 
 
 # Fixture to mock the datetime.now() function
@@ -154,7 +160,8 @@ def test_insert_event_no_kwargs_no_delegated_email(
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
-    result = google_calendar.insert_event(start, end, emails, title)
+    document_id = "test_document_id"
+    result = google_calendar.insert_event(start, end, emails, title, document_id)
     assert result == "test_link"
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
@@ -169,8 +176,16 @@ def test_insert_event_no_kwargs_no_delegated_email(
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             "guestsCanModify": True,
+            "attachments": [
+                {
+                    "fileUrl": f"https://docs.google.com/document/d/{document_id}",
+                    "mimeType": "application/vnd.google-apps.document",
+                    "title": "Incident Document",
+                }
+            ],
         },
         calendarId="primary",
+        supportsAttachments=True,
     )
     assert not mock_convert_string_to_camel_case.called
     assert mock_os_environ_get.called_once_with("SRE_BOT_EMAIL")
@@ -190,13 +205,23 @@ def test_insert_event_with_kwargs(
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
+    document_id = "test_document_id"
     kwargs = {
         "location": "Test Location",
         "description": "Test Description",
         "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
+        "attachments": [
+            {
+                "fileUrl": "https://docs.google.com/document/d/test_document_id",
+                "mimeType": "application/vnd.google-apps.document",
+                "title": "Incident Document",
+            }
+        ],
     }
-    result = google_calendar.insert_event(start, end, emails, title, **kwargs)
+    result = google_calendar.insert_event(
+        start, end, emails, title, document_id, **kwargs
+    )
     assert result == "test_link"
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
@@ -214,6 +239,56 @@ def test_insert_event_with_kwargs(
             **kwargs,
         },
         calendarId="primary",
+        supportsAttachments=True,
+    )
+    for key in kwargs:
+        mock_convert_string_to_camel_case.assert_any_call(key)
+
+    assert not mock_os_environ_get.called
+
+
+@patch("os.environ.get", return_value="test_email")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+def test_insert_event_with_no_document(
+    mock_convert_string_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
+):
+    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_convert_string_to_camel_case.side_effect = (
+        lambda x: x
+    )  # just return the same value
+    start = datetime.now()
+    end = start
+    emails = ["test1@test.com", "test2@test.com"]
+    title = "Test Event"
+    document_id = ""
+    kwargs = {
+        "location": "Test Location",
+        "description": "Test Description",
+        "delegated_user_email": "test_custom_email",
+        "time_zone": "Magic/Time_Zone",
+    }
+    result = google_calendar.insert_event(
+        start, end, emails, title, document_id, **kwargs
+    )
+    assert result == "test_link"
+    mock_execute_google_api_call.assert_called_once_with(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email="test_custom_email",
+        body={
+            "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
+            "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
+            "attendees": [{"email": email.strip()} for email in emails],
+            "summary": title,
+            "guestsCanModify": True,
+            **kwargs,
+        },
+        calendarId="primary",
+        supportsAttachments=True,
     )
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
@@ -237,7 +312,8 @@ def test_insert_event_api_call_error(
     end = start
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
-    google_calendar.insert_event(start, end, emails, title)
+    document_id = "test_document_id"
+    google_calendar.insert_event(start, end, emails, title, document_id)
     assert (
         "An unexpected error occurred in function 'insert_event': API call error"
         in caplog.text
@@ -247,65 +323,72 @@ def test_insert_event_api_call_error(
     assert not mock_handle_errors.called
 
 
-# Test out the find_first_available_slot function on the first available weekday
-def test_available_slot_on_first_weekday(mock_datetime_now, est_timezone):
+@patch("integrations.google_workspace.google_calendar.datetime")
+def test_available_slot_on_first_weekday(mock_datetime, fixed_utc_now, est_timezone):
+    # Mock datetime to control the flow of time in the test
+    mock_datetime.utcnow.return_value = fixed_utc_now
+    mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
+    mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+    # Simulate a freebusy response with no busy times on the first available day
     freebusy_response = {
         "calendars": {
             "primary": {
                 "busy": [
-                    # Assuming the provided busy time is on April 10, 2023, from 1 PM to 1:30 PM UTC (9 AM to 9:30 AM EST)
                     {
-                        "start": "2023-04-10T17:00:00Z",
-                        "end": "2023-04-10T17:30:00Z",
-                    }  # Busy at 1 PM to 1:30 PM EST on April 10
+                        "start": "2023-04-10T17:00:000Z",
+                        "end": "2023-04-10T17:30:000Z",
+                    }
                 ]
             }
         }
     }
 
-    start, end = google_calendar.find_first_available_slot(
-        freebusy_response, duration_minutes=30, days_in_future=3, search_days_limit=60
+    # Expected search date is three days in the future (which should be Thursday)
+    # Busy period is from 1 PM to 1:30 PM EST on the first day being checked (April 13th)
+    # The function should find an available slot after the busy period
+    expected_start_time = fixed_utc_now.replace(
+        day=fixed_utc_now.day + 3, hour=17, minute=0, second=0, microsecond=0
+    ).astimezone(est_timezone)
+    expected_end_time = expected_start_time + timedelta(minutes=30)
+
+    # Run the function under test
+    actual_start, actual_end = google_calendar.find_first_available_slot(
+        freebusy_response, days_in_future=3, duration_minutes=30, search_days_limit=60
     )
 
-    # Since April 10 is the "current" day and we start searching from 3 days in the future (April 13),
-    # we expect the function to find the first available slot on April 13 between 1 PM and 3 PM EST.
-    expected_start = datetime(
-        2023, 4, 13, 13, 0, tzinfo=est_timezone
-    )  # Expected start time in EST
-    expected_end = datetime(
-        2023, 4, 13, 13, 30, tzinfo=est_timezone
-    )  # Expected end time in EST
-
-    assert (
-        start == expected_start and end == expected_end
-    ), "The function should find the first available slot on April 13, 2023, from 1 PM to 1:30 PM EST."
+    # Check if the times returned match the expected values
+    assert actual_start == expected_start_time
+    assert actual_end == expected_end_time
 
 
 # Test out the find_first_available_slot function when multiple busy days
-def test_opening_exists_after_busy_days(mock_datetime_now, est_timezone):
+@patch("integrations.google_workspace.google_calendar.datetime")
+def test_opening_exists_after_busy_days(mock_datetime, fixed_utc_now, est_timezone):
+    # Mock datetime to control the flow of time in the test
+    mock_datetime.utcnow.return_value = fixed_utc_now
+    mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
+    mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
     freebusy_response = {
         "calendars": {
             "primary": {
                 "busy": [
-                    {"start": "2023-04-13T17:00:00Z", "end": "2023-04-13T19:00:00Z"},
-                    {"start": "2023-04-14T17:00:00Z", "end": "2023-04-14T19:00:00Z"},
-                    {"start": "2023-04-17T17:00:00Z", "end": "2023-04-17T19:00:00Z"},
-                    {"start": "2023-04-18T17:00:00Z", "end": "2023-04-18T19:00:00Z"},
+                    {"start": "2023-04-13T17:00:000Z", "end": "2023-04-13T19:00:000Z"},
+                    {"start": "2023-04-14T17:00:000Z", "end": "2023-04-14T19:00:000Z"},
+                    {"start": "2023-04-17T17:00:000Z", "end": "2023-04-17T19:00:000Z"},
+                    {"start": "2023-04-18T17:00:000Z", "end": "2023-04-18T19:00:000Z"},
                 ]
             }
         }
     }
 
     start, end = google_calendar.find_first_available_slot(
-        freebusy_response, duration_minutes=30, days_in_future=3, search_days_limit=60
+        freebusy_response, days_in_future=3, duration_minutes=30, search_days_limit=60
     )
-
-    expected_start = datetime(
-        2023, 4, 13, 14, 30, tzinfo=est_timezone
-    )  # Expected start time in EST
-    expected_end = datetime(
-        2023, 4, 13, 15, 0, tzinfo=est_timezone
-    )  # Expected end time in EST
+    expected_start = fixed_utc_now.replace(
+        day=fixed_utc_now.day + 9, hour=17, minute=0, second=0, microsecond=0
+    ).astimezone(est_timezone)
+    expected_end = expected_start + timedelta(minutes=30)
 
     assert (
         start == expected_start and end == expected_end
@@ -313,7 +396,11 @@ def test_opening_exists_after_busy_days(mock_datetime_now, est_timezone):
 
 
 # Test that weekends are skipped when searching for available slots
-def test_skipping_weekends(mock_datetime_now, est_timezone):
+@patch("integrations.google_workspace.google_calendar.datetime")
+def test_skipping_weekends(mock_datetime, fixed_utc_now, est_timezone):
+    mock_datetime.utcnow.return_value = fixed_utc_now
+    mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
+    mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
     freebusy_response = {
         "calendars": {
             "primary": {
@@ -330,8 +417,10 @@ def test_skipping_weekends(mock_datetime_now, est_timezone):
     )
 
     # Adjust these expected values based on the specific 'now' being mocked
-    expected_start = datetime(2023, 4, 11, 13, 0, tzinfo=est_timezone)
-    expected_end = datetime(2023, 4, 11, 13, 30, tzinfo=est_timezone)
+    expected_start = fixed_utc_now.replace(
+        day=fixed_utc_now.day + 1, hour=17, minute=0, second=0, microsecond=0
+    ).astimezone(est_timezone)
+    expected_end = expected_start + timedelta(minutes=30)
 
     assert (
         start == expected_start and end == expected_end
@@ -339,14 +428,20 @@ def test_skipping_weekends(mock_datetime_now, est_timezone):
 
 
 # Test that no available slots are found within the search limit
-def test_no_available_slots_within_search_limit(mock_datetime_now):
+@patch("integrations.google_workspace.google_calendar.datetime")
+def test_no_available_slots_within_search_limit(
+    mock_datetime, fixed_utc_now, est_timezone
+):
+    mock_datetime.utcnow.return_value = fixed_utc_now
+    mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
+    mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
     freebusy_response = {
         "calendars": {
             "primary": {
                 "busy": [
                     # Simulate a scenario where every eligible day within the search window is fully booked
                     # For simplicity, let's assume a pattern that covers the search hours for the next 60 days
-                    {"start": "2023-04-10T17:00:00Z", "end": "2023-08-13T19:00:00Z"},
+                    {"start": "2023-04-10T17:00:000Z", "end": "2023-08-13T19:00:000Z"},
                 ]
             }
         }

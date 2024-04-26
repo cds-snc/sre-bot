@@ -36,6 +36,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "items": items,
     }
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
+
     return execute_google_api_call(
         "calendar",
         "v3",
@@ -48,7 +49,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
 
 
 @handle_google_api_errors
-def insert_event(start, end, emails, title, **kwargs):
+def insert_event(start, end, emails, title, incident_document, **kwargs):
     """Creates a new event in the specified calendars.
 
     Args:
@@ -71,6 +72,21 @@ def insert_event(start, end, emails, title, **kwargs):
         "summary": title,
         "guestsCanModify": True,
     }
+    if incident_document:
+        body["attachments"] = [
+            {
+                "fileUrl": f"https://docs.google.com/document/d/{incident_document}",
+                "mimeType": "application/vnd.google-apps.document",
+                "title": "Incident Document",
+            }
+        ]
+    else:
+        # Optionally handle the case where 'incident_document' is None or empty
+        # For example, remove 'attachments' from 'body' if it shouldn't exist without a valid document
+        body.pop(
+            "attachments", None
+        )  # This removes 'attachments' if it exists, does nothing if it doesn't
+
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
@@ -86,6 +102,7 @@ def insert_event(start, end, emails, title, **kwargs):
         delegated_user_email=delegated_user_email,
         body=body,
         calendarId="primary",
+        supportsAttachments=True,
     )
     return result.get("htmlLink")
 
@@ -102,33 +119,26 @@ def find_first_available_slot(
     busy_times = []
     for calendar in freebusy_response["calendars"].values():
         for busy_period in calendar["busy"]:
-            start = (
-                datetime.strptime(busy_period["start"], "%Y-%m-%dT%H:%M:%SZ")
-                .replace(tzinfo=pytz.UTC)
-                .astimezone(est)
-            )
-            end = (
-                datetime.strptime(busy_period["end"], "%Y-%m-%dT%H:%M:%SZ")
-                .replace(tzinfo=pytz.UTC)
-                .astimezone(est)
-            )
+            # convert from iso 8601 standard to datetime
+            start = datetime.fromisoformat(busy_period["start"][:-1])
+            end = datetime.fromisoformat(busy_period["end"][:-1])
             busy_times.append((start, end))
     busy_times.sort(key=lambda x: x[0])
 
     for day_offset in range(days_in_future, days_in_future + search_days_limit):
         # Calculate the start and end times of the search window for the current day
-        search_date = datetime.now(tz=est) + timedelta(days=day_offset)
+        search_date = datetime.utcnow() + timedelta(days=day_offset)
 
         # Check if the day is Saturday (5) or Sunday (6) and skip it
         if search_date.weekday() in [5, 6]:
             continue
 
         search_start = search_date.replace(
-            hour=13, minute=0, second=0, microsecond=0
-        )  # 1 PM EST
+            hour=17, minute=0, second=0, microsecond=0
+        )  # 1 PM EST, times are in UTC
         search_end = search_date.replace(
-            hour=15, minute=0, second=0, microsecond=0
-        )  # 3 PM EST
+            hour=19, minute=0, second=0, microsecond=0
+        )  # 3 PM EST, times are in UTC
 
         # Attempt to find an available slot within this day's search window
         for current_time in (
@@ -139,6 +149,7 @@ def find_first_available_slot(
                 slot_end <= start or current_time >= end for start, end in busy_times
             ):
                 if slot_end <= search_end:
-                    return current_time, slot_end
+                    # return the time and convert them to EST timezone
+                    return current_time.astimezone(est), slot_end.astimezone(est)
 
     return None, None  # No available slot found after searching the limit
