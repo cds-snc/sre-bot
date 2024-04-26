@@ -17,17 +17,18 @@ def get_unique_users_from_groups(groups, key):
     Returns:
         list: A list of unique users from the groups
     """
-    users = set()
+    users_dict = {}
     if isinstance(groups, list):
         for group in groups:
-            group_users = filter_tools.get_nested_value(group, key)
-            if group_users:
-                users.update(str(user) for user in group_users)
+            for user in filter_tools.get_nested_value(group, key):
+                if user:
+                    users_dict[str(user)] = user
     elif isinstance(groups, dict):
-        group_users = filter_tools.get_nested_value(groups, key)
-        if group_users:
-            users.update(str(user) for user in group_users)
-    return [eval(user) for user in users]
+        for user in filter_tools.get_nested_value(groups, key):
+            if user:
+                users_dict[str(user)] = user
+
+    return list(users_dict.values())
 
 
 # def sync(source, target, **kwargs):
