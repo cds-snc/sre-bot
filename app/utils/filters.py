@@ -11,6 +11,8 @@ def filter_by_condition(list, condition):
 
 
 def get_nested_value(dictionary, key):
+    if key in dictionary:
+        return dictionary[key]
     try:
         return reduce(dict.get, key.split("."), dictionary)
     except TypeError:
