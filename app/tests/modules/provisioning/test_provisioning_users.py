@@ -51,4 +51,3 @@ def test_get_unique_users_from_dict_group_with_duplicate_key():
     assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
         expected_users, key=lambda user: user["id"]
     )
-
