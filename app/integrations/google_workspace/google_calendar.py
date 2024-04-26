@@ -36,7 +36,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "items": items,
     }
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
-    
+
     return execute_google_api_call(
         "calendar",
         "v3",

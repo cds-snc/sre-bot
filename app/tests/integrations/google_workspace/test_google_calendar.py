@@ -18,6 +18,7 @@ def event_details():
         }
     )
 
+
 # Fixture to mock the calendar service object
 @pytest.fixture
 def calendar_service_mock():
@@ -37,10 +38,12 @@ def calendar_service_mock():
 def est_timezone():
     return pytz.timezone("US/Eastern")
 
+
 @pytest.fixture
 def fixed_utc_now():
     # Return a fixed UTC datetime
     return datetime(2023, 4, 10, 12, 0)  # This is a Monday
+
 
 # Fixture to mock the datetime.now() function
 @pytest.fixture
@@ -250,7 +253,7 @@ def test_insert_event_api_call_error(
     assert not mock_handle_errors.called
 
 
-@patch('integrations.google_workspace.google_calendar.datetime')
+@patch("integrations.google_workspace.google_calendar.datetime")
 def test_available_slot_on_first_weekday(mock_datetime, fixed_utc_now, est_timezone):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
@@ -263,8 +266,8 @@ def test_available_slot_on_first_weekday(mock_datetime, fixed_utc_now, est_timez
             "primary": {
                 "busy": [
                     {
-                    "start": "2023-04-10T17:00:000Z",
-                    "end": "2023-04-10T17:30:000Z",
+                        "start": "2023-04-10T17:00:000Z",
+                        "end": "2023-04-10T17:30:000Z",
                     }
                 ]
             }
@@ -288,9 +291,9 @@ def test_available_slot_on_first_weekday(mock_datetime, fixed_utc_now, est_timez
     assert actual_start == expected_start_time
     assert actual_end == expected_end_time
 
-    
+
 # Test out the find_first_available_slot function when multiple busy days
-@patch('integrations.google_workspace.google_calendar.datetime')
+@patch("integrations.google_workspace.google_calendar.datetime")
 def test_opening_exists_after_busy_days(mock_datetime, fixed_utc_now, est_timezone):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
@@ -316,14 +319,14 @@ def test_opening_exists_after_busy_days(mock_datetime, fixed_utc_now, est_timezo
         day=fixed_utc_now.day + 9, hour=17, minute=0, second=0, microsecond=0
     ).astimezone(est_timezone)
     expected_end = expected_start + timedelta(minutes=30)
-    
+
     assert (
         start == expected_start and end == expected_end
     ), "Expected to find an available slot correctly."
 
 
 # Test that weekends are skipped when searching for available slots
-@patch('integrations.google_workspace.google_calendar.datetime')
+@patch("integrations.google_workspace.google_calendar.datetime")
 def test_skipping_weekends(mock_datetime, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
@@ -355,8 +358,10 @@ def test_skipping_weekends(mock_datetime, fixed_utc_now, est_timezone):
 
 
 # Test that no available slots are found within the search limit
-@patch('integrations.google_workspace.google_calendar.datetime')
-def test_no_available_slots_within_search_limit(mock_datetime, fixed_utc_now, est_timezone):
+@patch("integrations.google_workspace.google_calendar.datetime")
+def test_no_available_slots_within_search_limit(
+    mock_datetime, fixed_utc_now, est_timezone
+):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
     mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
