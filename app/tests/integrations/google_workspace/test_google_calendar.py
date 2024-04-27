@@ -44,6 +44,7 @@ def fixed_utc_now():
     # Return a fixed UTC datetime
     return datetime(2023, 4, 10, 12, 0)  # This is a Monday
 
+
 # Fixture to mock the datetime.now() function
 @pytest.fixture
 def mock_datetime_now(est_timezone):
@@ -68,10 +69,12 @@ def mock_datetime_now(est_timezone):
 def items():
     return [{"id": "calendar1"}, {"id": "calendar2"}]
 
+
 # Fixture to mock the year
 @pytest.fixture
 def mock_year():
     return 2024
+
 
 @patch(
     "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
@@ -325,9 +328,12 @@ def test_insert_event_api_call_error(
     assert mock_os_environ_get.called
     assert not mock_handle_errors.called
 
+
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays ,fixed_utc_now, mock_year, est_timezone):
+def test_available_slot_on_first_weekday(
+    mock_datetime, mock_federal_holidays, fixed_utc_now, mock_year, est_timezone
+):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = 2024
@@ -347,12 +353,10 @@ def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays ,f
             }
         }
     }
-    mock_federal_holidays.return_value = {"holidays": [
-            {"observedDate": "2024-01-01"},
-            {"observedDate": "2024-07-01"}
-        ]
+    mock_federal_holidays.return_value = {
+        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
     }
-    
+
     # Expected search date is three days in the future (which should be Thursday)
     # Busy period is from 1 PM to 1:30 PM EST on the first day being checked (April 13th)
     # The function should find an available slot after the busy period
@@ -374,7 +378,9 @@ def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays ,f
 # Test out the find_first_available_slot function when multiple busy days
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
+def test_opening_exists_after_busy_days(
+    mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone
+):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = 2024
@@ -393,13 +399,10 @@ def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fi
         }
     }
 
-    mock_federal_holidays.return_value = {"holidays": [
-            {"observedDate": "2024-01-01"},
-            {"observedDate": "2024-07-01"}
-        ]
+    mock_federal_holidays.return_value = {
+        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
     }
 
-    
     start, end = google_calendar.find_first_available_slot(
         freebusy_response, days_in_future=3, duration_minutes=30, search_days_limit=60
     )
@@ -416,7 +419,9 @@ def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fi
 # Test that weekends are skipped when searching for available slots
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_skipping_weekends(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
+def test_skipping_weekends(
+    mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone
+):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
     mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -430,10 +435,8 @@ def test_skipping_weekends(mock_datetime, mock_federal_holidays, fixed_utc_now, 
         }
     }
 
-    mock_federal_holidays.return_value = {"holidays": [
-            {"observedDate": "2024-01-01"},
-            {"observedDate": "2024-07-01"}
-        ]
+    mock_federal_holidays.return_value = {
+        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
     }
 
     # For this test, ensure the mocked 'now' falls before a weekend, and verify that the function skips to the next weekday
@@ -473,10 +476,8 @@ def test_no_available_slots_within_search_limit(
         }
     }
 
-    mock_federal_holidays.return_value = {"holidays": [
-            {"observedDate": "2024-01-01"},
-            {"observedDate": "2024-07-01"}
-        ]
+    mock_federal_holidays.return_value = {
+        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
     }
 
     start, end = google_calendar.find_first_available_slot(
@@ -495,10 +496,13 @@ def test_get_federal_holidays(requests_mock):
         "holidays": [
             {"observedDate": "2024-01-01"},
             {"observedDate": "2024-07-01"},
-            {"observedDate": "2024-12-25"}
+            {"observedDate": "2024-12-25"},
         ]
     }
-    requests_mock.get("https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024", json=mocked_response)
+    requests_mock.get(
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        json=mocked_response,
+    )
 
     # Call the function
     holidays = google_calendar.get_federal_holidays()
@@ -506,15 +510,21 @@ def test_get_federal_holidays(requests_mock):
     # Assert that the holidays are correctly parsed
     assert holidays == ["2024-01-01", "2024-07-01", "2024-12-25"]
 
+
 # test that holidays are correctly fetched for a different year
 def test_get_federal_holidays_with_different_year(requests_mock):
     # Mock the API response for a different year
-    requests_mock.get("https://canada-holidays.ca/api/v1/holidays?federal=true&year=2025", json={"holidays": []})
+    requests_mock.get(
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2025",
+        json={"holidays": []},
+    )
 
     # Patch datetime to control the current year
-    with patch('integrations.google_workspace.google_calendar.datetime') as mock_datetime:
+    with patch(
+        "integrations.google_workspace.google_calendar.datetime"
+    ) as mock_datetime:
         mock_datetime.now.return_value = datetime(2025, 1, 1)
-        
+
         # Call the function
         holidays = google_calendar.get_federal_holidays()
 
@@ -525,7 +535,10 @@ def test_get_federal_holidays_with_different_year(requests_mock):
 # Test that an empty list is returned when there are no holidays
 def test_api_returns_empty_list(requests_mock):
     # Mock no holidays
-    requests_mock.get("https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024", json={"holidays": []})
+    requests_mock.get(
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        json={"holidays": []},
+    )
 
     # Execute
     holidays = google_calendar.get_federal_holidays()
@@ -537,11 +550,16 @@ def test_api_returns_empty_list(requests_mock):
 # Test that a leap year is correctly handled
 def test_leap_year_handling(requests_mock):
     # Mock response for a leap year with an extra day
-    requests_mock.get("https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024", json={
-        "holidays": [
-            {"observedDate": "2024-02-29"}  # Assuming this is a special leap year holiday
-        ]
-    })
+    requests_mock.get(
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        json={
+            "holidays": [
+                {
+                    "observedDate": "2024-02-29"
+                }  # Assuming this is a special leap year holiday
+            ]
+        },
+    )
 
     # Execute
     holidays = google_calendar.get_federal_holidays()

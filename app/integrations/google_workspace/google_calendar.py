@@ -14,7 +14,6 @@ from integrations.utils.api import convert_string_to_camel_case
 SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
 
 
-
 @handle_google_api_errors
 def get_freebusy(time_min, time_max, items, **kwargs):
     """Returns free/busy information for a set of calendars.
@@ -128,7 +127,7 @@ def find_first_available_slot(
 
     # get the list of Canandian federal holidays
     federal_holidays = get_federal_holidays()
-    
+
     for day_offset in range(days_in_future, days_in_future + search_days_limit):
         # Calculate the start and end times of the search window for the current day
         search_date = datetime.utcnow() + timedelta(days=day_offset)
@@ -147,7 +146,7 @@ def find_first_available_slot(
         # if the day is a federal holiday, skip it
         if search_date.date().strftime("%Y-%m-%d") in federal_holidays:
             continue
-        
+
         # Attempt to find an available slot within this day's search window
         for current_time in (
             search_start + timedelta(minutes=i) for i in range(0, 121, duration_minutes)
@@ -162,17 +161,18 @@ def find_first_available_slot(
 
     return None, None  # No available slot found after searching the limit
 
+
 def get_federal_holidays():
     # Get the public holidays for the current year
-    # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api) 
+    # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api)
 
     # get today's year
     year = datetime.now().year
-    
+
     # call the api to get the public holidays
     url = f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={year}"
     response = requests.get(url)
-    
+
     # Store the observed dates of the holidays and return the list
     holidays = []
     for holiday in response.json()["holidays"]:
