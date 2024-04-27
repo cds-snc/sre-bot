@@ -491,6 +491,9 @@ def test_no_available_slots_within_search_limit(
 
 # test that the federal holidays are correctly parsed
 def test_get_federal_holidays(requests_mock):
+    # set the timeout to 10s
+    requests_mock.DEFAULT_TIMEOUT = 10
+    
     # Mock the API response
     mocked_response = {
         "holidays": [
@@ -513,6 +516,9 @@ def test_get_federal_holidays(requests_mock):
 
 # test that holidays are correctly fetched for a different year
 def test_get_federal_holidays_with_different_year(requests_mock):
+    # set the timeout to 10s
+    requests_mock.DEFAULT_TIMEOUT = 10
+    
     # Mock the API response for a different year
     requests_mock.get(
         "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2025",
@@ -534,6 +540,9 @@ def test_get_federal_holidays_with_different_year(requests_mock):
 
 # Test that an empty list is returned when there are no holidays
 def test_api_returns_empty_list(requests_mock):
+     # set the timeout to 10s
+    requests_mock.DEFAULT_TIMEOUT = 10
+    
     # Mock no holidays
     requests_mock.get(
         "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
@@ -549,6 +558,8 @@ def test_api_returns_empty_list(requests_mock):
 
 # Test that a leap year is correctly handled
 def test_leap_year_handling(requests_mock):
+    # set the timeout to 10s
+    requests_mock.DEFAULT_TIMEOUT = 10
     # Mock response for a leap year with an extra day
     requests_mock.get(
         "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
@@ -558,7 +569,7 @@ def test_leap_year_handling(requests_mock):
                     "observedDate": "2024-02-29"
                 }  # Assuming this is a special leap year holiday
             ]
-        },
+        }
     )
 
     # Execute

@@ -171,7 +171,7 @@ def get_federal_holidays():
 
     # call the api to get the public holidays
     url = f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={year}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
 
     # Store the observed dates of the holidays and return the list
     holidays = []
