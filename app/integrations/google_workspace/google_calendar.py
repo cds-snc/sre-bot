@@ -164,7 +164,7 @@ def find_first_available_slot(
 
 def get_federal_holidays():
     # Get the public holidays for the current year
-    # Uses Paul Craig's Public holidays api to retrieve the federal holidays 
+    # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api) 
 
     # get today's year
     year = datetime.now().year
