@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-
+import requests
 import pytz
 
 from integrations.google_workspace.google_service import (
@@ -125,6 +125,9 @@ def find_first_available_slot(
             busy_times.append((start, end))
     busy_times.sort(key=lambda x: x[0])
 
+    # get the list of Canandian federal holidays
+    federal_holidays = get_federal_holidays()
+
     for day_offset in range(days_in_future, days_in_future + search_days_limit):
         # Calculate the start and end times of the search window for the current day
         search_date = datetime.utcnow() + timedelta(days=day_offset)
@@ -140,6 +143,10 @@ def find_first_available_slot(
             hour=19, minute=0, second=0, microsecond=0
         )  # 3 PM EST, times are in UTC
 
+        # if the day is a federal holiday, skip it
+        if search_date.date().strftime("%Y-%m-%d") in federal_holidays:
+            continue
+
         # Attempt to find an available slot within this day's search window
         for current_time in (
             search_start + timedelta(minutes=i) for i in range(0, 121, duration_minutes)
@@ -153,3 +160,21 @@ def find_first_available_slot(
                     return current_time.astimezone(est), slot_end.astimezone(est)
 
     return None, None  # No available slot found after searching the limit
+
+
+def get_federal_holidays():
+    # Get the public holidays for the current year
+    # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api)
+
+    # get today's year
+    year = datetime.now().year
+
+    # call the api to get the public holidays
+    url = f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={year}"
+    response = requests.get(url, timeout=10)
+
+    # Store the observed dates of the holidays and return the list
+    holidays = []
+    for holiday in response.json()["holidays"]:
+        holidays.append(holiday["observedDate"])
+    return holidays
