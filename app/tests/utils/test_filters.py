@@ -210,7 +210,7 @@ def test_compare_list_with_complex_values_match_mode(
 
     target_values = aws_groups(5)
     target = {
-        "values": target_values["Groups"],
+        "values": target_values,
         "key": "DisplayName",
     }
 
