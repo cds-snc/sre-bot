@@ -1,6 +1,7 @@
 import os
 import logging
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
+from utils import filters
 
 INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
 INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
@@ -230,9 +231,15 @@ def list_groups_with_memberships(**kwargs):
     Returns:
         list: A list of group objects with their members.
     """
-    members_details = kwargs.get("members_details", True)
-    kwargs.pop("members_details", None)
+    members_details = kwargs.pop("members_details", True)
+    groups_filters = kwargs.pop("filters", [])
     groups = list_groups(**kwargs)
+
+    if not groups:
+        return []
+    for filter in groups_filters:
+        groups = filters.filter_by_condition(groups, filter)
+
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
         if group["GroupMemberships"] and members_details:
