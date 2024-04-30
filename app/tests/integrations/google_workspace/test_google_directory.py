@@ -345,14 +345,12 @@ def test_list_groups_with_members_filtered(
 ):
     groups = google_groups(2, prefix="test-")
     groups_to_filter_out = google_groups(4)[2:]
-    print(f"\nDEBUG GROUPS\n{json.dumps(groups, indent=2)}\nDEBUG GROUPS TO FILTER:\n{json.dumps(groups_to_filter_out, indent=2)}")
     groups.extend(groups_to_filter_out)
     group_members = [[], google_group_members(2)]
     users = google_users(2, prefix="test-")
 
     groups_with_users = google_groups_w_users(4, 2, prefix="test-")[:2]
     groups_with_users[0].pop("members", None)
-    print(f"\nDEBUG GROUPS WITH USERS\n{json.dumps(groups_with_users, indent=2)}")
 
     mock_list_groups.return_value = groups
     mock_list_group_members.side_effect = group_members
@@ -360,7 +358,9 @@ def test_list_groups_with_members_filtered(
     mock_filter_by_condition.return_value = groups[:2]
     filters = [lambda group: "test-" in group["name"]]
 
-    assert google_directory.list_groups_with_members(filters=filters) == groups_with_users
+    assert (
+        google_directory.list_groups_with_members(filters=filters) == groups_with_users
+    )
     assert mock_filter_by_condition.called_once_with(groups, filters)
     assert mock_list_group_members.call_count == 2
     assert mock_get_user.call_count == 2
