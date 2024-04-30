@@ -1,4 +1,3 @@
-import json
 import os
 from unittest.mock import call, patch  # type: ignore
 import pytest
@@ -824,9 +823,7 @@ def test_list_groups_with_memberships_filtered(
     aws_users,
 ):
     groups = aws_groups(2, prefix="test-")
-    print(f"DEBUG: groups:\n{json.dumps(groups, indent=2)}")
     groups_to_filter_out = aws_groups(4)[2:]
-    print(f"DEBUG: groups_to_filter_out:\n{json.dumps(groups_to_filter_out, indent=2)}")
     groups.extend(groups_to_filter_out)
     memberships = [
         [],
