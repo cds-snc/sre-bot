@@ -222,7 +222,7 @@ def test_execute_aws_api_call_non_paginated(
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -232,7 +232,7 @@ def test_execute_aws_api_call_non_paginated(
     )
 
     mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
-    mock_method.assert_called_once_with(arg1="value1")
+    mock_method.assert_called_once_with(Arg1="value1")
     assert result == {"key": "value"}
     mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
     mock_paginator.assert_not_called()
@@ -247,7 +247,7 @@ def test_execute_aws_api_call_paginated(
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_paginator.return_value = ["value1", "value2", "value3"]
 
     result = aws_client.execute_aws_api_call(
@@ -255,7 +255,10 @@ def test_execute_aws_api_call_paginated(
     )
 
     mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
-    mock_paginator.assert_called_once_with(mock_client, "some_method", arg1="value1")
+    mock_paginator.assert_called_once_with(
+        mock_client, "some_method", None, Arg1="value1"
+    )
+    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
     assert result == ["value1", "value2", "value3"]
 
 
@@ -267,7 +270,7 @@ def test_execute_aws_api_call_with_role_arn(
 ):
     mock_client = MagicMock()
     mock_assume_role_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"arg1": "value1"}
+    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -277,9 +280,10 @@ def test_execute_aws_api_call_with_role_arn(
     )
 
     mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
-    mock_method.assert_called_once_with(arg1="value1")
+    mock_method.assert_called_once_with(Arg1="value1")
     assert result == {"key": "value"}
     mock_paginator.assert_not_called()
+    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
 
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})

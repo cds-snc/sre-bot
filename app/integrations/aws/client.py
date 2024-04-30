@@ -94,7 +94,8 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
         ValueError: If the role_arn is not provided.
     """
 
-    role_arn = kwargs.get("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
+    role_arn = kwargs.pop("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
+    keys = kwargs.pop("keys", None)
     if role_arn is None:
         raise ValueError(
             "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
@@ -102,12 +103,11 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     if service_name is None or method is None:
         raise ValueError("The AWS service name and method must be provided")
     client = assume_role_client(service_name, role_arn)
-    kwargs.pop("role_arn", None)
     if kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
     if paginated:
-        return paginator(client, method, **kwargs)
+        return paginator(client, method, keys, **kwargs)
     else:
         return api_method(**kwargs)
 
