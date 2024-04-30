@@ -6,11 +6,32 @@ logger = logging.getLogger(__name__)
 
 
 def filter_by_condition(list, condition):
-    """Filter a list by a condition, keeping only the items that satisfy the condition."""
+    """Filter a list by a condition, keeping only the items that satisfy the condition.
+        Examples:
+
+        filter_by_condition([1, 2, 3, 4, 5], lambda x: x % 2 == 0)
+        Output: [2, 4]
+
+    Args:
+        list (list): The list to filter.
+        condition (function): The condition to apply to the items in the list.
+
+    Returns:
+        list: A list containing the items that satisfy the condition.
+    """
     return [item for item in list if condition(item)]
 
 
 def get_nested_value(dictionary, key):
+    """Get a nested value from a dictionary using a dot-separated key.
+
+    Args:
+        dictionary (dict): The dictionary to search.
+        key (str): The dot-separated key to search for.
+
+    Returns:
+        The value of the nested key in the dictionary, or None if the key is not found.
+    """
     if key in dictionary:
         return dictionary[key]
     try:
@@ -21,25 +42,30 @@ def get_nested_value(dictionary, key):
 
 
 def compare_lists(source, target, mode="sync", **kwargs):
-    """
-    Compare two lists and return specific elements based on the comparison.
+    """Compares two lists and returns specific elements based on the comparison mode and keys provided.
 
     Args:
-        `source (dict)`: Source system data. Must contain the keys 'values' (list) and 'key' (string).
-        `target (dict)`: Target system data. Must contain the keys 'values' (list) and 'key' (string).
-        `mode (str)`: The mode of operation. 'sync' for sync operation and 'match' for match operation.
+        `source (dict)`: Source data with `values` (list) and `key` (string).
+        `target (dict)`: Target data with `values` (list) and `key` (string).
+        `mode (str)`: Operation mode - `sync` or `match`.
 
-        **kwargs: Additional keyword arguments. Supported arguments are:
+        **kwargs: Additional arguments:
 
         - `filters (list)`: List of filters to apply to the users.
         - `enable_delete (bool)`: Enable the deletion of users in the target system.
         - `delete_target_all (bool)`: Mark all target system users for deletion.
 
-    Returns:
-        `tuple`:
-            In `sync` mode, a tuple containing the elements to add and the elements to remove in the target system.
+         In `sync` mode (default), the function returns:
 
-            In `match` mode, a tuple containing the elements that match between the source and target lists.
+            1. Elements in the source list but not in the target list (to be added to the target).
+            2. Elements in the target list but not in the source list (to be removed from the target).
+
+        In `match` mode, the function returns:
+
+            1. Elements present in both the source and target lists.
+
+    Returns:
+        tuple: Contains the elements as per the operation mode.
     """
     source_key = source.get("key", None)
     target_key = target.get("key", None)
