@@ -19,13 +19,15 @@ def get_unique_users_from_groups(groups, key):
     """
     users_dict = {}
     if isinstance(groups, list):
+        logger.info(f"Getting unique users from {len(groups)} groups.")
         for group in groups:
             for user in filter_tools.get_nested_value(group, key):
                 if user:
                     users_dict[str(user)] = user
     elif isinstance(groups, dict):
+        logger.info("Getting unique users from a single group.")
         for user in filter_tools.get_nested_value(groups, key):
             if user:
                 users_dict[str(user)] = user
-
+    logger.info(f"Found {len(users_dict)} unique users.")
     return list(users_dict.values())

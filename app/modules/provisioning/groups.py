@@ -1,6 +1,10 @@
+from logging import getLogger
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store
 from utils import filters as filter_tools
+
+
+logger = getLogger(__name__)
 
 
 def get_groups_with_members_from_integration(integration_source, **kwargs):
@@ -27,10 +31,12 @@ def get_groups_with_members_from_integration(integration_source, **kwargs):
     groups = []
     match integration_source:
         case "google_groups":
+            logger.info("Getting Google Groups with members.")
             groups = google_directory.list_groups_with_members(
                 query=query, members_details=members_details
             )
         case "aws_identity_center":
+            logger.info("Getting AWS Identity Center Groups with members.")
             groups = identity_store.list_groups_with_memberships(
                 members_details=members_details
             )
