@@ -1,3 +1,4 @@
+"""Module to sync the AWS Identity Center with the Google Workspace."""
 import json
 from logging import getLogger
 from integrations.aws import identity_store
@@ -10,8 +11,8 @@ logger = getLogger(__name__)
 
 def synchronize(**kwargs):
     """Sync the AWS Identity Center with the Google Workspace."""
-    sync_users = kwargs.get("sync_users", False)
-    sync_groups = kwargs.get("sync_groups", False)
+    sync_users = kwargs.get("sync_users", True)
+    sync_groups = kwargs.get("sync_groups", True)
     query = kwargs.get("query", "email:aws-*")
 
     users_sync_status = None
@@ -24,66 +25,45 @@ def synchronize(**kwargs):
     logger.info(f"Found {len(source_groups)} Source Groups")
 
     if sync_users:
-        source_users = users.get_unique_users_from_groups(source_groups, "members")
-
-        logger.info(f"Found {len(source_users)} Source Users")
-
-        target_users = identity_store.list_users()
-        logger.info(f"Found {len(target_users)} Target Users")
-
-        users_to_create, users_to_delete = filters.compare_lists(
-            {"values": source_users, "key": "primaryEmail"},
-            {"values": target_users, "key": "UserName"},
-            mode="sync",
-            enable_delete=True,
-        )
-        logger.info(f"{len(users_to_create)} Users to Create")
-        logger.info(f"{len(users_to_delete)} Users to Delete")
-
-        created_users = create_aws_users(users_to_create)
-        deleted_users = delete_aws_users(users_to_delete)
-
-        logger.info(
-            f"Users Sync Status: \n{len(created_users)} created\n{len(deleted_users)} deleted"
-        )
-        users_sync_status = created_users, deleted_users
+        users_sync_status = sync_identity_center_users(source_groups, **kwargs)
 
     if sync_groups:
-        target_groups = groups.get_groups_with_members_from_integration(
-            "aws_identity_center"
-        )
-        logger.info(f"Found {len(target_groups)} Target Groups")
-        logger.info("DEBUG: Target Groups")
-        logger.info(json.dumps(target_groups[0], indent=2))
-        for group in source_groups:
-            group["DisplayName"] = group["name"].replace("AWS-", "")
-        source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
-            {"values": source_groups, "key": "DisplayName"},
-            {"values": target_groups, "key": "DisplayName"},
-            mode="match",
-        )
-        logger.info(f"Found {len(source_groups_to_sync)} Source Groups to Sync")
-        logger.info(f"Found {len(target_groups_to_sync)} Target Groups to Sync")
-        for i in range(len(source_groups_to_sync)):
-            if (
-                source_groups_to_sync[i]["DisplayName"]
-                == target_groups_to_sync[i]["DisplayName"]
-            ):
-                users_to_add, users_to_remove = filters.compare_lists(
-                    {"values": source_groups_to_sync[i]["members"], "key": "email"},
-                    {
-                        "values": target_groups_to_sync[i]["GroupMemberships"],
-                        "key": "MemberId.UserName",
-                    },
-                    mode="sync",
-                )
-                logger.info(
-                    f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
-                )
-                create_group_memberships(source_groups_to_sync[i], users_to_add)
-                delete_group_memberships(
-                    target_groups_to_sync[i]["GroupId"], users_to_remove
-                )
+        groups_sync_status = sync_identity_center_groups(source_groups, **kwargs)
+        # target_groups = groups.get_groups_with_members_from_integration(
+        #     "aws_identity_center"
+        # )
+        # logger.info(f"Found {len(target_groups)} Target Groups")
+        # logger.info("DEBUG: Target Groups")
+        # logger.info(json.dumps(target_groups[0], indent=2))
+        # for group in source_groups:
+        #     group["DisplayName"] = group["name"].replace("AWS-", "")
+        # source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
+        #     {"values": source_groups, "key": "DisplayName"},
+        #     {"values": target_groups, "key": "DisplayName"},
+        #     mode="match",
+        # )
+        # logger.info(f"Found {len(source_groups_to_sync)} Source Groups to Sync")
+        # logger.info(f"Found {len(target_groups_to_sync)} Target Groups to Sync")
+        # for i in range(len(source_groups_to_sync)):
+        #     if (
+        #         source_groups_to_sync[i]["DisplayName"]
+        #         == target_groups_to_sync[i]["DisplayName"]
+        #     ):
+        #         users_to_add, users_to_remove = filters.compare_lists(
+        #             {"values": source_groups_to_sync[i]["members"], "key": "email"},
+        #             {
+        #                 "values": target_groups_to_sync[i]["GroupMemberships"],
+        #                 "key": "MemberId.UserName",
+        #             },
+        #             mode="sync",
+        #         )
+        #         logger.info(
+        #             f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
+        #         )
+        #         create_group_memberships(source_groups_to_sync[i], users_to_add)
+        #         delete_group_memberships(
+        #             target_groups_to_sync[i]["GroupId"], users_to_remove
+        #         )
 
     else:
         groups_sync_status = None
@@ -116,32 +96,122 @@ def create_aws_users(users_to_create):
 
 
 def delete_aws_users(users_to_delete):
-    """TODO: Function not currently implemented.
+    """Delete the users in the identity store.
 
-    Waiting for full users creation implementation as it has the potential to delete all users in the identity store.
-    """
+    Args:
+        users_to_delete (list): A list of users to delete.
+
+    Returns:
+        list: A list of users deleted."""
     users_deleted = []
     for user in users_to_delete:
-        # user_id = identity_store.get_user_id(user["UserName"])
-        logger.info(f"Deleting user:\n{json.dumps(user, indent=2)}")
-        # response = identity_store.delete_user(user["UserId"])
-        response = True
+        logger.info(f"Deleting user {user['UserName']} with id: {user['UserId']}")
+        response = identity_store.delete_user(user["UserId"])
         if response:
             users_deleted.append(user)
     return users_deleted
 
 
+def sync_identity_center_users(source_groups, **kwargs):
+    enable_delete = kwargs.get("enable_delete", False)
+    delete_target_all = kwargs.get("delete_target_all", False)
+
+    source_users = users.get_unique_users_from_groups(source_groups, "members")
+    logger.info(f"Found {len(source_users)} Source Users")
+
+    target_users = identity_store.list_users()
+    logger.info(f"Found {len(target_users)} Target Users")
+
+    users_to_create, users_to_delete = filters.compare_lists(
+        {"values": source_users, "key": "primaryEmail"},
+        {"values": target_users, "key": "UserName"},
+        mode="sync",
+        enable_delete=enable_delete,
+        delete_target_all=delete_target_all,
+    )
+    logger.info(
+        f"Identified {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
+    )
+
+    created_users = create_aws_users(users_to_create)
+    deleted_users = delete_aws_users(users_to_delete)
+
+    users_sync_status = created_users, deleted_users
+    return users_sync_status
+
+
 def create_group_memberships(group, users_to_add):
-    group_id = identity_store.get_group_id(group["DisplayName"])
+    memberships_created = []
     for user in users_to_add:
-        logger.info(f"Adding user {user['name']['givenName']} to group {group_id}")
-        identity_store.create_group_membership(group_id, user["UserId"])
+        logger.info(f"Adding user:\n{json.dumps(user, indent=2)}")
+        # membership_id = identity_store.create_group_membership(group_id, user["UserId"])
+        # memberships_created.append(membership_id)
+
+    return memberships_created
 
 
-def delete_group_memberships(group_id, users_to_remove):
+def delete_group_memberships(group, users_to_remove):
+    memberships_deleted = []
+    logger.info(f"DEBUG: Group {json.dumps(group, indent=2)}")
     for user in users_to_remove:
-        membership_id = identity_store.get_group_membership_id(group_id, user["UserId"])
-        if membership_id:
-            identity_store.delete_group_membership(membership_id)
-        logger.info(f"Deleting membership with ID {membership_id}")
-        # identity_store.delete_group_membership(membership_id)
+        # membership = filters.filter_by_condition(
+        #     group["GroupMemberships"],
+        #     lambda membership: membership["MemberId"]["UserName"]
+        #     == user["primaryEmail"],
+        # )
+        # if membership:
+        # logger.info(
+        #     f"Deleting user {user['name']['givenName']} from group {group['DisplayName']}"
+        # )
+        logger.info(f"Deleting user:\n{json.dumps(user, indent=2)}")
+
+        # response = identity_store.delete_group_membership(
+        #     membership["MembershipId"]
+        # )
+        # if response:
+        #     memberships_deleted.append(membership)
+    return memberships_deleted
+
+
+def sync_identity_center_groups(source_groups, **kwargs):
+    target_groups = groups.get_groups_with_members_from_integration(
+        "aws_identity_center"
+    )
+    logger.info(f"Found {len(target_groups)} Target Groups")
+    logger.info("DEBUG: Target Groups")
+    logger.info(json.dumps(target_groups[0], indent=2))
+    for group in source_groups:
+        group["DisplayName"] = group["name"].replace("AWS-", "")
+    source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
+        {"values": source_groups, "key": "DisplayName"},
+        {"values": target_groups, "key": "DisplayName"},
+        mode="match",
+    )
+    logger.info(f"Found {len(source_groups_to_sync)} Source Groups to Sync")
+    logger.info(f"Found {len(target_groups_to_sync)} Target Groups to Sync")
+    for i in range(len(source_groups_to_sync[:2])):
+        logger.info(f"DEBUG: {json.dumps(source_groups_to_sync[i], indent=2)}")
+        if (
+            source_groups_to_sync[i]["DisplayName"]
+            == target_groups_to_sync[i]["DisplayName"]
+        ):
+            users_to_add, users_to_remove = filters.compare_lists(
+                {"values": source_groups_to_sync[i]["members"], "key": "email"},
+                {
+                    "values": target_groups_to_sync[i]["GroupMemberships"],
+                    "key": "MemberId.UserName",
+                },
+                mode="sync",
+                enable_delete=True,
+            )
+            logger.info(
+                f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
+            )
+            groups_memberships_created = create_group_memberships(
+                target_groups_to_sync[i], users_to_add
+            )
+            groups_memberships_deleted = delete_group_memberships(
+                target_groups_to_sync[i], users_to_remove
+            )
+
+            return groups_memberships_created, groups_memberships_deleted
