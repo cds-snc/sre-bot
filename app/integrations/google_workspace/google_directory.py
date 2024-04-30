@@ -7,6 +7,7 @@ from integrations.google_workspace.google_service import (
     DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
 from integrations.utils.api import convert_string_to_camel_case
+from utils import filters
 
 
 @handle_google_api_errors
@@ -151,11 +152,15 @@ def list_groups_with_members(**kwargs):
     Returns:
         list: A list of group objects with members.
     """
-    members_details = kwargs.get("members_details", True)
-    kwargs.pop("members_details", None)
+    members_details = kwargs.pop("members_details", True)
     groups = list_groups(**kwargs)
+    groups_filters = kwargs.pop("filters", [])
     if not groups:
         return []
+
+    for filter in groups_filters:
+        groups = filters.filter_by_condition(groups, filter)
+
     for group in range(len(groups)):
         members = list_group_members(groups[group]["email"])
         if members and members_details:
