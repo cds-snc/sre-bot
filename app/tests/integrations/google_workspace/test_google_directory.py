@@ -1,4 +1,5 @@
 """Unit tests for google_directory module."""
+import json
 from unittest.mock import patch
 from integrations.google_workspace import google_directory
 
@@ -326,6 +327,41 @@ def test_list_groups_with_members(
     mock_get_user.side_effect = users
 
     assert google_directory.list_groups_with_members() == groups_with_users
+
+
+@patch("integrations.google_workspace.google_directory.filters.filter_by_condition")
+@patch("integrations.google_workspace.google_directory.list_groups")
+@patch("integrations.google_workspace.google_directory.list_group_members")
+@patch("integrations.google_workspace.google_directory.get_user")
+def test_list_groups_with_members_filtered(
+    mock_get_user,
+    mock_list_group_members,
+    mock_list_groups,
+    mock_filter_by_condition,
+    google_groups,
+    google_group_members,
+    google_users,
+    google_groups_w_users,
+):
+    groups = google_groups(2, prefix="test-")
+    groups_to_filter_out = google_groups(4)[2:]
+    groups.extend(groups_to_filter_out)
+    group_members = [[], google_group_members(2)]
+    users = google_users(2, prefix="test-")
+
+    groups_with_users = google_groups_w_users(4, 2, prefix="test-")[:2]
+    groups_with_users[0].pop("members", None)
+
+    mock_list_groups.return_value = groups
+    mock_list_group_members.side_effect = group_members
+    mock_get_user.side_effect = users
+    mock_filter_by_condition.return_value = groups[:2]
+    filters = [lambda group: "test-" in group["name"]]
+
+    assert google_directory.list_groups_with_members(filters=filters) == groups_with_users
+    assert mock_filter_by_condition.called_once_with(groups, filters)
+    assert mock_list_group_members.call_count == 2
+    assert mock_get_user.call_count == 2
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")
