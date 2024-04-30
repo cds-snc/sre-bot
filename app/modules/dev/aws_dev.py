@@ -3,7 +3,6 @@ import json
 import logging
 from modules.aws import sync_identity_center
 
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,10 +10,11 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def aws_dev_command(client, body, respond):
-    response = sync_identity_center.synchronize()
-    logger.info(json.dumps(response, indent=2))
+def aws_dev_command(ack, client, body, respond):
+    ack()
+    response = sync_identity_center.synchronize(sync_groups=True)
     if not response:
         respond("No groups found.")
-        return
-    respond(json.dumps(response, indent=2))
+    else:
+        logger.info(json.dumps(response, indent=2))
+        # respond(json.dumps(response[0], indent=2))
