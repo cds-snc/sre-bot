@@ -1,5 +1,4 @@
 """Unit tests for google_directory module."""
-import json
 from unittest.mock import patch
 from integrations.google_workspace import google_directory
 
