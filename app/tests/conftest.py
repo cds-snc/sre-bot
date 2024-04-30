@@ -115,30 +115,28 @@ def aws_users():
 @pytest.fixture
 def aws_groups():
     def _aws_groups(n=3, prefix="", store_id="d-123412341234"):
-        return {
-            "Groups": [
-                {
-                    "GroupId": f"{prefix}aws-group_id{i+1}",
-                    "DisplayName": f"{prefix}group-name{i+1}",
-                    "Description": f"A group to test resolving AWS-group{i+1} memberships",
-                    "IdentityStoreId": f"{store_id}",
-                }
-                for i in range(n)
-            ]
-        }
+        return [
+            {
+                "GroupId": f"{prefix}aws-group_id{i+1}",
+                "DisplayName": f"{prefix}group-name{i+1}",
+                "Description": f"A group to test resolving AWS-group{i+1} memberships",
+                "IdentityStoreId": f"{store_id}",
+            }
+            for i in range(n)
+        ]
 
     return _aws_groups
 
 
 @pytest.fixture
 def aws_groups_memberships():
-    def _aws_groups_memberships(n=3, prefix="", store_id="d-123412341234"):
+    def _aws_groups_memberships(n=3, prefix="", group_id=1, store_id="d-123412341234"):
         return {
             "GroupMemberships": [
                 {
                     "IdentityStoreId": f"{store_id}",
                     "MembershipId": f"{prefix}membership_id_{i+1}",
-                    "GroupId": f"{prefix}aws-group_id{i+1}",
+                    "GroupId": f"{prefix}aws-group_id{group_id}",
                     "MemberId": {
                         "UserId": f"{prefix}user_id{i+1}",
                     },
@@ -155,15 +153,16 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
     def _aws_groups_w_users(
         n_groups=1, n_users=3, prefix="", domain="test.com", store_id="d-123412341234"
     ):
-        groups = aws_groups(n_groups, prefix, store_id)["Groups"]
+        groups = aws_groups(n_groups, prefix, store_id)
         users = aws_users(n_users, prefix, domain, store_id)
-        memberships = aws_groups_memberships(n_groups, prefix, store_id)[
-            "GroupMemberships"
-        ]
-        for group, membership in zip(groups, memberships):
-            group.update(membership)
+        for i, group in enumerate(groups):
+            memberships = aws_groups_memberships(n_users, prefix, i + 1, store_id)[
+                "GroupMemberships"
+            ]
+            group.update(memberships[0])
             group["GroupMemberships"] = [
-                {**membership, "MemberId": user} for user in users
+                {**membership, "MemberId": user}
+                for user, membership in zip(users, memberships)
             ]
         return groups
 
