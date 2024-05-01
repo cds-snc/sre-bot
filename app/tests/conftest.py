@@ -159,7 +159,6 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
             memberships = aws_groups_memberships(n_users, prefix, i + 1, store_id)[
                 "GroupMemberships"
             ]
-            group.update(memberships[0])
             group["GroupMemberships"] = [
                 {**membership, "MemberId": user}
                 for user, membership in zip(users, memberships)
