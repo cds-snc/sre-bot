@@ -159,6 +159,7 @@ def create_group_memberships(group, users_to_add, target_users):
             lambda target_user: target_user["UserName"] == user["primaryEmail"],
         )
         if not matching_target_user:
+            logger.info(f"User {user['primaryEmail']} not found in the target system")
             continue
         membership_id = identity_store.create_group_membership(
             group["GroupId"], matching_target_user["UserId"]
