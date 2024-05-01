@@ -244,7 +244,6 @@ def test_create_group_memberships_with_empty_target_users(
     mock_filter_by_condition,
     mock_logger,
     aws_groups,
-    aws_users,
     google_users,
 ):
     group = aws_groups(1)[0]
@@ -297,6 +296,50 @@ def test_create_group_memberships_with_empty_users_to_add(
     assert mock_create_group_membership.call_count == 0
     assert mock_filter_by_condition.call_count == 0
     assert mock_logger.info.call_count == 0
+
+
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.filters.filter_by_condition")
+@patch("modules.aws.sync_identity_center.identity_store.create_group_membership")
+def test_create_group_memberships_matching_user_not_found(
+    mock_create_group_membership,
+    mock_filter_by_condition,
+    mock_logger,
+    aws_groups,
+    aws_users,
+    google_users,
+):
+    group = aws_groups(1)[0]
+    target_users = aws_users(2)
+    users_to_add = google_users(3)
+    mock_filter_by_condition.side_effect = [
+        target_users[0],
+        target_users[1],
+        None,
+    ]
+
+    mock_create_group_membership.side_effect = [
+        "membership1",
+        "membership2",
+    ]
+
+    result = sync_identity_center.create_group_memberships(
+        group, users_to_add, target_users
+    )
+
+    assert result == ["membership1", "membership2"]
+    for user in users_to_add[:2]:
+        print(f"Adding user {user['name']['fullName']} to group {group['DisplayName']}")
+        mock_logger.info.assert_any_call(
+            f"Added user {user['name']['fullName']} to group {group['DisplayName']}"
+        )
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[0]["UserId"]
+        )
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[1]["UserId"]
+        )
+    mock_logger.info.assert_any_call(f"User {users_to_add[2]['primaryEmail']} not found in the target system")
 
 
 # @patch("modules.aws.sync_identity_center.sync_aws_groups_members")
