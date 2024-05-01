@@ -49,6 +49,9 @@ def synchronize(**kwargs):
     if sync_users:
         users_sync_status = sync_identity_center_users(source_users, **kwargs)
 
+    else:
+        users_sync_status = None
+
     if sync_groups:
         groups_sync_status = sync_identity_center_groups(
             source_groups, target_groups, target_users, **kwargs
