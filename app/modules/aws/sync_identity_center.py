@@ -10,7 +10,16 @@ logger = getLogger(__name__)
 
 
 def synchronize(**kwargs):
-    """Sync the AWS Identity Center with the Google Workspace."""
+    """Sync the AWS Identity Center with the Google Workspace.
+
+    Args:
+        sync_users (bool): Toggle to sync users.
+        sync_groups (bool): Toggle to sync groups.
+        query (str): The query to filter the Google Groups.
+
+    Returns:
+        tuple: A tuple containing the users sync status and groups sync status.
+    """
     sync_users = kwargs.get("sync_users", True)
     sync_groups = kwargs.get("sync_groups", True)
     query = kwargs.get("query", "email:aws-*")
@@ -82,7 +91,8 @@ def delete_aws_users(users_to_delete):
         users_to_delete (list): A list of users to delete.
 
     Returns:
-        list: A list of users deleted."""
+        list: A list of users deleted.
+    """
     users_deleted = []
     for user in users_to_delete:
         logger.info(f"Deleting user {user['UserName']} with id: {user['UserId']}")
@@ -93,6 +103,18 @@ def delete_aws_users(users_to_delete):
 
 
 def sync_identity_center_users(source_users, target_users, **kwargs):
+    """Sync the users in the identity store.
+
+    Args:
+
+        source_users (list): A list of users from the source system.
+        target_users (list): A list of users in the identity store.
+        enable_delete (bool): Enable deletion of users.
+        delete_target_all (bool): Mark all target users for deletion.
+
+    Returns:
+        tuple: A tuple containing the users created and deleted.
+    """
     enable_delete = kwargs.get("enable_delete", False)
     delete_target_all = kwargs.get("delete_target_all", False)
 
@@ -115,12 +137,23 @@ def sync_identity_center_users(source_users, target_users, **kwargs):
 
 
 def create_group_memberships(group, users_to_add, target_users):
+    """Create group memberships for the users in the identity store.
+
+    Args:
+        group (dict): The group to add the users to.
+        users_to_add (list): A list of users to add to the group.
+        target_users (list): A list of users in the identity store.
+
+    Returns:
+        list: A list of memberships created.
+    """
     memberships_created = []
     if not target_users:
         return memberships_created
     for user in users_to_add:
         matching_target_user = filters.filter_by_condition(
-            target_users, lambda target_user: target_user["UserName"] == user["primaryEmail"]
+            target_users,
+            lambda target_user: target_user["UserName"] == user["primaryEmail"],
         )
         if not matching_target_user:
             continue

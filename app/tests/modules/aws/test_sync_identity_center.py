@@ -225,9 +225,15 @@ def test_create_group_memberships(
         mock_logger.info.assert_any_call(
             f"Added user {user['name']['fullName']} to group {group['DisplayName']}"
         )
-        mock_create_group_membership.assert_any_call(group["GroupId"], target_users[0]["UserId"])
-        mock_create_group_membership.assert_any_call(group["GroupId"], target_users[1]["UserId"])
-        mock_create_group_membership.assert_any_call(group["GroupId"], target_users[2]["UserId"])
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[0]["UserId"]
+        )
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[1]["UserId"]
+        )
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[2]["UserId"]
+        )
 
 
 @patch("modules.aws.sync_identity_center.logger")
