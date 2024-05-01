@@ -95,7 +95,7 @@ def test_compare_lists_default():
     assert users_to_delete == []
 
 
-def test_compare_lists_with_different_values_enable_delete_true():
+def test_compare_lists_with_different_values():
     source = {
         "key": "userName",
         "values": [{"userName": "user1"}, {"userName": "user2"}],
@@ -105,55 +105,9 @@ def test_compare_lists_with_different_values_enable_delete_true():
         "values": [{"DisplayName": "user1"}, {"DisplayName": "user3"}],
     }
 
-    users_to_create, users_to_delete = filters.compare_lists(
-        source, target, enable_delete=True
-    )
+    users_to_create, users_to_delete = filters.compare_lists(source, target)
     assert users_to_create == [{"userName": "user2"}]
     assert users_to_delete == [{"DisplayName": "user3"}]
-
-
-def test_compare_lists_with_different_values_enable_delete_false():
-    source = {
-        "key": "userName",
-        "values": [{"userName": "user1"}, {"userName": "user2"}],
-    }
-    target = {
-        "key": "DisplayName",
-        "values": [{"DisplayName": "user1"}, {"DisplayName": "user3"}],
-    }
-
-    users_to_create, users_to_delete = filters.compare_lists(
-        source, target, enable_delete=False
-    )
-    assert users_to_create == [{"userName": "user2"}]
-    assert users_to_delete == []
-
-
-def test_compare_lists_with_different_values_delete_target_all_true():
-    source = {
-        "key": "userName",
-        "values": [{"userName": "user1"}, {"userName": "user2"}],
-    }
-    target = {
-        "key": "DisplayName",
-        "values": [
-            {"DisplayName": "user1"},
-            {"DisplayName": "user2"},
-            {"DisplayName": "user3"},
-            {"DisplayName": "user4"},
-        ],
-    }
-
-    users_to_create, users_to_delete = filters.compare_lists(
-        source, target, delete_target_all=True
-    )
-    assert users_to_create == []
-    assert users_to_delete == [
-        {"DisplayName": "user1"},
-        {"DisplayName": "user2"},
-        {"DisplayName": "user3"},
-        {"DisplayName": "user4"},
-    ]
 
 
 def test_compare_lists_match_mode():
@@ -197,9 +151,7 @@ def test_compare_lists_missing_key():
     assert response == ([], [])
 
 
-def test_compare_list_with_complex_values_match_mode(
-    google_groups, aws_groups, google_users, aws_users
-):
+def test_compare_list_with_complex_values_match_mode(google_groups, aws_groups):
     prefix = "aws-"
     source_values = google_groups(3, prefix, "test.com")
     for value in source_values:
@@ -226,6 +178,6 @@ def test_compare_list_with_complex_values_sync_mode(google_users, aws_users):
     source = {"values": source_users, "key": "primaryEmail"}
     target = {"values": target_users, "key": "UserName"}
 
-    response = filters.compare_lists(source, target, mode="sync", enable_delete=True)
+    response = filters.compare_lists(source, target, mode="sync")
 
     assert response == ([], target["values"][3:])
