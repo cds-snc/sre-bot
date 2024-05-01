@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch, call
 from modules.aws import sync_identity_center
 
@@ -470,3 +471,116 @@ def test_create_group_memberships_matching_user_not_found(
     mock_logger.info.assert_any_call(
         f"User {users_to_add[2]['primaryEmail']} not found in the target system"
     )
+
+
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
+def test_delete_group_memberships(
+    mock_delete_group_membership,
+    mock_logger,
+    aws_users,
+    aws_groups_w_users,
+):
+    group = aws_groups_w_users(1, 6)[0]
+    users_to_remove = aws_users(3)
+
+    mock_delete_group_membership.side_effect = [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+    ]
+
+    result = sync_identity_center.delete_group_memberships(group, users_to_remove)
+
+    assert result == [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+    ]
+    assert mock_delete_group_membership.call_count == 3
+    for user in users_to_remove:
+        mock_logger.info.assert_any_call(
+            f"Removing user {user['UserName']} from group {group['DisplayName']}"
+        )
+        mock_logger.info.assert_any_call(
+            f"Removed user {user['UserName']} from group {group['DisplayName']}"
+        )
+
+
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
+def test_delete_group_memberships_with_missing_users(
+    mock_delete_group_membership,
+    mock_logger,
+    aws_users,
+    aws_groups_w_users,
+):
+    group = aws_groups_w_users(1, 6)[0]
+    users_to_remove = aws_users(3)
+    missing_users_to_remove = aws_users(3, prefix="missing-")
+    users_to_remove.extend(missing_users_to_remove)
+
+    mock_delete_group_membership.side_effect = [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+    ]
+
+    result = sync_identity_center.delete_group_memberships(group, users_to_remove)
+
+    assert result == [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+    ]
+    assert mock_delete_group_membership.call_count == 3
+
+    for user in users_to_remove[:3]:
+        mock_logger.info.assert_any_call(
+            f"Removing user {user['UserName']} from group {group['DisplayName']}"
+        )
+        mock_logger.info.assert_any_call(
+            f"Removed user {user['UserName']} from group {group['DisplayName']}"
+        )
+    for missing_user in missing_users_to_remove:
+        mock_logger.warn.assert_any_call(
+            f"User {missing_user['UserName']} not found in group {group['DisplayName']}"
+        )
+
+
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
+def test_delete_group_memberships_failed(
+    mock_delete_group_membership,
+    mock_logger,
+    aws_users,
+    aws_groups_w_users,
+):
+    group = aws_groups_w_users(1, 6)[0]
+    users_to_remove = aws_users(3)
+
+    mock_delete_group_membership.side_effect = [
+        "membership_id_1",
+        None,
+        "membership_id_3",
+    ]
+
+    result = sync_identity_center.delete_group_memberships(group, users_to_remove)
+
+    assert result == [
+        "membership_id_1",
+        "membership_id_3",
+    ]
+    assert mock_delete_group_membership.call_count == 3
+    for i in range(len(users_to_remove)):
+        mock_logger.info.assert_any_call(
+            f"Removing user {users_to_remove[i]['UserName']} from group {group['DisplayName']}"
+        )
+        if i == 1:
+            mock_logger.error.assert_any_call(
+                f"Failed to remove user {users_to_remove[i]['UserName']} from group {group['DisplayName']}"
+            )
+        else:
+            mock_logger.info.assert_any_call(
+                f"Removed user {users_to_remove[i]['UserName']} from group {group['DisplayName']}"
+            )

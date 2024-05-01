@@ -60,7 +60,6 @@ def synchronize(**kwargs):
     else:
         groups_sync_status = None
 
-    # return users_sync_status, groups_sync_status
     return users_sync_status, groups_sync_status
 
 
@@ -191,23 +190,31 @@ def create_group_memberships(group, users_to_add, target_users):
 
 def delete_group_memberships(group, users_to_remove):
     memberships_deleted = []
+    current_memberships = {
+        membership["MemberId"]["UserId"]: membership["MembershipId"]
+        for membership in group["GroupMemberships"]
+    }
     for user in users_to_remove:
-        # membership = filters.filter_by_condition(
-        #     group["GroupMemberships"],
-        #     lambda membership: membership["MemberId"]["UserName"]
-        #     == user["primaryEmail"],
-        # )
-        # if membership:
-        # logger.info(
-        #     f"Deleting user {user['name']['givenName']} from group {group['DisplayName']}"
-        # )
-        logger.info(f"Deleting user:\n{json.dumps(user, indent=2)}")
-
-        # response = identity_store.delete_group_membership(
-        #     membership["MembershipId"]
-        # )
-        # if response:
-        #     memberships_deleted.append(membership)
+        if user["UserId"] in current_memberships:
+            logger.info(
+                f"Removing user {user['UserName']} from group {group['DisplayName']}"
+            )
+            response = identity_store.delete_group_membership(
+                current_memberships[user["UserId"]]
+            )
+            if response:
+                memberships_deleted.append(response)
+                logger.info(
+                    f"Removed user {user['UserName']} from group {group['DisplayName']}"
+                )
+            else:
+                logger.error(
+                    f"Failed to remove user {user['UserName']} from group {group['DisplayName']}"
+                )
+        else:
+            logger.warn(
+                f"User {user['UserName']} not found in group {group['DisplayName']}"
+            )
     return memberships_deleted
 
 
