@@ -248,7 +248,7 @@ def sync_identity_center_groups(source_groups, target_groups, target_users, **kw
                 f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
             )
             groups_memberships_created = create_group_memberships(
-                target_groups_to_sync[i], users_to_add
+                target_groups_to_sync[i], users_to_add, target_users
             )
             groups_memberships_deleted = delete_group_memberships(
                 target_groups_to_sync[i], users_to_remove
