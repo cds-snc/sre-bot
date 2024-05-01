@@ -73,21 +73,25 @@ def create_aws_users(users_to_create):
     Returns:
         list: A list of ID of the users created.
     """
+    logger.info(f"Starting creation of {len(users_to_create)} users.")
     users_created = []
     for user in users_to_create:
-        logger.info(
-            f"Creating user {user['name']['givenName']} {user['name']['familyName']}, primary email: {user['primaryEmail']}"
-        )
+        logger.info(f"Attempting to create user: {user['primaryEmail']}")
         response = identity_store.create_user(
             user["primaryEmail"], user["name"]["givenName"], user["name"]["familyName"]
         )
         if response:
+            logger.info(f"Created user: {user['primaryEmail']}")
             users_created.append(response)
-
+        else:
+            logger.error(f"Failed to create user: {user['primaryEmail']}")
+    logger.info(
+        f"Finished creation of users. Total users created: {len(users_created)}."
+    )
     return users_created
 
 
-def delete_aws_users(users_to_delete):
+def delete_aws_users(users_to_delete, enable_delete=False):
     """Delete the users in the identity store.
 
     Args:
@@ -96,12 +100,22 @@ def delete_aws_users(users_to_delete):
     Returns:
         list: A list of users deleted.
     """
+    logger.info(f"Starting deletion of {len(users_to_delete)} users.")
     users_deleted = []
     for user in users_to_delete:
-        logger.info(f"Deleting user {user['UserName']} with id: {user['UserId']}")
-        response = identity_store.delete_user(user["UserId"])
-        if response:
-            users_deleted.append(user)
+        if not enable_delete:
+            logger.info(f"Deleting user (dry-run): {user['UserName']}")
+        else:
+            logger.info(f"Attempting to delete user: {user['UserName']}")
+            response = identity_store.delete_user(user["UserId"])
+            if response:
+                logger.info(f"Deleted user: {user['UserName']}")
+                users_deleted.append(user)
+            else:
+                logger.error(f"Failed to delete user: {user['UserName']}")
+    logger.info(
+        f"Finished deletion of users. Total users deleted: {len(users_deleted)}."
+    )
     return users_deleted
 
 
@@ -121,19 +135,21 @@ def sync_identity_center_users(source_users, target_users, **kwargs):
     enable_delete = kwargs.get("enable_delete", False)
     delete_target_all = kwargs.get("delete_target_all", False)
 
-    users_to_create, users_to_delete = filters.compare_lists(
-        {"values": source_users, "key": "primaryEmail"},
-        {"values": target_users, "key": "UserName"},
-        mode="sync",
-        enable_delete=enable_delete,
-        delete_target_all=delete_target_all,
-    )
+    if delete_target_all:
+        users_to_delete = target_users
+        users_to_create = []
+    else:
+        users_to_create, users_to_delete = filters.compare_lists(
+            {"values": source_users, "key": "primaryEmail"},
+            {"values": target_users, "key": "UserName"},
+            mode="sync",
+        )
     logger.info(
         f"Identified {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
     )
 
     created_users = create_aws_users(users_to_create)
-    deleted_users = delete_aws_users(users_to_delete)
+    deleted_users = delete_aws_users(users_to_delete, enable_delete=enable_delete)
 
     users_sync_status = created_users, deleted_users
     return users_sync_status
@@ -152,6 +168,7 @@ def create_group_memberships(group, users_to_add, target_users):
     """
     memberships_created = []
     if not target_users:
+        logger.warn("No users found in the target system")
         return memberships_created
     for user in users_to_add:
         matching_target_user = filters.filter_by_condition(
@@ -174,7 +191,6 @@ def create_group_memberships(group, users_to_add, target_users):
 
 def delete_group_memberships(group, users_to_remove):
     memberships_deleted = []
-    logger.info(f"DEBUG: Group {json.dumps(group, indent=2)}")
     for user in users_to_remove:
         # membership = filters.filter_by_condition(
         #     group["GroupMemberships"],
