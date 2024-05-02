@@ -1,5 +1,4 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
-import json
 from logging import getLogger
 from integrations.aws import identity_store
 from modules.provisioning import users, groups
@@ -34,7 +33,7 @@ def synchronize(**kwargs):
     source_users = users.get_unique_users_from_groups(source_groups, "members")
 
     logger.info(
-        f"Found {len(source_groups)} Source Groups and {len(source_users)} Users"
+        f"synchronize:Found {len(source_groups)} Source Groups and {len(source_users)} Users"
     )
 
     target_groups = groups.get_groups_with_members_from_integration(
@@ -43,7 +42,7 @@ def synchronize(**kwargs):
     target_users = identity_store.list_users()
 
     logger.info(
-        f"Found {len(target_groups)} Target Groups and {len(target_users)} Users"
+        f"synchronize:Found {len(target_groups)} Target Groups and {len(target_users)} Users"
     )
 
     if sync_users:
@@ -144,14 +143,13 @@ def sync_identity_center_users(source_users, target_users, **kwargs):
             mode="sync",
         )
     logger.info(
-        f"Identified {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
+        f"synchronize:users:Found {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
     )
 
     created_users = create_aws_users(users_to_create)
     deleted_users = delete_aws_users(users_to_delete, enable_delete=enable_delete)
 
-    users_sync_status = created_users, deleted_users
-    return users_sync_status
+    return created_users, deleted_users
 
 
 def create_group_memberships(group, users_to_add, target_users):
@@ -167,7 +165,7 @@ def create_group_memberships(group, users_to_add, target_users):
     """
     memberships_created = []
     if not target_users:
-        logger.warn("No users found in the target system")
+        logger.warn("No matching users found in the target system")
         return memberships_created
     for user in users_to_add:
         matching_target_user = filters.filter_by_condition(
@@ -188,7 +186,7 @@ def create_group_memberships(group, users_to_add, target_users):
     return memberships_created
 
 
-def delete_group_memberships(group, users_to_remove):
+def delete_group_memberships(group, users_to_remove, enable_delete=False):
     memberships_deleted = []
     current_memberships = {
         membership["MemberId"]["UserId"]: membership["MembershipId"]
@@ -196,21 +194,26 @@ def delete_group_memberships(group, users_to_remove):
     }
     for user in users_to_remove:
         if user["UserId"] in current_memberships:
-            logger.info(
-                f"Removing user {user['UserName']} from group {group['DisplayName']}"
-            )
-            response = identity_store.delete_group_membership(
-                current_memberships[user["UserId"]]
-            )
-            if response:
-                memberships_deleted.append(response)
+            if not enable_delete:
                 logger.info(
-                    f"Removed user {user['UserName']} from group {group['DisplayName']}"
+                    f"Removing user {user['UserName']} from group {group['DisplayName']} (dry-run)"
                 )
             else:
-                logger.error(
-                    f"Failed to remove user {user['UserName']} from group {group['DisplayName']}"
+                logger.info(
+                    f"Removing user {user['UserName']} from group {group['DisplayName']}"
                 )
+                response = identity_store.delete_group_membership(
+                    current_memberships[user["UserId"]]
+                )
+                if response:
+                    memberships_deleted.append(response)
+                    logger.info(
+                        f"Removed user {user['UserName']} from group {group['DisplayName']}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to remove user {user['UserName']} from group {group['DisplayName']}"
+                    )
         else:
             logger.warn(
                 f"User {user['UserName']} not found in group {group['DisplayName']}"
@@ -219,22 +222,26 @@ def delete_group_memberships(group, users_to_remove):
 
 
 def sync_identity_center_groups(source_groups, target_groups, target_users, **kwargs):
-    for group in source_groups:
-        group["DisplayName"] = group["name"].replace("AWS-", "")
+    enable_delete = kwargs.get("enable_delete", False)
+
     source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
         {"values": source_groups, "key": "DisplayName"},
         {"values": target_groups, "key": "DisplayName"},
         mode="match",
     )
     logger.info(
-        f"Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups to Sync"
+        f"synchronize:groups:Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups"
     )
+    groups_memberships_created = []
+    groups_memberships_deleted = []
     for i in range(len(source_groups_to_sync)):
-        logger.info(f"DEBUG: {json.dumps(source_groups_to_sync[i], indent=2)}")
         if (
             source_groups_to_sync[i]["DisplayName"]
             == target_groups_to_sync[i]["DisplayName"]
         ):
+            logger.info(
+                f"Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
+            )
             users_to_add, users_to_remove = filters.compare_lists(
                 {"values": source_groups_to_sync[i]["members"], "key": "email"},
                 {
@@ -242,16 +249,17 @@ def sync_identity_center_groups(source_groups, target_groups, target_users, **kw
                     "key": "MemberId.UserName",
                 },
                 mode="sync",
-                enable_delete=True,
             )
             logger.info(
                 f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
             )
-            groups_memberships_created = create_group_memberships(
+            memberships_created = create_group_memberships(
                 target_groups_to_sync[i], users_to_add, target_users
             )
-            groups_memberships_deleted = delete_group_memberships(
-                target_groups_to_sync[i], users_to_remove
+            groups_memberships_created.extend(memberships_created)
+            memberships_deleted = delete_group_memberships(
+                target_groups_to_sync[i], users_to_remove, enable_delete=enable_delete
             )
+            groups_memberships_deleted.extend(memberships_deleted)
 
-            return groups_memberships_created, groups_memberships_deleted
+    return groups_memberships_created, groups_memberships_deleted
