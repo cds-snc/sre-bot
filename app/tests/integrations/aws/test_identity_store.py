@@ -106,7 +106,7 @@ def test_create_user_failed(mock_resolve_identity_store_id, mock_execute_aws_api
         Name={"GivenName": first_name, "FamilyName": family_name},
         DisplayName=f"{first_name} {family_name}",
     )
-    assert result == None
+    assert result is None
 
 
 @patch("integrations.aws.identity_store.execute_aws_api_call")
