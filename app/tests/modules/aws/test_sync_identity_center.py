@@ -549,52 +549,69 @@ def test_create_group_memberships(
     ]
     assert mock_create_group_membership.call_count == 3
     assert mock_filter_by_condition.call_count == 3
-    for user in users_to_add:
+    for user in target_users:
         mock_logger.info.assert_any_call(
-            f"Added user {user['name']['fullName']} to group {group['DisplayName']}"
+            f"create_group_memberships:Successfully added user {user['UserName']} to group {group['DisplayName']}"
         )
         mock_create_group_membership.assert_any_call(
-            group["GroupId"], target_users[0]["UserId"]
-        )
-        mock_create_group_membership.assert_any_call(
-            group["GroupId"], target_users[1]["UserId"]
-        )
-        mock_create_group_membership.assert_any_call(
-            group["GroupId"], target_users[2]["UserId"]
+            group["GroupId"], user["UserId"]
         )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
+@patch("modules.aws.sync_identity_center.DRY_RUN", True)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.filter_by_condition")
 @patch("modules.aws.sync_identity_center.identity_store.create_group_membership")
-def test_create_group_memberships_with_empty_target_users(
+def test_create_group_memberships_dry_run(
     mock_create_group_membership,
     mock_filter_by_condition,
     mock_logger,
-    aws_groups,
+    aws_groups_w_users,
+    aws_users,
     google_users,
 ):
-    group = aws_groups(1)[0]
-    target_users = []
+    group = aws_groups_w_users(1, 3)[0]
+    target_users = aws_users(3)
     users_to_add = google_users(3)
+    mock_filter_by_condition.side_effect = [
+        [target_users[0]],
+        [target_users[1]],
+        [target_users[2]],
+    ]
+
+    mock_create_group_membership.side_effect = [
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
 
     result = sync_identity_center.create_group_memberships(
         group, users_to_add, target_users
     )
 
-    assert result == []
+    assert result == [
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
     assert mock_create_group_membership.call_count == 0
-    assert mock_filter_by_condition.call_count == 0
-    assert mock_logger.info.call_count == 0
-    assert mock_logger.warn.call_count == 1
-    assert (
-        call("No matching users found in the target system")
-        in mock_logger.warn.call_args_list
-    )
+    assert mock_filter_by_condition.call_count == 3
+    # assert not mock_create_group_membership.assert_any_call(
+    #     group["GroupId"], target_users[0]["UserId"]
+    # )
+    # mock_create_group_membership.assert_any_call(
+    #     group["GroupId"], target_users[1]["UserId"]
+    # )
+    # mock_create_group_membership.assert_any_call(
+    #     group["GroupId"], target_users[2]["UserId"]
+    # )
+    for user in target_users:
+        mock_logger.info.assert_any_call(
+            f"create_group_memberships:DRY_RUN:Successfully added user {user['UserName']} to group {group['DisplayName']}"
+        )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", True)
+@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.filter_by_condition")
 @patch("modules.aws.sync_identity_center.identity_store.create_group_membership")
@@ -616,7 +633,7 @@ def test_create_group_memberships_with_empty_users_to_add(
     assert result == []
     assert mock_create_group_membership.call_count == 0
     assert mock_filter_by_condition.call_count == 0
-    assert mock_logger.info.call_count == 0
+    assert mock_logger.info.call_count == 2
 
 
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
@@ -655,10 +672,9 @@ def test_create_group_memberships_matching_user_not_found(
     ]
     assert mock_create_group_membership.call_count == 2
 
-    for user in users_to_add[:2]:
-        print(f"Adding user {user['name']['fullName']} to group {group['DisplayName']}")
+    for user in target_users:
         mock_logger.info.assert_any_call(
-            f"Added user {user['name']['fullName']} to group {group['DisplayName']}"
+            f"create_group_memberships:Successfully added user {user['UserName']} to group {group['DisplayName']}"
         )
         mock_create_group_membership.assert_any_call(
             group["GroupId"], target_users[0]["UserId"]
@@ -667,7 +683,7 @@ def test_create_group_memberships_matching_user_not_found(
             group["GroupId"], target_users[1]["UserId"]
         )
     mock_logger.info.assert_any_call(
-        f"User {users_to_add[2]['primaryEmail']} not found in the target system"
+        f"create_group_memberships:Failed to find user {users_to_add[2]['primaryEmail']} in target system"
     )
 
 
