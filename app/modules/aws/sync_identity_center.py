@@ -184,11 +184,6 @@ def create_group_memberships(group, users_to_add, target_users):
         list: A list of memberships created.
     """
     memberships_created = []
-    if not target_users:
-        logger.warn(
-            "create_group_memberships:No matching users found in the target system"
-        )
-        return memberships_created
     logger.info(
         f"create_group_memberships:Adding {len(users_to_add)} users to group {group['DisplayName']}"
     )
