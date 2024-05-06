@@ -357,7 +357,6 @@ def test_delete_aws_users_empty_list(mock_delete_user, mock_logger):
     assert mock_delete_user.call_count == 0
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.delete_aws_users")
 @patch("modules.aws.sync_identity_center.create_aws_users")
@@ -372,7 +371,7 @@ def test_sync_identity_center_users_default(
 ):
     source_users = google_users(3)
     target_users = aws_users(6)[:3]
-    mock_compare_lists.return_value = source_users, []
+    mock_compare_lists.return_value = source_users, target_users
     mock_create_aws_users.return_value = source_users
     mock_delete_aws_users.return_value = []
 
@@ -389,15 +388,14 @@ def test_sync_identity_center_users_default(
         in mock_compare_lists.call_args_list
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
-    assert call([], enable_delete=False) in mock_delete_aws_users.call_args_list
+    assert call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
     assert mock_logger.info.call_count == 1
     assert (
-        call("synchronize:users:Found 3 Users to Create and 0 Users to Delete")
+        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
         in mock_logger.info.call_args_list
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.delete_aws_users")
 @patch("modules.aws.sync_identity_center.create_aws_users")
@@ -440,12 +438,11 @@ def test_sync_identity_center_users_enable_delete_true(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.delete_aws_users")
 @patch("modules.aws.sync_identity_center.create_aws_users")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
-def test_sync_identity_center_users_delete_target_all_dry_run(
+def test_sync_identity_center_users_delete_target_all_disable_delete(
     mock_compare_lists,
     mock_create_aws_users,
     mock_delete_aws_users,
@@ -464,10 +461,12 @@ def test_sync_identity_center_users_delete_target_all_dry_run(
 
     assert result == ([], target_users)
     assert mock_compare_lists.call_count == 0
+
     assert call([]) in mock_create_aws_users.call_args_list
     assert (
         call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
     )
+
     assert mock_logger.info.call_count == 1
     assert (
         call("synchronize:users:Found 0 Users to Create and 6 Users to Delete")
@@ -475,7 +474,6 @@ def test_sync_identity_center_users_delete_target_all_dry_run(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.delete_aws_users")
 @patch("modules.aws.sync_identity_center.create_aws_users")
@@ -499,11 +497,12 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
     assert result == ([], target_users)
     assert mock_compare_lists.call_count == 0
-    create_aws_users_call = call([])
-    assert create_aws_users_call in mock_create_aws_users.call_args_list
+
+    assert call([]) in mock_create_aws_users.call_args_list
     assert (
         call(target_users, enable_delete=True) in mock_delete_aws_users.call_args_list
     )
+
     assert mock_logger.info.call_count == 1
     assert (
         call("synchronize:users:Found 0 Users to Create and 6 Users to Delete")
@@ -553,9 +552,7 @@ def test_create_group_memberships(
         mock_logger.info.assert_any_call(
             f"create_group_memberships:Successfully added user {user['UserName']} to group {group['DisplayName']}"
         )
-        mock_create_group_membership.assert_any_call(
-            group["GroupId"], user["UserId"]
-        )
+        mock_create_group_membership.assert_any_call(group["GroupId"], user["UserId"])
 
 
 @patch("modules.aws.sync_identity_center.DRY_RUN", True)
@@ -596,15 +593,6 @@ def test_create_group_memberships_dry_run(
     ]
     assert mock_create_group_membership.call_count == 0
     assert mock_filter_by_condition.call_count == 3
-    # assert not mock_create_group_membership.assert_any_call(
-    #     group["GroupId"], target_users[0]["UserId"]
-    # )
-    # mock_create_group_membership.assert_any_call(
-    #     group["GroupId"], target_users[1]["UserId"]
-    # )
-    # mock_create_group_membership.assert_any_call(
-    #     group["GroupId"], target_users[2]["UserId"]
-    # )
     for user in target_users:
         mock_logger.info.assert_any_call(
             f"create_group_memberships:DRY_RUN:Successfully added user {user['UserName']} to group {group['DisplayName']}"
@@ -850,7 +838,6 @@ def test_delete_group_memberships_failed(
             )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
 @patch("modules.aws.sync_identity_center.create_group_memberships")
@@ -926,7 +913,6 @@ def test_sync_identity_center_groups_defaults(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
 @patch("modules.aws.sync_identity_center.create_group_memberships")
@@ -1012,7 +998,6 @@ def test_sync_identity_center_groups_enable_delete_true(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
 @patch("modules.aws.sync_identity_center.create_group_memberships")
@@ -1053,7 +1038,6 @@ def test_sync_identity_center_groups_empty_source_groups(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
 @patch("modules.aws.sync_identity_center.create_group_memberships")
@@ -1072,7 +1056,7 @@ def test_sync_identity_center_groups_empty_target_groups(
     mock_compare_lists.return_value = [], []
 
     result = sync_identity_center.sync_identity_center_groups(
-        source_groups, target_groups, target_users, dry_run=False, enable_delete=True
+        source_groups, target_groups, target_users, enable_delete=True
     )
 
     assert result == ([], [])
@@ -1094,7 +1078,6 @@ def test_sync_identity_center_groups_empty_target_groups(
     )
 
 
-@patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.compare_lists")
 @patch("modules.aws.sync_identity_center.create_group_memberships")
