@@ -1,4 +1,5 @@
 import pytest
+import string
 from integrations.utils.api import (
     convert_string_to_camel_case,
     convert_dict_to_camel_case,
@@ -6,6 +7,7 @@ from integrations.utils.api import (
     convert_string_to_pascal_case,
     convert_dict_to_pascale_case,
     convert_kwargs_to_pascal_case,
+    generate_unique_id,
 )
 
 
@@ -211,3 +213,39 @@ def test_convert_kwargs_to_pascal_case_with_non_dict_non_list_kwargs():
 def test_convert_kwargs_to_pascal_case_with_nested_list():
     kwargs = [{"key": ["value1", "value2"]}]
     assert convert_kwargs_to_pascal_case(kwargs) == [{"Key": ["value1", "value2"]}]
+
+
+def test_unique_id_format():
+    """Test that the unique ID is in the correct format."""
+    unique_id = generate_unique_id()
+    assert isinstance(unique_id, str), "Unique ID should be a string"
+    parts = unique_id.split("-")
+    assert len(parts) == 3, "Unique ID should have three parts separated by hyphens"
+    assert all(
+        len(part) == 3 for part in parts
+    ), "Each segment should be exactly 3 characters long"
+
+
+def test_unique_id_characters():
+    """Test that the unique ID contains only uppercase letters and digits."""
+    unique_id = generate_unique_id()
+    allowed_chars = set(string.ascii_lowercase + string.digits)
+    assert all(
+        char in allowed_chars for char in unique_id.replace("-", "")
+    ), "All characters should be alphanumeric"
+
+
+def test_unique_id_uniqueness():
+    """Test that multiple IDs are unique from each other."""
+    ids = {generate_unique_id() for _ in range(100)}
+    assert len(ids) == 100, "All generated IDs should be unique"
+
+
+# Additional test to ensure no illegal characters or formats appear
+def test_no_illegal_characters():
+    """Ensure no lowecase or special characters are in the ID"""
+    unique_id = generate_unique_id()
+    illegal_chars = set(string.ascii_uppercase + string.punctuation)
+    assert not any(
+        char in illegal_chars for char in unique_id.replace("-", "")
+    ), "ID should not have uppercase or special characters"

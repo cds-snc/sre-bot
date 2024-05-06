@@ -8,7 +8,7 @@ from integrations.google_workspace.google_service import (
     execute_google_api_call,
     DEFAULT_DELEGATED_ADMIN_EMAIL,
 )
-from integrations.utils.api import convert_string_to_camel_case
+from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
 # Get the email for the SRE bot
 SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
@@ -48,6 +48,21 @@ def get_freebusy(time_min, time_max, items, **kwargs):
     )
 
 
+# def generate_unique_id():
+#     # Define the characters to use in the ID
+#     chars = string.ascii_uppercase + string.digits
+
+#     # Function to generate a segment of three characters
+#     def generate_segment():
+#         return ''.join(random.choices(chars, k=3))
+
+#     # Generate the three segments and join them with hyphens
+#     segments = [generate_segment() for _ in range(3)]
+#     unique_id = '-'.join(segments)
+
+#     return unique_id
+
+
 @handle_google_api_errors
 def insert_event(start, end, emails, title, incident_document, **kwargs):
     """Creates a new event in the specified calendars.
@@ -71,6 +86,12 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
         "guestsCanModify": True,
+        "conferenceData": {
+            "createRequest": {
+                "requestId": generate_unique_id(),
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
     }
     if incident_document:
         body["attachments"] = [
@@ -103,6 +124,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         body=body,
         calendarId="primary",
         supportsAttachments=True,
+        conferenceDataVersion=1,
     )
     return result.get("htmlLink")
 
