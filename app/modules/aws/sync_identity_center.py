@@ -117,7 +117,7 @@ def delete_aws_users(users_to_delete, enable_delete=False):
     Returns:
         list: A list of users deleted.
     """
-    logger.info(f"delete_aws_users:Starting deletion of{len(users_to_delete)} users.")
+    logger.info(f"delete_aws_users:Starting deletion of {len(users_to_delete)} users.")
     users_deleted = []
     for user in users_to_delete:
         if enable_delete and not DRY_RUN:
@@ -126,13 +126,16 @@ def delete_aws_users(users_to_delete, enable_delete=False):
                 logger.info(
                     f"delete_aws_users:Successfully deleted user {user['UserName']}"
                 )
-                users_deleted.append(user)
+                users_deleted.append(user["UserName"])
             else:
                 logger.error(
                     f"delete_aws_users:Failed to delete user {user['UserName']}"
                 )
         else:
-            logger.info(f"Deleting user (dry-run): {user['UserName']}")
+            logger.info(
+                f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+            )
+            users_deleted.append(user["UserName"])
     logger.info(f"delete_aws_users:Finished deletion of {len(users_deleted)} users.")
     return users_deleted
 
