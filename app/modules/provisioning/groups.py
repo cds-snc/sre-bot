@@ -46,3 +46,11 @@ def get_groups_with_members_from_integration(integration_source, **kwargs):
     for filter in filters:
         groups = filter_tools.filter_by_condition(groups, filter)
     return groups
+
+
+def preformat_groups(groups, lookup_key, new_key, find="", replace=""):
+    for group in groups:
+        if lookup_key not in group:
+            raise KeyError(f"Group {group} does not have {lookup_key} key")
+        group[new_key] = group[lookup_key].replace(find, replace)
+    return groups
