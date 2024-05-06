@@ -268,17 +268,27 @@ def test_create_aws_users_empty_list(mock_create_user, mock_logger):
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_user")
 def test_delete_aws_users_default(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3, "user")
+    users_to_delete = aws_users(3)
+    expected_output = [
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
 
     result = sync_identity_center.delete_aws_users(users_to_delete)
 
-    assert result == []
+    assert result == expected_output
     assert mock_logger.info.call_count == 5
-    assert call("Starting deletion of 3 users.") in mock_logger.info.call_args_list
-    for user in users_to_delete:
-        mock_logger.info.assert_any_call(f"Deleting user (dry-run): {user['UserName']}")
     assert (
-        call("Finished deletion of users. Total users deleted: 0.")
+        call("delete_aws_users:Starting deletion of 3 users.")
+        in mock_logger.info.call_args_list
+    )
+    for user in users_to_delete:
+        mock_logger.info.assert_any_call(
+            f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+        )
+    assert (
+        call("delete_aws_users:Finished deletion of 3 users.")
         in mock_logger.info.call_args_list
     )
     mock_delete_user.call_count == 0
@@ -288,57 +298,94 @@ def test_delete_aws_users_default(mock_delete_user, mock_logger, aws_users):
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_user")
 def test_delete_aws_users_enable_delete_true(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3, "user")
+    users_to_delete = aws_users(3)
+    expected_output = [
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
     mock_delete_user.return_value = True
 
     result = sync_identity_center.delete_aws_users(users_to_delete, enable_delete=True)
 
-    assert result == users_to_delete
-    assert mock_logger.info.call_count == 8
-    assert call("Starting deletion of 3 users.") in mock_logger.info.call_args_list
+    assert result == expected_output
+    assert mock_logger.info.call_count == 5
+    assert (
+        call("delete_aws_users:Starting deletion of 3 users.")
+        in mock_logger.info.call_args_list
+    )
     for user in users_to_delete:
         mock_logger.info.assert_any_call(
-            f"Attempting to delete user: {user['UserName']}"
+            f"delete_aws_users:Successfully deleted user {user['UserName']}"
         )
         mock_delete_user.assert_any_call(user["UserId"])
-        mock_logger.info.assert_any_call(f"Deleted user: {user['UserName']}")
     assert (
-        call("Finished deletion of users. Total users deleted: 3.")
+        call("delete_aws_users:Finished deletion of 3 users.")
         in mock_logger.info.call_args_list
     )
     mock_delete_user.call_count == 3
+
+
+@patch("modules.aws.sync_identity_center.DRY_RUN", True)
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.identity_store.delete_user")
+def test_delete_aws_users_enable_delete_true_dry_run(mock_delete_user, mock_logger, aws_users):
+    users_to_delete = aws_users(3)
+    expected_output = [
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
+    mock_delete_user.return_value = True
+
+    result = sync_identity_center.delete_aws_users(users_to_delete, enable_delete=True)
+
+    assert result == expected_output
+    assert mock_logger.info.call_count == 5
+    assert (
+        call("delete_aws_users:Starting deletion of 3 users.")
+        in mock_logger.info.call_args_list
+    )
+    for user in users_to_delete:
+        mock_logger.info.assert_any_call(
+            f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+        )
+    assert (
+        call("delete_aws_users:Finished deletion of 3 users.")
+        in mock_logger.info.call_args_list
+    )
+    mock_delete_user.call_count == 0
 
 
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_user")
 def test_delete_aws_users_failed_deletion(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3, "user")
-    expected_output = users_to_delete.copy()
-    del expected_output[1]
+    users_to_delete = aws_users(3)
+    expected_output = ["user-email1@test.com", "user-email3@test.com"]
     mock_delete_user.side_effect = [True, False, True]
 
     result = sync_identity_center.delete_aws_users(users_to_delete, enable_delete=True)
 
     assert result == expected_output
-    assert mock_logger.info.call_count == 7
-    assert call("Starting deletion of 3 users.") in mock_logger.info.call_args_list
-    # for user in users_to_delete:
+    assert mock_logger.info.call_count == 4
+    assert mock_logger.error.call_count == 1
+    assert (
+        call("delete_aws_users:Starting deletion of 3 users.")
+        in mock_logger.info.call_args_list
+    )
     for i in range(len(users_to_delete)):
-        mock_logger.info.assert_any_call(
-            f"Attempting to delete user: {users_to_delete[i]['UserName']}"
-        )
         mock_delete_user.assert_any_call(users_to_delete[i]["UserId"])
         if i == 1:
             mock_logger.error.assert_any_call(
-                f"Failed to delete user: {users_to_delete[i]['UserName']}"
+                f"delete_aws_users:Failed to delete user {users_to_delete[i]['UserName']}"
             )
         else:
             mock_logger.info.assert_any_call(
-                f"Deleted user: {users_to_delete[i]['UserName']}"
+                f"delete_aws_users:Successfully deleted user {users_to_delete[i]['UserName']}"
             )
     assert (
-        call("Finished deletion of users. Total users deleted: 2.")
+        call("delete_aws_users:Finished deletion of 2 users.")
         in mock_logger.info.call_args_list
     )
     mock_delete_user.call_count == 3
@@ -388,7 +435,9 @@ def test_sync_identity_center_users_default(
         in mock_compare_lists.call_args_list
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
-    assert call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
+    assert (
+        call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
+    )
     assert mock_logger.info.call_count == 1
     assert (
         call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
