@@ -674,7 +674,7 @@ def test_create_group_memberships_matching_user_not_found(
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
-def test_delete_group_memberships_enable_defaults(
+def test_delete_group_memberships_defaults_not_deleting(
     mock_delete_group_membership,
     mock_logger,
     aws_groups_w_users,
@@ -682,16 +682,51 @@ def test_delete_group_memberships_enable_defaults(
     group = aws_groups_w_users(1, 6)[0]
     users_to_remove = group["GroupMemberships"]
 
-    # mock_delete_group_membership.side_effect = [
-    #     "membership_id_1",
-    #     "membership_id_2",
-    #     "membership_id_3",
-    #     "membership_id_4",
-    #     "membership_id_5",
-    #     "membership_id_6",
-    # ]
-
     result = sync_identity_center.delete_group_memberships(group, users_to_remove)
+
+    assert result == [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+        "membership_id_4",
+        "membership_id_5",
+        "membership_id_6",
+    ]
+    assert mock_delete_group_membership.call_count == 0
+    mock_logger.info.assert_any_call(
+        f"delete_group_memberships:Removing {len(users_to_remove)} users from group {group['DisplayName']}"
+    )
+    for user in users_to_remove:
+        mock_logger.info.assert_any_call(
+            f"delete_group_memberships:DRY_RUN:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
+        )
+
+    assert mock_logger.info.call_count == 8
+
+
+@patch("modules.aws.sync_identity_center.DRY_RUN", True)
+@patch("modules.aws.sync_identity_center.logger")
+@patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
+def test_delete_group_memberships_enable_delete_dry_run(
+    mock_delete_group_membership,
+    mock_logger,
+    aws_groups_w_users,
+):
+    group = aws_groups_w_users(1, 6)[0]
+    users_to_remove = group["GroupMemberships"]
+
+    mock_delete_group_membership.side_effect = [
+        "membership_id_1",
+        "membership_id_2",
+        "membership_id_3",
+        "membership_id_4",
+        "membership_id_5",
+        "membership_id_6",
+    ]
+
+    result = sync_identity_center.delete_group_memberships(
+        group, users_to_remove, enable_delete=True
+    )
 
     assert result == [
         "membership_id_1",
@@ -716,7 +751,7 @@ def test_delete_group_memberships_enable_defaults(
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
-def test_delete_group_memberships_enable_delete_true(
+def test_delete_group_memberships_enable_delete_and_not_dry_run(
     mock_delete_group_membership,
     mock_logger,
     aws_groups_w_users,
