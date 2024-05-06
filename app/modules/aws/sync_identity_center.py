@@ -6,6 +6,7 @@ from utils import filters
 
 
 logger = getLogger(__name__)
+DRY_RUN = True
 
 
 def synchronize(**kwargs):
@@ -46,12 +47,21 @@ def synchronize(**kwargs):
     )
 
     if sync_users:
-        users_sync_status = sync_identity_center_users(source_users, **kwargs)
+        logger.info("synchonize:users:Syncing Users")
+        users_sync_status = sync_identity_center_users(
+            source_users, target_users, **kwargs
+        )
 
     else:
         users_sync_status = None
 
     if sync_groups:
+        logger.info("synchonize:groups:Syncing Groups")
+
+        logger.info("synchonize:groups:Formatting Source Groups")
+        source_groups = groups.preformat_groups(
+            source_groups, "name", "DisplayName", find="AWS-", replace=""
+        )
         groups_sync_status = sync_identity_center_groups(
             source_groups, target_groups, target_users, **kwargs
         )
@@ -71,21 +81,30 @@ def create_aws_users(users_to_create):
     Returns:
         list: A list of ID of the users created.
     """
-    logger.info(f"Starting creation of {len(users_to_create)} users.")
+    logger.info(f"create_aws_users:Starting creation of {len(users_to_create)} users.")
     users_created = []
     for user in users_to_create:
-        logger.info(f"Attempting to create user: {user['primaryEmail']}")
-        response = identity_store.create_user(
-            user["primaryEmail"], user["name"]["givenName"], user["name"]["familyName"]
-        )
-        if response:
-            logger.info(f"Created user: {user['primaryEmail']}")
-            users_created.append(response)
+        if not DRY_RUN:
+            response = identity_store.create_user(
+                user["primaryEmail"],
+                user["name"]["givenName"],
+                user["name"]["familyName"],
+            )
+            if response:
+                logger.info(
+                    f"create_aws_users:Successfully created user {user['primaryEmail']}"
+                )
+                users_created.append(response)
+            else:
+                logger.error(
+                    f"create_aws_users:Failed to create user {user['primaryEmail']}"
+                )
         else:
-            logger.error(f"Failed to create user: {user['primaryEmail']}")
-    logger.info(
-        f"Finished creation of users. Total users created: {len(users_created)}."
-    )
+            logger.info(
+                f"create_aws_users:DRY_RUN:Successfully created user {user['primaryEmail']}"
+            )
+            users_created.append(user["primaryEmail"])
+    logger.info(f"create_aws_users:Finished creation of {len(users_created)} users.")
     return users_created
 
 
@@ -98,22 +117,23 @@ def delete_aws_users(users_to_delete, enable_delete=False):
     Returns:
         list: A list of users deleted.
     """
-    logger.info(f"Starting deletion of {len(users_to_delete)} users.")
+    logger.info(f"delete_aws_users:Starting deletion of{len(users_to_delete)} users.")
     users_deleted = []
     for user in users_to_delete:
-        if not enable_delete:
-            logger.info(f"Deleting user (dry-run): {user['UserName']}")
-        else:
-            logger.info(f"Attempting to delete user: {user['UserName']}")
+        if enable_delete and not DRY_RUN:
             response = identity_store.delete_user(user["UserId"])
             if response:
-                logger.info(f"Deleted user: {user['UserName']}")
+                logger.info(
+                    f"delete_aws_users:Successfully deleted user {user['UserName']}"
+                )
                 users_deleted.append(user)
             else:
-                logger.error(f"Failed to delete user: {user['UserName']}")
-    logger.info(
-        f"Finished deletion of users. Total users deleted: {len(users_deleted)}."
-    )
+                logger.error(
+                    f"delete_aws_users:Failed to delete user {user['UserName']}"
+                )
+        else:
+            logger.info(f"Deleting user (dry-run): {user['UserName']}")
+    logger.info(f"delete_aws_users:Finished deletion of {len(users_deleted)} users.")
     return users_deleted
 
 
@@ -165,63 +185,91 @@ def create_group_memberships(group, users_to_add, target_users):
     """
     memberships_created = []
     if not target_users:
-        logger.warn("No matching users found in the target system")
+        logger.warn(
+            "create_group_memberships:No matching users found in the target system"
+        )
         return memberships_created
+    logger.info(
+        f"create_group_memberships:Adding {len(users_to_add)} users to group {group['DisplayName']}"
+    )
     for user in users_to_add:
-        matching_target_user = filters.filter_by_condition(
+        matching_target_users = filters.filter_by_condition(
             target_users,
             lambda target_user: target_user["UserName"] == user["primaryEmail"],
         )
-        if not matching_target_user:
-            logger.info(f"User {user['primaryEmail']} not found in the target system")
-            continue
-        membership_id = identity_store.create_group_membership(
-            group["GroupId"], matching_target_user["UserId"]
-        )
-        if membership_id:
-            memberships_created.append(membership_id)
+        if matching_target_users:
+            matching_target_user = matching_target_users[0]
+        else:
             logger.info(
-                f"Added user {user['name']['fullName']} to group {group['DisplayName']}"
+                f"create_group_memberships:Failed to find user {user['primaryEmail']} in target system"
             )
+            continue
+        response = None
+        if not DRY_RUN:
+            response = identity_store.create_group_membership(
+                group["GroupId"], matching_target_user["UserId"]
+            )
+            if response:
+                logger.info(
+                    f"create_group_memberships:Successfully added user {matching_target_user['UserName']} to group {group['DisplayName']}"
+                )
+                memberships_created.append(response)
+            else:
+                logger.error(
+                    f"create_group_memberships:Failed to add user {matching_target_user['UserName']} to group {group['DisplayName']}"
+                )
+        else:
+            logger.info(
+                f"create_group_memberships:DRY_RUN:Successfully added user {matching_target_user['UserName']} to group {group['DisplayName']}"
+            )
+            memberships_created.append(user["primaryEmail"])
+    logger.info(
+        f"create_group_memberships:Finished adding {len(memberships_created)} users to group {group['DisplayName']}."
+    )
     return memberships_created
 
 
 def delete_group_memberships(group, users_to_remove, enable_delete=False):
     memberships_deleted = []
-    current_memberships = {
-        membership["MemberId"]["UserId"]: membership["MembershipId"]
-        for membership in group["GroupMemberships"]
-    }
+    logger.info(
+        f"delete_group_memberships:Removing {len(users_to_remove)} users from group {group['DisplayName']}"
+    )
     for user in users_to_remove:
-        if user["UserId"] in current_memberships:
-            if not enable_delete:
+        if enable_delete and not DRY_RUN:
+            response = identity_store.delete_group_membership(user["MembershipId"])
+
+            if response:
+                memberships_deleted.append(response)
                 logger.info(
-                    f"Removing user {user['UserName']} from group {group['DisplayName']} (dry-run)"
+                    f"delete_group_memberships:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
                 )
             else:
-                logger.info(
-                    f"Removing user {user['UserName']} from group {group['DisplayName']}"
+                logger.error(
+                    f"delete_group_memberships:Failed to remove user {user['MemberId']['UserName']} from group {group['DisplayName']}"
                 )
-                response = identity_store.delete_group_membership(
-                    current_memberships[user["UserId"]]
-                )
-                if response:
-                    memberships_deleted.append(response)
-                    logger.info(
-                        f"Removed user {user['UserName']} from group {group['DisplayName']}"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to remove user {user['UserName']} from group {group['DisplayName']}"
-                    )
         else:
-            logger.warn(
-                f"User {user['UserName']} not found in group {group['DisplayName']}"
+            logger.info(
+                f"delete_group_memberships:DRY_RUN:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
             )
+            memberships_deleted.append(user["MembershipId"])
+    logger.info(
+        f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
+    )
     return memberships_deleted
 
 
 def sync_identity_center_groups(source_groups, target_groups, target_users, **kwargs):
+    """Sync the groups in the identity store.
+
+    Args:
+        source_groups (list): A list of groups from the source system.
+        target_groups (list): A list of groups in the identity store.
+        target_users (list): A list of users in the identity store.
+        enable_delete (bool): Enable deletion of group memberships.
+
+    Returns:
+        tuple: A tuple containing the groups memberships created and deleted.
+    """
     enable_delete = kwargs.get("enable_delete", False)
 
     source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
@@ -232,6 +280,7 @@ def sync_identity_center_groups(source_groups, target_groups, target_users, **kw
     logger.info(
         f"synchronize:groups:Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups"
     )
+
     groups_memberships_created = []
     groups_memberships_deleted = []
     for i in range(len(source_groups_to_sync)):
@@ -240,18 +289,15 @@ def sync_identity_center_groups(source_groups, target_groups, target_users, **kw
             == target_groups_to_sync[i]["DisplayName"]
         ):
             logger.info(
-                f"Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
+                f"synchronize:groups:Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
             )
             users_to_add, users_to_remove = filters.compare_lists(
-                {"values": source_groups_to_sync[i]["members"], "key": "email"},
+                {"values": source_groups_to_sync[i]["members"], "key": "primaryEmail"},
                 {
                     "values": target_groups_to_sync[i]["GroupMemberships"],
                     "key": "MemberId.UserName",
                 },
                 mode="sync",
-            )
-            logger.info(
-                f"Adding {len(users_to_add)} users to group {target_groups_to_sync[i]['DisplayName']}"
             )
             memberships_created = create_group_memberships(
                 target_groups_to_sync[i], users_to_add, target_users
