@@ -56,6 +56,9 @@ def delete_user(user_id, **kwargs):
     Args:
         user_id (str): The user ID of the user.
         **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        bool: True if the user was deleted successfully, False otherwise.
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"UserId": user_id})
