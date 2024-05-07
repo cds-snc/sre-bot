@@ -37,6 +37,13 @@ def synchronize(**kwargs):
         f"synchronize:Found {len(source_groups)} Source Groups and {len(source_users)} Users"
     )
 
+    for group in source_groups:
+        logger.info(
+            f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
+        )
+    for user in source_users:
+        logger.info(f"synchronize:Source:User {user['primaryEmail']}")
+
     target_groups = groups.get_groups_with_members_from_integration(
         "aws_identity_center"
     )
@@ -45,6 +52,14 @@ def synchronize(**kwargs):
     logger.info(
         f"synchronize:Found {len(target_groups)} Target Groups and {len(target_users)} Users"
     )
+
+    for group in target_groups:
+        logger.info(
+            f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
+        )
+
+    for user in target_users:
+        logger.info(f"synchronize:Target:User {user['UserName']}")
 
     if enable_users_sync:
         logger.info("synchronize:users:Syncing Users")

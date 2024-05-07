@@ -118,7 +118,7 @@ def test_synchronize_defaults_dry_run_false(
         ),
     }
 
-    assert mock_logger.info.call_count == 50
+    assert mock_logger.info.call_count == 68
     assert (
         call("synchronize:Found 3 Source Groups and 6 Users")
         in mock_logger.info.call_args_list
@@ -249,7 +249,7 @@ def test_synchronize_defaults_dry_run_true(
         enable_users_sync=True, enable_groups_sync=True
     )
 
-    assert mock_logger.info.call_count == 50
+    assert mock_logger.info.call_count == 68
     assert (
         call("synchronize:Found 3 Source Groups and 6 Users")
         in mock_logger.info.call_args_list
@@ -394,7 +394,7 @@ def test_synchronize_enable_delete_dry_run_false(
         ),
     }
 
-    assert mock_logger.info.call_count == 50
+    assert mock_logger.info.call_count == 68
     assert (
         call("synchronize:Found 3 Source Groups and 6 Users")
         in mock_logger.info.call_args_list
@@ -559,7 +559,7 @@ def test_synchronize_enable_delete_dry_run_true(
         ),
     }
 
-    assert mock_logger.info.call_count == 50
+    assert mock_logger.info.call_count == 68
     assert (
         call("synchronize:Found 3 Source Groups and 6 Users")
         in mock_logger.info.call_args_list
@@ -672,17 +672,29 @@ def test_synchronize_sync_skip_users_if_false(
         in mock_sync_identity_center_groups.call_args_list
     )
 
-    assert mock_logger.info.call_count == 4
-    source_call = "synchronize:Found 3 Source Groups and 6 Users"
-    target_call = "synchronize:Found 3 Target Groups and 6 Users"
-    sync_call = "synchronize:groups:Syncing Groups"
-    formatting_call = "synchronize:groups:Formatting Source Groups"
-    assert mock_logger.info.call_args_list == [
-        call(source_call),
-        call(target_call),
-        call(sync_call),
-        call(formatting_call),
-    ]
+    assert mock_logger.info.call_count == 22
+    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
+    for group in source_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
+            )
+        )
+    for user in source_users:
+        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
+    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
+    for group in target_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
+            )
+        )
+    for user in target_users:
+        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
+    logger_calls.append(call("synchronize:groups:Syncing Groups"))
+    logger_calls.append(call("synchronize:groups:Formatting Source Groups"))
+
+    assert mock_logger.info.call_args_list == logger_calls
 
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
@@ -746,15 +758,28 @@ def test_synchronize_sync_skip_groups_false_if_false(
         in mock_sync_identity_center_users.call_args_list
     )
 
-    assert mock_logger.info.call_count == 3
-    source_call = "synchronize:Found 3 Source Groups and 6 Users"
-    target_call = "synchronize:Found 3 Target Groups and 6 Users"
-    sync_call = "synchronize:users:Syncing Users"
-    assert mock_logger.info.call_args_list == [
-        call(source_call),
-        call(target_call),
-        call(sync_call),
-    ]
+    assert mock_logger.info.call_count == 21
+    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
+    for group in source_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
+            )
+        )
+    for user in source_users:
+        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
+    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
+    for group in target_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
+            )
+        )
+    for user in target_users:
+        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
+    logger_calls.append(call("synchronize:users:Syncing Users"))
+
+    assert mock_logger.info.call_args_list == logger_calls
 
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
@@ -812,10 +837,27 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 0
-    assert mock_logger.info.call_count == 2
-    source_call = "synchronize:Found 3 Source Groups and 6 Users"
-    target_call = "synchronize:Found 3 Target Groups and 6 Users"
-    assert mock_logger.info.call_args_list == [call(source_call), call(target_call)]
+    assert mock_logger.info.call_count == 20
+    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
+    for group in source_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
+            )
+        )
+    for user in source_users:
+        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
+    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
+    for group in target_groups:
+        logger_calls.append(
+            call(
+                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
+            )
+        )
+    for user in target_users:
+        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
+
+    assert mock_logger.info.call_args_list == logger_calls
 
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
