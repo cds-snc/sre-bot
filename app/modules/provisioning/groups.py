@@ -1,4 +1,5 @@
 from logging import getLogger
+import re
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store
 from utils import filters as filter_tools
@@ -48,9 +49,10 @@ def get_groups_with_members_from_integration(integration_source, **kwargs):
     return groups
 
 
-def preformat_groups(groups, lookup_key, new_key, find="", replace=""):
+def preformat_groups(groups, lookup_key, new_key, pattern="", replace=""):
     for group in groups:
         if lookup_key not in group:
             raise KeyError(f"Group {group} does not have {lookup_key} key")
-        group[new_key] = group[lookup_key].replace(find, replace)
+        group[new_key] = re.sub(pattern, replace, group[lookup_key])
+
     return groups

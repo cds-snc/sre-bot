@@ -180,42 +180,75 @@ def test_get_groups_with_members_from_integration_filters_returns_subset(
     assert not mock_google_list_groups_with_members.called
 
 
-def test_preformat_groups(google_groups_w_users):
-    groups_to_format = google_groups_w_users(n_groups=1, n_users=1, prefix="PREFIX-")
+def test_preformat_groups():
+    groups_to_format = [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+        }
+    ]
+
     lookup_key = "name"
     new_key = "DisplayName"
-    find = "PREFIX-"
+    pattern = r"^PREFIX-"
     replace = "new-"
     response = groups.preformat_groups(
-        groups_to_format, lookup_key, new_key, find, replace
+        groups_to_format, lookup_key, new_key, pattern, replace
     )
 
     assert response == [
         {
             "id": "PREFIX-google_group_id1",
             "name": "PREFIX-group-name1",
-            "email": "PREFIX-group-name1@test.com",
             "members": [
                 {
                     "id": "PREFIX-user_id1",
                     "primaryEmail": "PREFIX-user-email1@test.com",
-                    "emails": [
-                        {
-                            "address": "PREFIX-user-email1@test.com",
-                            "primary": True,
-                            "type": "work",
-                        }
-                    ],
-                    "suspended": False,
-                    "name": {
-                        "fullName": "Given_name_1 Family_name_1",
-                        "familyName": "Family_name_1",
-                        "givenName": "Given_name_1",
-                        "displayName": "Given_name_1 Family_name_1",
-                    },
                 }
             ],
             "DisplayName": "new-group-name1",
+        }
+    ]
+
+
+def test_preformat_groups_returns_value_if_no_matching_pattern(google_groups_w_users):
+    groups_to_format = [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "not-PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+        }
+    ]
+    lookup_key = "name"
+    new_key = "DisplayName"
+    pattern = r"^PREFIX-"
+    replace = "new-"
+    response = groups.preformat_groups(
+        groups_to_format, lookup_key, new_key, pattern, replace
+    )
+
+    assert response == [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "not-PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+            "DisplayName": "not-PREFIX-group-name1",
         }
     ]
 
@@ -224,11 +257,11 @@ def test_preformat_groups_lookup_key_not_found_raise_error(google_groups_w_users
     groups_to_format = google_groups_w_users(n_groups=1, n_users=1, prefix="PREFIX-")
     lookup_key = "invalid_key"
     new_key = "DisplayName"
-    find = "PREFIX-"
+    pattern = "PREFIX-"
     replace = "new-"
 
     with pytest.raises(KeyError) as exc:
-        groups.preformat_groups(groups_to_format, lookup_key, new_key, find, replace)
+        groups.preformat_groups(groups_to_format, lookup_key, new_key, pattern, replace)
 
     expected_error_message = (
         f'"Group {groups_to_format[0]} does not have {lookup_key} key"'
