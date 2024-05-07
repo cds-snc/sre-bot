@@ -20,9 +20,9 @@ def synchronize(**kwargs):
     Returns:
         tuple: A tuple containing the users sync status and groups sync status.
     """
-    sync_users = kwargs.get("sync_users", True)
-    sync_groups = kwargs.get("sync_groups", True)
-    query = kwargs.get("query", "email:aws-*")
+    sync_users = kwargs.pop("sync_users", True)
+    sync_groups = kwargs.pop("sync_groups", True)
+    query = kwargs.pop("query", "email:aws-*")
 
     users_sync_status = None
     groups_sync_status = None
@@ -54,9 +54,9 @@ def synchronize(**kwargs):
         target_users = identity_store.list_users()
 
     if sync_groups:
-        logger.info("synchonize:groups:Syncing Groups")
+        logger.info("synchronize:groups:Syncing Groups")
 
-        logger.info("synchonize:groups:Formatting Source Groups")
+        logger.info("synchronize:groups:Formatting Source Groups")
         source_groups = groups.preformat_groups(
             source_groups, "name", "DisplayName", find="AWS-", replace=""
         )
