@@ -158,10 +158,15 @@ def test_get_freebusy_returns_object(mock_execute):
 @patch("os.environ.get", return_value="test_email")
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+@patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_no_kwargs_no_delegated_email(
-    mock_convert_string_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
+    mock_unique_id,
+    mock_convert_string_to_camel_case,
+    mock_execute_google_api_call,
+    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_unique_id.return_value = "abc-123-de4"
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
@@ -189,9 +194,16 @@ def test_insert_event_no_kwargs_no_delegated_email(
                     "title": "Incident Document",
                 }
             ],
+            "conferenceData": {
+                "createRequest": {
+                    "requestId": "abc-123-de4",
+                    "conferenceSolutionKey": {"type": "hangoutsMeet"},
+                }
+            },
         },
         calendarId="primary",
         supportsAttachments=True,
+        conferenceDataVersion=1,
     )
     assert not mock_convert_string_to_camel_case.called
     assert mock_os_environ_get.called_once_with("SRE_BOT_EMAIL")
@@ -200,10 +212,15 @@ def test_insert_event_no_kwargs_no_delegated_email(
 @patch("os.environ.get", return_value="test_email")
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+@patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_kwargs(
-    mock_convert_string_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
+    mock_unique_id,
+    mock_convert_string_to_camel_case,
+    mock_execute_google_api_call,
+    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_unique_id.return_value = "abc-123-de4"
     mock_convert_string_to_camel_case.side_effect = (
         lambda x: x
     )  # just return the same value
@@ -224,6 +241,12 @@ def test_insert_event_with_kwargs(
                 "title": "Incident Document",
             }
         ],
+        "conferenceData": {
+            "createRequest": {
+                "requestId": "abc-123-de4",
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
     }
     result = google_calendar.insert_event(
         start, end, emails, title, document_id, **kwargs
@@ -246,6 +269,7 @@ def test_insert_event_with_kwargs(
         },
         calendarId="primary",
         supportsAttachments=True,
+        conferenceDataVersion=1,
     )
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
@@ -256,10 +280,15 @@ def test_insert_event_with_kwargs(
 @patch("os.environ.get", return_value="test_email")
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+@patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_no_document(
-    mock_convert_string_to_camel_case, mock_execute_google_api_call, mock_os_environ_get
+    mock_unique_id,
+    mock_convert_string_to_camel_case,
+    mock_execute_google_api_call,
+    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_unique_id.return_value = "abc-123-de4"
     mock_convert_string_to_camel_case.side_effect = (
         lambda x: x
     )  # just return the same value
@@ -273,6 +302,12 @@ def test_insert_event_with_no_document(
         "description": "Test Description",
         "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
+        "conferenceData": {
+            "createRequest": {
+                "requestId": "abc-123-de4",
+                "conferenceSolutionKey": {"type": "hangoutsMeet"},
+            }
+        },
     }
     result = google_calendar.insert_event(
         start, end, emails, title, document_id, **kwargs
@@ -295,11 +330,67 @@ def test_insert_event_with_no_document(
         },
         calendarId="primary",
         supportsAttachments=True,
+        conferenceDataVersion=1,
     )
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
     assert not mock_os_environ_get.called
+
+
+@patch("os.environ.get", return_value="test_email")
+@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+@patch("integrations.google_workspace.google_calendar.generate_unique_id")
+def test_insert_event_google_hangout_link_created(
+    mock_unique_id,
+    mock_convert_string_to_camel_case,
+    mock_execute_google_api_call,
+    mock_os_environ_get,
+):
+    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_unique_id.return_value = "abc-123-de4"
+    start = datetime.now()
+    end = start
+    emails = ["test1@test.com", "test2@test.com"]
+    title = "Test Event"
+    document_id = "test_document_id"
+    result = google_calendar.insert_event(start, end, emails, title, document_id)
+    assert result == "test_link"
+    mock_execute_google_api_call.assert_called_once_with(
+        "calendar",
+        "v3",
+        "events",
+        "insert",
+        scopes=["https://www.googleapis.com/auth/calendar.events"],
+        delegated_user_email="test_email",
+        body={
+            "start": {"dateTime": start, "timeZone": "America/New_York"},
+            "end": {"dateTime": end, "timeZone": "America/New_York"},
+            "attendees": [{"email": email.strip()} for email in emails],
+            "summary": title,
+            "guestsCanModify": True,
+            "attachments": [
+                {
+                    "fileUrl": f"https://docs.google.com/document/d/{document_id}",
+                    "mimeType": "application/vnd.google-apps.document",
+                    "title": "Incident Document",
+                }
+            ],
+            "conferenceData": {
+                "createRequest": {
+                    "requestId": "abc-123-de4",
+                    "conferenceSolutionKey": {"type": "hangoutsMeet"},
+                }
+            },
+        },
+        calendarId="primary",
+        supportsAttachments=True,
+        conferenceDataVersion=1,
+    )
+    assert mock_unique_id.called
+    assert mock_execute_google_api_call.contains("conferenceData")
+    assert mock_execute_google_api_call.contains(mock_unique_id.return_value)
 
 
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")

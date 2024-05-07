@@ -1,5 +1,7 @@
 """Utilities for API integrations."""
 import re
+import string
+import random
 
 
 def convert_string_to_camel_case(snake_str):
@@ -67,3 +69,18 @@ def convert_kwargs_to_pascal_case(kwargs):
         return [convert_kwargs_to_pascal_case(i) for i in kwargs]
     else:
         return kwargs
+
+
+def generate_unique_id():
+    # Define the characters to use in the ID
+    chars = string.ascii_lowercase + string.digits
+
+    # Function to generate a segment of three characters
+    def generate_segment():
+        return "".join(random.choices(chars, k=3))
+
+    # Generate the three segments and join them with hyphens
+    segments = [generate_segment() for _ in range(3)]
+    unique_id = "-".join(segments)
+
+    return unique_id
