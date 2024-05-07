@@ -47,7 +47,7 @@ def synchronize(**kwargs):
     )
 
     if sync_users:
-        logger.info("synchonize:users:Syncing Users")
+        logger.info("synchronize:users:Syncing Users")
         users_sync_status = sync_identity_center_users(
             source_users, target_users, **kwargs
         )
