@@ -41,19 +41,13 @@ def get_nested_value(dictionary, key):
         return None
 
 
-def compare_lists(source, target, mode="sync", **kwargs):
+def compare_lists(source, target, mode="sync"):
     """Compares two lists and returns specific elements based on the comparison mode and keys provided.
 
     Args:
         `source (dict)`: Source data with `values` (list) and `key` (string).
         `target (dict)`: Target data with `values` (list) and `key` (string).
         `mode (str)`: Operation mode - `sync` or `match`.
-
-        **kwargs: Additional arguments:
-
-        - `filters (list)`: List of filters to apply to the users.
-        - `enable_delete (bool)`: Enable the deletion of users in the target system.
-        - `delete_target_all (bool)`: Mark all target system users for deletion.
 
          In `sync` mode (default), the function returns:
 
@@ -83,12 +77,6 @@ def compare_lists(source, target, mode="sync", **kwargs):
     }
 
     if mode == "sync":
-        enable_delete = kwargs.get("enable_delete", False)
-        delete_target_all = kwargs.get("delete_target_all", False)
-
-        if delete_target_all:
-            return [], target_values
-
         values_to_add = [
             filtered_source_values[key]
             for key in filtered_source_values
@@ -99,9 +87,6 @@ def compare_lists(source, target, mode="sync", **kwargs):
             for key in filtered_target_values
             if key not in filtered_source_values
         ]
-
-        if not enable_delete:
-            values_to_remove = []
 
         return values_to_add, values_to_remove
 
