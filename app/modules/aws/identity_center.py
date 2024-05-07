@@ -48,9 +48,7 @@ def synchronize(**kwargs):
 
     if enable_users_sync:
         logger.info("synchronize:users:Syncing Users")
-        users_sync_status = sync_users(
-            source_users, target_users, **kwargs
-        )
+        users_sync_status = sync_users(source_users, target_users, **kwargs)
         target_users = identity_store.list_users()
 
     if enable_groups_sync:

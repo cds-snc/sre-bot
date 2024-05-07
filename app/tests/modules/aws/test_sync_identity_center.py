@@ -9,9 +9,7 @@ from modules.aws import identity_center
 @patch("modules.aws.identity_center.identity_store.create_group_membership")
 @patch("modules.aws.identity_center.identity_store.delete_group_membership")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_defaults_dry_run_false(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
@@ -176,9 +174,7 @@ def test_synchronize_defaults_dry_run_false(
 @patch("modules.aws.identity_center.identity_store.create_group_membership")
 @patch("modules.aws.identity_center.identity_store.delete_group_membership")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_defaults_dry_run_true(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
@@ -249,7 +245,9 @@ def test_synchronize_defaults_dry_run_true(
         "membership_id_9",
     ]
 
-    result = identity_center.synchronize(enable_users_sync=True, enable_groups_sync=True)
+    result = identity_center.synchronize(
+        enable_users_sync=True, enable_groups_sync=True
+    )
 
     assert mock_logger.info.call_count == 50
     assert (
@@ -287,9 +285,7 @@ def test_synchronize_defaults_dry_run_true(
 @patch("modules.aws.identity_center.identity_store.create_group_membership")
 @patch("modules.aws.identity_center.identity_store.delete_group_membership")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_enable_delete_dry_run_false(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
@@ -454,9 +450,7 @@ def test_synchronize_enable_delete_dry_run_false(
 @patch("modules.aws.identity_center.identity_store.create_group_membership")
 @patch("modules.aws.identity_center.identity_store.delete_group_membership")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_enable_delete_dry_run_true(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
@@ -621,9 +615,7 @@ def test_synchronize_enable_delete_dry_run_true(
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
 @patch("modules.aws.identity_center.users.get_unique_users_from_groups")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_users_if_false(
     mock_get_groups_with_members_from_integration,
     mock_get_unique_users_from_groups,
@@ -700,9 +692,7 @@ def test_synchronize_sync_skip_users_if_false(
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
 @patch("modules.aws.identity_center.users.get_unique_users_from_groups")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_groups_false_if_false(
     mock_get_groups_with_members_from_integration,
     mock_get_unique_users_from_groups,
@@ -773,9 +763,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
 @patch("modules.aws.identity_center.users.get_unique_users_from_groups")
-@patch(
-    "modules.aws.identity_center.groups.get_groups_with_members_from_integration"
-)
+@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_users_and_groups_if_false(
     mock_get_groups_with_members_from_integration,
     mock_get_unique_users_from_groups,
@@ -804,7 +792,9 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
         "memberships_deleted",
     )
 
-    response = identity_center.synchronize(enable_groups_sync=False, enable_users_sync=False)
+    response = identity_center.synchronize(
+        enable_groups_sync=False, enable_users_sync=False
+    )
 
     assert response == {"users": None, "groups": None}
 
@@ -1150,9 +1140,7 @@ def test_sync_identity_center_users_enable_delete_true(
     mock_create_aws_users.return_value = source_users
     mock_delete_aws_users.return_value = target_users
 
-    result = identity_center.sync_users(
-        source_users, target_users, enable_delete=True
-    )
+    result = identity_center.sync_users(source_users, target_users, enable_delete=True)
 
     assert result == (source_users, target_users)
     assert (
@@ -1273,9 +1261,7 @@ def test_create_group_memberships(
         "user-email3@test.com",
     ]
 
-    result = identity_center.create_group_memberships(
-        group, users_to_add, target_users
-    )
+    result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == [
         "user-email1@test.com",
@@ -1321,9 +1307,7 @@ def test_create_group_memberships_handles_failure(
         "user-email3@test.com",
     ]
 
-    result = identity_center.create_group_memberships(
-        group, users_to_add, target_users
-    )
+    result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == [
         "user-email1@test.com",
@@ -1372,9 +1356,7 @@ def test_create_group_memberships_dry_run(
         [target_users[1]],
         [target_users[2]],
     ]
-    result = identity_center.create_group_memberships(
-        group, users_to_add, target_users
-    )
+    result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == [
         "aws-group_id1-user-email1@test.com",
@@ -1404,9 +1386,7 @@ def test_create_group_memberships_empty_list(
     target_users = aws_users(3)
     users_to_add = []
 
-    result = identity_center.create_group_memberships(
-        group, users_to_add, target_users
-    )
+    result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == []
     assert mock_create_group_membership.call_count == 0
@@ -1440,9 +1420,7 @@ def test_create_group_memberships_matching_user_not_found(
         "user-email2@test.com",
     ]
 
-    result = identity_center.create_group_memberships(
-        group, users_to_add, target_users
-    )
+    result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == [
         "user-email1@test.com",
@@ -1667,9 +1645,7 @@ def test_sync_identity_center_groups_defaults(
         [],
         [],
     ]
-    result = identity_center.sync_groups(
-        source_groups, target_groups, target_users
-    )
+    result = identity_center.sync_groups(source_groups, target_groups, target_users)
 
     assert result == (
         [
