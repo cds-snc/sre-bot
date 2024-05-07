@@ -84,6 +84,33 @@ def test_create_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
 
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 @patch("integrations.aws.identity_store.resolve_identity_store_id")
+def test_create_user_failed(mock_resolve_identity_store_id, mock_execute_aws_api_call):
+    mock_resolve_identity_store_id.return_value = {
+        "IdentityStoreId": "test_instance_id"
+    }
+    mock_execute_aws_api_call.return_value = False
+    email = "test@example.com"
+    first_name = "Test"
+    family_name = "User"
+
+    # Act
+    result = identity_store.create_user(email, first_name, family_name)
+
+    # Assert
+    mock_execute_aws_api_call.assert_called_once_with(
+        "identitystore",
+        "create_user",
+        IdentityStoreId="test_instance_id",
+        UserName=email,
+        Emails=[{"Value": email, "Type": "WORK", "Primary": True}],
+        Name={"GivenName": first_name, "FamilyName": family_name},
+        DisplayName=f"{first_name} {family_name}",
+    )
+    assert result is None
+
+
+@patch("integrations.aws.identity_store.execute_aws_api_call")
+@patch("integrations.aws.identity_store.resolve_identity_store_id")
 def test_get_user_id(mock_resolve_identity_store_id, mock_execute_aws_api_call):
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"

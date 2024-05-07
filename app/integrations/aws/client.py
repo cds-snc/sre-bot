@@ -23,8 +23,8 @@ def handle_aws_api_errors(func):
     Args:
         func (function): The function to decorate.
 
-        Returns:
-        The decorated function.
+    Returns:
+        The decorated function with error handling.
     """
 
     @wraps(func)
