@@ -12,7 +12,7 @@ from modules.aws import sync_identity_center
 @patch(
     "modules.aws.sync_identity_center.groups.get_groups_with_members_from_integration"
 )
-def test_synchronize_defaults_with_dry_run(
+def test_synchronize_defaults_with_dry_run_false(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
     mock_delete_group_membership,
@@ -300,7 +300,7 @@ def test_create_aws_users_dry_run(mock_create_user, mock_logger, google_users):
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.create_user")
-def test_create_aws_users_with_failure(
+def test_create_aws_users_handles_failure(
     mock_create_user, mock_logger, google_users, aws_users
 ):
     users_to_create = google_users(3)
@@ -349,6 +349,14 @@ def test_create_aws_users_empty_list(mock_create_user, mock_logger):
 
     assert result == users_to_create
     assert mock_create_user.call_count == 0
+    assert mock_logger.info.call_count == 2
+    assert (
+        call("create_aws_users:Starting creation of 0 users.")
+        in mock_logger.info.call_args_list
+    )
+    assert (
+        call("create_aws_users:Finished creation of 0 users.")
+    )
 
 
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
@@ -449,7 +457,7 @@ def test_delete_aws_users_enable_delete_true_dry_run(
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_user")
-def test_delete_aws_users_failed_deletion(mock_delete_user, mock_logger, aws_users):
+def test_delete_aws_users_handles_failure(mock_delete_user, mock_logger, aws_users):
     users_to_delete = aws_users(3)
     expected_output = ["user-email1@test.com", "user-email3@test.com"]
     mock_delete_user.side_effect = [True, False, True]
@@ -687,8 +695,11 @@ def test_create_group_memberships(
     assert mock_create_group_membership.call_count == 3
     assert mock_filter_by_condition.call_count == 3
     for user in target_users:
-        mock_logger.info.assert_any_call(
-            f"create_group_memberships:Successfully added user {user['UserName']} to group {group['DisplayName']}"
+        assert (
+            call(
+                f"create_group_memberships:Successfully added user {user['UserName']} to group {group['DisplayName']}"
+            )
+            in mock_logger.info.call_args_list
         )
         mock_create_group_membership.assert_any_call(group["GroupId"], user["UserId"])
 
@@ -697,7 +708,7 @@ def test_create_group_memberships(
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.filter_by_condition")
 @patch("modules.aws.sync_identity_center.identity_store.create_group_membership")
-def test_create_group_memberships_creation_failed(
+def test_create_group_memberships_handles_failure(
     mock_create_group_membership,
     mock_filter_by_condition,
     mock_logger,
@@ -731,15 +742,23 @@ def test_create_group_memberships_creation_failed(
     assert mock_create_group_membership.call_count == 3
     assert mock_filter_by_condition.call_count == 3
     for i in range(len(target_users)):
-        if i == 2:
-            mock_logger.error.assert_any_call(
-                f"create_group_memberships:Failed to add {target_users[i]['UserName']} to group {group['DisplayName']}"
+        if i == 1:
+            assert (
+                call(
+                    f"create_group_memberships:Failed to add user {target_users[i]['UserName']} to group {group['DisplayName']}"
+                )
+                in mock_logger.error.call_args_list
             )
         else:
-            mock_logger.error.assert_any_call(
-                f"create_group_memberships:Successfully added user {target_users[i]['UserName']} to group {group['DisplayName']}"
+            assert (
+                call(
+                    f"create_group_memberships:Successfully added user {target_users[i]['UserName']} to group {group['DisplayName']}"
+                )
+                in mock_logger.info.call_args_list
             )
-        mock_create_group_membership.assert_any_call(group["GroupId"], target_users[i]["UserId"])
+        mock_create_group_membership.assert_any_call(
+            group["GroupId"], target_users[i]["UserId"]
+        )
 
 
 @patch("modules.aws.sync_identity_center.DRY_RUN", True)
@@ -784,7 +803,7 @@ def test_create_group_memberships_dry_run(
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.filters.filter_by_condition")
 @patch("modules.aws.sync_identity_center.identity_store.create_group_membership")
-def test_create_group_memberships_with_empty_users_to_add(
+def test_create_group_memberships_empty_list(
     mock_create_group_membership,
     mock_filter_by_condition,
     mock_logger,
@@ -980,7 +999,7 @@ def test_delete_group_memberships_enable_delete_and_not_dry_run(
 @patch("modules.aws.sync_identity_center.DRY_RUN", False)
 @patch("modules.aws.sync_identity_center.logger")
 @patch("modules.aws.sync_identity_center.identity_store.delete_group_membership")
-def test_delete_group_memberships_failed(
+def test_delete_group_memberships_handles_failure(
     mock_delete_group_membership,
     mock_logger,
     aws_groups_w_users,
