@@ -230,5 +230,7 @@ def test_preformat_groups_lookup_key_not_found_raise_error(google_groups_w_users
     with pytest.raises(KeyError) as exc:
         groups.preformat_groups(groups_to_format, lookup_key, new_key, find, replace)
 
-    expected_error_message = f"\"Group {groups_to_format[0]} does not have {lookup_key} key\""
+    expected_error_message = (
+        f'"Group {groups_to_format[0]} does not have {lookup_key} key"'
+    )
     assert str(exc.value) == expected_error_message
