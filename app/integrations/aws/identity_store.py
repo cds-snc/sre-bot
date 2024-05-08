@@ -63,7 +63,8 @@ def delete_user(user_id, **kwargs):
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"UserId": user_id})
     response = execute_aws_api_call("identitystore", "delete_user", **kwargs)
-    return True if response == {} else False
+    del response["ResponseMetadata"]
+    return response == {}
 
 
 @handle_aws_api_errors
@@ -85,8 +86,7 @@ def get_user_id(user_name, **kwargs):
             }
         }
     )
-    response = execute_aws_api_call("identitystore", "get_user_id", **kwargs)
-    return response["UserId"] if response else False
+    return execute_aws_api_call("identitystore", "get_user_id", **kwargs)["UserId"]
 
 
 @handle_aws_api_errors
@@ -100,9 +100,7 @@ def describe_user(user_id, **kwargs):
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"UserId": user_id})
     response = execute_aws_api_call("identitystore", "describe_user", **kwargs)
-    if not response:
-        return False
-    response.pop("ResponseMetadata", None)
+    del response["ResponseMetadata"]
     return response
 
 
@@ -122,6 +120,9 @@ def get_group_id(group_name, **kwargs):
     Args:
         group_name (str): The name of the group.
         **kwargs: Additional keyword arguments for the API call.
+
+    Returns:
+        str: The group ID of the group.
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update(
@@ -140,7 +141,13 @@ def get_group_id(group_name, **kwargs):
 
 @handle_aws_api_errors
 def list_groups(**kwargs):
-    """Retrieves all groups from the AWS Identity Center (identitystore)"""
+    """Retrieves all groups from the AWS Identity Center (identitystore)
+    
+    Args:
+        **kwargs: Additional keyword arguments for the API call.
+        
+    Returns:
+        list: A list of group objects."""
     kwargs = resolve_identity_store_id(kwargs)
     response = execute_aws_api_call(
         "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
@@ -184,7 +191,8 @@ def delete_group_membership(membership_id, **kwargs):
     response = execute_aws_api_call(
         "identitystore", "delete_group_membership", **kwargs
     )
-    return True if response["ResponseMetadata"]["HTTPStatusCode"] == 200 else False
+    del response["ResponseMetadata"]
+    return response == {}
 
 
 @handle_aws_api_errors

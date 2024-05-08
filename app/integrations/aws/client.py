@@ -12,9 +12,11 @@ ROLE_ARN = os.environ.get("AWS_DEFAULT_ROLE_ARN", None)
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
+THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
+RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 
 def handle_aws_api_errors(func):
@@ -33,21 +35,22 @@ def handle_aws_api_errors(func):
             return func(*args, **kwargs)
         except BotoCoreError as e:
             logger.error(
-                f"A BotoCore error occurred in function '{func.__name__}': {e}"
+                f"{func.__module__}.{func.__name__}:BotoCore error: {e}"
             )
         except ClientError as e:
-            if e.response["Error"]["Code"] == "ResourceNotFoundException":
-                logger.info(f"Resource not found in function '{func.__name__}': {e}")
-                return False
+            if e.response["Error"]["Code"] in THROTTLING_ERRORS:
+                logger.info(f"{func.__module__}.{func.__name__}: {e}")
+            elif e.response["Error"]["Code"] in RESOURCE_NOT_FOUND_ERRORS:
+                logger.warn(f"{func.__module__}.{func.__name__}: {e}")
             else:
                 logger.error(
-                    f"A ClientError occurred in function '{func.__name__}': {e}"
+                    f"{func.__module__}.{func.__name__}: {e}"
                 )
         except Exception as e:  # Catch-all for any other types of exceptions
             logger.error(
-                f"An unexpected error occurred in function '{func.__name__}': {e}"
+                f"{func.__module__}.{func.__name__}: {e}"
             )
-        return None
+        return False
 
     return wrapper
 
