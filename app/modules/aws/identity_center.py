@@ -119,7 +119,7 @@ def create_aws_users(users_to_create):
     return users_created
 
 
-def delete_aws_users(users_to_delete, enable_delete=False):
+def delete_aws_users(users_to_delete, enable_user_delete=False):
     """Delete the users in the identity store.
 
     Args:
@@ -131,7 +131,7 @@ def delete_aws_users(users_to_delete, enable_delete=False):
     logger.info(f"delete_aws_users:Starting deletion of {len(users_to_delete)} users.")
     users_deleted = []
     for user in users_to_delete:
-        if enable_delete and not DRY_RUN:
+        if enable_user_delete and not DRY_RUN:
             response = identity_store.delete_user(user["UserId"])
             if response:
                 logger.info(
@@ -158,13 +158,13 @@ def sync_users(source_users, target_users, **kwargs):
 
         source_users (list): A list of users from the source system.
         target_users (list): A list of users in the identity store.
-        enable_delete (bool): Enable deletion of users.
+        enable_user_delete (bool): Enable deletion of users.
         delete_target_all (bool): Mark all target users for deletion.
 
     Returns:
         tuple: A tuple containing the users created and deleted.
     """
-    enable_delete = kwargs.get("enable_delete", False)
+    enable_user_delete = kwargs.get("enable_user_delete", False)
     delete_target_all = kwargs.get("delete_target_all", False)
 
     if delete_target_all:
@@ -181,7 +181,9 @@ def sync_users(source_users, target_users, **kwargs):
     )
 
     created_users = create_aws_users(users_to_create)
-    deleted_users = delete_aws_users(users_to_delete, enable_delete=enable_delete)
+    deleted_users = delete_aws_users(
+        users_to_delete, enable_user_delete=enable_user_delete
+    )
 
     return created_users, deleted_users
 
@@ -221,7 +223,7 @@ def create_group_memberships(target_group, users_to_add, target_users):
                 logger.info(
                     f"create_group_memberships:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
                 )
-                memberships_created.append(response)
+                memberships_created.append(matching_target_user["UserName"])
             else:
                 logger.error(
                     f"create_group_memberships:Failed to add user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
@@ -230,22 +232,20 @@ def create_group_memberships(target_group, users_to_add, target_users):
             logger.info(
                 f"create_group_memberships:DRY_RUN:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
             )
-            memberships_created.append(
-                target_group["GroupId"] + "-" + user["primaryEmail"]
-            )
+            memberships_created.append(matching_target_user["UserName"])
     logger.info(
         f"create_group_memberships:Finished adding {len(memberships_created)} users to group {target_group['DisplayName']}."
     )
     return memberships_created
 
 
-def delete_group_memberships(group, users_to_remove, enable_delete=False):
+def delete_group_memberships(group, users_to_remove, enable_membership_delete=False):
     """Delete group memberships for the users in the identity store.
 
     Args:
         group (dict): The group to remove the users from.
         users_to_remove (list): A list of users to remove from the group.
-        enable_delete (bool): Enable deletion of group memberships.
+        enable_membership_delete (bool): Enable deletion of group memberships.
 
     Returns:
         list: A list of group membership ID for memberships deleted.
@@ -255,11 +255,11 @@ def delete_group_memberships(group, users_to_remove, enable_delete=False):
         f"delete_group_memberships:Removing {len(users_to_remove)} users from group {group['DisplayName']}"
     )
     for user in users_to_remove:
-        if enable_delete and not DRY_RUN:
+        if enable_membership_delete and not DRY_RUN:
             response = identity_store.delete_group_membership(user["MembershipId"])
 
             if response:
-                memberships_deleted.append(response)
+                memberships_deleted.append(user["MemberId"]["UserName"])
                 logger.info(
                     f"delete_group_memberships:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
                 )
@@ -271,7 +271,7 @@ def delete_group_memberships(group, users_to_remove, enable_delete=False):
             logger.info(
                 f"delete_group_memberships:DRY_RUN:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
             )
-            memberships_deleted.append(user["MembershipId"])
+            memberships_deleted.append(user["MemberId"]["UserName"])
     logger.info(
         f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
     )
@@ -285,12 +285,12 @@ def sync_groups(source_groups, target_groups, target_users, **kwargs):
         source_groups (list): A list of groups from the source system.
         target_groups (list): A list of groups in the identity store.
         target_users (list): A list of users in the identity store.
-        enable_delete (bool): Enable deletion of group memberships.
+        enable_membership_delete (bool): Enable deletion of group memberships.
 
     Returns:
         tuple: A tuple containing the groups memberships created and deleted.
     """
-    enable_delete = kwargs.get("enable_delete", False)
+    enable_membership_delete = kwargs.get("enable_membership_delete", False)
 
     source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
         {"values": source_groups, "key": "DisplayName"},
@@ -324,7 +324,9 @@ def sync_groups(source_groups, target_groups, target_users, **kwargs):
             )
             groups_memberships_created.extend(memberships_created)
             memberships_deleted = delete_group_memberships(
-                target_groups_to_sync[i], users_to_remove, enable_delete=enable_delete
+                target_groups_to_sync[i],
+                users_to_remove,
+                enable_membership_delete=enable_membership_delete,
             )
             groups_memberships_deleted.extend(memberships_deleted)
 

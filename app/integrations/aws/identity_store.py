@@ -161,7 +161,7 @@ def create_group_membership(group_id, user_id, **kwargs):
         str: The membership ID of the created group membership.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"GroupId": group_id, "UserId": user_id})
+    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
     response = execute_aws_api_call(
         "identitystore", "create_group_membership", **kwargs
     )
@@ -184,7 +184,7 @@ def delete_group_membership(membership_id, **kwargs):
     response = execute_aws_api_call(
         "identitystore", "delete_group_membership", **kwargs
     )
-    return True if response == {} else False
+    return True if response["ResponseMetadata"]["HTTPStatusCode"] == 200 else False
 
 
 @handle_aws_api_errors
