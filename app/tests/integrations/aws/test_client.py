@@ -7,86 +7,79 @@ import pytest
 ROLE_ARN = "test_role_arn"
 
 
-@patch("integrations.aws.client.logger.error")
-@patch("integrations.aws.client.logger.info")
-def test_handle_aws_api_errors_catches_botocore_error(
-    mocked_logging_info, mocked_logging_error
-):
+@patch("integrations.aws.client.logger")
+def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
     mock_func = MagicMock(side_effect=BotoCoreError())
-    mock_func.__name__ = "mock_func"
-    decorated_func = aws_client.handle_aws_api_errors(mock_func)
-
-    result = decorated_func()
-
-    assert result is None
-    mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "A BotoCore error occurred in function 'mock_func': An unspecified error occurred"
-    )
-    mocked_logging_info.assert_not_called()
-
-
-@patch("integrations.aws.client.logger.error")
-@patch("integrations.aws.client.logger.info")
-def test_handle_aws_api_errors_catches_client_error_resource_not_found(
-    mocked_logging_info, mocked_logging_error
-):
-    mock_func = MagicMock(
-        side_effect=ClientError(
-            {"Error": {"Code": "ResourceNotFoundException"}}, "operation_name"
-        )
-    )
-    mock_func.__name__ = "mock_func"
+    mock_func.__name__ = "mock_func_name"
+    mock_func.__module__ = "mock_module"
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
 
     result = decorated_func()
 
     assert result is False
     mock_func.assert_called_once()
-    mocked_logging_info.assert_called_once_with(
-        "Resource not found in function 'mock_func': An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown"
+    mock_logger.error.assert_called_once_with(
+        "mock_module.mock_func_name:BotoCore error: An unspecified error occurred"
     )
-    mocked_logging_error.assert_not_called()
+    mock_logger.info.assert_not_called()
 
 
-@patch("integrations.aws.client.logger.error")
-@patch("integrations.aws.client.logger.info")
-def test_handle_aws_api_errors_catches_client_error_other(
-    mocked_logging_info, mocked_logging_error
-):
+@patch("integrations.aws.client.logger")
+def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logger):
+    mock_func = MagicMock(
+        side_effect=ClientError(
+            {"Error": {"Code": "ResourceNotFoundException"}}, "operation_name"
+        )
+    )
+    mock_func.__name__ = "mock_func_name"
+    mock_func.__module__ = "mock_module"
+    decorated_func = aws_client.handle_aws_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is False
+    mock_func.assert_called_once()
+    mock_logger.warn.assert_called_once_with(
+        "mock_module.mock_func_name: An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown"
+    )
+    mock_logger.error.assert_not_called()
+    mock_logger.info.assert_not_called()
+
+
+@patch("integrations.aws.client.logger")
+def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
     mock_func = MagicMock(
         side_effect=ClientError({"Error": {"Code": "OtherError"}}, "operation_name")
     )
-    mock_func.__name__ = "mock_func"
+    mock_func.__name__ = "mock_func_name"
+    mock_func.__module__ = "mock_module"
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
 
     result = decorated_func()
 
-    assert result is None
+    assert result is False
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "A ClientError occurred in function 'mock_func': An error occurred (OtherError) when calling the operation_name operation: Unknown"
+    mock_logger.error.assert_called_once_with(
+        "mock_module.mock_func_name: An error occurred (OtherError) when calling the operation_name operation: Unknown"
     )
-    mocked_logging_info.assert_not_called()
+    mock_logger.info.assert_not_called()
 
 
-@patch("integrations.aws.client.logger.error")
-@patch("integrations.aws.client.logger.info")
-def test_handle_aws_api_errors_catches_exception(
-    mocked_logging_info, mocked_logging_error
-):
+@patch("integrations.aws.client.logger")
+def test_handle_aws_api_errors_catches_exception(mock_logger):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
-    mock_func.__name__ = "mock_func"
+    mock_func.__name__ = "mock_func_name"
+    mock_func.__module__ = "mock_module"
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
 
     result = decorated_func()
 
-    assert result is None
+    assert result is False
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "An unexpected error occurred in function 'mock_func': Exception message"
+    mock_logger.error.assert_called_once_with(
+        "mock_module.mock_func_name: Exception message"
     )
-    mocked_logging_info.assert_not_called()
+    mock_logger.info.assert_not_called()
 
 
 def test_handle_aws_api_errors_passes_through_return_value():

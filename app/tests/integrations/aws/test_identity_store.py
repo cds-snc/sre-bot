@@ -106,7 +106,7 @@ def test_create_user_failed(mock_resolve_identity_store_id, mock_execute_aws_api
         Name={"GivenName": first_name, "FamilyName": family_name},
         DisplayName=f"{first_name} {family_name}",
     )
-    assert result is None
+    assert result is False
 
 
 @patch("integrations.aws.identity_store.execute_aws_api_call")
@@ -179,6 +179,7 @@ def test_describe_user(
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
+    user["ResponseMetadata"] = {"HTTPStatusCode": 200}
     mock_execute_aws_api_call.return_value = user
     user_id = "user_id1"
 
@@ -239,7 +240,9 @@ def test_delete_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
-    mock_execute_aws_api_call.return_value = {}
+    mock_execute_aws_api_call.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200}
+    }
     user_id = "test_user_id"
 
     result = identity_store.delete_user(user_id)
@@ -593,9 +596,8 @@ def test_delete_group_membership_resource_not_found(
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
-    mock_execute_aws_api_call.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 404}
-    }
+    # API error handling should return False if the resource is not found
+    mock_execute_aws_api_call.return_value = False
     membership_id = "nonexistent_membership_id"
 
     result = identity_store.delete_group_membership(membership_id)
