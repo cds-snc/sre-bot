@@ -8,7 +8,9 @@ ROLE_ARN = "test_role_arn"
 
 
 @patch("integrations.aws.client.logger")
-def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
+def test_handle_aws_api_errors_catches_botocore_error(
+    mock_logger
+):
     mock_func = MagicMock(side_effect=BotoCoreError())
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
@@ -25,7 +27,9 @@ def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
 
 
 @patch("integrations.aws.client.logger")
-def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logger):
+def test_handle_aws_api_errors_catches_client_error_resource_not_found(
+    mock_logger
+):
     mock_func = MagicMock(
         side_effect=ClientError(
             {"Error": {"Code": "ResourceNotFoundException"}}, "operation_name"
@@ -47,7 +51,9 @@ def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logg
 
 
 @patch("integrations.aws.client.logger")
-def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
+def test_handle_aws_api_errors_catches_client_error_other(
+    mock_logger
+):
     mock_func = MagicMock(
         side_effect=ClientError({"Error": {"Code": "OtherError"}}, "operation_name")
     )
@@ -66,7 +72,9 @@ def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
 
 
 @patch("integrations.aws.client.logger")
-def test_handle_aws_api_errors_catches_exception(mock_logger):
+def test_handle_aws_api_errors_catches_exception(
+    mock_logger
+):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"

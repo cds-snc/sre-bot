@@ -34,16 +34,22 @@ def handle_aws_api_errors(func):
         try:
             return func(*args, **kwargs)
         except BotoCoreError as e:
-            logger.error(f"{func.__module__}.{func.__name__}:BotoCore error: {e}")
+            logger.error(
+                f"{func.__module__}.{func.__name__}:BotoCore error: {e}"
+            )
         except ClientError as e:
             if e.response["Error"]["Code"] in THROTTLING_ERRORS:
                 logger.info(f"{func.__module__}.{func.__name__}: {e}")
             elif e.response["Error"]["Code"] in RESOURCE_NOT_FOUND_ERRORS:
                 logger.warn(f"{func.__module__}.{func.__name__}: {e}")
             else:
-                logger.error(f"{func.__module__}.{func.__name__}: {e}")
+                logger.error(
+                    f"{func.__module__}.{func.__name__}: {e}"
+                )
         except Exception as e:  # Catch-all for any other types of exceptions
-            logger.error(f"{func.__module__}.{func.__name__}: {e}")
+            logger.error(
+                f"{func.__module__}.{func.__name__}: {e}"
+            )
         return False
 
     return wrapper
