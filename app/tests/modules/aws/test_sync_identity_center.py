@@ -83,31 +83,31 @@ def test_synchronize_defaults_dry_run_false(
     ]
 
     expected_group_memberships_to_create = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
     ]
 
     expected_group_memberships_to_delete = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_delete=True
+        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
     )
 
     assert result == {
@@ -222,27 +222,27 @@ def test_synchronize_defaults_dry_run_true(
     ]
 
     expected_group_memberships_to_create = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
     ]
 
     expected_group_memberships_to_delete = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
     ]
 
     result = identity_center.synchronize(
@@ -359,31 +359,31 @@ def test_synchronize_enable_delete_dry_run_false(
     ]
 
     expected_group_memberships_to_create = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
     ]
 
     expected_group_memberships_to_delete = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_delete=True
+        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
     )
 
     assert result == {
@@ -524,31 +524,31 @@ def test_synchronize_enable_delete_dry_run_true(
     ]
 
     expected_group_memberships_to_create = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
     ]
 
     expected_group_memberships_to_delete = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
+        'user-email7@test.com',
+        'user-email8@test.com',
+        'user-email9@test.com',
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_delete=True
+        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
     )
 
     assert result == {
@@ -1023,7 +1023,7 @@ def test_delete_aws_users_enable_delete_true(mock_delete_user, mock_logger, aws_
     ]
     mock_delete_user.return_value = True
 
-    result = identity_center.delete_aws_users(users_to_delete, enable_delete=True)
+    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
 
     assert result == expected_output
     assert mock_logger.info.call_count == 5
@@ -1057,7 +1057,7 @@ def test_delete_aws_users_enable_delete_true_dry_run(
     ]
     mock_delete_user.return_value = True
 
-    result = identity_center.delete_aws_users(users_to_delete, enable_delete=True)
+    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
 
     assert result == expected_output
     assert mock_logger.info.call_count == 5
@@ -1084,7 +1084,7 @@ def test_delete_aws_users_handles_failure(mock_delete_user, mock_logger, aws_use
     expected_output = ["user-email1@test.com", "user-email3@test.com"]
     mock_delete_user.side_effect = [True, False, True]
 
-    result = identity_center.delete_aws_users(users_to_delete, enable_delete=True)
+    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
 
     assert result == expected_output
     assert mock_logger.info.call_count == 4
@@ -1155,7 +1155,7 @@ def test_sync_identity_center_users_default(
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=False) in mock_delete_aws_users.call_args_list
     )
     assert mock_logger.info.call_count == 1
     assert (
@@ -1182,7 +1182,7 @@ def test_sync_identity_center_users_enable_delete_true(
     mock_create_aws_users.return_value = source_users
     mock_delete_aws_users.return_value = target_users
 
-    result = identity_center.sync_users(source_users, target_users, enable_delete=True)
+    result = identity_center.sync_users(source_users, target_users, enable_user_delete=True)
 
     assert result == (source_users, target_users)
     assert (
@@ -1195,7 +1195,7 @@ def test_sync_identity_center_users_enable_delete_true(
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_delete=True) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=True) in mock_delete_aws_users.call_args_list
     )
     assert mock_logger.info.call_count == 1
     assert (
@@ -1230,7 +1230,7 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
 
     assert call([]) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_delete=False) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=False) in mock_delete_aws_users.call_args_list
     )
 
     assert mock_logger.info.call_count == 1
@@ -1258,7 +1258,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
     mock_delete_aws_users.return_value = target_users
 
     result = identity_center.sync_users(
-        source_users, target_users, enable_delete=True, delete_target_all=True
+        source_users, target_users, enable_user_delete=True, delete_target_all=True
     )
 
     assert result == ([], target_users)
@@ -1266,7 +1266,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
     assert call([]) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_delete=True) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=True) in mock_delete_aws_users.call_args_list
     )
 
     assert mock_logger.info.call_count == 1
@@ -1401,9 +1401,9 @@ def test_create_group_memberships_dry_run(
     result = identity_center.create_group_memberships(group, users_to_add, target_users)
 
     assert result == [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
     ]
     assert mock_create_group_membership.call_count == 0
     assert mock_filter_by_condition.call_count == 3
@@ -1499,12 +1499,12 @@ def test_delete_group_memberships_defaults_not_deleting(
     result = identity_center.delete_group_memberships(group, users_to_remove)
 
     assert result == [
-        "membership_id_1",
-        "membership_id_2",
-        "membership_id_3",
-        "membership_id_4",
-        "membership_id_5",
-        "membership_id_6",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email4@test.com",
+        "user-email5@test.com",
+        "user-email6@test.com",
     ]
     assert mock_delete_group_membership.call_count == 0
     mock_logger.info.assert_any_call(
@@ -1539,16 +1539,16 @@ def test_delete_group_memberships_enable_delete_dry_run(
     ]
 
     result = identity_center.delete_group_memberships(
-        group, users_to_remove, enable_delete=True
+        group, users_to_remove, enable_membership_delete=True
     )
 
     assert result == [
-        "membership_id_1",
-        "membership_id_2",
-        "membership_id_3",
-        "membership_id_4",
-        "membership_id_5",
-        "membership_id_6",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email4@test.com",
+        "user-email5@test.com",
+        "user-email6@test.com",
     ]
     assert mock_delete_group_membership.call_count == 0
     mock_logger.info.assert_any_call(
@@ -1583,16 +1583,16 @@ def test_delete_group_memberships_enable_delete_and_not_dry_run(
     ]
 
     result = identity_center.delete_group_memberships(
-        group, users_to_remove, enable_delete=True
+        group, users_to_remove, enable_membership_delete=True
     )
 
     assert result == [
-        "membership_id_1",
-        "membership_id_2",
-        "membership_id_3",
-        "membership_id_4",
-        "membership_id_5",
-        "membership_id_6",
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        "user-email4@test.com",
+        "user-email5@test.com",
+        "user-email6@test.com",
     ]
     assert mock_delete_group_membership.call_count == 6
     mock_logger.info.assert_any_call(
@@ -1627,14 +1627,14 @@ def test_delete_group_memberships_handles_failure(
     ]
 
     result = identity_center.delete_group_memberships(
-        group, users_to_remove, enable_delete=True
+        group, users_to_remove, enable_membership_delete=True
     )
 
     assert result == [
-        "membership_id_1",
-        "membership_id_3",
-        "membership_id_5",
-        "membership_id_6",
+        "user-email1@test.com",
+        "user-email3@test.com",
+        "user-email5@test.com",
+        "user-email6@test.com",
     ]
     assert mock_delete_group_membership.call_count == 6
     for i in range(len(users_to_remove)):
