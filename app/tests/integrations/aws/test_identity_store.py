@@ -240,7 +240,9 @@ def test_delete_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
-    mock_execute_aws_api_call.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    mock_execute_aws_api_call.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200}
+    }
     user_id = "test_user_id"
 
     result = identity_store.delete_user(user_id)
