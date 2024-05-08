@@ -481,7 +481,7 @@ def test_create_group_membership(
         "create_group_membership",
         IdentityStoreId="test_instance_id",
         GroupId=group_id,
-        UserId=user_id,
+        MemberId={"UserId": user_id},
     )
     assert result == "test_membership_id"
 
@@ -505,7 +505,7 @@ def test_create_group_membership_unsuccessful(
         "create_group_membership",
         IdentityStoreId="test_instance_id",
         GroupId=group_id,
-        UserId=user_id,
+        MemberId={"UserId": user_id},
     )
     assert result is False
 
@@ -569,7 +569,9 @@ def test_delete_group_membership(
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
-    mock_execute_aws_api_call.return_value = {}
+    mock_execute_aws_api_call.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200}
+    }
     membership_id = "test_membership_id"
 
     result = identity_store.delete_group_membership(membership_id)
@@ -591,7 +593,9 @@ def test_delete_group_membership_resource_not_found(
     mock_resolve_identity_store_id.return_value = {
         "IdentityStoreId": "test_instance_id"
     }
-    mock_execute_aws_api_call.return_value = False
+    mock_execute_aws_api_call.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 404}
+    }
     membership_id = "nonexistent_membership_id"
 
     result = identity_store.delete_group_membership(membership_id)
