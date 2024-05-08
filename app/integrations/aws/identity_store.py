@@ -142,10 +142,10 @@ def get_group_id(group_name, **kwargs):
 @handle_aws_api_errors
 def list_groups(**kwargs):
     """Retrieves all groups from the AWS Identity Center (identitystore)
-
+    
     Args:
         **kwargs: Additional keyword arguments for the API call.
-
+        
     Returns:
         list: A list of group objects."""
     kwargs = resolve_identity_store_id(kwargs)
