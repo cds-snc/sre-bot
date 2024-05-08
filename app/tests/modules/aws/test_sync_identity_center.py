@@ -107,7 +107,10 @@ def test_synchronize_defaults_dry_run_false(
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
+        enable_users_sync=True,
+        enable_groups_sync=True,
+        enable_user_delete=True,
+        enable_membership_delete=True,
     )
 
     assert result == {
@@ -371,19 +374,22 @@ def test_synchronize_enable_delete_dry_run_false(
     ]
 
     expected_group_memberships_to_delete = [
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
+        enable_users_sync=True,
+        enable_groups_sync=True,
+        enable_user_delete=True,
+        enable_membership_delete=True,
     )
 
     assert result == {
@@ -536,19 +542,22 @@ def test_synchronize_enable_delete_dry_run_true(
     ]
 
     expected_group_memberships_to_delete = [
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
-        'user-email7@test.com',
-        'user-email8@test.com',
-        'user-email9@test.com',
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
+        "user-email7@test.com",
+        "user-email8@test.com",
+        "user-email9@test.com",
     ]
 
     result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True, enable_user_delete=True, enable_membership_delete=True
+        enable_users_sync=True,
+        enable_groups_sync=True,
+        enable_user_delete=True,
+        enable_membership_delete=True,
     )
 
     assert result == {
@@ -1155,7 +1164,8 @@ def test_sync_identity_center_users_default(
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_user_delete=False) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=False)
+        in mock_delete_aws_users.call_args_list
     )
     assert mock_logger.info.call_count == 1
     assert (
@@ -1182,7 +1192,9 @@ def test_sync_identity_center_users_enable_delete_true(
     mock_create_aws_users.return_value = source_users
     mock_delete_aws_users.return_value = target_users
 
-    result = identity_center.sync_users(source_users, target_users, enable_user_delete=True)
+    result = identity_center.sync_users(
+        source_users, target_users, enable_user_delete=True
+    )
 
     assert result == (source_users, target_users)
     assert (
@@ -1195,7 +1207,8 @@ def test_sync_identity_center_users_enable_delete_true(
     )
     assert call(source_users) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_user_delete=True) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=True)
+        in mock_delete_aws_users.call_args_list
     )
     assert mock_logger.info.call_count == 1
     assert (
@@ -1230,7 +1243,8 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
 
     assert call([]) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_user_delete=False) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=False)
+        in mock_delete_aws_users.call_args_list
     )
 
     assert mock_logger.info.call_count == 1
@@ -1266,7 +1280,8 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
     assert call([]) in mock_create_aws_users.call_args_list
     assert (
-        call(target_users, enable_user_delete=True) in mock_delete_aws_users.call_args_list
+        call(target_users, enable_user_delete=True)
+        in mock_delete_aws_users.call_args_list
     )
 
     assert mock_logger.info.call_count == 1

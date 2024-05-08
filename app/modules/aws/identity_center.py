@@ -232,9 +232,7 @@ def create_group_memberships(target_group, users_to_add, target_users):
             logger.info(
                 f"create_group_memberships:DRY_RUN:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
             )
-            memberships_created.append(
-                matching_target_user["UserName"]
-            )
+            memberships_created.append(matching_target_user["UserName"])
     logger.info(
         f"create_group_memberships:Finished adding {len(memberships_created)} users to group {target_group['DisplayName']}."
     )
