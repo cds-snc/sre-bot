@@ -113,11 +113,11 @@ def get_unique_nested_dicts(source_items, nested_key):
     Considers the whole object for uniqueness, not specific keys.
 
     Args:
-        groups (list or dict): A list of groups or a single group.
-        key (str): The key to get the users from the groups.
+        source_items (list or dict): A list of dicts or a single dict.
+        nested_key (str): The key to search for nested items.
 
     Returns:
-        list: A list of unique users from the groups
+        list: A list containing the unique dictionaries found in the nested key.
     """
     unique_dicts = {}
     if isinstance(source_items, list):
