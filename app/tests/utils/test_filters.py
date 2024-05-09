@@ -181,3 +181,54 @@ def test_compare_list_with_complex_values_sync_mode(google_users, aws_users):
     response = filters.compare_lists(source, target, mode="sync")
 
     assert response == ([], target["values"][3:])
+
+
+def test_get_unique_nested_dicts(google_groups_w_users):
+    groups = google_groups_w_users()
+    unique_users = []
+    for group in groups:
+        for user in group["members"]:
+            if user not in unique_users:
+                unique_users.append(user)
+    users_from_groups = filters.get_unique_nested_dicts(groups, "members")
+
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
+        unique_users, key=lambda user: user["id"]
+    )
+
+
+def test_get_unique_nested_dicts_with_empty_source():
+    groups = []
+    users_from_groups = filters.get_unique_nested_dicts(groups, "members")
+    assert users_from_groups == []
+
+
+def test_get_unique_nested_dicts_from_single_dict(google_groups_w_users):
+    source_group = google_groups_w_users()[0]
+    users_from_groups = filters.get_unique_nested_dicts(source_group, "members")
+    expected_users = source_group["members"]
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
+        expected_users, key=lambda user: user["id"]
+    )
+
+
+def test_get_unique_nested_dicts_with_duplicate_key():
+    group = {
+        "id": "source_group_id1",
+        "name": "SOURCE-group1",
+        "email": "SOURCE-group1@test.com",
+        "members": [
+            {"email": "user1.test@test.com", "id": "user1_id", "username": "user1"},
+            {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
+            {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
+        ],
+    }
+    users_from_groups = filters.get_unique_nested_dicts(group, "members")
+    expected_users = [
+        {"email": "user1.test@test.com", "id": "user1_id", "username": "user1"},
+        {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
+        {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
+    ]
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
+        expected_users, key=lambda user: user["id"]
+    )
