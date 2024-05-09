@@ -1,14 +1,14 @@
 from unittest.mock import MagicMock, call, patch
-from modules.provisioning import users
+from modules.provisioning import entities
 
 
-@patch("modules.provisioning.users.logger")
+@patch("modules.provisioning.entities.logger")
 def test_provision_entities_success(mock_logger):
     users_list = [{"name": "user1"}, {"name": "user2"}, {"name": "user3"}]
     mock_function = MagicMock()
     mock_function.return_value = True
 
-    result = users.provision_entities(
+    result = entities.provision_entities(
         mock_function,
         users_list,
         integration_name="aws",
@@ -26,13 +26,13 @@ def test_provision_entities_success(mock_logger):
     mock_logger.error.assert_not_called()
 
 
-@patch("modules.provisioning.users.logger")
+@patch("modules.provisioning.entities.logger")
 def test_provision_entities_failure(mock_logger):
     mock_function = MagicMock()
     users_list = [{"name": "user1"}, {"name": "user2"}, {"name": "user3"}]
     mock_function.side_effect = [True, False, True]
 
-    result = users.provision_entities(
+    result = entities.provision_entities(
         mock_function,
         users_list,
         integration_name="aws",
@@ -56,11 +56,11 @@ def test_provision_entities_failure(mock_logger):
     ]
 
 
-@patch("modules.provisioning.users.logger")
+@patch("modules.provisioning.entities.logger")
 def test_provision_entities_empty_list(mock_logger):
     users_list = []
     mock_function = MagicMock()
-    result = users.provision_entities(
+    result = entities.provision_entities(
         mock_function,
         users_list,
         integration_name="aws",
