@@ -1,4 +1,3 @@
-# from logging import getLogger
 import logging
 
 
@@ -7,33 +6,53 @@ logger = logging.getLogger(__name__)
 DISPLAY_KEYS = {"aws": "UserName", "google": "primaryEmail"}
 
 
-def provision_users(
-    integration, operation, function, users, display_key=None, **kwargs
+def provision_entities(
+    function,
+    entities,
+    execute=True,
+    integration_name="unspecified",
+    operation_name="processing",
+    entity_name="entity(ies)",
+    display_key=None,
+    **kwargs,
 ):
-    """Provision users in the specified integration's operation.
+    """Provision entities in the specified integration's operation.
 
     Args:
-        integration (str): The target integration intended for the users.
-        operation (str): The operation to perform on the users.
-        function (function): The function to perform on the users.
-        users (list): A list of user objects to create.
-        display_key (str): The key to display the user name.
+        function (function): The function to execute for each entity.
+        entities (list): The list of entities to provision.
+        execute (bool, optional): Whether to execute the operation. Defaults to True.
+        integration_name (str, optional): The name of the integration. Defaults to "unspecified".
+        operation_name (str, optional): The name of the operation. Defaults to "processing".
+        entity_name (str, optional): The name of the entity. Defaults to "entity(ies)".
+        display_key (str, optional): The key to display in the logs. Defaults to None.
+        **kwargs: Additional keyword arguments to pass to the function.
 
     Returns:
-        list: A list of created users objects.
+        list: A list of created entities objects.
     """
-    provisioned_users = []
-    logger.info(f"{integration}:Starting {operation} of {len(users)} user(s)")
-    for user in users:
-        logger.info(f"user's data:\n{user}")
-        response = function(**user, **kwargs)
-        if response:
-            logger.info(
-                f"{integration}:Successful {operation} of user {user[display_key] if display_key else user}"
-            )
-            provisioned_users.append({"user": user, "response": response})
+    provisioned_entities = []
+    logger.info(
+        f"{integration_name}:Starting {operation_name} of {len(entities)} {entity_name}"
+    )
+    for entity in entities:
+        if execute:
+            response = function(**entity, **kwargs)
+            if response:
+                logger.info(
+                    f"{integration_name}:Successful {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
+                )
+                provisioned_entities.append({"entity": entity, "response": response})
+            else:
+                logger.error(
+                    f"{integration_name}:Failed {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
+                )
         else:
-            logger.error(
-                f"{integration}:Failed {operation} user {user[display_key] if display_key else user}"
+            logger.info(
+                f"{integration_name}:DRY_RUN:Successful {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
             )
-    return provisioned_users
+            provisioned_entities.append({"entity": entity, "response": None})
+    logger.info(
+        f"{integration_name}:Completed {operation_name} of {len(provisioned_entities)} {entity_name}"
+    )
+    return provisioned_entities
