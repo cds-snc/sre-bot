@@ -61,8 +61,8 @@ def delete_user(user_id, **kwargs):
         bool: True if the user was deleted successfully, False otherwise.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"UserId": user_id})
-    response = execute_aws_api_call("identitystore", "delete_user", **kwargs)
+    params = {"UserId": user_id, "IdentityStoreId": kwargs.get("IdentityStoreId")}
+    response = execute_aws_api_call("identitystore", "delete_user", **params)
     del response["ResponseMetadata"]
     return response == {}
 
