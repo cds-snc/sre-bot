@@ -1,7 +1,7 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 from logging import getLogger
 from integrations.aws import identity_store
-from modules.provisioning import users, groups
+from modules.provisioning import groups
 from utils import filters
 
 
