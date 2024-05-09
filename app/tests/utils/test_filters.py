@@ -1,3 +1,4 @@
+import pytest
 from utils import filters
 
 
@@ -232,3 +233,92 @@ def test_get_unique_nested_dicts_with_duplicate_key():
     assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
         expected_users, key=lambda user: user["id"]
     )
+
+
+def test_preformat_items():
+    items_to_format = [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+        }
+    ]
+
+    lookup_key = "name"
+    new_key = "DisplayName"
+    pattern = r"^PREFIX-"
+    replace = "new-"
+    response = filters.preformat_items(
+        items_to_format, lookup_key, new_key, pattern, replace
+    )
+
+    assert response == [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+            "DisplayName": "new-group-name1",
+        }
+    ]
+
+
+def test_preformat_items_returns_value_if_no_matching_pattern():
+    items_to_format = [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "not-PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+        }
+    ]
+    lookup_key = "name"
+    new_key = "DisplayName"
+    pattern = r"^PREFIX-"
+    replace = "new-"
+    response = filters.preformat_items(
+        items_to_format, lookup_key, new_key, pattern, replace
+    )
+
+    assert response == [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "not-PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+            "DisplayName": "not-PREFIX-group-name1",
+        }
+    ]
+
+
+def test_preformat_items_lookup_key_not_found_raise_error(google_groups_w_users):
+    items_to_format = google_groups_w_users(n_groups=1, n_users=1, prefix="PREFIX-")
+    lookup_key = "invalid_key"
+    new_key = "DisplayName"
+    pattern = "PREFIX-"
+    replace = "new-"
+
+    with pytest.raises(KeyError) as exc:
+        filters.preformat_items(items_to_format, lookup_key, new_key, pattern, replace)
+
+    expected_error_message = (
+        f'"Item {items_to_format[0]} does not have {lookup_key} key"'
+    )
+    assert str(exc.value) == expected_error_message

@@ -1,6 +1,7 @@
 """This module contains utility functions for filtering lists and dictionaries."""
 from functools import reduce
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -133,3 +134,12 @@ def get_unique_nested_dicts(source_items, nested_key):
                 unique_dicts[str(nested_dict)] = nested_dict
     logger.info(f"Found {len(unique_dicts)} unique dictionaries.")
     return list(unique_dicts.values())
+
+
+def preformat_items(items, lookup_key, new_key, pattern="", replace=""):
+    for item in items:
+        if lookup_key not in item:
+            raise KeyError(f"Item {item} does not have {lookup_key} key")
+        item[new_key] = re.sub(pattern, replace, item[lookup_key])
+
+    return items
