@@ -619,7 +619,7 @@ def test_synchronize_enable_delete_dry_run_true(
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
 @patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.groups.preformat_groups")
+@patch("modules.aws.identity_center.filters.preformat_items")
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
@@ -631,7 +631,7 @@ def test_synchronize_sync_skip_users_if_false(
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
-    mock_preformat_groups,
+    mock_preformat_items,
     mock_logger,
     aws_groups_w_users,
     aws_users,
@@ -646,7 +646,7 @@ def test_synchronize_sync_skip_users_if_false(
         source_groups,
         target_groups,
     ]
-    mock_preformat_groups.return_value = source_groups
+    mock_preformat_items.return_value = source_groups
     mock_get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
@@ -708,7 +708,7 @@ def test_synchronize_sync_skip_users_if_false(
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
 @patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.groups.preformat_groups")
+@patch("modules.aws.identity_center.filters.preformat_items")
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
@@ -720,7 +720,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
-    mock_preformat_groups,
+    mock_preformat_items,
     mock_logger,
     aws_groups_w_users,
     aws_users,
@@ -735,7 +735,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
         source_groups,
         target_groups,
     ]
-    mock_preformat_groups.return_value = source_groups
+    mock_preformat_items.return_value = source_groups
     mock_get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
