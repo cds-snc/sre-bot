@@ -69,7 +69,7 @@ def synchronize(**kwargs):
         logger.info("synchronize:groups:Syncing Groups")
 
         logger.info("synchronize:groups:Formatting Source Groups")
-        source_groups = groups.preformat_groups(
+        source_groups = filters.preformat_items(
             source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
         )
         groups_sync_status = sync_groups(
