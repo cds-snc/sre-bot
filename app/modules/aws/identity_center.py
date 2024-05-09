@@ -31,8 +31,7 @@ def synchronize(**kwargs):
     source_groups = groups.get_groups_with_members_from_integration(
         "google_groups", query=query, filters=source_groups_filters
     )
-    source_users = users.get_unique_users_from_groups(source_groups, "members")
-
+    source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(
         f"synchronize:Found {len(source_groups)} Source Groups and {len(source_users)} Users"
     )
