@@ -1,7 +1,7 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 from logging import getLogger
 from integrations.aws import identity_store
-from modules.provisioning import users, groups
+from modules.provisioning import groups
 from utils import filters
 
 
@@ -31,8 +31,7 @@ def synchronize(**kwargs):
     source_groups = groups.get_groups_with_members_from_integration(
         "google_groups", query=query, filters=source_groups_filters
     )
-    source_users = users.get_unique_users_from_groups(source_groups, "members")
-
+    source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(
         f"synchronize:Found {len(source_groups)} Source Groups and {len(source_users)} Users"
     )

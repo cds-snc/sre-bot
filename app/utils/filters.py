@@ -106,3 +106,30 @@ def compare_lists(source, target, mode="sync"):
         filtered_target_groups.sort(key=lambda x: x[target_key])
 
         return filtered_source_groups, filtered_target_groups
+
+
+def get_unique_nested_dicts(source_items, nested_key):
+    """Get the unique items from a list located in a dict or from a list of dicts with the same data schema.
+    Considers the whole object for uniqueness, not specific keys.
+
+    Args:
+        source_items (list or dict): A list of dicts or a single dict.
+        nested_key (str): The key to search for nested items.
+
+    Returns:
+        list: A list containing the unique dictionaries found in the nested key.
+    """
+    unique_dicts = {}
+    if isinstance(source_items, list):
+        logger.info(f"Getting unique dictionaries from {len(source_items)} items.")
+        for item in source_items:
+            for nested_dict in get_nested_value(item, nested_key):
+                if nested_dict:
+                    unique_dicts[str(nested_dict)] = nested_dict
+    elif isinstance(source_items, dict):
+        logger.info("Getting unique dictionaries from a single item.")
+        for nested_dict in get_nested_value(source_items, nested_key):
+            if nested_dict:
+                unique_dicts[str(nested_dict)] = nested_dict
+    logger.info(f"Found {len(unique_dicts)} unique dictionaries.")
+    return list(unique_dicts.values())

@@ -623,11 +623,11 @@ def test_synchronize_enable_delete_dry_run_true(
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.users.get_unique_users_from_groups")
+@patch("modules.aws.identity_center.filters.get_unique_nested_dicts")
 @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_users_if_false(
     mock_get_groups_with_members_from_integration,
-    mock_get_unique_users_from_groups,
+    mock_get_unique_nested_dicts,
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
@@ -647,7 +647,7 @@ def test_synchronize_sync_skip_users_if_false(
         target_groups,
     ]
     mock_preformat_groups.return_value = source_groups
-    mock_get_unique_users_from_groups.return_value = source_users
+    mock_get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
     mock_sync_identity_center_groups.return_value = (
@@ -671,7 +671,7 @@ def test_synchronize_sync_skip_users_if_false(
         aws_identity_center_call,
     ]
 
-    assert mock_get_unique_users_from_groups.call_count == 1
+    assert mock_get_unique_nested_dicts.call_count == 1
     assert mock_list_users.call_count == 1
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 1
@@ -712,11 +712,11 @@ def test_synchronize_sync_skip_users_if_false(
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.users.get_unique_users_from_groups")
+@patch("modules.aws.identity_center.filters.get_unique_nested_dicts")
 @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_groups_false_if_false(
     mock_get_groups_with_members_from_integration,
-    mock_get_unique_users_from_groups,
+    mock_get_unique_nested_dicts,
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
@@ -736,7 +736,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
         target_groups,
     ]
     mock_preformat_groups.return_value = source_groups
-    mock_get_unique_users_from_groups.return_value = source_users
+    mock_get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
     mock_sync_identity_center_groups.return_value = (
@@ -757,7 +757,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
         aws_identity_center_call,
     ]
 
-    assert mock_get_unique_users_from_groups.call_count == 1
+    assert mock_get_unique_nested_dicts.call_count == 1
     assert mock_list_users.call_count == 2
     assert mock_sync_identity_center_users.call_count == 1
     assert mock_sync_identity_center_groups.call_count == 0
@@ -796,11 +796,11 @@ def test_synchronize_sync_skip_groups_false_if_false(
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.users.get_unique_users_from_groups")
+@patch("modules.aws.identity_center.filters.get_unique_nested_dicts")
 @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
 def test_synchronize_sync_skip_users_and_groups_if_false(
     mock_get_groups_with_members_from_integration,
-    mock_get_unique_users_from_groups,
+    mock_get_unique_nested_dicts,
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
@@ -818,7 +818,7 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
         source_groups,
         target_groups,
     ]
-    mock_get_unique_users_from_groups.return_value = source_users
+    mock_get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
     mock_sync_identity_center_groups.return_value = (
@@ -841,7 +841,7 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
         aws_identity_center_call,
     ]
 
-    assert mock_get_unique_users_from_groups.call_count == 1
+    assert mock_get_unique_nested_dicts.call_count == 1
     assert mock_list_users.call_count == 1
 
     assert mock_sync_identity_center_users.call_count == 0

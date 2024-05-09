@@ -1,39 +1,10 @@
 # from logging import getLogger
 import logging
 
-from utils import filters as filter_tools
-
 
 logger = logging.getLogger(__name__)
 
 DISPLAY_KEYS = {"aws": "UserName", "google": "primaryEmail"}
-
-
-def get_unique_users_from_groups(groups, key):
-    """Get the unique users from a list of groups with the same data schema or a single group dict.
-    Considers the whole object for uniqueness, not specific keys.
-
-    Args:
-        groups (list or dict): A list of groups or a single group.
-        key (str): The key to get the users from the groups.
-
-    Returns:
-        list: A list of unique users from the groups
-    """
-    users_dict = {}
-    if isinstance(groups, list):
-        logger.info(f"Getting unique users from {len(groups)} groups.")
-        for group in groups:
-            for user in filter_tools.get_nested_value(group, key):
-                if user:
-                    users_dict[str(user)] = user
-    elif isinstance(groups, dict):
-        logger.info("Getting unique users from a single group.")
-        for user in filter_tools.get_nested_value(groups, key):
-            if user:
-                users_dict[str(user)] = user
-    logger.info(f"Found {len(users_dict)} unique users.")
-    return list(users_dict.values())
 
 
 def provision_users(
