@@ -4,7 +4,6 @@ import pytest
 from modules.aws import identity_center
 
 
-@patch("modules.aws.identity_center.DRY_RUN", False)
 @patch("modules.aws.identity_center.logger")
 @patch("modules.provisioning.entities.logger")
 @patch("modules.aws.identity_center.identity_store.create_user")
@@ -13,7 +12,7 @@ from modules.aws import identity_center
 @patch("modules.aws.identity_center.identity_store.delete_group_membership")
 @patch("modules.aws.identity_center.identity_store.list_users")
 @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
-def test_synchronize_defaults_dry_run_false(
+def test_synchronize_enable_all(
     mock_get_groups_with_members_from_integration,
     mock_list_users,
     mock_delete_group_membership,
