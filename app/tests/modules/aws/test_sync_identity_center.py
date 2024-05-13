@@ -895,269 +895,6 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
     assert mock_logger.info.call_args_list == logger_calls
 
 
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-def test_create_aws_users(
-    mock_create_user, mock_logger, google_users, google_groups_w_users
-):
-    users_to_create = google_users(3)
-    # groups_to_sync = google_groups_w_users(3, 9)
-    mock_create_user.side_effect = users_to_create
-
-    result = identity_center.create_aws_users(users_to_create)
-
-    assert result == users_to_create
-    assert mock_create_user.call_count == 3
-    mock_logger.info.assert_any_call(
-        f"create_aws_users:Starting creation of {len(users_to_create)} users."
-    )
-    for user in users_to_create:
-        mock_create_user.assert_has_calls(
-            [
-                call(
-                    user["primaryEmail"],
-                    user["name"]["givenName"],
-                    user["name"]["familyName"],
-                )
-                for user in users_to_create
-            ]
-        )
-        mock_logger.info.assert_any_call(
-            f"create_aws_users:Successfully created user {user['primaryEmail']}"
-        )
-    assert (
-        call("create_aws_users:Finished creation of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-
-
-@patch("modules.aws.identity_center.DRY_RUN", True)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-def test_create_aws_users_dry_run(mock_create_user, mock_logger, google_users):
-    users_to_create = google_users(3)
-    expected_output = [user["primaryEmail"] for user in users_to_create]
-
-    result = identity_center.create_aws_users(users_to_create)
-
-    assert result == expected_output
-    assert mock_create_user.call_count == 0
-    mock_logger.info.assert_any_call(
-        f"create_aws_users:Starting creation of {len(users_to_create)} users."
-    )
-    for user in users_to_create:
-        mock_logger.info.assert_any_call(
-            f"create_aws_users:DRY_RUN:Successfully created user {user['primaryEmail']}"
-        )
-    assert (
-        call("create_aws_users:Finished creation of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-def test_create_aws_users_handles_failure(
-    mock_create_user, mock_logger, google_users, aws_users
-):
-    users_to_create = google_users(3)
-    created_users = aws_users(3)
-    expected_output = [user["UserId"] for user in created_users]
-    mock_create_user.side_effect = [expected_output[0], None, expected_output[2]]
-    del expected_output[1]
-
-    result = identity_center.create_aws_users(users_to_create)
-
-    assert result == expected_output
-    assert mock_create_user.call_count == 3
-    assert mock_logger.info.call_count == 4
-    assert mock_logger.error.call_count == 1
-    mock_logger.info.assert_any_call(
-        f"create_aws_users:Starting creation of {len(users_to_create)} users."
-    )
-    for i in range(len(users_to_create)):
-        mock_create_user.assert_any_call(
-            users_to_create[i]["primaryEmail"],
-            users_to_create[i]["name"]["givenName"],
-            users_to_create[i]["name"]["familyName"],
-        )
-        if i == 1:
-            mock_logger.error.assert_any_call(
-                f"create_aws_users:Failed to create user {users_to_create[i]['primaryEmail']}"
-            )
-        else:
-            mock_logger.info.assert_any_call(
-                f"create_aws_users:Successfully created user {users_to_create[i]['primaryEmail']}"
-            )
-    assert (
-        call("create_aws_users:Finished creation of 2 users.")
-        in mock_logger.info.call_args_list
-    )
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-def test_create_aws_users_empty_list(mock_create_user, mock_logger):
-    users_to_create = []
-    mock_create_user.side_effect = users_to_create
-
-    result = identity_center.create_aws_users(users_to_create)
-
-    assert result == users_to_create
-    assert mock_create_user.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("create_aws_users:Starting creation of 0 users.")
-        in mock_logger.info.call_args_list
-    )
-    assert call("create_aws_users:Finished creation of 0 users.")
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-def test_delete_aws_users_default(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3)
-    expected_output = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-
-    result = identity_center.delete_aws_users(users_to_delete)
-
-    assert result == expected_output
-    assert mock_logger.info.call_count == 5
-    assert (
-        call("delete_aws_users:Starting deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    for user in users_to_delete:
-        mock_logger.info.assert_any_call(
-            f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
-        )
-    assert (
-        call("delete_aws_users:Finished deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    mock_delete_user.call_count == 0
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-def test_delete_aws_users_enable_delete_true(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3)
-    expected_output = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    mock_delete_user.return_value = True
-
-    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
-
-    assert result == expected_output
-    assert mock_logger.info.call_count == 5
-    assert (
-        call("delete_aws_users:Starting deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    for user in users_to_delete:
-        mock_logger.info.assert_any_call(
-            f"delete_aws_users:Successfully deleted user {user['UserName']}"
-        )
-        mock_delete_user.assert_any_call(user["UserId"])
-    assert (
-        call("delete_aws_users:Finished deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    mock_delete_user.call_count == 3
-
-
-@patch("modules.aws.identity_center.DRY_RUN", True)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-def test_delete_aws_users_enable_delete_true_dry_run(
-    mock_delete_user, mock_logger, aws_users
-):
-    users_to_delete = aws_users(3)
-    expected_output = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    mock_delete_user.return_value = True
-
-    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
-
-    assert result == expected_output
-    assert mock_logger.info.call_count == 5
-    assert (
-        call("delete_aws_users:Starting deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    for user in users_to_delete:
-        mock_logger.info.assert_any_call(
-            f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
-        )
-    assert (
-        call("delete_aws_users:Finished deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    mock_delete_user.call_count == 0
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-def test_delete_aws_users_handles_failure(mock_delete_user, mock_logger, aws_users):
-    users_to_delete = aws_users(3)
-    expected_output = ["user-email1@test.com", "user-email3@test.com"]
-    mock_delete_user.side_effect = [True, False, True]
-
-    result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
-
-    assert result == expected_output
-    assert mock_logger.info.call_count == 4
-    assert mock_logger.error.call_count == 1
-    assert (
-        call("delete_aws_users:Starting deletion of 3 users.")
-        in mock_logger.info.call_args_list
-    )
-    for i in range(len(users_to_delete)):
-        mock_delete_user.assert_any_call(users_to_delete[i]["UserId"])
-        if i == 1:
-            mock_logger.error.assert_any_call(
-                f"delete_aws_users:Failed to delete user {users_to_delete[i]['UserName']}"
-            )
-        else:
-            mock_logger.info.assert_any_call(
-                f"delete_aws_users:Successfully deleted user {users_to_delete[i]['UserName']}"
-            )
-    assert (
-        call("delete_aws_users:Finished deletion of 2 users.")
-        in mock_logger.info.call_args_list
-    )
-    mock_delete_user.call_count == 3
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-def test_delete_aws_users_empty_list(mock_delete_user, mock_logger):
-    users_to_delete = []
-    mock_delete_user.side_effect = users_to_delete
-
-    result = identity_center.delete_aws_users(users_to_delete)
-
-    assert result == users_to_delete
-    assert mock_delete_user.call_count == 0
-
-
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.identity_store.delete_user")
 @patch("modules.aws.identity_center.identity_store.create_user")
@@ -2051,3 +1788,266 @@ def test_sync_identity_center_groups_no_matching_groups_to_sync(
         call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
         in mock_logger.info.call_args_list
     )
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# def test_create_aws_users(
+#     mock_create_user, mock_logger, google_users, google_groups_w_users
+# ):
+#     users_to_create = google_users(3)
+#     # groups_to_sync = google_groups_w_users(3, 9)
+#     mock_create_user.side_effect = users_to_create
+
+#     result = identity_center.create_aws_users(users_to_create)
+
+#     assert result == users_to_create
+#     assert mock_create_user.call_count == 3
+#     mock_logger.info.assert_any_call(
+#         f"create_aws_users:Starting creation of {len(users_to_create)} users."
+#     )
+#     for user in users_to_create:
+#         mock_create_user.assert_has_calls(
+#             [
+#                 call(
+#                     user["primaryEmail"],
+#                     user["name"]["givenName"],
+#                     user["name"]["familyName"],
+#                 )
+#                 for user in users_to_create
+#             ]
+#         )
+#         mock_logger.info.assert_any_call(
+#             f"create_aws_users:Successfully created user {user['primaryEmail']}"
+#         )
+#     assert (
+#         call("create_aws_users:Finished creation of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", True)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# def test_create_aws_users_dry_run(mock_create_user, mock_logger, google_users):
+#     users_to_create = google_users(3)
+#     expected_output = [user["primaryEmail"] for user in users_to_create]
+
+#     result = identity_center.create_aws_users(users_to_create)
+
+#     assert result == expected_output
+#     assert mock_create_user.call_count == 0
+#     mock_logger.info.assert_any_call(
+#         f"create_aws_users:Starting creation of {len(users_to_create)} users."
+#     )
+#     for user in users_to_create:
+#         mock_logger.info.assert_any_call(
+#             f"create_aws_users:DRY_RUN:Successfully created user {user['primaryEmail']}"
+#         )
+#     assert (
+#         call("create_aws_users:Finished creation of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# def test_create_aws_users_handles_failure(
+#     mock_create_user, mock_logger, google_users, aws_users
+# ):
+#     users_to_create = google_users(3)
+#     created_users = aws_users(3)
+#     expected_output = [user["UserId"] for user in created_users]
+#     mock_create_user.side_effect = [expected_output[0], None, expected_output[2]]
+#     del expected_output[1]
+
+#     result = identity_center.create_aws_users(users_to_create)
+
+#     assert result == expected_output
+#     assert mock_create_user.call_count == 3
+#     assert mock_logger.info.call_count == 4
+#     assert mock_logger.error.call_count == 1
+#     mock_logger.info.assert_any_call(
+#         f"create_aws_users:Starting creation of {len(users_to_create)} users."
+#     )
+#     for i in range(len(users_to_create)):
+#         mock_create_user.assert_any_call(
+#             users_to_create[i]["primaryEmail"],
+#             users_to_create[i]["name"]["givenName"],
+#             users_to_create[i]["name"]["familyName"],
+#         )
+#         if i == 1:
+#             mock_logger.error.assert_any_call(
+#                 f"create_aws_users:Failed to create user {users_to_create[i]['primaryEmail']}"
+#             )
+#         else:
+#             mock_logger.info.assert_any_call(
+#                 f"create_aws_users:Successfully created user {users_to_create[i]['primaryEmail']}"
+#             )
+#     assert (
+#         call("create_aws_users:Finished creation of 2 users.")
+#         in mock_logger.info.call_args_list
+#     )
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# def test_create_aws_users_empty_list(mock_create_user, mock_logger):
+#     users_to_create = []
+#     mock_create_user.side_effect = users_to_create
+
+#     result = identity_center.create_aws_users(users_to_create)
+
+#     assert result == users_to_create
+#     assert mock_create_user.call_count == 0
+#     assert mock_logger.info.call_count == 2
+#     assert (
+#         call("create_aws_users:Starting creation of 0 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     assert call("create_aws_users:Finished creation of 0 users.")
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# def test_delete_aws_users_default(mock_delete_user, mock_logger, aws_users):
+#     users_to_delete = aws_users(3)
+#     expected_output = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+
+#     result = identity_center.delete_aws_users(users_to_delete)
+
+#     assert result == expected_output
+#     assert mock_logger.info.call_count == 5
+#     assert (
+#         call("delete_aws_users:Starting deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     for user in users_to_delete:
+#         mock_logger.info.assert_any_call(
+#             f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+#         )
+#     assert (
+#         call("delete_aws_users:Finished deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     mock_delete_user.call_count == 0
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# def test_delete_aws_users_enable_delete_true(mock_delete_user, mock_logger, aws_users):
+#     users_to_delete = aws_users(3)
+#     expected_output = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     mock_delete_user.return_value = True
+
+#     result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
+
+#     assert result == expected_output
+#     assert mock_logger.info.call_count == 5
+#     assert (
+#         call("delete_aws_users:Starting deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     for user in users_to_delete:
+#         mock_logger.info.assert_any_call(
+#             f"delete_aws_users:Successfully deleted user {user['UserName']}"
+#         )
+#         mock_delete_user.assert_any_call(user["UserId"])
+#     assert (
+#         call("delete_aws_users:Finished deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     mock_delete_user.call_count == 3
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", True)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# def test_delete_aws_users_enable_delete_true_dry_run(
+#     mock_delete_user, mock_logger, aws_users
+# ):
+#     users_to_delete = aws_users(3)
+#     expected_output = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     mock_delete_user.return_value = True
+
+#     result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
+
+#     assert result == expected_output
+#     assert mock_logger.info.call_count == 5
+#     assert (
+#         call("delete_aws_users:Starting deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     for user in users_to_delete:
+#         mock_logger.info.assert_any_call(
+#             f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+#         )
+#     assert (
+#         call("delete_aws_users:Finished deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     mock_delete_user.call_count == 0
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# def test_delete_aws_users_handles_failure(mock_delete_user, mock_logger, aws_users):
+#     users_to_delete = aws_users(3)
+#     expected_output = ["user-email1@test.com", "user-email3@test.com"]
+#     mock_delete_user.side_effect = [True, False, True]
+
+#     result = identity_center.delete_aws_users(users_to_delete, enable_user_delete=True)
+
+#     assert result == expected_output
+#     assert mock_logger.info.call_count == 4
+#     assert mock_logger.error.call_count == 1
+#     assert (
+#         call("delete_aws_users:Starting deletion of 3 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     for i in range(len(users_to_delete)):
+#         mock_delete_user.assert_any_call(users_to_delete[i]["UserId"])
+#         if i == 1:
+#             mock_logger.error.assert_any_call(
+#                 f"delete_aws_users:Failed to delete user {users_to_delete[i]['UserName']}"
+#             )
+#         else:
+#             mock_logger.info.assert_any_call(
+#                 f"delete_aws_users:Successfully deleted user {users_to_delete[i]['UserName']}"
+#             )
+#     assert (
+#         call("delete_aws_users:Finished deletion of 2 users.")
+#         in mock_logger.info.call_args_list
+#     )
+#     mock_delete_user.call_count == 3
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# def test_delete_aws_users_empty_list(mock_delete_user, mock_logger):
+#     users_to_delete = []
+#     mock_delete_user.side_effect = users_to_delete
+
+#     result = identity_center.delete_aws_users(users_to_delete)
+
+#     assert result == users_to_delete
+#     assert mock_delete_user.call_count == 0

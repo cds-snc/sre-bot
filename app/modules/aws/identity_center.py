@@ -218,74 +218,6 @@ def sync_groups(
     return groups_memberships_created, groups_memberships_deleted
 
 
-def create_aws_users(users_to_create):
-    """Create the users in the identity store.
-
-    Args:
-        users_to_create (list): A list of users to create from the source system.
-
-    Returns:
-        list: A list of user ID of the users created.
-    """
-    logger.info(f"create_aws_users:Starting creation of {len(users_to_create)} users.")
-    users_created = []
-    for user in users_to_create:
-        if not DRY_RUN:
-            response = identity_store.create_user(
-                user["primaryEmail"],
-                user["name"]["givenName"],
-                user["name"]["familyName"],
-            )
-            if response:
-                logger.info(
-                    f"create_aws_users:Successfully created user {user['primaryEmail']}"
-                )
-                users_created.append(response)
-            else:
-                logger.error(
-                    f"create_aws_users:Failed to create user {user['primaryEmail']}"
-                )
-        else:
-            logger.info(
-                f"create_aws_users:DRY_RUN:Successfully created user {user['primaryEmail']}"
-            )
-            users_created.append(user["primaryEmail"])
-    logger.info(f"create_aws_users:Finished creation of {len(users_created)} users.")
-    return users_created
-
-
-def delete_aws_users(users_to_delete, enable_user_delete=False):
-    """Delete the users in the identity store.
-
-    Args:
-        users_to_delete (list): A list of users to delete from the target system.
-
-    Returns:
-        list: A list of user name of the users deleted.
-    """
-    logger.info(f"delete_aws_users:Starting deletion of {len(users_to_delete)} users.")
-    users_deleted = []
-    for user in users_to_delete:
-        if enable_user_delete and not DRY_RUN:
-            response = identity_store.delete_user(user["UserId"])
-            if response:
-                logger.info(
-                    f"delete_aws_users:Successfully deleted user {user['UserName']}"
-                )
-                users_deleted.append(user["UserName"])
-            else:
-                logger.error(
-                    f"delete_aws_users:Failed to delete user {user['UserName']}"
-                )
-        else:
-            logger.info(
-                f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
-            )
-            users_deleted.append(user["UserName"])
-    logger.info(f"delete_aws_users:Finished deletion of {len(users_deleted)} users.")
-    return users_deleted
-
-
 def create_group_memberships(target_group, users_to_add, target_users):
     """Create group memberships for the users in the identity store.
 
@@ -374,3 +306,71 @@ def delete_group_memberships(group, users_to_remove, enable_membership_delete=Fa
         f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
     )
     return memberships_deleted
+
+
+# def create_aws_users(users_to_create):
+#     """Create the users in the identity store.
+
+#     Args:
+#         users_to_create (list): A list of users to create from the source system.
+
+#     Returns:
+#         list: A list of user ID of the users created.
+#     """
+#     logger.info(f"create_aws_users:Starting creation of {len(users_to_create)} users.")
+#     users_created = []
+#     for user in users_to_create:
+#         if not DRY_RUN:
+#             response = identity_store.create_user(
+#                 user["primaryEmail"],
+#                 user["name"]["givenName"],
+#                 user["name"]["familyName"],
+#             )
+#             if response:
+#                 logger.info(
+#                     f"create_aws_users:Successfully created user {user['primaryEmail']}"
+#                 )
+#                 users_created.append(response)
+#             else:
+#                 logger.error(
+#                     f"create_aws_users:Failed to create user {user['primaryEmail']}"
+#                 )
+#         else:
+#             logger.info(
+#                 f"create_aws_users:DRY_RUN:Successfully created user {user['primaryEmail']}"
+#             )
+#             users_created.append(user["primaryEmail"])
+#     logger.info(f"create_aws_users:Finished creation of {len(users_created)} users.")
+#     return users_created
+
+
+# def delete_aws_users(users_to_delete, enable_user_delete=False):
+#     """Delete the users in the identity store.
+
+#     Args:
+#         users_to_delete (list): A list of users to delete from the target system.
+
+#     Returns:
+#         list: A list of user name of the users deleted.
+#     """
+#     logger.info(f"delete_aws_users:Starting deletion of {len(users_to_delete)} users.")
+#     users_deleted = []
+#     for user in users_to_delete:
+#         if enable_user_delete and not DRY_RUN:
+#             response = identity_store.delete_user(user["UserId"])
+#             if response:
+#                 logger.info(
+#                     f"delete_aws_users:Successfully deleted user {user['UserName']}"
+#                 )
+#                 users_deleted.append(user["UserName"])
+#             else:
+#                 logger.error(
+#                     f"delete_aws_users:Failed to delete user {user['UserName']}"
+#                 )
+#         else:
+#             logger.info(
+#                 f"delete_aws_users:DRY_RUN:Successfully deleted user {user['UserName']}"
+#             )
+#             users_deleted.append(user["UserName"])
+#     logger.info(f"delete_aws_users:Finished deletion of {len(users_deleted)} users.")
+#     return users_deleted
