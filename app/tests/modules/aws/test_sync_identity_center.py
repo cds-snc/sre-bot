@@ -4,6 +4,7 @@ import pytest
 from modules.aws import identity_center
 
 
+@patch("modules.aws.identity_center.DRY_RUN", False)
 @patch("modules.aws.identity_center.logger")
 @patch("modules.provisioning.entities.logger")
 @patch("modules.aws.identity_center.identity_store.create_user")
