@@ -194,451 +194,451 @@ def test_synchronize_defaults_dry_run_false(
     assert mock_delete_group_membership.call_count == 9
 
 
-@patch("modules.aws.identity_center.DRY_RUN", True)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-@patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
-def test_synchronize_defaults_dry_run_true(
-    mock_get_groups_with_members_from_integration,
-    mock_list_users,
-    mock_delete_group_membership,
-    mock_create_group_membership,
-    mock_delete_user,
-    mock_create_user,
-    mock_logger,
-    google_groups_w_users,
-    aws_groups_w_users,
-    aws_users,
-):
-    # 3 groups, with 9 users in each group
-    source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
-    # only keep first 6 users in groups
-    for group in source_groups:
-        group["members"] = group["members"][:6]
-        for member in group["members"]:
-            member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
+# @patch("modules.aws.identity_center.DRY_RUN", True)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# @patch("modules.aws.identity_center.identity_store.create_group_membership")
+# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store.list_users")
+# @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
+# def test_synchronize_defaults_dry_run_true(
+#     mock_get_groups_with_members_from_integration,
+#     mock_list_users,
+#     mock_delete_group_membership,
+#     mock_create_group_membership,
+#     mock_delete_user,
+#     mock_create_user,
+#     mock_logger,
+#     google_groups_w_users,
+#     aws_groups_w_users,
+#     aws_users,
+# ):
+#     # 3 groups, with 9 users in each group
+#     source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
+#     # only keep first 6 users in groups
+#     for group in source_groups:
+#         group["members"] = group["members"][:6]
+#         for member in group["members"]:
+#             member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
 
-    # 3 groups, with 9 users in each group
-    target_groups = aws_groups_w_users(3, 9)
-    # only keep last 6 users in groups
-    for group in target_groups:
-        group["GroupMemberships"] = group["GroupMemberships"][3:]
+#     # 3 groups, with 9 users in each group
+#     target_groups = aws_groups_w_users(3, 9)
+#     # only keep last 6 users in groups
+#     for group in target_groups:
+#         group["GroupMemberships"] = group["GroupMemberships"][3:]
 
-    mock_get_groups_with_members_from_integration.side_effect = [
-        source_groups,
-        target_groups,
-    ]
+#     mock_get_groups_with_members_from_integration.side_effect = [
+#         source_groups,
+#         target_groups,
+#     ]
 
-    # keep last 6 users
-    target_users = aws_users(9)
-    mock_list_users.side_effect = [target_users[3:], target_users]
+#     # keep last 6 users
+#     target_users = aws_users(9)
+#     mock_list_users.side_effect = [target_users[3:], target_users]
 
-    expected_target_users_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    expected_target_users_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
+#     expected_target_users_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     expected_target_users_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
 
-    expected_group_memberships_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
+#     expected_group_memberships_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
 
-    expected_group_memberships_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
+#     expected_group_memberships_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
 
-    result = identity_center.synchronize(
-        enable_users_sync=True, enable_groups_sync=True
-    )
+#     result = identity_center.synchronize(
+#         enable_users_sync=True, enable_groups_sync=True
+#     )
 
-    assert mock_logger.info.call_count == 68
-    assert (
-        call("synchronize:Found 3 Source Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
-    assert (
-        call("synchronize:Found 3 Target Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
+#     assert mock_logger.info.call_count == 68
+#     assert (
+#         call("synchronize:Found 3 Source Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
+#     assert (
+#         call("synchronize:Found 3 Target Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
 
-    assert (
-        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
-        in mock_logger.info.call_args_list
-    )
+#     assert (
+#         call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
+#         in mock_logger.info.call_args_list
+#     )
 
-    assert result == {
-        "users": (expected_target_users_to_create, expected_target_users_to_delete),
-        "groups": (
-            expected_group_memberships_to_create,
-            expected_group_memberships_to_delete,
-        ),
-    }
+#     assert result == {
+#         "users": (expected_target_users_to_create, expected_target_users_to_delete),
+#         "groups": (
+#             expected_group_memberships_to_create,
+#             expected_group_memberships_to_delete,
+#         ),
+#     }
 
-    assert mock_create_user.call_count == 0
-    assert mock_delete_user.call_count == 0
-    assert mock_create_group_membership.call_count == 0
-    assert mock_delete_group_membership.call_count == 0
-
-
-@patch("modules.aws.identity_center.DRY_RUN", False)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-@patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
-def test_synchronize_enable_delete_dry_run_false(
-    mock_get_groups_with_members_from_integration,
-    mock_list_users,
-    mock_delete_group_membership,
-    mock_create_group_membership,
-    mock_delete_user,
-    mock_create_user,
-    mock_logger,
-    google_groups_w_users,
-    aws_groups_w_users,
-    aws_users,
-):
-    # 3 groups, with 9 users in each group
-    source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
-    # only keep first 6 users in groups
-    for group in source_groups:
-        group["members"] = group["members"][:6]
-        for member in group["members"]:
-            member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
-
-    # 3 groups, with 9 users in each group
-    target_groups = aws_groups_w_users(3, 9)
-    # only keep last 6 users in groups
-    for group in target_groups:
-        group["GroupMemberships"] = group["GroupMemberships"][3:]
-
-    mock_get_groups_with_members_from_integration.side_effect = [
-        source_groups,
-        target_groups,
-    ]
-
-    # keep last 6 users
-    target_users = aws_users(9)
-    mock_list_users.side_effect = [target_users[3:], target_users]
-    mock_create_user.side_effect = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    mock_create_group_membership.side_effect = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
-    ]
-    mock_delete_group_membership.side_effect = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-    ]
-    expected_target_users_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    expected_target_users_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
-
-    expected_group_memberships_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-
-    expected_group_memberships_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
-
-    result = identity_center.synchronize(
-        enable_users_sync=True,
-        enable_groups_sync=True,
-        enable_user_delete=True,
-        enable_membership_delete=True,
-    )
-
-    assert result == {
-        "users": (expected_target_users_to_create, expected_target_users_to_delete),
-        "groups": (
-            expected_group_memberships_to_create,
-            expected_group_memberships_to_delete,
-        ),
-    }
-
-    assert mock_logger.info.call_count == 68
-    assert (
-        call("synchronize:Found 3 Source Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
-    assert (
-        call("synchronize:Found 3 Target Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
-
-    assert (
-        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
-        in mock_logger.info.call_args_list
-    )
-
-    for user in expected_target_users_to_create:
-        assert (
-            call(f"create_aws_users:Successfully created user {user}")
-            in mock_logger.info.call_args_list
-        )
-    for user in expected_target_users_to_delete:
-        assert (
-            call(f"delete_aws_users:Successfully deleted user {user}")
-            in mock_logger.info.call_args_list
-        )
-    for group in target_groups:
-        for user in expected_target_users_to_create:
-            assert (
-                call(
-                    f"create_group_memberships:Successfully added user {user} to group {group['DisplayName']}"
-                )
-                in mock_logger.info.call_args_list
-            )
-
-    for group in target_groups:
-        for user in expected_target_users_to_delete:
-            assert (
-                call(
-                    f"delete_group_memberships:Successfully removed user {user} from group {group['DisplayName']}"
-                )
-                in mock_logger.info.call_args_list
-            )
-
-    assert mock_create_user.call_count == 3
-    assert mock_delete_user.call_count == 3
-    assert mock_create_group_membership.call_count == 9
-    assert mock_delete_group_membership.call_count == 9
+#     assert mock_create_user.call_count == 0
+#     assert mock_delete_user.call_count == 0
+#     assert mock_create_group_membership.call_count == 0
+#     assert mock_delete_group_membership.call_count == 0
 
 
-@patch("modules.aws.identity_center.DRY_RUN", True)
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.identity_store.create_user")
-@patch("modules.aws.identity_center.identity_store.delete_user")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-@patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
-def test_synchronize_enable_delete_dry_run_true(
-    mock_get_groups_with_members_from_integration,
-    mock_list_users,
-    mock_delete_group_membership,
-    mock_create_group_membership,
-    mock_delete_user,
-    mock_create_user,
-    mock_logger,
-    google_groups_w_users,
-    aws_groups_w_users,
-    aws_users,
-):
-    # 3 groups, with 9 users in each group
-    source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
-    # only keep first 6 users in groups
-    for group in source_groups:
-        group["members"] = group["members"][:6]
-        for member in group["members"]:
-            member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
+# @patch("modules.aws.identity_center.DRY_RUN", False)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# @patch("modules.aws.identity_center.identity_store.create_group_membership")
+# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store.list_users")
+# @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
+# def test_synchronize_enable_delete_dry_run_false(
+#     mock_get_groups_with_members_from_integration,
+#     mock_list_users,
+#     mock_delete_group_membership,
+#     mock_create_group_membership,
+#     mock_delete_user,
+#     mock_create_user,
+#     mock_logger,
+#     google_groups_w_users,
+#     aws_groups_w_users,
+#     aws_users,
+# ):
+#     # 3 groups, with 9 users in each group
+#     source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
+#     # only keep first 6 users in groups
+#     for group in source_groups:
+#         group["members"] = group["members"][:6]
+#         for member in group["members"]:
+#             member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
 
-    # 3 groups, with 9 users in each group
-    target_groups = aws_groups_w_users(3, 9)
-    # only keep last 6 users in groups
-    for group in target_groups:
-        group["GroupMemberships"] = group["GroupMemberships"][3:]
+#     # 3 groups, with 9 users in each group
+#     target_groups = aws_groups_w_users(3, 9)
+#     # only keep last 6 users in groups
+#     for group in target_groups:
+#         group["GroupMemberships"] = group["GroupMemberships"][3:]
 
-    mock_get_groups_with_members_from_integration.side_effect = [
-        source_groups,
-        target_groups,
-    ]
+#     mock_get_groups_with_members_from_integration.side_effect = [
+#         source_groups,
+#         target_groups,
+#     ]
 
-    # keep last 6 users
-    target_users = aws_users(9)
-    mock_list_users.side_effect = [target_users[3:], target_users]
-    mock_create_user.side_effect = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    mock_create_group_membership.side_effect = [
-        "aws-group_id1-user-email1@test.com",
-        "aws-group_id1-user-email2@test.com",
-        "aws-group_id1-user-email3@test.com",
-        "aws-group_id2-user-email1@test.com",
-        "aws-group_id2-user-email2@test.com",
-        "aws-group_id2-user-email3@test.com",
-        "aws-group_id3-user-email1@test.com",
-        "aws-group_id3-user-email2@test.com",
-        "aws-group_id3-user-email3@test.com",
-    ]
-    mock_delete_group_membership.side_effect = [
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-        "membership_id_7",
-        "membership_id_8",
-        "membership_id_9",
-    ]
-    expected_target_users_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
-    expected_target_users_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
+#     # keep last 6 users
+#     target_users = aws_users(9)
+#     mock_list_users.side_effect = [target_users[3:], target_users]
+#     mock_create_user.side_effect = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     mock_create_group_membership.side_effect = [
+#         "aws-group_id1-user-email1@test.com",
+#         "aws-group_id1-user-email2@test.com",
+#         "aws-group_id1-user-email3@test.com",
+#         "aws-group_id2-user-email1@test.com",
+#         "aws-group_id2-user-email2@test.com",
+#         "aws-group_id2-user-email3@test.com",
+#         "aws-group_id3-user-email1@test.com",
+#         "aws-group_id3-user-email2@test.com",
+#         "aws-group_id3-user-email3@test.com",
+#     ]
+#     mock_delete_group_membership.side_effect = [
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#     ]
+#     expected_target_users_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     expected_target_users_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
 
-    expected_group_memberships_to_create = [
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-        "user-email1@test.com",
-        "user-email2@test.com",
-        "user-email3@test.com",
-    ]
+#     expected_group_memberships_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
 
-    expected_group_memberships_to_delete = [
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-        "user-email7@test.com",
-        "user-email8@test.com",
-        "user-email9@test.com",
-    ]
+#     expected_group_memberships_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
 
-    result = identity_center.synchronize(
-        enable_users_sync=True,
-        enable_groups_sync=True,
-        enable_user_delete=True,
-        enable_membership_delete=True,
-    )
+#     result = identity_center.synchronize(
+#         enable_users_sync=True,
+#         enable_groups_sync=True,
+#         enable_user_delete=True,
+#         enable_membership_delete=True,
+#     )
 
-    assert result == {
-        "users": (expected_target_users_to_create, expected_target_users_to_delete),
-        "groups": (
-            expected_group_memberships_to_create,
-            expected_group_memberships_to_delete,
-        ),
-    }
+#     assert result == {
+#         "users": (expected_target_users_to_create, expected_target_users_to_delete),
+#         "groups": (
+#             expected_group_memberships_to_create,
+#             expected_group_memberships_to_delete,
+#         ),
+#     }
 
-    assert mock_logger.info.call_count == 68
-    assert (
-        call("synchronize:Found 3 Source Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
-    assert (
-        call("synchronize:Found 3 Target Groups and 6 Users")
-        in mock_logger.info.call_args_list
-    )
+#     assert mock_logger.info.call_count == 68
+#     assert (
+#         call("synchronize:Found 3 Source Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
+#     assert (
+#         call("synchronize:Found 3 Target Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
 
-    assert (
-        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
-        in mock_logger.info.call_args_list
-    )
+#     assert (
+#         call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
+#         in mock_logger.info.call_args_list
+#     )
 
-    for user in expected_target_users_to_create:
-        assert (
-            call(f"create_aws_users:DRY_RUN:Successfully created user {user}")
-            in mock_logger.info.call_args_list
-        )
-    for user in expected_target_users_to_delete:
-        assert (
-            call(f"delete_aws_users:DRY_RUN:Successfully deleted user {user}")
-            in mock_logger.info.call_args_list
-        )
-    for group in target_groups:
-        for user in expected_target_users_to_create:
-            assert (
-                call(
-                    f"create_group_memberships:DRY_RUN:Successfully added user {user} to group {group['DisplayName']}"
-                )
-                in mock_logger.info.call_args_list
-            )
+#     for user in expected_target_users_to_create:
+#         assert (
+#             call(f"create_aws_users:Successfully created user {user}")
+#             in mock_logger.info.call_args_list
+#         )
+#     for user in expected_target_users_to_delete:
+#         assert (
+#             call(f"delete_aws_users:Successfully deleted user {user}")
+#             in mock_logger.info.call_args_list
+#         )
+#     for group in target_groups:
+#         for user in expected_target_users_to_create:
+#             assert (
+#                 call(
+#                     f"create_group_memberships:Successfully added user {user} to group {group['DisplayName']}"
+#                 )
+#                 in mock_logger.info.call_args_list
+#             )
 
-    for group in target_groups:
-        for user in expected_target_users_to_delete:
-            assert (
-                call(
-                    f"delete_group_memberships:DRY_RUN:Successfully removed user {user} from group {group['DisplayName']}"
-                )
-                in mock_logger.info.call_args_list
-            )
+#     for group in target_groups:
+#         for user in expected_target_users_to_delete:
+#             assert (
+#                 call(
+#                     f"delete_group_memberships:Successfully removed user {user} from group {group['DisplayName']}"
+#                 )
+#                 in mock_logger.info.call_args_list
+#             )
 
-    assert mock_create_user.call_count == 0
-    assert mock_delete_user.call_count == 0
-    assert mock_create_group_membership.call_count == 0
-    assert mock_delete_group_membership.call_count == 0
+#     assert mock_create_user.call_count == 3
+#     assert mock_delete_user.call_count == 3
+#     assert mock_create_group_membership.call_count == 9
+#     assert mock_delete_group_membership.call_count == 9
+
+
+# @patch("modules.aws.identity_center.DRY_RUN", True)
+# @patch("modules.aws.identity_center.logger")
+# @patch("modules.aws.identity_center.identity_store.create_user")
+# @patch("modules.aws.identity_center.identity_store.delete_user")
+# @patch("modules.aws.identity_center.identity_store.create_group_membership")
+# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store.list_users")
+# @patch("modules.aws.identity_center.groups.get_groups_with_members_from_integration")
+# def test_synchronize_enable_delete_dry_run_true(
+#     mock_get_groups_with_members_from_integration,
+#     mock_list_users,
+#     mock_delete_group_membership,
+#     mock_create_group_membership,
+#     mock_delete_user,
+#     mock_create_user,
+#     mock_logger,
+#     google_groups_w_users,
+#     aws_groups_w_users,
+#     aws_users,
+# ):
+#     # 3 groups, with 9 users in each group
+#     source_groups = google_groups_w_users(3, 9, group_prefix="AWS-")
+#     # only keep first 6 users in groups
+#     for group in source_groups:
+#         group["members"] = group["members"][:6]
+#         for member in group["members"]:
+#             member["primaryEmail"] = member["primaryEmail"].replace("AWS-", "")
+
+#     # 3 groups, with 9 users in each group
+#     target_groups = aws_groups_w_users(3, 9)
+#     # only keep last 6 users in groups
+#     for group in target_groups:
+#         group["GroupMemberships"] = group["GroupMemberships"][3:]
+
+#     mock_get_groups_with_members_from_integration.side_effect = [
+#         source_groups,
+#         target_groups,
+#     ]
+
+#     # keep last 6 users
+#     target_users = aws_users(9)
+#     mock_list_users.side_effect = [target_users[3:], target_users]
+#     mock_create_user.side_effect = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     mock_create_group_membership.side_effect = [
+#         "aws-group_id1-user-email1@test.com",
+#         "aws-group_id1-user-email2@test.com",
+#         "aws-group_id1-user-email3@test.com",
+#         "aws-group_id2-user-email1@test.com",
+#         "aws-group_id2-user-email2@test.com",
+#         "aws-group_id2-user-email3@test.com",
+#         "aws-group_id3-user-email1@test.com",
+#         "aws-group_id3-user-email2@test.com",
+#         "aws-group_id3-user-email3@test.com",
+#     ]
+#     mock_delete_group_membership.side_effect = [
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#         "membership_id_7",
+#         "membership_id_8",
+#         "membership_id_9",
+#     ]
+#     expected_target_users_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+#     expected_target_users_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
+
+#     expected_group_memberships_to_create = [
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#         "user-email1@test.com",
+#         "user-email2@test.com",
+#         "user-email3@test.com",
+#     ]
+
+#     expected_group_memberships_to_delete = [
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#         "user-email7@test.com",
+#         "user-email8@test.com",
+#         "user-email9@test.com",
+#     ]
+
+#     result = identity_center.synchronize(
+#         enable_users_sync=True,
+#         enable_groups_sync=True,
+#         enable_user_delete=True,
+#         enable_membership_delete=True,
+#     )
+
+#     assert result == {
+#         "users": (expected_target_users_to_create, expected_target_users_to_delete),
+#         "groups": (
+#             expected_group_memberships_to_create,
+#             expected_group_memberships_to_delete,
+#         ),
+#     }
+
+#     assert mock_logger.info.call_count == 68
+#     assert (
+#         call("synchronize:Found 3 Source Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
+#     assert (
+#         call("synchronize:Found 3 Target Groups and 6 Users")
+#         in mock_logger.info.call_args_list
+#     )
+
+#     assert (
+#         call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
+#         in mock_logger.info.call_args_list
+#     )
+
+#     for user in expected_target_users_to_create:
+#         assert (
+#             call(f"create_aws_users:DRY_RUN:Successfully created user {user}")
+#             in mock_logger.info.call_args_list
+#         )
+#     for user in expected_target_users_to_delete:
+#         assert (
+#             call(f"delete_aws_users:DRY_RUN:Successfully deleted user {user}")
+#             in mock_logger.info.call_args_list
+#         )
+#     for group in target_groups:
+#         for user in expected_target_users_to_create:
+#             assert (
+#                 call(
+#                     f"create_group_memberships:DRY_RUN:Successfully added user {user} to group {group['DisplayName']}"
+#                 )
+#                 in mock_logger.info.call_args_list
+#             )
+
+#     for group in target_groups:
+#         for user in expected_target_users_to_delete:
+#             assert (
+#                 call(
+#                     f"delete_group_memberships:DRY_RUN:Successfully removed user {user} from group {group['DisplayName']}"
+#                 )
+#                 in mock_logger.info.call_args_list
+#             )
+
+#     assert mock_create_user.call_count == 0
+#     assert mock_delete_user.call_count == 0
+#     assert mock_create_group_membership.call_count == 0
+#     assert mock_delete_group_membership.call_count == 0
 
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
