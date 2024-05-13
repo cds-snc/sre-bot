@@ -3,8 +3,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DISPLAY_KEYS = {"aws": "UserName", "google": "primaryEmail"}
-
 
 def provision_entities(
     function,
