@@ -35,7 +35,7 @@ def test_get_groups_with_members_from_integration_google_query(
     mock_filter_tools,
     google_groups_w_users,
 ):
-    google_groups = google_groups_w_users(n_groups=3, n_users=3, prefix="aws-")
+    google_groups = google_groups_w_users(n_groups=3, n_users=3, group_prefix="aws-")
     google_groups.extend(google_groups_w_users(n_groups=3, n_users=3))
     mock_google_list_groups_with_members.return_value = google_groups[:3]
 
@@ -123,7 +123,7 @@ def test_get_groups_with_members_from_integration_filters_applied(
     aws_groups_w_users,
 ):
     aws_groups = []
-    aws_groups_prefix = aws_groups_w_users(n_groups=3, n_users=3, prefix="prefix")
+    aws_groups_prefix = aws_groups_w_users(n_groups=3, n_users=3, group_prefix="prefix")
     aws_groups.extend(aws_groups_prefix)
     aws_groups_wo_prefix = aws_groups_w_users(n_groups=3, n_users=3)
     aws_groups.extend(aws_groups_wo_prefix)
@@ -157,7 +157,7 @@ def test_get_groups_with_members_from_integration_filters_returns_subset(
     aws_groups_w_users,
 ):
     aws_groups = []
-    aws_groups_prefix = aws_groups_w_users(n_groups=3, n_users=3, prefix="prefix")
+    aws_groups_prefix = aws_groups_w_users(n_groups=3, n_users=3, group_prefix="prefix")
     aws_groups.extend(aws_groups_prefix)
     aws_groups_wo_prefix = aws_groups_w_users(n_groups=3, n_users=3)
     aws_groups.extend(aws_groups_wo_prefix)

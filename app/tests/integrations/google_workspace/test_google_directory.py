@@ -346,9 +346,9 @@ def test_list_groups_with_members_filtered(
     groups_to_filter_out = google_groups(4)[2:]
     groups.extend(groups_to_filter_out)
     group_members = [[], google_group_members(2)]
-    users = google_users(2, prefix="test-")
+    users = google_users(2)
 
-    groups_with_users = google_groups_w_users(4, 2, prefix="test-")[:2]
+    groups_with_users = google_groups_w_users(4, 2, group_prefix="test-")[:2]
     groups_with_users[0].pop("members", None)
 
     mock_list_groups.return_value = groups
