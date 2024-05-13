@@ -1,12 +1,13 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 from logging import getLogger
 from integrations.aws import identity_store
-from modules.provisioning import groups
+from modules.provisioning import groups, entities
 from utils import filters
 
 
 logger = getLogger(__name__)
 DRY_RUN = True
+EXECUTE_PROVISIONING = False
 
 
 def synchronize(**kwargs):
@@ -21,7 +22,11 @@ def synchronize(**kwargs):
         tuple: A tuple containing the users sync status and groups sync status.
     """
     enable_users_sync = kwargs.pop("enable_users_sync", True)
+    enable_user_create = kwargs.pop("enable_user_create", True)
+    enable_user_delete = kwargs.pop("enable_user_delete", False)
     enable_groups_sync = kwargs.pop("enable_groups_sync", True)
+    enable_membership_create = kwargs.pop("enable_membership_create", True)
+    enable_membership_delete = kwargs.pop("enable_membership_delete", False)
     query = kwargs.pop("query", "email:aws-*")
 
     users_sync_status = None
@@ -62,7 +67,9 @@ def synchronize(**kwargs):
 
     if enable_users_sync:
         logger.info("synchronize:users:Syncing Users")
-        users_sync_status = sync_users(source_users, target_users, **kwargs)
+        users_sync_status = sync_users(
+            source_users, target_users, enable_user_create, enable_user_delete, **kwargs
+        )
         target_users = identity_store.list_users()
 
     if enable_groups_sync:
@@ -73,13 +80,143 @@ def synchronize(**kwargs):
             source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
         )
         groups_sync_status = sync_groups(
-            source_groups, target_groups, target_users, **kwargs
+            source_groups,
+            target_groups,
+            target_users,
+            enable_membership_create,
+            enable_membership_delete,
+            **kwargs,
         )
 
     return {
         "users": users_sync_status,
         "groups": groups_sync_status,
     }
+
+
+def sync_users(
+    source_users,
+    target_users,
+    enable_user_create=True,
+    enable_user_delete=False,
+    **kwargs,
+):
+    """Sync the users in the identity store.
+
+    Args:
+
+        source_users (list): A list of users from the source system.
+        target_users (list): A list of users in the identity store.
+        enable_user_delete (bool): Enable deletion of users.
+        delete_target_all (bool): Mark all target users for deletion.
+
+    Returns:
+        tuple: A tuple containing the users created and deleted.
+    """
+    delete_target_all = kwargs.get("delete_target_all", False)
+
+    if delete_target_all:
+        users_to_delete = target_users
+        users_to_create = []
+    else:
+        users_to_create, users_to_delete = filters.compare_lists(
+            {"values": source_users, "key": "primaryEmail"},
+            {"values": target_users, "key": "UserName"},
+            mode="sync",
+        )
+    logger.info(
+        f"synchronize:users:Found {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
+    )
+
+    users_to_create = filters.preformat_items(users_to_create, "primaryEmail", "email")
+    for user in users_to_create:
+        if "name" in user:
+            user["first_name"] = filters.get_nested_value(user, "name.givenName")
+            user["family_name"] = filters.get_nested_value(user, "name.familyName")
+    print(f"DEBUG: users_to_create: {users_to_create}")
+    created_users = entities.provision_entities(
+        identity_store.create_user,
+        users_to_create,
+        execute=enable_user_create,
+        integration_name="aws",
+        operation_name="creation",
+        entity_name="user(s)",
+        display_key="primaryEmail",
+    )
+    for user in users_to_delete:
+        user["user_id"] = filters.get_nested_value(user, "UserId")
+    deleted_users = entities.provision_entities(
+        identity_store.delete_user,
+        users_to_delete,
+        execute=enable_user_delete,
+        integration_name="aws",
+        operation_name="deletion",
+        entity_name="user(s)",
+        display_key="UserName",
+    )
+
+    return created_users, deleted_users
+
+
+def sync_groups(
+    source_groups,
+    target_groups,
+    target_users,
+    enable_membership_create=True,
+    enable_membership_delete=False,
+    **kwargs,
+):
+    """Sync the groups in the identity store.
+
+    Args:
+        source_groups (list): A list of groups from the source system.
+        target_groups (list): A list of groups in the identity store.
+        target_users (list): A list of users in the identity store.
+        enable_membership_delete (bool): Enable deletion of group memberships.
+
+    Returns:
+        tuple: A tuple containing the groups memberships created and deleted.
+    """
+
+    source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
+        {"values": source_groups, "key": "DisplayName"},
+        {"values": target_groups, "key": "DisplayName"},
+        mode="match",
+    )
+    logger.info(
+        f"synchronize:groups:Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups"
+    )
+
+    groups_memberships_created = []
+    groups_memberships_deleted = []
+    for i in range(len(source_groups_to_sync)):
+        if (
+            source_groups_to_sync[i]["DisplayName"]
+            == target_groups_to_sync[i]["DisplayName"]
+        ):
+            logger.info(
+                f"synchronize:groups:Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
+            )
+            users_to_add, users_to_remove = filters.compare_lists(
+                {"values": source_groups_to_sync[i]["members"], "key": "primaryEmail"},
+                {
+                    "values": target_groups_to_sync[i]["GroupMemberships"],
+                    "key": "MemberId.UserName",
+                },
+                mode="sync",
+            )
+            memberships_created = create_group_memberships(
+                target_groups_to_sync[i], users_to_add, target_users
+            )
+            groups_memberships_created.extend(memberships_created)
+            memberships_deleted = delete_group_memberships(
+                target_groups_to_sync[i],
+                users_to_remove,
+                enable_membership_delete=enable_membership_delete,
+            )
+            groups_memberships_deleted.extend(memberships_deleted)
+
+    return groups_memberships_created, groups_memberships_deleted
 
 
 def create_aws_users(users_to_create):
@@ -148,43 +285,6 @@ def delete_aws_users(users_to_delete, enable_user_delete=False):
             users_deleted.append(user["UserName"])
     logger.info(f"delete_aws_users:Finished deletion of {len(users_deleted)} users.")
     return users_deleted
-
-
-def sync_users(source_users, target_users, **kwargs):
-    """Sync the users in the identity store.
-
-    Args:
-
-        source_users (list): A list of users from the source system.
-        target_users (list): A list of users in the identity store.
-        enable_user_delete (bool): Enable deletion of users.
-        delete_target_all (bool): Mark all target users for deletion.
-
-    Returns:
-        tuple: A tuple containing the users created and deleted.
-    """
-    enable_user_delete = kwargs.get("enable_user_delete", False)
-    delete_target_all = kwargs.get("delete_target_all", False)
-
-    if delete_target_all:
-        users_to_delete = target_users
-        users_to_create = []
-    else:
-        users_to_create, users_to_delete = filters.compare_lists(
-            {"values": source_users, "key": "primaryEmail"},
-            {"values": target_users, "key": "UserName"},
-            mode="sync",
-        )
-    logger.info(
-        f"synchronize:users:Found {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
-    )
-
-    created_users = create_aws_users(users_to_create)
-    deleted_users = delete_aws_users(
-        users_to_delete, enable_user_delete=enable_user_delete
-    )
-
-    return created_users, deleted_users
 
 
 def create_group_memberships(target_group, users_to_add, target_users):
@@ -275,58 +375,3 @@ def delete_group_memberships(group, users_to_remove, enable_membership_delete=Fa
         f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
     )
     return memberships_deleted
-
-
-def sync_groups(source_groups, target_groups, target_users, **kwargs):
-    """Sync the groups in the identity store.
-
-    Args:
-        source_groups (list): A list of groups from the source system.
-        target_groups (list): A list of groups in the identity store.
-        target_users (list): A list of users in the identity store.
-        enable_membership_delete (bool): Enable deletion of group memberships.
-
-    Returns:
-        tuple: A tuple containing the groups memberships created and deleted.
-    """
-    enable_membership_delete = kwargs.get("enable_membership_delete", False)
-
-    source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
-        {"values": source_groups, "key": "DisplayName"},
-        {"values": target_groups, "key": "DisplayName"},
-        mode="match",
-    )
-    logger.info(
-        f"synchronize:groups:Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups"
-    )
-
-    groups_memberships_created = []
-    groups_memberships_deleted = []
-    for i in range(len(source_groups_to_sync)):
-        if (
-            source_groups_to_sync[i]["DisplayName"]
-            == target_groups_to_sync[i]["DisplayName"]
-        ):
-            logger.info(
-                f"synchronize:groups:Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
-            )
-            users_to_add, users_to_remove = filters.compare_lists(
-                {"values": source_groups_to_sync[i]["members"], "key": "primaryEmail"},
-                {
-                    "values": target_groups_to_sync[i]["GroupMemberships"],
-                    "key": "MemberId.UserName",
-                },
-                mode="sync",
-            )
-            memberships_created = create_group_memberships(
-                target_groups_to_sync[i], users_to_add, target_users
-            )
-            groups_memberships_created.extend(memberships_created)
-            memberships_deleted = delete_group_memberships(
-                target_groups_to_sync[i],
-                users_to_remove,
-                enable_membership_delete=enable_membership_delete,
-            )
-            groups_memberships_deleted.extend(memberships_deleted)
-
-    return groups_memberships_created, groups_memberships_deleted
