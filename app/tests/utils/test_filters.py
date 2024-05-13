@@ -309,7 +309,9 @@ def test_preformat_items_returns_value_if_no_matching_pattern():
 
 
 def test_preformat_items_lookup_key_not_found_raise_error(google_groups_w_users):
-    items_to_format = google_groups_w_users(n_groups=1, n_users=1, group_prefix="PREFIX-")
+    items_to_format = google_groups_w_users(
+        n_groups=1, n_users=1, group_prefix="PREFIX-"
+    )
     lookup_key = "invalid_key"
     new_key = "DisplayName"
     pattern = "PREFIX-"
