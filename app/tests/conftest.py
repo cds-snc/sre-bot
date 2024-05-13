@@ -71,7 +71,9 @@ def google_group_members(google_users):
 # Fixture with users
 @pytest.fixture
 def google_groups_w_users(google_groups, google_users):
-    def _google_groups_w_users(n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"):
+    def _google_groups_w_users(
+        n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
+    ):
         groups = google_groups(n_groups, prefix=group_prefix, domain=domain)
         users = google_users(n_users, prefix=user_prefix, domain=domain)
         for group in groups:
@@ -151,14 +153,19 @@ def aws_groups_memberships():
 @pytest.fixture
 def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
     def _aws_groups_w_users(
-        n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com", store_id="d-123412341234"
+        n_groups=1,
+        n_users=3,
+        group_prefix="",
+        user_prefix="",
+        domain="test.com",
+        store_id="d-123412341234",
     ):
         groups = aws_groups(n_groups, group_prefix, store_id)
         users = aws_users(n_users, user_prefix, domain, store_id)
         for i, group in enumerate(groups):
-            memberships = aws_groups_memberships(n_users, group_prefix, i + 1, store_id)[
-                "GroupMemberships"
-            ]
+            memberships = aws_groups_memberships(
+                n_users, group_prefix, i + 1, store_id
+            )["GroupMemberships"]
             group["GroupMemberships"] = [
                 {**membership, "MemberId": user}
                 for user, membership in zip(users, memberships)
