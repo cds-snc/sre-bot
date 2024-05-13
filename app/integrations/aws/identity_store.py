@@ -38,15 +38,14 @@ def create_user(email, first_name, family_name, **kwargs):
         str: The unique ID of the user created.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update(
-        {
-            "UserName": email,
-            "Emails": [{"Value": email, "Type": "WORK", "Primary": True}],
-            "Name": {"GivenName": first_name, "FamilyName": family_name},
-            "DisplayName": f"{first_name} {family_name}",
-        }
-    )
-    return execute_aws_api_call("identitystore", "create_user", **kwargs)["UserId"]
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "UserName": email,
+        "Emails": [{"Value": email, "Type": "WORK", "Primary": True}],
+        "Name": {"GivenName": first_name, "FamilyName": family_name},
+        "DisplayName": f"{first_name} {family_name}",
+    }
+    return execute_aws_api_call("identitystore", "create_user", **params)["UserId"]
 
 
 @handle_aws_api_errors
