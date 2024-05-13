@@ -7,7 +7,6 @@ from utils import filters
 
 logger = getLogger(__name__)
 DRY_RUN = True
-EXECUTE_PROVISIONING = False
 
 
 def synchronize(**kwargs):
