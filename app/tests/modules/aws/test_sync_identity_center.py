@@ -33,24 +33,18 @@ def test_synchronize_enable_all(
     for group in source_groups:
         group["members"] = group["members"][:6]
 
-    source_users = google_users(9)[:6]
-
-    for user in source_users:
-        user["primaryEmail"] = user["primaryEmail"].replace("AWS-", "")
     # 3 groups, with 9 users in each group
     target_groups = aws_groups_w_users(3, 9)
     # only keep last 6 users in groups
     for group in target_groups:
         group["GroupMemberships"] = group["GroupMemberships"][3:]
 
+    # Setup source and target groups for expected output
     mock_get_groups_with_members_from_integration.side_effect = [
         source_groups,
         target_groups,
     ]
 
-    target_users = aws_users(9)
-    # keep last 6 users for the first return value on compare list
-    mock_list_users.side_effect = [target_users[3:], target_users]
     create_groupmembership_side_effect = [
         "aws-group_id1-user-email1@test.com",
         "aws-group_id1-user-email2@test.com",
@@ -73,34 +67,6 @@ def test_synchronize_enable_all(
         "membership_id_8",
         "membership_id_9",
     ]
-
-    def create_user_side_effect(email, first_name, family_name, **kwargs):
-        return email
-
-    def delete_user_side_effect(user_id, **kwargs):
-        return kwargs["UserName"]
-
-    mock_create_user.side_effect = create_user_side_effect
-    mock_delete_user.side_effect = delete_user_side_effect
-
-    mock_create_group_membership.side_effect = create_groupmembership_side_effect
-    mock_delete_group_membership.side_effect = delete_group_membership_side_effect
-
-    expected_target_users_to_create = []
-    for user in source_users[:3]:
-        expected_target_users_to_create.append(
-            {"entity": user, "response": user["primaryEmail"]}
-        )
-        user["email"] = user["primaryEmail"]
-        user["first_name"] = user["name"]["givenName"]
-        user["family_name"] = user["name"]["familyName"]
-
-    deleted_target_users = target_users[6:]
-    expected_target_users_to_delete = []
-    for user in deleted_target_users:
-        expected_target_users_to_delete.append(
-            {"entity": user, "response": user["UserName"]}
-        )
 
     expected_group_memberships_to_create = [
         "user-email1@test.com",
@@ -126,6 +92,42 @@ def test_synchronize_enable_all(
         "user-email9@test.com",
     ]
 
+    mock_create_group_membership.side_effect = create_groupmembership_side_effect
+    mock_delete_group_membership.side_effect = delete_group_membership_side_effect
+
+    # Setup source and target users for test
+    source_users = google_users(9)[:6]
+    target_users = aws_users(9)
+    # keep last 6 users for the first return value
+    # keep first 6 users for the second return value
+    mock_list_users.side_effect = [target_users[3:], target_users[:6]]
+
+    # Setup source and target users for expected output
+    def create_user_side_effect(email, first_name, family_name, **kwargs):
+        return email
+
+    def delete_user_side_effect(user_id, **kwargs):
+        return kwargs["UserName"]
+
+    mock_create_user.side_effect = create_user_side_effect
+    mock_delete_user.side_effect = delete_user_side_effect
+
+    expected_target_users_created = []
+    for user in source_users[:3]:
+        expected_target_users_created.append(
+            {"entity": user, "response": user["primaryEmail"]}
+        )
+        user["email"] = user["primaryEmail"]
+        user["first_name"] = user["name"]["givenName"]
+        user["family_name"] = user["name"]["familyName"]
+
+    deleted_target_users = target_users[6:]
+    expected_target_users_deleted = []
+    for user in deleted_target_users:
+        expected_target_users_deleted.append(
+            {"entity": user, "response": user["UserName"]}
+        )
+
     result = identity_center.synchronize(
         enable_users_sync=True,
         enable_groups_sync=True,
@@ -134,7 +136,7 @@ def test_synchronize_enable_all(
     )
 
     assert result == {
-        "users": (expected_target_users_to_create, expected_target_users_to_delete),
+        "users": (expected_target_users_created, expected_target_users_deleted),
         "groups": (
             expected_group_memberships_to_create,
             expected_group_memberships_to_delete,
@@ -160,33 +162,33 @@ def test_synchronize_enable_all(
         call("aws:Starting creation of 3 user(s)")
     ) in mock_provision_entities_logger.info.call_args_list
 
-    for user in expected_target_users_to_create:
+    for user in expected_target_users_created:
         assert (
             call(f"aws:Successful creation of user(s) {user['entity']['primaryEmail']}")
             in mock_provision_entities_logger.info.call_args_list
         )
-    for user in expected_target_users_to_delete:
+    for user in expected_target_users_deleted:
         assert (
             call(f"aws:Successful deletion of user(s) {user['entity']['UserName']}")
             in mock_provision_entities_logger.info.call_args_list
         )
-    # for group in target_groups:
-    #     for user in expected_target_users_to_create:
-    #         assert (
-    #             call(
-    #                 f"create_group_memberships:Successfully added user {user} to group {group['DisplayName']}"
-    #             )
-    #             in mock_logger.info.call_args_list
-    #         )
+    for group in target_groups:
+        for user in expected_group_memberships_to_create:
+            assert (
+                call(
+                    f"create_group_memberships:Successfully added user {user} to group {group['DisplayName']}"
+                )
+                in mock_logger.info.call_args_list
+            )
 
-    # for group in target_groups:
-    #     for user in expected_target_users_to_delete:
-    #         assert (
-    #             call(
-    #                 f"delete_group_memberships:Successfully removed user {user} from group {group['DisplayName']}"
-    #             )
-    #             in mock_logger.info.call_args_list
-    #         )
+    for group in target_groups:
+        for user in expected_group_memberships_to_delete:
+            assert (
+                call(
+                    f"delete_group_memberships:Successfully removed user {user} from group {group['DisplayName']}"
+                )
+                in mock_logger.info.call_args_list
+            )
 
     assert mock_create_user.call_count == 3
     assert mock_delete_user.call_count == 3
