@@ -1,4 +1,5 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
+import json
 from logging import getLogger
 from integrations.aws import identity_store
 from modules.provisioning import groups, entities
@@ -32,52 +33,31 @@ def synchronize(**kwargs):
     groups_sync_status = None
 
     source_groups_filters = [lambda group: "AWS-" in group["name"]]
-    source_groups = groups.get_groups_with_members_from_integration(
-        "google_groups", query=query, filters=source_groups_filters
+    source_groups = groups.get_groups_from_integration(
+        "google_groups", query=query, processing_filters=source_groups_filters
     )
     source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(
-        f"synchronize:Found {len(source_groups)} Source Groups and {len(source_users)} Users"
+        f"synchronize:Found {len(source_groups)} Groups and {len(source_users)} Users from Source"
     )
 
-    for group in source_groups:
-        logger.info(
-            f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
-        )
-    for user in source_users:
-        logger.info(f"synchronize:Source:User {user['primaryEmail']}")
-
-    target_groups = groups.get_groups_with_members_from_integration(
-        "aws_identity_center"
-    )
+    target_groups = groups.get_groups_from_integration("aws_identity_center")
     target_users = identity_store.list_users()
 
     logger.info(
-        f"synchronize:Found {len(target_groups)} Target Groups and {len(target_users)} Users"
+        f"synchronize:Found {len(target_groups)} Groups and {len(target_users)} Users from Target"
     )
 
-    for group in target_groups:
-        logger.info(
-            f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
-        )
-
-    for user in target_users:
-        logger.info(f"synchronize:Target:User {user['UserName']}")
+    # for user in target_users:
+    #     logger.info(f"synchronize:Target:User {user['UserName']}")
 
     if enable_users_sync:
-        logger.info("synchronize:users:Syncing Users")
         users_sync_status = sync_users(
             source_users, target_users, enable_user_create, enable_user_delete, **kwargs
         )
         target_users = identity_store.list_users()
 
     if enable_groups_sync:
-        logger.info("synchronize:groups:Syncing Groups")
-
-        logger.info("synchronize:groups:Formatting Source Groups")
-        source_groups = filters.preformat_items(
-            source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
-        )
         groups_sync_status = sync_groups(
             source_groups,
             target_groups,
@@ -126,31 +106,32 @@ def sync_users(
     logger.info(
         f"synchronize:users:Found {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
     )
+    preformatting_keys = [
+        ("primaryEmail", "email"),
+        ("name.givenName", "first_name"),
+        ("name.familyName", "family_name"),
+    ]
+    for old_key, new_key in preformatting_keys:
+        users_to_create = filters.preformat_items(users_to_create, old_key, new_key)
 
-    users_to_create = filters.preformat_items(users_to_create, "primaryEmail", "email")
-    for user in users_to_create:
-        if "name" in user:
-            user["first_name"] = filters.get_nested_value(user, "name.givenName")
-            user["family_name"] = filters.get_nested_value(user, "name.familyName")
-    print(f"DEBUG: users_to_create: {users_to_create}")
     created_users = entities.provision_entities(
         identity_store.create_user,
         users_to_create,
         execute=enable_user_create,
-        integration_name="aws",
-        operation_name="creation",
-        entity_name="user(s)",
+        integration_name="AWS",
+        operation_name="Creation",
+        entity_name="User",
         display_key="primaryEmail",
     )
-    for user in users_to_delete:
-        user["user_id"] = filters.get_nested_value(user, "UserId")
+
+    users_to_delete = filters.preformat_items(users_to_delete, "UserId", "user_id")
     deleted_users = entities.provision_entities(
         identity_store.delete_user,
         users_to_delete,
         execute=enable_user_delete,
-        integration_name="aws",
-        operation_name="deletion",
-        entity_name="user(s)",
+        integration_name="AWS",
+        operation_name="Deletion",
+        entity_name="User",
         display_key="UserName",
     )
 
@@ -176,7 +157,10 @@ def sync_groups(
     Returns:
         tuple: A tuple containing the groups memberships created and deleted.
     """
-
+    logger.info("synchronize:groups:Formatting Source Groups")
+    source_groups = filters.preformat_items(
+        source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
+    )
     source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
         {"values": source_groups, "key": "DisplayName"},
         {"values": target_groups, "key": "DisplayName"},
@@ -204,108 +188,134 @@ def sync_groups(
                 },
                 mode="sync",
             )
-            memberships_created = create_group_memberships(
-                target_groups_to_sync[i], users_to_add, target_users
+            # source user for each group membership to add should exist in the target users list
+            users_to_add = [
+                {
+                    **user,
+                    "user_id": target_user["UserId"],
+                    "group_id": target_groups_to_sync[i]["GroupId"],
+                }
+                for user in users_to_add
+                for target_user in target_users
+                if user.get("primaryEmail") == target_user["UserName"]
+            ]
+
+            memberships_created = entities.provision_entities(
+                identity_store.create_group_membership,
+                users_to_add,
+                integration_name="AWS",
+                operation_name="Creation",
+                entity_name="Group_Membership",
+                display_key="primaryEmail",
             )
             groups_memberships_created.extend(memberships_created)
-            memberships_deleted = delete_group_memberships(
-                target_groups_to_sync[i],
+
+            users_to_remove = [
+                {**user, "membership_id": user["MembershipId"]}
+                for user in users_to_remove
+                if user.get("MembershipId")
+            ]
+            memberships_deleted = entities.provision_entities(
+                identity_store.delete_group_membership,
                 users_to_remove,
-                enable_membership_delete=enable_membership_delete,
+                integration_name="AWS",
+                operation_name="Deletion",
+                entity_name="Group_Membership",
+                display_key="MemberId.UserName",
             )
             groups_memberships_deleted.extend(memberships_deleted)
 
     return groups_memberships_created, groups_memberships_deleted
 
 
-def create_group_memberships(target_group, users_to_add, target_users):
-    """Create group memberships for the users in the identity store.
+# def create_group_memberships(target_group, users_to_add, target_users):
+#     """Create group memberships for the users in the identity store.
 
-    Args:
-        group (dict): The group to add the users to.
-        users_to_add (list): A list of users to add to the group.
-        target_users (list): A list of users in the identity store.
+#     Args:
+#         group (dict): The group to add the users to.
+#         users_to_add (list): A list of users to add to the group.
+#         target_users (list): A list of users in the identity store.
 
-    Returns:
-        list: A list of group membership ID for memberships created.
-    """
-    memberships_created = []
-    logger.info(
-        f"create_group_memberships:Adding {len(users_to_add)} users to group {target_group['DisplayName']}"
-    )
-    for user in users_to_add:
-        matching_target_users = filters.filter_by_condition(
-            target_users,
-            lambda target_user: target_user["UserName"] == user["primaryEmail"],
-        )
-        if matching_target_users:
-            matching_target_user = matching_target_users[0]
-        else:
-            logger.info(
-                f"create_group_memberships:Failed to find user {user['primaryEmail']} in target system"
-            )
-            continue
-        if not DRY_RUN:
-            response = identity_store.create_group_membership(
-                target_group["GroupId"], matching_target_user["UserId"]
-            )
-            if response:
-                logger.info(
-                    f"create_group_memberships:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
-                )
-                memberships_created.append(matching_target_user["UserName"])
-            else:
-                logger.error(
-                    f"create_group_memberships:Failed to add user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
-                )
-        else:
-            logger.info(
-                f"create_group_memberships:DRY_RUN:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
-            )
-            memberships_created.append(matching_target_user["UserName"])
-    logger.info(
-        f"create_group_memberships:Finished adding {len(memberships_created)} users to group {target_group['DisplayName']}."
-    )
-    return memberships_created
+#     Returns:
+#         list: A list of group membership ID for memberships created.
+#     """
+#     memberships_created = []
+#     logger.info(
+#         f"create_group_memberships:Adding {len(users_to_add)} users to group {target_group['DisplayName']}"
+#     )
+#     for user in users_to_add:
+#         matching_target_users = filters.filter_by_condition(
+#             target_users,
+#             lambda target_user: target_user["UserName"] == user["primaryEmail"],
+#         )
+#         if matching_target_users:
+#             matching_target_user = matching_target_users[0]
+#         else:
+#             logger.info(
+#                 f"create_group_memberships:Failed to find user {user['primaryEmail']} in target system"
+#             )
+#             continue
+#         if not DRY_RUN:
+#             response = identity_store.create_group_membership(
+#                 target_group["GroupId"], matching_target_user["UserId"]
+#             )
+#             if response:
+#                 logger.info(
+#                     f"create_group_memberships:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
+#                 )
+#                 memberships_created.append(matching_target_user["UserName"])
+#             else:
+#                 logger.error(
+#                     f"create_group_memberships:Failed to add user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
+#                 )
+#         else:
+#             logger.info(
+#                 f"create_group_memberships:DRY_RUN:Successfully added user {matching_target_user['UserName']} to group {target_group['DisplayName']}"
+#             )
+#             memberships_created.append(matching_target_user["UserName"])
+#     logger.info(
+#         f"create_group_memberships:Finished adding {len(memberships_created)} users to group {target_group['DisplayName']}."
+#     )
+#     return memberships_created
 
 
-def delete_group_memberships(group, users_to_remove, enable_membership_delete=False):
-    """Delete group memberships for the users in the identity store.
+# def delete_group_memberships(group, users_to_remove, enable_membership_delete=False):
+#     """Delete group memberships for the users in the identity store.
 
-    Args:
-        group (dict): The group to remove the users from.
-        users_to_remove (list): A list of users to remove from the group.
-        enable_membership_delete (bool): Enable deletion of group memberships.
+#     Args:
+#         group (dict): The group to remove the users from.
+#         users_to_remove (list): A list of users to remove from the group.
+#         enable_membership_delete (bool): Enable deletion of group memberships.
 
-    Returns:
-        list: A list of group membership ID for memberships deleted.
-    """
-    memberships_deleted = []
-    logger.info(
-        f"delete_group_memberships:Removing {len(users_to_remove)} users from group {group['DisplayName']}"
-    )
-    for user in users_to_remove:
-        if enable_membership_delete and not DRY_RUN:
-            response = identity_store.delete_group_membership(user["MembershipId"])
+#     Returns:
+#         list: A list of group membership ID for memberships deleted.
+#     """
+#     memberships_deleted = []
+#     logger.info(
+#         f"delete_group_memberships:Removing {len(users_to_remove)} users from group {group['DisplayName']}"
+#     )
+#     for user in users_to_remove:
+#         if enable_membership_delete and not DRY_RUN:
+#             response = identity_store.delete_group_membership(user["MembershipId"])
 
-            if response:
-                memberships_deleted.append(user["MemberId"]["UserName"])
-                logger.info(
-                    f"delete_group_memberships:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
-                )
-            else:
-                logger.error(
-                    f"delete_group_memberships:Failed to remove user {user['MemberId']['UserName']} from group {group['DisplayName']}"
-                )
-        else:
-            logger.info(
-                f"delete_group_memberships:DRY_RUN:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
-            )
-            memberships_deleted.append(user["MemberId"]["UserName"])
-    logger.info(
-        f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
-    )
-    return memberships_deleted
+#             if response:
+#                 memberships_deleted.append(user["MemberId"]["UserName"])
+#                 logger.info(
+#                     f"delete_group_memberships:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
+#                 )
+#             else:
+#                 logger.error(
+#                     f"delete_group_memberships:Failed to remove user {user['MemberId']['UserName']} from group {group['DisplayName']}"
+#                 )
+#         else:
+#             logger.info(
+#                 f"delete_group_memberships:DRY_RUN:Successfully removed user {user['MemberId']['UserName']} from group {group['DisplayName']}"
+#             )
+#             memberships_deleted.append(user["MemberId"]["UserName"])
+#     logger.info(
+#         f"delete_group_memberships:Finished removing {len(memberships_deleted)} users from group {group['DisplayName']}"
+#     )
+#     return memberships_deleted
 
 
 # def create_aws_users(users_to_create):
