@@ -1,4 +1,5 @@
 import logging
+from utils import filters
 
 
 logger = logging.getLogger(__name__)
@@ -8,9 +9,9 @@ def provision_entities(
     function,
     entities,
     execute=True,
-    integration_name="unspecified",
-    operation_name="processing",
-    entity_name="entity(ies)",
+    integration_name="Unspecified",
+    operation_name="Processing",
+    entity_name="Entity",
     display_key=None,
     **kwargs,
 ):
@@ -30,27 +31,35 @@ def provision_entities(
         list: A list of created entities objects.
     """
     provisioned_entities = []
+    if not entities:
+        logger.info(
+            f"{integration_name}:{entity_name}:{operation_name}: No entities to process"
+        )
+        return provisioned_entities
     logger.info(
-        f"{integration_name}:Starting {operation_name} of {len(entities)} {entity_name}"
+        f"{integration_name}:{entity_name}:{operation_name}: Started processing {len(entities)} entities"
     )
     for entity in entities:
+        entity_string = (
+            filters.get_nested_value(entity, display_key) if display_key else entity
+        )
         if execute:
             response = function(**entity, **kwargs)
             if response:
                 logger.info(
-                    f"{integration_name}:Successful {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
+                    f"{integration_name}:{entity_name}:{operation_name}:Successful: {entity_string}"
                 )
                 provisioned_entities.append({"entity": entity, "response": response})
             else:
                 logger.error(
-                    f"{integration_name}:Failed {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
+                    f"{integration_name}:{entity_name}:{operation_name}:Failed: {entity_string}"
                 )
         else:
             logger.info(
-                f"{integration_name}:DRY_RUN:Successful {operation_name} of {entity_name} {entity[display_key] if display_key else entity}"
+                f"{integration_name}:{entity_name}:{operation_name}:Successful:DRY_RUN: {entity_string}"
             )
             provisioned_entities.append({"entity": entity, "response": None})
     logger.info(
-        f"{integration_name}:Completed {operation_name} of {len(provisioned_entities)} {entity_name}"
+        f"{integration_name}:{entity_name}:{operation_name}: Completed processing {len(provisioned_entities)} entities"
     )
     return provisioned_entities

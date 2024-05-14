@@ -18,11 +18,15 @@ def test_provision_entities_success(mock_logger):
 
     assert len(result) == len(users_list)
     assert mock_function.call_count == len(users_list)
-    mock_logger.info.assert_any_call("aws:Starting creation of 3 entity(ies)")
-    for user in users_list:
-        mock_logger.info.assert_any_call(
-            f"aws:Successful creation of entity(ies) {user['name']}"
-        )
+    info_calls = [
+        call("aws:Entity:creation: Started processing 3 entities"),
+        call("aws:Entity:creation: Completed processing 3 entities"),
+    ]
+    for i, user in enumerate(users_list):
+        pos = i + 1
+        info_calls.insert(pos, call(f"aws:Entity:creation:Successful: {user['name']}"))
+
+    assert mock_logger.info.call_args_list == info_calls
     mock_logger.error.assert_not_called()
 
 
@@ -44,15 +48,15 @@ def test_provision_entities_failure(mock_logger):
     assert mock_function.call_count == len(users_list)
 
     info_calls = [
-        call("aws:Starting creation of 3 entity(ies)"),
-        call("aws:Successful creation of entity(ies) user1"),
-        call("aws:Successful creation of entity(ies) user3"),
-        call("aws:Completed creation of 2 entity(ies)"),
+        call("aws:Entity:creation: Started processing 3 entities"),
+        call("aws:Entity:creation:Successful: user1"),
+        call("aws:Entity:creation:Successful: user3"),
+        call("aws:Entity:creation: Completed processing 2 entities"),
     ]
 
     assert mock_logger.info.call_args_list == info_calls
     assert mock_logger.error.call_args_list == [
-        call("aws:Failed creation of entity(ies) user2")
+        call("aws:Entity:creation:Failed: user2"),
     ]
 
 
@@ -70,6 +74,7 @@ def test_provision_entities_empty_list(mock_logger):
 
     assert len(result) == 0
     assert mock_function.call_count == 0
-    mock_logger.info.assert_any_call("aws:Starting creation of 0 entity(ies)")
-    mock_logger.info.assert_any_call("aws:Completed creation of 0 entity(ies)")
+    assert call(
+        "aws:Entity:creation: No entities to process"
+    ) in mock_logger.info.call_args_list
     mock_logger.error.assert_not_called()
