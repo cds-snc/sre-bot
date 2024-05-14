@@ -138,8 +138,12 @@ def test_get_groups_from_integration_filters_applied(
     assert response == []
 
     assert mock_filters.filter_by_condition.call_count == 2
-    assert mock_filters.filter_by_condition.called_once_with(aws_groups, processing_filters)
-    assert mock_filters.filter_by_condition.called_once_with(aws_groups_prefix, processing_filters)
+    assert mock_filters.filter_by_condition.called_once_with(
+        aws_groups, processing_filters
+    )
+    assert mock_filters.filter_by_condition.called_once_with(
+        aws_groups_prefix, processing_filters
+    )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called
 
@@ -171,7 +175,11 @@ def test_get_groups_from_integration_filters_returns_subset(
     assert response == aws_groups_prefix
 
     assert mock_filters.filter_by_condition.call_count == 1
-    assert mock_filters.filter_by_condition.called_once_with(aws_groups, processing_filters)
-    assert mock_filters.filter_by_condition.called_once_with(aws_groups_prefix, processing_filters)
+    assert mock_filters.filter_by_condition.called_once_with(
+        aws_groups, processing_filters
+    )
+    assert mock_filters.filter_by_condition.called_once_with(
+        aws_groups_prefix, processing_filters
+    )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called
