@@ -167,9 +167,14 @@ def create_group_membership(group_id, user_id, **kwargs):
         str: The membership ID of the created group membership.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    # kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "GroupId": group_id,
+        "MemberId": {"UserId": user_id},
+    }
     response = execute_aws_api_call(
-        "identitystore", "create_group_membership", **kwargs
+        "identitystore", "create_group_membership", **params
     )
     return response["MembershipId"] if response else False
 
