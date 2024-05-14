@@ -138,8 +138,9 @@ def get_unique_nested_dicts(source_items, nested_key):
 
 def preformat_items(items, lookup_key, new_key, pattern="", replace=""):
     for item in items:
-        if lookup_key not in item:
+        value = get_nested_value(item, lookup_key)
+        if not value:
             raise KeyError(f"Item {item} does not have {lookup_key} key")
-        item[new_key] = re.sub(pattern, replace, item[lookup_key])
+        item[new_key] = re.sub(pattern, replace, value)
 
     return items

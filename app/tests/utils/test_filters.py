@@ -324,3 +324,48 @@ def test_preformat_items_lookup_key_not_found_raise_error(google_groups_w_users)
         f'"Item {items_to_format[0]} does not have {lookup_key} key"'
     )
     assert str(exc.value) == expected_error_message
+
+
+def test_preformat_items_with_nested_lookup_key():
+    items_to_format = [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+            "group_membership_id": {
+                "id": "PREFIX-group_membership_id1",
+                "name": "PREFIX-group_membership_name1",
+            },
+        }
+    ]
+
+    lookup_key = "group_membership_id.name"
+    new_key = "group_name"
+    pattern = r"^PREFIX-"
+    replace = "new-"
+    response = filters.preformat_items(
+        items_to_format, lookup_key, new_key, pattern, replace
+    )
+
+    assert response == [
+        {
+            "id": "PREFIX-google_group_id1",
+            "name": "PREFIX-group-name1",
+            "members": [
+                {
+                    "id": "PREFIX-user_id1",
+                    "primaryEmail": "PREFIX-user-email1@test.com",
+                }
+            ],
+            "group_membership_id": {
+                "id": "PREFIX-group_membership_id1",
+                "name": "PREFIX-group_membership_name1",
+            },
+            "group_name": "new-group_membership_name1",
+        }
+    ]
