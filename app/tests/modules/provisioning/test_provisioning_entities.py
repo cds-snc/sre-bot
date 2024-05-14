@@ -74,7 +74,8 @@ def test_provision_entities_empty_list(mock_logger):
 
     assert len(result) == 0
     assert mock_function.call_count == 0
-    assert call(
-        "aws:Entity:creation: No entities to process"
-    ) in mock_logger.info.call_args_list
+    assert (
+        call("aws:Entity:creation: No entities to process")
+        in mock_logger.info.call_args_list
+    )
     mock_logger.error.assert_not_called()
