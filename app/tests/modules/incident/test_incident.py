@@ -1139,6 +1139,38 @@ def test_handle_reaction_added_returns_link():
     mock_client.chat_getPermalink.assert_called_once()
 
 
+def test_handle_reaction_added_forwarded_message():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "messages": [
+            {
+                "type": "message",
+                "attachments": [{"fallback": "This is a forwarded message"}],
+                "text": "Original message text",
+                "ts": "1617556890.000100",
+                "user": "U1234567890",
+                "files": [{"url_private": "https://example.com/image.png"}],
+            }
+        ],
+    }
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Make assertion that the function calls the correct functions
+    mock_client.conversations_history.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
+    mock_client.users_profile_get.assert_called_once()
+
+
 def test_handle_reaction_removed_successful_message_removal():
     # Mock the client and logger
     logger = MagicMock()
@@ -1259,6 +1291,28 @@ def test_handle_reaction_removed_empty_message_list_handling():
     logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_history.return_value = {"messages": []}
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+    assert (
+        incident.handle_reaction_removed(mock_client, lambda: None, body, logger)
+        is None
+    )
+
+
+def test_handle_reaction_removed_forwarded_message():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_history.return_value = {
+        "attachments": [{"fallback": "This is a forwarded message"}],
+        "text": "Original message text",
+        "ts": "1617556890.000100",
+        "user": "U1234567890",
+        "files": [{"url_private": "https://example.com/image.png"}],
+    }
     body = {
         "event": {
             "reaction": "floppy_disk",

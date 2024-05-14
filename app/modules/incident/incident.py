@@ -454,6 +454,16 @@ def handle_reaction_added(client, ack, body, logger):
                             logger.error("No incident document found for this channel.")
 
             for message in messages:
+                # get the forwarded message and get the attachments appeending the forwarded message to the original message
+                if message.get("attachments"):
+                    attachments = message["attachments"]
+                    for attachment in attachments:
+                        fallback = attachment.get("fallback")
+                        if fallback:
+                            message["text"] += (
+                                "\nForwarded Message :" + attachment["fallback"]
+                            )
+
                 # get the message ts time
                 message_ts = message["ts"]
 
@@ -520,6 +530,16 @@ def handle_reaction_removed(client, ack, body, logger):
                 return
             # get the message we want to delete
             message = messages[0]
+
+            # get the forwarded message and get the attachments appeending the forwarded message to the original message
+            if message.get("attachments"):
+                attachments = message["attachments"]
+                for attachment in attachments:
+                    fallback = attachment.get("fallback")
+                    if fallback:
+                        message["text"] += (
+                            "Forwarded Message :" + attachment["fallback"]
+                        )
 
             # get the message ts time
             message_ts = message["ts"]
