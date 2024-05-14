@@ -262,11 +262,11 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.identity_store")
-@patch("modules.aws.identity_center.entities.provision_entities")
+@patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.filters")
 def test_sync_identity_center_users_default(
     mock_filters,
-    mock_provision_entities,
+    mock_entities,
     mock_identity_store,
     mock_logger,
     google_users,
@@ -282,7 +282,7 @@ def test_sync_identity_center_users_default(
         target_users,
     ]
     mock_filters.preformat_items.side_effect = preformat_side_effects
-    mock_provision_entities.side_effect = [source_users, []]
+    mock_entities.provision_entities.side_effect = [source_users, []]
 
     result = identity_center.sync_users(source_users, target_users)
 
@@ -306,7 +306,7 @@ def test_sync_identity_center_users_default(
             entity_name="User",
             display_key="primaryEmail",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
     assert (
         call(
@@ -318,7 +318,7 @@ def test_sync_identity_center_users_default(
             entity_name="User",
             display_key="UserName",
         )
-    ) in mock_provision_entities.call_args_list
+    ) in mock_entities.provision_entities.call_args_list
     assert mock_logger.info.call_count == 1
     assert (
         call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
@@ -328,11 +328,11 @@ def test_sync_identity_center_users_default(
 
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.identity_store")
-@patch("modules.aws.identity_center.entities.provision_entities")
-@patch("modules.aws.identity_center.filters.compare_lists")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
 def test_sync_identity_center_users_enable_delete_true(
-    mock_compare_lists,
-    mock_provision_entities,
+    mock_filters,
+    mock_entities,
     mock_identity_store,
     mock_logger,
     google_users,
@@ -340,8 +340,14 @@ def test_sync_identity_center_users_enable_delete_true(
 ):
     source_users = google_users(3)
     target_users = aws_users(6)[:3]
-    mock_compare_lists.return_value = source_users, target_users
-    mock_provision_entities.side_effect = [source_users, target_users]
+    mock_filters.preformat_items.side_effect = [
+        source_users,
+        source_users,
+        source_users,
+        target_users,
+    ]
+    mock_filters.compare_lists.return_value = source_users, target_users
+    mock_entities.provision_entities.side_effect = [source_users, target_users]
 
     result = identity_center.sync_users(
         source_users, target_users, enable_user_delete=True
@@ -354,7 +360,7 @@ def test_sync_identity_center_users_enable_delete_true(
             {"values": target_users, "key": "UserName"},
             mode="sync",
         )
-        in mock_compare_lists.call_args_list
+        in mock_filters.compare_lists.call_args_list
     )
     assert (
         call(
@@ -366,7 +372,7 @@ def test_sync_identity_center_users_enable_delete_true(
             entity_name="User",
             display_key="primaryEmail",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
     assert (
         call(
@@ -378,7 +384,7 @@ def test_sync_identity_center_users_enable_delete_true(
             entity_name="User",
             display_key="UserName",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
     assert mock_logger.info.call_count == 1
     assert (
@@ -389,11 +395,11 @@ def test_sync_identity_center_users_enable_delete_true(
 
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.identity_store")
-@patch("modules.aws.identity_center.entities.provision_entities")
-@patch("modules.aws.identity_center.filters.compare_lists")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
 def test_sync_identity_center_users_delete_target_all_disable_delete(
-    mock_compare_lists,
-    mock_provision_entities,
+    mock_filters,
+    mock_entities,
     mock_identity_store,
     mock_logger,
     google_users,
@@ -401,16 +407,20 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
 ):
     source_users = google_users(3)
     target_users = aws_users(6)
-    mock_identity_store.create_user.return_value = []
-    mock_identity_store.delete_user.return_value = target_users
-    mock_provision_entities.side_effect = [[], target_users]
+    mock_filters.preformat_items.side_effect = [
+        [],
+        [],
+        [],
+        target_users,
+    ]
+    mock_entities.provision_entities.side_effect = [[], []]
 
     result = identity_center.sync_users(
         source_users, target_users, delete_target_all=True
     )
 
-    assert result == ([], target_users)
-    assert mock_compare_lists.call_count == 0
+    assert result == ([], [])
+    assert mock_filters.compare_lists.call_count == 0
 
     assert (
         call(
@@ -422,7 +432,7 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
             entity_name="User",
             display_key="primaryEmail",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
     assert (
         call(
@@ -434,7 +444,7 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
             entity_name="User",
             display_key="UserName",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
 
     assert mock_logger.info.call_count == 1
@@ -446,11 +456,11 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
 
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.identity_store")
-@patch("modules.aws.identity_center.entities.provision_entities")
-@patch("modules.aws.identity_center.filters.compare_lists")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
 def test_sync_identity_center_users_delete_target_all_enable_delete(
-    mock_compare_lists,
-    mock_provision_entities,
+    mock_filters,
+    mock_entities,
     mock_identity_store,
     mock_logger,
     google_users,
@@ -458,7 +468,14 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 ):
     source_users = google_users(3)
     target_users = aws_users(6)
-    mock_provision_entities.side_effect = [[], target_users]
+    mock_filters.preformat_items.side_effect = [
+        [],
+        [],
+        [],
+        target_users,
+    ]
+
+    mock_entities.provision_entities.side_effect = [[], target_users]
 
     result = identity_center.sync_users(
         source_users,
@@ -469,7 +486,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
     )
 
     assert result == ([], target_users)
-    assert mock_compare_lists.call_count == 0
+    assert mock_filters.compare_lists.call_count == 0
 
     assert (
         call(
@@ -481,7 +498,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
             entity_name="User",
             display_key="primaryEmail",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
     assert (
         call(
@@ -493,7 +510,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
             entity_name="User",
             display_key="UserName",
         )
-        in mock_provision_entities.call_args_list
+        in mock_entities.provision_entities.call_args_list
     )
 
     assert mock_logger.info.call_count == 1
@@ -503,19 +520,155 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
     )
 
 
+@patch("modules.aws.identity_center.logger")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.identity_store")
+def test_sync_identity_center_groups_empty_source_groups(
+    mock_identity_store,
+    mock_filters,
+    mock_logger,
+    aws_groups_w_users,
+    aws_users,
+):
+    source_groups = []
+    target_groups = aws_groups_w_users(3, 3, group_prefix="target-")
+    target_users = aws_users(3)
+    mock_filters.preformat_items.return_value = []
+    mock_filters.compare_lists.return_value = [], []
+
+    result = identity_center.sync_groups(
+        source_groups, target_groups, target_users, enable_membership_delete=True
+    )
+
+    assert result == ([], [])
+    assert (
+        call(
+            {"values": source_groups, "key": "DisplayName"},
+            {"values": target_groups, "key": "DisplayName"},
+            mode="match",
+        )
+        in mock_filters.compare_lists.call_args_list
+    )
+    assert mock_filters.compare_lists.call_count == 1
+    assert mock_identity_store.create_group_membership.call_count == 0
+    assert mock_identity_store.delete_group_membership.call_count == 0
+    assert mock_logger.info.call_count == 2
+    assert (
+        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
+        in mock_logger.info.call_args_list
+    )
+
+
+@patch("modules.aws.identity_center.logger")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.identity_store")
+def test_sync_identity_center_groups_empty_target_groups(
+    mock_identity_store,
+    mock_filters,
+    mock_logger,
+    aws_users,
+    google_groups_w_users,
+):
+    source_groups = google_groups_w_users(3, 3, group_prefix="source-")
+    source_groups_formatted = [
+        {
+            **group,
+            "DisplayName": group["name"],
+        }
+        for group in source_groups
+    ]
+    target_groups = []
+    target_users = aws_users(3)
+    mock_filters.preformat_items.return_value = source_groups_formatted
+    mock_filters.compare_lists.return_value = [], []
+
+    result = identity_center.sync_groups(
+        source_groups_formatted,
+        target_groups,
+        target_users,
+        enable_membership_delete=True,
+    )
+
+    assert result == ([], [])
+    assert (
+        call(
+            {"values": source_groups_formatted, "key": "DisplayName"},
+            {"values": target_groups, "key": "DisplayName"},
+            mode="match",
+        )
+        in mock_filters.compare_lists.call_args_list
+    )
+    assert mock_filters.compare_lists.call_count == 1
+    assert mock_identity_store.create_group_membership.call_count == 0
+    assert mock_identity_store.delete_group_membership.call_count == 0
+    assert mock_logger.info.call_count == 2
+    assert (
+        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
+        in mock_logger.info.call_args_list
+    )
+
+
+@patch("modules.aws.identity_center.logger")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.identity_store")
+def test_sync_identity_center_groups_no_matching_groups_to_sync(
+    mock_identity_store,
+    mock_filters,
+    mock_logger,
+    aws_groups_w_users,
+    aws_users,
+    google_groups_w_users,
+):
+    source_groups = google_groups_w_users(3, 3, group_prefix="source-")
+    source_groups_formatted = [
+        {
+            **group,
+            "DisplayName": group["name"],
+        }
+        for group in source_groups
+    ]
+    target_groups = aws_groups_w_users(3, 3, group_prefix="target-")
+    target_users = aws_users(3)
+    mock_filters.preformat_items.return_value = source_groups_formatted
+    mock_filters.compare_lists.return_value = [], []
+
+    result = identity_center.sync_groups(
+        source_groups_formatted,
+        target_groups,
+        target_users,
+        enable_membership_delete=True,
+    )
+
+    assert result == ([], [])
+    assert (
+        call(
+            {"values": source_groups_formatted, "key": "DisplayName"},
+            {"values": target_groups, "key": "DisplayName"},
+            mode="match",
+        )
+        in mock_filters.compare_lists.call_args_list
+    )
+    assert mock_filters.compare_lists.call_count == 1
+    assert mock_identity_store.create_group_membership.call_count == 0
+    assert mock_identity_store.delete_group_membership.call_count == 0
+    assert mock_logger.info.call_count == 2
+    assert (
+        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
+        in mock_logger.info.call_args_list
+    )
+
+
 # @patch("modules.aws.identity_center.DRY_RUN", False)
 # @patch("modules.aws.identity_center.logger")
 # @patch("modules.provisioning.entities.logger")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store")
 # @patch("modules.aws.identity_center.identity_store")
 # @patch("modules.aws.identity_center.groups")
 # def test_synchronize_enable_all(
 #     mock_groups,
 #     mock_identity_store,
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
-#     mock_provision_entities_logger,
+#     mock_identity_store,
+#     mock_entities.provision_entities_logger,
 #     mock_logger,
 #     google_groups_w_users,
 #     google_users,
@@ -608,8 +761,8 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #     def delete_membership_side_effect(membership_id, **kwargs):
 #         return True
 
-#     mock_create_group_membership.side_effect = create_membership_side_effect
-#     mock_delete_group_membership.side_effect = delete_membership_side_effect
+#     mock_identity_store.create_group_membership.side_effect = create_membership_side_effect
+#     mock_identity_store.delete_group_membership.side_effect = delete_membership_side_effect
 
 #     result = identity_center.synchronize(
 #         enable_users_sync=True,
@@ -628,7 +781,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #     # }
 
 #     assert mock_logger.info.call_count == 28
-#     assert mock_provision_entities_logger.info.call_count == 0
+#     assert mock_entities.provision_entities_logger.info.call_count == 0
 #     assert (
 #         call("synchronize:Found 3 Source Groups and 6 Users")
 #         in mock_logger.info.call_args_list
@@ -645,17 +798,17 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     assert (
 #         call("aws:Starting creation of 3 user(s)")
-#     ) in mock_provision_entities_logger.info.call_args_list
+#     ) in mock_entities.provision_entities_logger.info.call_args_list
 
 #     for user in expected_target_users_created:
 #         assert (
 #             call(f"aws:Successful creation of user(s) {user['entity']['primaryEmail']}")
-#             in mock_provision_entities_logger.info.call_args_list
+#             in mock_entities.provision_entities_logger.info.call_args_list
 #         )
 #     for user in expected_target_users_deleted:
 #         assert (
 #             call(f"aws:Successful deletion of user(s) {user['entity']['UserName']}")
-#             in mock_provision_entities_logger.info.call_args_list
+#             in mock_entities.provision_entities_logger.info.call_args_list
 #         )
 #     for group in target_groups:
 #         for user in expected_group_memberships_to_create:
@@ -677,21 +830,21 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     assert mock_identity_store.create_user.call_count == 3
 #     assert mock_identity_store.delete_user.call_count == 3
-#     assert mock_create_group_membership.call_count == 9
-#     assert mock_delete_group_membership.call_count == 9
+#     assert mock_identity_store.create_group_membership.call_count == 9
+#     assert mock_identity_store.delete_group_membership.call_count == 9
 
 
 # @patch("modules.aws.identity_center.DRY_RUN", True)
 # @patch("modules.aws.identity_center.logger")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store")
+#
 # @patch("modules.aws.identity_center.identity_store")
 # @patch("modules.aws.identity_center.groups")
 # def test_synchronize_defaults_dry_run_true(
 #     mock_groups,
 #     mock_identity_store,
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
+#
+#     mock_identity_store,
 #     mock_logger,
 #     google_groups_w_users,
 #     aws_groups_w_users,
@@ -784,21 +937,21 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     assert mock_identity_store.create_user.call_count == 0
 #     assert mock_identity_store.delete_user.call_count == 0
-#     assert mock_create_group_membership.call_count == 0
-#     assert mock_delete_group_membership.call_count == 0
+#     assert mock_identity_store.create_group_membership.call_count == 0
+#     assert mock_identity_store.delete_group_membership.call_count == 0
 
 
 # @patch("modules.aws.identity_center.DRY_RUN", False)
 # @patch("modules.aws.identity_center.logger")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store")
+#
 # @patch("modules.aws.identity_center.identity_store")
 # @patch("modules.aws.identity_center.groups")
 # def test_synchronize_enable_delete_dry_run_false(
 #     mock_groups,
 #     mock_identity_store,
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
+#
+#     mock_identity_store,
 #     mock_logger,
 #     google_groups_w_users,
 #     aws_groups_w_users,
@@ -831,7 +984,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         "user-email2@test.com",
 #         "user-email3@test.com",
 #     ]
-#     mock_create_group_membership.side_effect = [
+#     mock_identity_store.create_group_membership.side_effect = [
 #         "aws-group_id1-user-email1@test.com",
 #         "aws-group_id1-user-email2@test.com",
 #         "aws-group_id1-user-email3@test.com",
@@ -842,7 +995,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         "aws-group_id3-user-email2@test.com",
 #         "aws-group_id3-user-email3@test.com",
 #     ]
-#     mock_delete_group_membership.side_effect = [
+#     mock_identity_store.delete_group_membership.side_effect = [
 #         "membership_id_7",
 #         "membership_id_8",
 #         "membership_id_9",
@@ -948,21 +1101,21 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     assert mock_identity_store.create_user.call_count == 3
 #     assert mock_identity_store.delete_user.call_count == 3
-#     assert mock_create_group_membership.call_count == 9
-#     assert mock_delete_group_membership.call_count == 9
+#     assert mock_identity_store.create_group_membership.call_count == 9
+#     assert mock_identity_store.delete_group_membership.call_count == 9
 
 
 # @patch("modules.aws.identity_center.DRY_RUN", True)
 # @patch("modules.aws.identity_center.logger")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.identity_store")
+#
 # @patch("modules.aws.identity_center.identity_store")
 # @patch("modules.aws.identity_center.groups")
 # def test_synchronize_enable_delete_dry_run_true(
 #     mock_groups,
 #     mock_identity_store,
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
+#
+#     mock_identity_store,
 #     mock_logger,
 #     google_groups_w_users,
 #     aws_groups_w_users,
@@ -995,7 +1148,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         "user-email2@test.com",
 #         "user-email3@test.com",
 #     ]
-#     mock_create_group_membership.side_effect = [
+#     mock_identity_store.create_group_membership.side_effect = [
 #         "aws-group_id1-user-email1@test.com",
 #         "aws-group_id1-user-email2@test.com",
 #         "aws-group_id1-user-email3@test.com",
@@ -1006,7 +1159,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         "aws-group_id3-user-email2@test.com",
 #         "aws-group_id3-user-email3@test.com",
 #     ]
-#     mock_delete_group_membership.side_effect = [
+#     mock_identity_store.delete_group_membership.side_effect = [
 #         "membership_id_7",
 #         "membership_id_8",
 #         "membership_id_9",
@@ -1112,8 +1265,8 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     assert mock_identity_store.create_user.call_count == 0
 #     assert mock_identity_store.delete_user.call_count == 0
-#     assert mock_create_group_membership.call_count == 0
-#     assert mock_delete_group_membership.call_count == 0
+#     assert mock_identity_store.create_group_membership.call_count == 0
+#     assert mock_identity_store.delete_group_membership.call_count == 0
 
 
 # @patch("modules.aws.identity_center.filters")
@@ -1207,15 +1360,15 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 # @patch("modules.aws.identity_center.logger")
 # @patch("modules.aws.identity_center.filters.preformat_items")
-# @patch("modules.aws.identity_center.filters.compare_lists")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
-# @patch("modules.aws.identity_center.entities.provision_entities")
+# @patch("modules.aws.identity_center.filters")
+# @patch("modules.aws.identity_center.identity_store")
+#
+# @patch("modules.aws.identity_center.entities")
 # def test_sync_identity_center_groups_defaults(
-#     mock_provision_entities,
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
-#     mock_compare_lists,
+#     mock_entities,
+#
+#     mock_identity_store,
+#     mock_filters,
 #     mock_filters,
 #     mock_logger,
 #     aws_groups_w_users,
@@ -1231,7 +1384,7 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 #     mock_filters.preformat_items.return_value = preformated_source_groups
 #     # Mock the behavior of compare_lists to return the source and target groups
-#     mock_compare_lists.return_value = (preformated_source_groups, target_groups)
+#     mock_filters.compare_lists.return_value = (preformated_source_groups, target_groups)
 
 #     def create_user_side_effect(email, first_name, family_name, **kwargs):
 #         return email
@@ -1246,13 +1399,13 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         return kwargs["UserName"]
 
 #     # Mock the behavior of create_group_membership to return a membership id
-#     mock_create_group_membership.return_value = {
+#     mock_identity_store.create_group_membership.return_value = {
 #         "entity": "group_membership",
 #         "response": "membership_id_1",
 #     }
 
 #     # Mock the behavior of delete_group_membership to return False
-#     mock_delete_group_membership.return_value = False
+#     mock_identity_store.delete_group_membership.return_value = False
 
 #     # Call the function under test
 #     result = identity_center.sync_groups(source_groups, target_groups, target_users)
@@ -1269,13 +1422,12 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 
 
 # @patch("modules.aws.identity_center.logger")
-# @patch("modules.aws.identity_center.filters.compare_lists")
-# @patch("modules.aws.identity_center.identity_store.create_group_membership")
-# @patch("modules.aws.identity_center.identity_store.delete_group_membership")
+# @patch("modules.aws.identity_center.filters")
+# @patch("modules.aws.identity_center.identity_store")
 # def test_sync_identity_center_groups_enable_delete_true(
-#     mock_delete_group_membership,
-#     mock_create_group_membership,
-#     mock_compare_lists,
+#
+#     mock_identity_store,
+#     mock_filters,
 #     mock_logger,
 #     aws_groups_w_users,
 #     aws_users,
@@ -1296,13 +1448,13 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #         (source_groups[1]["members"], target_groups[1]["GroupMemberships"]),
 #         (source_groups[2]["members"], target_groups[2]["GroupMemberships"]),
 #     ]
-#     mock_compare_lists.side_effect = side_effects
-#     mock_create_group_membership.side_effect = [
+#     mock_filters.compare_lists.side_effect = side_effects
+#     mock_identity_store.create_group_membership.side_effect = [
 #         ["target-membership_id_1", "target-membership_id_2", "target-membership_id_3"],
 #         ["target-membership_id_1", "target-membership_id_2", "target-membership_id_3"],
 #         ["target-membership_id_1", "target-membership_id_2", "target-membership_id_3"],
 #     ]
-#     mock_delete_group_membership.side_effect = [
+#     mock_identity_store.delete_group_membership.side_effect = [
 #         ["target-membership_id_4", "target-membership_id_5", "target-membership_id_6"],
 #         ["target-membership_id_4", "target-membership_id_5", "target-membership_id_6"],
 #         ["target-membership_id_4", "target-membership_id_5", "target-membership_id_6"],
@@ -1341,134 +1493,13 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
 #             {"values": target_groups, "key": "DisplayName"},
 #             mode="match",
 #         )
-#         in mock_compare_lists.call_args_list
+#         in mock_filters.compare_lists.call_args_list
 #     )
-#     assert mock_compare_lists.call_count == 4
-#     assert mock_create_group_membership.call_count == 3
-#     assert mock_delete_group_membership.call_count == 3
+#     assert mock_filters.compare_lists.call_count == 4
+#     assert mock_identity_store.create_group_membership.call_count == 3
+#     assert mock_identity_store.delete_group_membership.call_count == 3
 #     assert mock_logger.info.call_count == 5
 #     assert (
 #         call("synchronize:groups:Found 3 Source Groups and 3 Target Groups")
 #         in mock_logger.info.call_args_list
 #     )
-
-
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.filters.compare_lists")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-def test_sync_identity_center_groups_empty_source_groups(
-    mock_delete_group_membership,
-    mock_create_group_membership,
-    mock_compare_lists,
-    mock_logger,
-    aws_groups_w_users,
-    aws_users,
-):
-    source_groups = []
-    target_groups = aws_groups_w_users(3, 3, group_prefix="target-")
-    target_users = aws_users(3)
-    mock_compare_lists.return_value = [], []
-
-    result = identity_center.sync_groups(
-        source_groups, target_groups, target_users, enable_membership_delete=True
-    )
-
-    assert result == ([], [])
-    assert (
-        call(
-            {"values": source_groups, "key": "DisplayName"},
-            {"values": target_groups, "key": "DisplayName"},
-            mode="match",
-        )
-        in mock_compare_lists.call_args_list
-    )
-    assert mock_compare_lists.call_count == 1
-    assert mock_create_group_membership.call_count == 0
-    assert mock_delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
-    )
-
-
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.filters.compare_lists")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-def test_sync_identity_center_groups_empty_target_groups(
-    mock_delete_group_membership,
-    mock_create_group_membership,
-    mock_compare_lists,
-    mock_logger,
-    aws_users,
-    google_groups_w_users,
-):
-    source_groups = google_groups_w_users(3, 3, group_prefix="source-")
-    target_groups = []
-    target_users = aws_users(3)
-    mock_compare_lists.return_value = [], []
-
-    result = identity_center.sync_groups(
-        source_groups, target_groups, target_users, enable_membership_delete=True
-    )
-
-    assert result == ([], [])
-    assert (
-        call(
-            {"values": source_groups, "key": "DisplayName"},
-            {"values": target_groups, "key": "DisplayName"},
-            mode="match",
-        )
-        in mock_compare_lists.call_args_list
-    )
-    assert mock_compare_lists.call_count == 1
-    assert mock_create_group_membership.call_count == 0
-    assert mock_delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
-    )
-
-
-@patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.filters.compare_lists")
-@patch("modules.aws.identity_center.identity_store.create_group_membership")
-@patch("modules.aws.identity_center.identity_store.delete_group_membership")
-def test_sync_identity_center_groups_no_matching_groups_to_sync(
-    mock_create_group_membership,
-    mock_delete_group_membership,
-    mock_compare_lists,
-    mock_logger,
-    aws_groups_w_users,
-    aws_users,
-    google_groups_w_users,
-):
-    source_groups = google_groups_w_users(3, 3, group_prefix="source-")
-    target_groups = aws_groups_w_users(3, 3, group_prefix="target-")
-    target_users = aws_users(3)
-    mock_compare_lists.return_value = [], []
-
-    result = identity_center.sync_groups(
-        source_groups, target_groups, target_users, enable_membership_delete=True
-    )
-
-    assert result == ([], [])
-    assert (
-        call(
-            {"values": source_groups, "key": "DisplayName"},
-            {"values": target_groups, "key": "DisplayName"},
-            mode="match",
-        )
-        in mock_compare_lists.call_args_list
-    )
-    assert mock_compare_lists.call_count == 1
-    assert mock_create_group_membership.call_count == 0
-    assert mock_delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
-    )
