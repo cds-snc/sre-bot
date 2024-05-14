@@ -200,6 +200,7 @@ def sync_groups(
             memberships_created = entities.provision_entities(
                 identity_store.create_group_membership,
                 users_to_add,
+                execute=enable_membership_create,
                 integration_name="AWS",
                 operation_name="Creation",
                 entity_name="Group_Membership",
@@ -215,6 +216,7 @@ def sync_groups(
             memberships_deleted = entities.provision_entities(
                 identity_store.delete_group_membership,
                 users_to_remove,
+                execute=enable_membership_delete,
                 integration_name="AWS",
                 operation_name="Deletion",
                 entity_name="Group_Membership",
