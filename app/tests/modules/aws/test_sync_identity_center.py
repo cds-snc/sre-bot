@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch, call, ANY, MagicMock
 from pytest import fixture
 
@@ -9,12 +8,15 @@ from modules.aws import identity_center
 def provision_entities_side_effect(mock_identity_store):
     def _provision_entities_side_effect(function, entities, **kwargs):
         entities_provisioned = []
-        function_name = function._mock_name.split('.')[-1]
+        function_name = function._mock_name.split(".")[-1]
 
         for entity in entities:
             if function_name == "create_user":
                 entities_provisioned.append(
-                    {"entity": entity["primaryEmail"], "response": entity["primaryEmail"]}
+                    {
+                        "entity": entity["primaryEmail"],
+                        "response": entity["primaryEmail"],
+                    }
                 )
             elif function_name == "delete_user":
                 entities_provisioned.append(
@@ -22,13 +24,17 @@ def provision_entities_side_effect(mock_identity_store):
                 )
             elif function_name == "create_group_membership":
                 entities_provisioned.append(
-                    {"entity": entity["primaryEmail"], "response": "membership-" + entity["primaryEmail"]}
+                    {
+                        "entity": entity["primaryEmail"],
+                        "response": "membership-" + entity["primaryEmail"],
+                    }
                 )
             elif function_name == "delete_group_membership":
                 entities_provisioned.append(
                     {"entity": entity["MemberId"]["UserName"], "response": True}
                 )
         return entities_provisioned
+
     return _provision_entities_side_effect
 
 
@@ -298,7 +304,7 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 @patch("modules.aws.identity_center.identity_store")
 @patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.filters")
-def test_sync_identity_center_users_default(
+def test_sync_users_default(
     mock_filters,
     mock_entities,
     mock_identity_store,
@@ -364,7 +370,7 @@ def test_sync_identity_center_users_default(
 @patch("modules.aws.identity_center.identity_store")
 @patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.filters")
-def test_sync_identity_center_users_enable_delete_true(
+def test_sync_users_enable_delete_true(
     mock_filters,
     mock_entities,
     mock_identity_store,
@@ -431,7 +437,7 @@ def test_sync_identity_center_users_enable_delete_true(
 @patch("modules.aws.identity_center.identity_store")
 @patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.filters")
-def test_sync_identity_center_users_delete_target_all_disable_delete(
+def test_sync_users_delete_target_all_disable_delete(
     mock_filters,
     mock_entities,
     mock_identity_store,
@@ -492,7 +498,7 @@ def test_sync_identity_center_users_delete_target_all_disable_delete(
 @patch("modules.aws.identity_center.identity_store")
 @patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.filters")
-def test_sync_identity_center_users_delete_target_all_enable_delete(
+def test_sync_users_delete_target_all_enable_delete(
     mock_filters,
     mock_entities,
     mock_identity_store,
@@ -564,8 +570,7 @@ def test_sync_groups_defaults_with_matching_groups(
     aws_groups_w_users,
     aws_users,
     google_groups_w_users,
-    google_users,
-    provision_entities_side_effect
+    provision_entities_side_effect,
 ):
     source_groups = google_groups_w_users(3, 3, group_prefix="AWS-")
     source_groups_formatted = [
@@ -590,21 +595,57 @@ def test_sync_groups_defaults_with_matching_groups(
         (source_users_to_create, target_users_to_remove),
     ]
 
+    formatted_source_users = [
+        {**user, "user_id": user["id"], "group_id": "aws-group_id1"}
+        for user in source_users_to_create
+    ]
+    formatted_target_users = [
+        {**user, "membership_id": user["MembershipId"]}
+        for user in target_users_to_remove
+        if user.get("MembershipId")
+    ]
     mock_entities.provision_entities.side_effect = provision_entities_side_effect
 
     result = identity_center.sync_groups(source_groups, target_groups, target_users)
 
     assert result == (
         [
-            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
-            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
-            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
-            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
-            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
-            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
-            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
-            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
-            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
+            {
+                "entity": "user-email1@test.com",
+                "response": "membership-user-email1@test.com",
+            },
+            {
+                "entity": "user-email2@test.com",
+                "response": "membership-user-email2@test.com",
+            },
+            {
+                "entity": "user-email3@test.com",
+                "response": "membership-user-email3@test.com",
+            },
+            {
+                "entity": "user-email1@test.com",
+                "response": "membership-user-email1@test.com",
+            },
+            {
+                "entity": "user-email2@test.com",
+                "response": "membership-user-email2@test.com",
+            },
+            {
+                "entity": "user-email3@test.com",
+                "response": "membership-user-email3@test.com",
+            },
+            {
+                "entity": "user-email1@test.com",
+                "response": "membership-user-email1@test.com",
+            },
+            {
+                "entity": "user-email2@test.com",
+                "response": "membership-user-email2@test.com",
+            },
+            {
+                "entity": "user-email3@test.com",
+                "response": "membership-user-email3@test.com",
+            },
         ],
         [
             {"entity": "user-email1@test.com", "response": True},
@@ -626,7 +667,7 @@ def test_sync_groups_defaults_with_matching_groups(
             mode="match",
         ),
     ]
-    for i, group in enumerate(source_groups_formatted):
+    for i in range(len(source_groups_formatted)):
         compare_list_calls.append(
             call(
                 {
@@ -642,6 +683,29 @@ def test_sync_groups_defaults_with_matching_groups(
         )
 
     assert compare_list_calls == mock_filters.compare_lists.call_args_list
+    assert mock_entities.provision_entities.call_count == 6
+    provision_entities_calls = [
+        call(
+            mock_identity_store.create_group_membership,
+            formatted_source_users,
+            execute=True,
+            integration_name="AWS",
+            operation_name="Creation",
+            entity_name="Group_Membership",
+            display_key="primaryEmail",
+        ),
+        call(
+            mock_identity_store.delete_group_membership,
+            formatted_target_users,
+            execute=False,
+            integration_name="AWS",
+            operation_name="Deletion",
+            entity_name="Group_Membership",
+            display_key="MemberId.UserName",
+        ),
+    ]
+    assert provision_entities_calls in mock_entities.provision_entities.call_args_list
+    # assert mock_entities.provision_entities.call_args_list == provision_entities_calls
 
 
 #     mock_filters.preformat_items.return_value = [
@@ -668,7 +732,7 @@ def test_sync_groups_defaults_with_matching_groups(
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.identity_store")
-def test_sync_identity_center_groups_empty_source_groups(
+def test_sync_groups_empty_source_groups(
     mock_identity_store,
     mock_filters,
     mock_logger,
@@ -707,7 +771,7 @@ def test_sync_identity_center_groups_empty_source_groups(
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.identity_store")
-def test_sync_identity_center_groups_empty_target_groups(
+def test_sync_groups_empty_target_groups(
     mock_identity_store,
     mock_filters,
     mock_logger,
@@ -756,7 +820,7 @@ def test_sync_identity_center_groups_empty_target_groups(
 @patch("modules.aws.identity_center.logger")
 @patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.identity_store")
-def test_sync_identity_center_groups_no_matching_groups_to_sync(
+def test_sync_groups_without_matching_groups_to_sync(
     mock_identity_store,
     mock_filters,
     mock_logger,
@@ -1509,7 +1573,7 @@ def test_sync_identity_center_groups_no_matching_groups_to_sync(
 # @patch("modules.aws.identity_center.identity_store")
 #
 # @patch("modules.aws.identity_center.entities")
-# def test_sync_identity_center_groups_defaults(
+# def test_sync_groups_defaults(
 #     mock_entities,
 #
 #     mock_identity_store,
@@ -1569,7 +1633,7 @@ def test_sync_identity_center_groups_no_matching_groups_to_sync(
 # @patch("modules.aws.identity_center.logger")
 # @patch("modules.aws.identity_center.filters")
 # @patch("modules.aws.identity_center.identity_store")
-# def test_sync_identity_center_groups_enable_delete_true(
+# def test_sync_groups_enable_delete_true(
 #
 #     mock_identity_store,
 #     mock_filters,
