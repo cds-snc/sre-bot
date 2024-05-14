@@ -26,7 +26,6 @@ def test_synchronize_defaults_synchronizes_users_and_groups(
     target_users_end = target_groups[0]["GroupMemberships"][3:]
     mock_groups.get_groups_from_integration.side_effect = [source_groups, target_groups]
     mock_filters.get_unique_nested_dicts.return_value = source_users
-    print(f"DEBUG: source users ({len(source_users)}):\n{source_users}")
     mock_identity_store.list_users.side_effect = [
         target_users_start,
         target_users_end,
