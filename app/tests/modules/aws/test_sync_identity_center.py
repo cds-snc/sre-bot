@@ -668,19 +668,17 @@ from modules.aws import identity_center
 
 @patch("modules.aws.identity_center.DRY_RUN", False)
 @patch("modules.aws.identity_center.logger")
-@patch("modules.aws.identity_center.filters.preformat_items")
 @patch("modules.aws.identity_center.sync_groups")
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
-@patch("modules.aws.identity_center.filters.get_unique_nested_dicts")
+@patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.groups.get_groups_from_integration")
 def test_synchronize_sync_skip_users_if_false(
     mock_get_groups_from_integration,
-    mock_get_unique_nested_dicts,
+    mock_filters,
     mock_list_users,
     mock_sync_identity_center_users,
     mock_sync_identity_center_groups,
-    mock_preformat_items,
     mock_logger,
     aws_groups_w_users,
     aws_users,
@@ -695,8 +693,8 @@ def test_synchronize_sync_skip_users_if_false(
         source_groups,
         target_groups,
     ]
-    mock_preformat_items.return_value = source_groups
-    mock_get_unique_nested_dicts.return_value = source_users
+    mock_filters.preformat_items.return_value = source_groups
+    mock_filters.get_unique_nested_dicts.return_value = source_users
     mock_list_users.return_value = target_users
     mock_sync_identity_center_users.return_value = ("users_created", "users_deleted")
     mock_sync_identity_center_groups.return_value = (
@@ -713,14 +711,14 @@ def test_synchronize_sync_skip_users_if_false(
 
     assert mock_get_groups_from_integration.call_count == 2
 
-    google_groups_call = call("google_groups", query="email:aws-*", filters=ANY)
+    google_groups_call = call("google_groups", query="email:aws-*", processing_filters=ANY)
     aws_identity_center_call = call("aws_identity_center")
     assert mock_get_groups_from_integration.call_args_list == [
         google_groups_call,
         aws_identity_center_call,
     ]
 
-    assert mock_get_unique_nested_dicts.call_count == 1
+    assert mock_filters.get_unique_nested_dicts.call_count == 1
     assert mock_list_users.call_count == 1
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 1
@@ -730,27 +728,9 @@ def test_synchronize_sync_skip_users_if_false(
         in mock_sync_identity_center_groups.call_args_list
     )
 
-    assert mock_logger.info.call_count == 21
-    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
-    for group in source_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
-            )
-        )
-    for user in source_users:
-        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
-    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
-    for group in target_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
-            )
-        )
-    for user in target_users:
-        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
-    logger_calls.append(call("synchronize:groups:Syncing Groups"))
-
+    assert mock_logger.info.call_count == 2
+    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
+    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
     assert mock_logger.info.call_args_list == logger_calls
 
 
@@ -798,7 +778,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
 
     assert mock_get_groups_from_integration.call_count == 2
 
-    google_groups_call = call("google_groups", query="email:aws-*", filters=ANY)
+    google_groups_call = call("google_groups", query="email:aws-*", processing_filters=ANY)
     aws_identity_center_call = call("aws_identity_center")
     assert mock_get_groups_from_integration.call_args_list == [
         google_groups_call,
@@ -815,27 +795,9 @@ def test_synchronize_sync_skip_groups_false_if_false(
         in mock_sync_identity_center_users.call_args_list
     )
 
-    assert mock_logger.info.call_count == 21
-    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
-    for group in source_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
-            )
-        )
-    for user in source_users:
-        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
-    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
-    for group in target_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
-            )
-        )
-    for user in target_users:
-        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
-    logger_calls.append(call("synchronize:users:Syncing Users"))
-
+    assert mock_logger.info.call_count == 2
+    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
+    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
     assert mock_logger.info.call_args_list == logger_calls
 
 
@@ -845,9 +807,9 @@ def test_synchronize_sync_skip_groups_false_if_false(
 @patch("modules.aws.identity_center.sync_users")
 @patch("modules.aws.identity_center.identity_store.list_users")
 @patch("modules.aws.identity_center.filters.get_unique_nested_dicts")
-@patch("modules.aws.identity_center.groups.get_groups_from_integration")
+@patch("modules.aws.identity_center.groups")
 def test_synchronize_sync_skip_users_and_groups_if_false(
-    mock_get_groups_from_integration,
+    mock_groups,
     mock_get_unique_nested_dicts,
     mock_list_users,
     mock_sync_identity_center_users,
@@ -862,7 +824,7 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
     source_users = google_users(6)
     target_groups = aws_groups_w_users(3, 6)
     target_users = aws_users(6)
-    mock_get_groups_from_integration.side_effect = [
+    mock_groups.get_groups_from_integration.side_effect = [
         source_groups,
         target_groups,
     ]
@@ -880,11 +842,11 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
     assert response == {"users": None, "groups": None}
 
-    assert mock_get_groups_from_integration.call_count == 2
+    assert mock_groups.get_groups_from_integration.call_count == 2
 
-    google_groups_call = call("google_groups", query="email:aws-*", filters=ANY)
+    google_groups_call = call("google_groups", query="email:aws-*", processing_filters=ANY)
     aws_identity_center_call = call("aws_identity_center")
-    assert mock_get_groups_from_integration.call_args_list == [
+    assert mock_groups.get_groups_from_integration.call_args_list == [
         google_groups_call,
         aws_identity_center_call,
     ]
@@ -894,26 +856,9 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 0
-    assert mock_logger.info.call_count == 20
-    logger_calls = [call("synchronize:Found 3 Source Groups and 6 Users")]
-    for group in source_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Source:Group {group['name']} has {len(group['members'])} members"
-            )
-        )
-    for user in source_users:
-        logger_calls.append(call(f"synchronize:Source:User {user['primaryEmail']}"))
-    logger_calls.append(call("synchronize:Found 3 Target Groups and 6 Users"))
-    for group in target_groups:
-        logger_calls.append(
-            call(
-                f"synchronize:Target:Group {group['DisplayName']} has {len(group['GroupMemberships'])} members"
-            )
-        )
-    for user in target_users:
-        logger_calls.append(call(f"synchronize:Target:User {user['UserName']}"))
-
+    assert mock_logger.info.call_count == 2
+    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
+    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
     assert mock_logger.info.call_args_list == logger_calls
 
 
