@@ -1,6 +1,40 @@
-from unittest.mock import patch, call, ANY
+import json
+from unittest.mock import patch, call, ANY, MagicMock
+from pytest import fixture
 
 from modules.aws import identity_center
+
+
+@fixture
+def provision_entities_side_effect(mock_identity_store):
+    def _provision_entities_side_effect(function, entities, **kwargs):
+        entities_provisioned = []
+        function_name = function._mock_name.split('.')[-1]
+
+        for entity in entities:
+            if function_name == "create_user":
+                entities_provisioned.append(
+                    {"entity": entity["primaryEmail"], "response": entity["primaryEmail"]}
+                )
+            elif function_name == "delete_user":
+                entities_provisioned.append(
+                    {"entity": entity["UserName"], "response": True}
+                )
+            elif function_name == "create_group_membership":
+                entities_provisioned.append(
+                    {"entity": entity["primaryEmail"], "response": "membership-" + entity["primaryEmail"]}
+                )
+            elif function_name == "delete_group_membership":
+                entities_provisioned.append(
+                    {"entity": entity["MemberId"]["UserName"], "response": True}
+                )
+        return entities_provisioned
+    return _provision_entities_side_effect
+
+
+@fixture
+def mock_identity_store():
+    return MagicMock()
 
 
 @patch("modules.aws.identity_center.logger")
@@ -518,6 +552,117 @@ def test_sync_identity_center_users_delete_target_all_enable_delete(
         call("synchronize:users:Found 0 Users to Create and 6 Users to Delete")
         in mock_logger.info.call_args_list
     )
+
+
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.identity_store")
+def test_sync_groups_defaults_with_matching_groups(
+    mock_identity_store,
+    mock_entities,
+    mock_filters,
+    aws_groups_w_users,
+    aws_users,
+    google_groups_w_users,
+    google_users,
+    provision_entities_side_effect
+):
+    source_groups = google_groups_w_users(3, 3, group_prefix="AWS-")
+    source_groups_formatted = [
+        {
+            **group,
+            "DisplayName": group["name"].replace("AWS-", ""),
+        }
+        for group in source_groups
+    ]
+    source_groups_formatted.sort(key=lambda x: x["DisplayName"])
+    target_groups = aws_groups_w_users(3, 3)
+    target_groups.sort(key=lambda x: x["DisplayName"])
+    target_users = aws_users(6)
+    target_users_to_remove = target_groups[0]["GroupMemberships"][:3]
+    source_users_to_create = source_groups[0]["members"]
+    mock_filters.preformat_items.return_value = source_groups_formatted
+
+    mock_filters.compare_lists.side_effect = [
+        (source_groups_formatted, target_groups),
+        (source_users_to_create, target_users_to_remove),
+        (source_users_to_create, target_users_to_remove),
+        (source_users_to_create, target_users_to_remove),
+    ]
+
+    mock_entities.provision_entities.side_effect = provision_entities_side_effect
+
+    result = identity_center.sync_groups(source_groups, target_groups, target_users)
+
+    assert result == (
+        [
+            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
+            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
+            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
+            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
+            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
+            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
+            {"entity": "user-email1@test.com", "response": "membership-user-email1@test.com"},
+            {"entity": "user-email2@test.com", "response": "membership-user-email2@test.com"},
+            {"entity": "user-email3@test.com", "response": "membership-user-email3@test.com"},
+        ],
+        [
+            {"entity": "user-email1@test.com", "response": True},
+            {"entity": "user-email2@test.com", "response": True},
+            {"entity": "user-email3@test.com", "response": True},
+            {"entity": "user-email1@test.com", "response": True},
+            {"entity": "user-email2@test.com", "response": True},
+            {"entity": "user-email3@test.com", "response": True},
+            {"entity": "user-email1@test.com", "response": True},
+            {"entity": "user-email2@test.com", "response": True},
+            {"entity": "user-email3@test.com", "response": True},
+        ],
+    )
+    assert mock_filters.compare_lists.call_count == 4
+    compare_list_calls = [
+        call(
+            {"values": source_groups_formatted, "key": "DisplayName"},
+            {"values": target_groups, "key": "DisplayName"},
+            mode="match",
+        ),
+    ]
+    for i, group in enumerate(source_groups_formatted):
+        compare_list_calls.append(
+            call(
+                {
+                    "values": source_groups_formatted[i]["members"],
+                    "key": "primaryEmail",
+                },
+                {
+                    "values": target_groups[i]["GroupMemberships"],
+                    "key": "MemberId.UserName",
+                },
+                mode="sync",
+            )
+        )
+
+    assert compare_list_calls == mock_filters.compare_lists.call_args_list
+
+
+#     mock_filters.preformat_items.return_value = [
+#         {"name": "group1", "DisplayName": "group1"}
+#     ]
+#     mock_filters.compare_lists.side_effect = [
+#         (
+#             [{"name": "group1", "DisplayName": "group1"}],
+#             [{"name": "group1", "DisplayName": "group1"}],
+#         ),
+#         ([{"primaryEmail": "user1"}], [{"MembershipId": "user1"}]),
+#     ]
+#     mock_entities.provision_entities.side_effect = [
+#         [{"user_id": "user1", "group_id": "group1"}],
+#         [{"membership_id": "user1"}],
+#     ]
+#     created, deleted = identity_center.sync_groups(
+#         [{"name": "group1"}], [{"name": "group1"}], [{"UserName": "user1"}]
+#     )
+#     assert created == [{"user_id": "user1", "group_id": "group1"}]
+#     assert deleted == [{"membership_id": "user1"}]
 
 
 @patch("modules.aws.identity_center.logger")
