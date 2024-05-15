@@ -9,29 +9,37 @@ def provision_entities_side_effect_fixture(mock_identity_store):
     def _provision_entities_side_effect(function, entities, **kwargs):
         entities_provisioned = []
         function_name = function._mock_name.split(".")[-1]
-
+        execute = kwargs.get("execute", True)
         for entity in entities:
             if function_name == "create_user":
                 entities_provisioned.append(
                     {
                         "entity": entity["primaryEmail"],
-                        "response": entity["primaryEmail"],
+                        "response": {entity["primaryEmail"] if execute else None},
                     }
                 )
             elif function_name == "delete_user":
                 entities_provisioned.append(
-                    {"entity": entity["UserName"], "response": True}
+                    {
+                        "entity": entity["UserName"],
+                        "response": kwargs.get("execute", True),
+                    }
                 )
             elif function_name == "create_group_membership":
                 entities_provisioned.append(
                     {
                         "entity": entity["primaryEmail"],
-                        "response": "membership-" + entity["primaryEmail"],
+                        "response": f"membership-{entity['primaryEmail']}"
+                        if execute
+                        else None,
                     }
                 )
             elif function_name == "delete_group_membership":
                 entities_provisioned.append(
-                    {"entity": entity["MemberId"]["UserName"], "response": True}
+                    {
+                        "entity": entity["MemberId"]["UserName"],
+                        "response": kwargs.get("execute", False),
+                    }
                 )
         return entities_provisioned
 
@@ -40,14 +48,23 @@ def provision_entities_side_effect_fixture(mock_identity_store):
 
 @fixture
 def provision_entities_calls_fixture():
-    def _provision_entities_calls(mock_identity_store, group_users, target_groups, execute_create, execute_delete):
+    def _provision_entities_calls(
+        mock_identity_store, group_users, target_groups, execute_create, execute_delete
+    ):
         provision_entities_calls = []
         for i in range(len(group_users)):
             provision_entities_calls.extend(
                 [
                     call(
                         mock_identity_store.create_group_membership,
-                        [{**user, "user_id": user["id"], "group_id": target_groups[i]["GroupId"]} for user in group_users[i][0]],
+                        [
+                            {
+                                **user,
+                                "user_id": user["id"],
+                                "group_id": target_groups[i]["GroupId"],
+                            }
+                            for user in group_users[i][0]
+                        ],
                         execute=execute_create,
                         integration_name="AWS",
                         operation_name="Creation",
@@ -56,7 +73,10 @@ def provision_entities_calls_fixture():
                     ),
                     call(
                         mock_identity_store.delete_group_membership,
-                        [{**user, "membership_id": user["MembershipId"]} for user in group_users[i][1]],
+                        [
+                            {**user, "membership_id": user["MembershipId"]}
+                            for user in group_users[i][1]
+                        ],
                         execute=execute_delete,
                         integration_name="AWS",
                         operation_name="Deletion",
@@ -120,19 +140,24 @@ def compare_list_calls_fixture():
 
 @fixture
 def expected_output_fixture():
-    def _expected_output(group_users):
+    def _expected_output(group_users, execute_create, execute_delete):
         expected_output = ([], [])
         for group in group_users:
             for user in group[0]:
                 expected_output[0].append(
                     {
                         "entity": user["primaryEmail"],
-                        "response": "membership-" + user["primaryEmail"],
+                        "response": "membership-" + user["primaryEmail"]
+                        if execute_create
+                        else None,
                     }
                 )
             for user in group[1]:
                 expected_output[1].append(
-                    {"entity": user["MemberId"]["UserName"], "response": True}
+                    {
+                        "entity": user["MemberId"]["UserName"],
+                        "response": True if execute_delete else False,
+                    }
                 )
         return expected_output
 
@@ -664,7 +689,7 @@ def test_sync_users_delete_target_all_enable_delete(
 @patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.entities")
 @patch("modules.aws.identity_center.identity_store")
-def test_sync_groups_defaults_with_matching_groups(
+def test_sync_groups_with_matching_groups_defaults(
     mock_identity_store,
     mock_entities,
     mock_filters,
@@ -707,22 +732,99 @@ def test_sync_groups_defaults_with_matching_groups(
     # target users are used to resolve the users from the target system
     target_users = aws_users(6)
 
-    mock_entities.provision_entities.side_effect = provision_entities_side_effect_fixture
+    mock_entities.provision_entities.side_effect = (
+        provision_entities_side_effect_fixture
+    )
 
     mock_filters.compare_lists.side_effect = compare_list_side_effects
 
     result = identity_center.sync_groups(source_groups, target_groups, target_users)
 
-    expected_output = expected_output_fixture(group_users)
+    expected_output = expected_output_fixture(group_users, True, False)
     assert result == expected_output
 
     assert mock_filters.compare_lists.call_count == 4
-    compare_list_calls = compare_list_calls_fixture(source_groups_formatted, target_groups)
+    compare_list_calls = compare_list_calls_fixture(
+        source_groups_formatted, target_groups
+    )
     assert compare_list_calls == mock_filters.compare_lists.call_args_list
 
     assert mock_entities.provision_entities.call_count == 6
 
-    provision_entities_calls = provision_entities_calls_fixture(mock_identity_store, group_users, target_groups, True, False)
+    provision_entities_calls = provision_entities_calls_fixture(
+        mock_identity_store, group_users, target_groups, True, False
+    )
+
+    assert provision_entities_calls == mock_entities.provision_entities.call_args_list
+
+
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.identity_store")
+def test_sync_groups_with_matching_groups_delete_enable(
+    mock_identity_store,
+    mock_entities,
+    mock_filters,
+    aws_groups_w_users,
+    aws_users,
+    google_groups_w_users,
+    provision_entities_side_effect_fixture,
+    provision_entities_calls_fixture,
+    format_source_groups_fixture,
+    compare_list_calls_fixture,
+    expected_output_fixture,
+):
+    # source groups get formatted to match the expected patterns
+    source_groups = google_groups_w_users(3, 3, group_prefix="AWS-")
+    source_groups_formatted = format_source_groups_fixture(source_groups)
+    mock_filters.preformat_items.return_value = source_groups_formatted
+
+    target_groups = aws_groups_w_users(3, 6)
+    target_groups.sort(key=lambda x: x["DisplayName"])
+
+    # first time compare list is called returns formatted source groups and target groups
+    compare_list_side_effects = [(source_groups_formatted, target_groups)]
+    group_users = []
+    for i in range(len(source_groups_formatted)):
+        compare_list_side_effects.append(
+            (
+                source_groups_formatted[i]["members"],
+                target_groups[i]["GroupMemberships"][3:],
+            )
+        )
+        group_users.append(
+            (
+                source_groups_formatted[i]["members"],
+                target_groups[i]["GroupMemberships"][3:],
+            )
+        )
+    # 3 other times its called it will be the group's users
+    mock_filters.compare_lists.side_effect = compare_list_side_effects
+
+    # target users are used to resolve the users from the target system
+    target_users = aws_users(6)
+
+    mock_entities.provision_entities.side_effect = (
+        provision_entities_side_effect_fixture
+    )
+
+    mock_filters.compare_lists.side_effect = compare_list_side_effects
+
+    identity_center.sync_groups(
+        source_groups, target_groups, target_users, enable_membership_delete=True
+    )
+
+    assert mock_filters.compare_lists.call_count == 4
+    compare_list_calls = compare_list_calls_fixture(
+        source_groups_formatted, target_groups
+    )
+    assert compare_list_calls == mock_filters.compare_lists.call_args_list
+
+    assert mock_entities.provision_entities.call_count == 6
+
+    provision_entities_calls = provision_entities_calls_fixture(
+        mock_identity_store, group_users, target_groups, True, True
+    )
 
     assert provision_entities_calls == mock_entities.provision_entities.call_args_list
 
