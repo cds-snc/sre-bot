@@ -601,6 +601,7 @@ def test_sync_groups_defaults_with_matching_groups(
             target_groups[i]["GroupMemberships"]
         )
     group_users = [(source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:]) for i in range(3)]
+    mock_filters.compare_lists.side_effect = [(source_groups_formatted, target_groups)] + group_users
 
     target_users = aws_users(6)
     target_users_to_remove = [
@@ -610,7 +611,6 @@ def test_sync_groups_defaults_with_matching_groups(
         user for source_group in source_groups for user in source_group["members"]
     ]
 
-    mock_filters.compare_lists.side_effect = [(source_groups_formatted, target_groups)] + group_users
     
     formatted_group_users = [
         (
