@@ -810,9 +810,12 @@ def test_sync_groups_with_matching_groups_delete_enable(
 
     mock_filters.compare_lists.side_effect = compare_list_side_effects
 
-    identity_center.sync_groups(
+    result = identity_center.sync_groups(
         source_groups, target_groups, target_users, enable_membership_delete=True
     )
+
+    expected_output = expected_output_fixture(group_users, True, True)
+    assert result == expected_output
 
     assert mock_filters.compare_lists.call_count == 4
     compare_list_calls = compare_list_calls_fixture(
