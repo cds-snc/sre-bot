@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch, call, ANY, MagicMock
 from pytest import fixture
 
@@ -6,7 +5,7 @@ from modules.aws import identity_center
 
 
 @fixture
-def provision_entities_side_effect(mock_identity_store):
+def provision_entities_side_effect_fixture(mock_identity_store):
     def _provision_entities_side_effect(function, entities, **kwargs):
         entities_provisioned = []
         function_name = function._mock_name.split(".")[-1]
@@ -37,6 +36,107 @@ def provision_entities_side_effect(mock_identity_store):
         return entities_provisioned
 
     return _provision_entities_side_effect
+
+
+@fixture
+def provision_entities_calls_fixture():
+    def _provision_entities_calls(mock_identity_store, group_users, execute_create, execute_delete):
+        provision_entities_calls = []
+        for i in range(len(group_users)):
+            provision_entities_calls.extend(
+                [
+                    call(
+                        mock_identity_store.create_group_membership,
+                        group_users[i][0],
+                        execute=execute_create,
+                        integration_name="AWS",
+                        operation_name="Creation",
+                        entity_name="Group_Membership",
+                        display_key="primaryEmail",
+                    ),
+                    call(
+                        mock_identity_store.delete_group_membership,
+                        group_users[i][1],
+                        execute=execute_delete,
+                        integration_name="AWS",
+                        operation_name="Deletion",
+                        entity_name="Group_Membership",
+                        display_key="MemberId.UserName",
+                    ),
+                ]
+            )
+        return provision_entities_calls
+
+    return _provision_entities_calls
+
+
+@fixture
+def format_source_groups_fixture():
+    def _format_source_groups(source_groups):
+        # Format the source groups to match the expected patterns
+        source_groups_formatted = sorted(
+            (
+                {
+                    **group,
+                    "DisplayName": group["name"].replace("AWS-", ""),
+                }
+                for group in source_groups
+            ),
+            key=lambda x: x["DisplayName"],
+        )
+        return source_groups_formatted
+
+    return _format_source_groups
+
+
+@fixture
+def compare_list_calls_fixture():
+    def _compare_list_calls(source_groups_formatted, target_groups):
+        compare_list_calls = [
+            call(
+                {"values": source_groups_formatted, "key": "DisplayName"},
+                {"values": target_groups, "key": "DisplayName"},
+                mode="match",
+            ),
+        ]
+        for i in range(len(source_groups_formatted)):
+            compare_list_calls.append(
+                call(
+                    {
+                        "values": source_groups_formatted[i]["members"],
+                        "key": "primaryEmail",
+                    },
+                    {
+                        "values": target_groups[i]["GroupMemberships"],
+                        "key": "MemberId.UserName",
+                    },
+                    mode="sync",
+                )
+            )
+        return compare_list_calls
+
+    return _compare_list_calls
+
+
+@fixture
+def expected_output_fixture():
+    def _expected_output(group_users):
+        expected_output = ([], [])
+        for group in group_users:
+            for user in group[0]:
+                expected_output[0].append(
+                    {
+                        "entity": user["primaryEmail"],
+                        "response": "membership-" + user["primaryEmail"],
+                    }
+                )
+            for user in group[1]:
+                expected_output[1].append(
+                    {"entity": user["MemberId"]["UserName"], "response": True}
+                )
+        return expected_output
+
+    return _expected_output
 
 
 @fixture
@@ -571,21 +671,17 @@ def test_sync_groups_defaults_with_matching_groups(
     aws_groups_w_users,
     aws_users,
     google_groups_w_users,
-    provision_entities_side_effect,
+    provision_entities_side_effect_fixture,
+    provision_entities_calls_fixture,
+    format_source_groups_fixture,
+    compare_list_calls_fixture,
+    expected_output_fixture,
 ):
-    # source groups get formatted to match the expected patterns
     source_groups = google_groups_w_users(3, 3, group_prefix="AWS-")
-    source_groups_formatted = sorted(
-        (
-            {
-                **group,
-                "DisplayName": group["name"].replace("AWS-", ""),
-            }
-            for group in source_groups
-        ),
-        key=lambda x: x["DisplayName"],
-    )
+    # source groups get formatted to match the expected patterns
+    source_groups_formatted = format_source_groups_fixture(source_groups)
     mock_filters.preformat_items.return_value = source_groups_formatted
+
     target_groups = aws_groups_w_users(3, 6)
     target_groups.sort(key=lambda x: x["DisplayName"])
 
@@ -628,79 +724,22 @@ def test_sync_groups_defaults_with_matching_groups(
         for i in range(3)
     ]
 
-
-    mock_entities.provision_entities.side_effect = provision_entities_side_effect
+    mock_entities.provision_entities.side_effect = provision_entities_side_effect_fixture
 
     mock_filters.compare_lists.side_effect = compare_list_side_effects
 
-    expected_output = ([], [])
-    for i in range(3):
-        for user in group_users[i][0]:
-            expected_output[0].append(
-                {
-                    "entity": user["primaryEmail"],
-                    "response": "membership-" + user["primaryEmail"],
-                }
-            )
-        for user in group_users[i][1]:
-            expected_output[1].append(
-                {"entity": user["MemberId"]["UserName"], "response": True}
-            )
-
     result = identity_center.sync_groups(source_groups, target_groups, target_users)
 
+    expected_output = expected_output_fixture(group_users)
     assert result == expected_output
 
     assert mock_filters.compare_lists.call_count == 4
-    compare_list_calls = [
-        call(
-            {"values": source_groups_formatted, "key": "DisplayName"},
-            {"values": target_groups, "key": "DisplayName"},
-            mode="match",
-        ),
-    ]
-    for i in range(len(source_groups_formatted)):
-        compare_list_calls.append(
-            call(
-                {
-                    "values": source_groups_formatted[i]["members"],
-                    "key": "primaryEmail",
-                },
-                {
-                    "values": target_groups[i]["GroupMemberships"],
-                    "key": "MemberId.UserName",
-                },
-                mode="sync",
-            )
-        )
+    compare_list_calls = compare_list_calls_fixture(source_groups_formatted, target_groups)
     assert compare_list_calls == mock_filters.compare_lists.call_args_list
 
     assert mock_entities.provision_entities.call_count == 6
 
-    provision_entities_calls = []
-    for i in range(3):
-        provision_entities_calls.extend(
-            [
-                call(
-                    mock_identity_store.create_group_membership,
-                    formatted_group_users[i][0],
-                    execute=True,
-                    integration_name="AWS",
-                    operation_name="Creation",
-                    entity_name="Group_Membership",
-                    display_key="primaryEmail",
-                ),
-                call(
-                    mock_identity_store.delete_group_membership,
-                    formatted_group_users[i][1],
-                    execute=False,
-                    integration_name="AWS",
-                    operation_name="Deletion",
-                    entity_name="Group_Membership",
-                    display_key="MemberId.UserName",
-                ),
-            ]
-        )
+    provision_entities_calls = provision_entities_calls_fixture(mock_identity_store, formatted_group_users, True, False)
 
     assert provision_entities_calls == mock_entities.provision_entities.call_args_list
 
