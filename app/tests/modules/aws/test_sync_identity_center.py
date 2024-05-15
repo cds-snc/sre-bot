@@ -594,20 +594,23 @@ def test_sync_groups_defaults_with_matching_groups(
     group_users = []
     for i in range(len(source_groups_formatted)):
         compare_list_side_effects.append(
-            (source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:])
+            (
+                source_groups_formatted[i]["members"],
+                target_groups[i]["GroupMemberships"][3:],
+            )
         )
-        group_users.append((source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:]))
-
+        group_users.append(
+            (
+                source_groups_formatted[i]["members"],
+                target_groups[i]["GroupMemberships"][3:],
+            )
+        )
+    # 3 other times its called it will be the group's users
     mock_filters.compare_lists.side_effect = compare_list_side_effects
 
+    # target users are used to resolve the users from the target system
     target_users = aws_users(6)
-    target_users_to_remove = [
-        user for group in target_groups for user in group["GroupMemberships"][3:]
-    ]
-    source_users_to_create = [
-        user for source_group in source_groups for user in source_group["members"]
-    ]
-    
+
     formatted_group_users = [
         (
             [
@@ -615,32 +618,34 @@ def test_sync_groups_defaults_with_matching_groups(
                 for user in group_users[i][0]
             ],
             [
-                {**user, "user_id": user["MembershipId"], "group_id": target_groups[i]["GroupId"]}
+                {
+                    **user,
+                    "membership_id": user["MembershipId"],
+                    "group_id": target_groups[i]["GroupId"],
+                }
                 for user in group_users[i][1]
             ],
         )
         for i in range(3)
     ]
 
-    formatted_target_users = [
-        {**user, "membership_id": user["MembershipId"]}
-        for user in target_users_to_remove
-        if user.get("MembershipId")
-    ]
     mock_entities.provision_entities.side_effect = provision_entities_side_effect
 
+    mock_filters.compare_lists.side_effect = compare_list_side_effects
+
     expected_output = ([], [])
-    for user in source_users_to_create:
-        expected_output[0].append(
-            {
-                "entity": user["primaryEmail"],
-                "response": "membership-" + user["primaryEmail"],
-            }
-        )
-    for user in formatted_target_users:
-        expected_output[1].append(
-            {"entity": user["MemberId"]["UserName"], "response": True}
-        )
+    for i in range(3):
+        for user in group_users[i][0]:
+            expected_output[0].append(
+                {
+                    "entity": user["primaryEmail"],
+                    "response": "membership-" + user["primaryEmail"],
+                }
+            )
+        for user in group_users[i][1]:
+            expected_output[1].append(
+                {"entity": user["MemberId"]["UserName"], "response": True}
+            )
 
     result = identity_center.sync_groups(source_groups, target_groups, target_users)
 
@@ -671,62 +676,31 @@ def test_sync_groups_defaults_with_matching_groups(
 
     assert compare_list_calls == mock_filters.compare_lists.call_args_list
     assert mock_entities.provision_entities.call_count == 6
-    provision_entities_calls = [
-        call(
-            mock_identity_store.create_group_membership,
-            formatted_group_users[0][0],
-            execute=True,
-            integration_name="AWS",
-            operation_name="Creation",
-            entity_name="Group_Membership",
-            display_key="primaryEmail",
-        ),
-        call(
-            mock_identity_store.delete_group_membership,
-            formatted_target_users[:3],
-            execute=False,
-            integration_name="AWS",
-            operation_name="Deletion",
-            entity_name="Group_Membership",
-            display_key="MemberId.UserName",
-        ),
-        call(
-            mock_identity_store.create_group_membership,
-            formatted_group_users[1][0],
-            execute=True,
-            integration_name="AWS",
-            operation_name="Creation",
-            entity_name="Group_Membership",
-            display_key="primaryEmail",
-        ),
-        call(
-            mock_identity_store.delete_group_membership,
-            formatted_target_users[3:6],
-            execute=False,
-            integration_name="AWS",
-            operation_name="Deletion",
-            entity_name="Group_Membership",
-            display_key="MemberId.UserName",
-        ),
-        call(
-            mock_identity_store.create_group_membership,
-            formatted_group_users[2][0],
-            execute=True,
-            integration_name="AWS",
-            operation_name="Creation",
-            entity_name="Group_Membership",
-            display_key="primaryEmail",
-        ),
-        call(
-            mock_identity_store.delete_group_membership,
-            formatted_target_users[6:],
-            execute=False,
-            integration_name="AWS",
-            operation_name="Deletion",
-            entity_name="Group_Membership",
-            display_key="MemberId.UserName",
-        ),
-    ]
+
+    provision_entities_calls = []
+    for i in range(3):
+        provision_entities_calls.extend(
+            [
+                call(
+                    mock_identity_store.create_group_membership,
+                    formatted_group_users[i][0],
+                    execute=True,
+                    integration_name="AWS",
+                    operation_name="Creation",
+                    entity_name="Group_Membership",
+                    display_key="primaryEmail",
+                ),
+                call(
+                    mock_identity_store.delete_group_membership,
+                    formatted_group_users[i][1],
+                    execute=False,
+                    integration_name="AWS",
+                    operation_name="Deletion",
+                    entity_name="Group_Membership",
+                    display_key="MemberId.UserName",
+                ),
+            ]
+        )
 
     assert provision_entities_calls == mock_entities.provision_entities.call_args_list
 
