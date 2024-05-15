@@ -573,54 +573,59 @@ def test_sync_groups_defaults_with_matching_groups(
     google_groups_w_users,
     provision_entities_side_effect,
 ):
+    # source groups get formatted to match the expected patterns
     source_groups = google_groups_w_users(3, 3, group_prefix="AWS-")
-    source_groups_formatted = [
-        {
-            **group,
-            "DisplayName": group["name"].replace("AWS-", ""),
-        }
-        for group in source_groups
-    ]
-    source_groups_formatted.sort(key=lambda x: x["DisplayName"])
-    target_groups = aws_groups_w_users(3, 3)
+    source_groups_formatted = sorted(
+        (
+            {
+                **group,
+                "DisplayName": group["name"].replace("AWS-", ""),
+            }
+            for group in source_groups
+        ),
+        key=lambda x: x["DisplayName"],
+    )
+    mock_filters.preformat_items.return_value = source_groups_formatted
+    target_groups = aws_groups_w_users(3, 6)
     target_groups.sort(key=lambda x: x["DisplayName"])
-    target_users = aws_users(6)
-    # target_users_to_remove = target_groups[0]["GroupMemberships"][:3]
-    target_users_to_remove = [
-        user for group in target_groups for user in group["GroupMemberships"]
+
+    # first time compare list is called returns formatted source groups and target groups
+    compare_list_side_effects = [
+        (source_groups_formatted, target_groups),
     ]
-    # source_users_to_create = source_groups[0]["members"]
+
+    target_users = aws_users(6)
+    target_users_to_remove = [
+        user for group in target_groups for user in group["GroupMemberships"][3:]
+    ]
     source_users_to_create = [
         user for source_group in source_groups for user in source_group["members"]
     ]
-    print(f"DEBUG source users:\n{json.dumps(source_users_to_create, indent=2)}")
+    for i in range(len(source_groups_formatted)):
+        compare_list_side_effects.append(
+            source_groups_formatted[i]["members"]
+        )
+        compare_list_side_effects.append(
+            target_groups[i]["GroupMemberships"]
+        )
+    group_users = [(source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:]) for i in range(3)]
 
-    mock_filters.preformat_items.return_value = source_groups_formatted
-
-    first_group_users = source_users_to_create[:3], target_users_to_remove[:3]
-    second_group_users = source_users_to_create[3:6], target_users_to_remove[3:6]
-    third_group_users = source_users_to_create[6:], target_users_to_remove[6:]
-
-    mock_filters.compare_lists.side_effect = [
-        (source_groups_formatted, target_groups),
-        first_group_users,
-        second_group_users,
-        third_group_users,
+    mock_filters.compare_lists.side_effect = [(source_groups_formatted, target_groups)] + group_users
+    
+    formatted_group_users = [
+        (
+            [
+                {**user, "user_id": user["id"], "group_id": target_groups[i]["GroupId"]}
+                for user in group_users[i][0]
+            ],
+            [
+                {**user, "user_id": user["MembershipId"], "group_id": target_groups[i]["GroupId"]}
+                for user in group_users[i][1]
+            ],
+        )
+        for i in range(3)
     ]
 
-    formatted_source_users = []
-    for user in first_group_users[0]:
-        formatted_source_users.append(
-            {**user, "user_id": user["id"], "group_id": "aws-group_id1"}
-        )
-    for user in second_group_users[0]:
-        formatted_source_users.append(
-            {**user, "user_id": user["id"], "group_id": "aws-group_id2"}
-        )
-    for user in third_group_users[0]:
-        formatted_source_users.append(
-            {**user, "user_id": user["id"], "group_id": "aws-group_id3"}
-        )
     formatted_target_users = [
         {**user, "membership_id": user["MembershipId"]}
         for user in target_users_to_remove
@@ -673,7 +678,7 @@ def test_sync_groups_defaults_with_matching_groups(
     provision_entities_calls = [
         call(
             mock_identity_store.create_group_membership,
-            formatted_source_users[:3],
+            formatted_group_users[0][0],
             execute=True,
             integration_name="AWS",
             operation_name="Creation",
@@ -691,7 +696,7 @@ def test_sync_groups_defaults_with_matching_groups(
         ),
         call(
             mock_identity_store.create_group_membership,
-            formatted_source_users[3:6],
+            formatted_group_users[1][0],
             execute=True,
             integration_name="AWS",
             operation_name="Creation",
@@ -709,7 +714,7 @@ def test_sync_groups_defaults_with_matching_groups(
         ),
         call(
             mock_identity_store.create_group_membership,
-            formatted_source_users[6:],
+            formatted_group_users[2][0],
             execute=True,
             integration_name="AWS",
             operation_name="Creation",
