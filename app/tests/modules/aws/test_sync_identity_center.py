@@ -590,18 +590,15 @@ def test_sync_groups_defaults_with_matching_groups(
     target_groups.sort(key=lambda x: x["DisplayName"])
 
     # first time compare list is called returns formatted source groups and target groups
-    compare_list_side_effects = [
-        (source_groups_formatted, target_groups),
-    ]
+    compare_list_side_effects = [(source_groups_formatted, target_groups)]
+    group_users = []
     for i in range(len(source_groups_formatted)):
         compare_list_side_effects.append(
-            source_groups_formatted[i]["members"]
+            (source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:])
         )
-        compare_list_side_effects.append(
-            target_groups[i]["GroupMemberships"]
-        )
-    group_users = [(source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:]) for i in range(3)]
-    mock_filters.compare_lists.side_effect = [(source_groups_formatted, target_groups)] + group_users
+        group_users.append((source_groups_formatted[i]["members"], target_groups[i]["GroupMemberships"][3:]))
+
+    mock_filters.compare_lists.side_effect = compare_list_side_effects
 
     target_users = aws_users(6)
     target_users_to_remove = [
@@ -610,7 +607,6 @@ def test_sync_groups_defaults_with_matching_groups(
     source_users_to_create = [
         user for source_group in source_groups for user in source_group["members"]
     ]
-
     
     formatted_group_users = [
         (
