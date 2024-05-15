@@ -621,13 +621,13 @@ def test_sync_groups_defaults_with_matching_groups(
                 {
                     **user,
                     "membership_id": user["MembershipId"],
-                    "group_id": target_groups[i]["GroupId"],
                 }
                 for user in group_users[i][1]
             ],
         )
         for i in range(3)
     ]
+
 
     mock_entities.provision_entities.side_effect = provision_entities_side_effect
 
@@ -673,8 +673,8 @@ def test_sync_groups_defaults_with_matching_groups(
                 mode="sync",
             )
         )
-
     assert compare_list_calls == mock_filters.compare_lists.call_args_list
+
     assert mock_entities.provision_entities.call_count == 6
 
     provision_entities_calls = []
