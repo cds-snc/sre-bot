@@ -38,15 +38,14 @@ def create_user(email, first_name, family_name, **kwargs):
         str: The unique ID of the user created.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update(
-        {
-            "UserName": email,
-            "Emails": [{"Value": email, "Type": "WORK", "Primary": True}],
-            "Name": {"GivenName": first_name, "FamilyName": family_name},
-            "DisplayName": f"{first_name} {family_name}",
-        }
-    )
-    return execute_aws_api_call("identitystore", "create_user", **kwargs)["UserId"]
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "UserName": email,
+        "Emails": [{"Value": email, "Type": "WORK", "Primary": True}],
+        "Name": {"GivenName": first_name, "FamilyName": family_name},
+        "DisplayName": f"{first_name} {family_name}",
+    }
+    return execute_aws_api_call("identitystore", "create_user", **params)["UserId"]
 
 
 @handle_aws_api_errors
@@ -168,9 +167,14 @@ def create_group_membership(group_id, user_id, **kwargs):
         str: The membership ID of the created group membership.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    # kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "GroupId": group_id,
+        "MemberId": {"UserId": user_id},
+    }
     response = execute_aws_api_call(
-        "identitystore", "create_group_membership", **kwargs
+        "identitystore", "create_group_membership", **params
     )
     return response["MembershipId"] if response else False
 
