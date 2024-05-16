@@ -257,10 +257,14 @@ def list_groups_with_memberships(**kwargs):
     for filter in groups_filters:
         groups = filters.filter_by_condition(groups, filter)
 
+    groups_with_memberships = []
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
-        if group["GroupMemberships"] and members_details:
-            for membership in group["GroupMemberships"]:
-                membership["MemberId"] = describe_user(membership["MemberId"]["UserId"])
-
-    return groups
+        if group["GroupMemberships"]:
+            if members_details:
+                for membership in group["GroupMemberships"]:
+                    membership["MemberId"] = describe_user(
+                        membership["MemberId"]["UserId"]
+                    )
+            groups_with_memberships.append(group)
+    return groups_with_memberships
