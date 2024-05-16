@@ -7,6 +7,9 @@ import logging
 
 from integrations import google_drive, maxmind, opsgenie
 
+from integrations.aws import client as aws_client
+from modules.aws import identity_center
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -20,6 +23,7 @@ def init(bot):
     schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(scheduler_heartbeat)
     schedule.every(5).minutes.do(integration_healthchecks)
+    schedule.every(2).hours.do(provision_aws_identity_center)
 
 
 def scheduler_heartbeat():
@@ -32,12 +36,20 @@ def integration_healthchecks():
         "google_drive": google_drive.healthcheck,
         "maxmind": maxmind.healthcheck,
         "opsgenie": opsgenie.healthcheck,
+        "aws": aws_client.healthcheck,
     }
     for key, healthcheck in healthchecks.items():
         if not healthcheck():
             logging.error(f"Integration {key} is unhealthy 💀")
         else:
             logging.info(f"Integration {key} is healthy 🌈")
+
+
+def provision_aws_identity_center():
+    logging.info("Provisioning AWS Identity Center")
+    identity_center.synchronize(
+        enable_user_create=False, enable_membership_create=False
+    )
 
 
 def run_continuously(interval=1):
