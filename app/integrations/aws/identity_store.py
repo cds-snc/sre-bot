@@ -24,6 +24,22 @@ def resolve_identity_store_id(kwargs):
     return kwargs
 
 
+def healthcheck():
+    """Check the health of the AWS integration.
+
+    Returns:
+        bool: True if the integration is healthy, False otherwise.
+    """
+    healthy = False
+    try:
+        response = list_users()
+        healthy = True if response else False
+        logger.info(f"AWS IdentityStore healthcheck result: {response}")
+    except Exception as error:
+        logger.error(f"AWS IdentityStore healthcheck failed: {error}")
+    return healthy
+
+
 @handle_aws_api_errors
 def create_user(email, first_name, family_name, **kwargs):
     """Creates a new user in the AWS Identity Center (identitystore)

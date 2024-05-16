@@ -135,12 +135,3 @@ def paginator(client, operation, keys=None, **kwargs):
                     results.extend(page[key])
 
     return results
-
-
-def healthcheck():
-    """Check the health of the AWS integration.
-
-    Returns:
-        bool: True if the integration is healthy, False otherwise.
-    """
-    return execute_aws_api_call("sts", "get_caller_identity") is not False

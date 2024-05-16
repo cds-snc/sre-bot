@@ -55,6 +55,26 @@ def test_resolve_identity_store_id_no_env():
         identity_store.resolve_identity_store_id({})
 
 
+@patch("integrations.aws.identity_store.list_users")
+def test_healtcheck_is_healthy(mock_list_users):
+    mock_list_users.return_value = ["User1", "User2"]
+
+    result = identity_store.healthcheck()
+
+    assert result is True
+    mock_list_users.assert_called_once
+
+
+@patch("integrations.aws.identity_store.list_users")
+def test_healtcheck_is_unhealthy(mock_list_users):
+    mock_list_users.return_value = []
+
+    result = identity_store.healthcheck()
+
+    assert result is False
+    mock_list_users.assert_called_once
+
+
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 @patch("integrations.aws.identity_store.resolve_identity_store_id")
 def test_create_user(mock_resolve_identity_store_id, mock_execute_aws_api_call):
