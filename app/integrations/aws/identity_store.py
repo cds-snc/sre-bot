@@ -246,7 +246,7 @@ def list_groups_with_memberships(**kwargs):
         **kwargs: Additional keyword arguments for the API call. (passed to list_groups)
 
     Returns:
-        list: A list of group objects with their members.
+        list: A list of group objects with their members. Any group without members will not be included.
     """
     members_details = kwargs.pop("members_details", True)
     groups_filters = kwargs.pop("filters", [])
