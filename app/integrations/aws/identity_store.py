@@ -230,6 +230,7 @@ def list_group_memberships(group_id, **kwargs):
     response = execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
+        paginated=True,
         GroupId=group_id,
         **kwargs,
     )

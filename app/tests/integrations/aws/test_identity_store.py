@@ -636,6 +636,7 @@ def test_list_group_memberships(mock_execute_aws_api_call):
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
         "list_group_memberships",
+        paginated=True,
         GroupId="test_group_id",
         IdentityStoreId="test_instance_id",
     )
@@ -682,6 +683,7 @@ def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.assert_called_once_with(
         "identitystore",
         "list_group_memberships",
+        paginated=True,
         GroupId="test_group_id",
         IdentityStoreId="custom_instance_id",
     )
