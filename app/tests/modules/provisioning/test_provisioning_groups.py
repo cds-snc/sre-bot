@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from modules.provisioning import groups
 
 
@@ -183,3 +183,34 @@ def test_get_groups_from_integration_filters_returns_subset(
     )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called
+
+
+def test_list_groups_with_members():
+    mock_list_groups_function = MagicMock()
+    mock_list_group_members_function = MagicMock()
+    mock_describe_user_function = MagicMock()
+
+    groups = [{"id": "1", "displayName": "group1", "members": ["member1", "member2"]}]
+    mock_list_groups_function.return_value = groups
+    groups_members = [
+        {"member_id": "member1", "role": "admin"},
+        {"member_id": "member2", "role": "member"},
+        # {"member_id": "member3", "role": "member"},
+        # {"member_id": "member4", "role": "manager"},
+    ]
+    mock_list_group_members_function.return_value = groups_members
+    users = [
+        {"id": "user_id2", "userName": "user2"},
+        {"id": "user_id4", "userName": "user4"},
+        # {"id": "user_id1", "userName": "user1"},
+        # {"id": "user_id3", "userName": "user3"},
+    ]
+    mock_describe_user_function.return_value = users
+
+    result = groups.list_groups_with_members(
+        mock_list_groups_function,
+        mock_list_group_members_function,
+        mock_describe_user_function,
+    )
+
+    assert result
