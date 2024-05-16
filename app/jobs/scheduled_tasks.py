@@ -7,7 +7,7 @@ import logging
 
 from integrations import google_drive, maxmind, opsgenie
 
-from integrations.aws import client as aws_client
+from integrations.aws import identity_store
 from modules.aws import identity_center
 
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +36,7 @@ def integration_healthchecks():
         "google_drive": google_drive.healthcheck,
         "maxmind": maxmind.healthcheck,
         "opsgenie": opsgenie.healthcheck,
-        "aws": aws_client.healthcheck,
+        "aws": identity_store.healthcheck,
     }
     for key, healthcheck in healthchecks.items():
         if not healthcheck():

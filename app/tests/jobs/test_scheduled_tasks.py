@@ -24,7 +24,7 @@ def test_run_continuously(time_mock, threading_mock, schedule_mock):
     assert result == cease_continuous_run
 
 
-@patch("jobs.scheduled_tasks.aws_client")
+@patch("jobs.scheduled_tasks.identity_store")
 @patch("jobs.scheduled_tasks.google_drive")
 @patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
@@ -43,7 +43,7 @@ def test_integration_healthchecks_healthy(
     assert mock_logging.error.call_count == 0
 
 
-@patch("jobs.scheduled_tasks.aws_client")
+@patch("jobs.scheduled_tasks.identity_store")
 @patch("jobs.scheduled_tasks.google_drive")
 @patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
