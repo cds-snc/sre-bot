@@ -312,3 +312,23 @@ def test_execute_aws_api_call_raises_exception_when_role_arn_not_provided(
     )
     mock_assume_role.assert_not_called()
     mock_convert_kwargs_to_pascal_case.assert_not_called()
+
+
+@patch("integrations.aws.client.execute_aws_api_call")
+def test_healtcheck_is_healthy(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = {"key": "value"}
+
+    result = aws_client.healthcheck()
+
+    assert result is True
+    mock_execute_aws_api_call.assert_called_once_with("sts", "get_caller_identity")
+
+
+@patch("integrations.aws.client.execute_aws_api_call")
+def test_healtcheck_is_unhealthy(mock_execute_aws_api_call):
+    mock_execute_aws_api_call.return_value = False
+
+    result = aws_client.healthcheck()
+
+    assert result is False
+    mock_execute_aws_api_call.assert_called_once_with("sts", "get_caller_identity")
