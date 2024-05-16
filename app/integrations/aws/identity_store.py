@@ -231,10 +231,11 @@ def list_group_memberships(group_id, **kwargs):
         "identitystore",
         "list_group_memberships",
         paginated=True,
+        keys=["GroupMemberships"],
         GroupId=group_id,
         **kwargs,
     )
-    return response["GroupMemberships"] if response else []
+    return response if response else []
 
 
 @handle_aws_api_errors
