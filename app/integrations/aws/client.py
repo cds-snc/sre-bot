@@ -5,7 +5,6 @@ import boto3  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from dotenv import load_dotenv
 from integrations.utils.api import convert_kwargs_to_pascal_case
-from integrations.aws import identity_store
 
 load_dotenv()
 
