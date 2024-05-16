@@ -20,8 +20,9 @@ from dotenv import load_dotenv
 from functools import wraps
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
-from googleapiclient.errors import HttpError, Error  # type: ignore
+from googleapiclient.errors import HttpError  # type: ignore
 from google.auth.exceptions import RefreshError  # type: ignore
+from exceptions import ExpectedAPIError, UnexpectedAPIError
 
 # Define the default arguments
 DEFAULT_DELEGATED_ADMIN_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
@@ -78,19 +79,16 @@ def handle_google_api_errors(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except HttpError as e:
-            logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
-        except ValueError as e:
-            logging.error(f"A ValueError occurred in function '{func.__name__}': {e}")
-        except RefreshError as e:
-            logging.error(f"A RefreshError occurred in function '{func.__name__}': {e}")
-        except Error as e:
-            logging.error(f"An error occurred in function '{func.__name__}': {e}")
+        except (HttpError, ValueError, RefreshError) as e:
+            logging.error(
+                f"An expected error occurred in function '{func.__name__}': {e}"
+            )
+            raise ExpectedAPIError(e)
         except Exception as e:  # Catch-all for any other types of exceptions
             logging.error(
                 f"An unexpected error occurred in function '{func.__name__}': {e}"
             )
-        return None
+            raise UnexpectedAPIError(e)
 
     return wrapper
 
