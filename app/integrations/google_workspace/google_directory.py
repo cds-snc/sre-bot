@@ -150,7 +150,7 @@ def list_groups_with_members(**kwargs):
     """List all groups in the Google Workspace domain with their members.
 
     Returns:
-        list: A list of group objects with members.
+        list: A list of group objects with members. Any group without members will not be included.
     """
     members_details = kwargs.pop("members_details", True)
     groups = list_groups(**kwargs)
@@ -161,14 +161,13 @@ def list_groups_with_members(**kwargs):
     for filter in groups_filters:
         groups = filters.filter_by_condition(groups, filter)
 
-    for group in range(len(groups)):
-        members = list_group_members(groups[group]["email"])
+    groups_with_members = []
+    for group in groups:
+        members = list_group_members(group["email"])
         if members and members_details:
-            groups[group]["members"] = members
-
-            for member in range(len(groups[group]["members"])):
-                groups[group]["members"][member] = get_user(
-                    groups[group]["members"][member]["email"]
-                )
-
-    return groups
+            detailed_members = []
+            for member in members:
+                detailed_members.append(get_user(member["email"]))
+            group["members"] = detailed_members
+            groups_with_members.append(group)
+    return groups_with_members

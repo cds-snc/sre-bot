@@ -230,10 +230,12 @@ def list_group_memberships(group_id, **kwargs):
     response = execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
+        paginated=True,
+        keys=["GroupMemberships"],
         GroupId=group_id,
         **kwargs,
     )
-    return response["GroupMemberships"] if response else []
+    return response if response else []
 
 
 @handle_aws_api_errors
@@ -244,7 +246,7 @@ def list_groups_with_memberships(**kwargs):
         **kwargs: Additional keyword arguments for the API call. (passed to list_groups)
 
     Returns:
-        list: A list of group objects with their members.
+        list: A list of group objects with their members. Any group without members will not be included.
     """
     members_details = kwargs.pop("members_details", True)
     groups_filters = kwargs.pop("filters", [])
@@ -255,10 +257,14 @@ def list_groups_with_memberships(**kwargs):
     for filter in groups_filters:
         groups = filters.filter_by_condition(groups, filter)
 
+    groups_with_memberships = []
     for group in groups:
         group["GroupMemberships"] = list_group_memberships(group["GroupId"])
-        if group["GroupMemberships"] and members_details:
-            for membership in group["GroupMemberships"]:
-                membership["MemberId"] = describe_user(membership["MemberId"]["UserId"])
-
-    return groups
+        if group["GroupMemberships"]:
+            if members_details:
+                for membership in group["GroupMemberships"]:
+                    membership["MemberId"] = describe_user(
+                        membership["MemberId"]["UserId"]
+                    )
+            groups_with_memberships.append(group)
+    return groups_with_memberships
