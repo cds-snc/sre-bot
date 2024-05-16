@@ -39,7 +39,7 @@ def get_groups_from_integration(integration_source, **kwargs):
             groups = google_directory.list_groups_with_members(
                 query=query, members_details=members_details
             )
-            integration_name = "Google:"
+            integration_name = "Google"
             group_display_key = "name"
             members = "members"
             members_display_key = "primaryEmail"
@@ -48,7 +48,7 @@ def get_groups_from_integration(integration_source, **kwargs):
             groups = identity_store.list_groups_with_memberships(
                 members_details=members_details
             )
-            integration_name = "AWS:"
+            integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
             members_display_key = "MemberId.UserName"
@@ -73,7 +73,7 @@ def log_groups(
     group_display_key=None,
     members=None,
     members_display_key=None,
-    integration_name="",
+    integration_name="Unspecified",
 ):
     """Log the groups information.
 
@@ -81,19 +81,19 @@ def log_groups(
         groups (list): The list of groups to log.
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
-    logger.info(f"{integration_name}Found {len(groups)} groups")
+    logger.info(f"{integration_name}:Found {len(groups)} groups")
     for group in groups:
         group_display_name = filters.get_nested_value(group, group_display_key)
         if group.get(members):
             logger.info(
-                f"{integration_name}Group: {group_display_name} has {len(group[members])} members"
+                f"{integration_name}:Group: {group_display_name} has {len(group[members])} members"
             )
             for member in group[members]:
                 members_display_name = filters.get_nested_value(
                     member, members_display_key
                 )
-                logger.info(f"{integration_name}Group:Member: {members_display_name}")
+                logger.info(f"{integration_name}:Group:Member: {members_display_name}")
         else:
             logger.info(
-                f"{integration_name}Group: {group_display_name} has no members."
+                f"{integration_name}:Group: {group_display_name} has no members"
             )
