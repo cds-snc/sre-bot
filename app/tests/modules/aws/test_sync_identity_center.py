@@ -216,6 +216,7 @@ def test_synchronize_sync_users_and_groups_with_defaults(
     logger_calls = [
         call("synchronize:Found 1 Groups and 3 Users from Source"),
         call("synchronize:Found 1 Groups and 3 Users from Target"),
+        call("synchronize:Sync Completed"),
     ]
     assert mock_logger.info.call_args_list == logger_calls
 
@@ -292,9 +293,10 @@ def test_synchronize_sync_skip_users_if_false(
         in mock_sync_identity_center_groups.call_args_list
     )
 
-    assert mock_logger.info.call_count == 2
+    assert mock_logger.info.call_count == 3
     logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
     logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
+    logger_calls.append(call("synchronize:Sync Completed"))
     assert mock_logger.info.call_args_list == logger_calls
 
 
@@ -358,9 +360,10 @@ def test_synchronize_sync_skip_groups_false_if_false(
         in mock_sync_identity_center_users.call_args_list
     )
 
-    assert mock_logger.info.call_count == 2
+    assert mock_logger.info.call_count == 3
     logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
     logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
+    logger_calls.append(call("synchronize:Sync Completed"))
     assert mock_logger.info.call_args_list == logger_calls
 
 
@@ -420,9 +423,10 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 0
-    assert mock_logger.info.call_count == 2
+    assert mock_logger.info.call_count == 3
     logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
     logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
+    logger_calls.append(call("synchronize:Sync Completed"))
     assert mock_logger.info.call_args_list == logger_calls
 
 

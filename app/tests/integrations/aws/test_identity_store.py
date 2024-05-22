@@ -741,6 +741,13 @@ def test_list_groups_with_memberships(
     users = aws_users(2, prefix="test-", domain="test.com")
     expected_output = [
         {
+            "Description": "A group to test resolving AWS-group1 memberships",
+            "DisplayName": "test-group-name1",
+            "GroupId": "test-aws-group_id1",
+            "GroupMemberships": [],
+            "IdentityStoreId": "d-123412341234",
+        },
+        {
             "GroupId": "test-aws-group_id2",
             "DisplayName": "test-group-name2",
             "Description": "A group to test resolving AWS-group2 memberships",
@@ -826,7 +833,7 @@ def test_list_groups_with_memberships_empty_groups(
 @patch("integrations.aws.identity_store.list_groups")
 @patch("integrations.aws.identity_store.list_group_memberships")
 @patch("integrations.aws.identity_store.describe_user")
-def test_list_groups_with_memberships_empty_groups_memberships(
+def test_list_groups_with_memberships_empty_groups_memberships_with_flag(
     mock_describe_user, mock_list_group_memberships, mock_list_groups, aws_groups
 ):
     groups = aws_groups(2, prefix="test-")
@@ -834,7 +841,7 @@ def test_list_groups_with_memberships_empty_groups_memberships(
     groups_memberships = [[], []]
     mock_list_groups.return_value = groups
     mock_list_group_memberships.side_effect = groups_memberships
-    result = identity_store.list_groups_with_memberships()
+    result = identity_store.list_groups_with_memberships(include_empty_groups=False)
     assert result == expected_output
     assert mock_list_group_memberships.call_count == 2
     assert mock_describe_user.call_count == 0
@@ -863,6 +870,13 @@ def test_list_groups_with_memberships_filtered(
     users = aws_users(2, prefix="test-", domain="test.com")
 
     expected_output = [
+        {
+            "Description": "A group to test resolving AWS-group1 memberships",
+            "DisplayName": "test-group-name1",
+            "GroupId": "test-aws-group_id1",
+            "GroupMemberships": [],
+            "IdentityStoreId": "d-123412341234",
+        },
         {
             "GroupId": "test-aws-group_id2",
             "DisplayName": "test-group-name2",
