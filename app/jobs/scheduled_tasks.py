@@ -48,7 +48,9 @@ def integration_healthchecks():
 def provision_aws_identity_center():
     logging.info("Provisioning AWS Identity Center")
     identity_center.synchronize(
-        enable_user_create=False, enable_membership_create=False
+        enable_user_create=False,
+        enable_membership_create=True,
+        enable_membership_delete=True,
     )
 
 
