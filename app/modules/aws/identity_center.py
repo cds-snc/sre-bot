@@ -62,6 +62,7 @@ def synchronize(**kwargs):
             enable_membership_delete,
             **kwargs,
         )
+    logger.info("synchronize:Sync Completed")
 
     return {
         "users": users_sync_status,
