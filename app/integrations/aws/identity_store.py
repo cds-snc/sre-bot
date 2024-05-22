@@ -208,8 +208,12 @@ def delete_group_membership(membership_id, **kwargs):
     """
     kwargs = resolve_identity_store_id(kwargs)
     kwargs.update({"MembershipId": membership_id})
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "MembershipId": membership_id,
+    }
     response = execute_aws_api_call(
-        "identitystore", "delete_group_membership", **kwargs
+        "identitystore", "delete_group_membership", **params
     )
     del response["ResponseMetadata"]
     return response == {}
@@ -266,6 +270,7 @@ def list_groups_with_memberships(**kwargs):
     """
     members_details = kwargs.pop("members_details", True)
     groups_filters = kwargs.pop("filters", [])
+    include_empty_groups = kwargs.pop("include_empty_groups", True)
     groups = list_groups(**kwargs)
 
     if not groups:
@@ -282,5 +287,6 @@ def list_groups_with_memberships(**kwargs):
                     membership["MemberId"] = describe_user(
                         membership["MemberId"]["UserId"]
                     )
+        if group["GroupMemberships"] or include_empty_groups:
             groups_with_memberships.append(group)
     return groups_with_memberships
