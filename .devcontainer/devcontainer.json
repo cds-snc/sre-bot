@@ -40,18 +40,18 @@
 	"postCreateCommand": ".devcontainer/maxmind-create.sh && .devcontainer/dynamodb-create.sh",
 	"remoteUser": "vscode",
 	"features": {
-		"ghcr.io/devcontainers/features/aws-cli:1": {
+		"ghcr.io/devcontainers/features/aws-cli:1@sha256:8d39e89cc98291953fb03cf7ef540dc1a7c78c3162f0eee9b61c800e4838f807": {
 			"version": "2.2.29"
 		},
 		"docker-in-docker": {
 			"version": "latest",
 			"moby": true
 		},
-		"ghcr.io/devcontainers/features/terraform:1": {
+		"ghcr.io/devcontainers/features/terraform:1@sha256:403fe3406aaf4618d9ca5b79cd1bd4a3576eac8816b18419650ab2f87026bb09": {
 			"version": "1.0.3",
 			"terragrunt": "0.31.1"
 		},
-		"ghcr.io/devcontainers/features/node:1": {
+		"ghcr.io/devcontainers/features/node:1@sha256:6c4f444d8e3eb68594d60ec128bce76a80647edc2b9a94960ca377895855145f": {
 			"version": "16.20.0"
 		},
 		"terraform": {
