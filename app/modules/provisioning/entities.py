@@ -1,5 +1,6 @@
 import logging
 from utils import filters
+from integrations.sentinel import log_to_sentinel
 
 
 logger = logging.getLogger(__name__)
@@ -49,14 +50,26 @@ def provision_entities(
                 logger.info(
                     f"{integration_name}:{entity_name}:{operation_name}:Successful: {entity_string}"
                 )
+                log_to_sentinel(
+                    f"{integration_name}_{entity_name}_{operation_name}_successful",
+                    {"entity": entity},
+                )
                 provisioned_entities.append({"entity": entity, "response": response})
             else:
                 logger.error(
                     f"{integration_name}:{entity_name}:{operation_name}:Failed: {entity_string}"
                 )
+                log_to_sentinel(
+                    f"{integration_name}_{entity_name}_{operation_name}_failed",
+                    {"entity": entity},
+                )
         else:
             logger.info(
                 f"{integration_name}:{entity_name}:{operation_name}:Successful:DRY_RUN: {entity_string}"
+            )
+            log_to_sentinel(
+                f"{integration_name}_{entity_name}_{operation_name}_dry_run",
+                {"entity": entity},
             )
             provisioned_entities.append({"entity": entity, "response": None})
     logger.info(
