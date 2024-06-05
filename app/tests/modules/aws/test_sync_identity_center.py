@@ -62,6 +62,8 @@ def provision_entities_calls_fixture():
                                 **user,
                                 "user_id": user["id"],
                                 "group_id": target_groups[i]["GroupId"],
+                                "log_user_name": user["primaryEmail"],
+                                "log_group_name": target_groups[i]["DisplayName"],
                             }
                             for user in group_users[i][0]
                         ],
@@ -74,7 +76,12 @@ def provision_entities_calls_fixture():
                     call(
                         mock_identity_store.delete_group_membership,
                         [
-                            {**user, "membership_id": user["MembershipId"]}
+                            {
+                                **user,
+                                "membership_id": user["MembershipId"],
+                                "log_user_name": user["MemberId"]["UserName"],
+                                "log_group_name": target_groups[i]["DisplayName"],
+                            }
                             for user in group_users[i][1]
                         ],
                         execute=execute_delete,
@@ -449,6 +456,8 @@ def test_sync_users_default(
         source_users,
         source_users,
         source_users,
+        source_users,
+        target_users,
         target_users,
     ]
     mock_filters.preformat_items.side_effect = preformat_side_effects
@@ -514,6 +523,8 @@ def test_sync_users_enable_delete_true(
         source_users,
         source_users,
         source_users,
+        source_users,
+        target_users,
         target_users,
     ]
     mock_filters.compare_lists.return_value = source_users, target_users
@@ -581,6 +592,8 @@ def test_sync_users_delete_target_all_disable_delete(
         [],
         [],
         [],
+        [],
+        [],
         target_users,
     ]
     mock_entities.provision_entities.side_effect = [[], []]
@@ -639,6 +652,8 @@ def test_sync_users_delete_target_all_enable_delete(
     source_users = google_users(3)
     target_users = aws_users(6)
     mock_filters.preformat_items.side_effect = [
+        [],
+        [],
         [],
         [],
         [],
