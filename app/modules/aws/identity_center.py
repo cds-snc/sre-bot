@@ -277,7 +277,7 @@ def provision_aws_users(operation, users_emails):
             display_key="primaryEmail",
         )
     else:
-        target_users = users.get_users_from_integration('aws_identity_center')
+        target_users = users.get_users_from_integration("aws_identity_center")
         users_to_delete = [
             user for user in target_users if user["UserName"] in users_emails
         ]
