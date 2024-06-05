@@ -41,6 +41,13 @@ def provision_entities(
         f"{integration_name}:{entity_name}:{operation_name}: Started processing {len(entities)} entities"
     )
     for entity in entities:
+        event = {
+            "name": "provision_entities",
+            "integration": integration_name,
+            "entity": entity_name,
+            "operation": operation_name,
+            "status": "dry_run",
+        }
         entity_string = (
             filters.get_nested_value(entity, display_key) if display_key else entity
         )
@@ -50,17 +57,19 @@ def provision_entities(
                 logger.info(
                     f"{integration_name}:{entity_name}:{operation_name}:Successful: {entity_string}"
                 )
+                event["status"] = "successful"
                 log_to_sentinel(
-                    f"{integration_name}_{entity_name}_{operation_name}_successful",
+                    event,
                     {"entity": entity},
                 )
                 provisioned_entities.append({"entity": entity, "response": response})
             else:
+                event["status"] = "failed"
                 logger.error(
                     f"{integration_name}:{entity_name}:{operation_name}:Failed: {entity_string}"
                 )
                 log_to_sentinel(
-                    f"{integration_name}_{entity_name}_{operation_name}_failed",
+                    event,
                     {"entity": entity},
                 )
         else:
@@ -68,7 +77,7 @@ def provision_entities(
                 f"{integration_name}:{entity_name}:{operation_name}:Successful:DRY_RUN: {entity_string}"
             )
             log_to_sentinel(
-                f"{integration_name}_{entity_name}_{operation_name}_dry_run",
+                event,
                 {"entity": entity},
             )
             provisioned_entities.append({"entity": entity, "response": None})
