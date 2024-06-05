@@ -79,6 +79,10 @@ handler = FastAPI()
 handler.state.limiter = limiter
 handler.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+def sentinel_hader_key(request: Request):
+    return request.headers.get("X-Sentinel-Auth")
+
 # Set up the templates directory and static folder for the frontend with the build folder for production
 if os.path.exists("../frontend/build"):
     # Sets the templates directory to the React build folder
