@@ -35,6 +35,18 @@ def test_aws_command_handles_access_command(request_access_modal):
     assert request_access_modal.called_with(client, body)
 
 
+@patch("modules.aws.aws.request_user_provisioing")
+def test_aws_command_handles_provision_command(mock_request_provisioning):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    aws.aws_command(ack, {"text": "user"}, MagicMock(), respond, client, body)
+    ack.assert_called
+    assert mock_request_provisioning.called_with(client, body)
+
+
 @patch("modules.aws.aws.request_health_modal")
 def test_aws_command_handles_health_command(request_health_modal):
     ack = MagicMock()

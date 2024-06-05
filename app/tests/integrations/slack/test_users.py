@@ -140,13 +140,13 @@ def test_get_user_email():
         "user": {"profile": {"email": "test@example.com"}},
     }
     body = {"user_id": "U1234"}
-    assert users.get_user_email(client, body) == "test@example.com"
+    assert users.get_user_email_from_body(client, body) == "test@example.com"
 
     # Test when the user ID is not found in the request body
     body = {}
-    assert users.get_user_email(client, body) is None
+    assert users.get_user_email_from_body(client, body) is None
 
     # Test when the users_info call is not successful
     client.users_info.return_value = {"ok": False}
     body = {"user_id": "U1234"}
-    assert users.get_user_email(client, body) is None
+    assert users.get_user_email_from_body(client, body) is None

@@ -34,7 +34,7 @@ def get_user_id_from_request(body):
             return match.group(0)
 
 
-def get_user_email(client: WebClient, body):
+def get_user_email_from_body(client: WebClient, body):
     """
     Returns the user email from the body of a request, otherwise None.
       Supports the following formats:
@@ -47,6 +47,22 @@ def get_user_email(client: WebClient, body):
         user_info = client.users_info(user=user_id)
         if user_info["ok"]:
             return user_info["user"]["profile"]["email"]
+
+
+def get_user_email_from_handle(client: WebClient, user_handle: str):
+    user_handle = user_handle.lstrip("@")
+
+    users_list = client.users_list()
+
+    for member in users_list["members"]:
+        if "name" in member and member["name"] == user_handle:
+            user_id = member["id"]
+
+            user_info = client.users_info(user=user_id)
+
+            return user_info["user"]["profile"]["email"]
+
+    return None
 
 
 def get_user_locale(client: WebClient, user_id=None):

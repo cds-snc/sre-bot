@@ -6,11 +6,14 @@ This module provides the following features:
 
 """
 
+import json
 import os
 
 from server.utils import log_ops_message
 from integrations import aws_sso, aws_account_health
-from integrations.slack import commands as slack_commands
+from integrations.slack import commands as slack_commands, users as slack_users
+from modules.provisioning.groups import get_groups_from_integration
+from modules.aws.identity_center import provision_aws_users
 from models import aws_access_requests
 
 PREFIX = os.environ.get("PREFIX", "")
@@ -46,6 +49,8 @@ def aws_command(ack, command, logger, respond, client, body):
             request_access_modal(client, body)
         case "health":
             request_health_modal(client, body)
+        case "user":
+            request_user_provisioing(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -286,3 +291,26 @@ def request_health_modal(client, body):
             ],
         },
     )
+
+
+def request_user_provisioing(client, body, respond, args, logger):
+    requestor_email = slack_users.get_user_email_from_body(client, body)
+    admin_group = get_groups_from_integration("google_groups", query="email:sre-ifs*")
+    admins_emails = [admin["primaryEmail"] for admin in admin_group[0]["members"]]
+    requestor_is_admin = False
+    if requestor_email in admins_emails:
+        requestor_is_admin = True
+        operation = args[0]
+        users_emails = args[1:]
+        users_emails = [
+            slack_users.get_user_email_from_handle(client, email)
+            if email.startswith("@")
+            else email
+            for email in users_emails
+        ]
+        response = provision_aws_users(operation, users_emails)
+        respond(f"Request completed:\n{json.dumps(response, indent=2)}")
+    else:
+        respond(f"Function is restricted to admins: {requestor_is_admin}")
+
+    logger.info("Completed user provisioning request")
