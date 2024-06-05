@@ -13,6 +13,9 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Extra
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from models import webhooks
 from server.utils import log_ops_message
 from integrations.sentinel import log_to_sentinel
@@ -28,7 +31,6 @@ from sns_message_validator import (
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
-
 
 class WebhookPayload(BaseModel):
     channel: str | None = None
@@ -68,8 +70,14 @@ class AwsSnsPayload(BaseModel):
     class Config:
         extra = Extra.forbid
 
+# initialize the limiter
+limiter = Limiter(key_func=get_remote_address)
 
 handler = FastAPI()
+
+# add the limiter to the handler
+handler.state.limiter = limiter
+handler.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Set up the templates directory and static folder for the frontend with the build folder for production
 if os.path.exists("../frontend/build"):
@@ -123,6 +131,7 @@ oauth.register(
 
 # Logout route. If you log out of the application, you will be redirected to the homepage
 @handler.route("/logout")
+@limiter.limit("5/minute")
 async def logout(request: Request):
     request.session.pop("user", None)
     return RedirectResponse(url="/")
@@ -130,6 +139,7 @@ async def logout(request: Request):
 
 # Login route. You will be redirected to the google login page
 @handler.get("/login")
+@limiter.limit("5/minute")
 async def login(request: Request):
     # get the current environment (ie dev or prod)
     environment = os.environ.get("ENVIRONMENT")
@@ -146,6 +156,7 @@ async def login(request: Request):
 
 # Authenticate route. This is the route that will be called after the user logs in and you are redirected to the /home page
 @handler.route("/auth")
+@limiter.limit("5/minute")
 async def auth(request: Request):
     try:
         access_token = await oauth.google.authorize_access_token(request)
@@ -159,6 +170,7 @@ async def auth(request: Request):
 
 # User route. Returns the user's first name that is currently logged into the application
 @handler.route("/user")
+@limiter.limit("5/minute")
 async def user(request: Request):
     user = request.session.get("user")
     if user:
@@ -168,7 +180,11 @@ async def user(request: Request):
 
 
 @handler.get("/geolocate/{ip}")
-def geolocate(ip):
+@limiter.limit("15/minute")
+def geolocate(ip, request: Request):
+    print("Request: ", request)
+    print("Headers:", request.headers)
+    print("Query parameters:", request.query_params)
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
         raise HTTPException(status_code=404, detail=reader)
@@ -183,6 +199,7 @@ def geolocate(ip):
 
 
 @handler.post("/hook/{id}")
+@limiter.limit("15/minute")
 def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     webhook = webhooks.get_webhook(id)
     if webhook:
@@ -291,7 +308,8 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
 
 
 @handler.get("/version")
-def get_version():
+@limiter.limit("5/minute")
+def get_version(request: Request):
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
 
@@ -325,5 +343,6 @@ def append_incident_buttons(payload, webhook_id):
 
 # Defines a route handler for `/*` essentially.
 @handler.get("/{rest_of_path:path}")
-async def react_app(req: Request, rest_of_path: str):
-    return templates.TemplateResponse("index.html", {"request": req})
+@limiter.limit("5/minute")
+async def react_app(request: Request, rest_of_path: str):
+    return templates.TemplateResponse("index.html", {"request": request})
