@@ -105,6 +105,7 @@ def sync_users(
     )
     preformatting_keys = [
         ("primaryEmail", "email"),
+        ("primaryEmail", "log_user_name"),
         ("name.givenName", "first_name"),
         ("name.familyName", "family_name"),
     ]
@@ -120,8 +121,13 @@ def sync_users(
         entity_name="User",
         display_key="primaryEmail",
     )
+    preformatting_keys = [
+        ("UserId", "user_id"),
+        ("UserName", "log_user_name"),
+    ]
+    for old_key, new_key in preformatting_keys:
+        users_to_delete = filters.preformat_items(users_to_delete, old_key, new_key)
 
-    users_to_delete = filters.preformat_items(users_to_delete, "UserId", "user_id")
     deleted_users = entities.provision_entities(
         identity_store.delete_user,
         users_to_delete,
@@ -191,6 +197,8 @@ def sync_groups(
                     **user,
                     "user_id": target_user["UserId"],
                     "group_id": target_groups_to_sync[i]["GroupId"],
+                    "log_user_name": user["primaryEmail"],
+                    "log_group_name": target_groups_to_sync[i]["DisplayName"],
                 }
                 for user in users_to_add
                 for target_user in target_users
@@ -209,7 +217,12 @@ def sync_groups(
             groups_memberships_created.extend(memberships_created)
 
             users_to_remove = [
-                {**user, "membership_id": user["MembershipId"]}
+                {
+                    **user,
+                    "membership_id": user["MembershipId"],
+                    "log_user_name": user["MemberId"]["UserName"],
+                    "log_group_name": target_groups_to_sync[i]["DisplayName"],
+                }
                 for user in users_to_remove
                 if user.get("MembershipId")
             ]
