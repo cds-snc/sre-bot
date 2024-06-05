@@ -80,9 +80,7 @@ def provision_entities_calls_fixture():
                                 **user,
                                 "membership_id": user["MembershipId"],
                                 "log_user_name": user["MemberId"]["UserName"],
-                                "log_group_name": target_groups[i][
-                                    "DisplayName"
-                                ],
+                                "log_group_name": target_groups[i]["DisplayName"],
                             }
                             for user in group_users[i][1]
                         ],
