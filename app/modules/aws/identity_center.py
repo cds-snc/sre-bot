@@ -1,7 +1,7 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 from logging import getLogger
 from integrations.aws import identity_store
-from modules.provisioning import groups, entities
+from modules.provisioning import groups, entities, users
 from utils import filters
 
 
@@ -83,6 +83,7 @@ def sync_users(
 
         source_users (list): A list of users from the source system.
         target_users (list): A list of users in the identity store.
+        enable_user_create (bool): Enable creation of users.
         enable_user_delete (bool): Enable deletion of users.
         delete_target_all (bool): Mark all target users for deletion.
 
@@ -238,3 +239,61 @@ def sync_groups(
             groups_memberships_deleted.extend(memberships_deleted)
 
     return groups_memberships_created, groups_memberships_deleted
+
+
+def provision_aws_users(operation, users_emails):
+    """Provision users in the AWS Identity Center.
+
+    Args:
+        users_emails (list): A list of emails of the users to provision.
+
+    Returns:
+        dict: The response of the users created.
+    """
+    if operation not in ["create", "delete"]:
+        raise ValueError("Invalid operation")
+
+    if operation == "create":
+        source_users = users.get_users_from_integration("google_directory")
+        users_to_create = [
+            user for user in source_users if user["primaryEmail"] in users_emails
+        ]
+        preformatting_keys = [
+            ("primaryEmail", "email"),
+            ("primaryEmail", "log_user_name"),
+            ("name.givenName", "first_name"),
+            ("name.familyName", "family_name"),
+        ]
+        for old_key, new_key in preformatting_keys:
+            users_to_create = filters.preformat_items(users_to_create, old_key, new_key)
+
+        return entities.provision_entities(
+            identity_store.create_user,
+            users_to_create,
+            execute=False,
+            integration_name="AWS",
+            operation_name="Creation",
+            entity_name="User",
+            display_key="primaryEmail",
+        )
+    else:
+        target_users = users.get_users_from_integration('aws_identity_center')
+        users_to_delete = [
+            user for user in target_users if user["UserName"] in users_emails
+        ]
+        preformatting_keys = [
+            ("UserId", "user_id"),
+            ("UserName", "log_user_name"),
+        ]
+        for old_key, new_key in preformatting_keys:
+            users_to_delete = filters.preformat_items(users_to_delete, old_key, new_key)
+
+        return entities.provision_entities(
+            identity_store.delete_user,
+            users_to_delete,
+            execute=False,
+            integration_name="AWS",
+            operation_name="Deletion",
+            entity_name="User",
+            display_key="UserName",
+        )
