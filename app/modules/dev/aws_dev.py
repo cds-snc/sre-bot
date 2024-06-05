@@ -11,27 +11,10 @@ logger = logging.getLogger(__name__)
 
 def aws_dev_command(ack, client, body, respond):
     ack()
-    response = identity_center.synchronize(enable_groups_sync=False)
+    response = identity_center.synchronize(
+        enable_user_create=False, enable_membership_create=False
+    )
     if not response:
-        respond("No groups found.")
+        respond("Sync failed.")
     else:
-        message = ""
-        if identity_center.DRY_RUN:
-            message += "Dry run mode enabled.\n"
-        if response["users"]:
-            users_created, users_deleted = response["users"]
-            message += "Users created:\n- " + "\n- ".join(users_created) + "\n"
-            message += "Users deleted:\n- " + "\n- ".join(users_deleted) + "\n"
-        else:
-            message += "Users Sync Disabled.\n"
-        if response["groups"]:
-            groups_created, groups_deleted = response["groups"]
-            message += (
-                "Groups memberships created:\n- " + "\n- ".join(groups_created) + "\n"
-            )
-            message += (
-                "Groups memberships deleted:\n- " + "\n- ".join(groups_deleted) + "\n"
-            )
-        else:
-            message += "Groups Sync Disabled.\n"
-        respond(message)
+        respond("Sync successful.")
