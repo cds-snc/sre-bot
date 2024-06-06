@@ -355,6 +355,6 @@ def append_incident_buttons(payload, webhook_id):
 
 # Defines a route handler for `/*` essentially.
 @handler.get("/{rest_of_path:path}")
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def react_app(request: Request, rest_of_path: str):
     return templates.TemplateResponse("index.html", {"request": request})
