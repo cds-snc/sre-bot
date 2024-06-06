@@ -318,9 +318,10 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     else:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-
+# Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
+# As a result, we are giving a generous rate limit of so that we don't run into any issues with the healthchecks
 @handler.get("/version")
-@limiter.limit("5/minute")
+@limiter.limit("15/minute")
 def get_version(request: Request):
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
