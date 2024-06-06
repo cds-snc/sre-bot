@@ -32,6 +32,7 @@ from sns_message_validator import (
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
 
+
 class WebhookPayload(BaseModel):
     channel: str | None = None
     text: str | None = None
@@ -69,6 +70,7 @@ class AwsSnsPayload(BaseModel):
 
     class Config:
         extra = Extra.forbid
+
 
 # initialize the limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -129,19 +131,18 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
+
 def sentinel_key_func(request: Request):
     # Check if the 'X-Sentinel-Source' exists and is not empty
-    if request.headers.get('X-Sentinel-Source'):
+    if request.headers.get("X-Sentinel-Source"):
         return None  # Skip rate limiting if the header exists and is not empty
     return get_remote_address(request)
 
 
 @handler.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(
-        status_code=429,
-        content={"message": "Rate limit exceeded"}
-    )
+    return JSONResponse(status_code=429, content={"message": "Rate limit exceeded"})
+
 
 # Logout route. If you log out of the application, you will be redirected to the homepage
 @handler.route("/logout")
@@ -209,9 +210,10 @@ def geolocate(ip, request: Request):
         }
 
 
-
 @handler.post("/hook/{id}")
-@limiter.limit("30/minute") # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
+@limiter.limit(
+    "30/minute"
+)  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
 def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     webhook = webhooks.get_webhook(id)
     if webhook:
@@ -317,6 +319,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             raise HTTPException(status_code=404, detail="Webhook not active")
     else:
         raise HTTPException(status_code=404, detail="Webhook not found")
+
 
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
 # As a result, we are giving a generous rate limit of so that we don't run into any issues with the healthchecks
