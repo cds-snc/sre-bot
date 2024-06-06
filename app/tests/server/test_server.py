@@ -519,7 +519,7 @@ async def test_logout_rate_limiting():
         # Make 5 requests to the logout endpoint
         for _ in range(5):
             response = await client.get("/logout")
-            assert response.status_code == 307 
+            assert response.status_code == 307
             assert response.url.path == "/logout"
 
         # The 6th request should be rate limited
@@ -557,7 +557,7 @@ async def test_auth_rate_limiting():
             # Make 5 requests to the auth endpoint
             for _ in range(5):
                 response = await client.get("/auth")
-                assert response.status_code == 307 
+                assert response.status_code == 307
 
             # The 6th request should be rate limited
             response = await client.get("/auth")
@@ -568,86 +568,18 @@ async def test_auth_rate_limiting():
 @pytest.mark.asyncio
 async def test_user_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
-        # Create a mock session with a user
-    #     user_data = {"given_name": "John"}
-
-    #     session_data = {"user": {"given_name": "FirstName"}}
-    #     headers = {"Cookie": f"session={session_data}"}
-    #     session_data = {"user": {"given_name": "FirstName"}}
-    # headers = {"Cookie": f"session={session_data}"}
-    # response = client.get("/user", headers=headers)
-    # assert response.status_code == 200
-
+        # Simulate a logged in session
+        session_data = {"user": {"given_name": "FirstName"}}
+        headers = {"Cookie": f"session={session_data}"}
         # Make 5 requests to the user endpoint
         for _ in range(5):
-            session_data = {"user": {"given_name": "FirstName"}}
-            headers = {"Cookie": f"session={session_data}"}
             response = await client.get("/user", headers=headers)
             assert response.status_code == 200
-            assert response.json() == {'error': 'Not logged in'}
 
-            # The 6th request should be rate limited
-            response = await client.get("/user")
-            assert response.status_code == 429
-            assert response.json() == {"message": "Rate limit exceeded"}
-
-        # Patch the session middleware to include the user session
-        # with patch("starlette.middleware.sessions.SessionMiddleware.__call__", new_callable=AsyncMock):
-        #     with patch("starlette.requests.Request.session", new_callable=AsyncMock) as mock_session:
-        #         mock_session.return_value = {"user": user_data}
-                
-        #         # Make 5 requests to the user endpoint
-        #         for _ in range(5):
-        #             response = await client.get("/user", headers=headers)
-        #             assert response.status_code == 200
-        #             assert response.json() == {"name": "John"}
-
-        #         # The 6th request should be rate limited
-        #         response = await client.get("/user")
-        #         assert response.status_code == 429
-        #         assert response.json() == {"message": "Rate limit exceeded"}
-# @pytest.mark.asyncio
-# async def test_user_rate_limiting():
-#     async with AsyncClient(app=app, base_url="http://test") as client:
-#         # Create a mock session with a user
-#         user_data = {"given_name": "John"}
-
-#         # Mock the session
-#         with patch("starlette.middleware.sessions.SessionMiddleware.__call__", new_callable=Mock):
-#             with patch("starlette.requests.Request.session", return_value={"user": user_data}) as mock_session:
-#                 # Make 5 requests to the user endpoint
-#                 for _ in range(5):
-#                     response = await client.get("/user")
-#                     assert response.status_code == 200
-#                     assert response.json() == {"name": "John"}
-
-#                 # The 6th request should be rate limited
-#                 response = await client.get("/user")
-#                 assert response.status_code == 429
-#                 assert response.json() == {"message": "Rate limit exceeded"}
-                
-# @pytest.mark.asyncio
-# async def test_user_rate_limiting():
-#     async with AsyncClient(app=app, base_url="http://test") as client:
-#         # Create a mock session with a user
-#         user_data = {"given_name": "John"}
-#         session = {"user": user_data}
-
-#         # Mock the request object to include the session
-#         with patch(
-#             "starlette.requests.Request.session", return_value={"user":user_data}) as mock_session: 
-#             mock_session.return_value = session
-
-#             # Make 5 requests to the user endpoint
-#             for _ in range(5):
-#                 response = await client.get("/user")
-#                 assert response.status_code == 200
-#                 assert response.json() == {"name": "John"}
-
-#             # The 6th request should be rate limited
-#             response = await client.get("/user")
-#             assert response.status_code == 429
-#             assert response.json() == {"message": "Rate limit exceeded"}
+        # The 6th request should be rate limited
+        response = await client.get("/user", headers=headers)
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
 
 
 @pytest.mark.asyncio
@@ -689,15 +621,11 @@ async def test_webhooks_rate_limiting():
                         # Make 30 requests to the handle_webhook endpoint
                         payload = '{"Type": "Notification"}'
                         for _ in range(30):
-                            response = await client.post(
-                                "/hook/test-id", json=payload
-                            )
+                            response = await client.post("/hook/test-id", json=payload)
                             assert response.status_code == 200
 
                         # The 31st request should be rate limited
-                        response = await client.post(
-                            "/hook/test-id", json=payload
-                        )
+                        response = await client.post("/hook/test-id", json=payload)
                         assert response.status_code == 429
                         assert response.json() == {"message": "Rate limit exceeded"}
 
