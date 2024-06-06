@@ -80,9 +80,6 @@ handler.state.limiter = limiter
 handler.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-def sentinel_hader_key(request: Request):
-    return request.headers.get("X-Sentinel-Auth")
-
 # Set up the templates directory and static folder for the frontend with the build folder for production
 if os.path.exists("../frontend/build"):
     # Sets the templates directory to the React build folder
@@ -132,6 +129,19 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
+def sentinel_key_func(request: Request):
+    # Check if the 'X-Sentinel-Source' exists and is not empty
+    if request.headers.get('X-Sentinel-Source'):
+        return None  # Skip rate limiting if the header exists and is not empty
+    return get_remote_address(request)
+
+
+@handler.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"message": "Rate limit exceeded"}
+    )
 
 # Logout route. If you log out of the application, you will be redirected to the homepage
 @handler.route("/logout")
@@ -184,11 +194,8 @@ async def user(request: Request):
 
 
 @handler.get("/geolocate/{ip}")
-@limiter.limit("15/minute")
+@limiter.limit("10/minute", key_func=sentinel_key_func)
 def geolocate(ip, request: Request):
-    print("Request: ", request)
-    print("Headers:", request.headers)
-    print("Query parameters:", request.query_params)
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
         raise HTTPException(status_code=404, detail=reader)
@@ -202,8 +209,9 @@ def geolocate(ip, request: Request):
         }
 
 
+
 @handler.post("/hook/{id}")
-@limiter.limit("15/minute")
+@limiter.limit("30/minute") # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
 def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
     webhook = webhooks.get_webhook(id)
     if webhook:

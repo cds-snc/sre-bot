@@ -1,11 +1,17 @@
 from unittest import mock
+from unittest.mock import patch, AsyncMock
 from server import bot_middleware, server
 import urllib.parse
+from slowapi.errors import RateLimitExceeded
+from starlette.responses import JSONResponse
+from httpx import AsyncClient
+
 
 import os
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import ANY, call, MagicMock, patch, PropertyMock
+from fastapi import Request
+from unittest.mock import ANY, call, MagicMock, patch, PropertyMock, Mock
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -442,3 +448,187 @@ def test_user_endpoint_with_no_logged_in_user():
     response = client.get("/user")
     assert response.status_code == 200
     assert response.json() == {"error": "Not logged in"}
+
+
+def test_header_exists_and_not_empty():
+    # Create a mock request with the header 'X-Sentinel-Source'
+    mock_request = Mock(spec=Request)
+    mock_request.headers = {'X-Sentinel-Source': 'some_value'}
+    
+    # Call the function
+    result = server.sentinel_key_func(mock_request)
+    
+    # Assert that the result is None (no rate limiting)
+    assert result is None
+
+def test_header_not_present():
+    # Create a mock request without the header 'X-Sentinel-Source'
+    mock_request = Mock(spec=Request)
+    mock_request.headers = {}
+    
+    # Mock the client attribute to return the expected IP address
+    mock_request.client.host = '192.168.1.1'
+
+    # Mock the get_remote_address function to return a specific value
+    with patch('slowapi.util.get_remote_address', return_value='192.168.1.1'):
+        result = server.sentinel_key_func(mock_request)
+    # Assert that the result is the IP address (rate limiting applied)
+    assert result == '192.168.1.1'
+
+def test_header_empty():
+    # Create a mock request with an empty 'X-Sentinel-Source' header
+    mock_request = Mock(spec=Request)
+    mock_request.headers = {'X-Sentinel-Source': ''}
+    
+    # Mock the client attribute to return the expected IP address
+    mock_request.client.host = '192.168.1.1'
+    
+    # Mock the get_remote_address function to return a specific value
+    with patch('slowapi.util.get_remote_address', return_value='192.168.1.1'):
+        result = server.sentinel_key_func(mock_request)
+    
+    # Assert that the result is the IP address (rate limiting applied)
+    assert result == '192.168.1.1'
+
+@pytest.mark.asyncio
+async def test_rate_limit_handler():
+    # Create a mock request
+    mock_request = Mock(spec=Request)
+    
+    # Create a mock exception
+    mock_exception = Mock(spec=RateLimitExceeded)
+    
+    # Call the handler function
+    response = await server.rate_limit_handler(mock_request, mock_exception)
+    
+    # Assert the response is a JSONResponse
+    assert isinstance(response, JSONResponse)
+    
+    # Assert the status code is 429
+    assert response.status_code == 429
+    
+    # Assert the content of the response
+    assert response.body.decode('utf-8') == '{"message":"Rate limit exceeded"}'
+
+
+@pytest.mark.asyncio
+async def logout_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Make 5 requests to the logout endpoint
+        for _ in range(5):
+            response = await client.get("/logout")
+            assert response.status_code == 200
+            assert response.url.path == "/"
+
+        # The 6th request should be rate limited
+        response = await client.get("/logout")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def login_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Set the environment variable for the test
+        os.environ["ENVIRONMENT"] = "dev"
+        
+        # Make 5 requests to the login endpoint
+        for _ in range(5):
+            response = await client.get("/login")
+            assert response.status_code == 302 
+
+        # The 6th request should be rate limited
+        response = await client.get("/login")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
+
+@pytest.mark.asyncio
+async def auth_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Mock the OAuth process
+        with patch('oauth.google.authorize_access_token', new_callable=AsyncMock) as mock_auth:
+            mock_auth.return_value = {"userinfo": {"name": "Test User"}}
+            
+            # Make 5 requests to the auth endpoint
+            for _ in range(5):
+                response = await client.get("/auth")
+                assert response.status_code == 200
+
+            # The 6th request should be rate limited
+            response = await client.get("/auth")
+            assert response.status_code == 429
+            assert response.json() == {"message": "Rate limit exceeded"}
+
+@pytest.mark.asyncio
+async def user_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Create a mock session with a user
+        user_data = {"given_name": "John"}
+        session = {"user": user_data}
+        
+        # Mock the request object to include the session
+        with patch("starlette.requests.Request.session", new_callable=Mock) as mock_session:
+            mock_session.return_value = session
+
+            # Make 5 requests to the user endpoint
+            for _ in range(5):
+                response = await client.get("/user")
+                assert response.status_code == 200
+                assert response.json() == {"name": "John"}
+
+            # The 6th request should be rate limited
+            response = await client.get("/user")
+            assert response.status_code == 429
+            assert response.json() == {"message": "Rate limit exceeded"}
+
+@pytest.mark.asyncio
+async def geolocate_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Mock the maxmind.geolocate function
+        with patch('your_module.maxmind.geolocate', return_value=("Country", "City", 12.34, 56.78)):
+            # Make 10 requests to the geolocate endpoint
+            for _ in range(10):
+                response = await client.get("/geolocate/8.8.8.8")
+                assert response.status_code == 200
+                assert response.json() == {
+                    "country": "Country",
+                    "city": "City",
+                    "latitude": 12.34,
+                    "longitude": 56.78,
+                }
+
+            # The 11th request should be rate limited
+            response = await client.get("/geolocate/8.8.8.8")
+            assert response.status_code == 429
+            assert response.json() == {"message": "Rate limit exceeded"}
+       
+@pytest.mark.asyncio
+async def webhook_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Mock the webhooks.get_webhook function
+        with patch('your_module.webhooks.get_webhook', return_value={"channel": {"S": "test-channel"}}):
+            with patch('your_module.webhooks.is_active', return_value=True):
+                with patch('your_module.webhooks.increment_invocation_count'):
+                    with patch('your_module.sns_message_validator.validate_message'):
+                        # Make 30 requests to the handle_webhook endpoint
+                        for _ in range(30):
+                            response = await client.post("/hook/test-id", json={"Type": "Notification"})
+                            assert response.status_code == 200
+
+                        # The 31st request should be rate limited
+                        response = await client.post("/hook/test-id", json={"Type": "Notification"})
+                        assert response.status_code == 429
+                        assert response.json() == {"message": "Rate limit exceeded"}
+
+@pytest.mark.asyncio
+async def version_test_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Make 5 requests to the version endpoint
+        for _ in range(5):
+            response = await client.get("/version")
+            assert response.status_code == 200
+
+        # The 6th request should be rate limited
+        response = await client.get("/version")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
