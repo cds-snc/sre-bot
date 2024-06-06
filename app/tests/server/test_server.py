@@ -642,3 +642,17 @@ async def test_version_rate_limiting():
         response = await client.get("/version")
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def test_react_app_rate_limiting():
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        # Make 10 requests to the react_app endpoint
+        for _ in range(10):
+            response = await client.get("/some-path")
+            assert response.status_code == 200
+
+        # The 11th request should be rate limited
+        response = await client.get("/some-path")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
