@@ -139,6 +139,7 @@ def sentinel_key_func(request: Request):
     return get_remote_address(request)
 
 
+# Rate limit handler for RateLimitExceeded exceptions
 @handler.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(status_code=429, content={"message": "Rate limit exceeded"})
@@ -194,6 +195,8 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
+# Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
+# If we have a custom header of 'X-Sentinel-Source', then we skip rate limiting so that Sentinel is not rate limited
 @handler.get("/geolocate/{ip}")
 @limiter.limit("10/minute", key_func=sentinel_key_func)
 def geolocate(ip, request: Request):
