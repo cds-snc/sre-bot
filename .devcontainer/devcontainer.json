@@ -40,11 +40,6 @@
 			}
 		}
 	},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": ".devcontainer/maxmind-create.sh && .devcontainer/dynamodb-create.sh",
-	"remoteUser": "vscode",
 	"features": {
 		"ghcr.io/devcontainers/features/aws-cli:1": {
 			"version": "2.2.29"
@@ -60,5 +55,10 @@
 		"ghcr.io/devcontainers/features/node:1": {
 			"version": "16.20.0"
 		}
-	}
+	},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": ".devcontainer/maxmind-create.sh && .devcontainer/dynamodb-create.sh",
+	"remoteUser": "vscode"
 }
