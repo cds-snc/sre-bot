@@ -61,8 +61,7 @@
 			"version": "16.20.0"
 		},
 		"ghcr.io/devcontainers/features/python:1": {
-			"version": "3.11.0",
-			"installPath": "/usr/local/bin/python"
+			"version": "3.11.9"
 		}
 	}
 }
