@@ -18,7 +18,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 # Setup aliases and autocomplete
 RUN echo "\n\
-    complete -C /usr/bin/aws_completer aws\n\
+    complete -C /usr/local/bin/aws_completer aws\n\
     complete -C /usr/local/bin/terraform terraform\n\
     complete -C /usr/local/bin/terraform terragrunt\n\
     alias tf='terraform'\n\
