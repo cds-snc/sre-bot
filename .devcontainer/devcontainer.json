@@ -17,14 +17,20 @@
 				"redhat.vscode-yaml",
 				"timonwong.shellcheck",
 				"hashicorp.terraform",
-				"github.copilot"
+				"github.copilot",
+				"ms-python.black-formatter"
 			],
 			"settings": {
-				"python.pythonPath": "/usr/local/bin/python",
+				// "python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
 				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
 				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
 				"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+				"mypy-type-checker.cwd": "${workspaceFolder}/app",
+				"flake8.cwd": "${workspaceFolder}/app",
+				"python.analysis.extraPaths": [
+					"${workspaceFolder}/app"
+				],
 				"[python]": {
 					"editor.formatOnSave": true
 				},
@@ -43,7 +49,7 @@
 		"ghcr.io/devcontainers/features/aws-cli:1": {
 			"version": "2.2.29"
 		},
-		"docker-in-docker": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
 			"version": "latest",
 			"moby": true
 		},
@@ -54,9 +60,9 @@
 		"ghcr.io/devcontainers/features/node:1": {
 			"version": "16.20.0"
 		},
-		"terraform": {
-			"version": "1.3.3",
-			"terragrunt": "0.31.1"
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "3.11.0",
+			"installPath": "/usr/local/bin/python"
 		}
 	}
 }

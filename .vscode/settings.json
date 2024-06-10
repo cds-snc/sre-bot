@@ -1,6 +1,0 @@
-{
-    "mypy-type-checker.cwd": "${workspaceFolder}/app",
-    "flake8.cwd": "${workspaceFolder}/app",
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/app"]
-}
