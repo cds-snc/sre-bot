@@ -29,9 +29,9 @@ def provision_entities_side_effect_fixture(mock_identity_store):
                 entities_provisioned.append(
                     {
                         "entity": entity["primaryEmail"],
-                        "response": f"membership-{entity['primaryEmail']}"
-                        if execute
-                        else None,
+                        "response": (
+                            f"membership-{entity['primaryEmail']}" if execute else None
+                        ),
                     }
                 )
             elif function_name == "delete_group_membership":
@@ -154,9 +154,11 @@ def expected_output_fixture():
                 expected_output[0].append(
                     {
                         "entity": user["primaryEmail"],
-                        "response": "membership-" + user["primaryEmail"]
-                        if execute_create
-                        else None,
+                        "response": (
+                            "membership-" + user["primaryEmail"]
+                            if execute_create
+                            else None
+                        ),
                     }
                 )
             for user in group[1]:

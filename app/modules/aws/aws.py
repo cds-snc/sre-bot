@@ -303,9 +303,11 @@ def request_user_provisioing(client, body, respond, args, logger):
         operation = args[0]
         users_emails = args[1:]
         users_emails = [
-            slack_users.get_user_email_from_handle(client, email)
-            if email.startswith("@")
-            else email
+            (
+                slack_users.get_user_email_from_handle(client, email)
+                if email.startswith("@")
+                else email
+            )
             for email in users_emails
         ]
         response = provision_aws_users(operation, users_emails)

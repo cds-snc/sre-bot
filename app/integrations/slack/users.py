@@ -2,6 +2,7 @@
 
 This module contains the user related functionality for the Slack integration.
 """
+
 import re
 from slack_sdk import WebClient
 

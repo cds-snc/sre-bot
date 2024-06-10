@@ -1,4 +1,5 @@
 """Module for getting users from integrations."""
+
 from logging import getLogger
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store

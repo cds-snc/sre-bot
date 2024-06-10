@@ -4,7 +4,7 @@ dev:
 	PREFIX="dev-" python3 -m uvicorn main:server_app --reload
 
 fmt:
-	black . $(ARGS) --target-version py310
+	black . $(ARGS) --target-version py311
 
 install:
 	pip3 install --user -r requirements.txt
@@ -23,7 +23,7 @@ lint-ci:
 	flake8 .
 
 fmt-ci:
-	black --check . --target-version py310
+	black --check . --target-version py311
 
 run:
 	uvicorn main:server_app
