@@ -15,6 +15,6 @@ def aws_dev_command(ack, client, body, respond):
         enable_user_create=False, enable_membership_create=False
     )
     if not response:
-        respond("Sync failed.")
+        respond("Sync failed. See logs")
     else:
         respond("Sync successful.")
