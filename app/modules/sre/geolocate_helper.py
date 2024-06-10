@@ -2,6 +2,7 @@
 
 This module provides the ability to geolocate an IP address using the maxmind service.
 """
+
 from integrations import maxmind
 
 

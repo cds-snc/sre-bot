@@ -6,6 +6,7 @@ Functions:
     create_google_meet(title: str) -> str:
         Starts a Google Meet session and returns the URL of the session.
 """
+
 import re
 from datetime import datetime
 

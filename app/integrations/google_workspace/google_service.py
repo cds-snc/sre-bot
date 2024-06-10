@@ -11,6 +11,7 @@ Functions:
         Decorator that catches and logs any HttpError or Error exceptions that occur when the decorated function is called.
 
 """
+
 import os
 import logging
 import json
