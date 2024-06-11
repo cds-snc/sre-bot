@@ -50,7 +50,7 @@ def aws_command(ack, command, logger, respond, client, body):
         case "health":
             request_health_modal(client, body)
         case "user":
-            request_user_provisioing(client, body, respond, args, logger)
+            request_user_provisioning(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -293,7 +293,7 @@ def request_health_modal(client, body):
     )
 
 
-def request_user_provisioing(client, body, respond, args, logger):
+def request_user_provisioning(client, body, respond, args, logger):
     requestor_email = slack_users.get_user_email_from_body(client, body)
     admin_group = get_groups_from_integration("google_groups", query="email:sre-ifs*")
     admins_emails = [admin["primaryEmail"] for admin in admin_group[0]["members"]]

@@ -9,7 +9,7 @@ def test_aws_command_handles_empty_command():
 
     aws.aws_command(ack, {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock())
     ack.assert_called
-    assert respond.called
+    respond.assert_called
 
 
 def test_aws_command_handles_help_command():
@@ -20,7 +20,7 @@ def test_aws_command_handles_help_command():
         ack, {"text": "help"}, MagicMock(), respond, MagicMock(), MagicMock()
     )
     ack.assert_called
-    assert respond.called_with(aws.help_text)
+    respond.assert_called_with(aws.help_text)
 
 
 @patch("modules.aws.aws.request_access_modal")
@@ -29,40 +29,47 @@ def test_aws_command_handles_access_command(request_access_modal):
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
-
     aws.aws_command(ack, {"text": "access"}, MagicMock(), respond, client, body)
     ack.assert_called
-    assert request_access_modal.called_with(client, body)
+    request_access_modal.assert_called_with(client, body)
 
 
-@patch("modules.aws.aws.request_user_provisioing")
-def test_aws_command_handles_provision_command(mock_request_provisioning):
+@patch("modules.aws.aws.slack_commands.parse_command")
+@patch("modules.aws.aws.request_user_provisioning")
+def test_aws_command_handles_provision_command(mock_request_provisioning: MagicMock, mock_parse_command: MagicMock):
     ack = MagicMock()
+    logger = MagicMock()
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
+    mock_parse_command.return_value = ["user", "create", "user.name@email.com"]
+    aws.aws_command(ack, {"text": "user create user.name@email.com"}, logger, respond, client, body)
+    ack.assert_called()
+    mock_request_provisioning.assert_called_with(
+        client, body, respond, ["create", "user.name@email.com"], logger
+    )
 
-    aws.aws_command(ack, {"text": "user"}, MagicMock(), respond, client, body)
-    ack.assert_called
-    assert mock_request_provisioning.called_with(client, body)
 
-
+@patch("modules.aws.aws.slack_commands.parse_command")
 @patch("modules.aws.aws.request_health_modal")
-def test_aws_command_handles_health_command(request_health_modal):
+def test_aws_command_handles_health_command(
+    request_health_modal: MagicMock, mock_parse_command: MagicMock
+):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
-
+    mock_parse_command.return_value = ["health"]
     aws.aws_command(ack, {"text": "health"}, MagicMock(), respond, client, body)
     ack.assert_called
-    assert request_health_modal.called_with(client, body)
+    request_health_modal.assert_called_with(client, body)
 
 
-def test_aws_command_handles_unknown_command():
+@patch("modules.aws.aws.slack_commands.parse_command")
+def test_aws_command_handles_unknown_command(mock_parse_command):
     ack = MagicMock()
     respond = MagicMock()
-
+    mock_parse_command.return_value = ["unknown"]
     aws.aws_command(
         ack, {"text": "unknown"}, MagicMock(), respond, MagicMock(), MagicMock()
     )
