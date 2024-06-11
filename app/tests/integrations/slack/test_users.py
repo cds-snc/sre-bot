@@ -150,3 +150,35 @@ def test_get_user_email():
     client.users_info.return_value = {"ok": False}
     body = {"user_id": "U1234"}
     assert users.get_user_email_from_body(client, body) is None
+
+
+def test_get_user_email_from_handle():
+    client = MagicMock(spec=WebClient)
+    client.users_list.return_value = {
+        "members": [
+            {
+                "id": "U1234",
+                "name": "user_name1",
+                "profile": {"email": "user_email1@test.com"},
+            },
+            {
+                "id": "U5678",
+                "name": "user_name2",
+                "profile": {"email": "user_email2@test.com"},
+            },
+        ]
+    }
+    client.users_info.side_effect = lambda user: {
+        "U1234": {"user": {"profile": {"email": "user_email1@test.com"}}},
+        "U5678": {"user": {"profile": {"email": "user_email2@test.com"}}},
+    }.get(user, {})
+
+    assert (
+        users.get_user_email_from_handle(client, "@user_name1")
+        == "user_email1@test.com"
+    )
+    assert (
+        users.get_user_email_from_handle(client, "@user_name2")
+        == "user_email2@test.com"
+    )
+    assert users.get_user_email_from_handle(client, "@unknown_name") is None
