@@ -1052,11 +1052,7 @@ def test_provision_aws_user_create_missing_users(
 @patch("modules.aws.identity_center.filters")
 @patch("modules.aws.identity_center.users")
 def test_provision_aws_user_delete(
-    mock_users,
-    mock_filters,
-    mock_entities,
-    mock_identity_store,
-    aws_users
+    mock_users, mock_filters, mock_entities, mock_identity_store, aws_users
 ):
     target_users = aws_users(6)
     users_emails = ["user-email1@test.com"]
@@ -1101,4 +1097,6 @@ def test_provision_aws_user_delete_missing_users(
 
 def test_provision_aws_user_invalid_operation():
     with raises(ValueError):
-        identity_center.provision_aws_users("invalid-operation", ["user.email1@test.com"])
+        identity_center.provision_aws_users(
+            "invalid-operation", ["user.email1@test.com"]
+        )
