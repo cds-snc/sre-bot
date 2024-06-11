@@ -1,4 +1,4 @@
-black==24.3.0
+black==24.4.2
 checkov==3.2.133
 coverage==6.5.0
 flake8==6.1.0
