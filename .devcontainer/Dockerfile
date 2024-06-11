@@ -1,21 +1,12 @@
 # See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.183.0/containers/python-3/.devcontainer/base.Dockerfile
 
-# [Choice] Python version: 3, 3.9, 3.8, 3.7, 3.6
 ARG VARIANT="3.11"
-FROM mcr.microsoft.com/vscode/devcontainers/python:0-${VARIANT}
+FROM mcr.microsoft.com/devcontainers/python:1-${VARIANT}
 
 # Install packages
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     && apt-get autoremove -y && apt-get clean -y
-
-# Install Nodejs
-RUN apt-get -y install nodejs \
-    npm
-
-# Install Checkov
-RUN pip3 install --upgrade requests setuptools \
-    && pip3 install --upgrade botocore checkov
 
 COPY .devcontainer/apt-packages.txt ./
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
@@ -23,7 +14,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 # Setup aliases and autocomplete
 RUN echo "\n\
-    complete -C /usr/bin/aws_completer aws\n\
+    complete -C /usr/local/bin/aws_completer aws\n\
     complete -C /usr/local/bin/terraform terraform\n\
     complete -C /usr/local/bin/terraform terragrunt\n\
     alias tf='terraform'\n\
