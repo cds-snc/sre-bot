@@ -1,5 +1,5 @@
 from unittest.mock import patch, call, ANY, MagicMock
-from pytest import fixture
+from pytest import fixture, raises
 
 from modules.aws import identity_center
 
@@ -989,3 +989,116 @@ def test_sync_groups_without_matching_groups_to_sync(
         call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
         in mock_logger.info.call_args_list
     )
+
+
+@patch("modules.aws.identity_center.identity_store")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.users")
+def test_provision_aws_user_create(
+    mock_users,
+    mock_filters,
+    mock_entities,
+    mock_identity_store,
+    google_users,
+):
+    source_users = google_users(3)
+    users_emails = ["user-email1@test.com"]
+    mock_users.get_users_from_integration.return_value = source_users
+    mock_filters.preformat_items.return_value = [source_users[0]]
+    mock_entities.provision_entities.return_value = [
+        {
+            "entity": source_users[0]["primaryEmail"],
+            "response": users_emails[0],
+        }
+    ]
+    identity_center.provision_aws_users("create", users_emails)
+    mock_users.get_users_from_integration.assert_called_once_with("google_directory")
+    mock_filters.preformat_items.call_count == 4
+    mock_entities.provision_entities.assert_called_once_with(
+        mock_identity_store.create_user,
+        [source_users[0]],
+        execute=True,
+        integration_name="AWS",
+        operation_name="Creation",
+        entity_name="User",
+        display_key="primaryEmail",
+    )
+
+
+@patch("modules.aws.identity_center.identity_store")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.users")
+def test_provision_aws_user_create_missing_users(
+    mock_users,
+    mock_filters,
+    mock_entities,
+    mock_identity_store,
+    google_users,
+):
+    source_users = google_users(3)
+    users_emails = ["user-email4@test.com"]
+    mock_users.get_users_from_integration.return_value = source_users
+    identity_center.provision_aws_users("create", users_emails)
+    mock_users.get_users_from_integration.assert_called_once_with("google_directory")
+    mock_filters.preformat_items.call_count == 0
+    mock_entities.provision_entities.assert_not_called
+    mock_identity_store.create_user.assert_not_called
+
+
+@patch("modules.aws.identity_center.identity_store")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.users")
+def test_provision_aws_user_delete(
+    mock_users,
+    mock_filters,
+    mock_entities,
+    mock_identity_store,
+    aws_users
+):
+    target_users = aws_users(6)
+    users_emails = ["user-email1@test.com"]
+    mock_users.get_users_from_integration.return_value = target_users
+    mock_filters.preformat_items.return_value = [target_users[0]]
+    mock_entities.provision_entities.return_value = [
+        {
+            "entity": target_users[0]["UserName"],
+            "response": users_emails[0],
+        }
+    ]
+    identity_center.provision_aws_users("delete", users_emails)
+    mock_users.get_users_from_integration.assert_called_once_with("aws_identity_center")
+    mock_filters.preformat_items.call_count == 2
+    mock_entities.provision_entities.assert_called_once_with(
+        mock_identity_store.delete_user,
+        [target_users[0]],
+        execute=True,
+        integration_name="AWS",
+        operation_name="Deletion",
+        entity_name="User",
+        display_key="UserName",
+    )
+
+
+@patch("modules.aws.identity_center.identity_store")
+@patch("modules.aws.identity_center.entities")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.users")
+def test_provision_aws_user_delete_missing_users(
+    mock_users, mock_filters, mock_entities, mock_identity_store, aws_users
+):
+    target_users = aws_users(3)
+    users_emails = ["user-email4@test.com"]
+    mock_users.get_users_from_integration.return_value = target_users
+    identity_center.provision_aws_users("delete", users_emails)
+    mock_users.get_users_from_integration.assert_called_once_with("aws_identity_center")
+    mock_filters.preformat_items.call_count == 0
+    mock_entities.provision_entities.assert_not_called
+    mock_identity_store.create_user.assert_not_called
+
+
+def test_provision_aws_user_invalid_operation():
+    with raises(ValueError):
+        identity_center.provision_aws_users("invalid-operation", ["user.email1@test.com"])
