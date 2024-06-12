@@ -346,7 +346,6 @@ def test_log_groups_missing_group_display_key(
                 assert record.message in expected_warn_messages
 
 
-
 @patch("modules.provisioning.groups.filters")
 def test_log_groups_no_group_members_display_keys(
     mock_filters,
