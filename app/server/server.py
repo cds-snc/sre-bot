@@ -196,9 +196,8 @@ async def user(request: Request):
 
 
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
-# If we have a custom header of 'X-Sentinel-Source', then we skip rate limiting so that Sentinel is not rate limited
 @handler.get("/geolocate/{ip}")
-def geolocate(ip, request: Request):
+def geolocate(ip):
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
         raise HTTPException(status_code=404, detail=reader)
