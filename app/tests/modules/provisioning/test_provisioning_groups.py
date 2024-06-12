@@ -215,7 +215,7 @@ def test_log_groups(
             members_display_key="MemberId.UserName",
             integration_name="AWS:",
         )
-        expected_messages = [
+        expected_info_messages = [
             "AWS:Found 3 groups",
             "AWS:Group: group-name1 has 3 members",
             "AWS:Group:Member: user-email1@test.com",
@@ -230,8 +230,9 @@ def test_log_groups(
             "AWS:Group:Member: user-email2@test.com",
             "AWS:Group:Member: user-email3@test.com",
         ]
-        for message in expected_messages:
-            assert message in caplog.text
+        for record in caplog.records:
+            if record.levelname == "INFO":
+                assert record.message in expected_info_messages
 
 
 @patch("modules.provisioning.groups.filters")
@@ -249,15 +250,16 @@ def test_log_groups_no_groups(
             members_display_key="MemberId.UserName",
             integration_name="AWS:",
         )
-        expected_messages = [
+        expected_info_messages = [
             "AWS:Found 0 groups",
         ]
-        for message in expected_messages:
-            assert message in caplog.text
+        for record in caplog.records:
+            if record.levelname == "INFO":
+                assert record.message in expected_info_messages
 
 
 @patch("modules.provisioning.groups.filters")
-def test_log_groups_no_group_members(
+def test_log_groups_missing_members_key(
     mock_filters,
     caplog,
     aws_groups_w_users,
@@ -282,14 +284,67 @@ def test_log_groups_no_group_members(
             "AWS:Group: group-name2 has no members.",
             "AWS:Group: group-name3 has no members.",
         ]
-        expected_warn_messages = [
-            "AWS:No members key provided."
-        ]
+        expected_warn_messages = ["AWS:No members key provided."]
         for record in caplog.records:
             if record.levelname == "INFO":
                 assert record.message in expected_info_messages
             elif record.levelname == "WARN":
                 assert record.message in expected_warn_messages
+
+
+@patch("modules.provisioning.groups.filters")
+def test_log_groups_missing_group_display_key(
+    mock_filters,
+    caplog,
+    aws_groups_w_users,
+):
+    groups_w_members = aws_groups_w_users(3, 3)
+    mock_filters.get_nested_value.side_effect = [
+        None,
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        None,
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+        None,
+        "user-email1@test.com",
+        "user-email2@test.com",
+        "user-email3@test.com",
+    ]
+    with caplog.at_level(logging.INFO):
+        groups.log_groups(
+            groups_w_members,
+            group_display_key=None,
+            members="GroupMemberships",
+            members_display_key="MemberId.UserName",
+            integration_name="AWS:",
+        )
+        expected_info_messages = [
+            "AWS:Found 3 groups",
+            "AWS:Group: <Group Name not found> has 3 members",
+            "AWS:Group:Member: user-email1@test.com",
+            "AWS:Group:Member: user-email2@test.com",
+            "AWS:Group:Member: user-email3@test.com",
+            "AWS:Group: <Group Name not found> has 3 members",
+            "AWS:Group:Member: user-email1@test.com",
+            "AWS:Group:Member: user-email2@test.com",
+            "AWS:Group:Member: user-email3@test.com",
+            "AWS:Group: <Group Name not found> has 3 members",
+            "AWS:Group:Member: user-email1@test.com",
+            "AWS:Group:Member: user-email2@test.com",
+            "AWS:Group:Member: user-email3@test.com",
+        ]
+
+        expected_warn_messages = ["AWS:No group display key provided."]
+
+        for record in caplog.records:
+            if record.levelname == "INFO":
+                assert record.message in expected_info_messages
+            elif record.levelname == "WARN":
+                assert record.message in expected_warn_messages
+
 
 
 @patch("modules.provisioning.groups.filters")
@@ -337,9 +392,7 @@ def test_log_groups_no_group_members_display_keys(
             "AWS:Group:Member: <User Name not found>",
         ]
 
-        expected_warn_messages = [
-            "AWS:No members display key provided."
-        ]
+        expected_warn_messages = ["AWS:No members display key provided."]
 
         for record in caplog.records:
             if record.levelname == "INFO":
