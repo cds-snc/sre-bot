@@ -271,7 +271,7 @@ def provision_aws_users(operation, users_emails):
         return entities.provision_entities(
             identity_store.create_user,
             users_to_create,
-            execute=False,
+            execute=True,
             integration_name="AWS",
             operation_name="Creation",
             entity_name="User",
@@ -292,7 +292,7 @@ def provision_aws_users(operation, users_emails):
         return entities.provision_entities(
             identity_store.delete_user,
             users_to_delete,
-            execute=False,
+            execute=True,
             integration_name="AWS",
             operation_name="Deletion",
             entity_name="User",

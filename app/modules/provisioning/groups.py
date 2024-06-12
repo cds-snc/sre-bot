@@ -81,9 +81,18 @@ def log_groups(
         groups (list): The list of groups to log.
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
+    if not group_display_key:
+        logger.warn(f"{integration_name}No group display key provided.")
+    if not members:
+        logger.warn(f"{integration_name}No members key provided.")
+    if not members_display_key:
+        logger.warn(f"{integration_name}No members display key provided.")
+
     logger.info(f"{integration_name}Found {len(groups)} groups")
     for group in groups:
         group_display_name = filters.get_nested_value(group, group_display_key)
+        if not group_display_name:
+            group_display_name = "<Group Name not found>"
         if group.get(members):
             logger.info(
                 f"{integration_name}Group: {group_display_name} has {len(group[members])} members"
@@ -92,6 +101,8 @@ def log_groups(
                 members_display_name = filters.get_nested_value(
                     member, members_display_key
                 )
+                if not members_display_name:
+                    members_display_name = "<User Name not found>"
                 logger.info(f"{integration_name}Group:Member: {members_display_name}")
         else:
             logger.info(

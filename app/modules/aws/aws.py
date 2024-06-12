@@ -50,7 +50,7 @@ def aws_command(ack, command, logger, respond, client, body):
         case "health":
             request_health_modal(client, body)
         case "user":
-            request_user_provisioing(client, body, respond, args, logger)
+            request_user_provisioning(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -293,13 +293,11 @@ def request_health_modal(client, body):
     )
 
 
-def request_user_provisioing(client, body, respond, args, logger):
+def request_user_provisioning(client, body, respond, args, logger):
     requestor_email = slack_users.get_user_email_from_body(client, body)
     admin_group = get_groups_from_integration("google_groups", query="email:sre-ifs*")
     admins_emails = [admin["primaryEmail"] for admin in admin_group[0]["members"]]
-    requestor_is_admin = False
     if requestor_email in admins_emails:
-        requestor_is_admin = True
         operation = args[0]
         users_emails = args[1:]
         users_emails = [
@@ -313,6 +311,8 @@ def request_user_provisioing(client, body, respond, args, logger):
         response = provision_aws_users(operation, users_emails)
         respond(f"Request completed:\n{json.dumps(response, indent=2)}")
     else:
-        respond(f"Function is restricted to admins: {requestor_is_admin}")
+        respond(
+            "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."
+        )
 
     logger.info("Completed user provisioning request")
