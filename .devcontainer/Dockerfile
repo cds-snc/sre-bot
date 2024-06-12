@@ -12,10 +12,6 @@ COPY .devcontainer/apt-packages.txt ./
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && xargs apt-get -y install --no-install-recommends <apt-packages.txt
 
-# Install Checkov
-RUN pip3 install --upgrade requests setuptools \
-    && pip3 install --upgrade botocore checkov
-
 # Setup aliases and autocomplete
 RUN echo "\n\
     complete -C /usr/local/bin/aws_completer aws\n\
