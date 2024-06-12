@@ -82,11 +82,11 @@ def log_groups(
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
     if not group_display_key:
-        logger.warn(f"{integration_name}No group display key provided.")
+        logger.warning(f"{integration_name}No group display key provided.")
     if not members:
-        logger.warn(f"{integration_name}No members key provided.")
+        logger.warning(f"{integration_name}No members key provided.")
     if not members_display_key:
-        logger.warn(f"{integration_name}No members display key provided.")
+        logger.warning(f"{integration_name}No members display key provided.")
 
     logger.info(f"{integration_name}Found {len(groups)} groups")
     for group in groups:
