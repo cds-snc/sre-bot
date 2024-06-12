@@ -39,7 +39,7 @@ def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logg
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.warn.assert_called_once_with(
+    mock_logger.warning.assert_called_once_with(
         "mock_module.mock_func_name: An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown"
     )
     mock_logger.error.assert_not_called()
