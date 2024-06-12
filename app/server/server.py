@@ -198,7 +198,7 @@ async def user(request: Request):
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
 # If we have a custom header of 'X-Sentinel-Source', then we skip rate limiting so that Sentinel is not rate limited
 @handler.get("/geolocate/{ip}")
-@limiter.limit("10/minute", key_func=sentinel_key_func)
+@limiter.limit("20/minute", key_func=sentinel_key_func)
 def geolocate(ip, request: Request):
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
@@ -327,7 +327,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
 # As a result, we are giving a generous rate limit of so that we don't run into any issues with the healthchecks
 @handler.get("/version")
-@limiter.limit("15/minute")
+@limiter.limit("50/minute")
 def get_version(request: Request):
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
