@@ -583,31 +583,6 @@ async def test_user_rate_limiting():
 
 
 @pytest.mark.asyncio
-async def test_geolocate_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        # Mock the maxmind.geolocate function
-        with patch(
-            "server.server.maxmind.geolocate",
-            return_value=("Country", "City", 12.34, 56.78),
-        ):
-            # Make 10 requests to the geolocate endpoint
-            for _ in range(20):
-                response = await client.get("/geolocate/8.8.8.8")
-                assert response.status_code == 200
-                assert response.json() == {
-                    "country": "Country",
-                    "city": "City",
-                    "latitude": 12.34,
-                    "longitude": 56.78,
-                }
-
-            # The 21th request should be rate limited
-            response = await client.get("/geolocate/8.8.8.8")
-            assert response.status_code == 429
-            assert response.json() == {"message": "Rate limit exceeded"}
-
-
-@pytest.mark.asyncio
 async def test_webhooks_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Mock the webhooks.get_webhook function
