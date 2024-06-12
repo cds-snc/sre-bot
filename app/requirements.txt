@@ -21,7 +21,6 @@ python-dotenv==0.21.1
 python-i18n==0.3.9
 pytz==2023.4
 requests==2.31.0
-slowapi==0.1.9
 schedule==1.2.2
 slack-bolt==1.18.1
 trello==0.9.7.3
