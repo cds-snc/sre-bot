@@ -91,17 +91,16 @@ def get_user_id(user_name, **kwargs):
         **kwargs: Additional keyword arguments for the API call.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update(
-        {
-            "AlternateIdentifier": {
-                "UniqueAttribute": {
-                    "AttributePath": "userName",
-                    "AttributeValue": user_name,
-                },
-            }
-        }
-    )
-    return execute_aws_api_call("identitystore", "get_user_id", **kwargs)["UserId"]
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "AlternateIdentifier": {
+            "UniqueAttribute": {
+                "AttributePath": "userName",
+                "AttributeValue": user_name,
+            },
+        },
+    }
+    return execute_aws_api_call("identitystore", "get_user_id", **params)["UserId"]
 
 
 @handle_aws_api_errors
@@ -113,9 +112,13 @@ def describe_user(user_id, **kwargs):
         **kwargs: Additional keyword arguments for the API call.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"UserId": user_id})
-    response = execute_aws_api_call("identitystore", "describe_user", **kwargs)
-    del response["ResponseMetadata"]
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "UserId": user_id,
+    }
+    response = execute_aws_api_call("identitystore", "describe_user", **params)
+    for key in ["ResponseMetadata", "IdentityStoreId"]:
+        del response[key]
     return response
 
 
@@ -123,8 +126,13 @@ def describe_user(user_id, **kwargs):
 def list_users(**kwargs):
     """Retrieves all users from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+    }
+    if "filters" in kwargs:
+        params["Filters"] = kwargs["filters"]
     return execute_aws_api_call(
-        "identitystore", "list_users", paginated=True, keys=["Users"], **kwargs
+        "identitystore", "list_users", paginated=True, keys=["Users"], **params
     )
 
 
@@ -140,17 +148,16 @@ def get_group_id(group_name, **kwargs):
         str: The group ID of the group.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update(
-        {
-            "AlternateIdentifier": {
-                "UniqueAttribute": {
-                    "AttributePath": "displayName",
-                    "AttributeValue": group_name,
-                },
-            }
-        }
-    )
-    response = execute_aws_api_call("identitystore", "get_group_id", **kwargs)
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "AlternateIdentifier": {
+            "UniqueAttribute": {
+                "AttributePath": "displayName",
+                "AttributeValue": group_name,
+            },
+        },
+    }
+    response = execute_aws_api_call("identitystore", "get_group_id", **params)
     return response["GroupId"] if response else False
 
 
@@ -164,8 +171,13 @@ def list_groups(**kwargs):
     Returns:
         list: A list of group objects."""
     kwargs = resolve_identity_store_id(kwargs)
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+    }
+    if "filters" in kwargs:
+        params["Filters"] = kwargs["filters"]
     response = execute_aws_api_call(
-        "identitystore", "list_groups", paginated=True, keys=["Groups"], **kwargs
+        "identitystore", "list_groups", paginated=True, keys=["Groups"], **params
     )
     return response if response else []
 
@@ -183,7 +195,6 @@ def create_group_membership(group_id, user_id, **kwargs):
         str: The membership ID of the created group membership.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    # kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
     params = {
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "GroupId": group_id,
@@ -207,7 +218,6 @@ def delete_group_membership(membership_id, **kwargs):
         bool: True if the group membership was deleted successfully, False otherwise.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"MembershipId": membership_id})
     params = {
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "MembershipId": membership_id,
@@ -229,9 +239,13 @@ def get_group_membership_id(group_id, user_id, **kwargs):
         **kwargs: Additional keyword arguments for the API call.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    kwargs.update({"GroupId": group_id, "MemberId": {"UserId": user_id}})
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "GroupId": group_id,
+        "MemberId": {"UserId": user_id},
+    }
     response = execute_aws_api_call(
-        "identitystore", "get_group_membership_id", **kwargs
+        "identitystore", "get_group_membership_id", **params
     )
     return response["MembershipId"] if response else False
 
@@ -247,13 +261,16 @@ def list_group_memberships(group_id, **kwargs):
     Returns:
         list: A list of group membership objects."""
     kwargs = resolve_identity_store_id(kwargs)
+    params = {
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "GroupId": group_id,
+        "keys": ["GroupMemberships"],
+        "paginated": True,
+    }
     response = execute_aws_api_call(
         "identitystore",
         "list_group_memberships",
-        paginated=True,
-        keys=["GroupMemberships"],
-        GroupId=group_id,
-        **kwargs,
+        **params,
     )
     return response if response else []
 
