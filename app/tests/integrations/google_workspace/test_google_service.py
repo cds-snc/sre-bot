@@ -167,7 +167,7 @@ def test_handle_google_api_errors_catches_refresh_error(mocked_logging_error):
 
 
 def test_handle_google_api_errors_passes_through_return_value():
-    mock_func = MagicMock(return_value="test")
+    mock_func = MagicMock(return_value=("test", set()))
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -203,9 +203,13 @@ def test_execute_google_api_call_calls_get_google_service_with_delegated_user_em
     )
 
 
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
 @patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
 def test_execute_google_api_call_calls_getattr_with_service_and_resource(
+    mock_get_google_api_command_parameters,
     mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
 ):
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
@@ -215,10 +219,17 @@ def test_execute_google_api_call_calls_getattr_with_service_and_resource(
     mock_service.resource.assert_called_once()
 
 
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
 @patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
 def test_execute_google_api_call_when_paginate_is_false(
+    mock_get_google_api_command_parameters,
     mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
 ):
+    mock_get_google_api_command_parameters.return_value = ["arg1"]
+    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
@@ -237,13 +248,20 @@ def test_execute_google_api_call_when_paginate_is_false(
     )
 
     mock_resource.method.assert_called_once_with(arg1="value1")
-    assert result == {"key": "value"}
+    assert result == ({"key": "value"}, set())
 
 
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
 @patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
 def test_execute_google_api_call_when_paginate_is_true(
+    mock_get_google_api_command_parameters,
     mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
 ):
+    mock_get_google_api_command_parameters.return_value = ["arg1"]
+    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
@@ -285,7 +303,7 @@ def test_execute_google_api_call_when_paginate_is_true(
         "service_name", "version", "resource", "method", paginate=True, arg1="value1"
     )
 
-    assert result == ["value1", "value2", "value3"]
+    assert result == (["value1", "value2", "value3"], set())
     mock_resource.method.assert_called_once_with(arg1="value1")
     mock_resource.method_next.assert_any_call(
         mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"}

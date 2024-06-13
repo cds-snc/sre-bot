@@ -218,7 +218,6 @@ def test_describe_user(
                 "Primary": True,
             }
         ],
-        "IdentityStoreId": "d-123412341234",
     }
 
     result = identity_store.describe_user(user_id)
@@ -356,7 +355,6 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
         paginated=True,
         keys=["Users"],
         IdentityStoreId="test_instance_id",
-        custom_param="custom_value",
     )
     assert result == ["User1", "User2"]
 
@@ -474,7 +472,6 @@ def test_list_groups_with_kwargs(mock_execute_aws_api_call):
         paginated=True,
         keys=["Groups"],
         IdentityStoreId="custom_instance_id",
-        extra_arg="extra_value",
     )
 
     assert result == ["Group1", "Group2"]
