@@ -79,11 +79,14 @@ def handle_google_api_errors(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            result, unsupported_params = func(*args, **kwargs)
-            if unsupported_params:
-                logging.warning(
-                    f"Unsupported parameters in '{func.__name__}' were filtered out: {', '.join(unsupported_params)}"
-                )
+            result = func(*args, **kwargs)
+            # Check if the result is a tuple and has two elements (for backward compatibility)
+            if isinstance(result, tuple) and len(result) == 2:
+                result, unsupported_params = result
+                if unsupported_params:
+                    logging.warning(
+                        f"Unsupported parameters in '{func.__name__}' were filtered out: {', '.join(unsupported_params)}"
+                    )
             return result
         except HttpError as e:
             logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
@@ -131,8 +134,7 @@ def execute_google_api_call(
     resource_obj = getattr(service, resource)()
     api_method = getattr(resource_obj, method)
     supported_params = get_google_api_command_parameters(service, resource, method)
-    if kwargs:
-        formatted_kwargs = convert_kwargs_to_camel_case(kwargs)
+    formatted_kwargs = convert_kwargs_to_camel_case(kwargs) if kwargs else {}
     filtered_params = {
         k: v for k, v in formatted_kwargs.items() if k in supported_params
     }
