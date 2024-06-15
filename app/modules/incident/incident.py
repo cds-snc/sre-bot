@@ -16,7 +16,7 @@ from integrations.google_drive import (
 from .handle_slack_message_reactions import (
     rearrange_by_datetime_ascending,
     convert_epoch_to_datetime_est,
-    hande_forwarded_messages,
+    handle_forwarded_messages,
     handle_images_in_message,
     get_incident_document_id,
 )
@@ -447,7 +447,7 @@ def handle_reaction_added(client, ack, body, logger):
 
             for message in messages:
                 # get the forwarded message and get the attachments appeending the forwarded message to the original message
-                message = hande_forwarded_messages(message)
+                message = handle_forwarded_messages(message)
 
                 # get the message ts time
                 message_ts = message["ts"]
@@ -515,7 +515,7 @@ def handle_reaction_removed(client, ack, body, logger):
             message = messages[0]
 
             # get the forwarded message and get the attachments appeending the forwarded message to the original message
-            message = hande_forwarded_messages(message)
+            message = handle_forwarded_messages(message)
 
             # get the message ts time
             message_ts = message["ts"]

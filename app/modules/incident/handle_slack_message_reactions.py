@@ -66,7 +66,7 @@ def convert_epoch_to_datetime_est(epoch_time):
     return est_datetime.strftime("%Y-%m-%d %H:%M:%S") + " ET"
 
 
-def hande_forwarded_messages(message):
+def handle_forwarded_messages(message):
     """
     Append forwarded messages from attachments to the original message text.
 
