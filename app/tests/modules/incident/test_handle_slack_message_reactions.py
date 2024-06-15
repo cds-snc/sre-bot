@@ -110,3 +110,55 @@ def test_convert_epoch_to_datetime_est_edge_cases():
         handle_slack_message_reactions.convert_epoch_to_datetime_est(32503680000)
         == "2999-12-31 19:00:00 ET"
     )
+
+def test_handle_forwarded_messages_with_attachments():
+    message = {
+        "text": "Original message",
+        "attachments": [
+            {"fallback": "```Forwarded message 1```"},
+            {"fallback": "Another forwarded message 2"},
+        ],
+    }
+    updated_message = handle_slack_message_reactions.handle_forwarded_messages(message)
+    assert updated_message["text"] == (
+        "Original message\nForwarded Message: Forwarded message 1\nForwarded Message: Another forwarded message 2"
+    )
+
+def test_handle_forwarded_messages_without_attachments():
+    message = {
+        "text": "Original message",
+    }
+    updated_message = handle_slack_message_reactions.handle_forwarded_messages(message)
+    assert updated_message["text"] == "Original message"
+
+def test_handle_forwarded_messages_with_empty_attachments():
+    message = {
+        "text": "Original message",
+        "attachments": [],
+    }
+    updated_message = handle_slack_message_reactions.handle_forwarded_messages(message)
+    assert updated_message["text"] == "Original message"
+
+def test_handle_forwarded_messages_with_no_fallback():
+    message = {
+        "text": "Original message",
+        "attachments": [
+            {"no_fallback": "This attachment has no fallback"},
+        ],
+    }
+    updated_message = handle_slack_message_reactions.handle_forwarded_messages(message)
+    assert updated_message["text"] == "Original message"
+
+def test_handle_forwarded_messages_mixed_fallback():
+    message = {
+        "text": "Original message",
+        "attachments": [
+            {"fallback": "```Forwarded message 1```"},
+            {"no_fallback": "This attachment has no fallback"},
+            {"fallback": "Another ```forwarded``` message 2"},
+        ],
+    }
+    updated_message = handle_slack_message_reactions.handle_forwarded_messages(message)
+    assert updated_message["text"] == (
+        "Original message\nForwarded Message: Forwarded message 1\nForwarded Message: Another forwarded message 2"
+    )
