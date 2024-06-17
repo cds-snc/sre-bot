@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 from integrations import google_drive, opsgenie
 from integrations.slack import users as slack_users
-from integrations.google_workspace import google_docs
 from integrations.sentinel import log_to_sentinel
 from models import webhooks
 from integrations.google_drive import (
@@ -17,6 +16,9 @@ from integrations.google_drive import (
 from .handle_slack_message_reactions import (
     rearrange_by_datetime_ascending,
     convert_epoch_to_datetime_est,
+    handle_forwarded_messages,
+    handle_images_in_message,
+    get_incident_document_id,
 )
 
 load_dotenv()
@@ -441,28 +443,11 @@ def handle_reaction_added(client, ack, body, logger):
             messages = return_messages(client, body, channel_id)
 
             # get the incident report document id from the incident channel
-            # get and update the incident document
-            document_id = ""
-            response = client.bookmarks_list(channel_id=channel_id)
-            if response["ok"]:
-                for item in range(len(response["bookmarks"])):
-                    if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = google_docs.extract_google_doc_id(
-                            response["bookmarks"][item]["link"]
-                        )
-                        if document_id == "":
-                            logger.error("No incident document found for this channel.")
+            document_id = get_incident_document_id(client, channel_id, logger)
 
             for message in messages:
                 # get the forwarded message and get the attachments appeending the forwarded message to the original message
-                if message.get("attachments"):
-                    attachments = message["attachments"]
-                    for attachment in attachments:
-                        fallback = attachment.get("fallback")
-                        if fallback:
-                            message["text"] += (
-                                "\nForwarded Message :" + attachment["fallback"]
-                            )
+                message = handle_forwarded_messages(message)
 
                 # get the message ts time
                 message_ts = message["ts"]
@@ -483,6 +468,9 @@ def handle_reaction_added(client, ack, body, logger):
                 # get the current timeline section content
                 content = get_timeline_section(document_id)
 
+                # handle any images in the messages
+                message = handle_images_in_message(message)
+
                 # if the message contains mentions to other slack users, replace those mentions with their name
                 message = slack_users.replace_user_id_with_handle(
                     client, message["text"]
@@ -494,11 +482,6 @@ def handle_reaction_added(client, ack, body, logger):
                     content += (
                         f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
                     )
-
-                    # if there is an image in the message, then add it to the timeline
-                    if "files" in message:
-                        image = message["files"][0]["url_private"]
-                        content += f"\nImage: {image}"
 
                     # sort all the message to be in ascending chronological order
                     sorted_content = rearrange_by_datetime_ascending(content)
@@ -532,14 +515,7 @@ def handle_reaction_removed(client, ack, body, logger):
             message = messages[0]
 
             # get the forwarded message and get the attachments appeending the forwarded message to the original message
-            if message.get("attachments"):
-                attachments = message["attachments"]
-                for attachment in attachments:
-                    fallback = attachment.get("fallback")
-                    if fallback:
-                        message["text"] += (
-                            "Forwarded Message :" + attachment["fallback"]
-                        )
+            message = handle_forwarded_messages(message)
 
             # get the message ts time
             message_ts = message["ts"]
@@ -553,19 +529,13 @@ def handle_reaction_removed(client, ack, body, logger):
             user_full_name = user["profile"]["real_name"]
 
             # get the incident report document id from the incident channel
-            # get and update the incident document
-            document_id = ""
-            response = client.bookmarks_list(channel_id=channel_id)
-            if response["ok"]:
-                for item in range(len(response["bookmarks"])):
-                    if response["bookmarks"][item]["title"] == "Incident report":
-                        document_id = google_docs.extract_google_doc_id(
-                            response["bookmarks"][item]["link"]
-                        )
-                        if document_id == "":
-                            logger.error("No incident document found for this channel.")
-            # Retrieve the current content of the timeline
+            document_id = get_incident_document_id(client, channel_id, logger)
+
+            # get the current content from the document
             content = get_timeline_section(document_id)
+
+            # handle any images in the message
+            message = handle_images_in_message(message)
 
             # if the message contains mentions to other slack users, replace those mentions with their name
             message = slack_users.replace_user_id_with_handle(client, message["text"])
@@ -579,11 +549,6 @@ def handle_reaction_removed(client, ack, body, logger):
             message_to_remove = (
                 f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
             )
-
-            # if there is a file in the message, then add it to the message to remove
-            if "files" in message:
-                image = message["files"][0]["url_private"]
-                message_to_remove += f"\nImage: {image}"
 
             # Remove the message
             if message_to_remove in content:
