@@ -87,6 +87,7 @@ def handle_google_api_errors(func):
                     logging.warning(
                         f"Unsupported parameters in '{func.__name__}' were filtered out: {', '.join(unsupported_params)}"
                     )
+                return result
             return result
         except HttpError as e:
             logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
@@ -108,19 +109,19 @@ def handle_google_api_errors(func):
 def execute_google_api_call(
     service_name,
     version,
-    resource,
+    resource_path,
     method,
     scopes=None,
     delegated_user_email=None,
     paginate=False,
     **kwargs,
 ):
-    """Execute a Google API call.
+    """Execute a Google API call on a resource.
 
     Args:
         service_name (str): The name of the Google service.
         version (str): The version of the Google service.
-        resource (str): The resource to access.
+        resource_path (str): The path to the resource, which can include nested resources separated by dots.
         method (str): The method to call on the resource.
         scopes (list, optional): The scopes for the Google service.
         delegated_user_email (str, optional): The email address of the user to impersonate.
@@ -131,9 +132,22 @@ def execute_google_api_call(
         dict or list: The result of the API call. If paginate is True, returns a list of all results.
     """
     service = get_google_service(service_name, version, delegated_user_email, scopes)
-    resource_obj = getattr(service, resource)()
-    api_method = getattr(resource_obj, method)
-    supported_params = get_google_api_command_parameters(service, resource, method)
+    resource_obj = service
+
+    for resource in resource_path.split("."):
+        try:
+            resource_obj = getattr(resource_obj, resource)()
+        except Exception as e:
+            raise AttributeError(
+                f"Error accessing {resource} on resource object. Exception: {e}"
+            )
+
+    try:
+        api_method = getattr(resource_obj, method)
+    except Exception as e:
+        raise AttributeError(f"Error executing API method {method}. Exception: {e}")
+
+    supported_params = get_google_api_command_parameters(resource_obj, method)
     formatted_kwargs = convert_kwargs_to_camel_case(kwargs) if kwargs else {}
     filtered_params = {
         k: v for k, v in formatted_kwargs.items() if k in supported_params
@@ -153,19 +167,17 @@ def execute_google_api_call(
         return api_method(**filtered_params).execute(), unsupported_params
 
 
-def get_google_api_command_parameters(service, resource, method):
+def get_google_api_command_parameters(resource_obj, method):
     """
     Get the parameter names for a Google API command, excluding non-parameter documentation.
 
     Args:
-        service (googleapiclient.discovery.Resource): The Google service resource.
-        resource (str): The name of the resource.
-        method (str): The name of the method.
+        resource_obj (object): The Google API resource object.
+        method (str): The name of the API method to get the parameters for.
 
     Returns:
         list: The names of the parameters for the API method, excluding non-parameter documentation.
     """
-    resource_obj = getattr(service, resource)()
     api_method = getattr(resource_obj, method)
 
     parameter_names = []
