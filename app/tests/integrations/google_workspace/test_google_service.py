@@ -11,6 +11,7 @@ from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
     execute_google_api_call,
+    get_google_api_command_parameters
 )
 
 
@@ -377,7 +378,9 @@ def test_execute_google_api_call_with_nested_resource_path_throws_error(
     mock_get_google_service.return_value = mock_service
 
     mock_resource1 = MagicMock()
-    mock_resource1.resource2.side_effect = AttributeError("resource2 cannot be accessed")
+    mock_resource1.resource2.side_effect = AttributeError(
+        "resource2 cannot be accessed"
+    )
     mock_service.resource1.return_value = mock_resource1
 
     with pytest.raises(AttributeError) as e:
@@ -406,7 +409,10 @@ def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
     mock_resource = MagicMock()
     mock_service.return_value = mock_resource
 
-    mock_getattr.side_effect = [mock_resource, AttributeError("method cannot be accessed")]
+    mock_getattr.side_effect = [
+        mock_resource,
+        AttributeError("method cannot be accessed"),
+    ]
 
     with pytest.raises(AttributeError) as e:
         execute_google_api_call(
@@ -417,3 +423,21 @@ def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
         "Error executing API method method. Exception: method cannot be accessed"
         in str(e.value)
     )
+
+
+def test_get_google_api_command_parameters_returns_correct_parameters():
+    mock_resource = MagicMock()
+    mock_method = MagicMock()
+    mock_method.__doc__ = """
+Args:
+    arg1: Description of arg1.
+    arg2: Description of arg2.
+
+Returns:
+    Some return value.
+    """
+    mock_resource.method = mock_method
+
+    result = get_google_api_command_parameters(mock_resource, "method")
+
+    assert result == ["arg1", "arg2"]
