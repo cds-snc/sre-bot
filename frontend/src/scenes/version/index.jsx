@@ -27,11 +27,20 @@ const Version = () => {
       fetchVersion();
     }, []);
 
+    // format the subtitle content 
+    const subtitleContent = error ? (
+        `Error: ${error}`
+      ) : (
+        <>
+          SRE Bot Version: <b>{version}</b>
+        </>
+      );
+
     //display the version
     return (
               <Box m="20px">
                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Header title="Version" subtitle={error ? `Error: ${error}` : `SRE Bot Version: <b>${version}</b>`}/> 
+                    <Header title="Version" subtitle={subtitleContent} /> 
                 </Box>
             </Box>
     );
