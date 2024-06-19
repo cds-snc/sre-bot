@@ -1,21 +1,12 @@
 import { Box, Alert } from "@mui/material";
 import Header from "../../components/Header";
 import { React, useState } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps"
-import { Marker } from "react-simple-maps"
 import Paper from '@mui/material/Paper';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SearchIcon from '@mui/icons-material/Search';
 import PinDropIcon from '@mui/icons-material/PinDrop';
-
-//set the maps' width and height cooordinates
-const width = 800
-const height = 500
-const geoUrl =
-  "https://raw.githubusercontent.com/deldersveld/topojson/master/world-countries.json"
-
 
 // call the backend API to fetch the location data using the /geolocate endpoint
 // if we are in development we need to call the API using the full URL
@@ -60,7 +51,7 @@ function Geolocate() {
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Header title="Geolocate an IP"/>
       </Box>
-      {/* Display the input bo and search button */}
+      {/* Display the input bar and search button */}
       <Box>
         <Paper
           sx={{ p: '2px 4px', display: 'flex', alignItems: 'center', width: 400 }}
@@ -86,25 +77,6 @@ function Geolocate() {
         <Alert sx={{fontSize:'larger'}} severity="error">{location.detail}</Alert></Box> 
         ) : (
           location && <Box sx={{fontSize:'larger'}}><br></br><CheckCircleOutlineIcon color="success" fontSize="large"/>  Located in <b>{location.city}, {location.country}</b> with coordinates [{location.latitude}, {location.longitude}]</Box>)}
-        {/* Display the map */}
-        <ComposableMap width={width} height={height}>
-          <Geographies geography={geoUrl}>
-            {({ geographies }) =>
-              geographies.map((geo) => (
-                <Geography key={geo.rsmKey} geography={geo} style={{
-                  hover: { fill: "#adadad" },
-                  pressed: { fill: "#5a5a5a" },
-                }} />
-              ))
-            }
-          </Geographies>
-          {/* Display the location coordinates of our location with a red circle. */}
-          {location && location.latitude && location.longitude && (
-            <Marker coordinates={[location.longitude, location.latitude]}>
-              <circle r={5} fill="#F53" />
-            </Marker>
-          )}
-        </ComposableMap>
         </Box>
       </Box>
     );

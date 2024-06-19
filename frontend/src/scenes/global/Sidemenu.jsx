@@ -9,6 +9,8 @@ import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import AccessAlarmsIcon from '@mui/icons-material/AccessAlarms';
 import HistoryIcon from '@mui/icons-material/History';
 import WebhookIcon from '@mui/icons-material/Webhook';
+import KeyIcon from '@mui/icons-material/Key';
+import NewReleasesIcon from '@mui/icons-material/NewReleases';
 import LocationSearchingIcon from '@mui/icons-material/LocationSearching';
 import InfoIcon from '@mui/icons-material/Info';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -153,6 +155,13 @@ const Sidemenu = () => {
                   setSelected={setSelected}
                 />
                 <Item
+                  title="AWS Access"
+                  to="/access"
+                  icon={<KeyIcon/>}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
                   title="Start an Incident"
                   to="/incident"
                   icon={<AccessAlarmsIcon />}
@@ -184,6 +193,13 @@ const Sidemenu = () => {
                   title="FAQ Page"
                   to="/faq"
                   icon={<InfoIcon/>}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+                <Item
+                  title="Version"
+                  to="/version"
+                  icon={<NewReleasesIcon/>}
                   selected={selected}
                   setSelected={setSelected}
                 />
