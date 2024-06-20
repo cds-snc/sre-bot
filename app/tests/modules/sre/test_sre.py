@@ -27,7 +27,7 @@ def test_sre_command_with_empty_string():
         MagicMock(), {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock()
     )
     respond.assert_called_once_with(
-        "Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes"
+        "Type `/sre help` to see a list of commands.\nTapez `/sre aide` pour voir une liste de commandes"
     )
 
 
