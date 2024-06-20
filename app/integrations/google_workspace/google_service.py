@@ -87,7 +87,6 @@ def handle_google_api_errors(func):
                     logging.warning(
                         f"Unsupported parameters in '{func.__name__}' were filtered out: {', '.join(unsupported_params)}"
                     )
-                return result
             return result
         except HttpError as e:
             logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
