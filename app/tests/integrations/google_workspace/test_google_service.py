@@ -11,6 +11,7 @@ from integrations.google_workspace.google_service import (
     get_google_service,
     handle_google_api_errors,
     execute_google_api_call,
+    get_google_api_command_parameters,
 )
 
 
@@ -176,6 +177,23 @@ def test_handle_google_api_errors_passes_through_return_value():
     mock_func.assert_called_once()
 
 
+@patch("logging.warning")
+def test_handle_google_api_errors_processes_unsupported_params(
+    mocked_logging_warning,
+):
+    mock_func = MagicMock(return_value=("test", {"unsupported"}))
+    mock_func.__name__ = "mock_func"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result == "test"
+    mock_func.assert_called_once()
+    mocked_logging_warning.assert_called_once_with(
+        "Unsupported parameters in 'mock_func' were filtered out: unsupported"
+    )
+
+
 @patch("integrations.google_workspace.google_service.get_google_service")
 def test_execute_google_api_call_calls_get_google_service(mock_get_google_service):
     execute_google_api_call("service_name", "version", "resource", "method")
@@ -309,3 +327,117 @@ def test_execute_google_api_call_when_paginate_is_true(
         mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"}
     )
     assert mock_method_next.call_count == 2
+
+
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
+@patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
+def test_execute_google_api_call_with_nested_resource_path(
+    mock_get_google_api_command_parameters,
+    mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
+):
+    mock_get_google_api_command_parameters.return_value = ["arg1"]
+    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+
+    mock_service = MagicMock()
+    mock_get_google_service.return_value = mock_service
+
+    # Set up the MagicMock for resource
+    mock_resource1 = MagicMock()
+    mock_resource2 = MagicMock()
+    mock_resource1.resource2.return_value = mock_resource2
+    mock_service.resource1.return_value = mock_resource1
+
+    # Set up the MagicMock for method
+    mock_method = MagicMock()
+    mock_resource2.method.return_value = mock_method
+
+    mock_method.execute.return_value = "result"
+
+    result = execute_google_api_call(
+        "service_name", "version", "resource1.resource2", "method", arg1="value1"
+    )
+
+    mock_resource2.method.assert_called_once_with(arg1="value1")
+    assert result == ("result", set())
+
+
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
+@patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
+def test_execute_google_api_call_with_nested_resource_path_throws_error(
+    mock_get_google_api_command_parameters,
+    mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
+):
+    mock_get_google_api_command_parameters.return_value = ["arg1"]
+    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+
+    mock_service = MagicMock()
+    mock_get_google_service.return_value = mock_service
+
+    mock_resource1 = MagicMock()
+    mock_resource1.resource2.side_effect = AttributeError(
+        "resource2 cannot be accessed"
+    )
+    mock_service.resource1.return_value = mock_resource1
+
+    with pytest.raises(AttributeError) as e:
+        execute_google_api_call(
+            "service_name", "version", "resource1.resource2", "method", arg1="value1"
+        )
+
+    assert "Error accessing resource2 on resource object" in str(e.value)
+
+
+@patch("integrations.google_workspace.google_service.convert_kwargs_to_camel_case")
+@patch("integrations.google_workspace.google_service.get_google_service")
+@patch("integrations.google_workspace.google_service.get_google_api_command_parameters")
+@patch("integrations.google_workspace.google_service.getattr")
+def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
+    mock_getattr,
+    mock_get_google_api_command_parameters,
+    mock_get_google_service,
+    mock_convert_kwargs_to_camel_case,
+):
+    mock_get_google_api_command_parameters.return_value = ["arg1"]
+    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+
+    mock_service = MagicMock()
+    mock_get_google_service.getattr.return_value = mock_service
+    mock_resource = MagicMock()
+    mock_service.return_value = mock_resource
+
+    mock_getattr.side_effect = [
+        mock_resource,
+        AttributeError("method cannot be accessed"),
+    ]
+
+    with pytest.raises(AttributeError) as e:
+        execute_google_api_call(
+            "service_name", "version", "resource", "method", arg1="value1"
+        )
+
+    assert (
+        "Error executing API method method. Exception: method cannot be accessed"
+        in str(e.value)
+    )
+
+
+def test_get_google_api_command_parameters_returns_correct_parameters():
+    mock_resource = MagicMock()
+    mock_method = MagicMock()
+    mock_method.__doc__ = """
+Args:
+    arg1: Description of arg1.
+    arg2: Description of arg2.
+
+Returns:
+    Some return value.
+    """
+    mock_resource.method = mock_method
+
+    result = get_google_api_command_parameters(mock_resource, "method")
+
+    assert result == ["arg1", "arg2"]

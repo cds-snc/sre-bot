@@ -7,7 +7,7 @@ import os
 
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
-from modules.dev import aws_dev, google_service
+from modules.dev import aws_dev, google
 from integrations.slack import commands as slack_commands
 
 help_text = """
@@ -61,7 +61,7 @@ def sre_command(ack, command, logger, respond, client, body):
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case "google":
             if PREFIX == "dev-":
-                google_service.google_service_command(ack, client, body, respond)
+                google.google_service_command(ack, client, body, respond, logger)
             else:
                 respond("This command is only available in the dev environment.")
             return
