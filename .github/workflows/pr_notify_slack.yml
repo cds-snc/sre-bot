@@ -1,0 +1,27 @@
+name: PR Slack Notify
+
+on:
+  pull_request:
+    types: [review_requested]
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  pr_slack_notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Slack message
+        if: ${{ github.event.requested_team.name == 'Internal SRE'}}
+        env:
+          SLACK_SRE_CHANNEL_WEBHOOK_URL: ${{ secrets.SLACK_SRE_CHANNEL_WEBHOOK_URL }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO_NAME: ${{ github.repository }}
+          PR_CREATOR: ${{ github.event.pull_request.user.login }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+            curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"*Review requested*: <$PR_URL|PR> - $PR_TITLE by $PR_CREATOR in $REPO_NAME.\"}" \
+            $SLACK_SRE_CHANNEL_WEBHOOK_URL
