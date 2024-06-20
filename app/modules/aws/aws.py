@@ -19,9 +19,20 @@ from models import aws_access_requests
 PREFIX = os.environ.get("PREFIX", "")
 
 help_text = """
-\n `/aws access` - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
-\n `/aws health` - query the health of an AWS account | demander l'état de santé d'un compte AWS
-\n `/aws help` - show this help text | montre le dialogue d'aide
+\n `/aws user <operation> <user1> <user2> ...`
+\n      - Provision or deprovision AWS users | Provisionner ou déprovisionner des utilisateurs AWS
+\n        Supports multiple users for a single operation | Supporte plusieurs utilisateurs pour l'opération
+\n        `<operation>`: `create` or/ou `delete`
+\n        `<user>`: email address or Slack username of the user | adresse courriel ou identifiant Slack de l'utilisateur
+\n        Usage: `/aws user create @username user.name@email.com`
+\n `/aws help | aide`
+\n      - Show this help text | montre le dialogue d'aide
+\n
+\n (currently disabled)
+\n `/aws access`
+\n      - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
+\n `/aws health`
+\n      - Query the health of an AWS account | Demander l'état de santé d'un compte AWS
 """
 
 
@@ -43,7 +54,7 @@ def aws_command(ack, command, logger, respond, client, body):
 
     action, *args = slack_commands.parse_command(command["text"])
     match action:
-        case "help":
+        case "help" | "aide":
             respond(help_text)
         case "access":
             request_access_modal(client, body)

@@ -11,7 +11,7 @@ from modules.dev import aws_dev, google
 from integrations.slack import commands as slack_commands
 
 help_text = """
-\n `/sre help`
+\n `/sre help | aide`
 \n      - show this help text
 \n      - montre le texte d'aide
 \n `/sre geolocate <ip>`
@@ -40,13 +40,13 @@ def sre_command(ack, command, logger, respond, client, body):
 
     if command["text"] == "":
         respond(
-            "Type `/sre help` to see a list of commands.\nTapez `/sre help` pour voir une liste de commandes"
+            "Type `/sre help` to see a list of commands.\nTapez `/sre aide` pour voir une liste de commandes"
         )
         return
 
     action, *args = slack_commands.parse_command(command["text"])
     match action:
-        case "help":
+        case "help" | "aide":
             respond(help_text)
         case "geolocate":
             if len(args) == 0:
