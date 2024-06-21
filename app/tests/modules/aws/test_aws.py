@@ -306,59 +306,52 @@ def test_request_health_modal(get_accounts_mocks):
     )
 
 
+@patch("modules.aws.aws.AWS_ADMIN_GROUPS", ["admin-group@email.com"])
 @patch("modules.aws.aws.provision_aws_users")
-@patch("modules.aws.aws.get_groups_from_integration")
+@patch("modules.aws.aws.permissions")
 @patch("modules.aws.aws.slack_users")
 def test_request_user_provisioning(
-    mock_slack_users, mock_get_groups_from_integration, mock_provision_aws_user
+    mock_slack_users, mock_permissions, mock_provision_aws_user
 ):
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
     logger = MagicMock()
     mock_slack_users.get_user_email_from_body.return_value = "user.name@email.com"
-    mock_get_groups_from_integration.return_value = [
-        {
-            "group": "group1",
-            "members": [{"user_id": "user_id", "primaryEmail": "user.name@email.com"}],
-        }
-    ]
     mock_provision_aws_user.return_value = True
     aws.request_user_provisioning(
         client, body, respond, ["create", "user.email"], logger
     )
     mock_slack_users.get_user_email_from_body.assert_called_with(client, body)
-    mock_get_groups_from_integration.assert_called_with(
-        "google_groups", query="email:sre-ifs*"
+    mock_permissions.is_user_member_of_groups.assert_called_with(
+        "user.name@email.com", ["admin-group@email.com"]
     )
     respond.assert_called_with("Request completed:\ntrue")
     logger.info.assert_called_with("Completed user provisioning request")
 
 
+@patch("modules.aws.aws.AWS_ADMIN_GROUPS", ["admin-group@email.com"])
 @patch("modules.aws.aws.provision_aws_users")
-@patch("modules.aws.aws.get_groups_from_integration")
+@patch("modules.aws.aws.permissions")
 @patch("modules.aws.aws.slack_users")
 def test_request_user_provisioning_requestor_not_admin(
-    mock_slack_users, mock_get_groups_from_integration, mock_provision_aws_user
+    mock_slack_users,
+    mock_permissions,
+    mock_provision_aws_user,
 ):
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
     logger = MagicMock()
     mock_slack_users.get_user_email_from_body.return_value = "notadmin.name@email.com"
-    mock_get_groups_from_integration.return_value = [
-        {
-            "group": "group1",
-            "members": [{"user_id": "user_id", "primaryEmail": "user.name@email.com"}],
-        }
-    ]
+    mock_permissions.is_user_member_of_groups.return_value = False
     mock_provision_aws_user.return_value = True
     aws.request_user_provisioning(
         client, body, respond, ["create", "user.email"], logger
     )
     mock_slack_users.get_user_email_from_body.assert_called_with(client, body)
-    mock_get_groups_from_integration.assert_called_with(
-        "google_groups", query="email:sre-ifs*"
+    mock_permissions.is_user_member_of_groups.assert_called_with(
+        "notadmin.name@email.com", ["admin-group@email.com"]
     )
     respond.assert_called_with(
         "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."

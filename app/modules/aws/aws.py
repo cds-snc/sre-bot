@@ -12,11 +12,12 @@ import os
 from server.utils import log_ops_message
 from integrations import aws_sso, aws_account_health
 from integrations.slack import commands as slack_commands, users as slack_users
-from modules.provisioning.groups import get_groups_from_integration
+from modules.permissions import handler as permissions
 from modules.aws.identity_center import provision_aws_users
 from models import aws_access_requests
 
 PREFIX = os.environ.get("PREFIX", "")
+AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
 
 help_text = """
 \n `/aws user <operation> <user1> <user2> ...`
@@ -306,9 +307,7 @@ def request_health_modal(client, body):
 
 def request_user_provisioning(client, body, respond, args, logger):
     requestor_email = slack_users.get_user_email_from_body(client, body)
-    admin_group = get_groups_from_integration("google_groups", query="email:sre-ifs*")
-    admins_emails = [admin["primaryEmail"] for admin in admin_group[0]["members"]]
-    if requestor_email in admins_emails:
+    if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         operation = args[0]
         users_emails = args[1:]
         users_emails = [
