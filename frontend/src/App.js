@@ -7,8 +7,6 @@ import Topmenu from "./scenes/global/Topmenu";
 import Dashboard from "./scenes/dashboard";
 import Version from "./scenes/version";
 import AWS_Access from "./scenes/access";
-import Version from "./scenes/version";
-import AWS_Access from "./scenes/access";
 import Sidemenu from "./scenes/global/Sidemenu";
 import Webhooks from './scenes/webhooks';
 import Incident from './scenes/incident';
@@ -121,19 +119,6 @@ function App() {
                     </div>
                   </ThemeProvider>
                 </ColorModeContext.Provider>} />
-              <Route path="/access" element={
-              <ColorModeContext.Provider value={colorMode}>
-                  <ThemeProvider theme={theme}>
-                    <CssBaseline />
-                    <div className="app">
-                      <Sidemenu isSidemenu={isSidemenu} />
-                      <main className="content">
-                        <Topmenu setIsSidemenu={setIsSidemenu} />
-                        <AWS_Access/>
-                      </main>
-                    </div>
-                  </ThemeProvider>
-                </ColorModeContext.Provider>} />
               <Route path="/incident" element={
               <ColorModeContext.Provider value={colorMode}>
                   <ThemeProvider theme={theme}>
@@ -186,20 +171,7 @@ function App() {
                     </div>
               </ThemeProvider>
                 </ColorModeContext.Provider>} />
-                <Route path="/version" element={
-              <ColorModeContext.Provider value={colorMode}>
-                  <ThemeProvider theme={theme}>
-                    <CssBaseline />
-                    <div className="app">
-                      <Sidemenu isSidemenu={isSidemenu} />
-                      <main className="content">
-                        <Topmenu setIsSidemenu={setIsSidemenu} />
-                        <Version/>
-                      </main>
-                    </div>
-                  </ThemeProvider>
-                </ColorModeContext.Provider>} />
-                <Route path="/version" element={
+              <Route path="/version" element={
               <ColorModeContext.Provider value={colorMode}>
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
