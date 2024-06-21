@@ -1,9 +1,9 @@
-from integrations import aws_sso
+from modules.aws import aws_sso
 
 from unittest.mock import call, MagicMock, patch
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_add_permissions_for_user_returns_true_if_permissions_added_with_write(
     assume_role_client_mock,
 ):
@@ -17,7 +17,7 @@ def test_add_permissions_for_user_returns_true_if_permissions_added_with_write(
     )
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_add_permissions_for_user_returns_true_if_permissions_added_with_read(
     assume_role_client_mock,
 ):
@@ -29,7 +29,7 @@ def test_add_permissions_for_user_returns_true_if_permissions_added_with_read(
     assert aws_sso.add_permissions_for_user("test_user", "test_account", "read") is True
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_add_permissions_for_user_returns_false_if_permissions_failed(
     assume_role_client_mock,
 ):
@@ -43,7 +43,7 @@ def test_add_permissions_for_user_returns_false_if_permissions_failed(
     )
 
 
-@patch("integrations.aws_sso.boto3")
+@patch("modules.aws.aws_sso.boto3")
 def test_assume_role_client_returns_session(boto3_mock):
     client = MagicMock()
     client.assume_role.return_value = {
@@ -67,12 +67,12 @@ def test_assume_role_client_returns_session(boto3_mock):
     )
 
 
-@patch("integrations.aws_sso.ACCOUNTS", {"id": "name"})
+@patch("modules.aws.aws_sso.ACCOUNTS", {"id": "name"})
 def test_get_accounts():
     assert aws_sso.get_accounts() == {"id": "name"}
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_get_accounts_for_permission_set_returns_empty_list_if_no_accounts_found(
     assume_role_client_mock,
 ):
@@ -84,7 +84,7 @@ def test_get_accounts_for_permission_set_returns_empty_list_if_no_accounts_found
     assert aws_sso.get_accounts_for_permission_set("test_permission_set") == []
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_get_user_id_returns_users_if_they_exist(assume_role_client_mock):
     client = MagicMock()
     client.list_users.return_value = {"Users": [{"UserId": "test_user_id"}]}
@@ -92,7 +92,7 @@ def test_get_user_id_returns_users_if_they_exist(assume_role_client_mock):
     assert aws_sso.get_user_id("test_user") == "test_user_id"
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_get_user_id_returns_none_if_they_do_not_exist(assume_role_client_mock):
     client = MagicMock()
     client.list_users.return_value = {"Users": []}
@@ -100,7 +100,7 @@ def test_get_user_id_returns_none_if_they_do_not_exist(assume_role_client_mock):
     assert aws_sso.get_user_id("test_user") is None
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_remove_permissions_for_user_returns_true_if_permissions_added_with_write(
     assume_role_client_mock,
 ):
@@ -115,7 +115,7 @@ def test_remove_permissions_for_user_returns_true_if_permissions_added_with_writ
     )
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_remove_permissions_for_user_returns_true_if_permissions_added_with_read(
     assume_role_client_mock,
 ):
@@ -129,7 +129,7 @@ def test_remove_permissions_for_user_returns_true_if_permissions_added_with_read
     )
 
 
-@patch("integrations.aws_sso.assume_role_client")
+@patch("modules.aws.aws_sso.assume_role_client")
 def test_remove_permissions_for_user_returns_false_if_permissions_failed(
     assume_role_client_mock,
 ):

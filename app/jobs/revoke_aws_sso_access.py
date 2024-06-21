@@ -1,5 +1,4 @@
-from integrations import aws_sso
-from models import aws_access_requests
+from modules.aws import aws_sso, aws_access_requests
 from server.utils import log_ops_message
 import logging
 

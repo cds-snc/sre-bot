@@ -1,12 +1,12 @@
 import arrow
 import os
 
-from integrations import aws_account_health
+from modules.aws import aws_account_health
 
 from unittest.mock import call, MagicMock, patch
 
 
-@patch("integrations.aws_account_health.boto3")
+@patch("modules.aws.aws_account_health.boto3")
 def test_assume_role_client_returns_session(boto3_mock):
     client = MagicMock()
     client.assume_role.return_value = {
@@ -30,7 +30,7 @@ def test_assume_role_client_returns_session(boto3_mock):
     )
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_accounts(assume_role_client_mock):
     client = MagicMock()
     client.list_accounts.side_effect = [
@@ -59,10 +59,10 @@ def test_get_accounts(assume_role_client_mock):
     }
 
 
-@patch("integrations.aws_account_health.get_securityhub_summary")
-@patch("integrations.aws_account_health.get_guardduty_summary")
-@patch("integrations.aws_account_health.get_config_summary")
-@patch("integrations.aws_account_health.get_account_spend")
+@patch("modules.aws.aws_account_health.get_securityhub_summary")
+@patch("modules.aws.aws_account_health.get_guardduty_summary")
+@patch("modules.aws.aws_account_health.get_config_summary")
+@patch("modules.aws.aws_account_health.get_account_spend")
 def test_get_account_health(
     get_account_spend_mock,
     get_config_summary_mock,
@@ -96,7 +96,7 @@ def test_get_account_health(
     assert "security" in result
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_account_spend_with_data(assume_role_client_mock):
     client = MagicMock()
     client.get_cost_and_usage.return_value = {
@@ -120,7 +120,7 @@ def test_get_account_spend_with_data(assume_role_client_mock):
     )
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_account_spend_with_no_data(assume_role_client_mock):
     client = MagicMock()
     client.get_cost_and_usage.return_value = {"ResultsByTime": [{}]}
@@ -140,7 +140,7 @@ def test_get_account_spend_with_no_data(assume_role_client_mock):
     )
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_config_summary(assume_role_client_mock):
     client = MagicMock()
     client.describe_aggregate_compliance_by_config_rules.return_value = {
@@ -153,7 +153,7 @@ def test_get_config_summary(assume_role_client_mock):
     )
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_guardduty_summary(assume_role_client_mock):
     client = MagicMock()
     client.list_detectors.return_value = {"DetectorIds": ["foo"]}
@@ -167,7 +167,7 @@ def test_get_guardduty_summary(assume_role_client_mock):
     )
 
 
-@patch("integrations.aws_account_health.assume_role_client")
+@patch("modules.aws.aws_account_health.assume_role_client")
 def test_get_securityhub_summary(assume_role_client_mock):
     client = MagicMock()
     client.get_findings.side_effect = [

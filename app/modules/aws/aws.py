@@ -10,11 +10,10 @@ import json
 import os
 
 from server.utils import log_ops_message
-from integrations import aws_sso, aws_account_health
+from modules.aws import aws_sso, aws_account_health, aws_access_requests
 from integrations.slack import commands as slack_commands, users as slack_users
 from modules.permissions import handler as permissions
 from modules.aws.identity_center import provision_aws_users
-from models import aws_access_requests
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
