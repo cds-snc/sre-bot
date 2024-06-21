@@ -7,12 +7,15 @@ import Topmenu from "./scenes/global/Topmenu";
 import Dashboard from "./scenes/dashboard";
 import Version from "./scenes/version";
 import AWS_Access from "./scenes/access";
+import Version from "./scenes/version";
+import AWS_Access from "./scenes/access";
 import Sidemenu from "./scenes/global/Sidemenu";
 import Webhooks from './scenes/webhooks';
 import Incident from './scenes/incident';
 import IncidentHistory from './scenes/incident_history';
 import Geolocate from './scenes/geolocate';
 import Faq from './scenes/faq';
+import Logout from './scenes/logout';
 
 /**
  * The main component of the application.
@@ -118,6 +121,19 @@ function App() {
                     </div>
                   </ThemeProvider>
                 </ColorModeContext.Provider>} />
+              <Route path="/access" element={
+              <ColorModeContext.Provider value={colorMode}>
+                  <ThemeProvider theme={theme}>
+                    <CssBaseline />
+                    <div className="app">
+                      <Sidemenu isSidemenu={isSidemenu} />
+                      <main className="content">
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
+                        <AWS_Access/>
+                      </main>
+                    </div>
+                  </ThemeProvider>
+                </ColorModeContext.Provider>} />
               <Route path="/incident" element={
               <ColorModeContext.Provider value={colorMode}>
                   <ThemeProvider theme={theme}>
@@ -183,7 +199,32 @@ function App() {
                     </div>
                   </ThemeProvider>
                 </ColorModeContext.Provider>} />
-              <Route path="/logout" element = {<LandingPage/>} />
+                <Route path="/version" element={
+              <ColorModeContext.Provider value={colorMode}>
+                  <ThemeProvider theme={theme}>
+                    <CssBaseline />
+                    <div className="app">
+                      <Sidemenu isSidemenu={isSidemenu} />
+                      <main className="content">
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
+                        <Version/>
+                      </main>
+                    </div>
+                  </ThemeProvider>
+                </ColorModeContext.Provider>} />
+                <Route path="/logout" element={
+              <ColorModeContext.Provider value={colorMode}>
+                  <ThemeProvider theme={theme}>
+                    <CssBaseline />
+                    <div className="app">
+                      <Sidemenu isSidemenu={isSidemenu} />
+                      <main className="content">
+                        <Topmenu setIsSidemenu={setIsSidemenu} />
+                        <Logout/>
+                      </main>
+                    </div>
+                  </ThemeProvider>
+                </ColorModeContext.Provider>} />
             </>
           ) : (
             <Route path="/" element={<LandingPage />} />

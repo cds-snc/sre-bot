@@ -410,6 +410,8 @@ def atip_view_handler(ack, body, say, logger, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
+    if PREFIX:
+        slug = f"{PREFIX}-{slug}"
     response = client.conversations_create(name=f"{slug}")
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
