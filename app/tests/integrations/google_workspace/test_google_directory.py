@@ -277,6 +277,24 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     )
 
 
+@patch("integrations.google_workspace.google_directory.DEFAULT_DELEGATED_ADMIN_EMAIL", "default_delegated_admin_email")
+@patch("integrations.google_workspace.google_directory.execute_google_api_call")
+def test_get_group_calls_execute_google_api_call_with_correct_args(
+    mock_execute_google_api_call,
+):
+    group_key = "test_group_key"
+    google_directory.get_group(group_key)
+    mock_execute_google_api_call.assert_called_once_with(
+        "admin",
+        "directory_v1",
+        "groups",
+        "get",
+        ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
+        "default_delegated_admin_email",
+        groupKey=group_key,
+    )
+
+
 @patch("integrations.google_workspace.google_directory.list_group_members")
 def test_add_users_to_group_calls_list_group_members(mock_list_group_members):
     group = {"id": "test_group_id"}
