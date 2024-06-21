@@ -2,10 +2,10 @@ import datetime
 
 from unittest.mock import patch
 
-from models import aws_access_requests
+from modules.aws import aws_access_requests
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_already_has_access_returns_false_is_no_record_exists(client_mock):
     client_mock.query.return_value = {"Count": 0}
     assert (
@@ -16,7 +16,7 @@ def test_already_has_access_returns_false_is_no_record_exists(client_mock):
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_already_has_access_returns_false_is_record_exists_but_expired(client_mock):
     client_mock.query.return_value = {
         "Count": 1,
@@ -37,7 +37,7 @@ def test_already_has_access_returns_false_is_record_exists_but_expired(client_mo
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_already_has_access_returns_false_if_records_does_not_match_user_id(
     client_mock,
 ):
@@ -60,7 +60,7 @@ def test_already_has_access_returns_false_if_records_does_not_match_user_id(
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_already_has_access_returns_false_if_records_does_not_match_access_type(
     client_mock,
 ):
@@ -83,7 +83,7 @@ def test_already_has_access_returns_false_if_records_does_not_match_access_type(
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_already_has_access_returns_minutes_remaining_until_expiry(client_mock):
     client_mock.query.return_value = {
         "Count": 1,
@@ -107,7 +107,7 @@ def test_already_has_access_returns_minutes_remaining_until_expiry(client_mock):
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_create_aws_access_request_creates_record_and_returns_true_if_response_is_200(
     client_mock,
 ):
@@ -125,7 +125,7 @@ def test_create_aws_access_request_creates_record_and_returns_true_if_response_i
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_create_aws_access_request_creates_record_and_returns_false_if_response_is_not_200(
     client_mock,
 ):
@@ -143,7 +143,7 @@ def test_create_aws_access_request_creates_record_and_returns_false_if_response_
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_expire_request_expires_record_returns_true_if_response_is_200(
     client_mock,
 ):
@@ -151,7 +151,7 @@ def test_expire_request_expires_record_returns_true_if_response_is_200(
     assert aws_access_requests.expire_request("test_account_id", "test_user_id") is True
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_expire_request_expires_record_returns_false_if_response_is_not_200(
     client_mock,
 ):
@@ -161,13 +161,13 @@ def test_expire_request_expires_record_returns_false_if_response_is_not_200(
     )
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_get_expired_requests_returns_empty_list_if_no_records_exist(client_mock):
     client_mock.scan.return_value = {"Count": 0, "Items": []}
     assert aws_access_requests.get_expired_requests() == []
 
 
-@patch("models.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.client")
 def test_get_expired_requests_returns_list_of_expired_requests(client_mock):
     client_mock.scan.return_value = {
         "Count": 1,
