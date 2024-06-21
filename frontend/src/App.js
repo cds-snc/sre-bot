@@ -171,7 +171,7 @@ function App() {
                     </div>
               </ThemeProvider>
                 </ColorModeContext.Provider>} />
-                <Route path="/version" element={
+              <Route path="/version" element={
               <ColorModeContext.Provider value={colorMode}>
                   <ThemeProvider theme={theme}>
                     <CssBaseline />
