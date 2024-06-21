@@ -129,6 +129,20 @@ def list_group_members(group_key, delegated_user_email=None):
     )
 
 
+@handle_google_api_errors
+def get_group(group_key):
+    scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
+    return execute_google_api_call(
+        "admin",
+        "directory_v1",
+        "groups",
+        "get",
+        scopes,
+        DEFAULT_DELEGATED_ADMIN_EMAIL,
+        groupKey=group_key,
+    )
+
+
 def add_users_to_group(group, group_key):
     """Add users to a group in the Google Workspace domain.
 
