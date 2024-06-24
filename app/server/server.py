@@ -254,7 +254,7 @@ def login_required(route):
 
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
 @handler.get("/geolocate/{ip}")
-async def geolocate(ip):
+def geolocate(ip):
     reader = maxmind.geolocate(ip)
     if isinstance(reader, str):
         raise HTTPException(status_code=404, detail=reader)
