@@ -14,7 +14,9 @@ VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
 THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
 RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
-
+CLIENT_DEFAULTS = {
+    "region_name": AWS_REGION,
+}
 
 logger = logging.getLogger()
 
@@ -65,13 +67,26 @@ def assume_role_client(service_name, role_arn):
         RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
     )
     credentials = assumed_role_object["Credentials"]
-    client = boto3.client(
-        service_name,
-        aws_access_key_id=credentials["AccessKeyId"],
-        aws_secret_access_key=credentials["SecretAccessKey"],
-        aws_session_token=credentials["SessionToken"],
-    )
-    return client
+    return credentials
+
+
+def get_aws_service_client(service_name, **config):
+    """Get an AWS service client.
+
+    Args:
+        service_name (str): The name of the AWS service.
+        **config: Additional keyword arguments for the service client.
+
+    Returns:
+        botocore.client.BaseClient: The service client.
+    """
+    role_arn = config.get("role_arn", None)
+    if role_arn is not None:
+        credentials = assume_role_client(service_name, role_arn)
+        config["aws_access_key_id"] = credentials["AccessKeyId"]
+        config["aws_secret_access_key"] = credentials["SecretAccessKey"]
+        config["aws_session_token"] = credentials["SessionToken"]
+    return boto3.client(service_name, **config)
 
 
 def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
@@ -91,15 +106,9 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
         ValueError: If the role_arn is not provided.
     """
 
-    role_arn = kwargs.pop("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
     keys = kwargs.pop("keys", None)
-    if role_arn is None:
-        raise ValueError(
-            "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
-        )
-    if service_name is None or method is None:
-        raise ValueError("The AWS service name and method must be provided")
-    client = assume_role_client(service_name, role_arn)
+    client_config = kwargs.pop("client_config", CLIENT_DEFAULTS)
+    client = get_aws_service_client(service_name, **client_config)
     if kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
