@@ -5,7 +5,8 @@
       "capabilities": {
         "drop": [
           "ALL"
-        ]
+        ],
+        "add": null
       }
     },
     "logConfiguration": {
@@ -40,6 +41,12 @@
         "name": "nofile",
         "softLimit": 1000000
       }
-    ]
+    ],
+    "cpu": null,
+    "environment": null,
+    "essential": null,
+    "mountPoints": null,
+    "systemControls": null,
+    "volumesFrom": null
   }
 ]
