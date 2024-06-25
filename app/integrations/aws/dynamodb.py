@@ -15,6 +15,7 @@ def query(
 ):
     params = {
         "TableName": table_name,
+        "client_config": client_config
     }
     if key_condition_expression:
         params["KeyConditionExpression"] = key_condition_expression
