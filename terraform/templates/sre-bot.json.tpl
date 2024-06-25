@@ -19,7 +19,9 @@
     "name": "sre-bot",
     "portMappings": [
       {
-        "containerPort": 8000
+        "containerPort": 8000,
+        "hostPort": 8000,
+        "protocol": "tcp"
       }
     ],
     "secrets": [
