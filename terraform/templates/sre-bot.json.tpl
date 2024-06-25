@@ -6,7 +6,7 @@
         "drop": [
           "ALL"
         ],
-        "add": null
+        "add": [] 
       }
     },
     "logConfiguration": {
@@ -42,11 +42,11 @@
         "softLimit": 1000000
       }
     ],
-    "cpu": null,
-    "environment": null,
-    "essential": null,
-    "mountPoints": null,
-    "systemControls": null,
-    "volumesFrom": null
+    "cpu": 0,
+    "environment": [],
+    "essential": true,
+    "mountPoints": [],
+    "systemControls": [],
+    "volumesFrom": [] 
   }
 ]
