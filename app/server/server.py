@@ -28,14 +28,8 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
-<<<<<<< HEAD
 from datetime import datetime,timezone
 from integrations.aws.ogranizations import get_active_account_names 
-=======
-from functools import wraps
-from fastapi import status
-
->>>>>>> origin/main
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -210,7 +204,6 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
-<<<<<<< HEAD
 @handler.post("/request_access")
 async def create_access_request(request: AccessRequest):
     # Log or process the request here
@@ -225,60 +218,6 @@ async def create_access_request(request: AccessRequest):
     
     # Simulate successful processing
     return {"message": "Access request created successfully", "data": request}
-=======
-def get_current_user(request: Request):
-    """
-    Retrieves the currently logged-in user from the session.
-    Args:
-        request (Request): The HTTP request object containing session information.
-    Returns:
-        dict: The user information if the user is logged in.
-    Raises:
-        HTTPException: If the user is not authenticated.
-    """
-    # Retrieve the 'user' from the session stored in the request
-    user = request.session.get("user")
-
-    # If there is no 'user' in the session, raise an HTTP 401 Unauthorized exception
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Google login"},
-        )
-    return user
-
-
-def login_required(route):
-    """
-    A decorator to ensure that the user is logged in before accessing the route.
-    Args:
-        route (function): The route function that requires login.
-    Returns:
-        function: The decorated route function with login check.
-    """
-
-    @wraps(route)
-    async def decorated_route(*args, **kwargs):
-        """
-        The decorated route function that includes login check.
-        Args:
-            *args: Variable length argument list for the route function.
-            **kwargs: Arbitrary keyword arguments for the route function.
-        Returns:
-            The result of the original route function if the user is logged in.
-        """
-        # Get the current request from the arguments
-        request = kwargs.get("request")
-        if request:
-            # Check if the user is logged in
-            user = get_current_user(request)  # noqa: F841
-        # Call the original route function and return its result
-        return await route(*args, **kwargs)
-
-    # Return the decorated route function
-    return decorated_route
->>>>>>> origin/main
 
 
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
