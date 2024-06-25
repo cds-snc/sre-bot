@@ -1,4 +1,5 @@
-import * as React from 'react';
+//import * as React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
@@ -9,17 +10,73 @@ import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 
-const AWSRequestForm = ({ accounts, onSend }) => {
-  const [account, setAccount] = React.useState('');
+dayjs.extend(utc);
 
-  const handleChange = (event) => {
+const AWSRequestForm = ({ onSend }) => {
+  const [account, setAccount] = useState('');
+  const [accounts, setAccounts] = useState([]);
+  const [reason, setReason] = useState('');
+  const [startDate, setStartDate] = useState(dayjs());
+  const [endDate, setEndDate] = useState(dayjs());
+
+
+  useEffect(() => {
+    // Fetch accounts from API
+    const fetchAccounts = async () => {
+      try {
+        const response = await fetch('/accounts');
+        const data = await response.json();
+        setAccounts(data); // Assuming the API returns an array of account numbers
+      } catch (error) {
+        console.error('Failed to fetch accounts', error);
+      }
+    };
+
+    fetchAccounts();
+  }, []);
+
+  const handleChangeAccount = (event) => {
     setAccount(event.target.value);
   };
 
-  const handleSend = () => {
-    if (onSend) {
-      onSend(account);
+  const handleChangeReason = (event) => {
+    setReason(event.target.value);
+  };
+
+  const handleSend = async () => {
+   const requestData = {
+      account,
+      reason,
+      startDate: startDate.utc().toISOString(),
+      endDate: endDate.utc().toISOString(),
+    };
+    console.log("Request Data")
+    console.log(requestData);
+
+    try {
+      const response = await fetch('/request_access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Request failed');
+      }
+
+      const result = await response.json();
+
+      if (onSend) {
+        onSend(result);
+      }
+    } catch (error) {
+      console.error('Failed to send request', error);
     }
   };
 
@@ -35,22 +92,40 @@ const AWSRequestForm = ({ accounts, onSend }) => {
             labelId="demo-simple-select-standard-label"
             id="demo-simple-select-standard"
             value={account}
-            onChange={handleChange}
+            onChange={handleChangeAccount}
             label="AWS Account"
         >
-        <MenuItem value={12345}>12345</MenuItem>
-        <MenuItem value={56789}>56789</MenuItem>
+          {accounts.map((acc) => (
+            <MenuItem key={acc} value={acc}>
+              {acc}
+            </MenuItem>
+          ))}
         </Select>
-        <TextField id="standard-basic" label="Reason for access" variant="standard" sx={{ mt: 2 }} />
+        <TextField 
+          id="standard-basic" 
+          label="Reason for access" 
+          variant="standard" 
+          sx={{ mt: 2 }} 
+          value={reason} 
+          onChange={handleChangeReason} 
+        />
         <br />
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DemoContainer components={['DateTimePicker']}>
-            <DateTimePicker label="Start date and time" />
+            <DateTimePicker 
+              label="Start date and time" 
+              value={startDate} 
+              onChange={(newValue) => setStartDate(newValue)} 
+            />
           </DemoContainer>
         </LocalizationProvider>
         <LocalizationProvider dateAdapter={AdapterDayjs}>
           <DemoContainer components={['DateTimePicker']}>
-            <DateTimePicker label="End date and time" />
+            <DateTimePicker 
+              label="End date and time" 
+              value={endDate} 
+              onChange={(newValue) => setEndDate(newValue)} 
+            />
           </DemoContainer>
         </LocalizationProvider>
         <br />

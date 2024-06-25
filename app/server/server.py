@@ -28,6 +28,8 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
+from datetime import datetime,timezone
+from integrations.aws.ogranizations import get_active_account_names 
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -70,6 +72,13 @@ class AwsSnsPayload(BaseModel):
 
     class Config:
         extra = Extra.forbid
+
+
+class AccessRequest(BaseModel):
+    account: str 
+    reason: str
+    startDate: datetime
+    endDate: datetime
 
 
 # initialize the limiter
@@ -195,6 +204,22 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
+@handler.post("/request_access")
+async def create_access_request(request: AccessRequest):
+    # Log or process the request here
+    if not request.account or not request.reason:
+        raise HTTPException(status_code=400, detail="Account and reason are required")
+
+    if request.startDate.replace(tzinfo=timezone.utc) <= datetime.now().replace(tzinfo=timezone.utc):
+        raise HTTPException(status_code=401, detail="Start date must be in the future")
+    
+    if request.endDate.replace(tzinfo=timezone.utc) < request.startDate:
+        raise HTTPException(status_code=402, detail="End date must be after start date")
+    
+    # Simulate successful processing
+    return {"message": "Access request created successfully", "data": request}
+
+
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
 @handler.get("/geolocate/{ip}")
 def geolocate(ip):
@@ -209,6 +234,11 @@ def geolocate(ip):
             "latitude": latitude,
             "longitude": longitude,
         }
+
+
+@handler.get("/accounts")
+async def get_accounts(request: Request):
+    return get_active_account_names()
 
 
 @handler.post("/hook/{id}")
