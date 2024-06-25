@@ -1,16 +1,16 @@
 from unittest import mock
 from unittest.mock import ANY, call, MagicMock, patch, PropertyMock, Mock, AsyncMock
 from server import bot_middleware, server
+from server.server import login_required
 import urllib.parse
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 from httpx import AsyncClient
 
-
 import os
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import Request
+from fastapi import Request, HTTPException, status
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -623,7 +623,7 @@ async def test_version_rate_limiting():
 async def test_react_app_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Make 10 requests to the react_app endpoint
-        for _ in range(10):
+        for _ in range(20):
             response = await client.get("/some-path")
             assert response.status_code == 200
 
@@ -631,3 +631,94 @@ async def test_react_app_rate_limiting():
         response = await client.get("/some-path")
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
+
+
+def test_get_current_user_authenticated():
+    # Create a mock request object with a session containing a user
+    mock_request = MagicMock(spec=Request)
+    mock_request.session = {"user": {"username": "testuser"}}
+
+    # Call the function with the mock request
+    result = server.get_current_user(mock_request)
+
+    # Assert the result is the user
+    assert result == {"username": "testuser"}
+
+
+def test_get_current_user_not_authenticated():
+    # Create a mock request object with an empty session
+    mock_request = MagicMock(spec=Request)
+    mock_request.session = {}
+
+    # Call the function and assert it raises HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        server.get_current_user(mock_request)
+
+    # Assert the exception details
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
+
+
+def test_get_current_user_no_session():
+    # Create a mock request object with no session attribute
+    mock_request = MagicMock(spec=Request)
+    del mock_request.session
+
+    # Call the function and assert it raises HTTPException
+    with pytest.raises(AttributeError):
+        server.get_current_user(mock_request)
+
+
+def test_get_current_user_missing_user_in_session():
+    # Create a mock request object with a session missing the 'user' key
+    mock_request = MagicMock(spec=Request)
+    mock_request.session = {"some_other_key": "some_value"}
+
+    # Call the function and assert it raises HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        server.get_current_user(mock_request)
+
+    # Assert the exception details
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
+
+
+# Mock route handler to test the decorator
+@login_required
+async def mock_route_handler(request: Request):
+    return {"message": "Success"}
+
+
+@pytest.mark.asyncio
+@patch("server.server.get_current_user")
+async def test_login_required_user_logged_in(mock_get_current_user):
+    # Mock the request object with a session containing a user
+    mock_request = MagicMock(spec=Request)
+    mock_request.session = {"user": {"username": "testuser"}}
+
+    # Patch get_current_user to return the user
+    mock_get_current_user.return_value = {"username": "testuser"}
+
+    # Call the decorated function
+    response = await mock_route_handler(request=mock_request)
+
+    # Assert the result is the success message
+    assert response == {"message": "Success"}
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_session_not_user():
+    # Mock the request object with no session attribute
+    mock_request = MagicMock(spec=Request)
+    mock_request.session = {"some_message": "blah blah blah"}
+
+    # Call the function and assert it raises HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        server.get_current_user(mock_request)
+
+    # Assert the exception details
+    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
