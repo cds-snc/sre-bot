@@ -10,6 +10,7 @@ import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import Alert from '@mui/material/Alert';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -21,6 +22,8 @@ const AWSRequestForm = ({ onSend }) => {
   const [reason, setReason] = useState('');
   const [startDate, setStartDate] = useState(dayjs());
   const [endDate, setEndDate] = useState(dayjs());
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
 
   useEffect(() => {
@@ -64,19 +67,26 @@ const AWSRequestForm = ({ onSend }) => {
         },
         body: JSON.stringify(requestData),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Request failed');
-      }
-
-      const result = await response.json();
-
-      if (onSend) {
-        onSend(result);
+        setErrorMessage(errorData.detail || 'Request failed');
+        setSuccessMessage('');
+      } else {
+        const result = await response.json();
+        setSuccessMessage('Request sent successfully');
+        setErrorMessage('');
+        if (onSend) {
+          onSend(result);
+        }
+        // Reset all fields after successful request
+        setAccount('');
+        setReason('');
+        setStartDate(dayjs());
+        setEndDate(dayjs());
       }
     } catch (error) {
-      console.error('Failed to send request', error);
+      setErrorMessage('Failed to send request');
+      setSuccessMessage('');
     }
   };
 
@@ -86,6 +96,8 @@ const AWSRequestForm = ({ onSend }) => {
         Fill out the fields below to request access to the desired AWS account. 
       </Typography>
       <br />
+      {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
+      {successMessage && <Alert severity="success">{successMessage}</Alert>}
       <FormControl variant="standard" sx={{ m: 1, minWidth: 120 }}>
         <InputLabel id="aws-account-select-label">AWS Account</InputLabel>
         <Select

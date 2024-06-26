@@ -17,7 +17,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from models import webhooks
-from server.utils import log_ops_message
+from server.utils import log_ops_message, get_user_email_from_request
 from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
@@ -28,8 +28,11 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
+from functools import wraps
+from fastapi import Depends,status
 from datetime import datetime,timezone
-from integrations.aws.ogranizations import get_active_account_names 
+from integrations.aws.ogranizations import get_active_account_names
+from modules.aws.aws import request_aws_account_access
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -203,21 +206,86 @@ async def user(request: Request):
     else:
         return JSONResponse({"error": "Not logged in"})
 
+def get_current_user(request: Request):
+    """
+    Retrieves the currently logged-in user from the session.
+    Args:
+        request (Request): The HTTP request object containing session information.
+    Returns:
+        dict: The user information if the user is logged in.
+    Raises:
+        HTTPException: If the user is not authenticated.
+    """
+    # Retrieve the 'user' from the session stored in the request
+    user = request.session.get("user")
+
+    # If there is no 'user' in the session, raise an HTTP 401 Unauthorized exception
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Google login"},
+        )
+    return user
+
+
+def login_required(route):
+    """
+    A decorator to ensure that the user is logged in before accessing the route.
+    Args:
+        route (function): The route function that requires login.
+    Returns:
+        function: The decorated route function with login check.
+    """
+
+    @wraps(route)
+    async def decorated_route(*args, **kwargs):
+        """
+        The decorated route function that includes login check.
+        Args:
+            *args: Variable length argument list for the route function.
+            **kwargs: Arbitrary keyword arguments for the route function.
+        Returns:
+            The result of the original route function if the user is logged in.
+        """
+        # Get the current request from the arguments
+        request = kwargs.get("request")
+        if request:
+            # Check if the user is logged in
+            user = get_current_user(request)  # noqa: F841
+        # Call the original route function and return its result
+        return await route(*args, **kwargs)
+
+    # Return the decorated route function
+    return decorated_route
 
 @handler.post("/request_access")
-async def create_access_request(request: AccessRequest):
+@limiter.limit("5/minute")
+@login_required
+async def create_access_request(request: Request, access_request: AccessRequest, use: dict = Depends(get_current_user)):
+    print("IN HERE")
     # Log or process the request here
-    if not request.account or not request.reason:
+    if not access_request.account or not access_request.reason:
         raise HTTPException(status_code=400, detail="Account and reason are required")
 
-    if request.startDate.replace(tzinfo=timezone.utc) <= datetime.now().replace(tzinfo=timezone.utc):
-        raise HTTPException(status_code=401, detail="Start date must be in the future")
+    if access_request.startDate.replace(tzinfo=timezone.utc) <= datetime.now().replace(tzinfo=timezone.utc):
+        raise HTTPException(status_code=400, detail="Start date must be in the future")
     
-    if request.endDate.replace(tzinfo=timezone.utc) < request.startDate:
-        raise HTTPException(status_code=402, detail="End date must be after start date")
+    if access_request.endDate.replace(tzinfo=timezone.utc) < access_request.startDate:
+        raise HTTPException(status_code=400, detail="End date must be after start date")
+    
+    # get the user email from the request
+    user_email = get_user_email_from_request(request)
     
     # Simulate successful processing
-    return {"message": "Access request created successfully", "data": request}
+    response = request_aws_account_access(access_request.account, access_request.reason, access_request.startDate, access_request.endDate, user_email, "read")
+    
+    if response:
+        return {"message": "Access request created successfully", "data": access_request}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to create access request")
+
+    # we need to store this in the dynamodb table and send a slack notification 
 
 
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
@@ -237,7 +305,9 @@ def geolocate(ip):
 
 
 @handler.get("/accounts")
-async def get_accounts(request: Request):
+@limiter.limit("5/minute")
+@login_required
+async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
     return get_active_account_names()
 
 

@@ -2,6 +2,7 @@ from unittest.mock import patch
 from integrations.aws.ogranizations import (
     list_organization_accounts,
     get_active_account_names,
+    get_account_id_by_name,
     healthcheck,
 )
 
@@ -243,3 +244,48 @@ def test_healthcheck_exception(mock_list_organization_accounts):
 
     # Verify the result
     assert result is False
+
+
+@patch("integrations.aws.ogranizations.list_organization_accounts")
+def test_get_account_id_by_name_found(mock_list_organization_accounts):
+    # Mock the list_organization_accounts function
+    mock_list_organization_accounts.return_value = [
+        {"Id": "123456789012", "Name": "TestAccount1"},
+        {"Id": "234567890123", "Name": "TestAccount2"},
+    ]
+
+    account_id = get_account_id_by_name("TestAccount1")
+    assert account_id == "123456789012"
+
+
+@patch("integrations.aws.ogranizations.list_organization_accounts")
+def test_get_account_id_by_name_not_found(mock_list_organization_accounts):
+    # Mock the list_organization_accounts function
+    mock_list_organization_accounts.return_value = [
+        {"Id": "123456789012", "Name": "TestAccount1"},
+        {"Id": "234567890123", "Name": "TestAccount2"},
+    ]
+
+    account_id = get_account_id_by_name("NonExistentAccount")
+    assert account_id is None
+
+
+@patch("integrations.aws.ogranizations.list_organization_accounts")
+def test_get_account_id_by_name_empty_list(mock_list_organization_accounts):
+    # Mock the list_organization_accounts function
+    mock_list_organization_accounts.return_value = []
+
+    account_id = get_account_id_by_name("TestAccount1")
+    assert account_id is None
+
+
+@patch("integrations.aws.ogranizations.list_organization_accounts")
+def test_get_account_id_by_name_case_sensitivity(mock_list_organization_accounts):
+    # Mock the list_organization_accounts function
+    mock_list_organization_accounts.return_value = [
+        {"Id": "123456789012", "Name": "TestAccount1"},
+        {"Id": "234567890123", "Name": "testaccount1"},
+    ]
+
+    account_id = get_account_id_by_name("TestAccount1")
+    assert account_id == "123456789012"

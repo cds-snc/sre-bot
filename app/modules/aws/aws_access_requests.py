@@ -49,6 +49,20 @@ def already_has_access(account_id, user_id, access_type):
 def create_aws_access_request(
     account_id, account_name, user_id, email, access_type, rationale
 ):
+    print("Creating request")
+    print("Account ID: ", account_id)
+    print("Account Name: ", account_name)
+    print("User ID: ", user_id)
+    print("Email: ", email)
+    print("Access Type: ", access_type)
+    print("Rationale: ", rationale)
+    print("Date", str(datetime.datetime.now().timestamp()))
+    user_id = "U02KULRUCA2"
+    account_id = "123456789012"
+    account_name = "Test Account"
+    email = "test@test.com"
+    rationale = "Test"
+    access_type = "write"
     response = client.put_item(
         TableName=table,
         Item={
