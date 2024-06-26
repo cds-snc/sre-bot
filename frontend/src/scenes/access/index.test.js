@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
 import AWS_Access from './index';
 import BasicTabs from '../../components/Tabs';
-import AWSRequestForm from '../../components/AccessForm';
+import AWSRequestForm from '../../components/AWSRequestForm';
 import FiberNewIcon from '@mui/icons-material/FiberNew';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import ManageHistoryIcon from '@mui/icons-material/ManageHistory';
@@ -19,7 +19,7 @@ jest.mock('../../components/Tabs', () => (props) => (
     ))}
   </div>
 ));
-jest.mock('../../components/AccessForm', () => () => <div data-testid="AWSRequestForm">AWS Request Form</div>);
+jest.mock('../../components/AWSRequestForm', () => () => <div data-testid="AWSRequestForm">AWS Request Form</div>);
 
 describe('AWS_Access', () => {
   const tabs = [
