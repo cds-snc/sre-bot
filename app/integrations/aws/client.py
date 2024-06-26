@@ -52,11 +52,10 @@ def handle_aws_api_errors(func):
 
 
 @handle_aws_api_errors
-def assume_role_client(service_name, role_arn):
-    """Assume an AWS IAM role and return a service client.
+def assume_role_client(role_arn):
+    """Assume an IAM role to get temporary credentials.
 
     Args:
-        service_name (str): The name of the AWS service.
         role_arn (str): The ARN of the IAM role to assume.
 
     Returns:
@@ -71,7 +70,7 @@ def assume_role_client(service_name, role_arn):
 
 
 def get_aws_service_client(service_name, **config):
-    """Get an AWS service client.
+    """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
 
     Args:
         service_name (str): The name of the AWS service.
