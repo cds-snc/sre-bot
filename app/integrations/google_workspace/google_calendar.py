@@ -111,7 +111,12 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         supportsAttachments=True,
         conferenceDataVersion=1,
     )
-    return result.get("htmlLink")
+    # Handle the instance differently if the result is a dictionary or a tuple
+    if isinstance(result, dict):
+        htmllink = result.get("htmlLink")
+    elif isinstance(result, tuple):
+        htmllink = result[0].get("htmlLink")
+    return htmllink
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
