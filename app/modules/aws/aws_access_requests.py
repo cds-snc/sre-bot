@@ -48,7 +48,14 @@ def already_has_access(account_id, user_id, access_type):
 
 
 def create_aws_access_request(
-    account_id, account_name, user_id, email, start_date_time, end_date_time, access_type, rationale
+    account_id,
+    account_name,
+    user_id,
+    email,
+    start_date_time,
+    end_date_time,
+    access_type,
+    rationale,
 ):
     id = str(uuid.uuid4())
     response = client.put_item(
@@ -62,7 +69,7 @@ def create_aws_access_request(
             "access_type": {"S": access_type},
             "rationale": {"S": rationale},
             "start_date_time": {"S": str(start_date_time.timestamp())},
-            "end_date_time": {"S": str(end_date_time.timestamp())}, 
+            "end_date_time": {"S": str(end_date_time.timestamp())},
             "created_at": {"N": str(datetime.datetime.now().timestamp())},
             "expired": {"BOOL": False},
         },

@@ -1,14 +1,19 @@
 from unittest import mock
 from unittest.mock import ANY, call, MagicMock, patch, PropertyMock, Mock, AsyncMock
 from server import bot_middleware, server
-from server.server import login_required
+from server.server import login_required, AccessRequest
 import urllib.parse
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 from httpx import AsyncClient
+from starlette.types import Scope
+from starlette.datastructures import Headers
+
 
 import os
 import pytest
+import datetime
+
 from fastapi.testclient import TestClient
 from fastapi import Request, HTTPException, status
 
@@ -722,3 +727,213 @@ async def test_get_current_user_session_not_user():
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
     assert exc_info.value.detail == "Not authenticated"
     assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
+
+
+@pytest.fixture
+def valid_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
+
+
+@pytest.fixture
+def expired_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        - datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
+
+
+@pytest.fixture
+def invalid_dates_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+        endDate=datetime.datetime.now(datetime.timezone.utc),
+    )
+
+
+def get_mock_request(session_data=None):
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "headers": Headers({"content-type": "application/json"}).raw,
+        "path": "/request_access",
+        "raw_path": b"/request_access",
+        "session": session_data or {},
+    }
+    return Request(scope)
+
+
+@patch("server.utils.get_user_email_from_request")
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.organizations.get_account_id_by_name")
+@patch("integrations.aws.organizations.list_organization_accounts")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@pytest.mark.asyncio
+async def test_create_access_request_succes(
+    create_aws_access_request_mock,
+    mock_list_organization_accounts,
+    mock_get_account_id_by_name,
+    mock_get_user_id,
+    mock_get_current_user,
+    mock_get_user_email_from_request,
+    valid_access_request,
+):
+    mock_accounts = [
+        {
+            "Id": "345678901234",
+            "Arn": "arn:aws:organizations::345678901234:account/o-exampleorgid/345678901234",
+            "Email": "example3@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2023-02-15T12:00:00.000000+00:00",
+        }
+    ]
+
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_list_organization_accounts.return_value = mock_accounts
+    mock_get_user_id.return_value = "user_id_456"
+    mock_get_account_id_by_name.return_value = "345678901234"
+    mock_get_current_user.return_value = {"username": "test_user"}
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    create_aws_access_request_mock.return_value = True
+
+    # Act
+    response = await server.create_access_request(request, valid_access_request)
+
+    # Assert
+    assert response == {
+        "message": "Access request created successfully",
+        "data": valid_access_request,
+    }
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws.request_aws_account_access", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_create_access_request_missing_fields(
+    mock_request_aws_account_access,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+):
+    # Arrange
+    access_request = AccessRequest(
+        account="",
+        reason="",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(request, access_request)
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Account and reason are required"
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws.request_aws_account_access", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_create_access_request_start_date_in_past(
+    mock_request_aws_account_access,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+    expired_access_request,
+):
+    # Arrange
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    mock_get_current_user.return_value = {"user": "test_user"}
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(request, expired_access_request)
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Start date must be in the future"
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws.request_aws_account_access", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_create_access_request_end_date_before_start_date(
+    mock_request_aws_account_access,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+    invalid_dates_access_request,
+):
+    # Arrange
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    mock_get_current_user.return_value = {"user": "test_user"}
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(request, invalid_dates_access_request)
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "End date must be after start date"
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.organizations.list_organization_accounts")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@pytest.mark.asyncio
+async def test_create_access_request_failure(
+    mock_create_aws_access_request,
+    mock_get_organization_accounts,
+    mock_get_user_id,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+    valid_access_request,
+):
+    # Arrange
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_accounts = [
+        {
+            "Id": "345678901234",
+            "Arn": "arn:aws:organizations::345678901234:account/o-exampleorgid/345678901234",
+            "Email": "example3@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2023-02-15T12:00:00.000000+00:00",
+        }
+    ]
+
+    mock_get_organization_accounts.return_value = mock_accounts
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    mock_get_user_id.return_value = "user_id_456"
+    mock_get_current_user.return_value = {"user": "test_user"}
+    mock_create_aws_access_request.return_value = False
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(request, valid_access_request)
+    assert excinfo.value.status_code == 500
+    assert excinfo.value.detail == "Failed to create access request"

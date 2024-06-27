@@ -1,5 +1,5 @@
 from unittest.mock import patch
-from integrations.aws.ogranizations import (
+from integrations.aws.organizations import (
     list_organization_accounts,
     get_active_account_names,
     get_account_id_by_name,
@@ -10,7 +10,7 @@ from integrations.aws.ogranizations import (
 ORG_ROLE_ARN = "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
 
 
-@patch("integrations.aws.ogranizations.execute_aws_api_call")
+@patch("integrations.aws.organizations.execute_aws_api_call")
 def test_list_organization_accounts_success(mock_execute_aws_api_call):
     # Mock return value
     mock_accounts = [
@@ -35,7 +35,7 @@ def test_list_organization_accounts_success(mock_execute_aws_api_call):
     assert result == mock_accounts
 
 
-@patch("integrations.aws.ogranizations.execute_aws_api_call")
+@patch("integrations.aws.organizations.execute_aws_api_call")
 def test_list_organization_accounts_failure(mock_execute_aws_api_call):
     # Mock the execute_aws_api_call function to raise an exception
     mock_execute_aws_api_call.side_effect = Exception("Some AWS error")
@@ -47,7 +47,7 @@ def test_list_organization_accounts_failure(mock_execute_aws_api_call):
     assert result is False
 
 
-@patch("integrations.aws.ogranizations.execute_aws_api_call")
+@patch("integrations.aws.organizations.execute_aws_api_call")
 def test_list_organization_accounts_empty(mock_execute_aws_api_call):
     # Mock return value with an empty list
     mock_execute_aws_api_call.return_value = []
@@ -59,7 +59,7 @@ def test_list_organization_accounts_empty(mock_execute_aws_api_call):
     assert result == []
 
 
-@patch("integrations.aws.ogranizations.execute_aws_api_call")
+@patch("integrations.aws.organizations.execute_aws_api_call")
 def test_list_organization_accounts_pagination(mock_execute_aws_api_call):
     # Mock return value simulating a paginated response
     mock_accounts_page1 = [
@@ -94,7 +94,7 @@ def test_list_organization_accounts_pagination(mock_execute_aws_api_call):
     assert result == mock_accounts_page1
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_active_account_names_success(mock_list_organization_accounts):
     # Mock return value
     mock_accounts = [
@@ -136,7 +136,7 @@ def test_get_active_account_names_success(mock_list_organization_accounts):
     assert result == ["ExampleAccount1", "ExampleAccount3"]
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_active_account_names_no_active_accounts(mock_list_organization_accounts):
     # Mock return value with no active accounts
     mock_accounts = [
@@ -161,7 +161,7 @@ def test_get_active_account_names_no_active_accounts(mock_list_organization_acco
     assert result == []
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_active_account_names_empty_response(mock_list_organization_accounts):
     # Mock return value with an empty list
     mock_list_organization_accounts.return_value = []
@@ -173,7 +173,7 @@ def test_get_active_account_names_empty_response(mock_list_organization_accounts
     assert result == []
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_active_account_names_none_response(mock_list_organization_accounts):
     # Mock return value as None
     mock_list_organization_accounts.return_value = None
@@ -185,7 +185,7 @@ def test_get_active_account_names_none_response(mock_list_organization_accounts)
     assert result == []
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_healthcheck_success(mock_list_organization_accounts):
     # Mock return value
     mock_accounts = [
@@ -210,7 +210,7 @@ def test_healthcheck_success(mock_list_organization_accounts):
     assert result is True
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_healthcheck_empty_response(mock_list_organization_accounts):
     # Mock return value with an empty list
     mock_list_organization_accounts.return_value = []
@@ -222,7 +222,7 @@ def test_healthcheck_empty_response(mock_list_organization_accounts):
     assert result is False
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_healthcheck_none_response(mock_list_organization_accounts):
     # Mock return value as None
     mock_list_organization_accounts.return_value = None
@@ -234,7 +234,7 @@ def test_healthcheck_none_response(mock_list_organization_accounts):
     assert result is False
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_healthcheck_exception(mock_list_organization_accounts):
     # Mock the list_organization_accounts function to raise an exception
     mock_list_organization_accounts.side_effect = Exception("Some AWS error")
@@ -246,7 +246,7 @@ def test_healthcheck_exception(mock_list_organization_accounts):
     assert result is False
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_account_id_by_name_found(mock_list_organization_accounts):
     # Mock the list_organization_accounts function
     mock_list_organization_accounts.return_value = [
@@ -258,7 +258,7 @@ def test_get_account_id_by_name_found(mock_list_organization_accounts):
     assert account_id == "123456789012"
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_account_id_by_name_not_found(mock_list_organization_accounts):
     # Mock the list_organization_accounts function
     mock_list_organization_accounts.return_value = [
@@ -270,7 +270,7 @@ def test_get_account_id_by_name_not_found(mock_list_organization_accounts):
     assert account_id is None
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_account_id_by_name_empty_list(mock_list_organization_accounts):
     # Mock the list_organization_accounts function
     mock_list_organization_accounts.return_value = []
@@ -279,7 +279,7 @@ def test_get_account_id_by_name_empty_list(mock_list_organization_accounts):
     assert account_id is None
 
 
-@patch("integrations.aws.ogranizations.list_organization_accounts")
+@patch("integrations.aws.organizations.list_organization_accounts")
 def test_get_account_id_by_name_case_sensitivity(mock_list_organization_accounts):
     # Mock the list_organization_accounts function
     mock_list_organization_accounts.return_value = [

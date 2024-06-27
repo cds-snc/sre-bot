@@ -10,9 +10,9 @@ import json
 import os
 
 from server.utils import log_ops_message
-from modules.aws import aws_sso, aws_account_health, aws_access_requests 
+from modules.aws import aws_sso, aws_account_health, aws_access_requests
 from integrations.slack import commands as slack_commands, users as slack_users
-from integrations.aws.ogranizations import get_account_id_by_name
+from integrations.aws.organizations import get_account_id_by_name
 from modules.permissions import handler as permissions
 from modules.aws.identity_center import provision_aws_users
 
@@ -328,8 +328,18 @@ def request_user_provisioning(client, body, respond, args, logger):
     logger.info("Completed user provisioning request")
 
 
-def request_aws_account_access(account_name, rationale, start_date, end_date, user_email, access_type):
+def request_aws_account_access(
+    account_name, rationale, start_date, end_date, user_email, access_type
+):
     account_id = get_account_id_by_name(account_name)
     user_id = aws_sso.get_user_id(user_email)
-    return aws_access_requests.create_aws_access_request(account_id, account_name, user_id, user_email, start_date, end_date, access_type, rationale)
-
+    return aws_access_requests.create_aws_access_request(
+        account_id,
+        account_name,
+        user_id,
+        user_email,
+        start_date,
+        end_date,
+        access_type,
+        rationale,
+    )

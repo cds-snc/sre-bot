@@ -29,9 +29,9 @@ from sns_message_validator import (
     SignatureVerificationFailureException,
 )
 from functools import wraps
-from fastapi import Depends,status
-from datetime import datetime,timezone, timedelta
-from integrations.aws.ogranizations import get_active_account_names
+from fastapi import Depends, status
+from datetime import datetime, timezone, timedelta
+from integrations.aws.organizations import get_active_account_names
 from modules.aws.aws import request_aws_account_access
 
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +78,7 @@ class AwsSnsPayload(BaseModel):
 
 
 class AccessRequest(BaseModel):
-    account: str 
+    account: str
     reason: str
     startDate: datetime
     endDate: datetime
@@ -206,6 +206,7 @@ async def user(request: Request):
     else:
         return JSONResponse({"error": "Not logged in"})
 
+
 def get_current_user(request: Request):
     """
     Retrieves the currently logged-in user from the session.
@@ -259,28 +260,45 @@ def login_required(route):
     # Return the decorated route function
     return decorated_route
 
+
 @handler.post("/request_access")
 @limiter.limit("5/minute")
 @login_required
-async def create_access_request(request: Request, access_request: AccessRequest, use: dict = Depends(get_current_user)):
+async def create_access_request(
+    request: Request,
+    access_request: AccessRequest,
+    use: dict = Depends(get_current_user),
+):
     # Log or process the request here
     if not access_request.account or not access_request.reason:
         raise HTTPException(status_code=400, detail="Account and reason are required")
 
-    if (access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)) < datetime.now().replace(tzinfo=timezone.utc):
+    if (
+        access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)
+    ) < datetime.now().replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="Start date must be in the future")
-    
+
     if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
         raise HTTPException(status_code=400, detail="End date must be after start date")
-    
+
     # get the user email from the request
     user_email = get_user_email_from_request(request)
-    
-    # Store the request in the database 
-    response = request_aws_account_access(access_request.account, access_request.reason, access_request.startDate, access_request.endDate, user_email, "read")
-    
+
+    # Store the request in the database
+    response = request_aws_account_access(
+        access_request.account,
+        access_request.reason,
+        access_request.startDate,
+        access_request.endDate,
+        user_email,
+        "read",
+    )
+
     if response:
-        return {"message": "Access request created successfully", "data": access_request}
+        return {
+            "message": "Access request created successfully",
+            "data": access_request,
+        }
     else:
         raise HTTPException(status_code=500, detail="Failed to create access request")
 

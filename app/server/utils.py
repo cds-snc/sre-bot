@@ -13,9 +13,11 @@ def log_ops_message(client, message):
 
 def get_user_email_from_request(request: Request):
     if not request or not request.session:
-        raise HTTPException(status_code=400, detail="Invalid request or missing session data")
-    
+        raise HTTPException(
+            status_code=400, detail="Invalid request or missing session data"
+        )
+
     user_email = request.session.get("user").get("email")
     if user_email:
-       return user_email
+        return user_email
     return None

@@ -5,7 +5,6 @@ import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
 import { Select, TextField, Button, Typography, Box } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-//import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -100,10 +99,10 @@ const AWSRequestForm = ({ onSend }) => {
       </Typography>
       <br />
       <FormControl variant="standard" sx={{ m: 1, minWidth: 120 }}>
-        <InputLabel id="aws-account-select-label">AWS Account</InputLabel>
+        <InputLabel id="aws-account-select-label" htmlFor="aws-account-select">AWS Account</InputLabel>
         <Select
-            labelId="demo-simple-select-standard-label"
-            id="demo-simple-select-standard"
+            labelId="aws-account-select-label"
+            id="aws-account-select"
             value={account}
             onChange={handleChangeAccount}
             label="AWS Account"
@@ -123,26 +122,24 @@ const AWSRequestForm = ({ onSend }) => {
           onChange={handleChangeReason} 
         />
         <br />
+        <br />
         <LocalizationProvider dateAdapter={AdapterDayjs}>
-          {/* <DemoContainer components={['DateTimePicker']}> */}
-          <Box components={['DateTimePicker']}>
+          <Box mb={2}> 
             <DateTimePicker 
               label="Start date and time" 
               value={startDate} 
               onChange={(newValue) => setStartDate(newValue)} 
             />
-          {/* </DemoContainer> */}
+          <br />
           </Box>
         </LocalizationProvider>
         <LocalizationProvider dateAdapter={AdapterDayjs}>
-          {/* <DemoContainer components={['DateTimePicker']}> */}
-          <Box components={['DateTimePicker']}>
+          <Box>
             <DateTimePicker 
               label="End date and time" 
               value={endDate} 
               onChange={(newValue) => setEndDate(newValue)} 
             />
-          {/* </DemoContainer> */}
           </Box>
         </LocalizationProvider>
         <br />

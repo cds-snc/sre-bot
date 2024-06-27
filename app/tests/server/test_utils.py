@@ -1,9 +1,9 @@
 import pytest
 from server import utils
 from integrations.slack import users as slack_users
-from server.utils import get_user_email_from_request 
+from server.utils import get_user_email_from_request
 from unittest.mock import MagicMock
-from fastapi import Request, HTTPException
+from fastapi import HTTPException
 
 
 def test_log_ops_message():
@@ -50,6 +50,7 @@ def test_get_user_id_from_request_found():
     user_email = get_user_email_from_request(mock_request)
     assert user_email == "test@example.com"
 
+
 def test_get_user_id_from_request_not_found():
     # Mock the session data with no email
     mock_request = MagicMock()
@@ -57,6 +58,7 @@ def test_get_user_id_from_request_not_found():
 
     user_email = get_user_email_from_request(mock_request)
     assert user_email is None
+
 
 def test_get_user_id_from_request_no_user():
     # Mock the session data with no user key
@@ -67,6 +69,7 @@ def test_get_user_id_from_request_no_user():
         get_user_email_from_request(mock_request)
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Invalid request or missing session data"
+
 
 def test_get_user_email_from_request_no_session():
     # Mock the request with no session data
