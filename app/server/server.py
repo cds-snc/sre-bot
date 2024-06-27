@@ -78,6 +78,16 @@ class AwsSnsPayload(BaseModel):
 
 
 class AccessRequest(BaseModel):
+    """
+    AccessRequest represents a request for access to an AWS account.
+
+    This class defines the schema for an access request, which includes the following fields:
+    - account: The name of the AWS account to which access is requested.
+    - reason: The reason for requesting access to the AWS account.
+    - startDate: The start date and time for the requested access period.
+    - endDate: The end date and time for the requested access period.
+    """
+
     account: str
     reason: str
     startDate: datetime
@@ -269,15 +279,33 @@ async def create_access_request(
     access_request: AccessRequest,
     use: dict = Depends(get_current_user),
 ):
-    # Log or process the request here
+    """
+    Endpoint to create an AWS access request.
+
+    This asynchronous function handles POST requests to the "/request_access" endpoint. It performs several validation checks on the provided access request data and then attempts to create an access request in the system. The function is protected by a rate limiter and requires user authentication.
+
+    Args:
+        request (Request): The FastAPI request object.
+        access_request (AccessRequest): The data model representing the access request.
+        use (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
+    Raises:
+        HTTPException: If any validation checks fail or if the request creation fails.
+
+    Returns:
+        dict: A dictionary containing a success message and the access request data if the request is successfully created.
+    """
+    # Check if the account and reason fields are provided
     if not access_request.account or not access_request.reason:
         raise HTTPException(status_code=400, detail="Account and reason are required")
 
+    # Check if the start date is at least 5 minutes in the future
     if (
         access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)
     ) < datetime.now().replace(tzinfo=timezone.utc):
         raise HTTPException(status_code=400, detail="Start date must be in the future")
 
+    # Check if the end date is after the start date
     if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
         raise HTTPException(status_code=400, detail="End date must be after start date")
 
@@ -293,13 +321,14 @@ async def create_access_request(
         user_email,
         "read",
     )
-
+    # Return a success message and the access request data if the request is created successfully
     if response:
         return {
             "message": "Access request created successfully",
             "data": access_request,
         }
     else:
+        # Raise an HTTP 500 error if the request creation fails
         raise HTTPException(status_code=500, detail="Failed to create access request")
 
 
@@ -323,6 +352,19 @@ def geolocate(ip):
 @limiter.limit("5/minute")
 @login_required
 async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
+    """
+    Endpoint to retrieve active AWS account names.
+
+    This asynchronous function handles GET requests to the "/accounts" endpoint.
+    It retrieves a list of active AWS account names. The function is protected by a rate limiter and requires user authentication.
+
+    Args:
+        request (Request): The FastAPI request object.
+        user (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
+    Returns:
+        list: A list of active AWS account names.
+    """
     return get_active_account_names()
 
 
