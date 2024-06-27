@@ -90,7 +90,12 @@ const AWSRequestForm = ({ onSend }) => {
   // display the fields. If the post request is successful, hide the form and display a success message
   return (
     <div>
-      {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
+      {errorMessage && (
+        <>
+          <Alert severity="error">{errorMessage}</Alert> 
+          <br />
+        </>
+        )}
       {successMessage && <Alert severity="success">{successMessage}</Alert>} 
       {!successMessage && (
         <>

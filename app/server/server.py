@@ -272,7 +272,7 @@ def login_required(route):
 
 
 @handler.post("/request_access")
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 @login_required
 async def create_access_request(
     request: Request,
@@ -308,6 +308,15 @@ async def create_access_request(
     # Check if the end date is after the start date
     if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
         raise HTTPException(status_code=400, detail="End date must be after start date")
+
+    # If the request is for more than 24 hours in the future, this is not allowed
+    if access_request.endDate.replace(tzinfo=timezone.utc) > datetime.now().replace(
+        tzinfo=timezone.utc
+    ) + timedelta(days=1):
+        raise HTTPException(
+            status_code=400,
+            detail="The access request cannot be for more than 24 hours",
+        )
 
     # get the user email from the request
     user_email = get_user_email_from_request(request)

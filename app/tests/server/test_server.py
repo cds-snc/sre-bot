@@ -627,12 +627,12 @@ async def test_version_rate_limiting():
 @pytest.mark.asyncio
 async def test_react_app_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
-        # Make 10 requests to the react_app endpoint
+        # Make 20 requests to the react_app endpoint
         for _ in range(20):
             response = await client.get("/some-path")
             assert response.status_code == 200
 
-        # The 11th request should be rate limited
+        # The 21th request should be rate limited
         response = await client.get("/some-path")
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
@@ -761,6 +761,17 @@ def invalid_dates_access_request():
         startDate=datetime.datetime.now(datetime.timezone.utc)
         + datetime.timedelta(days=1),
         endDate=datetime.datetime.now(datetime.timezone.utc),
+    )
+
+
+@pytest.fixture
+def more_than_24hours_dates_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=5),
     )
 
 
@@ -895,6 +906,50 @@ async def test_create_access_request_end_date_before_start_date(
         await server.create_access_request(request, invalid_dates_access_request)
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "End date must be after start date"
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.organizations.list_organization_accounts")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@pytest.mark.asyncio
+async def test_create_access_request_more_than_24_hours(
+    mock_create_aws_access_request,
+    mock_get_organization_accounts,
+    mock_get_user_id,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+    more_than_24hours_dates_access_request,
+):
+    # Arrange
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_accounts = [
+        {
+            "Id": "345678901234",
+            "Arn": "arn:aws:organizations::345678901234:account/o-exampleorgid/345678901234",
+            "Email": "example3@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2023-02-15T12:00:00.000000+00:00",
+        }
+    ]
+
+    mock_get_organization_accounts.return_value = mock_accounts
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    mock_get_user_id.return_value = "user_id_456"
+    mock_get_current_user.return_value = {"user": "test_user"}
+    mock_create_aws_access_request.return_value = False
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(
+            request, more_than_24hours_dates_access_request
+        )
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "The access request cannot be for more than 24 hours"
 
 
 @patch("server.server.get_current_user", new_callable=AsyncMock)
