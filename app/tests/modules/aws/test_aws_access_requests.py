@@ -118,8 +118,6 @@ def test_create_aws_access_request_creates_record_and_returns_true_if_response_i
             "test_account_name",
             "test_user_id",
             "test_email",
-            datetime.datetime.now(),
-            datetime.datetime.now() + datetime.timedelta(hours=1),
             "test_access_type",
             "test_rationale",
         )
@@ -138,8 +136,6 @@ def test_create_aws_access_request_creates_record_and_returns_false_if_response_
             "test_account_name",
             "test_user_id",
             "test_email",
-            datetime.datetime.now(),
-            datetime.datetime.now() + datetime.timedelta(hours=1),
             "test_access_type",
             "test_rationale",
         )

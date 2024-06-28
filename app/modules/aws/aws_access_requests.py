@@ -1,7 +1,6 @@
 import boto3
 import datetime
 import os
-import uuid
 
 client = boto3.client(
     "dynamodb",
@@ -48,28 +47,17 @@ def already_has_access(account_id, user_id, access_type):
 
 
 def create_aws_access_request(
-    account_id,
-    account_name,
-    user_id,
-    email,
-    start_date_time,
-    end_date_time,
-    access_type,
-    rationale,
+    account_id, account_name, user_id, email, access_type, rationale
 ):
-    id = str(uuid.uuid4())
     response = client.put_item(
         TableName=table,
         Item={
-            "id": {"S": id},
             "account_id": {"S": account_id},
             "account_name": {"S": account_name},
             "user_id": {"S": user_id},
             "email": {"S": email},
             "access_type": {"S": access_type},
             "rationale": {"S": rationale},
-            "start_date_time": {"S": str(start_date_time.timestamp())},
-            "end_date_time": {"S": str(end_date_time.timestamp())},
             "created_at": {"N": str(datetime.datetime.now().timestamp())},
             "expired": {"BOOL": False},
         },
