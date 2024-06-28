@@ -5,7 +5,8 @@
       "capabilities": {
         "drop": [
           "ALL"
-        ]
+        ],
+        "add": [] 
       }
     },
     "logConfiguration": {
@@ -19,7 +20,9 @@
     "name": "sre-bot",
     "portMappings": [
       {
-        "containerPort": 8000
+        "containerPort": 8000,
+        "hostPort": 8000,
+        "protocol": "tcp"
       }
     ],
     "secrets": [
@@ -38,6 +41,12 @@
         "name": "nofile",
         "softLimit": 1000000
       }
-    ]
+    ],
+    "cpu": 0,
+    "environment": [],
+    "essential": true,
+    "mountPoints": [],
+    "systemControls": [],
+    "volumesFrom": [] 
   }
 ]
