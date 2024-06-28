@@ -1,4 +1,5 @@
 import logging
+from dotenv import load_dotenv
 import os
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,6 +8,8 @@ from fastapi import HTTPException, status, Request
 
 
 logging.basicConfig(level=logging.INFO)
+
+load_dotenv()
 
 SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
 if SECRET_KEY is None:
