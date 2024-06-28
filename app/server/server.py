@@ -17,7 +17,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from models import webhooks
-from server.utils import log_ops_message, create_access_token
+from server.utils import (
+    log_ops_message,
+    create_access_token,
+    get_current_user,
+    get_user_email_from_request,
+)
 from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
@@ -28,6 +33,10 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
+from fastapi import Depends
+from datetime import datetime, timezone, timedelta
+from integrations.aws.organizations import get_active_account_names
+from modules.aws.aws import request_aws_account_access
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -70,6 +79,23 @@ class AwsSnsPayload(BaseModel):
 
     class Config:
         extra = Extra.forbid
+
+
+class AccessRequest(BaseModel):
+    """
+    AccessRequest represents a request for access to an AWS account.
+
+    This class defines the schema for an access request, which includes the following fields:
+    - account: The name of the AWS account to which access is requested.
+    - reason: The reason for requesting access to the AWS account.
+    - startDate: The start date and time for the requested access period.
+    - endDate: The end date and time for the requested access period.
+    """
+
+    account: str
+    reason: str
+    startDate: datetime
+    endDate: datetime
 
 
 # initialize the limiter
@@ -198,6 +224,75 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
+@handler.post("/request_access")
+@limiter.limit("10/minute")
+async def create_access_request(
+    request: Request,
+    access_request: AccessRequest,
+    use: dict = Depends(get_current_user),
+):
+    """
+    Endpoint to create an AWS access request.
+
+    This asynchronous function handles POST requests to the "/request_access" endpoint. It performs several validation checks on the provided access request data and then attempts to create an access request in the system. The function is protected by a rate limiter and requires user authentication.
+
+    Args:
+        request (Request): The FastAPI request object.
+        access_request (AccessRequest): The data model representing the access request.
+        use (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
+    Raises:
+        HTTPException: If any validation checks fail or if the request creation fails.
+
+    Returns:
+        dict: A dictionary containing a success message and the access request data if the request is successfully created.
+    """
+    # Check if the account and reason fields are provided
+    if not access_request.account or not access_request.reason:
+        raise HTTPException(status_code=400, detail="Account and reason are required")
+
+    # Check if the start date is at least 5 minutes in the future
+    if (
+        access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)
+    ) < datetime.now().replace(tzinfo=timezone.utc):
+        raise HTTPException(status_code=400, detail="Start date must be in the future")
+
+    # Check if the end date is after the start date
+    if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
+        raise HTTPException(status_code=400, detail="End date must be after start date")
+
+    # If the request is for more than 24 hours in the future, this is not allowed
+    if access_request.endDate.replace(tzinfo=timezone.utc) > datetime.now().replace(
+        tzinfo=timezone.utc
+    ) + timedelta(days=1):
+        raise HTTPException(
+            status_code=400,
+            detail="The access request cannot be for more than 24 hours",
+        )
+
+    # get the user email from the request
+    user_email = get_user_email_from_request(request)
+
+    # Store the request in the database
+    response = request_aws_account_access(
+        access_request.account,
+        access_request.reason,
+        access_request.startDate,
+        access_request.endDate,
+        user_email,
+        "read",
+    )
+    # Return a success message and the access request data if the request is created successfully
+    if response:
+        return {
+            "message": "Access request created successfully",
+            "data": access_request,
+        }
+    else:
+        # Raise an HTTP 500 error if the request creation fails
+        raise HTTPException(status_code=500, detail="Failed to create access request")
+
+
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
 @handler.get("/geolocate/{ip}")
 def geolocate(ip):
@@ -212,6 +307,25 @@ def geolocate(ip):
             "latitude": latitude,
             "longitude": longitude,
         }
+
+
+@handler.get("/accounts")
+@limiter.limit("5/minute")
+async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
+    """
+    Endpoint to retrieve active AWS account names.
+
+    This asynchronous function handles GET requests to the "/accounts" endpoint.
+    It retrieves a list of active AWS account names. The function is protected by a rate limiter and requires user authentication.
+
+    Args:
+        request (Request): The FastAPI request object.
+        user (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
+    Returns:
+        list: A list of active AWS account names.
+    """
+    return get_active_account_names()
 
 
 @handler.post("/hook/{id}")
