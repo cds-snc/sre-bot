@@ -36,24 +36,6 @@ def get_active_account_names():
     )
 
 
-def get_account_id_by_name(account_name):
-    """Retrieves the account ID for a given account name.
-
-    Args:
-        account_name (str): The name of the account.
-
-    Returns:
-        str: The account ID.
-    """
-    response = list_organization_accounts()
-
-    # Return the account ID for the account with the given name
-    return next(
-        (account["Id"] for account in response if account.get("Name") == account_name),
-        None,
-    )
-
-
 def healthcheck():
     """Check the health of the AWS integration.
 

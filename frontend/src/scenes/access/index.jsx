@@ -1,6 +1,6 @@
 import Header from "../../components/Header";
 import BasicTabs from "../../components/Tabs";
-import AWSRequestForm from "../../components/AWSRequestForm";
+import AWSRequestForm from "../../components/AccessForm";
 import { Box } from "@mui/material";
 import * as React from 'react';
 import FiberNewIcon from '@mui/icons-material/FiberNew';
