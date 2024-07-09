@@ -176,11 +176,9 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @limiter.limit("5/minute")
 async def logout(request: Request):
     request.session.pop("user", None)
-    # request.session.pop("access_token", None)
     response = RedirectResponse(url="/")
     response.delete_cookie("access_token")
     return response
-    # return RedirectResponse(url="/")
 
 
 # Login route. You will be redirected to the google login page
