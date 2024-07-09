@@ -176,8 +176,11 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @limiter.limit("5/minute")
 async def logout(request: Request):
     request.session.pop("user", None)
-    request.session.pop("access_token", None)
-    return RedirectResponse(url="/")
+    # request.session.pop("access_token", None)
+    response = RedirectResponse(url="/")
+    response.delete_cookie("access_token")
+    return response
+    # return RedirectResponse(url="/")
 
 
 # Login route. You will be redirected to the google login page
@@ -209,8 +212,11 @@ async def auth(request: Request):
     if user_data:
         request.session["user"] = dict(user_data)
         jwt_token = create_access_token(data={"sub": user_data["email"]})
-        request.session["access_token"] = jwt_token
-    return RedirectResponse(url="/")
+        response = RedirectResponse(url="/")
+        response.set_cookie(
+            "access_token", jwt_token, httponly=True, secure=True, samesite="Strict"
+        )
+    return response
 
 
 # User route. Returns the user's first name that is currently logged into the application

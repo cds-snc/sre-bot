@@ -125,7 +125,7 @@ async def test_get_current_user_no_token_or_session_user(mock_request):
     with pytest.raises(HTTPException) as exc_info:
         await utils.get_current_user(mock_request)
     assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Not authenticated"
+    assert exc_info.value.detail == "Invalid token"
 
 
 @pytest.mark.asyncio
