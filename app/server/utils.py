@@ -48,37 +48,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 async def get_current_user(request: Request):
     """
-    Retrieves the current authenticated user from the request.
+    Extracts and verifies the JWT token from the request cookies to authenticate the user.
 
-    This asynchronous function attempts to retrieve the user information
-    from either the session token or the session user stored in the request.
-    It performs the following steps:
-    1. Checks for the presence of an access token and session user in the request.
-    2. If neither is present, raises an HTTP 401 Unauthorized exception.
-    3. Attempts to decode the access token to extract the user information.
-    4. If the token is invalid or the user information is not present in the token,
-       it raises an HTTP 401 Unauthorized exception.
-    5. Returns the user information if successfully extracted from the token.
-
-    Args:
-        request (Request): The FastAPI request object containing session data.
-
-    Raises:
-        HTTPException: If neither the access token nor the session user is present in the request.
-        HTTPException: If the access token is invalid or the user information is not found.
+    Parameters:
+    request (Request): The HTTP request object containing the cookies.
 
     Returns:
-        str: The user information extracted from the token or session.
+    str: The user identifier extracted from the JWT token payload.
+
+    Raises:
+    HTTPException: If the JWT token is not found, is invalid, or does not contain a valid user identifier.
     """
-    # we are going to get the access token and the session user from the request to double check
-    token = request.session.get("access_token")
-    session_user = request.session.get("user")
-    if not token and not session_user:
+    jwt_token = request.cookies.get("access_token")
+    if not jwt_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
         user = payload.get("sub")
         if user is None:
             raise HTTPException(
