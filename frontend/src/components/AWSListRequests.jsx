@@ -42,8 +42,8 @@ const columns = [
       account: item.account_name.S,
       access_type: item.access_type.S,
       reason_for_access: item.rationale.S,
-      start_date: new Date(parseFloat(item.start_date_time.N) * 1000).toLocaleString(),
-      end_date: new Date(parseFloat(item.end_date_time.N) * 1000).toLocaleString(),
+      start_date: new Date(parseFloat(item.start_date_time.S) * 1000).toLocaleString(),
+      end_date: new Date(parseFloat(item.end_date_time.S) * 1000).toLocaleString(),
       status: item.expired.BOOL ? 'Expired' : 'Active'
     }));
   };

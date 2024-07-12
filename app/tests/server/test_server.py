@@ -8,14 +8,11 @@ from starlette.responses import JSONResponse
 from httpx import AsyncClient
 from starlette.types import Scope
 from starlette.datastructures import Headers
-
-
 import os
 import pytest
 import datetime
-
 from fastapi.testclient import TestClient
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -557,7 +554,9 @@ async def test_auth_rate_limiting():
         with patch(
             "server.server.oauth.google.authorize_access_token", new_callable=AsyncMock
         ) as mock_auth:
-            mock_auth.return_value = {"userinfo": {"name": "Test User"}}
+            mock_auth.return_value = {
+                "userinfo": {"name": "Test User", "email": "test@test.com"}
+            }
 
             # Make 5 requests to the auth endpoint
             for _ in range(5):
@@ -574,14 +573,14 @@ async def test_auth_rate_limiting():
 async def test_user_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
         # Simulate a logged in session
-        session_data = {"user": {"given_name": "FirstName"}}
+        session_data = {"user": {"given_name": "FirstName", "email": "test@test.com"}}
         headers = {"Cookie": f"session={session_data}"}
-        # Make 5 requests to the user endpoint
-        for _ in range(5):
+        # Make 10 requests to the user endpoint
+        for _ in range(10):
             response = await client.get("/user", headers=headers)
             assert response.status_code == 200
 
-        # The 6th request should be rate limited
+        # The 11th request should be rate limited
         response = await client.get("/user", headers=headers)
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
@@ -627,101 +626,148 @@ async def test_version_rate_limiting():
 @pytest.mark.asyncio
 async def test_react_app_rate_limiting():
     async with AsyncClient(app=app, base_url="http://test") as client:
-        # Make 10 requests to the react_app endpoint
+        # Make 20 requests to the react_app endpoint
         for _ in range(20):
             response = await client.get("/some-path")
             assert response.status_code == 200
 
-        # The 11th request should be rate limited
+        # The 21th request should be rate limited
         response = await client.get("/some-path")
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
 
 
-def test_get_current_user_authenticated():
-    # Create a mock request object with a session containing a user
-    mock_request = MagicMock(spec=Request)
-    mock_request.session = {"user": {"username": "testuser"}}
-
-    # Call the function with the mock request
-    result = server.get_current_user(mock_request)
-
-    # Assert the result is the user
-    assert result == {"username": "testuser"}
-
-
-def test_get_current_user_not_authenticated():
-    # Create a mock request object with an empty session
-    mock_request = MagicMock(spec=Request)
-    mock_request.session = {}
-
-    # Call the function and assert it raises HTTPException
-    with pytest.raises(HTTPException) as exc_info:
-        server.get_current_user(mock_request)
-
-    # Assert the exception details
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    assert exc_info.value.detail == "Not authenticated"
-    assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
+@pytest.fixture
+def valid_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
 
 
-def test_get_current_user_no_session():
-    # Create a mock request object with no session attribute
-    mock_request = MagicMock(spec=Request)
-    del mock_request.session
-
-    # Call the function and assert it raises HTTPException
-    with pytest.raises(AttributeError):
-        server.get_current_user(mock_request)
-
-
-def test_get_current_user_missing_user_in_session():
-    # Create a mock request object with a session missing the 'user' key
-    mock_request = MagicMock(spec=Request)
-    mock_request.session = {"some_other_key": "some_value"}
-
-    # Call the function and assert it raises HTTPException
-    with pytest.raises(HTTPException) as exc_info:
-        server.get_current_user(mock_request)
-
-    # Assert the exception details
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    assert exc_info.value.detail == "Not authenticated"
-    assert exc_info.value.headers["WWW-Authenticate"] == "Google login"
+@pytest.fixture
+def expired_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        - datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
 
 
-# Mock route handler to test the decorator
-@login_required
-async def mock_route_handler(request: Request):
-    return {"message": "Success"}
+@pytest.fixture
+def invalid_dates_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+        endDate=datetime.datetime.now(datetime.timezone.utc),
+    )
 
 
+@pytest.fixture
+def more_than_24hours_dates_access_request():
+    return AccessRequest(
+        account="ExampleAccount",
+        reason="test_reason",
+        startDate=datetime.datetime.now(datetime.timezone.utc),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=5),
+    )
+
+
+def get_mock_request(session_data=None):
+    scope: Scope = {
+        "type": "http",
+        "method": "POST",
+        "headers": Headers({"content-type": "application/json"}).raw,
+        "path": "/request_access",
+        "raw_path": b"/request_access",
+        "session": session_data or {},
+    }
+    return Request(scope)
+
+
+@patch("server.utils.get_user_email_from_request")
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.organizations.get_account_id_by_name")
+@patch("integrations.aws.organizations.list_organization_accounts")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
 @pytest.mark.asyncio
-@patch("server.server.get_current_user")
-async def test_login_required_user_logged_in(mock_get_current_user):
-    # Mock the request object with a session containing a user
-    mock_request = MagicMock(spec=Request)
-    mock_request.session = {"user": {"username": "testuser"}}
+async def test_create_access_request_succes(
+    create_aws_access_request_mock,
+    mock_list_organization_accounts,
+    mock_get_account_id_by_name,
+    mock_get_user_id,
+    mock_get_current_user,
+    mock_get_user_email_from_request,
+    valid_access_request,
+):
+    mock_accounts = [
+        {
+            "Id": "345678901234",
+            "Arn": "arn:aws:organizations::345678901234:account/o-exampleorgid/345678901234",
+            "Email": "example3@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2023-02-15T12:00:00.000000+00:00",
+        }
+    ]
 
-    # Patch get_current_user to return the user
-    mock_get_current_user.return_value = {"username": "testuser"}
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_list_organization_accounts.return_value = mock_accounts
+    mock_get_user_id.return_value = "user_id_456"
+    mock_get_account_id_by_name.return_value = "345678901234"
+    mock_get_current_user.return_value = {"username": "test_user"}
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    create_aws_access_request_mock.return_value = True
 
-    # Call the decorated function
-    response = await mock_route_handler(request=mock_request)
+    # Act
+    response = await server.create_access_request(request, valid_access_request)
 
-    # Assert the result is the success message
-    assert response == {"message": "Success"}
+    # Assert
+    assert response == {
+        "message": "Access request created successfully",
+        "data": valid_access_request,
+    }
 
 
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws.request_aws_account_access", new_callable=AsyncMock)
 @pytest.mark.asyncio
-async def test_get_current_user_session_not_user():
-    # Mock the request object with no session attribute
-    mock_request = MagicMock(spec=Request)
-    mock_request.session = {"some_message": "blah blah blah"}
+async def test_create_access_request_missing_fields(
+    mock_request_aws_account_access,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+):
+    # Arrange
+    access_request = AccessRequest(
+        account="",
+        reason="",
+        startDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(minutes=10),
+        endDate=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(days=1),
+    )
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
 
-    # Call the function and assert it raises HTTPException
-    with pytest.raises(HTTPException) as exc_info:
-        server.get_current_user(mock_request)
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(request, access_request)
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Account and reason are required"
 
     # Assert the exception details
     assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
@@ -895,6 +941,50 @@ async def test_create_access_request_end_date_before_start_date(
         await server.create_access_request(request, invalid_dates_access_request)
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "End date must be after start date"
+
+
+@patch("server.server.get_current_user", new_callable=AsyncMock)
+@patch("server.utils.get_user_email_from_request")
+@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.organizations.list_organization_accounts")
+@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
+@pytest.mark.asyncio
+async def test_create_access_request_more_than_24_hours(
+    mock_create_aws_access_request,
+    mock_get_organization_accounts,
+    mock_get_user_id,
+    mock_get_user_email_from_request,
+    mock_get_current_user,
+    more_than_24hours_dates_access_request,
+):
+    # Arrange
+    session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
+    request = get_mock_request(session_data)
+    mock_accounts = [
+        {
+            "Id": "345678901234",
+            "Arn": "arn:aws:organizations::345678901234:account/o-exampleorgid/345678901234",
+            "Email": "example3@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2023-02-15T12:00:00.000000+00:00",
+        }
+    ]
+
+    mock_get_organization_accounts.return_value = mock_accounts
+    mock_get_user_email_from_request.return_value = "user@example.com"
+    mock_get_user_id.return_value = "user_id_456"
+    mock_get_current_user.return_value = {"user": "test_user"}
+    mock_create_aws_access_request.return_value = False
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as excinfo:
+        await server.create_access_request(
+            request, more_than_24hours_dates_access_request
+        )
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "The access request cannot be for more than 24 hours"
 
 
 @patch("server.server.get_current_user", new_callable=AsyncMock)

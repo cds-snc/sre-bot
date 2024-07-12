@@ -68,8 +68,8 @@ def create_aws_access_request(
             "email": {"S": email},
             "access_type": {"S": access_type},
             "rationale": {"S": rationale},
-            "start_date_time": {"N": str(start_date_time.timestamp())},
-            "end_date_time": {"N": str(end_date_time.timestamp())},
+            "start_date_time": {"S": str(start_date_time.timestamp())},
+            "end_date_time": {"S": str(end_date_time.timestamp())},
             "created_at": {"N": str(datetime.datetime.now().timestamp())},
             "expired": {"BOOL": False},
         },
@@ -113,13 +113,13 @@ def get_expired_requests():
 def get_active_requests():
     # Get the current timestamp
     current_timestamp = datetime.datetime.now().timestamp()
-    
+
     # Query to get records where current date time is less than end_date_time
     response = client.scan(
         TableName=table,
         FilterExpression="end_date_time > :current_time",
         ExpressionAttributeValues={
-            ":current_time": {"N": str(current_timestamp)}
+            ":current_time": {"S": str(current_timestamp)}
         }
     )
     return response.get("Items", [])
@@ -128,13 +128,13 @@ def get_active_requests():
 def get_past_requests():
     # Get the current timestamp
     current_timestamp = datetime.datetime.now().timestamp()
-    
+
     # Query to get records where current date time is greater than end_date_time
     response = client.scan(
         TableName=table,
         FilterExpression="end_date_time < :current_time",
         ExpressionAttributeValues={
-            ":current_time": {"N": str(current_timestamp)}
+            ":current_time": {"S": str(current_timestamp)}
         }
     )
     return response.get("Items", [])

@@ -28,7 +28,10 @@ const AWSRequestForm = ({ onSend }) => {
     // Fetch accounts from API
     const fetchAccounts = async () => {
       try {
-        const response = await fetch('/accounts');
+        const response = await fetch('/accounts', {
+          method: 'GET',
+          credentials: 'include', //Include cookies with requests
+        });
         const data = await response.json();
         setAccounts(data); // Assuming the API returns an array of account numbers
       } catch (error) {
@@ -63,6 +66,7 @@ const AWSRequestForm = ({ onSend }) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', //Include cookies with requests
         body: JSON.stringify(requestData),
       });
       if (!response.ok) {
