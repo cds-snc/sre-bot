@@ -5,8 +5,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Request
-from fastapi.responses import RedirectResponse
-
 
 logging.basicConfig(level=logging.INFO)
 

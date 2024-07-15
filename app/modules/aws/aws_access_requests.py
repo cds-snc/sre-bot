@@ -111,6 +111,15 @@ def get_expired_requests():
 
 
 def get_active_requests():
+    """
+    Retrieves active requests from the DynamoDB table.
+
+    This function fetches records where the current time is less than the 'end_date_time' attribute,
+    indicating active requests.
+
+    Returns:
+        list: A list of active items from the DynamoDB table, or an empty list if none are found.
+    """
     # Get the current timestamp
     current_timestamp = datetime.datetime.now().timestamp()
 
@@ -118,14 +127,21 @@ def get_active_requests():
     response = client.scan(
         TableName=table,
         FilterExpression="end_date_time > :current_time",
-        ExpressionAttributeValues={
-            ":current_time": {"S": str(current_timestamp)}
-        }
+        ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
     )
     return response.get("Items", [])
 
 
 def get_past_requests():
+    """
+    Retrieves past requests from the DynamoDB table.
+
+    This function fetches records where the current time is greater than the 'end_date_time' attribute,
+    indicating past requests.
+
+    Returns:
+        list: A list of past items from the DynamoDB table, or an empty list if none are found.
+    """
     # Get the current timestamp
     current_timestamp = datetime.datetime.now().timestamp()
 
@@ -133,8 +149,6 @@ def get_past_requests():
     response = client.scan(
         TableName=table,
         FilterExpression="end_date_time < :current_time",
-        ExpressionAttributeValues={
-            ":current_time": {"S": str(current_timestamp)}
-        }
+        ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
     )
     return response.get("Items", [])

@@ -12,9 +12,7 @@ const AWS_Access= () => {
   const tabs = [
     { label: 'New Request', content: <AWSRequestForm />, icon: <FiberNewIcon />},
     { label: 'Upcoming Requests', content: <AWSListRequests endpoint_url="active_requests"/>, icon: <LibraryBooksIcon />},
-    // { label: 'Upcoming Requests', content: <div>View current requests that have not been approved or denied.</div>, icon: <LibraryBooksIcon />},
     { label: 'Past Requests', content: <AWSListRequests endpoint_url="past_requests" /> , icon: <ManageHistoryIcon />},
-    //{ label: 'Past Requests', content: <div>View all past approved/denied requests.</div>, icon: <ManageHistoryIcon />},
   ];
     return (
     <Box m="20px">

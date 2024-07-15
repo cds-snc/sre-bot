@@ -33,8 +33,7 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
-from functools import wraps
-from fastapi import Depends, status
+from fastapi import Depends
 from datetime import datetime, timezone, timedelta
 from integrations.aws.organizations import get_active_account_names
 from modules.aws.aws import request_aws_account_access
@@ -81,23 +80,6 @@ class AwsSnsPayload(BaseModel):
 
     class Config:
         extra = Extra.forbid
-
-
-class AccessRequest(BaseModel):
-    """
-    AccessRequest represents a request for access to an AWS account.
-
-    This class defines the schema for an access request, which includes the following fields:
-    - account: The name of the AWS account to which access is requested.
-    - reason: The reason for requesting access to the AWS account.
-    - startDate: The start date and time for the requested access period.
-    - endDate: The end date and time for the requested access period.
-    """
-
-    account: str
-    reason: str
-    startDate: datetime
-    endDate: datetime
 
 
 class AccessRequest(BaseModel):
@@ -316,66 +298,6 @@ async def create_access_request(
         raise HTTPException(status_code=500, detail="Failed to create access request")
 
 
-@handler.post("/request_access")
-@limiter.limit("5/minute")
-async def create_access_request(
-    request: Request,
-    access_request: AccessRequest,
-    user: dict = Depends(get_current_user),
-):
-    """
-    Endpoint to create an AWS access request.
-
-    This asynchronous function handles POST requests to the "/request_access" endpoint. It performs several validation checks on the provided access request data and then attempts to create an access request in the system. The function is protected by a rate limiter and requires user authentication.
-
-    Args:
-        request (Request): The FastAPI request object.
-        access_request (AccessRequest): The data model representing the access request.
-        use (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
-
-    Raises:
-        HTTPException: If any validation checks fail or if the request creation fails.
-
-    Returns:
-        dict: A dictionary containing a success message and the access request data if the request is successfully created.
-    """
-    # Check if the account and reason fields are provided
-    if not access_request.account or not access_request.reason:
-        raise HTTPException(status_code=400, detail="Account and reason are required")
-
-    # Check if the start date is at least 5 minutes in the future
-    if (
-        access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)
-    ) < datetime.now().replace(tzinfo=timezone.utc):
-        raise HTTPException(status_code=400, detail="Start date must be in the future")
-
-    # Check if the end date is after the start date
-    if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
-        raise HTTPException(status_code=400, detail="End date must be after start date")
-
-    # get the user email from the request
-    user_email = get_user_email_from_request(request)
-
-    # Store the request in the database
-    response = request_aws_account_access(
-        access_request.account,
-        access_request.reason,
-        access_request.startDate,
-        access_request.endDate,
-        user_email,
-        "read",
-    )
-    # Return a success message and the access request data if the request is created successfully
-    if response:
-        return {
-            "message": "Access request created successfully",
-            "data": access_request,
-        }
-    else:
-        # Raise an HTTP 500 error if the request creation fails
-        raise HTTPException(status_code=500, detail="Failed to create access request")
-
-
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
 @handler.get("/geolocate/{ip}")
 def geolocate(ip):
@@ -391,24 +313,6 @@ def geolocate(ip):
             "longitude": longitude,
         }
 
-@handler.get("/accounts")
-@limiter.limit("10/minute")
-async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
-    """
-    Endpoint to retrieve active AWS account names.
-
-    This asynchronous function handles GET requests to the "/accounts" endpoint.
-    It retrieves a list of active AWS account names. The function is protected by a rate limiter and requires user authentication.
-
-    Args:
-        request (Request): The FastAPI request object.
-        user (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
-
-    Returns:
-        list: A list of active AWS account names.
-    """
-    return get_active_account_names()
-
 
 @handler.get("/accounts")
 @limiter.limit("5/minute")
@@ -427,10 +331,13 @@ async def get_accounts(request: Request, user: dict = Depends(get_current_user))
         list: A list of active AWS account names.
     """
     return get_active_account_names()
+
 
 @handler.get("/active_requests")
 @limiter.limit("5/minute")
-async def get_aws_active_requests(request: Request, user: dict = Depends(get_current_user)):
+async def get_aws_active_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
     """
     Retrieves the active access requests from the database.
     Args:
@@ -443,7 +350,9 @@ async def get_aws_active_requests(request: Request, user: dict = Depends(get_cur
 
 @handler.get("/past_requests")
 @limiter.limit("5/minute")
-async def get_aws_past_requests(request: Request, user: dict = Depends(get_current_user)):
+async def get_aws_past_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
     """
     Retrieves the past access requests from the database.
     Args:
@@ -452,6 +361,7 @@ async def get_aws_past_requests(request: Request, user: dict = Depends(get_curre
         list: The list of past access requests.
     """
     return get_past_requests()
+
 
 @handler.post("/hook/{id}")
 @limiter.limit(

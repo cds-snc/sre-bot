@@ -5,7 +5,12 @@ from integrations.slack import users as slack_users
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request, HTTPException
 from datetime import timedelta, datetime
-from server.utils import create_access_token, get_user_email_from_request, SECRET_KEY, ALGORITHM
+from server.utils import (
+    create_access_token,
+    get_user_email_from_request,
+    SECRET_KEY,
+    ALGORITHM,
+)
 
 
 def test_log_ops_message():
@@ -82,6 +87,8 @@ def test_get_user_email_from_request_no_session():
         get_user_email_from_request(mock_request)
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Invalid request or missing session data"
+
+
 def test_create_access_token_with_expires_delta():
     data = {"sub": "testuser"}
     expires = timedelta(minutes=10)
