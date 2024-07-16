@@ -14,7 +14,7 @@ test('renders AWSRequestForm and fetches accounts', async () => {
 
   render(<AWSRequestForm />);
 
-  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/accounts'));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/accounts', {"credentials": "include", "method": "GET"}));
 
   expect(screen.getByText('Fill out the fields below to request access to the desired AWS account.')).toBeInTheDocument();
   expect(screen.getByLabelText('AWS Account')).toBeInTheDocument();
@@ -35,7 +35,7 @@ test('handles form submission', async () => {
 
   render(<AWSRequestForm />);
 
-  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/accounts'));
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith('/accounts' , {"credentials": "include", "method": "GET"}));
 
   // Open the select dropdown
   fireEvent.mouseDown(screen.getByLabelText('AWS Account'));

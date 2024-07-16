@@ -193,3 +193,105 @@ def test_get_expired_requests_returns_list_of_expired_requests(client_mock):
             "expired": {"BOOL": True},
         }
     ]
+
+
+@patch("modules.aws.aws_access_requests.client")
+def test_get_active_requests(mock_dynamodb_scan):
+    # Mock the current timestamp
+    current_timestamp = datetime.datetime(2024, 1, 1).timestamp()
+
+    # Define the mock response
+    mock_response = {
+        "Items": [
+            {"id": {"S": "123"}, "end_date_time": {"S": "1720830150.452"}},
+            {"id": {"S": "456"}, "end_date_time": {"S": "1720830150.999"}},
+        ]
+    }
+    mock_dynamodb_scan.scan.return_value = mock_response
+
+    # Call the function
+    with patch("modules.aws.aws_access_requests.datetime") as mock_datetime:
+        mock_datetime.datetime.now.return_value = datetime.datetime(2024, 1, 1)
+        items = aws_access_requests.get_active_requests()
+
+        # Assertions
+    mock_dynamodb_scan.scan.assert_called_once_with(
+        TableName="aws_access_requests",
+        FilterExpression="end_date_time > :current_time",
+        ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
+    )
+    assert items == mock_response["Items"]
+
+
+@patch("modules.aws.aws_access_requests.client")
+def test_get_active_requests_empty(mock_dynamodb_scan):
+    # Mock the current timestamp
+    current_timestamp = datetime.datetime(2024, 1, 1).timestamp()
+    with patch("modules.aws.aws_access_requests.datetime") as mock_datetime:
+        mock_datetime.datetime.now.return_value = datetime.datetime(2024, 1, 1)
+
+        # Define the mock response
+        mock_response = {"Items": []}
+        mock_dynamodb_scan.scan.return_value = mock_response
+
+        # Call the function
+        items = aws_access_requests.get_active_requests()
+
+        # Assertions
+        mock_dynamodb_scan.scan.assert_called_once_with(
+            TableName="aws_access_requests",
+            FilterExpression="end_date_time > :current_time",
+            ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
+        )
+        assert items == mock_response["Items"]
+
+
+@patch("modules.aws.aws_access_requests.client")
+def test_get_past_requests(mock_dynamodb_scan):
+    # Mock the current timestamp
+    current_timestamp = datetime.datetime(2024, 1, 1).timestamp()
+    with patch("modules.aws.aws_access_requests.datetime") as mock_datetime:
+        mock_datetime.datetime.now.return_value = datetime.datetime(2024, 1, 1)
+
+        # Define the mock response
+        mock_response = {
+            "Items": [
+                {"id": {"S": "123"}, "end_date_time": {"S": "1720830150.452"}},
+                {"id": {"S": "456"}, "end_date_time": {"S": "1720830150.999"}},
+            ]
+        }
+        mock_dynamodb_scan.scan.return_value = mock_response
+
+        # Call the function
+        items = aws_access_requests.get_past_requests()
+
+        # Assertions
+        mock_dynamodb_scan.scan.assert_called_once_with(
+            TableName="aws_access_requests",
+            FilterExpression="end_date_time < :current_time",
+            ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
+        )
+        assert items == mock_response["Items"]
+
+
+@patch("modules.aws.aws_access_requests.client")
+def test_get_past_requests_empty(mock_dynamodb_scan):
+    # Mock the current timestamp
+    current_timestamp = datetime.datetime(2024, 1, 1).timestamp()
+    with patch("modules.aws.aws_access_requests.datetime") as mock_datetime:
+        mock_datetime.datetime.now.return_value = datetime.datetime(2024, 1, 1)
+
+        # Define the mock response
+        mock_response = {"Items": []}
+        mock_dynamodb_scan.scan.return_value = mock_response
+
+        # Call the function
+        items = aws_access_requests.get_past_requests()
+
+        # Assertions
+        mock_dynamodb_scan.scan.assert_called_once_with(
+            TableName="aws_access_requests",
+            FilterExpression="end_date_time < :current_time",
+            ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
+        )
+        assert items == mock_response["Items"]

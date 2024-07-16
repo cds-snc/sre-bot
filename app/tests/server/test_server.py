@@ -7,12 +7,12 @@ from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 from httpx import AsyncClient
 from starlette.types import Scope
-from starlette.datastructures import Headers
+from starlette.datastructures import Headers, MutableHeaders
 import os
 import pytest
 import datetime
 from fastapi.testclient import TestClient
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, status
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -683,11 +683,17 @@ def more_than_24hours_dates_access_request():
     )
 
 
-def get_mock_request(session_data=None):
+def get_mock_request(session_data=None, cookies=None):
+    headers = Headers({"content-type": "application/json"})
+    if cookies:
+        cookie_header = "; ".join([f"{key}={value}" for key, value in cookies.items()])
+        headers = MutableHeaders(headers)
+        headers.append("cookie", cookie_header)
+
     scope: Scope = {
         "type": "http",
         "method": "POST",
-        "headers": Headers({"content-type": "application/json"}).raw,
+        "headers": headers.raw,
         "path": "/request_access",
         "raw_path": b"/request_access",
         "session": session_data or {},
@@ -832,7 +838,8 @@ async def test_create_access_request_more_than_24_hours(
 ):
     # Arrange
     session_data = {"user": {"username": "test_user", "email": "user@example.com"}}
-    request = get_mock_request(session_data)
+    cookies = {"access_token": "mocked_jwt_token"}
+    request = get_mock_request(session_data, cookies)
     mock_accounts = [
         {
             "Id": "345678901234",
@@ -849,7 +856,7 @@ async def test_create_access_request_more_than_24_hours(
     mock_get_user_email_from_request.return_value = "user@example.com"
     mock_get_user_id.return_value = "user_id_456"
     mock_get_current_user.return_value = {"user": "test_user"}
-    mock_create_aws_access_request.return_value = False
+    mock_create_aws_access_request.return_value = True
 
     # Act & Assert
     with pytest.raises(HTTPException) as excinfo:
@@ -900,3 +907,94 @@ async def test_create_access_request_failure(
         await server.create_access_request(request, valid_access_request)
     assert excinfo.value.status_code == 500
     assert excinfo.value.detail == "Failed to create access request"
+
+
+@pytest.mark.asyncio
+async def test_get_aws_active_requests_unauthenticated():
+    # Mock get_current_user to raise an HTTPException
+    with patch("modules.aws.aws_access_requests.get_active_requests"):
+        with patch(
+            "server.utils.get_current_user",
+            side_effect=HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            ),
+        ):
+            # Create an invalid JWT token
+            invalid_jwt_token = "invalid_jwt_token"
+
+            # Mock the cookie in the request
+            request = get_mock_request(cookies={"access_token": invalid_jwt_token})
+
+            # Call the dependency function directly to see if it raises an exception
+            with pytest.raises(HTTPException):
+                await server.get_current_user(request)
+
+            # If you need to test the actual endpoint, use the TestClient
+            response = client.get(
+                "/active_requests", cookies={"access_token": invalid_jwt_token}
+            )
+
+            # Assertions for the endpoint
+            assert response.status_code == 401
+            assert response.json() == {"detail": "Invalid token"}
+
+
+@patch("server.utils.get_current_user", new_callable=AsyncMock)
+@patch("modules.aws.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.get_active_requests")
+@pytest.mark.asyncio
+async def test_get_aws_active_requests_success(
+    mock_get_active_requests, mock_dynamodbscan, mock_get_current_user
+):
+    mock_get_current_user.return_value = {"username": "test_user"}
+
+    mock_response = [
+        {
+            "id": {"S": "123"},
+            "account_name": {"S": "ExampleAccount"},
+            "access_type": {"S": "read"},
+            "reason_for_access": {"S": "test_reason"},
+            "start_date_time": {"S": "1720820150.452"},
+            "end_date_time": {"S": "1720830150.452"},
+            "expired": {"BOOL": False},
+        },
+        {
+            "id": {"S": "456"},
+            "account_name": {"S": "ExampleAccount2"},
+            "access_type": {"S": "write"},
+            "reason_for_access": {"S": "test_reason2"},
+            "start_date_time": {"S": "1720820150.999"},
+            "end_date_time": {"S": "1720830150.999"},
+            "expired": {"BOOL": False},
+        },
+    ]
+    mock_dynamo_response = {"Items": mock_response}
+    mock_dynamodbscan.scan.return_value = mock_dynamo_response
+
+    # Create a mock request with the cookie
+    request = get_mock_request(cookies={"access_token": "mocked_jwt_token"})
+
+    # Act
+    mock_get_active_requests.return_value = mock_response
+    response = await server.get_aws_active_requests(request)
+
+    # Assertions
+    assert response == mock_response
+
+
+@pytest.mark.asyncio
+async def test_get_aws_active_requests_exception_unauthenticated():
+    # Mock get_current_user to raise an HTTPException
+    with patch("modules.aws.aws_access_requests.get_active_requests"):
+        with patch(
+            "server.utils.get_current_user",
+            side_effect=HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+            ),
+        ):
+            # Make the GET request
+            response = client.get("/active_requests")
+
+            # Assertions
+            assert response.status_code == 401
+            assert response.json() == {"detail": "Not authenticated"}

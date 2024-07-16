@@ -37,6 +37,7 @@ from fastapi import Depends
 from datetime import datetime, timezone, timedelta
 from integrations.aws.organizations import get_active_account_names
 from modules.aws.aws import request_aws_account_access
+from modules.aws.aws_access_requests import get_active_requests, get_past_requests
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -330,6 +331,36 @@ async def get_accounts(request: Request, user: dict = Depends(get_current_user))
         list: A list of active AWS account names.
     """
     return get_active_account_names()
+
+
+@handler.get("/active_requests")
+@limiter.limit("5/minute")
+async def get_aws_active_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
+    """
+    Retrieves the active access requests from the database.
+    Args:
+        request (Request): The HTTP request object.
+    Returns:
+        list: The list of active access requests.
+    """
+    return get_active_requests()
+
+
+@handler.get("/past_requests")
+@limiter.limit("5/minute")
+async def get_aws_past_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
+    """
+    Retrieves the past access requests from the database.
+    Args:
+        request (Request): The HTTP request object.
+    Returns:
+        list: The list of past access requests.
+    """
+    return get_past_requests()
 
 
 @handler.post("/hook/{id}")

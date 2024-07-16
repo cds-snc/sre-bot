@@ -6,7 +6,6 @@ from typing import Optional
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Request
 
-
 logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
