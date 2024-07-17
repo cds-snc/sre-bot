@@ -160,20 +160,31 @@ def add_users_to_group(group, group_key):
     return group
 
 
-def list_groups_with_members(**kwargs):
+def list_groups_with_members(
+    group_members: bool = True,
+    members_details: bool = True,
+    groups_filters: list = [],
+    query: str | None = None,
+):
     """List all groups in the Google Workspace domain with their members.
+
+    Args:
+        group_members (bool): Include the group members in the response.
+        members_details (bool): Include the members details in the response.
+        groups_filters (list): List of filters to apply to the groups.
+        query (str): The query to search for groups.
 
     Returns:
         list: A list of group objects with members. Any group without members will not be included.
     """
-    members_details = kwargs.pop("members_details", True)
-    groups = list_groups(**kwargs)
-    groups_filters = kwargs.pop("filters", [])
+    groups = list_groups(query=query)
     if not groups:
         return []
 
     for filter in groups_filters:
         groups = filters.filter_by_condition(groups, filter)
+    if not group_members:
+        return groups
 
     groups_with_members = []
     for group in groups:

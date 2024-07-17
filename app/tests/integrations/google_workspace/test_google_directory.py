@@ -377,12 +377,13 @@ def test_list_groups_with_members_filtered(
     mock_list_group_members.side_effect = group_members
     mock_get_user.side_effect = users
     mock_filter_by_condition.return_value = groups[:2]
-    filters = [lambda group: "test-" in group["name"]]
+    groups_filters = [lambda group: "test-" in group["name"]]
 
     assert (
-        google_directory.list_groups_with_members(filters=filters) == groups_with_users
+        google_directory.list_groups_with_members(groups_filters=groups_filters)
+        == groups_with_users
     )
-    assert mock_filter_by_condition.called_once_with(groups, filters)
+    assert mock_filter_by_condition.called_once_with(groups, groups_filters)
     assert mock_list_group_members.call_count == 2
     assert mock_get_user.call_count == 2
 
@@ -412,6 +413,23 @@ def test_list_groups_with_members_without_details(
     mock_get_user.side_effect = users
 
     assert google_directory.list_groups_with_members(members_details=False) == []
+
+
+@patch("integrations.google_workspace.google_directory.list_groups")
+@patch("integrations.google_workspace.google_directory.list_group_members")
+@patch("integrations.google_workspace.google_directory.get_user")
+def test_list_groups_with_members_without_members_enabled(
+    mock_get_user,
+    mock_list_group_members,
+    mock_list_groups,
+    google_groups,
+):
+    groups = google_groups(2)
+    mock_list_groups.return_value = groups
+    assert google_directory.list_groups_with_members(group_members=False) == groups
+
+    mock_list_group_members.assert_not_called()
+    mock_get_user.assert_not_called()
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")

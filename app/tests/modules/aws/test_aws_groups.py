@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 from modules.aws import groups
 
 
@@ -122,10 +122,11 @@ def test_request_groups_sync_handles_user_without_permission(
     mock_identity_center.synchronize.assert_not_called()
 
 
+@patch("modules.aws.groups.provisioning_groups")
 @patch("modules.aws.groups.slack_users")
 @patch("modules.aws.groups.permissions")
 def test_request_groups_list_handles_user_with_permission(
-    mock_permissions, mock_slack_users
+    mock_permissions, mock_slack_users, mock_provisioning_groups
 ):
     client = MagicMock()
     body = MagicMock()
@@ -135,6 +136,13 @@ def test_request_groups_list_handles_user_with_permission(
 
     mock_slack_users.get_user_email_from_body.return_value = "authorized.user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
+    mock_provisioning_groups.get_groups_from_integration.return_value = [
+        {
+            "DisplayName": "Group 1",
+            "GroupMemberships": [{"MemberId": {"UserName": "user1"}}],
+        },
+        {"DisplayName": "Group 2"},
+    ]
 
     groups.request_groups_list(client, body, respond, args, logger)
 
@@ -142,8 +150,13 @@ def test_request_groups_list_handles_user_with_permission(
     mock_permissions.is_user_member_of_groups.assert_called_once_with(
         "authorized.user@test.com", groups.AWS_ADMIN_GROUPS
     )
-    respond.assert_called_once_with("AWS Groups List request received.")
-    logger.info.assert_not_called()
+
+    respond_calls = [
+        call("AWS Groups List request received."),
+        call("Groups found:\n • Group 1 (1 members)\n • Group 2 (0 members)\n"),
+    ]
+    respond.assert_has_calls(respond_calls)
+    logger.info.assert_called_once_with("Listing AWS Identity Center Groups.")
 
 
 @patch("modules.aws.groups.slack_users")

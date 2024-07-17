@@ -1,6 +1,7 @@
 import os
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
+from modules.provisioning import groups as provisioning_groups
 from integrations.slack import users as slack_users
 
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -8,7 +9,7 @@ AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").spli
 help_text = """
 \n *AWS Groups*:
 \n • `/aws groups sync` - Sync groups from AWS Identity Center.
-\n • `/aws groups list` - List all groups from AWS Identity Center. (Coming soon)
+\n • `/aws groups list` - List all groups from AWS Identity Center.
 """
 
 
@@ -57,7 +58,18 @@ def request_groups_list(client, body, respond, args, logger):
     requestor_email = slack_users.get_user_email_from_body(client, body)
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         respond("AWS Groups List request received.")
+        logger.info("Listing AWS Identity Center Groups.")
+        response = provisioning_groups.get_groups_from_integration(
+            "aws_identity_center", members_details=False
+        )
+        response.sort(key=lambda x: x["DisplayName"])
+        formatted_string = "Groups found:\n"
+        for group in response:
+            members_count = 0
+            if group.get("GroupMemberships"):
+                members_count = len(group["GroupMemberships"])
+            formatted_string += f" • {group['DisplayName']} ({members_count} members)\n"
+        respond(formatted_string)
     else:
         respond("You do not have permission to list groups.")
         return
-    pass
