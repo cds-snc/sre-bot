@@ -55,6 +55,22 @@ def test_aws_command_handles_provision_command(
 
 
 @patch("modules.aws.aws.slack_commands.parse_command")
+@patch("modules.aws.groups.command_handler")
+def test_aws_command_handles_groups_command(
+    command_handler: MagicMock, mock_parse_command: MagicMock
+):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    logger = MagicMock()
+    mock_parse_command.return_value = ["groups", "sync"]
+    aws.aws_command(ack, {"text": "groups sync"}, logger, respond, client, body)
+    ack.assert_called
+    command_handler.assert_called_with(client, body, respond, ["sync"], logger)
+
+
+@patch("modules.aws.aws.slack_commands.parse_command")
 @patch("modules.aws.aws.request_health_modal")
 def test_aws_command_handles_health_command(
     request_health_modal: MagicMock, mock_parse_command: MagicMock
