@@ -937,8 +937,8 @@ def test_list_groups_with_memberships_filtered(
 
     mock_describe_user.side_effect = user_side_effect
     mock_filter_by_condition.return_value = groups[:2]
-    filters = [lambda group: "test-" in group["DisplayName"]]
-    result = identity_store.list_groups_with_memberships(filters=filters)
+    groups_filters = [lambda group: "test-" in group["DisplayName"]]
+    result = identity_store.list_groups_with_memberships(groups_filters=groups_filters)
 
     assert mock_filter_by_condition.call_count == 1
     assert mock_list_group_memberships.call_count == 2
