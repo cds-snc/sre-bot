@@ -7,7 +7,13 @@ from utils import filters
 logger = getLogger(__name__)
 
 
-def get_groups_from_integration(integration_source: str, pre_processing_filters: list = [], post_processing_filters: list = [], query: str | None = None, members_details: bool = True) -> list:
+def get_groups_from_integration(
+    integration_source: str,
+    pre_processing_filters: list = [],
+    post_processing_filters: list = [],
+    query: str | None = None,
+    members_details: bool = True,
+) -> list:
     """Retrieve the users from an integration group source.
     Supported sources are:
     - Google Groups
