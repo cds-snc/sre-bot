@@ -944,3 +944,42 @@ def test_list_groups_with_memberships_filtered(
     assert mock_list_group_memberships.call_count == 2
     assert mock_describe_user.call_count == 2
     assert result == expected_output
+
+
+@patch("integrations.aws.identity_store.list_groups")
+@patch("integrations.aws.identity_store.list_group_memberships")
+@patch("integrations.aws.identity_store.describe_user")
+def test_list_groups_with_memberhips_without_members_enabled(
+    mock_describe_user,
+    mock_list_group_memberships,
+    mock_list_groups,
+    aws_groups,
+    aws_groups_memberships,
+):
+    groups = aws_groups(2, prefix="test-")
+    memberships = [
+        [],
+        aws_groups_memberships(2, prefix="test-", group_id=2)["GroupMemberships"],
+    ]
+    expected_output = [
+        {
+            "Description": "A group to test resolving AWS-group1 memberships",
+            "DisplayName": "test-group-name1",
+            "GroupId": "test-aws-group_id1",
+            "IdentityStoreId": "d-123412341234",
+        },
+        {
+            "GroupId": "test-aws-group_id2",
+            "DisplayName": "test-group-name2",
+            "Description": "A group to test resolving AWS-group2 memberships",
+            "IdentityStoreId": "d-123412341234",
+        },
+    ]
+    mock_list_groups.return_value = groups
+    mock_list_group_memberships.side_effect = memberships
+
+    result = identity_store.list_groups_with_memberships(group_members=False)
+
+    assert result == expected_output
+    assert mock_list_group_memberships.call_count == 0
+    assert mock_describe_user.call_count == 0
