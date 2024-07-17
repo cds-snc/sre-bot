@@ -1,4 +1,4 @@
-from unittest.mock import patch, call, ANY, MagicMock
+from unittest.mock import patch, MagicMock
 from modules.aws import groups
 
 
