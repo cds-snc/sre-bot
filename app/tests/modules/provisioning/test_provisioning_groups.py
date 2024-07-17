@@ -127,23 +127,23 @@ def test_get_groups_from_integration_filters_applied(
     aws_groups.extend(aws_groups_wo_prefix)
     mock_aws_list_groups_with_memberships.return_value = aws_groups
     mock_filters.filter_by_condition.side_effect = [aws_groups_prefix, []]
-    processing_filters = [
+    post_processing_filters = [
         lambda group: "prefix" in group["DisplayName"],
         lambda group: "prefix" in group["Description"],
     ]
 
     response = groups.get_groups_from_integration(
-        "aws_identity_center", processing_filters=processing_filters
+        "aws_identity_center", post_processing_filters=post_processing_filters
     )
 
     assert response == []
 
     assert mock_filters.filter_by_condition.call_count == 2
     assert mock_filters.filter_by_condition.called_once_with(
-        aws_groups, processing_filters
+        aws_groups, post_processing_filters
     )
     assert mock_filters.filter_by_condition.called_once_with(
-        aws_groups_prefix, processing_filters
+        aws_groups_prefix, post_processing_filters
     )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called
@@ -165,22 +165,22 @@ def test_get_groups_from_integration_filters_returns_subset(
     aws_groups.extend(aws_groups_wo_prefix)
     mock_aws_list_groups_with_memberships.return_value = aws_groups
     mock_filters.filter_by_condition.side_effect = [aws_groups_prefix]
-    processing_filters = [
+    post_processing_filters = [
         lambda group: "prefix" in group["DisplayName"],
     ]
 
     response = groups.get_groups_from_integration(
-        "aws_identity_center", processing_filters=processing_filters
+        "aws_identity_center", post_processing_filters=post_processing_filters
     )
 
     assert response == aws_groups_prefix
 
     assert mock_filters.filter_by_condition.call_count == 1
     assert mock_filters.filter_by_condition.called_once_with(
-        aws_groups, processing_filters
+        aws_groups, post_processing_filters
     )
     assert mock_filters.filter_by_condition.called_once_with(
-        aws_groups_prefix, processing_filters
+        aws_groups_prefix, post_processing_filters
     )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_google_list_groups_with_members.called

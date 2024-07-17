@@ -7,7 +7,7 @@ from utils import filters
 logger = getLogger(__name__)
 
 
-def get_groups_from_integration(integration_source, **kwargs):
+def get_groups_from_integration(integration_source: str, pre_processing_filters: list = [], post_processing_filters: list = [], query: str | None = None, members_details: bool = True) -> list:
     """Retrieve the users from an integration group source.
     Supported sources are:
     - Google Groups
@@ -15,19 +15,14 @@ def get_groups_from_integration(integration_source, **kwargs):
 
     Args:
         integration_source (str): The source of the groups.
-        **kwargs: Additional keyword arguments. Supported arguments are:
-
-            - `filters` (list): List of filters to apply to the groups.
-            - `query` (str): The query to search for groups.
-            - `members_details` (bool): Include the members details in the groups.
+        pre_processing_filters (list): List of filters to apply directly after the groups are retrieved, before processing members.
+        post_processing_filters (list): List of filters to apply to the groups after processing members (optional).
+        query (str): The query to search for groups (only supported by Google Groups).
+        members_details (bool): Include the members details in the groups.
 
     Returns:
         list: A list of groups with members, empty list if no groups are found.
     """
-    processing_filters = kwargs.get("processing_filters", [])
-    query = kwargs.get("query", None)
-    members_details = kwargs.get("members_details", True)
-
     groups = []
     group_display_key = None
     members = None
@@ -37,7 +32,9 @@ def get_groups_from_integration(integration_source, **kwargs):
         case "google_groups":
             logger.info("Getting Google Groups with members.")
             groups = google_directory.list_groups_with_members(
-                query=query, members_details=members_details
+                query=query,
+                members_details=members_details,
+                groups_filters=pre_processing_filters,
             )
             integration_name = "Google:"
             group_display_key = "name"
@@ -46,7 +43,8 @@ def get_groups_from_integration(integration_source, **kwargs):
         case "aws_identity_center":
             logger.info("Getting AWS Identity Center Groups with members.")
             groups = identity_store.list_groups_with_memberships(
-                members_details=members_details
+                members_details=members_details,
+                groups_filters=pre_processing_filters,
             )
             integration_name = "AWS:"
             group_display_key = "DisplayName"
@@ -55,7 +53,7 @@ def get_groups_from_integration(integration_source, **kwargs):
         case _:
             return groups
 
-    for filter in processing_filters:
+    for filter in post_processing_filters:
         groups = filters.filter_by_condition(groups, filter)
 
     log_groups(
