@@ -4,6 +4,10 @@
 def parse_command(command):
     """
     Parses a command string into a list of arguments.
+    Args:
+        command (str): The command string.
+    Returns:
+        List[str]: The list of arguments.
     """
     args = []
     arg = ""

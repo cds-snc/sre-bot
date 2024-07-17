@@ -15,6 +15,7 @@ from integrations.slack import commands as slack_commands, users as slack_users
 from integrations.aws.organizations import get_account_id_by_name
 from modules.permissions import handler as permissions
 from modules.aws.identity_center import provision_aws_users
+from modules.aws import groups
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -63,6 +64,8 @@ def aws_command(ack, command, logger, respond, client, body):
             request_health_modal(client, body)
         case "user":
             request_user_provisioning(client, body, respond, args, logger)
+        case "groups":
+            groups.command_handler(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
