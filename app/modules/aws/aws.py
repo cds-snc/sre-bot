@@ -12,8 +12,10 @@ import os
 from server.utils import log_ops_message
 from modules.aws import aws_sso, aws_account_health, aws_access_requests
 from integrations.slack import commands as slack_commands, users as slack_users
+from integrations.aws.organizations import get_account_id_by_name
 from modules.permissions import handler as permissions
 from modules.aws.identity_center import provision_aws_users
+from modules.aws import groups
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -62,6 +64,8 @@ def aws_command(ack, command, logger, respond, client, body):
             request_health_modal(client, body)
         case "user":
             request_user_provisioning(client, body, respond, args, logger)
+        case "groups":
+            groups.command_handler(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -325,3 +329,40 @@ def request_user_provisioning(client, body, respond, args, logger):
         )
 
     logger.info("Completed user provisioning request")
+
+
+def request_aws_account_access(
+    account_name, rationale, start_date, end_date, user_email, access_type
+):
+    """
+    Request AWS account access for a user.
+
+    This function initiates a request for access to an AWS account for a specified user.
+    It performs the following steps:
+    1. Retrieves the account ID associated with the given account name.
+    2. Retrieves the user ID associated with the given user email.
+    3. Creates an AWS access request with the provided details.
+
+    Args:
+        account_name (str): The name of the AWS account to which access is requested.
+        rationale (str): The reason for requesting access to the AWS account.
+        start_date (datetime): The start date and time for the requested access period.
+        end_date (datetime): The end date and time for the requested access period.
+        user_email (str): The email address of the user requesting access.
+        access_type (str): The type of access requested (e.g., 'read', 'write').
+
+    Returns:
+        bool: True if the access request was successfully created, False otherwise.
+    """
+    account_id = get_account_id_by_name(account_name)
+    user_id = aws_sso.get_user_id(user_email)
+    return aws_access_requests.create_aws_access_request(
+        account_id,
+        account_name,
+        user_id,
+        user_email,
+        start_date,
+        end_date,
+        access_type,
+        rationale,
+    )

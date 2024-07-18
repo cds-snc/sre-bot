@@ -217,7 +217,7 @@ def test_synchronize_sync_users_and_groups_with_defaults(
 
     assert mock_groups.get_groups_from_integration.call_count == 2
     assert mock_groups.get_groups_from_integration.call_args_list == [
-        call("google_groups", query="email:aws-*", processing_filters=ANY),
+        call("google_groups", query="email:aws-*", post_processing_filters=ANY),
         call("aws_identity_center"),
     ]
 
@@ -284,7 +284,7 @@ def test_synchronize_sync_skip_users_if_false(
     assert mock_groups.get_groups_from_integration.call_count == 2
 
     google_groups_call = call(
-        "google_groups", query="email:aws-*", processing_filters=ANY
+        "google_groups", query="email:aws-*", post_processing_filters=ANY
     )
     aws_identity_center_call = call("aws_identity_center")
     assert mock_groups.get_groups_from_integration.call_args_list == [
@@ -351,7 +351,7 @@ def test_synchronize_sync_skip_groups_false_if_false(
     assert mock_groups.get_groups_from_integration.call_count == 2
 
     google_groups_call = call(
-        "google_groups", query="email:aws-*", processing_filters=ANY
+        "google_groups", query="email:aws-*", post_processing_filters=ANY
     )
     aws_identity_center_call = call("aws_identity_center")
     assert mock_groups.get_groups_from_integration.call_args_list == [
@@ -419,7 +419,7 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
     assert mock_groups.get_groups_from_integration.call_count == 2
 
     google_groups_call = call(
-        "google_groups", query="email:aws-*", processing_filters=ANY
+        "google_groups", query="email:aws-*", post_processing_filters=ANY
     )
     aws_identity_center_call = call("aws_identity_center")
     assert mock_groups.get_groups_from_integration.call_args_list == [

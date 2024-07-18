@@ -14,7 +14,6 @@ const Logout = () => {
   
           if (response.ok) {
             // Clear the authentication state and redirect to the landing page
-            navigate('/');
             window.location.reload(); // Refresh the session
           } else {
             console.error('Failed to log out');

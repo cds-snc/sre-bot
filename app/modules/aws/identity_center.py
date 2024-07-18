@@ -34,7 +34,7 @@ def synchronize(**kwargs):
 
     source_groups_filters = [lambda group: "AWS-" in group["name"]]
     source_groups = groups.get_groups_from_integration(
-        "google_groups", query=query, processing_filters=source_groups_filters
+        "google_groups", query=query, post_processing_filters=source_groups_filters
     )
     source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(

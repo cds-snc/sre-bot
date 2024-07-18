@@ -17,7 +17,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from models import webhooks
-from server.utils import log_ops_message
+from server.utils import (
+    log_ops_message,
+    create_access_token,
+    get_current_user,
+    get_user_email_from_request,
+)
 from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
@@ -28,9 +33,11 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
-from functools import wraps
-from fastapi import status
-
+from fastapi import Depends
+from datetime import datetime, timezone, timedelta
+from integrations.aws.organizations import get_active_account_names
+from modules.aws.aws import request_aws_account_access
+from modules.aws.aws_access_requests import get_active_requests, get_past_requests
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
@@ -73,6 +80,23 @@ class AwsSnsPayload(BaseModel):
 
     class Config:
         extra = Extra.forbid
+
+
+class AccessRequest(BaseModel):
+    """
+    AccessRequest represents a request for access to an AWS account.
+
+    This class defines the schema for an access request, which includes the following fields:
+    - account: The name of the AWS account to which access is requested.
+    - reason: The reason for requesting access to the AWS account.
+    - startDate: The start date and time for the requested access period.
+    - endDate: The end date and time for the requested access period.
+    """
+
+    account: str
+    reason: str
+    startDate: datetime
+    endDate: datetime
 
 
 # initialize the limiter
@@ -153,7 +177,9 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 @limiter.limit("5/minute")
 async def logout(request: Request):
     request.session.pop("user", None)
-    return RedirectResponse(url="/")
+    response = RedirectResponse(url="/")
+    response.delete_cookie("access_token")
+    return response
 
 
 # Login route. You will be redirected to the google login page
@@ -184,12 +210,17 @@ async def auth(request: Request):
     user_data = access_token.get("userinfo")
     if user_data:
         request.session["user"] = dict(user_data)
-    return RedirectResponse(url="/")
+        jwt_token = create_access_token(data={"sub": user_data["email"]})
+        response = RedirectResponse(url="/")
+        response.set_cookie(
+            "access_token", jwt_token, httponly=True, secure=True, samesite="Strict"
+        )
+    return response
 
 
 # User route. Returns the user's first name that is currently logged into the application
 @handler.route("/user")
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def user(request: Request):
     user = request.session.get("user")
     if user:
@@ -198,58 +229,73 @@ async def user(request: Request):
         return JSONResponse({"error": "Not logged in"})
 
 
-def get_current_user(request: Request):
+@handler.post("/request_access")
+@limiter.limit("10/minute")
+async def create_access_request(
+    request: Request,
+    access_request: AccessRequest,
+    use: dict = Depends(get_current_user),
+):
     """
-    Retrieves the currently logged-in user from the session.
+    Endpoint to create an AWS access request.
+
+    This asynchronous function handles POST requests to the "/request_access" endpoint. It performs several validation checks on the provided access request data and then attempts to create an access request in the system. The function is protected by a rate limiter and requires user authentication.
+
     Args:
-        request (Request): The HTTP request object containing session information.
-    Returns:
-        dict: The user information if the user is logged in.
+        request (Request): The FastAPI request object.
+        access_request (AccessRequest): The data model representing the access request.
+        use (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
     Raises:
-        HTTPException: If the user is not authenticated.
-    """
-    # Retrieve the 'user' from the session stored in the request
-    user = request.session.get("user")
+        HTTPException: If any validation checks fail or if the request creation fails.
 
-    # If there is no 'user' in the session, raise an HTTP 401 Unauthorized exception
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Google login"},
-        )
-    return user
-
-
-def login_required(route):
-    """
-    A decorator to ensure that the user is logged in before accessing the route.
-    Args:
-        route (function): The route function that requires login.
     Returns:
-        function: The decorated route function with login check.
+        dict: A dictionary containing a success message and the access request data if the request is successfully created.
     """
+    # Check if the account and reason fields are provided
+    if not access_request.account or not access_request.reason:
+        raise HTTPException(status_code=400, detail="Account and reason are required")
 
-    @wraps(route)
-    async def decorated_route(*args, **kwargs):
-        """
-        The decorated route function that includes login check.
-        Args:
-            *args: Variable length argument list for the route function.
-            **kwargs: Arbitrary keyword arguments for the route function.
-        Returns:
-            The result of the original route function if the user is logged in.
-        """
-        # Get the current request from the arguments
-        request = kwargs.get("request")
-        if request:
-            # Check if the user is logged in
-            user = get_current_user(request)  # noqa: F841
-        # Call the original route function and return its result
-        return await route(*args, **kwargs)
+    # Check if the start date is at least 5 minutes in the future
+    if (
+        access_request.startDate.replace(tzinfo=timezone.utc) + timedelta(minutes=5)
+    ) < datetime.now().replace(tzinfo=timezone.utc):
+        raise HTTPException(status_code=400, detail="Start date must be in the future")
 
-    # Return the decorated route function
-    return decorated_route
+    # Check if the end date is after the start date
+    if access_request.endDate.replace(tzinfo=timezone.utc) <= access_request.startDate:
+        raise HTTPException(status_code=400, detail="End date must be after start date")
+
+    # If the request is for more than 24 hours in the future, this is not allowed
+    if access_request.endDate.replace(tzinfo=timezone.utc) > datetime.now().replace(
+        tzinfo=timezone.utc
+    ) + timedelta(days=1):
+        raise HTTPException(
+            status_code=400,
+            detail="The access request cannot be for more than 24 hours",
+        )
+
+    # get the user email from the request
+    user_email = get_user_email_from_request(request)
+
+    # Store the request in the database
+    response = request_aws_account_access(
+        access_request.account,
+        access_request.reason,
+        access_request.startDate,
+        access_request.endDate,
+        user_email,
+        "read",
+    )
+    # Return a success message and the access request data if the request is created successfully
+    if response:
+        return {
+            "message": "Access request created successfully",
+            "data": access_request,
+        }
+    else:
+        # Raise an HTTP 500 error if the request creation fails
+        raise HTTPException(status_code=500, detail="Failed to create access request")
 
 
 # Geolocate route. Returns the country, city, latitude, and longitude of the IP address.
@@ -266,6 +312,55 @@ def geolocate(ip):
             "latitude": latitude,
             "longitude": longitude,
         }
+
+
+@handler.get("/accounts")
+@limiter.limit("5/minute")
+async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
+    """
+    Endpoint to retrieve active AWS account names.
+
+    This asynchronous function handles GET requests to the "/accounts" endpoint.
+    It retrieves a list of active AWS account names. The function is protected by a rate limiter and requires user authentication.
+
+    Args:
+        request (Request): The FastAPI request object.
+        user (dict, optional): Dependency that provides the current user context. Defaults to Depends(get_current_user).
+
+    Returns:
+        list: A list of active AWS account names.
+    """
+    return get_active_account_names()
+
+
+@handler.get("/active_requests")
+@limiter.limit("5/minute")
+async def get_aws_active_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
+    """
+    Retrieves the active access requests from the database.
+    Args:
+        request (Request): The HTTP request object.
+    Returns:
+        list: The list of active access requests.
+    """
+    return get_active_requests()
+
+
+@handler.get("/past_requests")
+@limiter.limit("5/minute")
+async def get_aws_past_requests(
+    request: Request, user: dict = Depends(get_current_user)
+):
+    """
+    Retrieves the past access requests from the database.
+    Args:
+        request (Request): The HTTP request object.
+    Returns:
+        list: The list of past access requests.
+    """
+    return get_past_requests()
 
 
 @handler.post("/hook/{id}")

@@ -276,7 +276,12 @@ def list_group_memberships(group_id, **kwargs):
 
 
 @handle_aws_api_errors
-def list_groups_with_memberships(**kwargs):
+def list_groups_with_memberships(
+    group_members: bool = True,
+    members_details: bool = True,
+    include_empty_groups: bool = True,
+    groups_filters: list = [],
+):
     """Retrieves groups with their members from the AWS Identity Center (identitystore)
 
     Args:
@@ -285,15 +290,15 @@ def list_groups_with_memberships(**kwargs):
     Returns:
         list: A list of group objects with their members. Any group without members will not be included.
     """
-    members_details = kwargs.pop("members_details", True)
-    groups_filters = kwargs.pop("filters", [])
-    include_empty_groups = kwargs.pop("include_empty_groups", True)
-    groups = list_groups(**kwargs)
+    groups = list_groups()
 
     if not groups:
         return []
+
     for filter in groups_filters:
         groups = filters.filter_by_condition(groups, filter)
+    if not group_members:
+        return groups
 
     groups_with_memberships = []
     for group in groups:
