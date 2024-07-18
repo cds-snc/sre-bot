@@ -2,7 +2,6 @@ import os
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from unittest.mock import MagicMock, patch
 from integrations.aws import client as aws_client
-import pytest
 
 ROLE_ARN = "test_role_arn"
 
