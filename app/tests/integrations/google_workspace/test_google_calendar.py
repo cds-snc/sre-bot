@@ -165,7 +165,17 @@ def test_insert_event_no_kwargs_no_delegated_email(
     mock_execute_google_api_call,
     mock_os_environ_get,
 ):
-    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_execute_google_api_call.return_value = {
+        "htmlLink": "test_link",
+        "start": {
+            "dateTime": "2024-07-25T13:30:00-04:00",
+            "timeZone": "America/New_York",
+        },
+        "end": {
+            "dateTime": "2024-07-25T14:00:00-04:00",
+            "timeZone": "America/New_York",
+        },
+    }
     mock_unique_id.return_value = "abc-123-de4"
     start = datetime.now()
     end = start
@@ -173,7 +183,10 @@ def test_insert_event_no_kwargs_no_delegated_email(
     title = "Test Event"
     document_id = "test_document_id"
     result = google_calendar.insert_event(start, end, emails, title, document_id)
-    assert result == "test_link"
+    assert result == {
+        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
+        "event_link": "test_link",
+    }
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
@@ -187,6 +200,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             "guestsCanModify": True,
+            "guestsCanInviteOthers": True,
             "attachments": [
                 {
                     "fileUrl": f"https://docs.google.com/document/d/{document_id}",
@@ -219,7 +233,17 @@ def test_insert_event_with_kwargs(
     mock_execute_google_api_call,
     mock_os_environ_get,
 ):
-    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_execute_google_api_call.return_value = {
+        "htmlLink": "test_link",
+        "start": {
+            "dateTime": "2024-07-25T13:30:00-04:00",
+            "timeZone": "America/New_York",
+        },
+        "end": {
+            "dateTime": "2024-07-25T14:00:00-04:00",
+            "timeZone": "America/New_York",
+        },
+    }
     mock_unique_id.return_value = "abc-123-de4"
     mock_convert_string_to_camel_case.side_effect = (
         lambda x: x
@@ -251,7 +275,10 @@ def test_insert_event_with_kwargs(
     result = google_calendar.insert_event(
         start, end, emails, title, document_id, **kwargs
     )
-    assert result == "test_link"
+    assert result == {
+        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
+        "event_link": "test_link",
+    }
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
@@ -265,6 +292,7 @@ def test_insert_event_with_kwargs(
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             "guestsCanModify": True,
+            "guestsCanInviteOthers": True,
             **kwargs,
         },
         calendarId="primary",
@@ -287,7 +315,17 @@ def test_insert_event_with_no_document(
     mock_execute_google_api_call,
     mock_os_environ_get,
 ):
-    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_execute_google_api_call.return_value = {
+        "htmlLink": "test_link",
+        "start": {
+            "dateTime": "2024-07-25T13:30:00-04:00",
+            "timeZone": "America/New_York",
+        },
+        "end": {
+            "dateTime": "2024-07-25T14:00:00-04:00",
+            "timeZone": "America/New_York",
+        },
+    }
     mock_unique_id.return_value = "abc-123-de4"
     mock_convert_string_to_camel_case.side_effect = (
         lambda x: x
@@ -312,7 +350,10 @@ def test_insert_event_with_no_document(
     result = google_calendar.insert_event(
         start, end, emails, title, document_id, **kwargs
     )
-    assert result == "test_link"
+    assert result == {
+        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
+        "event_link": "test_link",
+    }
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
@@ -326,6 +367,7 @@ def test_insert_event_with_no_document(
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             "guestsCanModify": True,
+            "guestsCanInviteOthers": True,
             **kwargs,
         },
         calendarId="primary",
@@ -348,7 +390,17 @@ def test_insert_event_google_hangout_link_created(
     mock_execute_google_api_call,
     mock_os_environ_get,
 ):
-    mock_execute_google_api_call.return_value = {"htmlLink": "test_link"}
+    mock_execute_google_api_call.return_value = {
+        "htmlLink": "test_link",
+        "start": {
+            "dateTime": "2024-07-25T13:30:00-04:00",
+            "timeZone": "America/New_York",
+        },
+        "end": {
+            "dateTime": "2024-07-25T14:00:00-04:00",
+            "timeZone": "America/New_York",
+        },
+    }
     mock_unique_id.return_value = "abc-123-de4"
     start = datetime.now()
     end = start
@@ -356,7 +408,10 @@ def test_insert_event_google_hangout_link_created(
     title = "Test Event"
     document_id = "test_document_id"
     result = google_calendar.insert_event(start, end, emails, title, document_id)
-    assert result == "test_link"
+    assert result == {
+        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
+        "event_link": "test_link",
+    }
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
@@ -370,6 +425,7 @@ def test_insert_event_google_hangout_link_created(
             "attendees": [{"email": email.strip()} for email in emails],
             "summary": title,
             "guestsCanModify": True,
+            "guestsCanInviteOthers": True,
             "attachments": [
                 {
                     "fileUrl": f"https://docs.google.com/document/d/{document_id}",

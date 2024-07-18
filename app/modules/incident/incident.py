@@ -285,6 +285,9 @@ def submit(ack, view, say, body, client, logger):
         channel=channel_id, topic=f"Incident: {name} / {product}"
     )
 
+    # Set the description
+    client.conversations_setDescription(channel=channel_id, description=f"{name}")
+
     # Announce incident
     user_id = body["user"]["id"]
     text = (
