@@ -11,7 +11,7 @@ from integrations.google_workspace.google_calendar import (
 
 
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
-def schedule_event(event_details, days):
+def schedule_event(event_details, days, user_emails):
     # Define the time range for the query
     now = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     # time_min is the current time + days and time_max is the current time + 60 days + days
@@ -20,11 +20,11 @@ def schedule_event(event_details, days):
 
     # Construct the items array
     items = []
-    emails = json.loads(event_details).get("emails")
+    #emails = json.loads(event_details).get("emails")
     incident_name = json.loads(event_details).get("topic")
-    for email in emails:
-        email = email.strip()
-        items.append({"id": email})
+    # for email in emails:
+    #     email = email.strip()
+    #     items.append({"id": email})
 
     # get the incident document link
     incident_document = json.loads(event_details).get("incident_document")
@@ -63,7 +63,7 @@ def schedule_event(event_details, days):
     event_link = insert_event(
         first_available_start.isoformat(),
         first_available_end.isoformat(),
-        emails,
+        user_emails,
         "Retro " + incident_name,
         incident_document,
         **event_config,
