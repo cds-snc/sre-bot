@@ -94,9 +94,9 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
 
 def request_user_provisioning(client, body, respond, args, logger):
     """Request AWS user provisioning.
-    
+
     This function processes a request to provision or deprovision AWS users.
-    
+
     Args:
         client (SlackClient): The Slack client instance.
         body (dict): The request body.
