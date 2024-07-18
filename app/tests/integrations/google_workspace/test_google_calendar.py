@@ -184,7 +184,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
     document_id = "test_document_id"
     result = google_calendar.insert_event(start, end, emails, title, document_id)
     assert result == {
-        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.", 
+        "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
     }
     mock_execute_google_api_call.assert_called_once_with(

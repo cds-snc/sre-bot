@@ -584,7 +584,7 @@ def save_incident_retro(client, ack, body, view):
 
     # pass the data using the view["private_metadata"] to the schedule_event function
     result = schedule_retro.schedule_event(view["private_metadata"], days)
-    
+
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if result is None:
         blocks = {
@@ -602,7 +602,9 @@ def save_incident_retro(client, ack, body, view):
                 ]
             ),
         }
-        logging.info("The event could not be scheduled since schedule_event returned None")
+        logging.info(
+            "The event could not be scheduled since schedule_event returned None"
+        )
 
     # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
     else:

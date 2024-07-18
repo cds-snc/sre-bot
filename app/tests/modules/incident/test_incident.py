@@ -583,7 +583,7 @@ def test_incident_submit_creates_channel_sets_description(
     client.conversations_setDescription.assert_called_once_with(
         channel="channel_id", description="name"
     )
-    
+
 
 @patch("modules.incident.incident.google_drive.update_incident_list")
 @patch("modules.incident.incident.google_drive.merge_data")

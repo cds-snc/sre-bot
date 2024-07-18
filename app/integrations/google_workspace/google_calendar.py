@@ -129,7 +129,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
 
     # Create a dictionary to return the event link and the event info
     result = dict(event_link=htmllink, event_info=event_info)
-    
+
     return result
 
 

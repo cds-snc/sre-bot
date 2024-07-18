@@ -68,4 +68,4 @@ def schedule_event(event_details, days):
         incident_document,
         **event_config,
     )
-    return result # Return the HTML link and event info
+    return result  # Return the HTML link and event info
