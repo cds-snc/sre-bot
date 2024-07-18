@@ -14,9 +14,6 @@ VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
 THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
 RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
-CLIENT_DEFAULTS = {
-    "region_name": AWS_REGION,
-}
 
 logger = logging.getLogger()
 
@@ -69,7 +66,7 @@ def assume_role_client(role_arn):
     return credentials
 
 
-def get_aws_service_client(service_name, **config):
+def get_aws_service_client(service_name, role_arn=None, **config):
     """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
 
     Args:
@@ -79,16 +76,23 @@ def get_aws_service_client(service_name, **config):
     Returns:
         botocore.client.BaseClient: The service client.
     """
-    role_arn = config.get("role_arn", None)
+
     if role_arn is not None:
-        credentials = assume_role_client(service_name, role_arn)
+        credentials = assume_role_client(role_arn)
         config["aws_access_key_id"] = credentials["AccessKeyId"]
         config["aws_secret_access_key"] = credentials["SecretAccessKey"]
         config["aws_session_token"] = credentials["SessionToken"]
     return boto3.client(service_name, **config)
 
 
-def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
+def execute_aws_api_call(
+    service_name,
+    method,
+    paginated=False,
+    keys=None,
+    role_arn=None,
+    **kwargs,
+):
     """Execute an AWS API call.
 
     Args:
@@ -104,10 +108,8 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     Raises:
         ValueError: If the role_arn is not provided.
     """
-
-    keys = kwargs.pop("keys", None)
-    client_config = kwargs.pop("client_config", CLIENT_DEFAULTS)
-    client = get_aws_service_client(service_name, **client_config)
+    config = kwargs.pop("config", dict(region_name=AWS_REGION))
+    client = get_aws_service_client(service_name, role_arn, **config)
     if kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
