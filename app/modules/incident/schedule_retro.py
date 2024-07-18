@@ -21,7 +21,12 @@ def schedule_event(event_details, days, user_emails):
     # Construct the items array
     items = []
     #emails = json.loads(event_details).get("emails")
-    incident_name = json.loads(event_details).get("topic")
+    # incident_name = json.loads(event_details).get("topic")
+    # for email in emails:
+    #     email = email.strip()
+    #     items.append({"id": email})
+    # emails = json.loads(event_details).get("emails")
+    incident_name = json.loads(event_details).get("name")
     # for email in emails:
     #     email = email.strip()
     #     items.append({"id": email})
@@ -60,7 +65,7 @@ def schedule_event(event_details, days, user_emails):
         },
     }
 
-    event_link = insert_event(
+    result = insert_event(
         first_available_start.isoformat(),
         first_available_end.isoformat(),
         user_emails,
@@ -68,5 +73,4 @@ def schedule_event(event_details, days, user_emails):
         incident_document,
         **event_config,
     )
-
-    return event_link
+    return result  # Return the HTML link and event info

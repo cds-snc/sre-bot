@@ -562,6 +562,34 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 @patch("modules.incident.incident.google_drive.create_new_incident")
 @patch("modules.incident.incident.google_drive.list_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
+def test_incident_submit_creates_channel_sets_description(
+    _log_to_sentinel_mock,
+    _mock_list_metadata,
+    _mock_create_new_incident,
+    _mock_merge_data,
+    _mock_update_incident_list,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    incident.submit(ack, view, say, body, client, logger)
+    client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
+    client.conversations_setDescription.assert_called_once_with(
+        channel="channel_id", description="name"
+    )
+
+
+@patch("modules.incident.incident.google_drive.update_incident_list")
+@patch("modules.incident.incident.google_drive.merge_data")
+@patch("modules.incident.incident.google_drive.create_new_incident")
+@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_adds_creator_to_channel(
     _log_to_sentinel_mock,
     _mock_list_metadata,

@@ -460,12 +460,13 @@ def schedule_incident_retro(client, body, ack):
     users = client.conversations_members(channel=channel_id)["members"]
 
     # Get the channel topic
-    channel_topic = client.conversations_info(channel=channel_id)["channel"]["topic"][
+    channel_name = client.conversations_info(channel=channel_id)["channel"]["purpose"][
         "value"
     ]
+
     # If for some reason the channel topic is empty, set it to "Incident Retro"
-    if channel_topic == "":
-        channel_topic = "Incident Retro"
+    if channel_name == "":
+        channel_name = "Incident Retro"
         logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
 
     # user_emails = []
@@ -498,8 +499,11 @@ def schedule_incident_retro(client, body, ack):
     data_to_send = json.dumps(
         {
             #"emails": user_emails,
-            "topic": channel_topic,
+            # "topic": channel_topic,
+            # "emails": user_emails,
+            "name": channel_name,
             "incident_document": document_id,
+            "channel_id": channel_id,
         }
     )
 
@@ -624,7 +628,7 @@ def save_incident_retro(client, ack, body, view):
     #event_link = schedule_retro.schedule_event(view["private_metadata"], days, user_emails)
     event_link = None
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
-    if event_link is None:
+    if result is None:
         blocks = {
             "type": "modal",
             "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
@@ -640,8 +644,15 @@ def save_incident_retro(client, ack, body, view):
                 ]
             ),
         }
+        logging.info(
+            "The event could not be scheduled since schedule_event returned None"
+        )
+
     # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
     else:
+        channel_id = json.loads(view["private_metadata"])["channel_id"]
+        event_link = result["event_link"]
+        event_info = result["event_info"]
         blocks = {
             "type": "modal",
             "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
@@ -651,7 +662,7 @@ def save_incident_retro(client, ack, body, view):
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": "*Successfully schduled calender event!*",
+                            "text": "*Successfully scheduled calender event!*",
                         },
                         "accessory": {
                             "type": "button",
@@ -667,9 +678,13 @@ def save_incident_retro(client, ack, body, view):
                 ]
             ),
         }
+        logging.info("Event has been scheduled successfully. Link: %s", event_link)
+
+        # post the message in the channel
+        client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
+
     # Open the modal and log that the event was scheduled successfully
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
-    logging.info("Event has been scheduled successfully. Link: %s", event_link)
 
 
 # We just need to handle the action here and record who clicked on it

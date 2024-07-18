@@ -795,7 +795,10 @@ def test_schedule_incident_retro_successful_no_bots():
     mock_client.usergroups_users_list.return_value = {"users": ["U34333"]}
     mock_client.conversations_members.return_value = {"members": ["U12345", "U67890"]}
     mock_client.conversations_info.return_value = {
-        "channel": {"topic": {"value": "Retro Topic"}}
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.users_info.side_effect = [
         {"user": {"profile": {"email": "user1@example.com"}}},
@@ -839,8 +842,9 @@ def test_schedule_incident_retro_successful_no_bots():
     expected_data = json.dumps(
         {
             "emails": ["user1@example.com", "user2@example.com"],
-            "topic": "Retro Topic",
+            "name": "Retro Purpose",
             "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
         }
     )
     assert (
@@ -856,7 +860,10 @@ def test_schedule_incident_retro_successful_bots():
         "members": ["U12345", "U67890", "U54321"]
     }
     mock_client.conversations_info.return_value = {
-        "channel": {"topic": {"value": "Retro Topic"}}
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.users_info.side_effect = [
         {"user": {"profile": {"email": "user1@example.com"}}},
@@ -903,8 +910,9 @@ def test_schedule_incident_retro_successful_bots():
     expected_data = json.dumps(
         {
             "emails": ["user1@example.com", "user2@example.com"],
-            "topic": "Retro Topic",
+            "name": "Retro Purpose",
             "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
         }
     )
     assert (
@@ -920,7 +928,10 @@ def test_schedule_incident_retro_successful_security_group():
         "members": ["U12345", "U67890", "U54321"]
     }
     mock_client.conversations_info.return_value = {
-        "channel": {"topic": {"value": "Retro Topic"}}
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.users_info.side_effect = [
         {"user": {"profile": {"email": "user2@example.com"}}},
@@ -966,8 +977,9 @@ def test_schedule_incident_retro_successful_security_group():
     expected_data = json.dumps(
         {
             "emails": ["user2@example.com"],
-            "topic": "Retro Topic",
+            "name": "Retro Purpose",
             "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
         }
     )
     assert (
@@ -983,7 +995,10 @@ def test_schedule_incident_retro_successful_no_security_group():
         "members": ["U12345", "U67890", "U54321"]
     }
     mock_client.conversations_info.return_value = {
-        "channel": {"topic": {"value": "Retro Topic"}}
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.users_info.side_effect = [
         {"user": {"profile": {"email": "user1@example.com"}}},
@@ -1030,8 +1045,9 @@ def test_schedule_incident_retro_successful_no_security_group():
     expected_data = json.dumps(
         {
             "emails": ["user1@example.com", "user2@example.com"],
-            "topic": "Retro Topic",
+            "name": "Retro Purpose",
             "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
         }
     )
     assert (
@@ -1044,7 +1060,10 @@ def test_schedule_incident_retro_with_no_users():
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
     mock_client.conversations_info.return_value = {
-        "channel": {"topic": {"value": "Retro Topic"}}
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.users_info.side_effect = []
     mock_client.bookmarks_list.return_value = {
@@ -1071,7 +1090,12 @@ def test_schedule_incident_retro_with_no_users():
 
     # construct the expected data object
     expected_data = json.dumps(
-        {"emails": [], "topic": "Retro Topic", "incident_document": "dummy_document_id"}
+        {
+            "emails": [],
+            "name": "Retro Purpose",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
     )
     # Assertions to validate behavior when no users are present in the channel
     assert (
@@ -1083,7 +1107,9 @@ def test_schedule_incident_retro_with_no_topic():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
-    mock_client.conversations_info.return_value = {"channel": {"topic": {"value": ""}}}
+    mock_client.conversations_info.return_value = {
+        "channel": {"topic": {"value": ""}, "purpose": {"value": "Retro Purpose"}}
+    }
     mock_client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -1111,8 +1137,54 @@ def test_schedule_incident_retro_with_no_topic():
     expected_data = json.dumps(
         {
             "emails": [],
-            "topic": "Incident Retro",
+            "name": "Retro Purpose",
             "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_purpose():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {"topic": {"value": ""}, "purpose": {"value": ""}}
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+    mock_client.users_info.side_effect = []
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object and set the topic to a default one
+    expected_data = json.dumps(
+        {
+            "emails": [],
+            "name": "Incident Retro",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
         }
     )
     # Assertions to validate behavior when no users are present in the channel
@@ -1125,10 +1197,22 @@ def test_schedule_incident_retro_with_no_topic():
 def test_save_incident_retro_success(schedule_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    schedule_event_mock.return_value = "http://example.com/event"
+    # schedule_event_mock.return_value = "http://example.com/event"
+    schedule_event_mock.return_value = {
+        "event_link": "http://example.com/event",
+        "event_info": "event_info",
+    }
     body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "Incident Retro",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
     view_mock_with_link = {
-        "private_metadata": "event details for scheduling",
+        "private_metadata": data_to_send,
         "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
     }
 
@@ -1144,7 +1228,51 @@ def test_save_incident_retro_success(schedule_event_mock):
     # Verify the modal content for success
     assert (
         mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
-        == "*Successfully schduled calender event!*"
+        == "*Successfully scheduled calender event!*"
+    )
+
+
+@patch("modules.incident.schedule_retro.schedule_event")
+def test_save_incident_retro_success_post_message_to_channel(schedule_event_mock):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    schedule_event_mock.return_value = {
+        "event_link": "http://example.com/event",
+        "event_info": "event_info",
+    }
+    body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "Incident Retro",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    view_mock_with_link = {
+        "private_metadata": data_to_send,
+        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+    }
+
+    # Call the function
+    incident_helper.save_incident_retro(
+        mock_client, mock_ack, body_mock, view_mock_with_link
+    )
+
+    # Assertions
+    mock_ack.assert_called_once()  # Ensure ack() was called
+    mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+
+    # Verify that the chat message was sent to the channel
+    mock_client.chat_postMessage.assert_called_once()
+    mock_client.chat_postMessage.assert_any_call(
+        channel="C1234567890", text="event_info", unfurl_links=False
+    )
+
+    # Verify the modal content for success
+    assert (
+        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == "*Successfully scheduled calender event!*"
     )
 
 
@@ -1154,8 +1282,16 @@ def test_save_incident_retro_failure(schedule_event_mock):
     mock_ack = MagicMock()
     schedule_event_mock.return_value = None
     body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "Incident Retro",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
     view_mock_with_link = {
-        "private_metadata": "event details for scheduling",
+        "private_metadata": data_to_send,
         "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
     }
 
