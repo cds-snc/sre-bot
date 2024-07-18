@@ -126,9 +126,7 @@ def describe_user(user_id, **kwargs):
 def list_users(**kwargs):
     """Retrieves all users from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
-    params = {
-        "IdentityStoreId": kwargs.get("IdentityStoreId"),
-    }
+    params = {"IdentityStoreId": kwargs.get("IdentityStoreId"), "role_arn": ROLE_ARN}
     if "filters" in kwargs:
         params["Filters"] = kwargs["filters"]
     return execute_aws_api_call(

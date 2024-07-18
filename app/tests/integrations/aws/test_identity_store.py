@@ -318,6 +318,7 @@ def test_list_users(mock_execute_aws_api_call):
         paginated=True,
         keys=["Users"],
         IdentityStoreId="test_instance_id",
+        role_arn="arn:aws:iam::659087519042:role/sre_bot_role",
     )
     assert result == ["User1", "User2"]
 
@@ -338,6 +339,7 @@ def test_list_users_with_identity_store_id(
         paginated=True,
         keys=["Users"],
         IdentityStoreId="custom_instance_id",
+        role_arn="arn:aws:iam::659087519042:role/sre_bot_role",
     )
     assert result == ["User1", "User2"]
 
@@ -355,6 +357,7 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
         paginated=True,
         keys=["Users"],
         IdentityStoreId="test_instance_id",
+        role_arn="arn:aws:iam::659087519042:role/sre_bot_role",
     )
     assert result == ["User1", "User2"]
 
