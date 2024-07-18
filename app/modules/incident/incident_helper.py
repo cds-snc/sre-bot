@@ -586,7 +586,6 @@ def save_incident_retro(client, ack, body, view):
     result = schedule_retro.schedule_event(view["private_metadata"], days)
     
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
-    #if event_link is None:
     if result is None:
         blocks = {
             "type": "modal",
@@ -636,6 +635,7 @@ def save_incident_retro(client, ack, body, view):
             ),
         }
         logging.info("Event has been scheduled successfully. Link: %s", event_link)
+
         # post the message in the channel
         client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
 

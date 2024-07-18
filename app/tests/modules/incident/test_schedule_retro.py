@@ -64,7 +64,7 @@ def test_schedule_event_successful(
         mock_datetime_now.now,  # use the fixture here
         mock_datetime_now.now + timedelta(hours=1),
     )
-    insert_event_mock.return_value = {"event_link": "https://calendar.link", "event_info": "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Calendar meeting details at: https://calendar.link"}
+    insert_event_mock.return_value = {"event_link": "https://calendar.link", "event_info": "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Check your calendar for more details."}
     mock_days = 1
 
     # Parse event details
@@ -103,7 +103,7 @@ def test_schedule_event_successful(
     )
 
     assert result["event_link"] == "https://calendar.link"
-    assert result["event_info"] == "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Calendar meeting details at: https://calendar.link"
+    assert result["event_info"] == "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Check your calendar for more details."
 
 
 # Test out the schedule_event function when no available slots are found

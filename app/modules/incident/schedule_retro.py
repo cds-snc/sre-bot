@@ -18,7 +18,6 @@ def schedule_event(event_details, days):
     time_min = (now + timedelta(days=days)).isoformat() + "Z"
     time_max = (now + timedelta(days=(60 + days))).isoformat() + "Z"
 
-    print("EVENT DETAILS: ", event_details)
     # Construct the items array
     items = []
     emails = json.loads(event_details).get("emails")
@@ -69,4 +68,4 @@ def schedule_event(event_details, days):
         incident_document,
         **event_config,
     )
-    return result  # Return the HTML link and event info
+    return result # Return the HTML link and event info
