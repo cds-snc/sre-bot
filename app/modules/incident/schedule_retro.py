@@ -20,17 +20,18 @@ def schedule_event(event_details, days, user_emails):
 
     # Construct the items array
     items = []
-    #emails = json.loads(event_details).get("emails")
+    # emails = json.loads(event_details).get("emails")
     # incident_name = json.loads(event_details).get("topic")
-    # for email in emails:
-    #     email = email.strip()
-    #     items.append({"id": email})
+    for email in user_emails:
+        email = email.strip()
+        items.append({"id": email})
     # emails = json.loads(event_details).get("emails")
     incident_name = json.loads(event_details).get("name")
     # for email in emails:
     #     email = email.strip()
     #     items.append({"id": email})
 
+    print("Emails: ", user_emails)
     # get the incident document link
     incident_document = json.loads(event_details).get("incident_document")
 

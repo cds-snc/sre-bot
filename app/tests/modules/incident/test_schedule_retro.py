@@ -69,6 +69,7 @@ def test_schedule_event_successful(
         "event_info": "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Check your calendar for more details.",
     }
     mock_days = 1
+    mock_emails = ["user1@example.com", "user2@example.com"]
 
     # Parse event details
     event_details_dict = json.loads(event_details)
@@ -77,7 +78,7 @@ def test_schedule_event_successful(
     document_id = event_details_dict["incident_document"]
 
     # Call the function under test
-    result = schedule_retro.schedule_event(event_details, mock_days)
+    result = schedule_retro.schedule_event(event_details, mock_days, mock_emails)
 
     # Assertions
     get_freebusy_mock.assert_called_once()
@@ -126,9 +127,10 @@ def test_schedule_event_no_available_slots(
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
     find_first_available_slot_mock.return_value = (None, None)
     mock_days = 1
+    mock_emails = ["test1@test.com", "test2@test.com"]
 
     # Call the function under test
-    event_link = schedule_retro.schedule_event(event_details, mock_days)
+    event_link = schedule_retro.schedule_event(event_details, mock_days, mock_emails)
 
     # Assertions
     get_freebusy_mock.assert_called_once()

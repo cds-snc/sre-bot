@@ -110,6 +110,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         body=body,
         calendarId="primary",
         supportsAttachments=True,
+        sendUpdates="all",
         conferenceDataVersion=1,
     )
     # Handle the instance differently if the result is a dictionary or a tuple and get the calendar link and start time

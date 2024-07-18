@@ -580,8 +580,8 @@ def test_incident_submit_creates_channel_sets_description(
     }
     incident.submit(ack, view, say, body, client, logger)
     client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
-    client.conversations_setDescription.assert_called_once_with(
-        channel="channel_id", description="name"
+    client.conversations_setPurpose.assert_called_once_with(
+        channel="channel_id", purpose="name"
     )
 
 
