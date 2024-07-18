@@ -1,7 +1,7 @@
 """Unit tests for schedule_retro module in Incident management proces."""
 
 import json
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 import pytest
 import pytz
@@ -17,6 +17,9 @@ def event_details():
         {
             "emails": ["user1@example.com", "user2@example.com"],
             "topic": "Incident Response Meeting",
+            "name": "Incident 123",
+            "channel_id": "C123456",
+            "incident_document": "https://docs.google.com/document/d/1/edit",
         }
     )
 
@@ -52,8 +55,8 @@ def test_schedule_event_successful(
     insert_event_mock,
     find_first_available_slot_mock,
     get_freebusy_mock,
-    event_details,
-    mock_datetime_now,  # add this fixture
+    event_details: str,
+    mock_datetime_now: MagicMock | AsyncMock,  # add this fixture
 ):
     # Set up the mock return values
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
@@ -61,17 +64,17 @@ def test_schedule_event_successful(
         mock_datetime_now.now,  # use the fixture here
         mock_datetime_now.now + timedelta(hours=1),
     )
-    insert_event_mock.return_value = "https://calendar.link"
+    insert_event_mock.return_value = {"event_link": "https://calendar.link", "event_info": "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Calendar meeting details at: https://calendar.link"}
     mock_days = 1
 
     # Parse event details
     event_details_dict = json.loads(event_details)
     emails = event_details_dict["emails"]
-    topic = event_details_dict["topic"]
-    document_id = event_details_dict.get("incident_document")
+    name = event_details_dict["name"]
+    document_id = event_details_dict["incident_document"]
 
     # Call the function under test
-    event_link = schedule_retro.schedule_event(event_details, mock_days)
+    result = schedule_retro.schedule_event(event_details, mock_days)
 
     # Assertions
     get_freebusy_mock.assert_called_once()
@@ -82,9 +85,9 @@ def test_schedule_event_successful(
         find_first_available_slot_mock.return_value[0].isoformat(),
         find_first_available_slot_mock.return_value[1].isoformat(),
         emails,
-        "Retro " + topic,
+        "Retro " + name,
         document_id,
-        description="This is a retro meeting to discuss incident: " + topic,
+        description="This is a retro meeting to discuss incident: " + name,
         conferenceData={
             "createRequest": {
                 "requestId": f"{find_first_available_slot_mock.return_value[0].timestamp()}",
@@ -99,7 +102,8 @@ def test_schedule_event_successful(
         },
     )
 
-    assert event_link == "https://calendar.link"
+    assert result["event_link"] == "https://calendar.link"
+    assert result["event_info"] == "Retro has been scheduled for Monday, April 10, 2023 at 10:00 AM EDT. Calendar meeting details at: https://calendar.link"
 
 
 # Test out the schedule_event function when no available slots are found
@@ -110,7 +114,7 @@ def test_schedule_event_no_available_slots(
     insert_event_mock,
     find_first_available_slot_mock,
     get_freebusy_mock,
-    event_details,
+    event_details: str,
 ):
     # Set up the mock return values
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}

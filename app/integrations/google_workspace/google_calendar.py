@@ -71,6 +71,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         "attendees": [{"email": email.strip()} for email in emails],
         "summary": title,
         "guestsCanModify": True,
+        "guestsCanInviteOthers": True,
         "conferenceData": {
             "createRequest": {
                 "requestId": generate_unique_id(),
@@ -111,12 +112,25 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         supportsAttachments=True,
         conferenceDataVersion=1,
     )
-    # Handle the instance differently if the result is a dictionary or a tuple
+    # Handle the instance differently if the result is a dictionary or a tuple and get the calendar link and start time
     if isinstance(result, dict):
         htmllink = result.get("htmlLink")
+        start_time = result.get("start").get("dateTime")
     elif isinstance(result, tuple):
         htmllink = result[0].get("htmlLink")
-    return htmllink
+        start_time = result[0].get("start").get("dateTime")
+
+    # Convert teh date to be more human readable
+    datetime_obj = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S%z")
+    formatted_datetime = datetime_obj.strftime("%A, %B %d, %Y at %I:%M %p")
+
+    # Compose a message to return indicating when the event has been scheduled
+    event_info = f"Retro has been scheduled for {formatted_datetime} EDT. Check your calendar for more details."
+
+    # Create a dictionary to return the event link and the event info
+    result = dict(event_link=htmllink, event_info=event_info)
+    
+    return result
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
