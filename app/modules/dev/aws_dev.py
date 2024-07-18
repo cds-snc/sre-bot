@@ -1,14 +1,10 @@
 """Testing AWS service (will be removed)"""
 
 import datetime
-import json
 import logging
 
-import boto3
-
 # from modules.aws import dynamodb
-from integrations.aws import dynamodb, identity_store, client as aws_client
-from integrations.slack import users as slack_users
+from integrations.aws import dynamodb
 
 from dotenv import load_dotenv
 
