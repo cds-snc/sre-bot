@@ -2,7 +2,6 @@ import os
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from unittest.mock import MagicMock, patch
 from integrations.aws import client as aws_client
-import pytest
 
 ROLE_ARN = "test_role_arn"
 
@@ -178,10 +177,9 @@ def test_paginate_no_key_in_page(mock_client):
 
 
 @patch("boto3.client")
-def test_assume_role_client(mock_boto3_client):
+def test_assume_role_client_returns_credentials(mock_boto3_client):
     mock_sts_client = MagicMock()
-    mock_service_client = MagicMock()
-    mock_boto3_client.side_effect = [mock_sts_client, mock_service_client]
+    mock_boto3_client.return_value = mock_sts_client
 
     mock_sts_client.assume_role.return_value = {
         "Credentials": {
@@ -191,30 +189,66 @@ def test_assume_role_client(mock_boto3_client):
         }
     }
 
-    client = aws_client.assume_role_client("test_service", "test_role_arn")
+    credentials = aws_client.assume_role_client("test_role_arn")
 
-    mock_boto3_client.assert_any_call("sts")
+    mock_boto3_client.assert_called_once_with("sts")
     mock_sts_client.assume_role.assert_called_once_with(
         RoleArn="test_role_arn", RoleSessionName="AssumeRoleSession1"
     )
-    mock_boto3_client.assert_any_call(
-        "test_service",
+    expected_credentials = {
+        "AccessKeyId": "test_access_key_id",
+        "SecretAccessKey": "test_secret_access_key",
+        "SessionToken": "test_session_token",
+    }
+    assert credentials == expected_credentials
+
+
+@patch("integrations.aws.client.assume_role_client")
+@patch("integrations.aws.client.boto3.client")
+def test_get_aws_service_client_assumes_role(mock_boto3_client, mock_assume_role):
+    mock_client = MagicMock()
+    mock_boto3_client.return_value = mock_client
+
+    config = {"role_arn": "test_role_arn"}
+
+    mock_assume_role.return_value = {
+        "AccessKeyId": "test_access_key_id",
+        "SecretAccessKey": "test_secret_access_key",
+        "SessionToken": "test_session_token",
+    }
+
+    client = aws_client.get_aws_service_client("service_name", **config)
+
+    mock_assume_role.assert_called_once_with("test_role_arn")
+    mock_boto3_client.assert_called_once_with(
+        "service_name",
         aws_access_key_id="test_access_key_id",
         aws_secret_access_key="test_secret_access_key",
         aws_session_token="test_session_token",
     )
-    assert client == mock_service_client
+    assert client == mock_client
+
+
+@patch("integrations.aws.client.boto3.client")
+def test_get_aws_service_client_no_role(mock_boto3_client):
+    mock_client = MagicMock()
+    mock_boto3_client.return_value = mock_client
+
+    client = aws_client.get_aws_service_client("service_name")
+
+    mock_boto3_client.assert_called_once_with("service_name")
+    assert client == mock_client
 
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
-@patch("integrations.aws.client.assume_role_client")
+@patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_non_paginated(
-    mock_assume_role_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
 ):
     mock_client = MagicMock()
-    mock_assume_role_client.return_value = mock_client
+    mock_get_aws_service_client.return_value = mock_client
     mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
@@ -224,7 +258,9 @@ def test_execute_aws_api_call_non_paginated(
         "service_name", "some_method", arg1="value1"
     )
 
-    mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
+    mock_get_aws_service_client.assert_called_once_with(
+        "service_name", None, region_name="ca-central-1"
+    )
     mock_method.assert_called_once_with(Arg1="value1")
     assert result == {"key": "value"}
     mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
@@ -233,13 +269,13 @@ def test_execute_aws_api_call_non_paginated(
 
 @patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
-@patch("integrations.aws.client.assume_role_client")
+@patch("integrations.aws.client.get_aws_service_client")
 @patch("integrations.aws.client.paginator")
 def test_execute_aws_api_call_paginated(
-    mock_paginator, mock_assume_role_client, mock_convert_kwargs_to_pascal_case
+    mock_paginator, mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case
 ):
     mock_client = MagicMock()
-    mock_assume_role_client.return_value = mock_client
+    mock_get_aws_service_client.return_value = mock_client
     mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_paginator.return_value = ["value1", "value2", "value3"]
 
@@ -247,7 +283,9 @@ def test_execute_aws_api_call_paginated(
         "service_name", "some_method", paginated=True, arg1="value1"
     )
 
-    mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
+    mock_get_aws_service_client.assert_called_once_with(
+        "service_name", None, region_name="ca-central-1"
+    )
     mock_paginator.assert_called_once_with(
         mock_client, "some_method", None, Arg1="value1"
     )
@@ -257,12 +295,12 @@ def test_execute_aws_api_call_paginated(
 
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
-@patch("integrations.aws.client.assume_role_client")
+@patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_with_role_arn(
-    mock_assume_role_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
 ):
     mock_client = MagicMock()
-    mock_assume_role_client.return_value = mock_client
+    mock_get_aws_service_client.return_value = mock_client
     mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
@@ -272,43 +310,10 @@ def test_execute_aws_api_call_with_role_arn(
         "service_name", "some_method", role_arn="test_role_arn", arg1="value1"
     )
 
-    mock_assume_role_client.assert_called_once_with("service_name", "test_role_arn")
+    mock_get_aws_service_client.assert_called_once_with(
+        "service_name", "test_role_arn", region_name="ca-central-1"
+    )
     mock_method.assert_called_once_with(Arg1="value1")
     assert result == {"key": "value"}
     mock_paginator.assert_not_called()
     mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
-
-
-@patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
-@patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
-@patch("integrations.aws.client.assume_role_client")
-def test_execute_aws_api_call_raises_exception_assume_role_on_error(
-    mock_assume_role, mock_convert_kwargs_to_pascal_case, mock_paginator
-):
-    with pytest.raises(ValueError):
-        aws_client.execute_aws_api_call(None, "some_method", role_arn="test_role_arn")
-
-    with pytest.raises(ValueError):
-        aws_client.execute_aws_api_call("service_name", None, role_arn="test_role_arn")
-
-    mock_assume_role.assert_not_called()
-    mock_convert_kwargs_to_pascal_case.assert_not_called()
-    mock_paginator.assert_not_called()
-
-
-@patch.dict(os.environ, clear=True)
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
-@patch("integrations.aws.client.assume_role_client")
-def test_execute_aws_api_call_raises_exception_when_role_arn_not_provided(
-    mock_assume_role, mock_convert_kwargs_to_pascal_case
-):
-    with pytest.raises(ValueError) as exc_info:
-        aws_client.execute_aws_api_call("service_name", "some_method", arg1="value1")
-
-    assert (
-        str(exc_info.value)
-        == "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
-    )
-    mock_assume_role.assert_not_called()
-    mock_convert_kwargs_to_pascal_case.assert_not_called()

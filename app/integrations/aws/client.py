@@ -15,7 +15,6 @@ AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
 THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
 RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
 
-
 logger = logging.getLogger()
 
 
@@ -50,11 +49,10 @@ def handle_aws_api_errors(func):
 
 
 @handle_aws_api_errors
-def assume_role_client(service_name, role_arn):
-    """Assume an AWS IAM role and return a service client.
+def assume_role_client(role_arn):
+    """Assume an IAM role to get temporary credentials.
 
     Args:
-        service_name (str): The name of the AWS service.
         role_arn (str): The ARN of the IAM role to assume.
 
     Returns:
@@ -65,16 +63,36 @@ def assume_role_client(service_name, role_arn):
         RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
     )
     credentials = assumed_role_object["Credentials"]
-    client = boto3.client(
-        service_name,
-        aws_access_key_id=credentials["AccessKeyId"],
-        aws_secret_access_key=credentials["SecretAccessKey"],
-        aws_session_token=credentials["SessionToken"],
-    )
-    return client
+    return credentials
 
 
-def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
+def get_aws_service_client(service_name, role_arn=None, **config):
+    """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
+
+    Args:
+        service_name (str): The name of the AWS service.
+        **config: Additional keyword arguments for the service client.
+
+    Returns:
+        botocore.client.BaseClient: The service client.
+    """
+
+    if role_arn is not None:
+        credentials = assume_role_client(role_arn)
+        config["aws_access_key_id"] = credentials["AccessKeyId"]
+        config["aws_secret_access_key"] = credentials["SecretAccessKey"]
+        config["aws_session_token"] = credentials["SessionToken"]
+    return boto3.client(service_name, **config)
+
+
+def execute_aws_api_call(
+    service_name,
+    method,
+    paginated=False,
+    keys=None,
+    role_arn=None,
+    **kwargs,
+):
     """Execute an AWS API call.
 
     Args:
@@ -90,16 +108,8 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     Raises:
         ValueError: If the role_arn is not provided.
     """
-
-    role_arn = kwargs.pop("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
-    keys = kwargs.pop("keys", None)
-    if role_arn is None:
-        raise ValueError(
-            "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
-        )
-    if service_name is None or method is None:
-        raise ValueError("The AWS service name and method must be provided")
-    client = assume_role_client(service_name, role_arn)
+    config = kwargs.pop("config", dict(region_name=AWS_REGION))
+    client = get_aws_service_client(service_name, role_arn, **config)
     if kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
