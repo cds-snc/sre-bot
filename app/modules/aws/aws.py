@@ -11,12 +11,12 @@ This module provides the following features:
 import json
 import os
 
-from modules.aws import aws_sso, aws_account_health, aws_access_requests
-from integrations.slack import commands as slack_commands, users as slack_users
 from integrations.aws.organizations import get_account_id_by_name
-from modules.permissions import handler as permissions
+from integrations.slack import commands as slack_commands
+from integrations.slack import users as slack_users
+from modules.aws import aws_access_requests, aws_account_health, aws_sso, groups
 from modules.aws.identity_center import provision_aws_users
-from modules.aws import groups
+from modules.permissions import handler as permissions
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -47,7 +47,7 @@ def register(bot):
     """
     bot.command(f"/{PREFIX}aws")(aws_command)
     bot.view("aws_access_view")(aws_access_requests.access_view_handler)
-    bot.view("aws_health_view")(health_view_handler)
+    bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
 
 def aws_command(ack, command, logger, respond, client, body) -> None:
@@ -80,7 +80,7 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
         case "access":
             aws_access_requests.request_access_modal(client, body)
         case "health":
-            request_health_modal(client, body)
+            aws_account_health.request_health_modal(client, body)
         case "user":
             request_user_provisioning(client, body, respond, args, logger)
         case "groups":
@@ -92,105 +92,18 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
             )
 
 
-def health_view_handler(ack, body, logger, client):
-    ack()
-
-    account_id = body["view"]["state"]["values"]["account"]["account"][
-        "selected_option"
-    ]["value"]
-
-    account_name = body["view"]["state"]["values"]["account"]["account"][
-        "selected_option"
-    ]["text"]["text"]
-
-    account_info = aws_account_health.get_account_health(account_id)
-
-    blocks = {
-        "type": "modal",
-        "callback_id": "health_view",
-        "title": {"type": "plain_text", "text": "AWS - Health Check"},
-        "close": {"type": "plain_text", "text": "Close"},
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"Health check for *{account_name}*: ({account_id})",
-                },
-            },
-            {"type": "divider"},
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"""
-*Cost:*
-
-{account_info['cost']['last_month']['start_date']} - {account_info['cost']['last_month']['end_date']}: ${account_info['cost']['last_month']['amount']} USD
-{account_info['cost']['current_month']['start_date']} - {account_info['cost']['current_month']['end_date']}: ${account_info['cost']['current_month']['amount']} USD
-                        """,
-                },
-            },
-            {"type": "divider"},
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"""
-*Security:*
-
-{"✅" if account_info['security']['config'] == 0 else "❌"} Config ({account_info['security']['config']} issues)\n
-{"✅" if account_info['security']['guardduty'] == 0 else "❌"} GuardDuty ({account_info['security']['guardduty']} issues)\n
-{"✅" if account_info['security']['securityhub'] == 0 else "❌"} SecurityHub ({account_info['security']['securityhub']} issues)\n
-                        """,
-                },
-            },
-        ],
-    }
-
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view=blocks,
-    )
-
-
-def request_health_modal(client, body):
-    accounts = aws_account_health.get_accounts()
-    options = [
-        {
-            "text": {"type": "plain_text", "text": value},
-            "value": key,
-        }
-        for key, value in accounts.items()
-    ]
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "aws_health_view",
-            "title": {"type": "plain_text", "text": "AWS - Account health"},
-            "submit": {"type": "plain_text", "text": "Submit"},
-            "blocks": [
-                {
-                    "block_id": "account",
-                    "type": "input",
-                    "element": {
-                        "type": "static_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Select an account to view | Choisissez un compte à afficher",
-                        },
-                        "options": options,
-                        "action_id": "account",
-                    },
-                    "label": {"type": "plain_text", "text": "Account", "emoji": True},
-                }
-            ],
-        },
-    )
-
-
 def request_user_provisioning(client, body, respond, args, logger):
+    """Request AWS user provisioning.
+    
+    This function processes a request to provision or deprovision AWS users.
+    
+    Args:
+        client (SlackClient): The Slack client instance.
+        body (dict): The request body.
+        respond (function): The function to respond to the request.
+        args (list): The list of arguments passed with the command.
+        logger (Logger): The logger instance.
+    """
     requestor_email = slack_users.get_user_email_from_body(client, body)
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         operation = args[0]
