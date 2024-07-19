@@ -3,7 +3,7 @@ import os
 
 from modules.aws import aws_account_health
 
-from unittest.mock import call, MagicMock, patch
+from unittest.mock import ANY, call, MagicMock, patch
 
 
 @patch("modules.aws.aws_account_health.boto3")
@@ -192,3 +192,47 @@ def test_get_ignored_security_hub_issues():
             "Value": '1.14 Ensure hardware MFA is enabled for the "root" account',
         },
     ]
+
+
+@patch("modules.aws.aws_account_health.get_account_health")
+def test_health_view_handler(get_account_health_mock):
+    ack = MagicMock()
+    body = {
+        "trigger_id": "trigger_id",
+        "view": {
+            "state": {
+                "values": {
+                    "account": {
+                        "account": {
+                            "selected_option": {
+                                "value": "account_id",
+                                "text": {"text": "account_name"},
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    }
+    client = MagicMock()
+
+    aws_account_health.health_view_handler(ack, body, MagicMock(), client)
+    ack.assert_called
+    client.views_open.assert_called_with(
+        trigger_id="trigger_id",
+        view=ANY,
+    )
+
+
+@patch("modules.aws.aws.aws_account_health.get_accounts")
+def test_request_health_modal(get_accounts_mocks):
+    client = MagicMock()
+    body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}
+
+    get_accounts_mocks.return_value = {"id": "name"}
+
+    aws_account_health.request_health_modal(client, body)
+    client.views_open.assert_called_with(
+        trigger_id="trigger_id",
+        view=ANY,
+    )
