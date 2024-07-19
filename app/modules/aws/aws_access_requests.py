@@ -1,4 +1,4 @@
-import boto3  # noqa
+import boto3  # type: ignore
 import datetime
 import os
 import uuid
