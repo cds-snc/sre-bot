@@ -240,7 +240,7 @@ def test_get_aws_service_client_no_role(mock_boto3_client):
     assert client == mock_client
 
 
-@patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
+@patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
@@ -267,7 +267,7 @@ def test_execute_aws_api_call_non_paginated(
     mock_paginator.assert_not_called()
 
 
-@patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
+@patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 @patch("integrations.aws.client.paginator")

@@ -8,7 +8,6 @@ from integrations.utils.api import convert_kwargs_to_pascal_case
 
 load_dotenv()
 
-ROLE_ARN = os.environ.get("AWS_DEFAULT_ROLE_ARN", None)
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
@@ -99,7 +98,7 @@ def execute_aws_api_call(
         service_name (str): The name of the AWS service.
         method (str): The method to call on the service client.
         paginate (bool, optional): Whether to paginate the API call.
-        role_arn (str, optional): The ARN of the IAM role to assume. If not provided as an argument, it will be taken from the AWS_SSO_ROLE_ARN environment variable.
+        role_arn (str, optional): The ARN of the IAM role to assume. If not provided as an argument, it will be taken from the AWS_ORG_ACCOUNT_ROLE_ARN environment variable.
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN")
+ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 
