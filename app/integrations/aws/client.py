@@ -48,24 +48,33 @@ def handle_aws_api_errors(func):
 
 
 @handle_aws_api_errors
-def assume_role_client(role_arn):
-    """Assume an IAM role to get temporary credentials.
+def assume_role_session(role_arn, session_name="DefaultSession"):
+    """Assume an IAM role and return a session with temporary credentials.
 
     Args:
         role_arn (str): The ARN of the IAM role to assume.
+        session_name (str): An identifier for the assumed role session.
 
     Returns:
-        botocore.client.BaseClient: The service client.
+        boto3.Session: A session with temporary credentials.
     """
     sts_client = boto3.client("sts")
-    assumed_role_object = sts_client.assume_role(
-        RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn, RoleSessionName=session_name
     )
-    credentials = assumed_role_object["Credentials"]
-    return credentials
+    credentials = assumed_role["Credentials"]
+
+    return boto3.Session(
+        aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"],
+        aws_session_token=credentials["SessionToken"],
+    )
 
 
-def get_aws_service_client(service_name, role_arn=None, **config):
+@handle_aws_api_errors
+def get_aws_service_client(
+    service_name, role_arn=None, session_name="DefaultSession", **config
+):
     """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
 
     Args:
@@ -76,12 +85,11 @@ def get_aws_service_client(service_name, role_arn=None, **config):
         botocore.client.BaseClient: The service client.
     """
 
-    if role_arn is not None:
-        credentials = assume_role_client(role_arn)
-        config["aws_access_key_id"] = credentials["AccessKeyId"]
-        config["aws_secret_access_key"] = credentials["SecretAccessKey"]
-        config["aws_session_token"] = credentials["SessionToken"]
-    return boto3.client(service_name, **config)
+    if role_arn:
+        session = assume_role_session(role_arn, session_name)
+    else:
+        session = boto3.Session(**config)
+    return session.client(service_name)
 
 
 def execute_aws_api_call(
