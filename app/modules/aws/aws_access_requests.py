@@ -1,14 +1,14 @@
-import boto3
+import boto3  # noqa
 import datetime
 import os
 import uuid
 
 from slack_sdk import WebClient
 from server.utils import log_ops_message
-from . import aws_sso
+from integrations.aws import identity_store, organizations, sso_admin
 
 
-client = boto3.client(
+dynamodb_client = boto3.client(
     "dynamodb",
     endpoint_url=(
         "http://dynamodb-local:8000" if os.environ.get("PREFIX", None) else None
@@ -20,7 +20,7 @@ table = "aws_access_requests"
 
 
 def already_has_access(account_id, user_id, access_type):
-    response = client.query(
+    response = dynamodb_client.query(
         TableName=table,
         KeyConditionExpression="account_id = :account_id and created_at > :created_at",
         ExpressionAttributeValues={
@@ -57,13 +57,13 @@ def create_aws_access_request(
     account_name,
     user_id,
     email,
-    start_date_time,
-    end_date_time,
     access_type,
     rationale,
+    start_date_time=datetime.datetime.now(),
+    end_date_time=datetime.datetime.now() + datetime.timedelta(hours=1),
 ):
     id = str(uuid.uuid4())
-    response = client.put_item(
+    response = dynamodb_client.put_item(
         TableName=table,
         Item={
             "id": {"S": id},
@@ -86,7 +86,7 @@ def create_aws_access_request(
 
 
 def expire_request(account_id, created_at):
-    response = client.update_item(
+    response = dynamodb_client.update_item(
         TableName=table,
         Key={
             "account_id": {"S": account_id},
@@ -102,7 +102,7 @@ def expire_request(account_id, created_at):
 
 
 def get_expired_requests():
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="expired = :expired and created_at < :created_at",
         ExpressionAttributeValues={
@@ -129,7 +129,7 @@ def get_active_requests():
     current_timestamp = datetime.datetime.now().timestamp()
 
     # Query to get records where current date time is less than end_date_time
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="end_date_time > :current_time",
         ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
@@ -151,7 +151,7 @@ def get_past_requests():
     current_timestamp = datetime.datetime.now().timestamp()
 
     # Query to get records where current date time is greater than end_date_time
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="end_date_time < :current_time",
         ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
@@ -193,7 +193,7 @@ def access_view_handler(ack, body, logger, client: WebClient):
 
     logger.info(msg)
     log_ops_message(client, msg)
-    aws_user_id = aws_sso.get_user_id(email)
+    aws_user_id = identity_store.get_user_id(email)
 
     if aws_user_id is None:
         msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator.\n<@{user_id}> ({email}) n'est pas enregistré avec AWS SSO. SVP contactez votre administrateur."
@@ -201,7 +201,7 @@ def access_view_handler(ack, body, logger, client: WebClient):
         msg = f"You already have access to {account_name} ({account}) with access type {access_type}. Your access will expire in {expires} minutes."
     elif create_aws_access_request(
         account, account_name, user_id, email, access_type, rationale
-    ) and aws_sso.add_permissions_for_user(aws_user_id, account, access_type):
+    ) and sso_admin.create_account_assignment(aws_user_id, account, access_type):
         msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.\nTraitement de la requête d'accès {access_type} pour le compte {account_name} ({account}) en cours. Cela peut prendre quelques minutes. Visitez <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> pour y accéder"
     else:
         msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel.\nLa requête d'accès {access_type} pour {account_name} ({account}) a échouée. Envoyez une note sur le canal <#sre-and-tech-ops>"
@@ -213,8 +213,13 @@ def access_view_handler(ack, body, logger, client: WebClient):
     )
 
 
-def request_access_modal(client, body):
-    accounts = aws_sso.get_accounts()
+def request_access_modal(client: WebClient, body):
+    accounts = {
+        account["Id"]: account["Name"]
+        for account in organizations.list_organization_accounts()
+    }
+    accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
+
     options = [
         {
             "text": {"type": "plain_text", "text": value},
