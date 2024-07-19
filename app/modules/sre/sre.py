@@ -4,10 +4,12 @@ This module contains the main command for the SRE bot. It is responsible for han
 """
 
 import os
+from slack_sdk import WebClient
+from slack_bolt import Ack, Respond, App
 
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
-from modules.dev import aws_dev, google
+from modules.dev import core as dev_core
 from integrations.slack import commands as slack_commands
 
 help_text = """
@@ -30,11 +32,11 @@ help_text = """
 PREFIX = os.environ.get("PREFIX", "")
 
 
-def register(bot):
+def register(bot: App):
     bot.command(f"/{PREFIX}sre")(sre_command)
 
 
-def sre_command(ack, command, logger, respond, client, body):
+def sre_command(ack: Ack, command, logger, respond: Respond, client: WebClient, body):
     ack()
     logger.info("SRE command received: %s", command["text"])
 
@@ -57,20 +59,10 @@ def sre_command(ack, command, logger, respond, client, body):
             incident_helper.handle_incident_command(args, client, body, respond, ack)
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
+        case "test":
+            dev_core.dev_command(ack, logger, respond, client, body, args)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
-        case "google":
-            if PREFIX == "dev-":
-                google.google_service_command(ack, client, body, respond, logger)
-            else:
-                respond("This command is only available in the dev environment.")
-            return
-        case "aws":
-            if PREFIX == "dev-":
-                aws_dev.aws_dev_command(ack, client, body, respond)
-            else:
-                respond("This command is only available in the dev environment.")
-            return
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
