@@ -12,9 +12,10 @@ import json
 import os
 
 from integrations.aws.organizations import get_account_id_by_name
+from integrations.aws import identity_store
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
-from modules.aws import aws_access_requests, aws_account_health, aws_sso, groups
+from modules.aws import aws_access_requests, aws_account_health, groups
 from modules.aws.identity_center import provision_aws_users
 from modules.permissions import handler as permissions
 
@@ -150,7 +151,7 @@ def request_aws_account_access(
         bool: True if the access request was successfully created, False otherwise.
     """
     account_id = get_account_id_by_name(account_name)
-    user_id = aws_sso.get_user_id(user_email)
+    user_id = identity_store.get_user_id(user_email)
     return aws_access_requests.create_aws_access_request(
         account_id,
         account_name,

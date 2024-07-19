@@ -91,25 +91,25 @@ def test_handle_aws_api_errors_passes_through_return_value():
     mock_func.assert_called_once()
 
 
-@patch("boto3.client")
-def test_paginate_no_key(mock_boto3_client):
+@patch("integrations.aws.client.boto3")
+def test_paginate_no_key(mock_boto3):
     """
     Test case to verify that the function works correctly when no keys are provided.
     """
     mock_paginator = MagicMock()
-    mock_boto3_client.return_value.get_paginator.return_value = mock_paginator
+    mock_boto3.client.return_value.get_paginator.return_value = mock_paginator
     pages = [
         {"Key1": ["Value1", "Value2"], "Key2": ["Value3", "Value4"]},
         {"Key1": ["Value5", "Value6"]},
     ]
     mock_paginator.paginate.return_value = pages
 
-    result = aws_client.paginator(mock_boto3_client.return_value, "operation")
+    result = aws_client.paginator(mock_boto3.client.return_value, "operation")
 
     assert result == pages
 
 
-@patch("boto3.client")
+@patch("integrations.aws.client.boto3.client")
 def test_paginate_single_key(mock_boto3_client):
     """
     Test case to verify that the function works correctly with a single key.
@@ -126,7 +126,7 @@ def test_paginate_single_key(mock_boto3_client):
     assert result == ["Value1", "Value2", "Value5", "Value6"]
 
 
-@patch("boto3.client")
+@patch("integrations.aws.client.boto3.client")
 def test_paginate_multiple_keys(mock_boto3_client):
     """
     Test case to verify that the function works correctly with multiple keys.
@@ -145,7 +145,7 @@ def test_paginate_multiple_keys(mock_boto3_client):
     assert result == ["Value1", "Value2", "Value3", "Value4", "Value5", "Value6"]
 
 
-@patch("boto3.client")
+@patch("integrations.aws.client.boto3.client")
 def test_paginate_empty_page(mock_boto3_client):
     """
     Test case to verify that the function works correctly with an empty page.
@@ -159,7 +159,7 @@ def test_paginate_empty_page(mock_boto3_client):
     assert result == ["Value5", "Value6"]
 
 
-@patch("boto3.client")
+@patch("integrations.aws.client.boto3.client")
 def test_paginate_no_key_in_page(mock_client):
     """
     Test case to verify that the function works correctly when the key is not in the page.
@@ -176,10 +176,10 @@ def test_paginate_no_key_in_page(mock_client):
     assert result == []
 
 
-@patch("boto3.client")
-def test_assume_role_client_returns_credentials(mock_boto3_client):
+@patch("integrations.aws.client.boto3")
+def test_assume_role_session_returns_credentials(mock_boto3):
     mock_sts_client = MagicMock()
-    mock_boto3_client.return_value = mock_sts_client
+    mock_boto3.client.return_value = mock_sts_client
 
     mock_sts_client.assume_role.return_value = {
         "Credentials": {
@@ -189,58 +189,64 @@ def test_assume_role_client_returns_credentials(mock_boto3_client):
         }
     }
 
-    credentials = aws_client.assume_role_client("test_role_arn")
+    mock_session_instance = MagicMock()
+    mock_boto3.Session.return_value = mock_session_instance
 
-    mock_boto3_client.assert_called_once_with("sts")
+    session = aws_client.assume_role_session("test_role_arn")
+
+    mock_boto3.client.assert_called_once_with("sts")
     mock_sts_client.assume_role.assert_called_once_with(
-        RoleArn="test_role_arn", RoleSessionName="AssumeRoleSession1"
+        RoleArn="test_role_arn", RoleSessionName="DefaultSession"
     )
-    expected_credentials = {
-        "AccessKeyId": "test_access_key_id",
-        "SecretAccessKey": "test_secret_access_key",
-        "SessionToken": "test_session_token",
-    }
-    assert credentials == expected_credentials
-
-
-@patch("integrations.aws.client.assume_role_client")
-@patch("integrations.aws.client.boto3.client")
-def test_get_aws_service_client_assumes_role(mock_boto3_client, mock_assume_role):
-    mock_client = MagicMock()
-    mock_boto3_client.return_value = mock_client
-
-    config = {"role_arn": "test_role_arn"}
-
-    mock_assume_role.return_value = {
-        "AccessKeyId": "test_access_key_id",
-        "SecretAccessKey": "test_secret_access_key",
-        "SessionToken": "test_session_token",
-    }
-
-    client = aws_client.get_aws_service_client("service_name", **config)
-
-    mock_assume_role.assert_called_once_with("test_role_arn")
-    mock_boto3_client.assert_called_once_with(
-        "service_name",
+    mock_boto3.Session.assert_called_once_with(
         aws_access_key_id="test_access_key_id",
         aws_secret_access_key="test_secret_access_key",
         aws_session_token="test_session_token",
     )
+    assert session == mock_session_instance
+
+
+@patch("integrations.aws.client.assume_role_session")
+@patch("integrations.aws.client.boto3.Session")
+def test_get_aws_service_client_assumes_role(
+    mock_boto3_session, mock_assume_role_session
+):
+    mock_client = MagicMock()
+    mock_session = MagicMock()
+    mock_session.client.return_value = mock_client
+    mock_boto3_session.return_value = mock_session
+    mock_assume_role_session.return_value.client.return_value = mock_client
+
+    role_arn = "test_role_arn"
+    session_name = "TestSession"
+    service_name = "service_name"
+    config = {"some_config": "value"}
+
+    client = aws_client.get_aws_service_client(
+        service_name, role_arn, session_name, **config
+    )
+
+    mock_assume_role_session.assert_called_once_with(role_arn, session_name)
+    mock_boto3_session.assert_not_called()
     assert client == mock_client
 
 
-@patch("integrations.aws.client.boto3.client")
-def test_get_aws_service_client_no_role(mock_boto3_client):
+@patch("integrations.aws.client.assume_role_session")
+@patch("integrations.aws.client.boto3")
+def test_get_aws_service_client_no_role(mock_boto3, mock_assume_role_session):
     mock_client = MagicMock()
-    mock_boto3_client.return_value = mock_client
+    mock_session = MagicMock()
+    mock_session.client.return_value = mock_client
+    mock_boto3.Session.return_value = mock_session
 
     client = aws_client.get_aws_service_client("service_name")
 
-    mock_boto3_client.assert_called_once_with("service_name")
+    mock_session.client.assert_called_once_with("service_name")
+    mock_assume_role_session.assert_not_called()
     assert client == mock_client
 
 
-@patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
+@patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
@@ -267,7 +273,7 @@ def test_execute_aws_api_call_non_paginated(
     mock_paginator.assert_not_called()
 
 
-@patch.dict(os.environ, {"AWS_SSO_ROLE_ARN": "test_role_arn"})
+@patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 @patch("integrations.aws.client.paginator")

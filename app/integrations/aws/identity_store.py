@@ -5,7 +5,7 @@ from utils import filters
 
 INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
 INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
-ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN", "")
+ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN", "")
 
 logger = logging.getLogger(__name__)
 

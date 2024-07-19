@@ -1,4 +1,5 @@
-from modules.aws import aws_sso, aws_access_requests
+from modules.aws import aws_access_requests
+from integrations.aws import sso_admin, identity_store
 from server.utils import log_ops_message
 import logging
 
@@ -19,8 +20,8 @@ def revoke_aws_sso_access(client):
         )
 
         try:
-            aws_user_id = aws_sso.get_user_id(email)
-            aws_sso.remove_permissions_for_user(aws_user_id, account_id, access_type)
+            aws_user_id = identity_store.get_user_id(email)
+            sso_admin.delete_account_assignment(aws_user_id, account_id, access_type)
             aws_access_requests.expire_request(
                 account_id=account_id, created_at=created_at
             )

@@ -152,7 +152,7 @@ def test_request_user_provisioning_requestor_not_admin(
 
 
 @patch("modules.aws.aws_access_requests.create_aws_access_request")
-@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.identity_store.get_user_id")
 @patch("integrations.aws.organizations.get_account_id_by_name")
 @patch("integrations.aws.organizations.list_organization_accounts")
 def test_request_aws_account_access_success(
@@ -209,7 +209,7 @@ def test_request_aws_account_access_success(
 
 
 @patch("modules.aws.aws_access_requests.create_aws_access_request")
-@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.identity_store.get_user_id")
 @patch("integrations.aws.organizations.get_account_id_by_name")
 @patch("integrations.aws.organizations.list_organization_accounts")
 def test_request_aws_account_access_failure(
