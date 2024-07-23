@@ -450,11 +450,6 @@ def schedule_incident_retro(client, body, ack):
             )
         return
 
-    # # Get security group members. We want to exclude them from the list of people to schedule the event for
-    # security_group_users = client.usergroups_users_list(
-    #     usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID")
-    # )["users"]
-
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
 
@@ -493,27 +488,8 @@ def schedule_incident_retro(client, body, ack):
         }
     )
 
-    # Fetch all users in the channel
-    result = client.conversations_members(channel=channel_id)
-
-    # Fetch user details
-    users = []
-    for user_id in result["members"]:
-        user_info = client.users_info(user=user_id)
-        if (
-            user_info["user"]["real_name"] != "SRE"
-            and user_info["user"]["real_name"] != "SRE Dev"
-        ):
-            users.append(
-                {
-                    "text": {
-                        "type": "plain_text",
-                        "text": user_info["user"]["real_name"],
-                        "emoji": True,
-                    },
-                    "value": user_info["user"]["id"],
-                }
-            )
+    # Fetch user details from all members of the channel
+    users = fetch_user_details(client, channel_id)
 
     blocks = {
         "type": "modal",
@@ -820,3 +796,37 @@ def return_channel_name(input_str):
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str
+
+
+def fetch_user_details(client, channel_id):
+    """
+    Fetches user details from a Slack channel, excluding users with the real names 'SRE' and 'SRE Dev'.
+
+    Parameters:
+    client (object): The Slack client used to interact with the Slack API.
+    channel_id (str): The ID of the Slack channel from which to fetch user details.
+
+    Returns:
+    list: A list of dictionaries containing user details, formatted for Slack modal blocks.
+    """
+    # get all members of the channel
+    result = client.conversations_members(channel=channel_id)
+    users = []
+    # extract the real name of the user and append it to the users list, excluding users with the real names 'SRE' and 'SRE Dev'
+    for user_id in result["members"]:
+        user_info = client.users_info(user=user_id)
+        if (
+            user_info["user"]["real_name"] != "SRE"
+            and user_info["user"]["real_name"] != "SRE Dev"
+        ):
+            users.append(
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": user_info["user"]["real_name"],
+                        "emoji": True,
+                    },
+                    "value": user_info["user"]["id"],
+                }
+            )
+    return users

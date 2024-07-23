@@ -1281,3 +1281,61 @@ def test_save_incident_retro_failure(schedule_event_mock):
         mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
         == "*Could not schedule event - no free time was found!*"
     )
+
+
+def test_fetch_user_details():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {
+        "members": ["U123", "U456", "U789"]
+    }
+    client_mock.users_info.side_effect = [
+        {"user": {"real_name": "Alice", "id": "U123"}},
+        {"user": {"real_name": "SRE", "id": "U456"}},
+        {"user": {"real_name": "Bob", "id": "U789"}},
+    ]
+
+    expected_users = [
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "Alice",
+                "emoji": True,
+            },
+            "value": "U123",
+        },
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "Bob",
+                "emoji": True,
+            },
+            "value": "U789",
+        },
+    ]
+
+    result = incident_helper.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
+
+
+def test_fetch_user_details_no_users():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {"members": []}
+
+    expected_users = []
+
+    result = incident_helper.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
+
+
+def test_fetch_user_details_all_sre():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {"members": ["U123", "U456"]}
+    client_mock.users_info.side_effect = [
+        {"user": {"real_name": "SRE", "id": "U123"}},
+        {"user": {"real_name": "SRE Dev", "id": "U456"}},
+    ]
+
+    expected_users = []
+
+    result = incident_helper.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
