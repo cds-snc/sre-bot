@@ -468,16 +468,6 @@ def schedule_incident_retro(client, body, ack):
         channel_name = "Incident Retro"
         logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
 
-    # user_emails = []
-
-    # # get the email addresses of all the users in the channel, except security group members and any apps/bots in the channel, since bots don't have an email address associated with them.
-    # for user in users:
-    #     if user not in security_group_users:
-    #         response = client.users_info(user=user)["user"]["profile"]
-    #         # don't include bots in the list of users
-    #         if "bot_id" not in response:
-    #             user_emails.append(response["email"])
-
     # get the incident document
     # get and update the incident document
     document_id = ""
@@ -497,9 +487,6 @@ def schedule_incident_retro(client, body, ack):
     # convert the data to string so that we can send it as private metadata
     data_to_send = json.dumps(
         {
-            # "emails": user_emails,
-            # "topic": channel_topic,
-            # "emails": user_emails,
             "name": channel_name,
             "incident_document": document_id,
             "channel_id": channel_id,
