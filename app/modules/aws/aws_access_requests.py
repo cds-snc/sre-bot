@@ -1,9 +1,14 @@
-import boto3
+import boto3  # type: ignore
 import datetime
 import os
 import uuid
 
-client = boto3.client(
+from slack_sdk import WebClient
+from server.utils import log_ops_message
+from integrations.aws import identity_store, organizations, sso_admin
+
+
+dynamodb_client = boto3.client(
     "dynamodb",
     endpoint_url=(
         "http://dynamodb-local:8000" if os.environ.get("PREFIX", None) else None
@@ -15,7 +20,7 @@ table = "aws_access_requests"
 
 
 def already_has_access(account_id, user_id, access_type):
-    response = client.query(
+    response = dynamodb_client.query(
         TableName=table,
         KeyConditionExpression="account_id = :account_id and created_at > :created_at",
         ExpressionAttributeValues={
@@ -52,13 +57,13 @@ def create_aws_access_request(
     account_name,
     user_id,
     email,
-    start_date_time,
-    end_date_time,
     access_type,
     rationale,
+    start_date_time=datetime.datetime.now(),
+    end_date_time=datetime.datetime.now() + datetime.timedelta(hours=1),
 ):
     id = str(uuid.uuid4())
-    response = client.put_item(
+    response = dynamodb_client.put_item(
         TableName=table,
         Item={
             "id": {"S": id},
@@ -81,7 +86,7 @@ def create_aws_access_request(
 
 
 def expire_request(account_id, created_at):
-    response = client.update_item(
+    response = dynamodb_client.update_item(
         TableName=table,
         Key={
             "account_id": {"S": account_id},
@@ -97,7 +102,7 @@ def expire_request(account_id, created_at):
 
 
 def get_expired_requests():
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="expired = :expired and created_at < :created_at",
         ExpressionAttributeValues={
@@ -124,7 +129,7 @@ def get_active_requests():
     current_timestamp = datetime.datetime.now().timestamp()
 
     # Query to get records where current date time is less than end_date_time
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="end_date_time > :current_time",
         ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
@@ -146,9 +151,149 @@ def get_past_requests():
     current_timestamp = datetime.datetime.now().timestamp()
 
     # Query to get records where current date time is greater than end_date_time
-    response = client.scan(
+    response = dynamodb_client.scan(
         TableName=table,
         FilterExpression="end_date_time < :current_time",
         ExpressionAttributeValues={":current_time": {"S": str(current_timestamp)}},
     )
     return response.get("Items", [])
+
+
+def access_view_handler(ack, body, logger, client: WebClient):
+    ack()
+
+    errors = {}
+
+    rationale = body["view"]["state"]["values"]["rationale"]["rationale"]["value"]
+
+    if len(rationale) > 2000:
+        errors["rationale"] = "Please use less than 2000 characters"
+    if len(errors) > 0:
+        ack(response_action="errors", errors=errors)
+        return
+
+    user_id = body["user"]["id"]
+
+    user = client.users_info(user=user_id)["user"]
+    email = user["profile"]["email"]
+
+    account = body["view"]["state"]["values"]["account"]["account"]["selected_option"][
+        "value"
+    ]
+
+    account_name = body["view"]["state"]["values"]["account"]["account"][
+        "selected_option"
+    ]["text"]["text"]
+
+    access_type = body["view"]["state"]["values"]["access_type"]["access_type"][
+        "selected_option"
+    ]["value"]
+
+    msg = f"<@{user_id}> ({email}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
+
+    logger.info(msg)
+    log_ops_message(client, msg)
+    aws_user_id = identity_store.get_user_id(email)
+
+    if aws_user_id is None:
+        msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator.\n<@{user_id}> ({email}) n'est pas enregistré avec AWS SSO. SVP contactez votre administrateur."
+    elif expires := already_has_access(account, user_id, access_type):
+        msg = f"You already have access to {account_name} ({account}) with access type {access_type}. Your access will expire in {expires} minutes."
+    elif create_aws_access_request(
+        account, account_name, user_id, email, access_type, rationale
+    ) and sso_admin.create_account_assignment(aws_user_id, account, access_type):
+        msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.\nTraitement de la requête d'accès {access_type} pour le compte {account_name} ({account}) en cours. Cela peut prendre quelques minutes. Visitez <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> pour y accéder"
+    else:
+        msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel.\nLa requête d'accès {access_type} pour {account_name} ({account}) a échouée. Envoyez une note sur le canal <#sre-and-tech-ops>"
+
+    client.chat_postEphemeral(
+        channel=user_id,
+        user=user_id,
+        text=msg,
+    )
+
+
+def request_access_modal(client: WebClient, body):
+    accounts = {
+        account["Id"]: account["Name"]
+        for account in organizations.list_organization_accounts()
+    }
+    accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
+
+    options = [
+        {
+            "text": {"type": "plain_text", "text": value},
+            "value": key,
+        }
+        for key, value in accounts.items()
+    ]
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view={
+            "type": "modal",
+            "callback_id": "aws_access_view",
+            "title": {"type": "plain_text", "text": "AWS - Account access"},
+            "submit": {"type": "plain_text", "text": "Submit"},
+            "blocks": [
+                {
+                    "block_id": "account",
+                    "type": "input",
+                    "element": {
+                        "type": "static_select",
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select an account to access | Choisissez un compte à accéder",
+                        },
+                        "options": options,
+                        "action_id": "account",
+                    },
+                    "label": {"type": "plain_text", "text": "Account", "emoji": True},
+                },
+                {
+                    "block_id": "access_type",
+                    "type": "input",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "What type of access do you want? :this-is-fine-fire: | Quel type d'accès désirez-vous? :this-is-fine-fire:",
+                        "emoji": True,
+                    },
+                    "element": {
+                        "type": "radio_buttons",
+                        "options": [
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Read access - just need to check something \n Lecture seule - je dois juste regarder quelque chose",
+                                    "emoji": True,
+                                },
+                                "value": "read",
+                            },
+                            {
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "Write access - need to modify something \n Écriture - je dois modifier quelque chose",
+                                    "emoji": True,
+                                },
+                                "value": "write",
+                            },
+                        ],
+                        "action_id": "access_type",
+                    },
+                },
+                {
+                    "type": "input",
+                    "block_id": "rationale",
+                    "element": {
+                        "type": "plain_text_input",
+                        "multiline": True,
+                        "action_id": "rationale",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "What do you plan on doing? | Que planifiez-vous faire?",
+                        "emoji": True,
+                    },
+                },
+            ],
+        },
+    )

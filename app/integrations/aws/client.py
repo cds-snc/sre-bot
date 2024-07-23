@@ -8,13 +8,11 @@ from integrations.utils.api import convert_kwargs_to_pascal_case
 
 load_dotenv()
 
-ROLE_ARN = os.environ.get("AWS_DEFAULT_ROLE_ARN", None)
 SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
 VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
 AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
 THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
 RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
-
 
 logger = logging.getLogger()
 
@@ -50,38 +48,65 @@ def handle_aws_api_errors(func):
 
 
 @handle_aws_api_errors
-def assume_role_client(service_name, role_arn):
-    """Assume an AWS IAM role and return a service client.
+def assume_role_session(role_arn, session_name="DefaultSession"):
+    """Assume an IAM role and return a session with temporary credentials.
 
     Args:
-        service_name (str): The name of the AWS service.
         role_arn (str): The ARN of the IAM role to assume.
+        session_name (str): An identifier for the assumed role session.
 
     Returns:
-        botocore.client.BaseClient: The service client.
+        boto3.Session: A session with temporary credentials.
     """
     sts_client = boto3.client("sts")
-    assumed_role_object = sts_client.assume_role(
-        RoleArn=role_arn, RoleSessionName="AssumeRoleSession1"
+    assumed_role = sts_client.assume_role(
+        RoleArn=role_arn, RoleSessionName=session_name
     )
-    credentials = assumed_role_object["Credentials"]
-    client = boto3.client(
-        service_name,
+    credentials = assumed_role["Credentials"]
+
+    return boto3.Session(
         aws_access_key_id=credentials["AccessKeyId"],
         aws_secret_access_key=credentials["SecretAccessKey"],
         aws_session_token=credentials["SessionToken"],
     )
-    return client
 
 
-def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
+@handle_aws_api_errors
+def get_aws_service_client(
+    service_name, role_arn=None, session_name="DefaultSession", **config
+):
+    """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
+
+    Args:
+        service_name (str): The name of the AWS service.
+        **config: Additional keyword arguments for the service client.
+
+    Returns:
+        botocore.client.BaseClient: The service client.
+    """
+
+    if role_arn:
+        session = assume_role_session(role_arn, session_name)
+    else:
+        session = boto3.Session(**config)
+    return session.client(service_name)
+
+
+def execute_aws_api_call(
+    service_name,
+    method,
+    paginated=False,
+    keys=None,
+    role_arn=None,
+    **kwargs,
+):
     """Execute an AWS API call.
 
     Args:
         service_name (str): The name of the AWS service.
         method (str): The method to call on the service client.
         paginate (bool, optional): Whether to paginate the API call.
-        role_arn (str, optional): The ARN of the IAM role to assume. If not provided as an argument, it will be taken from the AWS_SSO_ROLE_ARN environment variable.
+        role_arn (str, optional): The ARN of the IAM role to assume. If not provided as an argument, it will be taken from the AWS_ORG_ACCOUNT_ROLE_ARN environment variable.
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
@@ -90,16 +115,8 @@ def execute_aws_api_call(service_name, method, paginated=False, **kwargs):
     Raises:
         ValueError: If the role_arn is not provided.
     """
-
-    role_arn = kwargs.pop("role_arn", os.environ.get("AWS_SSO_ROLE_ARN", None))
-    keys = kwargs.pop("keys", None)
-    if role_arn is None:
-        raise ValueError(
-            "role_arn must be provided either as a keyword argument or as the AWS_SSO_ROLE_ARN environment variable"
-        )
-    if service_name is None or method is None:
-        raise ValueError("The AWS service name and method must be provided")
-    client = assume_role_client(service_name, role_arn)
+    config = kwargs.pop("config", dict(region_name=AWS_REGION))
+    client = get_aws_service_client(service_name, role_arn, **config)
     if kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)

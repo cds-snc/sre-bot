@@ -5,7 +5,7 @@ from utils import filters
 
 INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
 INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
-ROLE_ARN = os.environ.get("AWS_SSO_ROLE_ARN", "")
+ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN", "")
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ def create_user(email, first_name, family_name, **kwargs):
         "Emails": [{"Value": email, "Type": "WORK", "Primary": True}],
         "Name": {"GivenName": first_name, "FamilyName": family_name},
         "DisplayName": f"{first_name} {family_name}",
+        "role_arn": ROLE_ARN,
     }
     return execute_aws_api_call("identitystore", "create_user", **params)["UserId"]
 
@@ -76,7 +77,11 @@ def delete_user(user_id, **kwargs):
         bool: True if the user was deleted successfully, False otherwise.
     """
     kwargs = resolve_identity_store_id(kwargs)
-    params = {"UserId": user_id, "IdentityStoreId": kwargs.get("IdentityStoreId")}
+    params = {
+        "UserId": user_id,
+        "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "role_arn": ROLE_ARN,
+    }
     response = execute_aws_api_call("identitystore", "delete_user", **params)
     del response["ResponseMetadata"]
     return response == {}
@@ -99,6 +104,7 @@ def get_user_id(user_name, **kwargs):
                 "AttributeValue": user_name,
             },
         },
+        "role_arn": ROLE_ARN,
     }
     return execute_aws_api_call("identitystore", "get_user_id", **params)["UserId"]
 
@@ -115,6 +121,7 @@ def describe_user(user_id, **kwargs):
     params = {
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "UserId": user_id,
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call("identitystore", "describe_user", **params)
     for key in ["ResponseMetadata", "IdentityStoreId"]:
@@ -126,9 +133,7 @@ def describe_user(user_id, **kwargs):
 def list_users(**kwargs):
     """Retrieves all users from the AWS Identity Center (identitystore)"""
     kwargs = resolve_identity_store_id(kwargs)
-    params = {
-        "IdentityStoreId": kwargs.get("IdentityStoreId"),
-    }
+    params = {"IdentityStoreId": kwargs.get("IdentityStoreId"), "role_arn": ROLE_ARN}
     if "filters" in kwargs:
         params["Filters"] = kwargs["filters"]
     return execute_aws_api_call(
@@ -156,6 +161,7 @@ def get_group_id(group_name, **kwargs):
                 "AttributeValue": group_name,
             },
         },
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call("identitystore", "get_group_id", **params)
     return response["GroupId"] if response else False
@@ -173,6 +179,7 @@ def list_groups(**kwargs):
     kwargs = resolve_identity_store_id(kwargs)
     params = {
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
+        "role_arn": ROLE_ARN,
     }
     if "filters" in kwargs:
         params["Filters"] = kwargs["filters"]
@@ -199,6 +206,7 @@ def create_group_membership(group_id, user_id, **kwargs):
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "GroupId": group_id,
         "MemberId": {"UserId": user_id},
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call(
         "identitystore", "create_group_membership", **params
@@ -221,6 +229,7 @@ def delete_group_membership(membership_id, **kwargs):
     params = {
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "MembershipId": membership_id,
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call(
         "identitystore", "delete_group_membership", **params
@@ -243,6 +252,7 @@ def get_group_membership_id(group_id, user_id, **kwargs):
         "IdentityStoreId": kwargs.get("IdentityStoreId"),
         "GroupId": group_id,
         "MemberId": {"UserId": user_id},
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call(
         "identitystore", "get_group_membership_id", **params
@@ -266,6 +276,7 @@ def list_group_memberships(group_id, **kwargs):
         "GroupId": group_id,
         "keys": ["GroupMemberships"],
         "paginated": True,
+        "role_arn": ROLE_ARN,
     }
     response = execute_aws_api_call(
         "identitystore",
@@ -280,7 +291,7 @@ def list_groups_with_memberships(
     group_members: bool = True,
     members_details: bool = True,
     include_empty_groups: bool = True,
-    groups_filters: list = [],
+    groups_filters: list | None = None,
 ):
     """Retrieves groups with their members from the AWS Identity Center (identitystore)
 
@@ -295,8 +306,9 @@ def list_groups_with_memberships(
     if not groups:
         return []
 
-    for filter in groups_filters:
-        groups = filters.filter_by_condition(groups, filter)
+    if groups_filters is not None:
+        for groups_filter in groups_filters:
+            groups = filters.filter_by_condition(groups, groups_filter)
     if not group_members:
         return groups
 

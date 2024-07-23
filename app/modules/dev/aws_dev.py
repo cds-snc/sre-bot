@@ -1,7 +1,8 @@
 """Testing AWS service (will be removed)"""
 
 import logging
-from modules.aws import identity_center
+
+from integrations.aws import organizations
 
 from dotenv import load_dotenv
 
@@ -12,10 +13,18 @@ logger = logging.getLogger(__name__)
 
 def aws_dev_command(ack, client, body, respond):
     ack()
-    response = identity_center.synchronize(
-        enable_user_create=False, enable_membership_create=False
-    )
+    response = organizations.list_organization_accounts()
+    accounts = {
+        account["Id"]: account["Name"]
+        for account in response
+    }
+    accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
+    formatted_accounts = ""
+    for account in accounts.keys():
+        formatted_accounts += f"{account}: {accounts[account]}\n"
+
     if not response:
         respond("Sync failed. See logs")
     else:
-        respond("Sync successful.")
+        logger.info(accounts)
+        respond("Sync successful. See logs\n" + formatted_accounts)

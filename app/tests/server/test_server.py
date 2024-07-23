@@ -703,7 +703,7 @@ def get_mock_request(session_data=None, cookies=None):
 
 @patch("server.utils.get_user_email_from_request")
 @patch("server.server.get_current_user", new_callable=AsyncMock)
-@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.identity_store.get_user_id")
 @patch("integrations.aws.organizations.get_account_id_by_name")
 @patch("integrations.aws.organizations.list_organization_accounts")
 @patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
@@ -824,7 +824,7 @@ async def test_create_access_request_end_date_before_start_date(
 
 @patch("server.server.get_current_user", new_callable=AsyncMock)
 @patch("server.utils.get_user_email_from_request")
-@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.identity_store.get_user_id")
 @patch("integrations.aws.organizations.list_organization_accounts")
 @patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
 @pytest.mark.asyncio
@@ -869,7 +869,7 @@ async def test_create_access_request_more_than_24_hours(
 
 @patch("server.server.get_current_user", new_callable=AsyncMock)
 @patch("server.utils.get_user_email_from_request")
-@patch("modules.aws.aws_sso.get_user_id")
+@patch("integrations.aws.identity_store.get_user_id")
 @patch("integrations.aws.organizations.list_organization_accounts")
 @patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
 @pytest.mark.asyncio
@@ -940,7 +940,7 @@ async def test_get_aws_active_requests_unauthenticated():
 
 
 @patch("server.utils.get_current_user", new_callable=AsyncMock)
-@patch("modules.aws.aws_access_requests.client")
+@patch("modules.aws.aws_access_requests.dynamodb_client")
 @patch("modules.aws.aws_access_requests.get_active_requests")
 @pytest.mark.asyncio
 async def test_get_aws_active_requests_success(
