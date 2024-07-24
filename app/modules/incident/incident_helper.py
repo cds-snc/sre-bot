@@ -547,7 +547,7 @@ def schedule_incident_retro(client, body, ack):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "2. A proposed event will be added to everyone's calendar that is part of this channel (except Security team).",
+                        "text": "2. A proposed event will be added to everyone's calendar that is selected.",
                     },
                 },
                 {
