@@ -1143,12 +1143,17 @@ def test_schedule_incident_retro_with_no_topic():
         mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
     )
 
+
 def test_schedule_incident_retro_with_no_name():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
     mock_client.conversations_info.return_value = {
-        "channel": {"name": "", "topic": {"value": ""}, "purpose": {"value": "Retro Purpose"}}
+        "channel": {
+            "name": "",
+            "topic": {"value": ""},
+            "purpose": {"value": "Retro Purpose"},
+        }
     }
     mock_client.bookmarks_list.return_value = {
         "ok": True,
