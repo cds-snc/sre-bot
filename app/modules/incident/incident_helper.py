@@ -459,11 +459,6 @@ def schedule_incident_retro(client, body, ack):
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
 
-    # Get the channel topic
-    channel_name = client.conversations_info(channel=channel_id)["channel"]["purpose"][
-        "value"
-    ]
-
     # If for some reason the channel topic is empty, set it to "Incident Retro"
     if channel_name == "":
         channel_name = "Incident Retro"

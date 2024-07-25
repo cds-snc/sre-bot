@@ -14,10 +14,7 @@ logger = logging.getLogger(__name__)
 def aws_dev_command(ack, client, body, respond):
     ack()
     response = organizations.list_organization_accounts()
-    accounts = {
-        account["Id"]: account["Name"]
-        for account in response
-    }
+    accounts = {account["Id"]: account["Name"] for account in response}
     accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
     formatted_accounts = ""
     for account in accounts.keys():
