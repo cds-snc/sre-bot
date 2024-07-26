@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from modules.aws import users
 
 
