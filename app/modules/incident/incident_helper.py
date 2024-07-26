@@ -43,6 +43,7 @@ def register(bot):
     bot.view("view_save_incident_roles")(save_incident_roles)
     bot.view("view_save_event")(save_incident_retro)
     bot.action("confirm_click")(confirm_click)
+    bot.action("all-users-selected")(update_selected_users)
 
 
 def handle_incident_command(args, client, body, respond, ack):
@@ -452,6 +453,8 @@ def schedule_incident_retro(client, body, ack):
 
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
+    print("Userss are  ", users)
+    print("all members are", client.conversations_members(channel=channel_id))
 
     # Get the channel topic
     channel_name = client.conversations_info(channel=channel_id)["channel"]["purpose"][
@@ -528,6 +531,23 @@ def schedule_incident_retro(client, body, ack):
                         "options": users,
                     },
                 },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "OR press this button to select all members of the channel."
+                    },
+                    "accessory": {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Select all channel members",
+                            "emoji": True 
+                        },
+                        "value": "Clicked",
+                        "action_id": "all-users-selected"
+                    }
+                },
                 {"type": "divider"},
                 {
                     "type": "section",
@@ -573,6 +593,145 @@ def schedule_incident_retro(client, body, ack):
         view=blocks,
     )
 
+def update_selected_users(ack, client, body):
+    ack()
+    print(body)
+    print("In update selected users")
+    channel_id = json.loads(body["view"]["private_metadata"])["channel_id"]
+    print("Channel id is ", channel_id)
+    # if "value-0" in view["state"]["values"]["all-users-selected"]["all-users-selected"]:
+    #     print("Selected")
+    #channel_id = body["channel_id"]
+     # Get the channel topic
+    channel_name = client.conversations_info(channel=channel_id)["channel"]["purpose"][
+        "value"
+    ]
+
+    # If for some reason the channel topic is empty, set it to "Incident Retro"
+    if channel_name == "":
+        channel_name = "Incident Retro"
+        logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
+
+    # get the incident document
+    # get and update the incident document
+    document_id = ""
+    response = client.bookmarks_list(channel_id=channel_id)
+    if response["ok"]:
+        for item in range(len(response["bookmarks"])):
+            if response["bookmarks"][item]["title"] == "Incident report":
+                document_id = google_docs.extract_google_doc_id(
+                    response["bookmarks"][item]["link"]
+                )
+    else:
+        logging.warning(
+            "No bookmark link for the incident document found for channel %s",
+            channel_name,
+        )
+
+    # convert the data to string so that we can send it as private metadata
+    data_to_send = json.dumps(
+        {
+            "name": channel_name,
+            "incident_document": document_id,
+            "channel_id": channel_id,
+        }
+    )
+    # get all users in a channel
+    users = client.conversations_members(channel=channel_id)["members"]
+    print("Users are   ", users)
+    options = []
+    for i, name in enumerate(users):
+        real_name = client.users_profile_get(user=name)["profile"]["real_name"]
+        if real_name != "SRE" and real_name != "SRE Dev":
+            option = {
+                "text": {
+                    "type": "plain_text",
+                    "text": real_name,
+                    "emoji": True,
+                },
+                "value": f"value-{i}",
+            }
+            options.append(option)
+    blocks = {
+        "type": "modal",
+        "callback_id": "view_save_event",
+        "private_metadata": data_to_send,
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "submit": {"type": "plain_text", "text": "Schedule"},
+        "blocks": (
+            [
+                {
+                    "type": "input",
+                    "block_id": "number_of_days",
+                    "element": {
+                        "type": "number_input",
+                        "is_decimal_allowed": False,
+                        "min_value": "1",
+                        "max_value": "60",
+                        "action_id": "number_of_days",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "How many days from now should I start checking the calendar for availability?",
+                    },
+                },
+                {
+                    "type": "input",
+                    "block_id": "user_select_block",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Select everyone you want to include in the retro calendar invite",
+                        "emoji": True,
+                    },
+                    "element": {
+                        "type": "multi_static_select",
+                        "action_id": "user_select_action",
+                        "options": options,
+                        "initial_options": options,
+                    },
+                },
+                {"type": "divider"},
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "2. A proposed event will be added to everyone's calendar that is selected.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+                    },
+                },
+            ]
+        ),
+    }
+    # Update the modal view
+    view_id = body["view"]["id"]
+    client.views_update(view_id=view_id, view=blocks)
 
 # Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
 # a message is displayed to the user that the event could not be scheduled.
@@ -582,10 +741,12 @@ def save_incident_retro(client, ack, body, view):
     # get the number of days data from the view and convert to an integer
     days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
 
+    print("IN save incident retro, view is" , view)
     # get all the users selected in the multi select block
     users = view["state"]["values"]["user_select_block"]["user_select_action"][
         "selected_options"
     ]
+    print("Users are in save_incident_retro", users)
     user_emails = []
     for user in users:
         user_id = user["value"].strip()
