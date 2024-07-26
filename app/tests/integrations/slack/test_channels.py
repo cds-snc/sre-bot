@@ -195,3 +195,61 @@ def test_get_messages_in_time_period_with_error():
         channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1))
         == []
     )
+
+
+def test_fetch_user_details():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {
+        "members": ["U123", "U456", "U789"]
+    }
+    client_mock.users_info.side_effect = [
+        {"user": {"real_name": "Alice", "id": "U123"}},
+        {"user": {"real_name": "SRE", "id": "U456"}},
+        {"user": {"real_name": "Bob", "id": "U789"}},
+    ]
+
+    expected_users = [
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "Alice",
+                "emoji": True,
+            },
+            "value": "U123",
+        },
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "Bob",
+                "emoji": True,
+            },
+            "value": "U789",
+        },
+    ]
+
+    result = channels.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
+
+
+def test_fetch_user_details_no_users():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {"members": []}
+
+    expected_users = []
+
+    result = channels.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
+
+
+def test_fetch_user_details_all_sre():
+    client_mock = MagicMock()
+    client_mock.conversations_members.return_value = {"members": ["U123", "U456"]}
+    client_mock.users_info.side_effect = [
+        {"user": {"real_name": "SRE", "id": "U123"}},
+        {"user": {"real_name": "SRE Dev", "id": "U456"}},
+    ]
+
+    expected_users = []
+
+    result = channels.fetch_user_details(client_mock, "C123456")
+    assert result == expected_users
