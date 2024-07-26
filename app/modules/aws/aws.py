@@ -81,7 +81,6 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
             aws_account_health.request_health_modal(client, body)
         case "users":
             users.command_handler(client, body, respond, args, logger)
-            # request_user_provisioning(client, body, respond, args, logger)
         case "groups":
             groups.command_handler(client, body, respond, args, logger)
         case _:

@@ -5,7 +5,7 @@ from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from integrations.slack import users as slack_users
 
-AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "").split(",")
+AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
 
 help_text = """
 \n *AWS Users*:
