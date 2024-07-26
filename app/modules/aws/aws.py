@@ -8,16 +8,13 @@ This module provides the following features:
 
 """
 
-import json
 import os
+from slack_bolt import App
 
 from integrations.aws.organizations import get_account_id_by_name
 from integrations.aws import identity_store
 from integrations.slack import commands as slack_commands
-from integrations.slack import users as slack_users
-from modules.aws import aws_access_requests, aws_account_health, groups
-from modules.aws.identity_center import provision_aws_users
-from modules.permissions import handler as permissions
+from modules.aws import aws_access_requests, aws_account_health, groups, users
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -40,7 +37,7 @@ help_text = """
 """
 
 
-def register(bot):
+def register(bot: App) -> None:
     """AWS module registration.
 
     Args:
@@ -82,8 +79,8 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
             aws_access_requests.request_access_modal(client, body)
         case "health":
             aws_account_health.request_health_modal(client, body)
-        case "user":
-            request_user_provisioning(client, body, respond, args, logger)
+        case "users":
+            users.command_handler(client, body, respond, args, logger)
         case "groups":
             groups.command_handler(client, body, respond, args, logger)
         case _:
@@ -91,40 +88,6 @@ def aws_command(ack, command, logger, respond, client, body) -> None:
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
                 f"Commande inconnue: `{action}`. Tapez `/aws help` pour voir une liste des commandes."
             )
-
-
-def request_user_provisioning(client, body, respond, args, logger):
-    """Request AWS user provisioning.
-
-    This function processes a request to provision or deprovision AWS users.
-
-    Args:
-        client (SlackClient): The Slack client instance.
-        body (dict): The request body.
-        respond (function): The function to respond to the request.
-        args (list): The list of arguments passed with the command.
-        logger (Logger): The logger instance.
-    """
-    requestor_email = slack_users.get_user_email_from_body(client, body)
-    if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
-        operation = args[0]
-        users_emails = args[1:]
-        users_emails = [
-            (
-                slack_users.get_user_email_from_handle(client, email)
-                if email.startswith("@")
-                else email
-            )
-            for email in users_emails
-        ]
-        response = provision_aws_users(operation, users_emails)
-        respond(f"Request completed:\n{json.dumps(response, indent=2)}")
-    else:
-        respond(
-            "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."
-        )
-
-    logger.info("Completed user provisioning request")
 
 
 def request_aws_account_access(

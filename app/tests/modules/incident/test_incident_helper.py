@@ -836,7 +836,6 @@ def test_schedule_incident_retro_successful_no_bots():
 
     # Verify the correct API calls were made
     mock_client.conversations_members.assert_called_with(channel="C1234567890")
-    mock_client.conversations_info.assert_called_once_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -847,8 +846,7 @@ def test_schedule_incident_retro_successful_no_bots():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            # "emails": ["user1@example.com", "user2@example.com"],
-            "name": "Retro Purpose",
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -908,7 +906,6 @@ def test_schedule_incident_retro_successful_bots():
 
     # Verify the correct API calls were made
     mock_client.conversations_members.assert_called_with(channel="C1234567890")
-    mock_client.conversations_info.assert_called_once_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -919,7 +916,7 @@ def test_schedule_incident_retro_successful_bots():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            "name": "Retro Purpose",
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -977,7 +974,6 @@ def test_schedule_incident_retro_successful_no_security_group():
 
     # Verify the correct API calls were made
     mock_client.conversations_members.assert_called_with(channel="C1234567890")
-    mock_client.conversations_info.assert_called_once_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -988,7 +984,7 @@ def test_schedule_incident_retro_successful_no_security_group():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            "name": "Retro Purpose",
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1034,7 +1030,7 @@ def test_schedule_incident_retro_with_no_users():
     # construct the expected data object
     expected_data = json.dumps(
         {
-            "name": "Retro Purpose",
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1078,7 +1074,55 @@ def test_schedule_incident_retro_with_no_topic():
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
         {
-            "name": "Retro Purpose",
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_name():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "name": "",
+            "topic": {"value": ""},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+    mock_client.users_info.side_effect = []
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-",
+        "user_id": "U12345",
+    }
+
+    incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object and set the topic to a default one
+    expected_data = json.dumps(
+        {
+            "name": "incident-",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1122,7 +1166,7 @@ def test_schedule_incident_retro_with_no_purpose():
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
         {
-            "name": "Incident Retro",
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1144,7 +1188,8 @@ def test_save_incident_retro_success(schedule_event_mock):
     body_mock = {"trigger_id": "some_trigger_id"}
     data_to_send = json.dumps(
         {
-            "name": "Incident Retro",
+            "emails": [],
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1193,7 +1238,8 @@ def test_save_incident_retro_success_post_message_to_channel(schedule_event_mock
     body_mock = {"trigger_id": "some_trigger_id"}
     data_to_send = json.dumps(
         {
-            "name": "Incident Retro",
+            "emails": [],
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
@@ -1245,7 +1291,8 @@ def test_save_incident_retro_failure(schedule_event_mock):
     body_mock = {"trigger_id": "some_trigger_id"}
     data_to_send = json.dumps(
         {
-            "name": "Incident Retro",
+            "emails": [],
+            "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
         }
