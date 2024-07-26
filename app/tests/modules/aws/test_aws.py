@@ -34,26 +34,6 @@ def test_aws_command_handles_access_command(request_access_modal):
     request_access_modal.assert_called_with(client, body)
 
 
-# @patch("modules.aws.aws.slack_commands.parse_command")
-# @patch("modules.aws.aws.request_user_provisioning")
-# def test_aws_command_handles_provision_command(
-#     mock_request_provisioning: MagicMock, mock_parse_command: MagicMock
-# ):
-#     ack = MagicMock()
-#     logger = MagicMock()
-#     respond = MagicMock()
-#     client = MagicMock()
-#     body = MagicMock()
-#     mock_parse_command.return_value = ["user", "create", "user.name@email.com"]
-#     aws.aws_command(
-#         ack, {"text": "user create user.name@email.com"}, logger, respond, client, body
-#     )
-#     ack.assert_called()
-#     mock_request_provisioning.assert_called_with(
-#         client, body, respond, ["create", "user.name@email.com"], logger
-#     )
-
-
 @patch("modules.aws.aws.slack_commands.parse_command")
 @patch("modules.aws.groups.command_handler")
 def test_aws_command_handles_groups_command(
