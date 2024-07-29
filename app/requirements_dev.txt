@@ -1,5 +1,5 @@
 black==24.4.2
-checkov==3.2.194
+checkov==3.2.199
 coverage==6.5.0
 flake8==6.1.0
 freezegun==1.5.1
