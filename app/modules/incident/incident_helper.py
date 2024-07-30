@@ -1,4 +1,3 @@
-import os
 import json
 import logging
 from integrations import google_drive
@@ -451,11 +450,6 @@ def schedule_incident_retro(client, body, ack):
             )
         return
 
-    # Get security group members. We want to exclude them from the list of people to schedule the event for
-    security_group_users = client.usergroups_users_list(
-        usergroup=os.getenv("SLACK_SECURITY_USER_GROUP_ID")
-    )["users"]
-
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
 
@@ -463,16 +457,6 @@ def schedule_incident_retro(client, body, ack):
     if channel_name == "":
         channel_name = "Incident Retro"
         logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
-
-    user_emails = []
-
-    # get the email addresses of all the users in the channel, except security group members and any apps/bots in the channel, since bots don't have an email address associated with them.
-    for user in users:
-        if user not in security_group_users:
-            response = client.users_info(user=user)["user"]["profile"]
-            # don't include bots in the list of users
-            if "bot_id" not in response:
-                user_emails.append(response["email"])
 
     # get the incident document
     # get and update the incident document
@@ -493,12 +477,14 @@ def schedule_incident_retro(client, body, ack):
     # convert the data to string so that we can send it as private metadata
     data_to_send = json.dumps(
         {
-            "emails": user_emails,
             "name": channel_name,
             "incident_document": document_id,
             "channel_id": channel_id,
         }
     )
+
+    # Fetch user details from all members of the channel
+    users = slack_channels.fetch_user_details(client, channel_id)
 
     blocks = {
         "type": "modal",
@@ -523,6 +509,20 @@ def schedule_incident_retro(client, body, ack):
                         "text": "How many days from now should I start checking the calendar for availability?",
                     },
                 },
+                {
+                    "type": "input",
+                    "block_id": "user_select_block",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Select everyone you want to include in the retro calendar invite",
+                        "emoji": True,
+                    },
+                    "element": {
+                        "type": "multi_static_select",
+                        "action_id": "user_select_action",
+                        "options": users,
+                    },
+                },
                 {"type": "divider"},
                 {
                     "type": "section",
@@ -542,7 +542,7 @@ def schedule_incident_retro(client, body, ack):
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "2. A proposed event will be added to everyone's calendar that is part of this channel (except Security team).",
+                        "text": "2. A proposed event will be added to everyone's calendar that is selected.",
                     },
                 },
                 {
@@ -577,9 +577,18 @@ def save_incident_retro(client, ack, body, view):
     # get the number of days data from the view and convert to an integer
     days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
 
-    # pass the data using the view["private_metadata"] to the schedule_event function
-    result = schedule_retro.schedule_event(view["private_metadata"], days)
+    # get all the users selected in the multi select block
+    users = view["state"]["values"]["user_select_block"]["user_select_action"][
+        "selected_options"
+    ]
+    user_emails = []
+    for user in users:
+        user_id = user["value"].strip()
+        user_email = client.users_info(user=user_id)["user"]["profile"]["email"]
+        user_emails.append(user_email)
 
+    # pass the data using the view["private_metadata"] to the schedule_event function
+    result = schedule_retro.schedule_event(view["private_metadata"], days, user_emails)
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if result is None:
         blocks = {

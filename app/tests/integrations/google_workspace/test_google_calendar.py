@@ -217,6 +217,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
         },
         calendarId="primary",
         supportsAttachments=True,
+        sendUpdates="all",
         conferenceDataVersion=1,
     )
     assert not mock_convert_string_to_camel_case.called
@@ -297,6 +298,7 @@ def test_insert_event_with_kwargs(
         },
         calendarId="primary",
         supportsAttachments=True,
+        sendUpdates="all",
         conferenceDataVersion=1,
     )
     for key in kwargs:
@@ -372,6 +374,7 @@ def test_insert_event_with_no_document(
         },
         calendarId="primary",
         supportsAttachments=True,
+        sendUpdates="all",
         conferenceDataVersion=1,
     )
     for key in kwargs:
@@ -442,6 +445,7 @@ def test_insert_event_google_hangout_link_created(
         },
         calendarId="primary",
         supportsAttachments=True,
+        sendUpdates="all",
         conferenceDataVersion=1,
     )
     assert mock_unique_id.called

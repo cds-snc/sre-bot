@@ -801,9 +801,18 @@ def test_schedule_incident_retro_successful_no_bots():
         }
     }
     mock_client.users_info.side_effect = [
-        {"user": {"profile": {"email": "user1@example.com"}}},
-        {"user": {"profile": {"email": "user2@example.com"}}},
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
+        {
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
     ]
+
     mock_client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -826,10 +835,7 @@ def test_schedule_incident_retro_successful_no_bots():
     mock_ack.assert_called_once()
 
     # Verify the correct API calls were made
-    mock_client.usergroups_users_list.assert_called_once_with(
-        usergroup=SLACK_SECURITY_USER_GROUP_ID
-    )
-    mock_client.conversations_members.assert_called_once_with(channel="C1234567890")
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -840,7 +846,6 @@ def test_schedule_incident_retro_successful_no_bots():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            "emails": ["user1@example.com", "user2@example.com"],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -864,13 +869,20 @@ def test_schedule_incident_retro_successful_bots():
             "purpose": {"value": "Retro Purpose"},
         }
     }
+
     mock_client.users_info.side_effect = [
-        {"user": {"profile": {"email": "user1@example.com"}}},
-        {"user": {"profile": {"email": "user2@example.com"}}},
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
         {
-            "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
-        },  # This simulates a bot user
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
     ]
+
     mock_client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -893,10 +905,7 @@ def test_schedule_incident_retro_successful_bots():
     mock_ack.assert_called_once()
 
     # Verify the correct API calls were made
-    mock_client.usergroups_users_list.assert_called_once_with(
-        usergroup=SLACK_SECURITY_USER_GROUP_ID
-    )
-    mock_client.conversations_members.assert_called_once_with(channel="C1234567890")
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -907,73 +916,6 @@ def test_schedule_incident_retro_successful_bots():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            "emails": ["user1@example.com", "user2@example.com"],
-            "name": "incident-2024-01-12-test",
-            "incident_document": "dummy_document_id",
-            "channel_id": "C1234567890",
-        }
-    )
-    assert (
-        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
-    )
-
-
-def test_schedule_incident_retro_successful_security_group():
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_client.usergroups_users_list.return_value = {"users": ["U12345", "U444444"]}
-    mock_client.conversations_members.return_value = {
-        "members": ["U12345", "U67890", "U54321"]
-    }
-    mock_client.conversations_info.return_value = {
-        "channel": {
-            "topic": {"value": "Retro Topic"},
-            "purpose": {"value": "Retro Purpose"},
-        }
-    }
-    mock_client.users_info.side_effect = [
-        {"user": {"profile": {"email": "user2@example.com"}}},
-        {
-            "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
-        },  # This simulates a bot user
-    ]
-    mock_client.bookmarks_list.return_value = {
-        "ok": True,
-        "bookmarks": [
-            {
-                "title": "Incident report",
-                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
-            }
-        ],
-    }
-
-    body = {
-        "channel_id": "C1234567890",
-        "trigger_id": "T1234567890",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "U12345",
-    }
-
-    incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
-
-    mock_ack.assert_called_once()
-
-    # Verify the correct API calls were made
-    mock_client.usergroups_users_list.assert_called_once_with(
-        usergroup=SLACK_SECURITY_USER_GROUP_ID
-    )
-    mock_client.conversations_members.assert_called_once_with(channel="C1234567890")
-
-    # Check the users_info method was called correctly
-    calls = [call for call in mock_client.users_info.call_args_list]
-    assert (
-        len(calls) == 2
-    )  # Ensure we tried to fetch info for two users, minus the user being in the security group
-
-    # Verify the modal payload contains the correct data
-    expected_data = json.dumps(
-        {
-            "emails": ["user2@example.com"],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -998,11 +940,16 @@ def test_schedule_incident_retro_successful_no_security_group():
         }
     }
     mock_client.users_info.side_effect = [
-        {"user": {"profile": {"email": "user1@example.com"}}},
-        {"user": {"profile": {"email": "user2@example.com"}}},
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
         {
-            "user": {"profile": {"email": "user3@example.com", "bot_id": "B12345"}}
-        },  # This simulates a bot user
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
     ]
     mock_client.bookmarks_list.return_value = {
         "ok": True,
@@ -1026,10 +973,7 @@ def test_schedule_incident_retro_successful_no_security_group():
     mock_ack.assert_called_once()
 
     # Verify the correct API calls were made
-    mock_client.usergroups_users_list.assert_called_once_with(
-        usergroup=SLACK_SECURITY_USER_GROUP_ID
-    )
-    mock_client.conversations_members.assert_called_once_with(channel="C1234567890")
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
 
     # Check the users_info method was called correctly
     calls = [call for call in mock_client.users_info.call_args_list]
@@ -1040,7 +984,6 @@ def test_schedule_incident_retro_successful_no_security_group():
     # Verify the modal payload contains the correct data
     expected_data = json.dumps(
         {
-            "emails": ["user1@example.com", "user2@example.com"],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -1087,7 +1030,6 @@ def test_schedule_incident_retro_with_no_users():
     # construct the expected data object
     expected_data = json.dumps(
         {
-            "emails": [],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -1132,7 +1074,6 @@ def test_schedule_incident_retro_with_no_topic():
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
         {
-            "emails": [],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -1181,7 +1122,6 @@ def test_schedule_incident_retro_with_no_name():
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
         {
-            "emails": [],
             "name": "incident-",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -1226,7 +1166,6 @@ def test_schedule_incident_retro_with_no_purpose():
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
         {
-            "emails": [],
             "name": "incident-2024-01-12-test",
             "incident_document": "dummy_document_id",
             "channel_id": "C1234567890",
@@ -1242,7 +1181,6 @@ def test_schedule_incident_retro_with_no_purpose():
 def test_save_incident_retro_success(schedule_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    # schedule_event_mock.return_value = "http://example.com/event"
     schedule_event_mock.return_value = {
         "event_link": "http://example.com/event",
         "event_info": "event_info",
@@ -1258,7 +1196,19 @@ def test_save_incident_retro_success(schedule_event_mock):
     )
     view_mock_with_link = {
         "private_metadata": data_to_send,
-        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
     }
 
     # Call the function
@@ -1296,7 +1246,19 @@ def test_save_incident_retro_success_post_message_to_channel(schedule_event_mock
     )
     view_mock_with_link = {
         "private_metadata": data_to_send,
-        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
     }
 
     # Call the function
@@ -1337,7 +1299,19 @@ def test_save_incident_retro_failure(schedule_event_mock):
     )
     view_mock_with_link = {
         "private_metadata": data_to_send,
-        "state": {"values": {"number_of_days": {"number_of_days": {"value": "1"}}}},
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
     }
 
     # Call the function

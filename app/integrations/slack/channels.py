@@ -75,3 +75,37 @@ def get_messages_in_time_period(client, channel_id, time_delta):
         )  # Return only messages from users
     else:
         return []
+
+
+def fetch_user_details(client, channel_id):
+    """
+    Fetches user details from a Slack channel, excluding users with the real names 'SRE' and 'SRE Dev'.
+
+    Parameters:
+    client (object): The Slack client used to interact with the Slack API.
+    channel_id (str): The ID of the Slack channel from which to fetch user details.
+
+    Returns:
+    list: A list of dictionaries containing user details, formatted for Slack modal blocks.
+    """
+    # get all members of the channel
+    result = client.conversations_members(channel=channel_id)
+    users = []
+    # extract the real name of the user and append it to the users list, excluding users with the real names 'SRE' and 'SRE Dev'
+    for user_id in result["members"]:
+        user_info = client.users_info(user=user_id)
+        if (
+            user_info["user"]["real_name"] != "SRE"
+            and user_info["user"]["real_name"] != "SRE Dev"
+        ):
+            users.append(
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": user_info["user"]["real_name"],
+                        "emoji": True,
+                    },
+                    "value": user_info["user"]["id"],
+                }
+            )
+    return users
