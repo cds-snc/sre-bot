@@ -1,12 +1,11 @@
-resource "aws_wafv3_web_acl" "sre-bot"
-{
-    name        = "sre-bot"
-    scope       = "REGIONAL"
-    description = "WAF Web ACL for SRE Bot"
-    default_action {
-        allow {}
-    }
-    rule {
+resource "aws_wafv2_web_acl" "sre-bot" {
+  name        = "sre-bot"
+  scope       = "REGIONAL"
+  description = "WAF Web ACL for SRE Bot"
+  default_action {
+    allow {}
+  }
+  rule {
     name     = "APIRatesEvaluation"
     priority = 0
 
@@ -16,12 +15,12 @@ resource "aws_wafv3_web_acl" "sre-bot"
 
     statement {
       rate_based_statement {
-        limit               = 5000
-        aggregate_key_type  = "CONSTANT"
+        limit              = 5000
+        aggregate_key_type = "CONSTANT"
 
         scope_down_statement {
           byte_match_statement {
-            search_string         = "/"
+            search_string = "/"
             field_to_match {
               uri_path {}
             }
@@ -34,13 +33,13 @@ resource "aws_wafv3_web_acl" "sre-bot"
         }
       }
     }
-     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "APIRatesEvaluation"
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "APIRatesEvaluation"
     }
-    }
-    rule {
+  }
+  rule {
     name     = "AWS-AWSManagedRulesCommonRuleSet"
     priority = 1
 
@@ -56,12 +55,12 @@ resource "aws_wafv3_web_acl" "sre-bot"
     }
 
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "AWS-AWSManagedRulesCommonRuleSet"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWS-AWSManagedRulesCommonRuleSet"
     }
   }
-    rule {
+  rule {
     name     = "AWS-AWSManagedRulesKnownBadInputsRuleSet"
     priority = 2
 
@@ -77,14 +76,11 @@ resource "aws_wafv3_web_acl" "sre-bot"
     }
 
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "AWS-AWSManagedRulesKnownBadInputsRuleSet"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWS-AWSManagedRulesKnownBadInputsRuleSet"
     }
   }
-
-
-    
   rule {
     name     = "AWSManagedRulesLinuxRuleSet"
     priority = 3
@@ -101,12 +97,12 @@ resource "aws_wafv3_web_acl" "sre-bot"
     }
 
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "AWSManagedRulesLinuxRuleSet"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSManagedRulesLinuxRuleSet"
     }
   }
-    rule {
+  rule {
     name     = "AWS-AWSManagedRulesAmazonIpReputationList"
     priority = 4
 
@@ -122,9 +118,9 @@ resource "aws_wafv3_web_acl" "sre-bot"
     }
 
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "AWS-AWSManagedRulesAmazonIpReputationList"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWS-AWSManagedRulesAmazonIpReputationList"
     }
   }
   rule {
@@ -137,17 +133,16 @@ resource "aws_wafv3_web_acl" "sre-bot"
 
     statement {
       ip_set_reference_statement {
-        arn = var.blocked_ips_arn 
+        arn = aws_wafv2_ip_set.blocked_ips.arn
       }
     }
-
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "Blocked_ips"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "Blocked_ips"
     }
   }
-rule {
+  rule {
     name     = "AuthorizedEndpoints"
     priority = 6
 
@@ -157,7 +152,7 @@ rule {
 
     statement {
       and_statement {
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -175,7 +170,7 @@ rule {
           }
         }
 
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -193,7 +188,7 @@ rule {
           }
         }
 
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -211,7 +206,7 @@ rule {
           }
         }
 
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -229,7 +224,7 @@ rule {
           }
         }
 
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -247,7 +242,7 @@ rule {
           }
         }
 
-        statements {
+        statement {
           not_statement {
             statement {
               byte_match_statement {
@@ -268,26 +263,48 @@ rule {
     }
 
     visibility_config {
-      sampled_requests_enabled    = true
-      cloudwatch_metrics_enabled  = true
-      metric_name                 = "AuthorizedEndpoints"
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AuthorizedEndpoints"
+    }
+  }
+  rule {
+    name     = "rate-limit-rule"
+    priority = 7
+
+    action {
+      block {}
     }
 
+    statement {
+      rate_based_statement {
+        limit              = 1000
+        aggregate_key_type = "IP"
+      }
+    }
 
     visibility_config {
-        cloudwatch_metrics_enabled = true
-        metric_name                = "sre-bot"
-        sampled_requests_enabled    = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "rateLimitRule"
+      sampled_requests_enabled   = true
     }
-    tags = {
-        Name = "sre-bot"
-    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "sre-bot"
+    sampled_requests_enabled   = true
+  }
+  tags = {
+    Name = "sre-bot"
+  }
 }
-}
+
+
 resource "aws_wafv2_ip_set" "blocked_ips" {
   name        = "sre-bot-blocked-ips"
   description = "List of IP addresses for the SRE bot that are blocked due to attacks"
-  scope       = "REGIONAL" 
+  scope       = "REGIONAL"
 
   ip_address_version = "IPV4"
 
@@ -300,18 +317,15 @@ resource "aws_wafv2_ip_set" "blocked_ips" {
 
 }
 
-resource "aws_wafv3_web_acl_association" "sre-bot"
-{
-    resource_arn = aws_lb.sre-bot.arn
-    web_acl_arn  = aws_wafv3_web_acl.sre-bot.arn
+resource "aws_wafv2_web_acl_association" "sre-bot" {
+  resource_arn = aws_lb.sre_bot.arn
+  web_acl_arn  = aws_wafv2_web_acl.sre-bot.arn
 }
 
-resource "aws_cloudwatch_log_group" "sre_bot_waf_log_group"
-{
-    name = "sre-bot-waf-log-group"
+resource "aws_cloudwatch_log_group" "sre_bot_waf_log_group" {
+  name = "sre-bot-waf-log-group"
 }
-resource "aws_wafv2_web_acl_logging_configuration" "sre-bot"
-{
-    resource_arn = aws_wafv3_web_acl.sre-bot.arn
-    log_destination_configs = [aws_cloudwatch_log_group.sre_bot_waf_log_group.arn]
+resource "aws_wafv2_web_acl_logging_configuration" "sre-bot" {
+  resource_arn            = aws_wafv2_web_acl.sre-bot.arn
+  log_destination_configs = [aws_cloudwatch_log_group.sre_bot_waf_log_group.arn]
 }
