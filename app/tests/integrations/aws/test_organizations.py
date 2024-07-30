@@ -10,6 +10,7 @@ from integrations.aws.organizations import (
 ORG_ROLE_ARN = "arn:aws:iam::123456789012:role/OrganizationAccountAccessRole"
 
 
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
 @patch("integrations.aws.organizations.execute_aws_api_call")
 def test_list_organization_accounts_success(mock_execute_aws_api_call):
     # Mock return value
@@ -31,6 +32,13 @@ def test_list_organization_accounts_success(mock_execute_aws_api_call):
     # Execute the function
     result = list_organization_accounts()
 
+    mock_execute_aws_api_call.assert_called_with(
+        "organizations",
+        "list_accounts",
+        paginated=True,
+        keys=["Accounts"],
+        role_arn=ORG_ROLE_ARN,
+    )
     # Verify the result
     assert result == mock_accounts
 
