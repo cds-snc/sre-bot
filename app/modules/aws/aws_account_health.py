@@ -1,6 +1,11 @@
 import arrow
-import boto3
+import boto3  # type: ignore
 import os
+from slack_bolt import Ack
+from slack_sdk import WebClient
+from logging import Logger
+
+from integrations.aws import organizations
 
 AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
 LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
@@ -21,21 +26,6 @@ def assume_role_client(client_type, role=ORG_ROLE_ARN, region="ca-central-1"):
     )
 
     return session.client(client_type, region_name=region)
-
-
-def get_accounts():
-    client = assume_role_client("organizations")
-    response = client.list_accounts()
-    accounts = {}
-    # Loop response for NextToken
-    while True:
-        for account in response["Accounts"]:
-            accounts[account["Id"]] = account["Name"]
-        if "NextToken" in response:
-            response = client.list_accounts(NextToken=response["NextToken"])
-        else:
-            break
-    return dict(sorted(accounts.items(), key=lambda item: item[1]))
 
 
 def get_account_health(account_id):
@@ -177,7 +167,7 @@ def get_ignored_security_hub_issues():
     return list(map(lambda t: {"Value": t, "Comparison": "NOT_EQUALS"}, ignored_issues))
 
 
-def health_view_handler(ack, body, logger, client):
+def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
     ack()
 
     account_id = body["view"]["state"]["values"]["account"]["account"][
@@ -239,15 +229,19 @@ def health_view_handler(ack, body, logger, client):
     )
 
 
-def request_health_modal(client, body):
-    accounts = get_accounts()
+def request_health_modal(client: WebClient, body):
+    accounts = organizations.list_organization_accounts()
     options = [
         {
-            "text": {"type": "plain_text", "text": value},
-            "value": key,
+            "text": {
+                "type": "plain_text",
+                "text": f"{account['Name']} ({account['Id']})",
+            },
+            "value": account["Id"],
         }
-        for key, value in accounts.items()
+        for account in accounts
     ]
+    options.sort(key=lambda x: x["text"]["text"].lower())
     client.views_open(
         trigger_id=body["trigger_id"],
         view={

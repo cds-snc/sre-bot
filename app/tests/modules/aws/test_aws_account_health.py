@@ -30,35 +30,6 @@ def test_assume_role_client_returns_session(boto3_mock):
     )
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_accounts(assume_role_client_mock):
-    client = MagicMock()
-    client.list_accounts.side_effect = [
-        {
-            "Accounts": [
-                {
-                    "Id": "test_account_id",
-                    "Name": "test_account_name",
-                }
-            ],
-            "NextToken": "test_next_token",
-        },
-        {
-            "Accounts": [
-                {
-                    "Id": "test_account_id_2",
-                    "Name": "test_account_name_2",
-                }
-            ],
-        },
-    ]
-    assume_role_client_mock.return_value = client
-    assert aws_account_health.get_accounts() == {
-        "test_account_id": "test_account_name",
-        "test_account_id_2": "test_account_name_2",
-    }
-
-
 @patch("modules.aws.aws_account_health.get_securityhub_summary")
 @patch("modules.aws.aws_account_health.get_guardduty_summary")
 @patch("modules.aws.aws_account_health.get_config_summary")
@@ -224,12 +195,12 @@ def test_health_view_handler(get_account_health_mock):
     )
 
 
-@patch("modules.aws.aws.aws_account_health.get_accounts")
+@patch("modules.aws.aws.aws_account_health.organizations.list_organization_accounts")
 def test_request_health_modal(get_accounts_mocks):
     client = MagicMock()
     body = {"trigger_id": "trigger_id", "view": {"state": {"values": {}}}}
 
-    get_accounts_mocks.return_value = {"id": "name"}
+    get_accounts_mocks.return_value = [{"Id": "id", "Name": "name"}]
 
     aws_account_health.request_health_modal(client, body)
     client.views_open.assert_called_with(
