@@ -5,7 +5,7 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from logging import Logger
 
-from integrations.aws import organizations, security_hub, guard_duty
+from integrations.aws import organizations, security_hub, guard_duty, config
 
 AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
 LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
@@ -90,15 +90,14 @@ def get_account_spend(account_id, start_date, end_date):
 
 
 def get_config_summary(account_id):
-    client = assume_role_client("config", role=AUDIT_ROLE_ARN)
-    response = client.describe_aggregate_compliance_by_config_rules(
-        ConfigurationAggregatorName="aws-controltower-GuardrailsComplianceAggregator",
-        Filters={
-            "AccountId": account_id,
-            "ComplianceType": "NON_COMPLIANT",
-        },
+    config_name = "aws-controltower-GuardrailsComplianceAggregator"
+    filters = {
+        "AccountId": account_id,
+        "ComplianceType": "NON_COMPLIANT",
+    }
+    return len(
+        config.describe_aggregate_compliance_by_config_rules(config_name, filters)
     )
-    return len(response["AggregateComplianceByConfigRules"])
 
 
 def get_guardduty_summary(account_id):

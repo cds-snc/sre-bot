@@ -111,17 +111,19 @@ def test_get_account_spend_with_no_data(assume_role_client_mock):
     )
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_config_summary(assume_role_client_mock):
-    client = MagicMock()
-    client.describe_aggregate_compliance_by_config_rules.return_value = {
-        "AggregateComplianceByConfigRules": ["foo"]
+@patch("modules.aws.aws_account_health.config")
+def test_get_config_summary(config_mock):
+    expected_config_name = "aws-controltower-GuardrailsComplianceAggregator"
+    expected_filters = {
+        "AccountId": "test_account_id",
+        "ComplianceType": "NON_COMPLIANT",
     }
-    assume_role_client_mock.return_value = client
-    assert aws_account_health.get_config_summary("test_account_id") == 1
-    assert assume_role_client_mock.called_with(
-        "config", role=os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
-    )
+    config_mock.describe_aggregate_compliance_by_config_rules.return_value = [
+        "foo",
+        "bar",
+    ]
+    assert aws_account_health.get_config_summary("test_account_id") == 2
+    assert config_mock.called_with(expected_config_name, expected_filters)
 
 
 @patch("modules.aws.aws_account_health.guard_duty")
