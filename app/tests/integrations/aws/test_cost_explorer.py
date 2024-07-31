@@ -7,7 +7,10 @@ from integrations.aws import cost_explorer
 def test_get_cost_and_usage_returns_cost_and_usage_list_when_success(
     mock_execute_aws_api_call,
 ):
-    mock_execute_aws_api_call.return_value = [{"CostAndUsage": "foo"}, {"CostAndUsage": "bar"}]
+    mock_execute_aws_api_call.return_value = [
+        {"CostAndUsage": "foo"},
+        {"CostAndUsage": "bar"},
+    ]
     assert len(cost_explorer.get_cost_and_usage("foo", "bar", ["foo"])) == 2
     assert mock_execute_aws_api_call.called_with(
         "ce",
@@ -19,7 +22,6 @@ def test_get_cost_and_usage_returns_cost_and_usage_list_when_success(
         Granularity="bar",
         Metrics=["foo"],
     )
-
 
 
 @patch("integrations.aws.cost_explorer.ORG_ROLE_ARN", "foo")
