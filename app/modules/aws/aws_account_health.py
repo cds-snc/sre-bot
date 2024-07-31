@@ -1,6 +1,4 @@
 import arrow
-import boto3  # type: ignore
-import os
 from slack_bolt import Ack
 from slack_sdk import WebClient
 from logging import Logger
@@ -12,24 +10,6 @@ from integrations.aws import (
     config,
     cost_explorer,
 )
-
-ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
-
-
-def assume_role_client(client_type, role=ORG_ROLE_ARN, region="ca-central-1"):
-    client = boto3.client("sts")
-
-    response = client.assume_role(
-        RoleArn=role, RoleSessionName="SREBot_Org_Account_Role"
-    )
-
-    session = boto3.Session(
-        aws_access_key_id=response["Credentials"]["AccessKeyId"],
-        aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
-        aws_session_token=response["Credentials"]["SessionToken"],
-    )
-
-    return session.client(client_type, region_name=region)
 
 
 def get_account_health(account_id):

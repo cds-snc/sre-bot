@@ -1,33 +1,8 @@
 import arrow
-import os
 
 from modules.aws import aws_account_health
 
-from unittest.mock import ANY, call, MagicMock, patch
-
-
-@patch("modules.aws.aws_account_health.boto3")
-def test_assume_role_client_returns_session(boto3_mock):
-    client = MagicMock()
-    client.assume_role.return_value = {
-        "Credentials": {
-            "AccessKeyId": "test_access_key_id",
-            "SecretAccessKey": "test_secret_access_key",
-            "SessionToken": "test_session_token",
-        }
-    }
-    session = MagicMock()
-    session.client.return_value = "session-client"
-    boto3_mock.client.return_value = client
-    boto3_mock.Session.return_value = session
-    assert aws_account_health.assume_role_client("identitystore") == "session-client"
-    assert boto3_mock.client.call_count == 1
-    assert boto3_mock.Session.call_count == 1
-    assert boto3_mock.Session.call_args == call(
-        aws_access_key_id="test_access_key_id",
-        aws_secret_access_key="test_secret_access_key",
-        aws_session_token="test_session_token",
-    )
+from unittest.mock import ANY, MagicMock, patch
 
 
 @patch("modules.aws.aws_account_health.get_securityhub_summary")
