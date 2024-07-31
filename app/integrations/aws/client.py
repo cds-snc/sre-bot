@@ -2,7 +2,8 @@ import os
 import logging
 from functools import wraps
 import boto3  # type: ignore
-from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+from botocore.exceptions import BotoCoreError, ClientError
+from botocore.client import BaseClient  # type: ignore
 from dotenv import load_dotenv
 from integrations.utils.api import convert_kwargs_to_pascal_case
 
@@ -116,8 +117,9 @@ def execute_aws_api_call(
         ValueError: If the role_arn is not provided.
     """
     config = kwargs.pop("config", dict(region_name=AWS_REGION))
+    convert_kwargs = kwargs.pop("convert_kwargs", True)
     client = get_aws_service_client(service_name, role_arn, **config)
-    if kwargs:
+    if kwargs and convert_kwargs:
         kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
     if paginated:
@@ -126,11 +128,11 @@ def execute_aws_api_call(
         return api_method(**kwargs)
 
 
-def paginator(client, operation, keys=None, **kwargs):
+def paginator(client: BaseClient, operation, keys=None, **kwargs):
     """Generic paginator for AWS operations
 
     Args:
-        client (botocore.client.BaseClient): The service client.
+        client (BaseClient): The service client.
         operation (str): The operation to paginate.
         keys (list, optional): The keys to extract from the paginated results.
         **kwargs: Additional keyword arguments for the operation.
