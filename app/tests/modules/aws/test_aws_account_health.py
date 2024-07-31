@@ -67,22 +67,20 @@ def test_get_account_health(
     assert "security" in result
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_account_spend_with_data(assume_role_client_mock):
-    client = MagicMock()
-    client.get_cost_and_usage.return_value = {
+@patch("modules.aws.aws_account_health.cost_explorer")
+def test_get_account_spend_with_data(cost_explorer_mock):
+    cost_explorer_mock.get_cost_and_usage.return_value = {
         "ResultsByTime": [
             {"Groups": [{"Metrics": {"UnblendedCost": {"Amount": "100.123456789"}}}]}
         ]
     }
-    assume_role_client_mock.return_value = client
     assert (
         aws_account_health.get_account_spend(
             "test_account_id", "2020-01-01", "2020-01-31"
         )
         == "100.12"
     )
-    assert client.get_cost_and_usage.called_with(
+    assert cost_explorer_mock.get_cost_and_usage.called_with(
         TimePeriod={"Start": "2020-01-01", "End": "2020-01-31"},
         Granularity="MONTHLY",
         Metrics=["UnblendedCost"],
@@ -91,18 +89,16 @@ def test_get_account_spend_with_data(assume_role_client_mock):
     )
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_account_spend_with_no_data(assume_role_client_mock):
-    client = MagicMock()
-    client.get_cost_and_usage.return_value = {"ResultsByTime": [{}]}
-    assume_role_client_mock.return_value = client
+@patch("modules.aws.aws_account_health.cost_explorer")
+def test_get_account_spend_with_no_data(cost_explorer_mock):
+    cost_explorer_mock.get_cost_and_usage.return_value = {"ResultsByTime": [{}]}
     assert (
         aws_account_health.get_account_spend(
             "test_account_id", "2020-01-01", "2020-01-31"
         )
         == "0.00"
     )
-    assert client.get_cost_and_usage.called_with(
+    assert cost_explorer_mock.get_cost_and_usage.called_with(
         TimePeriod={"Start": "2020-01-01", "End": "2020-01-31"},
         Granularity="MONTHLY",
         Metrics=["UnblendedCost"],

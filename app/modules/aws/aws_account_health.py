@@ -5,10 +5,14 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from logging import Logger
 
-from integrations.aws import organizations, security_hub, guard_duty, config
+from integrations.aws import (
+    organizations,
+    security_hub,
+    guard_duty,
+    config,
+    cost_explorer,
+)
 
-AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
-LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
 ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
 
 
@@ -67,15 +71,13 @@ def get_account_health(account_id):
 
 
 def get_account_spend(account_id, start_date, end_date):
-    client = assume_role_client("ce")
-    response = client.get_cost_and_usage(
-        TimePeriod={"Start": start_date, "End": end_date},
-        Granularity="MONTHLY",
-        Metrics=["UnblendedCost"],
-        GroupBy=[
-            {"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"},
-        ],
-        Filter={"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [account_id]}},
+    time_period = {"Start": start_date, "End": end_date}
+    granularity = "MONTHLY"
+    metrics = ["UnblendedCost"]
+    group_by = [{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}]
+    filter = {"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [account_id]}}
+    response = cost_explorer.get_cost_and_usage(
+        time_period, granularity, metrics, filter, group_by
     )
     if "Groups" in response["ResultsByTime"][0]:
         return "{:0,.2f}".format(
