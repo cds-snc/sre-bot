@@ -46,11 +46,14 @@ def test_describe_aggregate_compliance_by_config_rules_passes_filters_to_api_cal
     mock_execute_aws_api_call,
 ):
     mock_execute_aws_api_call.return_value = [{"config": "foo"}]
-    assert len(
-        config.describe_aggregate_compliance_by_config_rules(
-            "foo", {"AccountId": "123456789012"}
+    assert (
+        len(
+            config.describe_aggregate_compliance_by_config_rules(
+                "foo", {"AccountId": "123456789012"}
+            )
         )
-    ) == 1
+        == 1
+    )
     assert mock_execute_aws_api_call.called_with(
         "config",
         "describe_aggregate_compliance_by_config_rules",
