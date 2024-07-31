@@ -5,7 +5,7 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from logging import Logger
 
-from integrations.aws import organizations
+from integrations.aws import organizations, security_hub, guard_duty
 
 AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
 LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
@@ -102,59 +102,46 @@ def get_config_summary(account_id):
 
 
 def get_guardduty_summary(account_id):
-    client = assume_role_client("guardduty", role=LOGGING_ROLE_ARN)
-    detector_id = client.list_detectors()["DetectorIds"][0]
-    response = client.get_findings_statistics(
-        DetectorId=detector_id,
-        FindingStatisticTypes=[
-            "COUNT_BY_SEVERITY",
-        ],
-        FindingCriteria={
-            "Criterion": {
-                "accountId": {"Eq": [account_id]},
-                "service.archived": {"Eq": ["false", "false"]},
-                "severity": {"Gte": 7},
-            }
-        },
-    )
-
+    detector_ids = guard_duty.list_detectors()
+    finding_criteria = {
+        "Criterion": {
+            "accountId": {"Eq": [account_id]},
+            "service.archived": {"Eq": ["false", "false"]},
+            "severity": {"Gte": 7},
+        }
+    }
+    response = guard_duty.get_findings_statistics(detector_ids[0], finding_criteria)
     return sum(response["FindingStatistics"]["CountBySeverity"].values())
 
 
 def get_securityhub_summary(account_id):
-    client = assume_role_client("securityhub", role=LOGGING_ROLE_ARN)
-    response = client.get_findings(
-        Filters={
-            "AwsAccountId": [{"Value": account_id, "Comparison": "EQUALS"}],
-            "ComplianceStatus": [
-                {"Value": "FAILED", "Comparison": "EQUALS"},
-            ],
-            "RecordState": [
-                {"Value": "ACTIVE", "Comparison": "EQUALS"},
-            ],
-            "SeverityProduct": [
-                {
-                    "Gte": 70,
-                    "Lte": 100,
-                },
-            ],
-            "Title": get_ignored_security_hub_issues(),
-            "UpdatedAt": [
-                {"DateRange": {"Value": 1, "Unit": "DAYS"}},
-            ],
-            "WorkflowStatus": [
-                {"Value": "NEW", "Comparison": "EQUALS"},
-            ],
-        }
-    )
+    filters = {
+        "AwsAccountId": [{"Value": account_id, "Comparison": "EQUALS"}],
+        "ComplianceStatus": [
+            {"Value": "FAILED", "Comparison": "EQUALS"},
+        ],
+        "RecordState": [
+            {"Value": "ACTIVE", "Comparison": "EQUALS"},
+        ],
+        "SeverityProduct": [
+            {
+                "Gte": 70,
+                "Lte": 100,
+            },
+        ],
+        "Title": get_ignored_security_hub_issues(),
+        "UpdatedAt": [
+            {"DateRange": {"Value": 1, "Unit": "DAYS"}},
+        ],
+        "WorkflowStatus": [
+            {"Value": "NEW", "Comparison": "EQUALS"},
+        ],
+    }
+    response = security_hub.get_findings(filters)
     issues = 0
-    # Loop response for NextToken
-    while True:
-        issues += len(response["Findings"])
-        if "NextToken" in response:
-            response = client.get_findings(NextToken=response["NextToken"])
-        else:
-            break
+    if response:
+        for res in response:
+            issues += len(res["Findings"])
     return issues
 
 

@@ -124,31 +124,48 @@ def test_get_config_summary(assume_role_client_mock):
     )
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_guardduty_summary(assume_role_client_mock):
-    client = MagicMock()
-    client.list_detectors.return_value = {"DetectorIds": ["foo"]}
-    client.get_findings_statistics.return_value = {
-        "FindingStatistics": {"CountBySeverity": {"foo": 1}}
+@patch("modules.aws.aws_account_health.guard_duty")
+def test_get_guardduty_summary(guard_duty_mock):
+    guard_duty_mock.list_detectors.return_value = ["foo"]
+    guard_duty_mock.get_findings_statistics.return_value = {
+        "FindingStatistics": {
+            "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+        }
     }
-    assume_role_client_mock.return_value = client
-    assert aws_account_health.get_guardduty_summary("test_account_id") == 1
-    assert assume_role_client_mock.called_with(
-        "guardduty", role=os.environ["AWS_LOGGING_ACCOUNT_ROLE_ARN"]
+    assert aws_account_health.get_guardduty_summary("test_account_id") == 10
+    guard_duty_mock.list_detectors.assert_called_once_with()
+    guard_duty_mock.get_findings_statistics.assert_called_once_with(
+        "foo",
+        {
+            "Criterion": {
+                "accountId": {"Eq": ["test_account_id"]},
+                "service.archived": {"Eq": ["false", "false"]},
+                "severity": {"Gte": 7},
+            }
+        },
     )
 
 
-@patch("modules.aws.aws_account_health.assume_role_client")
-def test_get_securityhub_summary(assume_role_client_mock):
-    client = MagicMock()
-    client.get_findings.side_effect = [
+@patch("modules.aws.aws_account_health.get_ignored_security_hub_issues")
+@patch("modules.aws.aws_account_health.security_hub")
+def test_get_securityhub_summary(
+    security_hub_mock, get_ignored_security_hub_issues_mock
+):
+    security_hub_mock.get_findings.return_value = [
         {"Findings": [{"Severity": {"Label": "LOW"}}], "NextToken": "foo"},
         {"Findings": [{"Severity": {"Label": "MEDIUM"}}]},
     ]
-    assume_role_client_mock.return_value = client
     assert aws_account_health.get_securityhub_summary("test_account_id") == 2
-    assert assume_role_client_mock.called_with(
-        "securityhub", role=os.environ["AWS_LOGGING_ACCOUNT_ROLE_ARN"]
+    assert security_hub_mock.get_findings.called_with(
+        {
+            "AwsAccountId": [{"Value": "test_account_id", "Comparison": "EQUALS"}],
+            "ComplianceStatus": [{"Value": "FAILED", "Comparison": "EQUALS"}],
+            "RecordState": [{"Value": "ACTIVE", "Comparison": "EQUALS"}],
+            "SeverityProduct": [{"Gte": 70, "Lte": 100}],
+            "Title": get_ignored_security_hub_issues_mock(),
+            "UpdatedAt": [{"DateRange": {"Value": 1, "Unit": "DAYS"}}],
+            "WorkflowStatus": [{"Value": "NEW", "Comparison": "EQUALS"}],
+        }
     )
 
 
