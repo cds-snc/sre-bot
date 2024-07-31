@@ -1,41 +1,15 @@
 import arrow
-import boto3
-import os
+from slack_bolt import Ack
+from slack_sdk import WebClient
+from logging import Logger
 
-AUDIT_ROLE_ARN = os.environ["AWS_AUDIT_ACCOUNT_ROLE_ARN"]
-LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
-ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
-
-
-def assume_role_client(client_type, role=ORG_ROLE_ARN, region="ca-central-1"):
-    client = boto3.client("sts")
-
-    response = client.assume_role(
-        RoleArn=role, RoleSessionName="SREBot_Org_Account_Role"
-    )
-
-    session = boto3.Session(
-        aws_access_key_id=response["Credentials"]["AccessKeyId"],
-        aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
-        aws_session_token=response["Credentials"]["SessionToken"],
-    )
-
-    return session.client(client_type, region_name=region)
-
-
-def get_accounts():
-    client = assume_role_client("organizations")
-    response = client.list_accounts()
-    accounts = {}
-    # Loop response for NextToken
-    while True:
-        for account in response["Accounts"]:
-            accounts[account["Id"]] = account["Name"]
-        if "NextToken" in response:
-            response = client.list_accounts(NextToken=response["NextToken"])
-        else:
-            break
-    return dict(sorted(accounts.items(), key=lambda item: item[1]))
+from integrations.aws import (
+    organizations,
+    security_hub,
+    guard_duty,
+    config,
+    cost_explorer,
+)
 
 
 def get_account_health(account_id):
@@ -77,15 +51,13 @@ def get_account_health(account_id):
 
 
 def get_account_spend(account_id, start_date, end_date):
-    client = assume_role_client("ce")
-    response = client.get_cost_and_usage(
-        TimePeriod={"Start": start_date, "End": end_date},
-        Granularity="MONTHLY",
-        Metrics=["UnblendedCost"],
-        GroupBy=[
-            {"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"},
-        ],
-        Filter={"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [account_id]}},
+    time_period = {"Start": start_date, "End": end_date}
+    granularity = "MONTHLY"
+    metrics = ["UnblendedCost"]
+    group_by = [{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}]
+    filter = {"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [account_id]}}
+    response = cost_explorer.get_cost_and_usage(
+        time_period, granularity, metrics, filter, group_by
     )
     if "Groups" in response["ResultsByTime"][0]:
         return "{:0,.2f}".format(
@@ -100,71 +72,57 @@ def get_account_spend(account_id, start_date, end_date):
 
 
 def get_config_summary(account_id):
-    client = assume_role_client("config", role=AUDIT_ROLE_ARN)
-    response = client.describe_aggregate_compliance_by_config_rules(
-        ConfigurationAggregatorName="aws-controltower-GuardrailsComplianceAggregator",
-        Filters={
-            "AccountId": account_id,
-            "ComplianceType": "NON_COMPLIANT",
-        },
+    config_name = "aws-controltower-GuardrailsComplianceAggregator"
+    filters = {
+        "AccountId": account_id,
+        "ComplianceType": "NON_COMPLIANT",
+    }
+    return len(
+        config.describe_aggregate_compliance_by_config_rules(config_name, filters)
     )
-    return len(response["AggregateComplianceByConfigRules"])
 
 
 def get_guardduty_summary(account_id):
-    client = assume_role_client("guardduty", role=LOGGING_ROLE_ARN)
-    detector_id = client.list_detectors()["DetectorIds"][0]
-    response = client.get_findings_statistics(
-        DetectorId=detector_id,
-        FindingStatisticTypes=[
-            "COUNT_BY_SEVERITY",
-        ],
-        FindingCriteria={
-            "Criterion": {
-                "accountId": {"Eq": [account_id]},
-                "service.archived": {"Eq": ["false", "false"]},
-                "severity": {"Gte": 7},
-            }
-        },
-    )
-
+    detector_ids = guard_duty.list_detectors()
+    finding_criteria = {
+        "Criterion": {
+            "accountId": {"Eq": [account_id]},
+            "service.archived": {"Eq": ["false", "false"]},
+            "severity": {"Gte": 7},
+        }
+    }
+    response = guard_duty.get_findings_statistics(detector_ids[0], finding_criteria)
     return sum(response["FindingStatistics"]["CountBySeverity"].values())
 
 
 def get_securityhub_summary(account_id):
-    client = assume_role_client("securityhub", role=LOGGING_ROLE_ARN)
-    response = client.get_findings(
-        Filters={
-            "AwsAccountId": [{"Value": account_id, "Comparison": "EQUALS"}],
-            "ComplianceStatus": [
-                {"Value": "FAILED", "Comparison": "EQUALS"},
-            ],
-            "RecordState": [
-                {"Value": "ACTIVE", "Comparison": "EQUALS"},
-            ],
-            "SeverityProduct": [
-                {
-                    "Gte": 70,
-                    "Lte": 100,
-                },
-            ],
-            "Title": get_ignored_security_hub_issues(),
-            "UpdatedAt": [
-                {"DateRange": {"Value": 1, "Unit": "DAYS"}},
-            ],
-            "WorkflowStatus": [
-                {"Value": "NEW", "Comparison": "EQUALS"},
-            ],
-        }
-    )
+    filters = {
+        "AwsAccountId": [{"Value": account_id, "Comparison": "EQUALS"}],
+        "ComplianceStatus": [
+            {"Value": "FAILED", "Comparison": "EQUALS"},
+        ],
+        "RecordState": [
+            {"Value": "ACTIVE", "Comparison": "EQUALS"},
+        ],
+        "SeverityProduct": [
+            {
+                "Gte": 70,
+                "Lte": 100,
+            },
+        ],
+        "Title": get_ignored_security_hub_issues(),
+        "UpdatedAt": [
+            {"DateRange": {"Value": 1, "Unit": "DAYS"}},
+        ],
+        "WorkflowStatus": [
+            {"Value": "NEW", "Comparison": "EQUALS"},
+        ],
+    }
+    response = security_hub.get_findings(filters)
     issues = 0
-    # Loop response for NextToken
-    while True:
-        issues += len(response["Findings"])
-        if "NextToken" in response:
-            response = client.get_findings(NextToken=response["NextToken"])
-        else:
-            break
+    if response:
+        for res in response:
+            issues += len(res["Findings"])
     return issues
 
 
@@ -177,7 +135,7 @@ def get_ignored_security_hub_issues():
     return list(map(lambda t: {"Value": t, "Comparison": "NOT_EQUALS"}, ignored_issues))
 
 
-def health_view_handler(ack, body, logger, client):
+def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
     ack()
 
     account_id = body["view"]["state"]["values"]["account"]["account"][
@@ -239,15 +197,19 @@ def health_view_handler(ack, body, logger, client):
     )
 
 
-def request_health_modal(client, body):
-    accounts = get_accounts()
+def request_health_modal(client: WebClient, body):
+    accounts = organizations.list_organization_accounts()
     options = [
         {
-            "text": {"type": "plain_text", "text": value},
-            "value": key,
+            "text": {
+                "type": "plain_text",
+                "text": f"{account['Name']} ({account['Id']})",
+            },
+            "value": account["Id"],
         }
-        for key, value in accounts.items()
+        for account in accounts
     ]
+    options.sort(key=lambda x: x["text"]["text"].lower())
     client.views_open(
         trigger_id=body["trigger_id"],
         view={

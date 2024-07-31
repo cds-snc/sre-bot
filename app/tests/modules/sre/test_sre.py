@@ -108,6 +108,16 @@ def test_sre_command_with_webhooks_argument(command_runner):
     command_runner.assert_called_once_with([], clientMock, body, respond)
 
 
+@patch("modules.dev.core.dev_command")
+def test_sre_command_with_test_argument(mock_dev_command):
+    mock_dev_command.return_value = "dev command help"
+    respond = MagicMock()
+    sre.sre_command(
+        MagicMock(), {"text": "test"}, MagicMock(), respond, MagicMock(), MagicMock()
+    )
+    mock_dev_command.assert_called_once()
+
+
 def test_sre_command_with_unknown_argument():
     respond = MagicMock()
     sre.sre_command(

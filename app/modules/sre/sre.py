@@ -6,6 +6,7 @@ This module contains the main command for the SRE bot. It is responsible for han
 import os
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
+from logging import Logger
 
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
@@ -36,7 +37,9 @@ def register(bot: App):
     bot.command(f"/{PREFIX}sre")(sre_command)
 
 
-def sre_command(ack: Ack, command, logger, respond: Respond, client: WebClient, body):
+def sre_command(
+    ack: Ack, command, logger: Logger, respond: Respond, client: WebClient, body
+):
     ack()
     logger.info("SRE command received: %s", command["text"])
 
