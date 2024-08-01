@@ -28,20 +28,26 @@ def synchronize(**kwargs):
     enable_membership_create = kwargs.pop("enable_membership_create", True)
     enable_membership_delete = kwargs.pop("enable_membership_delete", False)
     query = kwargs.pop("query", "email:aws-*")
+    pre_processing_filters = kwargs.pop("pre_processing_filters", [])
 
     users_sync_status = None
     groups_sync_status = None
 
     source_groups_filters = [lambda group: "AWS-" in group["name"]]
     source_groups = groups.get_groups_from_integration(
-        "google_groups", query=query, post_processing_filters=source_groups_filters
+        "google_groups",
+        query=query,
+        pre_processing_filters=pre_processing_filters,
+        post_processing_filters=source_groups_filters,
     )
     source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(
         f"synchronize:Found {len(source_groups)} Groups and {len(source_users)} Users from Source"
     )
 
-    target_groups = groups.get_groups_from_integration("aws_identity_center")
+    target_groups = groups.get_groups_from_integration(
+        "aws_identity_center", pre_processing_filters=pre_processing_filters
+    )
     target_users = identity_store.list_users()
 
     logger.info(

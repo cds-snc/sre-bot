@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock, call, ANY
 from modules.aws import groups
 
 
@@ -86,9 +86,44 @@ def test_request_groups_sync_synchronizes_groups(
     )
     logger.info.assert_called_once_with("Synchronizing AWS Identity Center Groups.")
     mock_identity_center.synchronize.assert_called_once_with(
+        enable_users_sync=False,
         enable_user_create=False,
         enable_membership_create=True,
         enable_membership_delete=True,
+        pre_processing_filters=[],
+    )
+    respond.assert_called_once_with("AWS Groups Memberships Synchronization Initiated.")
+
+
+@patch("modules.aws.groups.slack_users")
+@patch("modules.aws.groups.permissions")
+@patch("modules.aws.groups.identity_center")
+def test_request_groups_sync_synchronizes_groups_with_args(
+    mock_identity_center, mock_permissions, mock_slack_users
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = ["group1", "group2"]
+    logger = MagicMock()
+
+    mock_slack_users.get_user_email_from_body.return_value = "admin.user@test.com"
+    mock_permissions.is_user_member_of_groups.return_value = True
+    mock_identity_center.synchronize.return_value = None
+
+    groups.request_groups_sync(client, body, respond, args, logger)
+
+    mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
+    mock_permissions.is_user_member_of_groups.assert_called_once_with(
+        "admin.user@test.com", groups.AWS_ADMIN_GROUPS
+    )
+    logger.info.assert_called_once_with("Synchronizing AWS Identity Center Groups.")
+    mock_identity_center.synchronize.assert_called_once_with(
+        enable_users_sync=False,
+        enable_user_create=False,
+        enable_membership_create=True,
+        enable_membership_delete=True,
+        pre_processing_filters=ANY,
     )
     respond.assert_called_once_with("AWS Groups Memberships Synchronization Initiated.")
 

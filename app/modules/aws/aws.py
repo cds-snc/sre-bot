@@ -9,7 +9,9 @@ This module provides the following features:
 """
 
 import os
-from slack_bolt import App
+from slack_bolt import App, Ack, Respond
+from slack_sdk.web import WebClient
+from logging import Logger
 
 from integrations.aws.organizations import get_account_id_by_name
 from integrations.aws import identity_store
@@ -20,20 +22,25 @@ PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
 
 help_text = """
-\n `/aws user <operation> <user1> <user2> ...`
+\n `/aws users <operation> <user1> <user2> ...`
 \n      - Provision or deprovision AWS users | Provisionner ou déprovisionner des utilisateurs AWS
 \n        Supports multiple users for a single operation | Supporte plusieurs utilisateurs pour l'opération
 \n        `<operation>`: `create` or/ou `delete`
 \n        `<user>`: email address or Slack username of the user | adresse courriel ou identifiant Slack de l'utilisateur
 \n        Usage: `/aws user create @username user.name@email.com`
+\n `/aws groups <operation> <group1> <group2> ...`
+\n      - Manage AWS groups | Gérer les groupes AWS
+\n        `<operation>`: `sync`, `list`
+\n        `<group>`: name of the group | nom du groupe (sync only)
+\n        Usage: `/aws groups sync`, `/aws groups sync group-name` or/ou `/aws groups list`
 \n `/aws help | aide`
 \n      - Show this help text | montre le dialogue d'aide
 \n
 \n (currently disabled)
-\n `/aws access`
-\n      - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
 \n `/aws health`
 \n      - Query the health of an AWS account | Demander l'état de santé d'un compte AWS
+\n `/aws access`
+\n      - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
 """
 
 
@@ -48,7 +55,9 @@ def register(bot: App) -> None:
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
 
-def aws_command(ack, command, logger, respond, client, body) -> None:
+def aws_command(
+    ack: Ack, command, logger: Logger, respond: Respond, client: WebClient, body
+) -> None:
     """AWS command handler.
 
     This function handles the `/aws` command by parsing the command text and executing the appropriate action.

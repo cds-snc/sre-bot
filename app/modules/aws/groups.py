@@ -37,15 +37,37 @@ def command_handler(client, body, respond, args, logger):
 
 
 def request_groups_sync(client, body, respond, args, logger):
-    """Sync groups from AWS Identity Center."""
+    """Sync groups from AWS Identity Center.
+
+        If additional arguments are provided, they will be used to filter the groups to sync.
+
+    Args:
+        client (Slack WebClient): The Slack client.
+        body (dict): The request body.
+        respond (function): The function to respond to the request.
+        args (list[str]): The list of arguments.
+        logger (Logger): The logger.
+    """
     requestor_email = slack_users.get_user_email_from_body(client, body)
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
+        pre_processing_filters = (
+            [
+                lambda group, arg=arg: arg.lower()
+                in group.get("DisplayName", "").lower()
+                or arg.lower() in group.get("name", "").lower()
+                for arg in args
+            ]
+            if args
+            else []
+        )
         logger.info("Synchronizing AWS Identity Center Groups.")
         respond("AWS Groups Memberships Synchronization Initiated.")
         identity_center.synchronize(
+            enable_users_sync=False,
             enable_user_create=False,
             enable_membership_create=True,
             enable_membership_delete=True,
+            pre_processing_filters=pre_processing_filters,
         )
     else:
         logger.error(f"User {requestor_email} does not have permission to sync groups.")
