@@ -35,10 +35,10 @@ help_text = """
 \n        Usage: `/aws groups sync`, `/aws groups sync group-name` or/ou `/aws groups list`
 \n `/aws help | aide`
 \n      - Show this help text | montre le dialogue d'aide
-\n
-\n (currently disabled)
 \n `/aws health`
 \n      - Query the health of an AWS account | Demander l'état de santé d'un compte AWS
+\n
+\n (currently disabled)
 \n `/aws access`
 \n      - starts the process to access an AWS account | débute le processus pour accéder à un compte AWS
 """
