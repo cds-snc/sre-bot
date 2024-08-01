@@ -5,8 +5,49 @@ This module contains the user related functionality for the Slack integration.
 
 import re
 from slack_sdk import WebClient
+from logging import getLogger
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
+
+logger = getLogger(__name__)
+
+
+def get_all_users(client: WebClient, deleted=False, is_bot=False):
+    """Get all users from the Slack workspace.
+
+    Args:
+        client (WebClient): The Slack client instance.
+        deleted (bool, optional): Include deleted users. Defaults to False.
+        is_bot (bool, optional): Include bot users. Defaults to False.
+
+    Returns:
+        list: A list of active users.
+    """
+
+    users_list = []
+    cursor = None
+    try:
+        while True:
+            response = client.users_list(cursor=cursor, limit=200)
+            if response["ok"]:
+                if "members" in response:
+                    users_list.extend(response["members"])
+                cursor = response["response_metadata"]["next_cursor"]
+                if not cursor:
+                    break
+            else:
+                logger.error(f"Failed to get users list: {response['error']}")
+                break
+    except Exception as e:
+        logger.error(f"Failed to get users list: {e}")
+
+    # filters
+    if not deleted:
+        users_list = [user for user in users_list if not user["deleted"]]
+    if not is_bot:
+        users_list = [user for user in users_list if not user["is_bot"]]
+
+    return users_list
 
 
 def get_user_id_from_request(body):
@@ -50,18 +91,28 @@ def get_user_email_from_body(client: WebClient, body):
             return user_info["user"]["profile"]["email"]
 
 
-def get_user_email_from_handle(client: WebClient, user_handle: str):
+def get_user_email_from_handle(client: WebClient, user_handle: str) -> str | None:
+    """
+    Returns the user email from a user handle, otherwise None.
+
+    Args:
+        client (WebClient): The Slack client instance.
+        user_handle (str): The user handle.
+
+    Returns:
+        str | None: The user email or None.
+    """
     user_handle = user_handle.lstrip("@")
 
-    users_list = client.users_list()
-
-    for member in users_list["members"]:
+    users_list = get_all_users(client)
+    for member in users_list:
         if "name" in member and member["name"] == user_handle:
             user_id = member["id"]
 
             user_info = client.users_info(user=user_id)
 
-            return user_info["user"]["profile"]["email"]
+            if user_info["ok"]:
+                return user_info["user"]["profile"]["email"]
 
     return None
 
