@@ -1,7 +1,107 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from integrations.slack import users
 from slack_sdk import WebClient
+
+
+def test_get_all_users():
+    client = MagicMock()
+    client.users_list.return_value = {
+        "ok": True,
+        "members": [
+            {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+            {"id": "U00AAAAAAA1", "name": "user2", "deleted": True, "is_bot": False},
+            {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": True},
+        ],
+    }
+    assert users.get_all_users(client) == [
+        {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False}
+    ]
+
+
+def test_get_all_users_with_pagination():
+    client = MagicMock()
+    client.users_list.side_effect = [
+        {
+            "ok": True,
+            "members": [
+                {
+                    "id": "U00AAAAAAA0",
+                    "name": "user1",
+                    "deleted": False,
+                    "is_bot": False,
+                },
+                {
+                    "id": "U00AAAAAAA1",
+                    "name": "user2",
+                    "deleted": False,
+                    "is_bot": False,
+                },
+            ],
+            "response_metadata": {"next_cursor": "cursor"},
+        },
+        {
+            "ok": True,
+            "members": [
+                {
+                    "id": "U00AAAAAAA2",
+                    "name": "user3",
+                    "deleted": False,
+                    "is_bot": False,
+                }
+            ],
+            "response_metadata": {
+                "next_cursor": "",
+            },
+        },
+    ]
+    assert users.get_all_users(client) == [
+        {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+        {"id": "U00AAAAAAA1", "name": "user2", "deleted": False, "is_bot": False},
+        {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": False},
+    ]
+
+    assert client.users_list.call_count == 2
+
+
+def test_get_all_users_with_deleted():
+    client = MagicMock()
+    client.users_list.return_value = {
+        "ok": True,
+        "members": [
+            {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+            {"id": "U00AAAAAAA1", "name": "user2", "deleted": True, "is_bot": False},
+            {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": True},
+        ],
+    }
+    assert users.get_all_users(client, deleted=True) == [
+        {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+        {"id": "U00AAAAAAA1", "name": "user2", "deleted": True, "is_bot": False},
+    ]
+
+
+def test_get_all_users_with_bot():
+    client = MagicMock()
+    client.users_list.return_value = {
+        "ok": True,
+        "members": [
+            {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+            {"id": "U00AAAAAAA1", "name": "user2", "deleted": True, "is_bot": False},
+            {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": True},
+        ],
+    }
+    assert users.get_all_users(client, is_bot=True) == [
+        {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False},
+        {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": True},
+    ]
+
+
+def test_get_all_users_with_error():
+    client = MagicMock()
+    with patch("integrations.slack.users.logger") as mock_logger:
+        client.users_list.return_value = {"ok": False, "error": "error"}
+        assert users.get_all_users(client) == []
+        mock_logger.error.assert_called_once_with("Failed to get users list: error")
 
 
 def test_get_user_id_from_request_with_user_id():
@@ -130,8 +230,14 @@ def test_replace_user_id_with_multiple_users():
     assert users.replace_user_id_with_handle(client, message) == expected_message
 
 
-def test_get_user_email():
+@patch("integrations.slack.users.get_all_users")
+def test_get_user_email(mock_get_all_users):
     # Mock the WebClient
+
+    mock_get_all_users.return_value = [
+        {"id": "U1234", "name": "user_name1", "profile": {"email": "email1@test.com"}},
+        {"id": "U5678", "name": "user_name2", "profile": {"email": "email2@test.com"}},
+    ]
     client = MagicMock(spec=WebClient)
 
     # Test when the user ID is found in the request body and the users_info call is successful
@@ -152,25 +258,26 @@ def test_get_user_email():
     assert users.get_user_email_from_body(client, body) is None
 
 
-def test_get_user_email_from_handle():
+@patch("integrations.slack.users.get_all_users")
+def test_get_user_email_from_handle(mock_get_all_users):
+
     client = MagicMock(spec=WebClient)
-    client.users_list.return_value = {
-        "members": [
-            {
-                "id": "U1234",
-                "name": "user_name1",
-                "profile": {"email": "user_email1@test.com"},
-            },
-            {
-                "id": "U5678",
-                "name": "user_name2",
-                "profile": {"email": "user_email2@test.com"},
-            },
-        ]
-    }
+    mock_get_all_users.return_value = [
+        {
+            "id": "U1234",
+            "name": "user_name1",
+            "profile": {"email": "user_email1@test.com"},
+        },
+        {
+            "id": "U5678",
+            "name": "user_name2",
+            "profile": {"email": "user_email2@test.com"},
+        },
+    ]
+
     client.users_info.side_effect = lambda user: {
-        "U1234": {"user": {"profile": {"email": "user_email1@test.com"}}},
-        "U5678": {"user": {"profile": {"email": "user_email2@test.com"}}},
+        "U1234": {"ok": True, "user": {"profile": {"email": "user_email1@test.com"}}},
+        "U5678": {"ok": True, "user": {"profile": {"email": "user_email2@test.com"}}},
     }.get(user, {})
 
     assert (
