@@ -82,6 +82,34 @@ def test_get_account_spend_with_no_data(cost_explorer_mock):
     )
 
 
+@patch("modules.aws.aws_account_health.cost_explorer")
+def test_get_account_spend_with_no_groups_data(cost_explorer_mock):
+    # This is often the case on the first day of the month
+    cost_explorer_mock.get_cost_and_usage.return_value = {
+        "ResultsByTime": [
+            {
+                "TimePeriod": {"Start": "2024-08-01", "End": "2024-08-31"},
+                "Total": {"UnblendedCost": {"Amount": "0", "Unit": "USD"}},
+                "Groups": [],
+                "Estimated": True,
+            }
+        ],
+    }
+    assert (
+        aws_account_health.get_account_spend(
+            "test_account_id", "2020-01-01", "2020-01-31"
+        )
+        == "0.00"
+    )
+    assert cost_explorer_mock.get_cost_and_usage.called_with(
+        TimePeriod={"Start": "2020-01-01", "End": "2020-01-31"},
+        Granularity="MONTHLY",
+        Metrics=["UnblendedCost"],
+        GroupBy=[{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}],
+        Filter={"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": ["test_account_id"]}},
+    )
+
+
 @patch("modules.aws.aws_account_health.config")
 def test_get_config_summary(config_mock):
     expected_config_name = "aws-controltower-GuardrailsComplianceAggregator"

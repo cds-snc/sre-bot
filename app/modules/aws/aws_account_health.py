@@ -11,6 +11,8 @@ from integrations.aws import (
     cost_explorer,
 )
 
+logger = Logger(__name__)
+
 
 def get_account_health(account_id):
     last_day_of_current_month = arrow.utcnow().span("month")[1].format("YYYY-MM-DD")
@@ -59,7 +61,10 @@ def get_account_spend(account_id, start_date, end_date):
     response = cost_explorer.get_cost_and_usage(
         time_period, granularity, metrics, filter, group_by
     )
-    if "Groups" in response["ResultsByTime"][0]:
+    if (
+        "Groups" in response["ResultsByTime"][0]
+        and len(response["ResultsByTime"][0]["Groups"]) > 0
+    ):
         return "{:0,.2f}".format(
             float(
                 response["ResultsByTime"][0]["Groups"][0]["Metrics"]["UnblendedCost"][

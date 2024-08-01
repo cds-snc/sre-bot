@@ -1,8 +1,8 @@
-from logging import getLogger
+"""Cost Explorer API integration."""
+
 import os
 from .client import execute_aws_api_call, handle_aws_api_errors
 
-logger = getLogger(__name__)
 ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
 
 
