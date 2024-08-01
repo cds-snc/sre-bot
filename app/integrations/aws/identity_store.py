@@ -296,6 +296,10 @@ def list_groups_with_memberships(
     """Retrieves groups with their members from the AWS Identity Center (identitystore)
 
     Args:
+        group_members (bool): Include group members in the response. Default is True.
+        members_details (bool): Include the details of the members. Default is True.
+        include_empty_groups (bool): Include groups without members. Default is True.
+        groups_filters (list): A list of filters to apply to the groups. Default is None.
         **kwargs: Additional keyword arguments for the API call. (passed to list_groups)
 
     Returns:
@@ -309,6 +313,7 @@ def list_groups_with_memberships(
     if groups_filters is not None:
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
+    logger.info(f"Founds {len(groups)} groups in AWS Identity Store.")
     if not group_members:
         return groups
 

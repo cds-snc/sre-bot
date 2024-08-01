@@ -1,5 +1,6 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
+from logging import getLogger
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
@@ -8,6 +9,8 @@ from integrations.google_workspace.google_service import (
 )
 from integrations.utils.api import convert_string_to_camel_case
 from utils import filters
+
+logger = getLogger(__name__)
 
 
 @handle_google_api_errors
@@ -181,8 +184,10 @@ def list_groups_with_members(
     if not groups:
         return []
 
-    for filter in groups_filters:
-        groups = filters.filter_by_condition(groups, filter)
+    if groups_filters is not None:
+        for groups_filter in groups_filters:
+            groups = filters.filter_by_condition(groups, groups_filter)
+    logger.info(f"Found {len(groups)} groups.")
     if not group_members:
         return groups
 
