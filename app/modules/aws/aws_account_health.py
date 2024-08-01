@@ -2,7 +2,6 @@ import arrow
 from slack_bolt import Ack
 from slack_sdk import WebClient
 from logging import Logger
-from utils import filters
 
 from integrations.aws import (
     organizations,
