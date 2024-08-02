@@ -151,6 +151,38 @@ def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
         "selected_option"
     ]["text"]["text"]
 
+    temporary_blocks = {
+        "type": "modal",
+        "callback_id": "health_view",
+        "title": {"type": "plain_text", "text": "AWS - Health Check"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"Health check for *{account_name}*: ({account_id})",
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": """
+:beach-ball: Loading data...""",
+                },
+            },
+        ],
+    }
+
+    view_id = client.views_open(
+        trigger_id=body["trigger_id"],
+        view=temporary_blocks,
+    )[
+        "view"
+    ]["id"]
+
     account_info = get_account_health(account_id)
 
     blocks = {
@@ -196,10 +228,7 @@ def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
         ],
     }
 
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view=blocks,
-    )
+    client.views_update(view_id=view_id, view=blocks)
 
 
 def request_health_modal(client: WebClient, body):
