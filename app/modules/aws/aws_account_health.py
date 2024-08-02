@@ -161,7 +161,7 @@ def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Health check for *{account_name}*: ({account_id})",
+                    "text": f"Health check for *{account_name}*:",
                 },
             },
             {"type": "divider"},
@@ -195,7 +195,7 @@ def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Health check for *{account_name}*: ({account_id})",
+                    "text": f"Health check for *{account_name}*:",
                 },
             },
             {"type": "divider"},
