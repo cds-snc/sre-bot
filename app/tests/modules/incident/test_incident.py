@@ -283,8 +283,23 @@ def test_handle_incident_action_buttons_link_preview(
     )
 
 
+@patch("modules.incident.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.i18n")
+@patch("modules.incident.incident.slack_users.get_user_locale")
 @patch("modules.incident.incident.google_drive.list_folders")
-def test_incident_open_modal_calls_ack(mock_list_folders):
+def test_incident_open_modal_calls_ack(
+    mock_list_folders,
+    mock_get_user_locale,
+    mock_i18n,
+    mock_generate_incident_modal_view,
+):
+    loaded_view = mock_generate_incident_modal_view.return_value = ANY
+    mock_i18n.t.side_effect = [
+        "SRE - Start an incident",
+        "Submit",
+        "Launching incident process...",
+    ]
+    mock_get_user_locale.return_value = "en-US"
     mock_list_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     ack = MagicMock()
@@ -298,14 +313,14 @@ def test_incident_open_modal_calls_ack(mock_list_folders):
     assert kwargs["trigger_id"] == "trigger_id"
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
+    assert kwargs["view"]["title"]["text"] == "SRE - Start an incident"
+    assert kwargs["view"]["submit"]["text"] == "Submit"
     assert (
-        kwargs["view"]["blocks"][6]["element"]["initial_value"]
-        == "incident description"
+        kwargs["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: Launching incident process..."
     )
-    assert kwargs["view"]["blocks"][7]["element"]["options"][0]["value"] == "id"
-    assert (
-        kwargs["view"]["blocks"][7]["element"]["options"][0]["text"]["text"] == "name"
-    )
+    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "en-US")
+    client.views_update.assert_called_once_with(view_id=ANY, view=loaded_view)
 
 
 @patch("modules.incident.incident.generate_incident_modal_view")
