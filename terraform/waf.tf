@@ -323,7 +323,7 @@ resource "aws_wafv2_web_acl_association" "sre-bot" {
 }
 
 resource "aws_cloudwatch_log_group" "sre_bot_waf_log_group" {
-  name = "sre-bot-waf-log-group"
+  name = "aws-waf-logs-sre-bot"
 }
 resource "aws_wafv2_web_acl_logging_configuration" "sre-bot" {
   resource_arn            = aws_wafv2_web_acl.sre-bot.arn
