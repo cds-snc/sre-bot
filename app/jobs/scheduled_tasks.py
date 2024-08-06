@@ -5,7 +5,8 @@ import time
 import schedule
 import logging
 
-from integrations import google_drive, maxmind, opsgenie
+from integrations import maxmind, opsgenie
+from integrations.google_workspace import google_drive
 
 from integrations.aws import identity_store
 from modules.aws import identity_center
