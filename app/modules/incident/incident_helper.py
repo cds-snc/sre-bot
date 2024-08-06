@@ -1,5 +1,6 @@
 import json
 import logging
+from slack_sdk import WebClient
 from integrations import google_drive
 from integrations.google_workspace import google_docs
 from integrations.slack import channels as slack_channels
@@ -45,7 +46,7 @@ def register(bot):
     bot.action("confirm_click")(confirm_click)
 
 
-def handle_incident_command(args, client, body, respond, ack):
+def handle_incident_command(args, client: WebClient, body, respond, ack):
     if len(args) == 0:
         respond(help_text)
         return
@@ -429,7 +430,7 @@ def stale_incidents(client, body, ack):
 # Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
 # that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
 # submit button is clicked.
-def schedule_incident_retro(client, body, ack):
+def schedule_incident_retro(client: WebClient, body, ack):
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
@@ -571,8 +572,24 @@ def schedule_incident_retro(client, body, ack):
 
 # Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
 # a message is displayed to the user that the event could not be scheduled.
-def save_incident_retro(client, ack, body, view):
+def save_incident_retro(client: WebClient, ack, body, view):
     ack()
+    blocks = {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "blocks": (
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": ":beach-ball: *Scheduling the retro...*",
+                    },
+                }
+            ]
+        ),
+    }
+    loading_view = client.views_open(trigger_id=body["trigger_id"], view=blocks)["view"]
 
     # get the number of days data from the view and convert to an integer
     days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
@@ -646,7 +663,9 @@ def save_incident_retro(client, ack, body, view):
         client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
 
     # Open the modal and log that the event was scheduled successfully
-    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+    client.views_update(
+        view_id=loading_view["id"], hash=loading_view["hash"], view=blocks
+    )
 
 
 # We just need to handle the action here and record who clicked on it

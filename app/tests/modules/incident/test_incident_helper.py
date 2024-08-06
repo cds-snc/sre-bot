@@ -1219,10 +1219,15 @@ def test_save_incident_retro_success(schedule_event_mock):
     # Assertions
     mock_ack.assert_called_once()  # Ensure ack() was called
     mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+    mock_client.views_update.assert_called_once()  # Ensure the modal was updated
 
-    # Verify the modal content for success
     assert (
         mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success message is updated
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
         == "*Successfully scheduled calender event!*"
     )
 
@@ -1276,9 +1281,13 @@ def test_save_incident_retro_success_post_message_to_channel(schedule_event_mock
         channel="C1234567890", text="event_info", unfurl_links=False
     )
 
-    # Verify the modal content for success
     assert (
         mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
         == "*Successfully scheduled calender event!*"
     )
 
@@ -1322,9 +1331,14 @@ def test_save_incident_retro_failure(schedule_event_mock):
     # Assertions
     mock_ack.assert_called_once()  # Ensure ack() was called
     mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+    mock_client.views_update.assert_called_once()
 
-    # Verify the modal content for success
     assert (
         mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
         == "*Could not schedule event - no free time was found!*"
     )
