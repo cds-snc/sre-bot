@@ -185,6 +185,28 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
 
 def open_modal(client, ack, command, body):
     ack()
+    if "user" in body:
+        user_id = body["user"]["id"]
+    else:
+        user_id = body["user_id"]
+    locale = slack_users.get_user_locale(client, user_id)
+    i18n.set("locale", locale)
+    loading_view = {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f":beach-ball: {i18n.t('incident.modal.launching')}",
+                },
+            },
+        ],
+    }
+    view = client.views_open(trigger_id=body["trigger_id"], view=loading_view)["view"]
     folders = google_drive.list_folders()
     options = [
         {
@@ -193,14 +215,8 @@ def open_modal(client, ack, command, body):
         }
         for i in folders
     ]
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
-    locale = slack_users.get_user_locale(client, user_id)
-    i18n.set("locale", locale)
-    view = generate_incident_modal_view(command, options, locale)
-    client.views_open(trigger_id=body["trigger_id"], view=view)
+    loaded_view = generate_incident_modal_view(command, options, locale)
+    client.views_update(view_id=view["id"], view=loaded_view)
 
 
 def handle_change_locale_button(ack, client, body):

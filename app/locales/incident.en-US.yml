@@ -5,6 +5,7 @@ en-US:
   close: "Close"
   modal:
     title: "SRE - Start an incident"
+    launching: "Launching incident process..."
     congratulations: "Congratulations!"
     something_wrong: "Something has gone wrong. You've got this!"
     app_help: "This app is going to help you get set up. It will create the following: \n \n • a channel \n • an incident report \n • a Google Meet\n\n"
