@@ -106,7 +106,7 @@ def create_folder(name, parent_folder):
         fields="id",
     )
 
-    return result["id"]
+    return result
 
 
 @handle_google_api_errors
@@ -215,15 +215,20 @@ def get_file_by_name(name, folder_id=None):
 
 
 @handle_google_api_errors
-def list_folders_in_folder(folder):
+def list_folders_in_folder(folder, query=None):
     """List all folders in a folder in Google Drive.
 
     Args:
         folder (str): The id of the folder to list.
+        query (str, optional): A query to filter the folders.
 
     Returns:
         list: A list of folders in the folder.
     """
+    base_query = f"parents in '{folder}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false"
+    if query:
+        base_query += f" and {query}"
+
     return execute_google_api_call(
         "drive",
         "v3",
@@ -234,7 +239,7 @@ def list_folders_in_folder(folder):
         supportsAllDrives=True,
         includeItemsFromAllDrives=True,
         corpora="user",
-        q=f"parents in '{folder}' and mimeType = 'application/vnd.google-apps.folder' and trashed=false",
+        q=base_query,
         fields="files(id, name)",
     )
 

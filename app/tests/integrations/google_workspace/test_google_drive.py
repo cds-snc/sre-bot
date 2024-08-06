@@ -69,10 +69,14 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
 def test_create_folder_returns_folder_id(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {"id": "test_folder_id"}
-    assert (
-        google_drive.create_folder("test_folder", "parent_folder") == "test_folder_id"
-    )
+    execute_google_api_call_mock.return_value = {
+        "id": "test_folder_id",
+        "name": "test_folder",
+    }
+    assert google_drive.create_folder("test_folder", "parent_folder") == {
+        "id": "test_folder_id",
+        "name": "test_folder",
+    }
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
         "v3",
