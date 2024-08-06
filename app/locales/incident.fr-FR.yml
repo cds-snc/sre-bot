@@ -5,6 +5,7 @@ fr-FR:
   close: "Fermer"
   modal:
     title: "IFS - Lancer un incident"
+    launching: "Lancement du processus d'incident..."
     congratulations: "Félicitations!"
     something_wrong: "Il y a eu un problème. Vous pouvez y arriver!"
     app_help: "Cette application vous aidera à vous préparer. Elle créera les choses suivantes: \n \n • un canal \n • un rapport d'incident \n • une rencontre Google Meet\n\n"
