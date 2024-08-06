@@ -147,7 +147,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
     priority = 6
 
     action {
-      count {}
+      block {}
     }
 
     statement {
