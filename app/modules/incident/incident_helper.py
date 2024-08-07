@@ -6,7 +6,7 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from . import incident_folder, incident_roles, schedule_retro
+from . import incident_folder, incident_roles, incident_document, schedule_retro
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -155,7 +155,7 @@ def close_incident(client: WebClient, body, ack, respond):
 
     # Update the document status to "Closed" if we can get the document
     if document_id != "":
-        close_incident_document(document_id)
+        incident_document.update_incident_document_status(document_id)
     else:
         warning_message = (
             "Could not close the incident document - the document was not found."
@@ -192,23 +192,6 @@ def close_incident(client: WebClient, body, ack, respond):
         logging.info(
             "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
         )
-
-
-def close_incident_document(document_id):
-    # List of possible statuses to be replaced
-    possible_statuses = ["In Progress", "Open", "Ready to be Reviewed", "Reviewed"]
-
-    # Replace all possible statuses with "Closed"
-    changes = [
-        {
-            "replaceAllText": {
-                "containsText": {"text": f"Status: {status}", "matchCase": "false"},
-                "replaceText": "Status: Closed",
-            }
-        }
-        for status in possible_statuses
-    ]
-    return google_docs.batch_update(document_id, changes)
 
 
 def stale_incidents(client, body, ack):
