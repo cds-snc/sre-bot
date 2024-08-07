@@ -47,7 +47,7 @@ def test_handle_incident_command_with_help():
     respond.assert_called_once_with(incident_helper.help_text)
 
 
-@patch("modules.incident.incident_helper.list_folders")
+@patch("modules.incident.incident_helper.incident_folder.list_folders")
 def test_handle_incident_command_with_list_folders(list_folders_mock):
     client = MagicMock()
     body = MagicMock()
@@ -59,7 +59,7 @@ def test_handle_incident_command_with_list_folders(list_folders_mock):
     list_folders_mock.assert_called_once_with(client, body, ack)
 
 
-@patch("modules.incident.incident_helper.manage_roles")
+@patch("modules.incident.incident_helper.incident_roles.manage_roles")
 def test_handle_incident_command_with_roles(manage_roles_mock):
     client = MagicMock()
     body = MagicMock()
@@ -90,15 +90,6 @@ def test_handle_incident_command_with_unknown_command():
     )
 
 
-def test_add_folder_metadata():
-    client = MagicMock()
-    body = {"actions": [{"value": "foo"}], "view": {"id": "bar"}}
-    ack = MagicMock()
-    incident_helper.add_folder_metadata(client, body, ack)
-    ack.assert_called_once()
-    client.views_update.assert_called_once_with(view_id="bar", view=ANY)
-
-
 @patch("modules.incident.incident_helper.log_to_sentinel")
 def test_archive_channel_action_ignore(mock_log_to_sentinel):
     client = MagicMock()
@@ -123,15 +114,22 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     )
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 @patch("modules.incident.incident_helper.log_to_sentinel")
 def test_archive_channel_action_archive(
-    mock_log_to_sentinel, mock_extract_id, mock_update_spreadsheet, mock_close_document
+    mock_log_to_sentinel,
+    mock_extract_id,
+    mock_update_spreadsheet,
+    mock_update_document_status,
 ):
     client = MagicMock()
     body = {
@@ -161,136 +159,6 @@ def test_archive_channel_action_schedule_incident(mock_log_to_sentinel):
     assert ack.call_count == 1
 
 
-@patch("modules.incident.incident_helper.google_drive.delete_metadata")
-@patch("modules.incident.incident_helper.view_folder_metadata")
-def test_delete_folder_metadata(view_folder_metadata_mock, delete_metadata_mock):
-    client = MagicMock()
-    body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
-    ack = MagicMock()
-    incident_helper.delete_folder_metadata(client, body, ack)
-    ack.assert_called_once()
-    delete_metadata_mock.assert_called_once_with("bar", "foo")
-    view_folder_metadata_mock.assert_called_once_with(
-        client,
-        {"actions": [{"value": "bar"}], "view": {"private_metadata": "bar"}},
-        ack,
-    )
-
-
-@patch("modules.incident.incident_helper.google_drive.list_folders_in_folder")
-@patch("modules.incident.incident_helper.folder_item")
-def test_list_folders(folder_item_mock, list_folders_in_folder_mock):
-    client = MagicMock()
-    body = {"trigger_id": "foo"}
-    ack = MagicMock()
-    list_folders_in_folder_mock.return_value = [{"id": "foo", "name": "bar"}]
-    folder_item_mock.return_value = [["folder item"]]
-    incident_helper.list_folders(client, body, ack)
-    list_folders_in_folder_mock.assert_called_once()
-    folder_item_mock.assert_called_once_with({"id": "foo", "name": "bar"})
-    ack.assert_called_once()
-    client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
-
-
-@patch("modules.incident.incident_helper.google_drive.get_file_by_name")
-def test_manage_roles(get_document_by_channel_name_mock):
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-channel_name",
-        "trigger_id": "trigger_id",
-    }
-    ack = MagicMock()
-    respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = [
-        {"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}
-    ]
-    incident_helper.manage_roles(client, body, ack, respond)
-    ack.assert_called_once()
-    get_document_by_channel_name_mock.assert_called_once_with("channel_name")
-    client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
-
-
-@patch("modules.incident.incident_helper.google_drive.get_file_by_name")
-def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-channel_name",
-        "trigger_id": "trigger_id",
-    }
-    ack = MagicMock()
-    respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = []
-    incident_helper.manage_roles(client, body, ack, respond)
-    ack.assert_called_once()
-    respond.assert_called_once_with(
-        "No incident document found for `channel_name`. Please make sure the channel matches the document name."
-    )
-
-
-@patch("modules.incident.incident_helper.google_drive.add_metadata")
-def test_save_incident_roles(add_metadata_mock):
-    client = MagicMock()
-    ack = MagicMock()
-    view = {
-        "private_metadata": json.dumps(
-            {
-                "ic_id": "ic_id",
-                "ol_id": "ol_id",
-                "id": "file_id",
-                "channel_id": "channel_id",
-            }
-        ),
-        "state": {
-            "values": {
-                "ic_name": {"ic_select": {"selected_user": "selected_ic"}},
-                "ol_name": {"ol_select": {"selected_user": "selected_ol"}},
-            }
-        },
-    }
-    incident_helper.save_incident_roles(client, ack, view)
-    ack.assert_called_once()
-    add_metadata_mock.assert_any_call("file_id", "ic_id", "selected_ic")
-    add_metadata_mock.assert_any_call("file_id", "ol_id", "selected_ol")
-    client.chat_postMessage.assert_any_call(
-        text="<@selected_ic> has been assigned as incident commander for this incident.",
-        channel="channel_id",
-    )
-    client.chat_postMessage.assert_any_call(
-        text="<@selected_ol> has been assigned as operations lead for this incident.",
-        channel="channel_id",
-    )
-    client.conversations_setTopic.assert_called_once_with(
-        topic="IC: <@selected_ic> / OL: <@selected_ol>", channel="channel_id"
-    )
-
-
-@patch("modules.incident.incident_helper.google_drive.add_metadata")
-@patch("modules.incident.incident_helper.view_folder_metadata")
-def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
-    client = MagicMock()
-    body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
-    view = {
-        "state": {
-            "values": {
-                "key": {"key": {"value": "key"}},
-                "value": {"value": {"value": "value"}},
-            }
-        },
-        "private_metadata": "bar",
-    }
-    ack = MagicMock()
-    incident_helper.save_metadata(client, body, ack, view)
-    ack.assert_called_once()
-    add_metadata_mock.assert_called_once_with("bar", "key", "value")
-    view_folder_metadata_mock.assert_called_once_with(
-        client,
-        {"actions": [{"value": "bar"}]},
-        ack,
-    )
-
-
 @patch("modules.incident.incident_helper.slack_channels.get_stale_channels")
 def test_stale_incidents(get_stale_channels_mock):
     client = MagicMock()
@@ -304,48 +172,6 @@ def test_stale_incidents(get_stale_channels_mock):
     ack.assert_called_once()
     client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
     client.views_update.assert_called_once_with(view_id="view_id", view=ANY)
-
-
-@patch("modules.incident.incident_helper.google_drive.list_metadata")
-@patch("modules.incident.incident_helper.metadata_items")
-def test_view_folder_metadata_open(metadata_items_mock, list_metadata_mock):
-    client = MagicMock()
-    body = {"actions": [{"value": "foo"}], "trigger_id": "trigger_id"}
-    ack = MagicMock()
-    list_metadata_mock.return_value = {
-        "name": "folder",
-        "appProperties": [{"key": "key", "value": "value"}],
-    }
-
-    metadata_items_mock.return_value = [["metadata item"]]
-    incident_helper.view_folder_metadata(client, body, ack)
-    ack.assert_called_once()
-    list_metadata_mock.assert_called_once_with("foo")
-    metadata_items_mock.assert_called_once_with(
-        {"name": "folder", "appProperties": [{"key": "key", "value": "value"}]}
-    )
-    client.views_open(trigger_id="trigger_id", view=ANY)
-
-
-@patch("modules.incident.incident_helper.google_drive.list_metadata")
-@patch("modules.incident.incident_helper.metadata_items")
-def test_view_folder_metadata_update(metadata_items_mock, list_metadata_mock):
-    client = MagicMock()
-    body = {"actions": [{"value": "foo"}], "view": {"id": "view_id"}}
-    ack = MagicMock()
-    list_metadata_mock.return_value = {
-        "name": "folder",
-        "appProperties": [{"key": "key", "value": "value"}],
-    }
-
-    metadata_items_mock.return_value = [["metadata item"]]
-    incident_helper.view_folder_metadata(client, body, ack)
-    ack.assert_called_once()
-    list_metadata_mock.assert_called_once_with("foo")
-    metadata_items_mock.assert_called_once_with(
-        {"name": "folder", "appProperties": [{"key": "key", "value": "value"}]}
-    )
-    client.views_update(view_id="view_id", view=ANY)
 
 
 def test_channel_item():
@@ -372,79 +198,19 @@ def test_channel_item():
     ]
 
 
-def test_folder_item():
-    assert incident_helper.folder_item({"id": "foo", "name": "bar"}) == [
-        {
-            "accessory": {
-                "action_id": "view_folder_metadata",
-                "text": {
-                    "emoji": True,
-                    "text": "Manage metadata",
-                    "type": "plain_text",
-                },
-                "type": "button",
-                "value": "foo",
-            },
-            "text": {"text": "*bar*", "type": "mrkdwn"},
-            "type": "section",
-        },
-        {
-            "elements": [
-                {
-                    "text": "<https://drive.google.com/drive/u/0/folders/foo|View in Google Drive>",
-                    "type": "mrkdwn",
-                }
-            ],
-            "type": "context",
-        },
-        {"type": "divider"},
-    ]
-
-
-def test_metadata_items_empty():
-    empty = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*No metadata found. Click the button above to add metadata.*",
-            },
-        },
-    ]
-    assert incident_helper.metadata_items({}) == empty
-    assert incident_helper.metadata_items({"appProperties": []}) == empty
-
-
-def test_metadata_items():
-    assert incident_helper.metadata_items({"appProperties": {"key": "value"}}) == [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*key*\nvalue",
-            },
-            "accessory": {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Delete metadata",
-                    "emoji": True,
-                },
-                "value": "key",
-                "style": "danger",
-                "action_id": "delete_folder_metadata",
-            },
-        },
-    ]
-
-
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
-def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_document):
+def test_close_incident(
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -484,20 +250,24 @@ def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_doc
     )
 
     # Assert that the Google Drive document and spreadsheet update methods were called
-    mock_close_document.assert_called_once_with("dummy_document_id")
+    mock_update_document_status.assert_called_once_with("dummy_document_id")
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
     # Assert that the Slack client's conversations_archive method was called with the correct channel ID
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
 def test_close_incident_no_bookmarks(
-    mock_extract_id, mock_update_spreadsheet, mock_close_document
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -520,17 +290,21 @@ def test_close_incident_no_bookmarks(
 
     # Assertions to ensure that document update functions are not called as there are no bookmarks
     mock_extract_id.assert_not_called()
-    mock_close_document.assert_not_called()
+    mock_update_document_status.assert_not_called()
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
 def test_close_incident_no_bookmarks_error(
-    mock_extract_id, mock_update_spreadsheet, mock_close_document
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -553,7 +327,7 @@ def test_close_incident_no_bookmarks_error(
 
     # Assertions to ensure that document update functions are not called as there are no bookmarks
     mock_extract_id.assert_not_called()
-    mock_close_document.assert_not_called()
+    mock_update_document_status.assert_not_called()
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
 
@@ -632,14 +406,18 @@ def test_close_incident_cant_send_private_message(caplog):
         ), "Expected error message not found in log records"
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_conversations_archive_fail(
-    mock_extract_id, mock_update_spreadsheet, mock_close_document
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -676,21 +454,25 @@ def test_conversations_archive_fail(
 
     # Assertions
     # Ensure that the Google Drive document update method was called even if archiving fails
-    mock_close_document.assert_called_once_with("dummy_document_id")
+    mock_update_document_status.assert_called_once_with("dummy_document_id")
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
     # Ensure that the client's conversations_archive method was called
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_conversations_archive_fail_error_message(
-    mock_extract_id, mock_update_spreadsheet, mock_close_document, caplog
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, caplog
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -727,7 +509,7 @@ def test_conversations_archive_fail_error_message(
 
     # Assertions
     # Ensure that the Google Drive document update method was called even if archiving fails
-    mock_close_document.assert_called_once_with("dummy_document_id")
+    mock_update_document_status.assert_called_once_with("dummy_document_id")
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
     # Ensure that the client's conversations_archive method was called
@@ -739,14 +521,18 @@ def test_conversations_archive_fail_error_message(
     )
 
 
-@patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 def test_conversations_archive_succeeds_post_message_who_archived(
-    mock_extract_id, mock_update_spreadsheet, mock_close_document, caplog
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, caplog
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
