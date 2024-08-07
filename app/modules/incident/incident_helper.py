@@ -332,41 +332,6 @@ def close_incident_document(document_id):
     return google_docs.batch_update(document_id, changes)
 
 
-# def update_spreadsheet_incident_status(channel_name, status="Closed"):
-#     """Update the status of an incident in the incident list spreadsheet.
-
-#     Args:
-#         channel_name (str): The name of the channel to update.
-#         status (str): The status to update the incident to.
-
-#     Returns:
-#         bool: True if the status was updated successfully, False otherwise.
-#     """
-#     valid_statuses = ["Open", "Closed", "In Progress", "Resolved"]
-#     if status not in valid_statuses:
-#         logging.warning("Invalid status %s", status)
-#         return False
-#     sheet_name = "Sheet1"
-#     sheet = sheets.get_values(INCIDENT_LIST, range=sheet_name)
-#     values = sheet.get("values", [])
-#     if len(values) == 0:
-#         logging.warning("No incident found for channel %s", channel_name)
-#         return False
-#     # Find the row with the search value
-#     for i, row in enumerate(values):
-#         if channel_name in row:
-#             # Update the 4th column (index 3) of the found row
-#             update_range = (
-#                 f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
-#             )
-#             updated_sheet = sheets.batch_update_values(
-#                 INCIDENT_LIST, update_range, [[status]]
-#             )
-#             if updated_sheet:
-#                 return True
-#     return False
-
-
 def stale_incidents(client, body, ack):
     ack()
 
