@@ -14,13 +14,14 @@ INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 
 
 @handle_google_api_errors
-def add_metadata(file_id, key, value):
+def add_metadata(file_id, key, value, delegated_user_email=None):
     """Add metadata to a file in Google Drive.
 
     Args:
         file_id (str): The file id of the file to add metadata to.
         key (str): The key of the metadata to add.
         value (str): The value of the metadata to add.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
 
     Returns:
         dict: The updated file metadata.
@@ -30,6 +31,7 @@ def add_metadata(file_id, key, value):
         "v3",
         "files",
         "update",
+        delegated_user_email=delegated_user_email,
         fileId=file_id,
         body={"appProperties": {key: value}},
         fields="name, appProperties",
@@ -38,12 +40,13 @@ def add_metadata(file_id, key, value):
 
 
 @handle_google_api_errors
-def delete_metadata(file_id, key):
+def delete_metadata(file_id, key, delegated_user_email=None):
     """Delete metadata from a file in Google Drive.
 
     Args:
         file_id (str): The file id of the file to delete metadata from.
         key (str): The key of the metadata to delete.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
 
     Returns:
         dict: The updated file metadata.
@@ -53,6 +56,7 @@ def delete_metadata(file_id, key):
         "v3",
         "files",
         "update",
+        delegated_user_email=delegated_user_email,
         fileId=file_id,
         body={"appProperties": {key: None}},
         fields="name, appProperties",
@@ -82,17 +86,19 @@ def list_metadata(file_id):
 
 
 @handle_google_api_errors
-def create_folder(name, parent_folder):
+def create_folder(name, parent_folder, fields=None):
     """Create a new folder in Google Drive.
 
     Args:
         name (str): The name of the new folder.
         parent_folder (str): The id of the parent folder.
+        fields (str, optional): The fields to include in the response.
 
     Returns:
-        str: The id of the new folder.
+        dict: A File resource representing the new folder.
+        (https://developers.google.com/drive/api/reference/rest/v3/files#File)
     """
-    result = execute_google_api_call(
+    return execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -103,14 +109,12 @@ def create_folder(name, parent_folder):
             "parents": [parent_folder],
         },
         supportsAllDrives=True,
-        fields="id",
+        fields=fields,
     )
-
-    return result
 
 
 @handle_google_api_errors
-def create_file_from_template(name, folder, template):
+def create_file_from_template(name, folder, template, fields=None):
     """Create a new file in Google Drive from a template
      (Docs, Sheets, Slides, Forms, or Sites.)
 
@@ -120,9 +124,9 @@ def create_file_from_template(name, folder, template):
         template (str): The id of the template to use.
 
     Returns:
-        str: The id of the new file.
+        dict: A File resource representing the new file with a mask of 'id'.
     """
-    result = execute_google_api_call(
+    return execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -130,10 +134,8 @@ def create_file_from_template(name, folder, template):
         fileId=template,
         body={"name": name, "parents": [folder]},
         supportsAllDrives=True,
-        fields="id",
+        fields=fields,
     )
-
-    return result["id"]
 
 
 @handle_google_api_errors
