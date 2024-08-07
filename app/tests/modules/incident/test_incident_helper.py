@@ -114,7 +114,9 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     )
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -124,7 +126,10 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
 )
 @patch("modules.incident.incident_helper.log_to_sentinel")
 def test_archive_channel_action_archive(
-    mock_log_to_sentinel, mock_extract_id, mock_update_spreadsheet, mock_update_document_status
+    mock_log_to_sentinel,
+    mock_extract_id,
+    mock_update_spreadsheet,
+    mock_update_document_status,
 ):
     client = MagicMock()
     body = {
@@ -193,7 +198,9 @@ def test_channel_item():
     ]
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -201,7 +208,9 @@ def test_channel_item():
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
-def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_update_document_status):
+def test_close_incident(
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -248,7 +257,9 @@ def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_update_do
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -283,7 +294,9 @@ def test_close_incident_no_bookmarks(
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -393,7 +406,9 @@ def test_close_incident_cant_send_private_message(caplog):
         ), "Expected error message not found in log records"
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -446,7 +461,9 @@ def test_conversations_archive_fail(
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
@@ -504,7 +521,9 @@ def test_conversations_archive_fail_error_message(
     )
 
 
-@patch("modules.incident.incident_helper.incident_document.update_incident_document_status")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
 @patch(
     "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
 )
