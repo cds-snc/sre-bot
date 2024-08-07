@@ -33,7 +33,7 @@ def create(title: str) -> str:
 
 
 @handle_google_api_errors
-def batch_update(document_id: str, requests: list) -> None:
+def batch_update(document_id: str, requests: list) -> dict:
     """Applies a list of updates to a document in Google Docs.
 
     Args:
@@ -41,9 +41,9 @@ def batch_update(document_id: str, requests: list) -> None:
         requests (list): A list of update requests.
 
     Returns:
-        None
+        dict: The response from the Google Docs API.
     """
-    execute_google_api_call(
+    return execute_google_api_call(
         "docs",
         "v1",
         "documents",
