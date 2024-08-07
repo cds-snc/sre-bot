@@ -6,7 +6,7 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive, sheets
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from modules.incident import schedule_retro
+from . import incident_folder, schedule_retro
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -43,11 +43,11 @@ help_text = """
 
 
 def register(bot: App):
-    bot.action("add_folder_metadata")(add_folder_metadata)
-    bot.action("view_folder_metadata")(view_folder_metadata)
-    bot.view("view_folder_metadata_modal")(list_folders)
-    bot.view("add_metadata_view")(save_metadata)
-    bot.action("delete_folder_metadata")(delete_folder_metadata)
+    bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
+    bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
+    bot.view("view_folder_metadata_modal")(incident_folder.list_folders)
+    bot.view("add_metadata_view")(incident_folder.save_metadata)
+    bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
     bot.action("archive_channel")(archive_channel_action)
     bot.view("view_save_incident_roles")(save_incident_roles)
     bot.view("view_save_event")(save_incident_retro)
@@ -71,7 +71,7 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
         case "help":
             respond(help_text)
         case "list-folders":
-            list_folders(client, body, ack)
+            incident_folder.list_folders(client, body, ack)
         case "roles":
             manage_roles(client, body, ack, respond)
         case "close":
@@ -84,58 +84,6 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
             )
-
-
-def add_folder_metadata(client: WebClient, body, ack):
-    ack()
-    folder_id = body["actions"][0]["value"]
-    blocks = {
-        "type": "modal",
-        "callback_id": "add_metadata_view",
-        "title": {"type": "plain_text", "text": "SRE - Add metadata"},
-        "submit": {"type": "plain_text", "text": "Save metadata"},
-        "close": {"type": "plain_text", "text": "Cancel"},
-        "private_metadata": folder_id,
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Add metadata*",
-                },
-            },
-            {
-                "type": "input",
-                "block_id": "key",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "key",
-                    "placeholder": {"type": "plain_text", "text": "Key"},
-                },
-                "label": {
-                    "type": "plain_text",
-                    "text": "Key",
-                },
-            },
-            {
-                "type": "input",
-                "block_id": "value",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "value",
-                    "placeholder": {"type": "plain_text", "text": "Value"},
-                },
-                "label": {
-                    "type": "plain_text",
-                    "text": "Value",
-                },
-            },
-        ],
-    }
-    client.views_update(
-        view_id=body["view"]["id"],
-        view=blocks,
-    )
 
 
 def archive_channel_action(client: WebClient, body, ack, respond):
@@ -172,43 +120,13 @@ def archive_channel_action(client: WebClient, body, ack, respond):
         log_to_sentinel("incident_retro_scheduled", body)
 
 
-def delete_folder_metadata(client: WebClient, body, ack):
-    ack()
-    folder_id = body["view"]["private_metadata"]
-    key = body["actions"][0]["value"]
-    response = google_drive.delete_metadata(folder_id, key)
-    if not response:
-        logging.info(f"Failed to delete metadata `{key}`.\nResponse: {str(response)}")
-    else:
-        logging.info(f"Response: {str(response)}")
-    body["actions"] = [{"value": folder_id}]
-    view_folder_metadata(client, body, ack)
-
-
-def list_folders(client: WebClient, body, ack):
-    ack()
-    folders = google_drive.list_folders_in_folder(
-        SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
-    )
-    folders.sort(key=lambda x: x["name"])
-    blocks = {
-        "type": "modal",
-        "callback_id": "list_folders_view",
-        "title": {"type": "plain_text", "text": "SRE - Listing folders"},
-        "close": {"type": "plain_text", "text": "Close"},
-        "blocks": [
-            item for sublist in list(map(folder_item, folders)) for item in sublist
-        ],
-    }
-    client.views_open(trigger_id=body["trigger_id"], view=blocks)
-
-
 def manage_roles(client: WebClient, body, ack, respond):
     ack()
     channel_name = body["channel_name"]
     channel_name = channel_name[
         channel_name.startswith("incident-") and len("incident-") :
     ]
+    channel_name = channel_name[channel_name.startswith("dev-") and len("dev-") :]
     documents = google_drive.get_file_by_name(channel_name)
 
     if len(documents) == 0:
@@ -297,17 +215,6 @@ def manage_roles(client: WebClient, body, ack, respond):
         ),
     }
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
-
-
-def save_metadata(client: WebClient, body, ack, view):
-    ack()
-    folder_id = view["private_metadata"]
-    key = view["state"]["values"]["key"]["key"]["value"]
-    value = view["state"]["values"]["value"]["value"]["value"]
-    google_drive.add_metadata(folder_id, key, value)
-    body["actions"] = [{"value": folder_id}]
-    del body["view"]
-    view_folder_metadata(client, body, ack)
 
 
 def save_incident_roles(client: WebClient, ack, view):
@@ -753,46 +660,6 @@ def confirm_click(ack, body, client):
     logging.info(f"User {username} viewed the calendar event.")
 
 
-def view_folder_metadata(client, body, ack):
-    ack()
-    folder_id = body["actions"][0]["value"]
-    logging.info(f"Viewing metadata for folder {folder_id}")
-    folder = google_drive.list_metadata(folder_id)
-    blocks = {
-        "type": "modal",
-        "callback_id": "view_folder_metadata_modal",
-        "title": {"type": "plain_text", "text": "SRE - Showing metadata"},
-        "submit": {"type": "plain_text", "text": "Return to folders"},
-        "private_metadata": folder_id,
-        "blocks": (
-            [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "plain_text",
-                        "text": folder["name"],
-                    },
-                    "accessory": {
-                        "type": "button",
-                        "text": {"type": "plain_text", "text": "Add metadata"},
-                        "value": folder_id,
-                        "action_id": "add_folder_metadata",
-                    },
-                },
-                {"type": "divider"},
-            ]
-            + metadata_items(folder)
-        ),
-    }
-    if "view" in body:
-        client.views_update(
-            view_id=body["view"]["id"],
-            view=blocks,
-        )
-    else:
-        client.views_open(trigger_id=body["trigger_id"], view=blocks)
-
-
 def channel_item(channel):
     return [
         {
@@ -817,70 +684,6 @@ def channel_item(channel):
         },
         {"type": "divider"},
     ]
-
-
-def folder_item(folder):
-    return [
-        {
-            "type": "section",
-            "text": {"type": "mrkdwn", "text": f"*{folder['name']}*"},
-            "accessory": {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Manage metadata",
-                    "emoji": True,
-                },
-                "value": f"{folder['id']}",
-                "action_id": "view_folder_metadata",
-            },
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": f"<https://drive.google.com/drive/u/0/folders/{folder['id']}|View in Google Drive>",
-                }
-            ],
-        },
-        {"type": "divider"},
-    ]
-
-
-def metadata_items(folder):
-    if "appProperties" not in folder or len(folder["appProperties"]) == 0:
-        return [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*No metadata found. Click the button above to add metadata.*",
-                },
-            },
-        ]
-    else:
-        return [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*{key}*\n{value}",
-                },
-                "accessory": {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Delete metadata",
-                        "emoji": True,
-                    },
-                    "value": key,
-                    "style": "danger",
-                    "action_id": "delete_folder_metadata",
-                },
-            }
-            for key, value in folder["appProperties"].items()
-        ]
 
 
 def return_channel_name(input_str: str):
