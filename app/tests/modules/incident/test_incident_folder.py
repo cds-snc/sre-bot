@@ -207,3 +207,39 @@ def test_metadata_items():
             },
         },
     ]
+
+
+@patch("modules.incident.incident_folder.sheets")
+@patch("modules.incident.incident_folder.logging")
+def test_update_spreadsheet_incident_status_invalid_status(logging_mock, sheets_mock):
+    assert not incident_helper.update_spreadsheet_incident_status(
+        "foo", "InvalidStatus"
+    )
+    logging_mock.warning.assert_called_once_with("Invalid status %s", "InvalidStatus")
+
+
+@patch("modules.incident.incident_folder.sheets")
+@patch("modules.incident.incident_folder.logging")
+def test_update_spreadsheet_incident_status_empty_values(logging_mock, sheets_mock):
+    sheets_mock.get_values.return_value = {"values": []}
+    assert not incident_helper.update_spreadsheet_incident_status("foo", "Closed")
+    logging_mock.warning.assert_called_once_with(
+        "No incident found for channel %s", "foo"
+    )
+
+
+@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+@patch("modules.incident.incident_folder.sheets")
+def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
+    sheets_mock.get_values.return_value = {"values": [["foo", "bar", "baz", "qux"]]}
+    sheets_mock.batch_update_values.return_value = True
+    assert incident_helper.update_spreadsheet_incident_status("foo", "Closed")
+    sheets_mock.batch_update_values.assert_called_once_with(
+        "INCIDENT_LIST", "Sheet1!D1", [["Closed"]]
+    )
+
+
+@patch("modules.incident.incident_folder.sheets")
+def test_update_spreadsheet_incident_status_channel_not_found(sheets_mock):
+    sheets_mock.get_values.return_value = {"values": [["bar", "baz", "qux"]]}
+    assert not incident_helper.update_spreadsheet_incident_status("foo", "Closed")
