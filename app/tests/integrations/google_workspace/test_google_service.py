@@ -190,7 +190,7 @@ def test_handle_google_api_errors_processes_unsupported_params(
     assert result == "test"
     mock_func.assert_called_once()
     mocked_logging_warning.assert_called_once_with(
-        "Unsupported parameters in 'mock_func' were filtered out: unsupported"
+        "Unknown parameters in 'mock_func' were detected: unsupported"
     )
 
 
@@ -440,4 +440,4 @@ Returns:
 
     result = get_google_api_command_parameters(mock_resource, "method")
 
-    assert result == ["arg1", "arg2"]
+    assert result == ["fields", "arg1", "arg2"]
