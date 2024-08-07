@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock, ANY
 
-from modules.incident import incident_folder as incident_helper
+from modules.incident import incident_folder
 
 
 @patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
@@ -11,7 +11,7 @@ def test_list_folders(folder_item_mock, list_folders_in_folder_mock):
     ack = MagicMock()
     list_folders_in_folder_mock.return_value = [{"id": "foo", "name": "bar"}]
     folder_item_mock.return_value = [["folder item"]]
-    incident_helper.list_folders(client, body, ack)
+    incident_folder.list_folders(client, body, ack)
     list_folders_in_folder_mock.assert_called_once()
     folder_item_mock.assert_called_once_with({"id": "foo", "name": "bar"})
     ack.assert_called_once()
@@ -31,7 +31,7 @@ def test_delete_folder_metadata(
         "name": "folder",
         "appProperties": [{"key": "key", "value": "value"}],
     }
-    incident_helper.delete_folder_metadata(client, body, ack)
+    incident_folder.delete_folder_metadata(client, body, ack)
 
     ack.assert_called_once()
     delete_metadata_mock.assert_called_once_with("bar", "foo")
@@ -53,7 +53,7 @@ def test_delete_folder_metadata_failed(
     body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
     ack = MagicMock()
     delete_metadata_mock.return_value = {}
-    incident_helper.delete_folder_metadata(client, body, ack)
+    incident_folder.delete_folder_metadata(client, body, ack)
 
     ack.assert_called_once()
     delete_metadata_mock.assert_called_once_with("bar", "foo")
@@ -82,7 +82,7 @@ def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
         "private_metadata": "bar",
     }
     ack = MagicMock()
-    incident_helper.save_metadata(client, body, ack, view)
+    incident_folder.save_metadata(client, body, ack, view)
     ack.assert_called_once()
     add_metadata_mock.assert_called_once_with("bar", "key", "value")
     view_folder_metadata_mock.assert_called_once_with(
@@ -104,7 +104,7 @@ def test_view_folder_metadata_open(metadata_items_mock, list_metadata_mock):
     }
 
     metadata_items_mock.return_value = [["metadata item"]]
-    incident_helper.view_folder_metadata(client, body, ack)
+    incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
     list_metadata_mock.assert_called_once_with("foo")
     metadata_items_mock.assert_called_once_with(
@@ -125,7 +125,7 @@ def test_view_folder_metadata_update(metadata_items_mock, list_metadata_mock):
     }
 
     metadata_items_mock.return_value = [["metadata item"]]
-    incident_helper.view_folder_metadata(client, body, ack)
+    incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
     list_metadata_mock.assert_called_once_with("foo")
     metadata_items_mock.assert_called_once_with(
@@ -138,13 +138,13 @@ def test_add_folder_metadata():
     client = MagicMock()
     body = {"actions": [{"value": "foo"}], "view": {"id": "bar"}}
     ack = MagicMock()
-    incident_helper.add_folder_metadata(client, body, ack)
+    incident_folder.add_folder_metadata(client, body, ack)
     ack.assert_called_once()
     client.views_update.assert_called_once_with(view_id="bar", view=ANY)
 
 
 def test_folder_item():
-    assert incident_helper.folder_item({"id": "foo", "name": "bar"}) == [
+    assert incident_folder.folder_item({"id": "foo", "name": "bar"}) == [
         {
             "accessory": {
                 "action_id": "view_folder_metadata",
@@ -182,12 +182,12 @@ def test_metadata_items_empty():
             },
         },
     ]
-    assert incident_helper.metadata_items({}) == empty
-    assert incident_helper.metadata_items({"appProperties": []}) == empty
+    assert incident_folder.metadata_items({}) == empty
+    assert incident_folder.metadata_items({"appProperties": []}) == empty
 
 
 def test_metadata_items():
-    assert incident_helper.metadata_items({"appProperties": {"key": "value"}}) == [
+    assert incident_folder.metadata_items({"appProperties": {"key": "value"}}) == [
         {
             "type": "section",
             "text": {
@@ -212,7 +212,7 @@ def test_metadata_items():
 @patch("modules.incident.incident_folder.sheets")
 @patch("modules.incident.incident_folder.logging")
 def test_update_spreadsheet_incident_status_invalid_status(logging_mock, sheets_mock):
-    assert not incident_helper.update_spreadsheet_incident_status(
+    assert not incident_folder.update_spreadsheet_incident_status(
         "foo", "InvalidStatus"
     )
     logging_mock.warning.assert_called_once_with("Invalid status %s", "InvalidStatus")
@@ -222,7 +222,7 @@ def test_update_spreadsheet_incident_status_invalid_status(logging_mock, sheets_
 @patch("modules.incident.incident_folder.logging")
 def test_update_spreadsheet_incident_status_empty_values(logging_mock, sheets_mock):
     sheets_mock.get_values.return_value = {"values": []}
-    assert not incident_helper.update_spreadsheet_incident_status("foo", "Closed")
+    assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
     logging_mock.warning.assert_called_once_with(
         "No incident found for channel %s", "foo"
     )
@@ -233,7 +233,7 @@ def test_update_spreadsheet_incident_status_empty_values(logging_mock, sheets_mo
 def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
     sheets_mock.get_values.return_value = {"values": [["foo", "bar", "baz", "qux"]]}
     sheets_mock.batch_update_values.return_value = True
-    assert incident_helper.update_spreadsheet_incident_status("foo", "Closed")
+    assert incident_folder.update_spreadsheet_incident_status("foo", "Closed")
     sheets_mock.batch_update_values.assert_called_once_with(
         "INCIDENT_LIST", "Sheet1!D1", [["Closed"]]
     )
@@ -242,4 +242,4 @@ def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
 @patch("modules.incident.incident_folder.sheets")
 def test_update_spreadsheet_incident_status_channel_not_found(sheets_mock):
     sheets_mock.get_values.return_value = {"values": [["bar", "baz", "qux"]]}
-    assert not incident_helper.update_spreadsheet_incident_status("foo", "Closed")
+    assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
