@@ -6,7 +6,7 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from . import incident_folder, schedule_retro
+from . import incident_folder, incident_roles, schedule_retro
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -47,7 +47,7 @@ def register(bot: App):
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
     bot.action("archive_channel")(archive_channel_action)
-    bot.view("view_save_incident_roles")(save_incident_roles)
+    bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
     bot.view("view_save_event")(save_incident_retro)
     bot.action("confirm_click")(confirm_click)
 
@@ -71,7 +71,7 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
         case "list-folders":
             incident_folder.list_folders(client, body, ack)
         case "roles":
-            manage_roles(client, body, ack, respond)
+            incident_roles.manage_roles(client, body, ack, respond)
         case "close":
             close_incident(client, body, ack, respond)
         case "stale":
@@ -116,127 +116,6 @@ def archive_channel_action(client: WebClient, body, ack, respond):
         schedule_incident_retro(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)
-
-
-def manage_roles(client: WebClient, body, ack, respond):
-    ack()
-    channel_name = body["channel_name"]
-    channel_name = channel_name[
-        channel_name.startswith("incident-") and len("incident-") :
-    ]
-    channel_name = channel_name[channel_name.startswith("dev-") and len("dev-") :]
-    documents = google_drive.get_file_by_name(channel_name)
-
-    if len(documents) == 0:
-        respond(
-            f"No incident document found for `{channel_name}`. Please make sure the channel matches the document name."
-        )
-        return
-
-    document = documents[0]
-    current_ic = (
-        document["appProperties"]["ic_id"]
-        if "appProperties" in document and "ic_id" in document["appProperties"]
-        else False
-    )
-    current_ol = (
-        document["appProperties"]["ol_id"]
-        if "appProperties" in document and "ol_id" in document["appProperties"]
-        else False
-    )
-
-    ic_element = {
-        "type": "users_select",
-        "placeholder": {
-            "type": "plain_text",
-            "text": "Select an incident commander",
-        },
-        "action_id": "ic_select",
-    }
-    if current_ic:
-        ic_element["initial_user"] = current_ic
-
-    ol_element = {
-        "type": "users_select",
-        "placeholder": {
-            "type": "plain_text",
-            "text": "Select an operations lead",
-        },
-        "action_id": "ol_select",
-    }
-    if current_ol:
-        ol_element["initial_user"] = current_ol
-
-    blocks = {
-        "type": "modal",
-        "callback_id": "view_save_incident_roles",
-        "title": {"type": "plain_text", "text": "SRE - Roles management"},
-        "submit": {"type": "plain_text", "text": "Save roles"},
-        "private_metadata": json.dumps(
-            {
-                "id": document["id"],
-                "ic_id": current_ic,
-                "ol_id": current_ol,
-                "channel_id": body["channel_id"],
-            }
-        ),
-        "blocks": (
-            [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"Roles for {channel_name}",
-                    },
-                },
-                {"type": "divider"},
-                {
-                    "type": "input",
-                    "block_id": "ic_name",
-                    "element": ic_element,
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Incident Commander",
-                    },
-                },
-                {"type": "divider"},
-                {
-                    "type": "input",
-                    "block_id": "ol_name",
-                    "element": ol_element,
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Operations Lead",
-                    },
-                },
-            ]
-        ),
-    }
-    client.views_open(trigger_id=body["trigger_id"], view=blocks)
-
-
-def save_incident_roles(client: WebClient, ack, view):
-    ack()
-    selected_ic = view["state"]["values"]["ic_name"]["ic_select"]["selected_user"]
-    selected_ol = view["state"]["values"]["ol_name"]["ol_select"]["selected_user"]
-    metadata = json.loads(view["private_metadata"])
-    file_id = metadata["id"]
-    google_drive.add_metadata(file_id, "ic_id", selected_ic)
-    google_drive.add_metadata(file_id, "ol_id", selected_ol)
-    if metadata["ic_id"] != selected_ic:
-        client.chat_postMessage(
-            text=f"<@{selected_ic}> has been assigned as incident commander for this incident.",
-            channel=metadata["channel_id"],
-        )
-    if metadata["ol_id"] != selected_ol:
-        client.chat_postMessage(
-            text=f"<@{selected_ol}> has been assigned as operations lead for this incident.",
-            channel=metadata["channel_id"],
-        )
-    client.conversations_setTopic(
-        topic=f"IC: <@{selected_ic}> / OL: <@{selected_ol}>",
-        channel=metadata["channel_id"],
-    )
 
 
 def close_incident(client: WebClient, body, ack, respond):
