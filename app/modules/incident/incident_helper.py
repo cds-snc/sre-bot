@@ -3,7 +3,7 @@ import logging
 import os
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
-from integrations.google_workspace import google_docs, google_drive, sheets
+from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
 from . import incident_folder, schedule_retro
@@ -11,8 +11,6 @@ from . import incident_folder, schedule_retro
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
-INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
-INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
@@ -287,7 +285,7 @@ def close_incident(client: WebClient, body, ack, respond):
         respond(warning_message)
 
     # Update the spreadsheet with the current incident with status = closed
-    update_succeeded = update_spreadsheet_incident_status(
+    update_succeeded = incident_folder.update_spreadsheet_incident_status(
         return_channel_name(channel_name), "Closed"
     )
 
@@ -334,39 +332,39 @@ def close_incident_document(document_id):
     return google_docs.batch_update(document_id, changes)
 
 
-def update_spreadsheet_incident_status(channel_name, status="Closed"):
-    """Update the status of an incident in the incident list spreadsheet.
+# def update_spreadsheet_incident_status(channel_name, status="Closed"):
+#     """Update the status of an incident in the incident list spreadsheet.
 
-    Args:
-        channel_name (str): The name of the channel to update.
-        status (str): The status to update the incident to.
+#     Args:
+#         channel_name (str): The name of the channel to update.
+#         status (str): The status to update the incident to.
 
-    Returns:
-        bool: True if the status was updated successfully, False otherwise.
-    """
-    valid_statuses = ["Open", "Closed", "In Progress", "Resolved"]
-    if status not in valid_statuses:
-        logging.warning("Invalid status %s", status)
-        return False
-    sheet_name = "Sheet1"
-    sheet = sheets.get_values(INCIDENT_LIST, range=sheet_name)
-    values = sheet.get("values", [])
-    if len(values) == 0:
-        logging.warning("No incident found for channel %s", channel_name)
-        return False
-    # Find the row with the search value
-    for i, row in enumerate(values):
-        if channel_name in row:
-            # Update the 4th column (index 3) of the found row
-            update_range = (
-                f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
-            )
-            updated_sheet = sheets.batch_update_values(
-                INCIDENT_LIST, update_range, [[status]]
-            )
-            if updated_sheet:
-                return True
-    return False
+#     Returns:
+#         bool: True if the status was updated successfully, False otherwise.
+#     """
+#     valid_statuses = ["Open", "Closed", "In Progress", "Resolved"]
+#     if status not in valid_statuses:
+#         logging.warning("Invalid status %s", status)
+#         return False
+#     sheet_name = "Sheet1"
+#     sheet = sheets.get_values(INCIDENT_LIST, range=sheet_name)
+#     values = sheet.get("values", [])
+#     if len(values) == 0:
+#         logging.warning("No incident found for channel %s", channel_name)
+#         return False
+#     # Find the row with the search value
+#     for i, row in enumerate(values):
+#         if channel_name in row:
+#             # Update the 4th column (index 3) of the found row
+#             update_range = (
+#                 f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
+#             )
+#             updated_sheet = sheets.batch_update_values(
+#                 INCIDENT_LIST, update_range, [[status]]
+#             )
+#             if updated_sheet:
+#                 return True
+#     return False
 
 
 def stale_incidents(client, body, ack):

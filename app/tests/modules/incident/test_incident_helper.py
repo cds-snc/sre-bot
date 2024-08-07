@@ -115,7 +115,7 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
@@ -285,7 +285,7 @@ def test_channel_item():
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
@@ -338,7 +338,7 @@ def test_close_incident(mock_extract_id, mock_update_spreadsheet, mock_close_doc
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
@@ -371,7 +371,7 @@ def test_close_incident_no_bookmarks(
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
@@ -479,7 +479,7 @@ def test_close_incident_cant_send_private_message(caplog):
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
@@ -530,7 +530,7 @@ def test_conversations_archive_fail(
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
@@ -586,7 +586,7 @@ def test_conversations_archive_fail_error_message(
 
 
 @patch("modules.incident.incident_helper.close_incident_document")
-@patch("modules.incident.incident_helper.update_spreadsheet_incident_status")
+@patch("modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status")
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
