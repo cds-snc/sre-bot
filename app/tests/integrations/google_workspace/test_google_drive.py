@@ -17,6 +17,7 @@ def test_add_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "update",
+        delegated_user_email=None,
         fileId="file_id",
         body={"appProperties": {"key": "value"}},
         fields="name, appProperties",
@@ -37,6 +38,7 @@ def test_delete_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "update",
+        delegated_user_email=None,
         fileId="file_id",
         body={"appProperties": {"key": None}},
         fields="name, appProperties",
@@ -68,11 +70,40 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_create_folder_returns_folder_id(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {"id": "test_folder_id"}
-    assert (
-        google_drive.create_folder("test_folder", "parent_folder") == "test_folder_id"
+def test_create_folder_returns_folder(execute_google_api_call_mock):
+    execute_google_api_call_mock.return_value = {
+        "id": "test_folder_id",
+        "name": "test_folder",
+        "appProperties": {},
+    }
+    assert google_drive.create_folder("test_folder", "parent_folder") == {
+        "id": "test_folder_id",
+        "name": "test_folder",
+        "appProperties": {},
+    }
+    execute_google_api_call_mock.assert_called_once_with(
+        "drive",
+        "v3",
+        "files",
+        "create",
+        body={
+            "name": "test_folder",
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": ["parent_folder"],
+        },
+        supportsAllDrives=True,
+        fields=None,
     )
+
+
+@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
+    execute_google_api_call_mock.return_value = {
+        "id": "test_folder_id",
+    }
+    assert google_drive.create_folder("test_folder", "parent_folder", "id") == {
+        "id": "test_folder_id",
+    }
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
         "v3",
@@ -125,12 +156,12 @@ def test_create_file_with_invalid_type_raises_value_error(
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_create_file_from_template_returns_file_id(execute_google_api_call_mock):
+def test_create_file_from_template_returns_file(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {"id": "test_document_id"}
     result = google_drive.create_file_from_template(
         "test_document", "folder_id", "template_id"
     )
-    assert result == "test_document_id"
+    assert result == {"id": "test_document_id"}
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
         "v3",
@@ -139,7 +170,7 @@ def test_create_file_from_template_returns_file_id(execute_google_api_call_mock)
         fileId="template_id",
         body={"name": "test_document", "parents": ["folder_id"]},
         supportsAllDrives=True,
-        fields="id",
+        fields=None,
     )
 
 

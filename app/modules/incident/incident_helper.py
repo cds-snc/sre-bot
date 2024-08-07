@@ -1,13 +1,21 @@
 import json
 import logging
+import os
 from slack_sdk import WebClient
-from integrations import google_drive
-from integrations.google_workspace import google_docs
+from slack_bolt import Ack, Respond, App
+from integrations.google_workspace import google_docs, google_drive, sheets
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
 from modules.incident import schedule_retro
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
+SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
+SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
+INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
+INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
+START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
+END_HEADING = "Trigger"
+
 
 help_text = """
 \n `/sre incident create-folder <folder_name>`
@@ -34,7 +42,7 @@ help_text = """
 """
 
 
-def register(bot):
+def register(bot: App):
     bot.action("add_folder_metadata")(add_folder_metadata)
     bot.action("view_folder_metadata")(view_folder_metadata)
     bot.view("view_folder_metadata_modal")(list_folders)
@@ -46,7 +54,7 @@ def register(bot):
     bot.action("confirm_click")(confirm_click)
 
 
-def handle_incident_command(args, client: WebClient, body, respond, ack):
+def handle_incident_command(args, client: WebClient, body, respond: Respond, ack: Ack):
     if len(args) == 0:
         respond(help_text)
         return
@@ -55,7 +63,11 @@ def handle_incident_command(args, client: WebClient, body, respond, ack):
     match action:
         case "create-folder":
             name = " ".join(args)
-            respond(google_drive.create_folder(name))
+            folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
+            if folder:
+                respond(f"Folder `{folder['name']}` created.")
+            else:
+                respond(f"Failed to create folder `{name}`.")
         case "help":
             respond(help_text)
         case "list-folders":
@@ -63,7 +75,7 @@ def handle_incident_command(args, client: WebClient, body, respond, ack):
         case "roles":
             manage_roles(client, body, ack, respond)
         case "close":
-            close_incident(client, body, ack)
+            close_incident(client, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case "schedule":
@@ -74,7 +86,7 @@ def handle_incident_command(args, client: WebClient, body, respond, ack):
             )
 
 
-def add_folder_metadata(client, body, ack):
+def add_folder_metadata(client: WebClient, body, ack):
     ack()
     folder_id = body["actions"][0]["value"]
     blocks = {
@@ -126,7 +138,7 @@ def add_folder_metadata(client, body, ack):
     )
 
 
-def archive_channel_action(client, body, ack):
+def archive_channel_action(client: WebClient, body, ack, respond):
     ack()
     channel_id = body["channel"]["id"]
     action = body["actions"][0]["value"]
@@ -150,7 +162,7 @@ def archive_channel_action(client, body, ack):
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        close_incident(client, channel_info, ack)
+        close_incident(client, channel_info, ack, respond)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
@@ -160,18 +172,24 @@ def archive_channel_action(client, body, ack):
         log_to_sentinel("incident_retro_scheduled", body)
 
 
-def delete_folder_metadata(client, body, ack):
+def delete_folder_metadata(client: WebClient, body, ack):
     ack()
     folder_id = body["view"]["private_metadata"]
     key = body["actions"][0]["value"]
-    google_drive.delete_metadata(folder_id, key)
+    response = google_drive.delete_metadata(folder_id, key)
+    if not response:
+        logging.info(f"Failed to delete metadata `{key}`.\nResponse: {str(response)}")
+    else:
+        logging.info(f"Response: {str(response)}")
     body["actions"] = [{"value": folder_id}]
     view_folder_metadata(client, body, ack)
 
 
-def list_folders(client, body, ack):
+def list_folders(client: WebClient, body, ack):
     ack()
-    folders = google_drive.list_folders()
+    folders = google_drive.list_folders_in_folder(
+        SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
+    )
     folders.sort(key=lambda x: x["name"])
     blocks = {
         "type": "modal",
@@ -185,13 +203,13 @@ def list_folders(client, body, ack):
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
 
 
-def manage_roles(client, body, ack, respond):
+def manage_roles(client: WebClient, body, ack, respond):
     ack()
     channel_name = body["channel_name"]
     channel_name = channel_name[
         channel_name.startswith("incident-") and len("incident-") :
     ]
-    documents = google_drive.get_document_by_channel_name(channel_name)
+    documents = google_drive.get_file_by_name(channel_name)
 
     if len(documents) == 0:
         respond(
@@ -281,7 +299,7 @@ def manage_roles(client, body, ack, respond):
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
 
 
-def save_metadata(client, body, ack, view):
+def save_metadata(client: WebClient, body, ack, view):
     ack()
     folder_id = view["private_metadata"]
     key = view["state"]["values"]["key"]["key"]["value"]
@@ -292,7 +310,7 @@ def save_metadata(client, body, ack, view):
     view_folder_metadata(client, body, ack)
 
 
-def save_incident_roles(client, ack, view):
+def save_incident_roles(client: WebClient, ack, view):
     ack()
     selected_ic = view["state"]["values"]["ic_name"]["ic_select"]["selected_user"]
     selected_ol = view["state"]["values"]["ol_name"]["ol_select"]["selected_user"]
@@ -316,7 +334,7 @@ def save_incident_roles(client, ack, view):
     )
 
 
-def close_incident(client, body, ack):
+def close_incident(client: WebClient, body, ack, respond):
     ack()
     # get the current chanel id and name
     channel_id = body["channel_id"]
@@ -347,23 +365,31 @@ def close_incident(client, body, ack):
                     response["bookmarks"][item]["link"]
                 )
     else:
-        logging.warning(
-            "No bookmark link for the incident document found for channel %s",
-            channel_name,
-        )
+        warning_message = f"No bookmark link for the incident document found for channel {channel_name}"
+        logging.warning(warning_message)
+        respond(warning_message)
 
     # Update the document status to "Closed" if we can get the document
     if document_id != "":
-        google_drive.close_incident_document(document_id)
+        close_incident_document(document_id)
     else:
-        logging.warning(
+        warning_message = (
             "Could not close the incident document - the document was not found."
         )
+        logging.warning(warning_message)
+        respond(warning_message)
 
     # Update the spreadsheet with the current incident with status = closed
-    google_drive.update_spreadsheet_close_incident(return_channel_name(channel_name))
+    update_succeeded = update_spreadsheet_incident_status(
+        return_channel_name(channel_name), "Closed"
+    )
 
-    # Need to post the message before the channe is archived so that the message can be delivered.
+    if not update_succeeded:
+        warning_message = f"Could not update the incident status in the spreadsheet for channel {channel_name}"
+        logging.warning(warning_message)
+        respond(warning_message)
+
+    # Need to post the message before the channel is archived so that the message can be delivered.
     client.chat_postMessage(
         channel=channel_id,
         text=f"<@{user_id}> has archived this channel 👋",
@@ -382,6 +408,58 @@ def close_incident(client, body, ack):
         logging.info(
             "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
         )
+
+
+def close_incident_document(document_id):
+    # List of possible statuses to be replaced
+    possible_statuses = ["In Progress", "Open", "Ready to be Reviewed", "Reviewed"]
+
+    # Replace all possible statuses with "Closed"
+    changes = [
+        {
+            "replaceAllText": {
+                "containsText": {"text": f"Status: {status}", "matchCase": "false"},
+                "replaceText": "Status: Closed",
+            }
+        }
+        for status in possible_statuses
+    ]
+    return google_docs.batch_update(document_id, changes)
+
+
+def update_spreadsheet_incident_status(channel_name, status="Closed"):
+    """Update the status of an incident in the incident list spreadsheet.
+
+    Args:
+        channel_name (str): The name of the channel to update.
+        status (str): The status to update the incident to.
+
+    Returns:
+        bool: True if the status was updated successfully, False otherwise.
+    """
+    valid_statuses = ["Open", "Closed", "In Progress", "Resolved"]
+    if status not in valid_statuses:
+        logging.warning("Invalid status %s", status)
+        return False
+    sheet_name = "Sheet1"
+    sheet = sheets.get_values(INCIDENT_LIST, range=sheet_name)
+    values = sheet.get("values", [])
+    if len(values) == 0:
+        logging.warning("No incident found for channel %s", channel_name)
+        return False
+    # Find the row with the search value
+    for i, row in enumerate(values):
+        if channel_name in row:
+            # Update the 4th column (index 3) of the found row
+            update_range = (
+                f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
+            )
+            updated_sheet = sheets.batch_update_values(
+                INCIDENT_LIST, update_range, [[status]]
+            )
+            if updated_sheet:
+                return True
+    return False
 
 
 def stale_incidents(client, body, ack):
@@ -678,6 +756,7 @@ def confirm_click(ack, body, client):
 def view_folder_metadata(client, body, ack):
     ack()
     folder_id = body["actions"][0]["value"]
+    logging.info(f"Viewing metadata for folder {folder_id}")
     folder = google_drive.list_metadata(folder_id)
     blocks = {
         "type": "modal",
@@ -804,9 +883,12 @@ def metadata_items(folder):
         ]
 
 
-def return_channel_name(input_str):
+def return_channel_name(input_str: str):
     # return the channel name without the incident- prefix and appending a # to the channel name
     prefix = "incident-"
+    dev_prefix = prefix + "dev-"
+    if input_str.startswith(dev_prefix):
+        return "#" + input_str[len(dev_prefix) :]
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str

@@ -85,7 +85,7 @@ def handle_google_api_errors(func):
                 result, unsupported_params = result
                 if unsupported_params:
                     logging.warning(
-                        f"Unsupported parameters in '{func.__name__}' were filtered out: {', '.join(unsupported_params)}"
+                        f"Unknown parameters in '{func.__name__}' were detected: {', '.join(unsupported_params)}"
                     )
             return result
         except HttpError as e:
@@ -152,7 +152,7 @@ def execute_google_api_call(
         k: v for k, v in formatted_kwargs.items() if k in supported_params
     }
     unsupported_params = set(formatted_kwargs.keys()) - set(filtered_params.keys())
-
+    # filtered_params = kwargs
     if paginate:
         all_results = []
         request = api_method(**filtered_params)
@@ -178,8 +178,9 @@ def get_google_api_command_parameters(resource_obj, method):
         list: The names of the parameters for the API method, excluding non-parameter documentation.
     """
     api_method = getattr(resource_obj, method)
+    # Add known parameters not documented in the docstring
+    parameter_names = ["fields"]
 
-    parameter_names = []
     if hasattr(api_method, "__doc__") and api_method.__doc__:
         parsing_parameters = False
         doc_lines = api_method.__doc__.splitlines()
