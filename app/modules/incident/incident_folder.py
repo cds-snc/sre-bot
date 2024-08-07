@@ -1,3 +1,8 @@
+"""Module for managing SRE incident folders in Google Drive.
+
+Includes functions to manage the folders, the metadata, and the list of incidents in a Google Sheets spreadsheet.
+"""
+
 import os
 from slack_sdk.web import WebClient
 from slack_bolt import Ack
