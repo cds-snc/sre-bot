@@ -3,7 +3,6 @@ import pickle
 import base64
 import logging
 import datetime
-import re
 
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -295,45 +294,6 @@ def merge_data(file_id, name, product, slack_channel, on_call_names):
     return result
 
 
-# def get_timeline_section(document_id):
-#     # Retrieve the document
-#     service = get_google_service("docs", "v1")
-#     document = service.documents().get(documentId=document_id).execute()
-#     content = document.get("body").get("content")
-
-#     timeline_content = ""
-#     record = False
-#     found_start = False
-#     found_end = False
-
-#     # Iterate through the elements of the document
-#     for element in content:
-#         if "paragraph" in element:
-#             paragraph_elements = element.get("paragraph").get("elements")
-#             for elem in paragraph_elements:
-#                 text_run = elem.get("textRun")
-#                 if text_run:
-#                     text = text_run.get("content")
-#                     textStyle = text_run.get("textStyle", {})
-#                     if "link" in textStyle:
-#                         # Extract link URL
-#                         link = textStyle["link"].get("url")
-#                         # Format the text with the link as Markdown
-#                         formatted_text = f"[{text.strip()}]({link})"
-#                         # Replace the text with the formatted text
-#                         text = formatted_text
-#                     if START_HEADING in text:
-#                         record = True
-#                         found_start = True
-#                     elif END_HEADING in text:
-#                         found_end = True
-#                         if found_start:
-#                             return timeline_content
-#                     elif record:
-#                         timeline_content += text
-
-#     # Return None if either START_HEADING or END_HEADING not found
-#     return None if not (found_start and found_end) else timeline_content
 
 
 # Update the incident document with status of "Closed"
