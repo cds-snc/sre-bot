@@ -4,9 +4,10 @@ import pytz  # type: ignore
 from integrations.google_workspace import google_docs
 from integrations.slack import users as slack_users
 from integrations.google_drive import (
-    get_timeline_section,
+    # get_timeline_section,
     replace_text_between_headings,
 )
+from modules.incident.incident_document import get_timeline_section
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
