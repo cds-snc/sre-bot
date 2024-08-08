@@ -14,7 +14,7 @@ logger = getLogger(__name__)
 
 
 @handle_google_api_errors
-def get_user(user_key, delegated_user_email=None):
+def get_user(user_key, delegated_user_email=None, fields=None):
     """Get a user by user key in the Google Workspace domain.
 
     Args:
@@ -38,6 +38,7 @@ def get_user(user_key, delegated_user_email=None):
         scopes,
         delegated_user_email,
         userKey=user_key,
+        fields=fields,
     )
 
 
@@ -107,8 +108,12 @@ def list_groups(
 
 
 @handle_google_api_errors
-def list_group_members(group_key, delegated_user_email=None):
+def list_group_members(group_key, delegated_user_email=None, fields=None):
     """List all group members in the Google Workspace domain.
+
+    Args:
+        group_key (str): The group's email address or unique group ID.
+        delegated_user_email (str): The email address of the user to impersonate. (default: must be defined in .env)
 
     Returns:
         list: A list of group member objects.
@@ -129,11 +134,12 @@ def list_group_members(group_key, delegated_user_email=None):
         paginate=True,
         groupKey=group_key,
         maxResults=200,
+        fields=fields,
     )
 
 
 @handle_google_api_errors
-def get_group(group_key):
+def get_group(group_key, fields=None):
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
     return execute_google_api_call(
         "admin",
@@ -143,6 +149,7 @@ def get_group(group_key):
         scopes,
         DEFAULT_DELEGATED_ADMIN_EMAIL,
         groupKey=group_key,
+        fields=fields,
     )
 
 
@@ -180,7 +187,9 @@ def list_groups_with_members(
     Returns:
         list: A list of group objects with members. Any group without members will not be included.
     """
-    groups = list_groups(query=query)
+    groups = list_groups(
+        query=query, fields="groups(email, name, directMembersCount, description)"
+    )
     if not groups:
         return []
 
@@ -193,11 +202,17 @@ def list_groups_with_members(
 
     groups_with_members = []
     for group in groups:
-        members = list_group_members(group["email"])
+        logger.info(f"Getting members for group: {group['email']}")
+        members = list_group_members(
+            group["email"], fields="members(email, role, type, status)"
+        )
         if members and members_details:
             detailed_members = []
             for member in members:
-                detailed_members.append(get_user(member["email"]))
+                logger.info(f"Getting user details for member: {member['email']}")
+                detailed_members.append(
+                    get_user(member["email"], fields="name, primaryEmail")
+                )
             group["members"] = detailed_members
             groups_with_members.append(group)
     return groups_with_members

@@ -44,7 +44,7 @@ def get_groups_from_integration(
                 groups_filters=pre_processing_filters,
                 query=query,
             )
-            integration_name = "Google:"
+            integration_name = "Google"
             group_display_key = "name"
             members = "members"
             members_display_key = "primaryEmail"
@@ -55,7 +55,7 @@ def get_groups_from_integration(
                 members_details=members_details,
                 groups_filters=pre_processing_filters,
             )
-            integration_name = "AWS:"
+            integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
             members_display_key = "MemberId.UserName"
@@ -82,7 +82,7 @@ def log_groups(
     members=None,
     members_details=True,
     members_display_key=None,
-    integration_name="",
+    integration_name="No Integration Name Provided",
 ):
     """Log the groups information.
 
@@ -91,11 +91,11 @@ def log_groups(
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
     if not group_display_key:
-        logger.warning(f"{integration_name}No group display key provided.")
+        logger.warning(f"{integration_name}:No group display key provided.")
     if not members:
-        logger.warning(f"{integration_name}No members key provided.")
+        logger.warning(f"{integration_name}:No members key provided.")
     if not members_display_key:
-        logger.warning(f"{integration_name}No members display key provided.")
+        logger.warning(f"{integration_name}:No members display key provided.")
 
     logger.info(f"{integration_name}Found {len(groups)} groups")
     for group in groups:

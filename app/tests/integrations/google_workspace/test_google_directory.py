@@ -30,6 +30,7 @@ def test_get_user_returns_user(execute_google_api_call_mock):
         ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         "default_delegated_admin_email",
         userKey="test_user_id",
+        fields=None,
     )
 
 
@@ -58,6 +59,7 @@ def test_get_user_uses_custom_delegated_user_email_if_provided(
         ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         "custom.email@domain.com",
         userKey="test_user_id",
+        fields=None,
     )
 
 
@@ -241,6 +243,7 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
         paginate=True,
         groupKey=group_key,
         maxResults=200,
+        fields=None,
     )
 
 
@@ -274,6 +277,7 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         paginate=True,
         groupKey=group_key,
         maxResults=200,
+        fields=None,
     )
 
 
@@ -295,6 +299,7 @@ def test_get_group_calls_execute_google_api_call_with_correct_args(
         ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         "default_delegated_admin_email",
         groupKey=group_key,
+        fields=None,
     )
 
 

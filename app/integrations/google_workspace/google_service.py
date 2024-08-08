@@ -152,7 +152,6 @@ def execute_google_api_call(
         k: v for k, v in formatted_kwargs.items() if k in supported_params
     }
     unsupported_params = set(formatted_kwargs.keys()) - set(filtered_params.keys())
-    # filtered_params = kwargs
     if paginate:
         all_results = []
         request = api_method(**filtered_params)
