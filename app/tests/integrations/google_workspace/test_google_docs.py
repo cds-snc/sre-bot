@@ -66,7 +66,7 @@ def test_get_returns_document_resource(execute_google_api_call_mock):
         "lists": {},
     }
 
-    document = google_docs.get("test_document_id")
+    document = google_docs.get_document("test_document_id")
 
     # Check that the get function returns the correct document
     assert document == execute_google_api_call_mock.return_value
