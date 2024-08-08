@@ -225,8 +225,5 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                     }
                 )
         google_docs.batch_update(doc_id, requests)
-        # service.documents().batchUpdate(
-        #     documentId=doc_id, body={"requests": requests}
-        # ).execute()
     else:
         logging.warning("Headings not found")
