@@ -415,6 +415,58 @@ def test_handle_reaction_added_incident_report_document_not_found():
     mock_client.users_profile_get.assert_not_called()
 
 
+@patch("modules.incident.incident_conversation.replace_text_between_headings")
+@patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
+@patch("modules.incident.incident_conversation.slack_users")
+@patch("modules.incident.incident_conversation.handle_images_in_message")
+@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
+@patch("modules.incident.incident_conversation.handle_forwarded_messages")
+@patch("modules.incident.incident_conversation.get_incident_document_id")
+@patch("modules.incident.incident_conversation.return_messages")
+def test_handle_reaction_added_processes_messages(
+    mock_return_messages,
+    mock_get_incident_document_id,
+    mock_handle_forwarded_messages,
+    mock_convert_epoch_to_datetime_est,
+    mock_get_timeline_section,
+    mock_handle_images_in_message,
+    mock_slack_users,
+    mock_rearrange_by_datetime_ascending,
+    mock_replace_text_between_headings,
+):
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_return_messages.return_value = {
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    mock_return_messages.assert_called_once()
+    mock_get_incident_document_id.assert_called_once()
+    mock_handle_forwarded_messages.assert_called_once()
+    mock_convert_epoch_to_datetime_est.assert_called_once()
+    mock_get_timeline_section.assert_called_once()
+    mock_handle_images_in_message.assert_called_once()
+    mock_slack_users.replace_user_id_with_handle.assert_called_once()
+    mock_rearrange_by_datetime_ascending.assert_called_once()
+    mock_replace_text_between_headings.assert_called_once()
+
+
 def test_handle_reaction_added_adding_new_message_to_timeline():
     logger = MagicMock()
     mock_client = MagicMock()
@@ -653,6 +705,156 @@ def test_handle_reaction_removed_message_not_in_timeline():
         )
         is None
     )
+
+
+@patch("modules.incident.incident_conversation.replace_text_between_headings")
+@patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
+@patch("modules.incident.incident_conversation.slack_users")
+@patch("modules.incident.incident_conversation.handle_images_in_message")
+@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
+@patch("modules.incident.incident_conversation.handle_forwarded_messages")
+@patch("modules.incident.incident_conversation.get_incident_document_id")
+@patch("modules.incident.incident_conversation.return_messages")
+def test_handle_reaction_removed_processes_messages(
+    mock_return_messages,
+    mock_get_incident_document_id,
+    mock_handle_forwarded_messages,
+    mock_convert_epoch_to_datetime_est,
+    mock_get_timeline_section,
+    mock_handle_images_in_message,
+    mock_slack_users,
+    mock_rearrange_by_datetime_ascending,
+    mock_replace_text_between_headings,
+):
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+
+    mock_return_messages.return_value = [
+        {
+            "type": "message",
+            "text": "Original message text",
+            "ts": "1617556890.000100",
+            "user": "U1234567890",
+            "files": [{"url_private": "https://example.com/image.png"}],
+        }
+    ]
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    # Mock the return value of get_timeline_section
+    mock_get_timeline_section.return_value = " ➡️ [2021-04-04 12:34:50](https://example.com/permalink) John Doe: Original message text\n"
+
+    # Mock the return value of convert_epoch_to_datetime_est
+    mock_convert_epoch_to_datetime_est.return_value = "2021-04-04 12:34:50"
+
+    # Mock the return value of users_profile_get
+    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+
+    # Mock the return value of chat_getPermalink
+    mock_client.chat_getPermalink.return_value = {
+        "permalink": "https://example.com/permalink"
+    }
+
+    # Mock the return value of slack_users.replace_user_id_with_handle
+    mock_slack_users.replace_user_id_with_handle.return_value = "Original message text"
+
+    assert (
+        incident_conversation.handle_reaction_removed(
+            mock_client, lambda: None, body, logger
+        )
+        is None
+    )
+    mock_return_messages.assert_called_once()
+    mock_get_incident_document_id.assert_called_once()
+    mock_handle_forwarded_messages.assert_called_once()
+    mock_convert_epoch_to_datetime_est.assert_called_once()
+    mock_get_timeline_section.assert_called_once()
+    mock_handle_images_in_message.assert_called_once()
+    mock_slack_users.replace_user_id_with_handle.assert_called_once()
+    mock_rearrange_by_datetime_ascending.assert_not_called()
+    mock_replace_text_between_headings.assert_called_once()
+
+
+@patch("modules.incident.incident_conversation.return_messages")
+def test_handle_reaction_removed_no_messages(mock_return_messages):
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+
+    # Mock return_messages to return an empty list
+    mock_return_messages.return_value = []
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    assert (
+        incident_conversation.handle_reaction_removed(
+            mock_client, lambda: None, body, logger
+        )
+        is None
+    )
+    mock_return_messages.assert_called_once()
+    logger.warning.assert_called_once_with("No messages found")
+
+
+@patch("modules.incident.incident_conversation.return_messages")
+@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.get_incident_document_id")
+@patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
+@patch("modules.incident.incident_conversation.handle_forwarded_messages")
+@patch("modules.incident.incident_conversation.handle_images_in_message")
+@patch("modules.incident.incident_conversation.slack_users.replace_user_id_with_handle")
+def test_handle_reaction_removed_message_not_found(
+    mock_replace_user_id_with_handle,
+    mock_handle_images_in_message,
+    mock_handle_forwarded_messages,
+    mock_convert_epoch_to_datetime_est,
+    mock_get_incident_document_id,
+    mock_get_timeline_section,
+    mock_return_messages,
+):
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
+    mock_client.chat_getPermalink.return_value = {"permalink": "http://example.com"}
+
+    # Mock return_messages to return a list with one message
+    mock_return_messages.return_value = [
+        {"ts": "123456", "user": "U123456", "text": "Test message"}
+    ]
+    mock_handle_forwarded_messages.return_value = {
+        "ts": "123456",
+        "user": "U123456",
+        "text": "Test message",
+    }
+    mock_convert_epoch_to_datetime_est.return_value = "2023-10-01 12:00:00"
+    mock_get_incident_document_id.return_value = "doc123"
+    mock_get_timeline_section.return_value = "Some content without the message"
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident_conversation.handle_reaction_removed(
+        mock_client, lambda: None, body, logger
+    )
+
+    mock_return_messages.assert_called_once()
+    logger.warning.assert_called_once_with("Message not found in the timeline")
 
 
 def test_handle_reaction_removed_non_incident_channel_reaction_removal():
