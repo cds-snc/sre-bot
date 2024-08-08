@@ -1,10 +1,20 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from modules.incident import incident_document
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+
+
+def create_mock_document(content):
+    def create_paragraph_element(text):
+        if isinstance(text, dict):
+            return text
+        return {"paragraph": {"elements": [{"textRun": {"content": text}}]}}
+
+    content = [create_paragraph_element(text) for text in content]
+    return {"body": {"content": content}}
 
 
 @patch("modules.incident.incident_document.google_docs")
@@ -250,16 +260,6 @@ def test_extract_timeline_content_with_link(google_docs_mock):
     assert result == "Timeline content with a [link](http://example.com)"
 
 
-def create_mock_document(content):
-    def create_paragraph_element(text):
-        if isinstance(text, dict):
-            return text
-        return {"paragraph": {"elements": [{"textRun": {"content": text}}]}}
-
-    content = [create_paragraph_element(text) for text in content]
-    return {"body": {"content": content}}
-
-
 def test_no_headings_present_find_heading_indices():
     content = [
         {
@@ -402,9 +402,14 @@ def test_replace_text_between_headings(mock_google_docs):
     assert mock_google_docs.get_document.return_value.documents().batchUpdate.called
 
 
+@patch("modules.incident.incident_document.find_heading_indices")
 @patch("modules.incident.incident_document.google_docs")
-def test_replace_text_between_headings_more_text(mock_google_docs):
-    doc_id = ""
+def test_replace_text_between_headings_more_text(
+    mock_google_docs, mock_find_heading_indices
+):
+    doc_id = "mock_doc_id"
+    new_content = "[2023-10-01 12:00 ET](http://example.com) John Doe: New content ➡️ [2023-10-01 13:00 ET](http://example.com) Jane Doe: More new content"
+
     # Mock document content
     mock_document = {
         "body": {
@@ -465,17 +470,15 @@ def test_replace_text_between_headings_more_text(mock_google_docs):
             ]
         }
     }
-    mock_google_docs.get_document.return_value.documents().get().execute.return_value = (
-        mock_document
-    )
-    mock_google_docs.get_document.return_value.documents().batchUpdate().execute.return_value = (
-        {}
-    )
+    mock_google_docs.get_document.return_value = mock_document
+    mock_find_heading_indices.return_value = (45, 70)
+    mock_google_docs.batch_update.return_value = {
+        "replaceAllText": {"occurrencesChanged": 5}
+    }
 
     incident_document.replace_text_between_headings(
-        doc_id, mock_document, START_HEADING, END_HEADING
+        doc_id, new_content, START_HEADING, END_HEADING
     )
-    assert mock_google_docs.get_document.return_value.documents().batchUpdate.called
 
 
 @patch("modules.incident.incident_document.google_docs")
@@ -509,16 +512,17 @@ def test_replace_text_between_headings_start_heading_not_found(mock_google_docs)
             ]
         }
     }
-    mock_google_docs.get_document.return_value.documents().get().execute.return_value = (
-        mock_document
-    )
+    mock_google_docs.get_document.return_value.return_value = mock_document
+    # mock_google_docs.get_document.return_value.documents().get().execute.return_value = (
+    #     mock_document
+    # )
 
     incident_document.replace_text_between_headings(
         doc_id, mock_document, START_HEADING, END_HEADING
     )
 
     # Check if batchUpdate was not called as the start heading was not found
-    assert not mock_google_docs.get_document.return_value.documents().batchUpdate.called
+    assert not mock_google_docs.batch_update.called
 
 
 @patch("modules.incident.incident_document.google_docs")
@@ -552,6 +556,39 @@ def test_replace_text_between_headings_end_heading_not_found(mock_google_docs):
             ]
         }
     }
+    mock_google_docs.get_document.return_value = mock_document
+
+    incident_document.replace_text_between_headings(
+        doc_id, mock_document, START_HEADING, END_HEADING
+    )
+
+    # Check if batchUpdate was not called as the start heading was not found
+    assert not mock_google_docs.batch_update.called
+
+
+@patch("modules.incident.incident_document.google_docs")
+def test_replace_text_between_headings_neither_heading_not_found(mock_google_docs):
+    doc_id = "mock_doc_id"
+
+    # Mock document content where start heading does not exist
+    content = [
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "textRun": {
+                            "content": "Some old content",
+                            "endIndex": 40,
+                            "startIndex": 20,
+                        }
+                    }
+                ]
+            }
+        },
+    ]
+
+    mock_document = create_mock_document(content)
+
     mock_google_docs.get_document.return_value.documents().get().execute.return_value = (
         mock_document
     )
@@ -565,36 +602,108 @@ def test_replace_text_between_headings_end_heading_not_found(mock_google_docs):
 
 
 @patch("modules.incident.incident_document.google_docs")
-def test_replace_text_between_headings_neither_heading_not_found(mock_google_docs):
+@patch("modules.incident.incident_document.find_heading_indices")
+def test_replace_text_between_headings_with_indices(
+    mock_find_heading_indices, mock_google_docs
+):
     doc_id = "mock_doc_id"
+    new_content = "[2023-10-01 12:00 ET](http://example.com) John Doe: New content ➡️ [2023-10-01 13:00 ET](http://example.com) Jane Doe: More new content"
 
-    # Mock document content where start heading does not exist
-    mock_document = {
-        "body": {
-            "content": [
-                {
-                    "paragraph": {
-                        "elements": [
-                            {
-                                "textRun": {
-                                    "content": "Some old content",
-                                    "endIndex": 40,
-                                    "startIndex": 20,
-                                }
-                            }
-                        ]
+    # Mock document content
+    content = [
+        {
+            "paragraph": {
+                "elements": [{"textRun": {"content": START_HEADING, "endIndex": 20}}]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "textRun": {
+                            "content": "Some old content",
+                            "endIndex": 40,
+                            "startIndex": 20,
+                        }
                     }
-                },
-            ]
-        }
-    }
-    mock_google_docs.get_document.return_value.documents().get().execute.return_value = (
-        mock_document
-    )
+                ]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [{"textRun": {"content": END_HEADING, "startIndex": 40}}]
+            }
+        },
+    ]
+
+    mock_document = create_mock_document(content)
+    mock_google_docs.get_document.return_value = mock_document
+    mock_find_heading_indices.return_value = (20, 40)
+
+    mock_google_docs.batch_update.return_value = {}
 
     incident_document.replace_text_between_headings(
-        doc_id, mock_document, START_HEADING, END_HEADING
+        doc_id, new_content, START_HEADING, END_HEADING
     )
 
-    # Check if batchUpdate was not called as the start heading was not found
-    assert not mock_google_docs.get_document.return_value.documents().batchUpdate.called
+    assert mock_google_docs.batch_update.called
+
+
+@patch("modules.incident.incident_document.google_docs")
+@patch("modules.incident.incident_document.find_heading_indices")
+def test_replace_text_between_headings_with_unmatched_entry(
+    mock_find_heading_indices, mock_google_docs
+):
+    doc_id = "mock_doc_id"
+    new_content = "Unmatched entry content ➡️ Another unmatched entry"
+
+    # Mock document content
+    content = [
+        {
+            "paragraph": {
+                "elements": [{"textRun": {"content": START_HEADING, "endIndex": 20}}]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [
+                    {
+                        "textRun": {
+                            "content": "Some old content",
+                            "endIndex": 40,
+                            "startIndex": 20,
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "paragraph": {
+                "elements": [{"textRun": {"content": END_HEADING, "startIndex": 40}}]
+            }
+        },
+    ]
+
+    mock_document = {"body": {"content": content}}
+    mock_google_docs.get_document.return_value = mock_document
+    mock_find_heading_indices.return_value = (20, 40)
+
+    mock_google_docs.batch_update.return_value = {}
+
+    incident_document.replace_text_between_headings(
+        doc_id, new_content, START_HEADING, END_HEADING
+    )
+
+    assert mock_google_docs.batch_update.called
+    # Verify that the unmatched entry was inserted as is
+    requests = mock_google_docs.batch_update.call_args[0][1]
+    assert any(
+        "Unmatched entry content" in req["insertText"]["text"]
+        for req in requests
+        if "insertText" in req
+    )
+    assert any(
+        "Another unmatched entry" in req["insertText"]["text"]
+        for req in requests
+        if "insertText" in req
+    )
