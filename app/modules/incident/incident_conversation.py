@@ -153,3 +153,167 @@ def get_incident_document_id(client, channel_id, logger):
                 if document_id == "":
                     logger.error("No incident document found for this channel.")
     return document_id
+
+
+def handle_reaction_added(client, ack, body, logger):
+    ack()
+    # get the channel in which the reaction was used
+    channel_id = body["event"]["item"]["channel"]
+    # Get the channel name which requires us to use the conversations_info API call
+    channel_name = client.conversations_info(channel=channel_id)["channel"]["name"]
+
+    # if the emoji added is a floppy disk emoji and we are in an incident channel, then add the message to the incident timeline
+    if channel_name.startswith("incident-"):
+        # get the message from the conversation
+        try:
+            # get the messages from the conversation and incident channel
+            messages = return_messages(client, body, channel_id)
+
+            # get the incident report document id from the incident channel
+            document_id = get_incident_document_id(client, channel_id, logger)
+
+            for message in messages:
+                # get the forwarded message and get the attachments appending the forwarded message to the original message
+                message = handle_forwarded_messages(message)
+
+                # get the message ts time
+                message_ts = message["ts"]
+
+                # convert the time which is now in epoch time to standard ET Time
+                message_date_time = convert_epoch_to_datetime_est(message_ts)
+
+                # get a link to the message
+                link = client.chat_getPermalink(
+                    channel=channel_id, message_ts=message_ts
+                )["permalink"]
+
+                # get the user name from the message
+                user = client.users_profile_get(user=message["user"])
+                # get the full name of the user so that we include it into the timeline
+                user_full_name = user["profile"]["real_name"]
+
+                # get the current timeline section content
+                content = get_timeline_section(document_id)
+
+                # handle any images in the messages
+                message = handle_images_in_message(message)
+
+                # if the message contains mentions to other slack users, replace those mentions with their name
+                message = slack_users.replace_user_id_with_handle(
+                    client, message["text"]
+                )
+
+                # if the message already exists in the timeline, then don't put it there again
+                if content and message_date_time not in content:
+                    # append the new message to the content
+                    content += (
+                        f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
+                    )
+
+                    # sort all the message to be in ascending chronological order
+                    sorted_content = rearrange_by_datetime_ascending(content)
+
+                    # replace the content in the file with the new headings
+                    replace_text_between_headings(
+                        document_id, sorted_content, START_HEADING, END_HEADING
+                    )
+        except Exception as e:
+            logger.error(e)
+
+
+# Execute this function when a reaction was removed
+def handle_reaction_removed(client, ack, body, logger):
+    ack()
+    # get the channel id
+    channel_id = body["event"]["item"]["channel"]
+
+    # Get the channel name which requires us to use the conversations_info API call
+    result = client.conversations_info(channel=channel_id)
+    channel_name = result["channel"]["name"]
+
+    if channel_name.startswith("incident-"):
+        try:
+            messages = return_messages(client, body, channel_id)
+
+            if not messages:
+                logger.warning("No messages found")
+                return
+            # get the message we want to delete
+            message = messages[0]
+
+            # get the forwarded message and get the attachments appeending the forwarded message to the original message
+            message = handle_forwarded_messages(message)
+
+            # get the message ts time
+            message_ts = message["ts"]
+
+            # convert the epoch time to standard ET day/time
+            message_date_time = convert_epoch_to_datetime_est(message_ts)
+
+            # get the user of the person that send the message
+            user = client.users_profile_get(user=message["user"])
+            # get the user's full name
+            user_full_name = user["profile"]["real_name"]
+
+            # get the incident report document id from the incident channel
+            document_id = get_incident_document_id(client, channel_id, logger)
+
+            # get the current content from the document
+            content = get_timeline_section(document_id)
+
+            # handle any images in the message
+            message = handle_images_in_message(message)
+
+            # if the message contains mentions to other slack users, replace those mentions with their name
+            message = slack_users.replace_user_id_with_handle(client, message["text"])
+
+            # get a link to the message
+            link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)[
+                "permalink"
+            ]
+
+            # Construct the message to remove
+            message_to_remove = (
+                f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
+            )
+
+            # Remove the message
+            if message_to_remove in content:
+                content = content.replace(message_to_remove, "\n")
+
+                # Update the timeline content
+                result = replace_text_between_headings(
+                    document_id,
+                    content,
+                    START_HEADING,
+                    END_HEADING,
+                )
+            else:
+                logger.warning("Message not found in the timeline")
+                return
+        except Exception as e:
+            logger.error(e)
+
+
+# Function to return the messages from the conversation
+def return_messages(client, body, channel_id):
+    # Fetch the message that had the reaction removed
+    result = client.conversations_history(
+        channel=channel_id,
+        limit=1,
+        inclusive=True,
+        oldest=body["event"]["item"]["ts"],
+    )
+    # get the messages
+    messages = result["messages"]
+    # if the lenght is 0, then the message is part of a thread, so get the message from the thread
+    if messages.__len__() == 0:
+        # get thread messages
+        result = client.conversations_replies(
+            channel=channel_id,
+            ts=body["event"]["item"]["ts"],
+            inclusive=True,
+            include_all_metadata=True,
+        )
+        messages = result["messages"]
+    return messages
