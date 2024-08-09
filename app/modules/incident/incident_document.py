@@ -1,11 +1,71 @@
 """Module to manage the incident document used to track the details."""
 
+import datetime
 import logging
+import os
 import re
-from integrations.google_workspace import google_docs
+from integrations.google_workspace import google_docs, google_drive
 
+INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+
+
+def create_incident_document(title, folder):
+    """Create a new incident document in Google Docs.
+
+    Args:
+        title (str): The title of the new document.
+
+    Returns:
+        str: The ID of the new document.
+    """
+    return google_drive.create_file_from_template(title, folder, INCIDENT_TEMPLATE)[
+        "id"
+    ]
+
+
+def update_boilerplate_text(document_id, name, product, slack_channel, on_call_names):
+    requests = [
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{date}}", "matchCase": "true"},
+                "replaceText": datetime.datetime.now().strftime("%Y-%m-%d"),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{name}}", "matchCase": "true"},
+                "replaceText": str(name),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{on-call-names}}", "matchCase": "true"},
+                "replaceText": str(on_call_names),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{team}}", "matchCase": "true"},
+                "replaceText": str(product),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{slack-channel}}", "matchCase": "true"},
+                "replaceText": str(slack_channel),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{status}}", "matchCase": "true"},
+                "replaceText": "In Progress",
+            }
+        },
+    ]
+
+    google_docs.batch_update(document_id, requests)
 
 
 def update_incident_document_status(document_id, new_status="Closed"):
