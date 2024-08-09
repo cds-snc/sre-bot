@@ -3,6 +3,7 @@
 Includes functions to manage the folders, the metadata, and the list of incidents in a Google Sheets spreadsheet.
 """
 
+import datetime
 import os
 from slack_sdk.web import WebClient
 from slack_bolt import Ack
@@ -13,7 +14,14 @@ SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
 
 
-def list_folders(client: WebClient, body, ack: Ack):
+def list_incident_folders():
+    folders = google_drive.list_folders_in_folder(
+        SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
+    )
+    return folders.sort(key=lambda x: x["name"])
+
+
+def list_folders_view(client: WebClient, body, ack: Ack):
     ack()
     folders = google_drive.list_folders_in_folder(
         SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
@@ -53,6 +61,10 @@ def save_metadata(client: WebClient, body, ack, view):
     body["actions"] = [{"value": folder_id}]
     del body["view"]
     view_folder_metadata(client, body, ack)
+
+
+def get_folder_metadata(folder_id):
+    return google_drive.list_metadata(folder_id)
 
 
 def view_folder_metadata(client, body, ack):
@@ -209,6 +221,38 @@ def metadata_items(folder):
             }
             for key, value in folder["appProperties"].items()
         ]
+
+
+def add_new_incident_to_list(document_link, name, slug, product, channel_url):
+    """Update the incident list spreadsheet with a new incident.
+
+    Args:
+        document_link (str): The link to the incident document.
+        name (str): The name of the incident.
+        slug (str): The slug of the incident.
+        product (str): The product affected by the incident.
+        channel_url (str): The link to the Slack channel for the incident.
+
+    Returns:
+        bool: True if the incident was added successfully, False otherwise.
+    """
+    list = [
+        [
+            datetime.datetime.now().strftime("%Y-%m-%d"),
+            f'=HYPERLINK("{document_link}", "{name}")',
+            product,
+            "In Progress",
+            f'=HYPERLINK("{channel_url}", "#{slug}")',
+        ]
+    ]
+    range = "Sheet1!A:A"
+    body = {
+        "majorDimension": "ROWS",
+        "valueInputOption": "USER_ENTERED",
+        "values": list,
+    }
+    updated_sheet = sheets.append_values(INCIDENT_LIST, range, body)
+    return updated_sheet
 
 
 def update_spreadsheet_incident_status(channel_name, status="Closed"):

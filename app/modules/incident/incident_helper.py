@@ -43,7 +43,7 @@ help_text = """
 def register(bot: App):
     bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
     bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
-    bot.view("view_folder_metadata_modal")(incident_folder.list_folders)
+    bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
     bot.action("archive_channel")(archive_channel_action)
@@ -69,7 +69,7 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
         case "help":
             respond(help_text)
         case "list-folders":
-            incident_folder.list_folders(client, body, ack)
+            incident_folder.list_folders_view(client, body, ack)
         case "roles":
             incident_roles.manage_roles(client, body, ack, respond)
         case "close":

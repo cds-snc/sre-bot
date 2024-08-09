@@ -47,7 +47,7 @@ def test_handle_incident_command_with_help():
     respond.assert_called_once_with(incident_helper.help_text)
 
 
-@patch("modules.incident.incident_helper.incident_folder.list_folders")
+@patch("modules.incident.incident_helper.incident_folder.list_folders_view")
 def test_handle_incident_command_with_list_folders(list_folders_mock):
     client = MagicMock()
     body = MagicMock()

@@ -5,13 +5,13 @@ from modules.incident import incident_folder
 
 @patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
 @patch("modules.incident.incident_folder.folder_item")
-def test_list_folders(folder_item_mock, list_folders_in_folder_mock):
+def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
     client = MagicMock()
     body = {"trigger_id": "foo"}
     ack = MagicMock()
     list_folders_in_folder_mock.return_value = [{"id": "foo", "name": "bar"}]
     folder_item_mock.return_value = [["folder item"]]
-    incident_folder.list_folders(client, body, ack)
+    incident_folder.list_folders_view(client, body, ack)
     list_folders_in_folder_mock.assert_called_once()
     folder_item_mock.assert_called_once_with({"id": "foo", "name": "bar"})
     ack.assert_called_once()
