@@ -4,7 +4,9 @@ from modules.incident import incident_alert
 
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.incident")
-def test_handle_incident_action_buttons_call_incident(incident_mock, log_to_sentinel_mock):
+def test_handle_incident_action_buttons_call_incident(
+    incident_mock, log_to_sentinel_mock
+):
     client = MagicMock()
     ack = MagicMock()
     logger = MagicMock()
