@@ -3,6 +3,7 @@ import re
 import datetime
 import i18n  # type: ignore
 from dotenv import load_dotenv
+from slack_sdk import WebClient
 
 from integrations import opsgenie
 from integrations.slack import users as slack_users
@@ -197,7 +198,7 @@ def handle_change_locale_button(ack, client, body):
     client.views_update(view_id=body["view"]["id"], view=view)
 
 
-def submit(ack, view, say, body, client, logger):
+def submit(ack, view, say, body, client: WebClient, logger):
     ack()
 
     errors = {}

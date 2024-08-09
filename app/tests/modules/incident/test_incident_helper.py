@@ -207,6 +207,17 @@ def test_stale_incidents(get_stale_channels_mock):
     client.views_update.assert_called_once_with(view_id="view_id", view=ANY)
 
 
+@patch("modules.incident.incident_helper.logging")
+def test_confirm_click(mock_logging):
+    ack = MagicMock()
+    body = {
+        "user": {"id": "user_id", "username": "username"},
+    }
+    incident_helper.confirm_click(ack, body, client=MagicMock())
+    ack.assert_called_once()
+    mock_logging.info.assert_called_once_with("User username viewed the calendar event.")
+
+
 def test_channel_item():
     assert incident_helper.channel_item(
         {"id": "id", "topic": {"value": "topic_value"}}
@@ -502,7 +513,11 @@ def test_close_incident_cant_send_private_message(caplog):
         incident_helper.close_incident(
             client=mock_client, body=body, ack=mock_ack, respond=mock_respond
         )
-
+        mock_client.chat_postEphemeral.assert_called_once_with(
+            text="Channel general is not an incident channel. Please use this command in an incident channel.",
+            channel="C12345",
+            user="U12345",
+        )
         # Check that the expected error message was logged
         assert caplog.records  # Ensure there is at least one log record
 
@@ -686,6 +701,11 @@ def test_return_channel_name_with_prefix():
     assert incident_helper.return_channel_name("incident-abc123") == "#abc123"
 
 
+def test_return_channel_name_with_dev_prefix():
+    # Test the function with a string that includes the incident-dev prefix.
+    assert incident_helper.return_channel_name("incident-dev-abc123") == "#abc123"
+
+
 def test_return_channel_name_without_prefix():
     # Test the function with a string that does not include the prefix.
     assert incident_helper.return_channel_name("general") == "general"
@@ -699,6 +719,74 @@ def test_return_channel_name_empty_string():
 def test_return_channel_name_prefix_only():
     # Test the function with a string that is only the prefix.
     assert incident_helper.return_channel_name("incident-") == "#"
+
+
+def test_return_channel_name_dev_prefix_only():
+    # Test the function with a string that is only the incident-dev prefix.
+    assert incident_helper.return_channel_name("incident-dev-") == "#"
+
+
+@patch("modules.incident.incident_helper.logging.error")
+def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_error):
+    mock_ack = MagicMock()
+    mock_client = MagicMock()
+
+    # Mock the response of the private message to have been posted as expected
+    mock_client.chat_postEphemeral.return_value = {
+        "ok": False,
+        "error": "not_in_channel",
+    }
+
+    # Mock the exception and exception message
+    exception_message = "not_in_channel"
+    mock_client.chat_postEphemeral.side_effect = Exception(exception_message)
+
+    # The test channel and user IDs
+    channel_id = "C12345"
+    user_id = "U12345"
+    channel_name = "general"  # Not an incident channel
+
+    # Prepare the request body
+    body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
+
+    # Call the function being tested
+    incident_helper.schedule_incident_retro(client=mock_client, body=body, ack=mock_ack)
+
+    # Ensure the ack method was called
+    mock_ack.assert_called_once()
+
+    # Ensure the correct error message was posted to the channel
+    expected_text = "Channel general is not an incident channel. Please use this command in an incident channel."
+    mock_client.chat_postEphemeral.assert_called_once_with(
+        text=expected_text,
+        channel=channel_id,
+        user=user_id,
+    )
+
+    # Check that the expected error message was logged
+    expected_log_message = f"Could not post ephemeral message to user {user_id} due to {exception_message}."
+    mock_logging_error.assert_called_once_with(expected_log_message)
+
+
+@patch("modules.incident.incident_helper.logging")
+def test_schedule_incident_retro_no_bookmarks(mock_logging):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.bookmarks_list.return_value = {"ok": False, "error": "not_in_channel"}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    incident_helper.schedule_incident_retro(mock_client, body, mock_ack)
+
+    mock_ack.assert_called_once()
+    mock_logging.warning.assert_called_once_with(
+        "No bookmark link for the incident document found for channel %s", "incident-2024-01-12-test" 
+    )
 
 
 def test_schedule_incident_retro_successful_no_bots():
