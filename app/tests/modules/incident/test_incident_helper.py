@@ -4,7 +4,7 @@ from modules import incident_helper
 import logging
 
 
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
@@ -290,6 +290,7 @@ def test_close_incident(
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
+@patch("modules.incident.incident_helper.logging")
 @patch(
     "modules.incident.incident_helper.incident_document.update_incident_document_status"
 )
@@ -300,7 +301,7 @@ def test_close_incident(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
 def test_close_incident_no_bookmarks(
-    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, mock_logging
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -325,8 +326,12 @@ def test_close_incident_no_bookmarks(
     mock_extract_id.assert_not_called()
     mock_update_document_status.assert_not_called()
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
+    mock_logging.warning.assert_called_once_with(
+        "Could not close the incident document - the document was not found."
+    )
 
 
+@patch("modules.incident.incident_helper.logging")
 @patch(
     "modules.incident.incident_helper.incident_document.update_incident_document_status"
 )
@@ -337,7 +342,7 @@ def test_close_incident_no_bookmarks(
     "integrations.google_workspace.google_docs.extract_google_doc_id", return_value=None
 )
 def test_close_incident_no_bookmarks_error(
-    mock_extract_id, mock_update_spreadsheet, mock_update_document_status
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, mock_logging
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -362,6 +367,79 @@ def test_close_incident_no_bookmarks_error(
     mock_extract_id.assert_not_called()
     mock_update_document_status.assert_not_called()
     mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
+    mock_logging.warning.assert_has_calls(
+        [
+            call(
+                "No bookmark link for the incident document found for channel incident-2024-01-12-test"
+            ),
+            call("Could not close the incident document - the document was not found."),
+        ]
+    )
+
+
+@patch("modules.incident.incident_helper.logging")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
+@patch(
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
+    return_value="dummy_document_id",
+)
+def test_close_incident_update_status_failed(
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, mock_logging
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+
+    # Mock the response of client.bookmarks_list
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    # Mock the response of client.conversations_archive
+    mock_client.conversations_archive.return_value = {"ok": True}
+
+    mock_update_spreadsheet.return_value = False
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
+        mock_ack,
+        mock_respond,
+    )
+
+    # Assert that ack was called
+    mock_ack.assert_called_once()
+
+    # Assert that extract_google_doc_id was called with the correct URL
+    mock_extract_id.assert_called_once_with(
+        "https://docs.google.com/document/d/dummy_document_id/edit"
+    )
+
+    # Assert that the Google Drive document and spreadsheet update methods were called
+    mock_update_document_status.assert_called_once_with("dummy_document_id")
+    mock_update_spreadsheet.assert_called_once_with("#2024-01-12-test", "Closed")
+
+    mock_logging.warning.assert_called_once_with(
+        "Could not update the incident status in the spreadsheet for channel incident-2024-01-12-test"
+    )
+
+    # Assert that the Slack client's conversations_archive method was called with the correct channel ID
+    mock_client.conversations_archive.assert_called_once_with(channel="C12345")
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.
