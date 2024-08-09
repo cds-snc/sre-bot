@@ -7,9 +7,7 @@ from integrations.google_workspace.google_service import (
 
 
 @handle_google_api_errors
-def get_values(
-    spreadsheetId: str, range: str | None = None, fields=None
-):
+def get_values(spreadsheetId: str, range: str | None = None, fields=None):
     """Gets the values from a Google Sheet.
 
     Args:
