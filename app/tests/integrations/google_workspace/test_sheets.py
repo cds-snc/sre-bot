@@ -86,3 +86,23 @@ def test_batch_update_values_with_defaults(mock_execute_google_api_call):
             "data": [{"range": range, "values": values}],
         },
     )
+
+
+@patch("integrations.google_workspace.sheets.execute_google_api_call")
+def test_append_values(mock_execute_google_api_call):
+
+    spreadsheet_id = "1"
+    range = "A1:B2"
+    body = {"values": [["a", "b"], ["c", "d"]]}
+
+    sheets.append_values(spreadsheet_id, range, body)
+
+    mock_execute_google_api_call.assert_called_once_with(
+        "sheets",
+        "v4",
+        "spreadsheets.values",
+        "append",
+        spreadsheetId=spreadsheet_id,
+        range=range,
+        body=body,
+    )
