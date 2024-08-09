@@ -6,7 +6,13 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from . import incident_folder, incident_roles, incident_document, schedule_retro
+from . import (
+    incident_folder,
+    incident_roles,
+    incident_document,
+    schedule_retro,
+    incident_conversation,
+)
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -134,8 +140,7 @@ def close_incident(client: WebClient, body, ack, respond):
             )
         except Exception as e:
             logging.error(
-                f"Could not post ephemeral message to user %s due to {e}.",
-                user_id,
+                f"Could not post ephemeral message to user {user_id} due to {e}.",
             )
         return
 
@@ -256,18 +261,12 @@ def schedule_incident_retro(client: WebClient, body, ack):
             )
         except Exception as e:
             logging.error(
-                f"Could not post ephemeral message to user %s due to {e}.",
-                user_id,
+                f"Could not post ephemeral message to user {user_id} due to {e}."
             )
         return
 
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
-
-    # If for some reason the channel topic is empty, set it to "Incident Retro"
-    if channel_name == "":
-        channel_name = "Incident Retro"
-        logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
 
     # get the incident document
     # get and update the incident document
