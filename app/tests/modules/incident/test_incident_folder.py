@@ -3,6 +3,34 @@ from unittest.mock import patch, MagicMock, ANY
 from modules.incident import incident_folder
 
 
+@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch("modules.incident.incident_folder.google_drive")
+def test_list_incident_folders(google_drive_mock):
+    google_drive_mock.list_folders_in_folder.return_value = [
+        {"id": "foo", "name": "bar"}
+    ]
+    assert incident_folder.list_incident_folders() == [{"id": "foo", "name": "bar"}]
+    google_drive_mock.list_folders_in_folder.assert_called_once_with(
+        "SRE_INCIDENT_FOLDER", "not name contains 'Templates'"
+    )
+
+
+@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch("modules.incident.incident_folder.google_drive")
+def test_list_incident_folders_sorted(google_drive_mock):
+    google_drive_mock.list_folders_in_folder.return_value = [
+        {"id": "baz", "name": "qux"},
+        {"id": "foo", "name": "bar"},
+    ]
+    assert incident_folder.list_incident_folders() == [
+        {"id": "foo", "name": "bar"},
+        {"id": "baz", "name": "qux"},
+    ]
+    google_drive_mock.list_folders_in_folder.assert_called_once_with(
+        "SRE_INCIDENT_FOLDER", "not name contains 'Templates'"
+    )
+
+
 @patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
 @patch("modules.incident.incident_folder.folder_item")
 def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
@@ -90,6 +118,18 @@ def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
         {"actions": [{"value": "bar"}]},
         ack,
     )
+
+
+@patch("modules.incident.incident_folder.google_drive")
+def test_get_folder_metadata(google_drive_mock):
+    metadata = {
+        "id": "folder_id",
+        "name": "folder",
+        "appProperties": {"key": "value"},
+    }
+    google_drive_mock.list_metadata.return_value = metadata
+    assert incident_folder.get_folder_metadata("foo") == metadata
+    google_drive_mock.list_metadata.assert_called_once_with("foo")
 
 
 @patch("modules.incident.incident_folder.google_drive.list_metadata")
@@ -207,6 +247,41 @@ def test_metadata_items():
             },
         },
     ]
+
+
+@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+@patch("modules.incident.incident_folder.datetime")
+@patch("modules.incident.incident_folder.sheets")
+def test_add_new_incident_to_list(sheets_mock, datetime_mock):
+    datetime_mock.datetime.now.return_value.strftime.return_value = "2021-01-01"
+    document_link = "http://example.com"
+    name = "foo"
+    slug = "bar"
+    product = "baz"
+    channel_url = "http://channel.com"
+    body = {
+        "majorDimension": "ROWS",
+        "valueInputOption": "USER_ENTERED",
+        "values": [
+            [
+                "2021-01-01",
+                '=HYPERLINK("http://example.com", "foo")',
+                "baz",
+                "In Progress",
+                '=HYPERLINK("http://channel.com", "#bar")',
+            ]
+        ],
+    }
+    sheets_mock.append_values.return_value = ANY
+    updated_sheet = incident_folder.add_new_incident_to_list(
+        document_link, name, slug, product, channel_url
+    )
+    sheets_mock.append_values.assert_called_once_with(
+        "INCIDENT_LIST",
+        "Sheet1!A:A",
+        body,
+    )
+    assert updated_sheet == ANY
 
 
 @patch("modules.incident.incident_folder.sheets")

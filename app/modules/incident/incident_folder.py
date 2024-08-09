@@ -18,7 +18,8 @@ def list_incident_folders():
     folders = google_drive.list_folders_in_folder(
         SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
     )
-    return folders.sort(key=lambda x: x["name"])
+    folders.sort(key=lambda x: x["name"])
+    return folders
 
 
 def list_folders_view(client: WebClient, body, ack: Ack):
