@@ -45,7 +45,9 @@ def test_update_boilerplate_text_calls_batch_update(mock_google_docs, mock_datet
     on_call_names = "Alice, Bob"
 
     mock_datetime.datetime.now.return_value.strftime.return_value = "2023-10-01"
-    mock_google_docs.update_boilerplate_text(document_id, name, product, slack_channel, on_call_names)
+    mock_google_docs.update_boilerplate_text(
+        document_id, name, product, slack_channel, on_call_names
+    )
 
     expected_requests = [
         {
@@ -86,8 +88,12 @@ def test_update_boilerplate_text_calls_batch_update(mock_google_docs, mock_datet
         },
     ]
 
-    incident_document.update_boilerplate_text(document_id, name, product, slack_channel, on_call_names)
-    mock_google_docs.batch_update.assert_called_once_with(document_id, expected_requests)
+    incident_document.update_boilerplate_text(
+        document_id, name, product, slack_channel, on_call_names
+    )
+    mock_google_docs.batch_update.assert_called_once_with(
+        document_id, expected_requests
+    )
 
 
 @patch("modules.incident.incident_document.google_docs")
