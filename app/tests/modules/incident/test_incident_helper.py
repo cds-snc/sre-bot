@@ -69,6 +69,20 @@ def test_handle_incident_command_with_roles(manage_roles_mock):
     manage_roles_mock.assert_called_once_with(client, body, ack, respond)
 
 
+@patch("modules.incident.incident_helper.close_incident")
+def test_handle_incident_command_with_close(close_incident_mock):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+    incident_helper.handle_incident_command(["close"], client, body, respond, ack)
+    close_incident_mock.assert_called_once_with(client, body, ack, respond)
+
+
 @patch("modules.incident.incident_helper.stale_incidents")
 def test_handle_incident_command_with_stale(stale_incidents_mock):
     client = MagicMock()
@@ -77,6 +91,20 @@ def test_handle_incident_command_with_stale(stale_incidents_mock):
     ack = MagicMock()
     incident_helper.handle_incident_command(["stale"], client, body, respond, ack)
     stale_incidents_mock.assert_called_once_with(client, body, ack)
+
+
+@patch("modules.incident.incident_helper.schedule_incident_retro")
+def test_handle_incident_command_with_retro(schedule_incident_retro_mock):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+    incident_helper.handle_incident_command(["schedule"], client, body, respond, ack)
+    schedule_incident_retro_mock.assert_called_once_with(client, body, ack)
 
 
 def test_handle_incident_command_with_unknown_command():
@@ -103,9 +131,9 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     respond = MagicMock()
     incident_helper.archive_channel_action(client, body, ack, respond)
     ack.assert_called_once()
-    client.chat_update(
+    client.chat_update.assert_called_once_with(
         channel="channel_id",
-        text="<@user_id> has delayed archiving this channel for 14 days.",
+        text="<@user_id> has delayed scheduling and archiving this channel for 14 days.",
         ts="message_ts",
         attachments=[],
     )
@@ -114,22 +142,11 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel):
     )
 
 
-@patch(
-    "modules.incident.incident_helper.incident_document.update_incident_document_status"
-)
-@patch(
-    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
-)
-@patch(
-    "integrations.google_workspace.google_docs.extract_google_doc_id",
-    return_value="dummy_document_id",
-)
+@patch("modules.incident.incident_helper.close_incident")
 @patch("modules.incident.incident_helper.log_to_sentinel")
 def test_archive_channel_action_archive(
     mock_log_to_sentinel,
-    mock_extract_id,
-    mock_update_spreadsheet,
-    mock_update_document_status,
+    mock_close_incident,
 ):
     client = MagicMock()
     body = {
@@ -138,25 +155,41 @@ def test_archive_channel_action_archive(
         "message_ts": "message_ts",
         "user": {"id": "user_id"},
     }
-    ack = MagicMock()
-    respond = MagicMock()
-    incident_helper.archive_channel_action(client, body, ack, respond)
-    assert ack.call_count == 2
-    mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
-
-
-@patch("modules.incident.incident_helper.log_to_sentinel")
-def test_archive_channel_action_schedule_incident(mock_log_to_sentinel):
-    client = MagicMock()
     channel_info = {
         "channel_id": "channel_id",
-        "channel_name": "channel_name",
-        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "channel_name": "incident-2024-01-12-test",
         "user_id": "user_id",
     }
     ack = MagicMock()
-    incident_helper.schedule_incident_retro(client, channel_info, ack)
+    respond = MagicMock()
+    incident_helper.archive_channel_action(client, body, ack, respond)
     assert ack.call_count == 1
+    mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
+    mock_close_incident.assert_called_once_with(client, channel_info, ack, respond)
+
+
+@patch("modules.incident.incident_helper.schedule_incident_retro")
+@patch("modules.incident.incident_helper.log_to_sentinel")
+def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_schedule):
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "schedule_retro"}],
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+        "trigger_id": "trigger_id",
+    }
+    channel_info = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+        "trigger_id": "trigger_id",
+    }
+    ack = MagicMock()
+    incident_helper.archive_channel_action(client, body, ack, MagicMock())
+    assert ack.call_count == 1
+    mock_schedule.assert_called_once_with(client, channel_info, ack)
+    mock_log_to_sentinel.assert_called_once_with("incident_retro_scheduled", body)
 
 
 @patch("modules.incident.incident_helper.slack_channels.get_stale_channels")
