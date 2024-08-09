@@ -215,7 +215,9 @@ def test_confirm_click(mock_logging):
     }
     incident_helper.confirm_click(ack, body, client=MagicMock())
     ack.assert_called_once()
-    mock_logging.info.assert_called_once_with("User username viewed the calendar event.")
+    mock_logging.info.assert_called_once_with(
+        "User username viewed the calendar event."
+    )
 
 
 def test_channel_item():
@@ -785,7 +787,8 @@ def test_schedule_incident_retro_no_bookmarks(mock_logging):
 
     mock_ack.assert_called_once()
     mock_logging.warning.assert_called_once_with(
-        "No bookmark link for the incident document found for channel %s", "incident-2024-01-12-test" 
+        "No bookmark link for the incident document found for channel %s",
+        "incident-2024-01-12-test",
     )
 
 

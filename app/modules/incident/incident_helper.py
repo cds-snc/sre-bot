@@ -11,7 +11,6 @@ from . import (
     incident_roles,
     incident_document,
     schedule_retro,
-    incident_conversation,
 )
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
