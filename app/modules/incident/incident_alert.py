@@ -1,5 +1,5 @@
 from integrations.sentinel import log_to_sentinel
-from modules import incident
+from modules.incident import incident
 from models import webhooks
 
 
