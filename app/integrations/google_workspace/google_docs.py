@@ -55,7 +55,7 @@ def batch_update(document_id: str, requests: list) -> dict:
 
 
 @handle_google_api_errors
-def get(document_id: str) -> dict:
+def get_document(document_id: str) -> dict:
     """Gets a document from Google Docs.
 
     Args:
