@@ -261,7 +261,6 @@ def test_add_new_incident_to_list(sheets_mock, datetime_mock):
     channel_url = "http://channel.com"
     body = {
         "majorDimension": "ROWS",
-        "valueInputOption": "USER_ENTERED",
         "values": [
             [
                 "2021-01-01",

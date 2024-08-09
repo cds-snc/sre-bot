@@ -249,7 +249,6 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
     range = "Sheet1!A:A"
     body = {
         "majorDimension": "ROWS",
-        "valueInputOption": "USER_ENTERED",
         "values": list,
     }
     updated_sheet = sheets.append_values(INCIDENT_LIST, range, body)
