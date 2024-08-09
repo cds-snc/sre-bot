@@ -7,10 +7,9 @@ def test_get_values(mock_execute_google_api_call):
 
     spreadsheet_id = "1"
     range = "A1:B2"
-    include_grid_data = True
     fields = "fields"
 
-    sheets.get_values(spreadsheet_id, range, include_grid_data, fields)
+    sheets.get_values(spreadsheet_id, range, fields)
 
     mock_execute_google_api_call.assert_called_once_with(
         "sheets",
@@ -19,7 +18,6 @@ def test_get_values(mock_execute_google_api_call):
         "get",
         spreadsheetId=spreadsheet_id,
         range=range,
-        includeGridData=include_grid_data,
         fields=fields,
     )
 
@@ -38,7 +36,6 @@ def test_get_values_with_defaults(mock_execute_google_api_call):
         "get",
         spreadsheetId=spreadsheet_id,
         range=None,
-        includeGridData=None,
         fields=None,
     )
 
@@ -105,4 +102,6 @@ def test_append_values(mock_execute_google_api_call):
         spreadsheetId=spreadsheet_id,
         range=range,
         body=body,
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
     )

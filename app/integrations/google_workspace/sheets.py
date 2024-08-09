@@ -8,7 +8,7 @@ from integrations.google_workspace.google_service import (
 
 @handle_google_api_errors
 def get_values(
-    spreadsheetId: str, range: str | None = None, includeGridData=None, fields=None
+    spreadsheetId: str, range: str | None = None, fields=None
 ):
     """Gets the values from a Google Sheet.
 
@@ -28,7 +28,6 @@ def get_values(
         "get",
         spreadsheetId=spreadsheetId,
         range=range,
-        includeGridData=includeGridData,
         fields=fields,
     )
 
@@ -63,10 +62,13 @@ def batch_update_values(
     )
 
 
+@handle_google_api_errors
 def append_values(
     spreadsheetId: str,
     range: str,
     body: dict,
+    valueInputOption: str = "USER_ENTERED",
+    insertDataOption: str = "INSERT_ROWS",
 ) -> dict:
     """Appends values to a Google Sheet.
 
@@ -86,4 +88,6 @@ def append_values(
         spreadsheetId=spreadsheetId,
         range=range,
         body=body,
+        valueInputOption=valueInputOption,
+        insertDataOption=insertDataOption,
     )
