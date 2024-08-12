@@ -539,9 +539,16 @@ def test_handle_reaction_added_returns_link():
                 "user": "U123ABC456",
                 "text": "<U123ABC456> says Sample test message",
                 "ts": "1512085950.000216",
+                "has_more": False,
             }
         ],
     }
+
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
+    }
+
     mock_client.chat_getPermalink.return_value = {
         "ok": "true",
         "channel": "C123456",
