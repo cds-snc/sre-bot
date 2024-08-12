@@ -304,17 +304,23 @@ def test_get_incident_document_id_api_fails():
     logger.error.assert_not_called()
 
 
-@patch("integrations.google_workspace.google_docs.extract_google_doc_id")
-def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(
-    mock_extract_google_doc_id,
-):
+def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
     logger = MagicMock()
     mock_client = MagicMock()
 
     # Set up mock client and body to simulate the scenario
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
-        "messages": [{"ts": "123456", "user": "U123456"}]
+        "ok": True,
+        "has_more": False,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
     }
     mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
     mock_client.bookmarks_list.return_value = {
@@ -334,7 +340,7 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(
 
     # Assert the correct API calls were made
     mock_client.conversations_info.assert_called_once()
-    mock_extract_google_doc_id.assert_called_once()
+    mock_client.bookmarks_list.assert_called_once()
 
 
 def test_handle_reaction_added_non_incident_channel():
@@ -371,14 +377,25 @@ def test_handle_reaction_added_empty_message_list():
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
 
     # Assert that the function tries to fetch replies when the message list is empty
-    mock_client.conversations_replies.assert_called_once()
+    mock_client.conversations_replies.assert_not_called()
 
 
 def test_handle_reaction_added_message_in_thread():
     logger = MagicMock()
     mock_client = MagicMock()
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "has_more": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Sample test message",
+                "ts": "1512085950.000216",
+            }
+        ],
+    }
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {"messages": []}
     mock_client.conversations_replies.return_value = {
         "messages": [{"ts": "123456", "user": "U123456"}]
     }
@@ -392,7 +409,46 @@ def test_handle_reaction_added_message_in_thread():
 
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
 
-    # Assert that the function fetches thread replies
+    # Assert that the function doe
+    mock_client.conversations_replies.assert_called_once()
+
+
+def test_handle_reaction_added_message_in_thread_return_top_message():
+    logger = MagicMock()
+    mock_client = MagicMock()
+    mock_client.conversations_history.return_value = {
+        "ok": True,
+        "has_more": True,
+        "messages": [
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Parent test message",
+                "ts": "1512085950.000216",
+            },
+            {
+                "type": "message",
+                "user": "U123ABC456",
+                "text": "Child test message",
+                "ts": "1512085950.000216",
+            },
+        ],
+    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.conversations_replies.return_value = {
+        "messages": [{"ts": "123456", "user": "U123456"}]
+    }
+
+    body = {
+        "event": {
+            "reaction": "floppy_disk",
+            "item": {"channel": "C123456", "ts": "123456"},
+        }
+    }
+
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+
+    # Assert that the function doe
     mock_client.conversations_replies.assert_called_once()
 
 
@@ -473,6 +529,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline():
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
@@ -503,6 +560,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline_user_handle():
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
@@ -533,6 +591,7 @@ def test_handle_reaction_added_returns_link():
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
@@ -546,7 +605,12 @@ def test_handle_reaction_added_returns_link():
 
     mock_client.bookmarks_list.return_value = {
         "ok": True,
-        "bookmarks": [{"title": "Incident report", "link": "http://example.com"}],
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/123456789",
+            }
+        ],
     }
 
     mock_client.chat_getPermalink.return_value = {
@@ -564,6 +628,7 @@ def test_handle_reaction_added_returns_link():
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
 
     # Make assertion that the function calls the correct functions
+    mock_client.conversations_info.assert_called_once()
     mock_client.conversations_history.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
@@ -576,6 +641,7 @@ def test_handle_reaction_added_forwarded_message():
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
@@ -625,6 +691,7 @@ def test_handle_reaction_removed_successful_message_removal():
     }
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
@@ -666,6 +733,7 @@ def test_handle_reaction_removed_successful_message_removal_user_id():
     }
     mock_client.conversations_history.return_value = {
         "ok": True,
+        "has_more": False,
         "messages": [
             {
                 "type": "message",
