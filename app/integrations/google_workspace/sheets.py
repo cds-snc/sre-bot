@@ -7,9 +7,7 @@ from integrations.google_workspace.google_service import (
 
 
 @handle_google_api_errors
-def get_values(
-    spreadsheetId: str, range: str | None = None, includeGridData=None, fields=None
-):
+def get_values(spreadsheetId: str, range: str | None = None, fields=None):
     """Gets the values from a Google Sheet.
 
     Args:
@@ -28,7 +26,6 @@ def get_values(
         "get",
         spreadsheetId=spreadsheetId,
         range=range,
-        includeGridData=includeGridData,
         fields=fields,
     )
 
@@ -60,4 +57,35 @@ def batch_update_values(
             "valueInputOption": valueInputOption,
             "data": [{"range": range, "values": values}],
         },
+    )
+
+
+@handle_google_api_errors
+def append_values(
+    spreadsheetId: str,
+    range: str,
+    body: dict,
+    valueInputOption: str = "USER_ENTERED",
+    insertDataOption: str = "INSERT_ROWS",
+) -> dict:
+    """Appends values to a Google Sheet.
+
+    Args:
+        spreadsheetId (str): The id of the Google Sheet.
+        range (str): The range to append to.
+        body (dict): The values to append.
+
+    Returns:
+        dict: The response from the Google Sheets API.
+    """
+    return execute_google_api_call(
+        "sheets",
+        "v4",
+        "spreadsheets.values",
+        "append",
+        spreadsheetId=spreadsheetId,
+        range=range,
+        body=body,
+        valueInputOption=valueInputOption,
+        insertDataOption=insertDataOption,
     )

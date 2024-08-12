@@ -1,4 +1,5 @@
-from modules import incident
+from integrations.sentinel import log_to_sentinel
+from modules.incident import incident
 from models import webhooks
 
 
@@ -9,7 +10,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
     user = body["user"]["id"]
     if name == "call-incident":
         incident.open_modal(client, ack, {"text": value}, body)
-        incident.log_to_sentinel("call_incident_button_pressed", body)
+        log_to_sentinel("call_incident_button_pressed", body)
     elif name == "ignore-incident":
         ack()
         webhooks.increment_acknowledged_count(value)
@@ -42,4 +43,4 @@ def handle_incident_action_buttons(client, ack, body, logger):
 
         logger.info(f"Updating chat: {body['original_message']}")
         client.api_call("chat.update", json=body["original_message"])
-        incident.log_to_sentinel("ignore_incident_button_pressed", body)
+        log_to_sentinel("ignore_incident_button_pressed", body)

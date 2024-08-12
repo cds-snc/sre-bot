@@ -28,9 +28,9 @@ def test_is_floppy_disk_false():
 @patch("modules.incident.incident.generate_incident_modal_view")
 @patch("modules.incident.incident.i18n")
 @patch("modules.incident.incident.slack_users.get_user_locale")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 def test_incident_open_modal_calls_ack(
-    mock_list_folders,
+    mock_list_incident_folders,
     mock_get_user_locale,
     mock_i18n,
     mock_generate_incident_modal_view,
@@ -42,7 +42,7 @@ def test_incident_open_modal_calls_ack(
         "Launching incident process...",
     ]
     mock_get_user_locale.return_value = "en-US"
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     ack = MagicMock()
     command = {"text": "incident description"}
@@ -66,11 +66,11 @@ def test_incident_open_modal_calls_ack(
 
 
 @patch("modules.incident.incident.generate_incident_modal_view")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 def test_incident_open_modal_calls_generate_incident_modal_view(
-    mock_list_folders, mock_generate_incident_modal_view
+    mock_list_incident_folders, mock_generate_incident_modal_view
 ):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
@@ -84,14 +84,14 @@ def test_incident_open_modal_calls_generate_incident_modal_view(
 @patch("modules.incident.incident.i18n.set")
 @patch("modules.incident.incident.slack_users.get_user_locale")
 @patch("modules.incident.incident.generate_incident_modal_view")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 def test_incident_open_modal_calls_i18n_set(
-    mock_list_folders,
+    mock_list_incident_folders,
     mock_generate_incident_modal_view,
     mock_get_user_locale,
     mock_i18n_set,
 ):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     mock_get_user_locale.return_value = "en-US"
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
@@ -106,15 +106,15 @@ def test_incident_open_modal_calls_i18n_set(
 
 @patch("modules.incident.incident.i18n")
 @patch("modules.incident.incident.slack_users.get_user_locale")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 @patch("modules.incident.incident.generate_incident_modal_view")
 def test_incident_open_modal_calls_get_user_locale(
     mock_generate_incident_modal_view,
-    mock_list_folders,
+    mock_list_incident_folders,
     mock_get_user_locale,
     mock_i18n,
 ):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     mock_get_user_locale.return_value = "fr-FR"
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
@@ -128,9 +128,11 @@ def test_incident_open_modal_calls_get_user_locale(
 
 
 @patch("modules.incident.incident.i18n")
-@patch("modules.incident.incident.google_drive.list_folders")
-def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_i18n):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
+def test_incident_open_modal_displays_localized_strings(
+    mock_list_incident_folders, mock_i18n
+):
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     ack = MagicMock()
@@ -143,9 +145,9 @@ def test_incident_open_modal_displays_localized_strings(mock_list_folders, mock_
 
 @patch("modules.incident.incident.i18n")
 @patch("integrations.slack.users.get_user_locale")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 def test_incident_locale_button_calls_ack(
-    mock_list_folders, mock_get_user_locale, mock_i18n
+    mock_list_incident_folders, mock_get_user_locale, mock_i18n
 ):
     ack = MagicMock()
     client = MagicMock()
@@ -163,12 +165,12 @@ def test_incident_locale_button_calls_ack(
 
 
 @patch("modules.incident.incident.generate_incident_modal_view")
-@patch("modules.incident.incident.google_drive.list_folders")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
 def test_incident_locale_button_updates_view_modal_locale_value(
-    mock_list_folders,
+    mock_list_incident_folders,
     mock_generate_incident_modal_view,
 ):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
     options = helper_options()
@@ -185,9 +187,9 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
 
 
-@patch("modules.incident.incident.google_drive.list_folders")
-def test_incident_local_button_calls_views_update(mock_list_folders):
-    mock_list_folders.return_value = [{"id": "id", "name": "name"}]
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
+def test_incident_local_button_calls_views_update(mock_list_incident_folders):
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     ack = MagicMock()
     client = MagicMock()
     body = {
@@ -203,17 +205,17 @@ def test_incident_local_button_calls_views_update(mock_list_folders):
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_calls_ack(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -226,17 +228,17 @@ def test_incident_submit_calls_ack(
 
 
 @patch("modules.incident.incident.generate_success_modal")
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_calls_views_open(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
     _mock_generate_success_modal,
 ):
     ack = MagicMock()
@@ -282,17 +284,17 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -314,17 +316,17 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_channel_sets_description(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -342,17 +344,17 @@ def test_incident_submit_creates_channel_sets_description(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_adds_creator_to_channel(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -376,17 +378,17 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_truncates_meet_link_if_too_long(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -415,17 +417,17 @@ def test_incident_submit_truncates_meet_link_if_too_long(
     assert len(kwargs["link"]) <= 78
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _log_to_sentinel_mock,
-    _mock_list_metadata,
-    _mock_create_new_incident,
-    _mock_merge_data,
-    _mock_update_incident_list,
+    _mock_get_folder_metadata,
+    _mock_create_incident_document,
+    _mock_update_boilerplate_text,
+    _mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -451,17 +453,17 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_a_document_and_announces_it(
     _log_to_sentinel_mock,
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
-    mock_update_incident_list,
+    mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -483,7 +485,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     mock_merge_data.assert_called_once_with(
         "id", "name", "product", "https://gcdigital.slack.com/archives/channel_id", ""
     )
-    mock_update_incident_list.assert_called_once_with(
+    mock_add_new_incident_to_list.assert_called_once_with(
         "https://docs.google.com/document/d/id/edit",
         "name",
         f"{DATE}-name",
@@ -492,10 +494,10 @@ def test_incident_submit_creates_a_document_and_announces_it(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_pulls_oncall_people_into_the_channel(
@@ -504,7 +506,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
-    mock_update_incident_list,
+    mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -550,10 +552,10 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
@@ -562,7 +564,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
-    mock_update_incident_list,
+    mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -607,10 +609,10 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_does_not_invite_security_group_members_already_in_channel(
@@ -619,7 +621,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
-    mock_update_incident_list,
+    mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -662,10 +664,10 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
-@patch("modules.incident.incident.google_drive.update_incident_list")
-@patch("modules.incident.incident.google_drive.merge_data")
-@patch("modules.incident.incident.google_drive.create_new_incident")
-@patch("modules.incident.incident.google_drive.list_metadata")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch.dict(os.environ, {"PREFIX": "dev"})
@@ -675,7 +677,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     mock_list_metadata,
     mock_create_new_incident,
     mock_merge_data,
-    mock_update_incident_list,
+    mock_add_new_incident_to_list,
 ):
     ack = MagicMock()
     logger = MagicMock()

@@ -17,6 +17,85 @@ def create_mock_document(content):
     return {"body": {"content": content}}
 
 
+@patch("modules.incident.incident_document.INCIDENT_TEMPLATE", "test_template_id")
+@patch("modules.incident.incident_document.google_drive")
+def test_create_incident_document_calls_create_file_from_template(mock_google_drive):
+    title = "Incident 123"
+    folder = "test_folder_id"
+    mock_google_drive.create_file_from_template.return_value = {
+        "id": "test_document_id",
+        "name": title,
+    }
+
+    response = incident_document.create_incident_document(title, folder)
+    assert response == "test_document_id"
+
+    mock_google_drive.create_file_from_template.assert_called_once_with(
+        title, folder, "test_template_id"
+    )
+
+
+@patch("modules.incident.incident_document.datetime")
+@patch("modules.incident.incident_document.google_docs")
+def test_update_boilerplate_text_calls_batch_update(mock_google_docs, mock_datetime):
+    document_id = "test_document_id"
+    name = "John Doe"
+    product = "Product Test"
+    slack_channel = "#general"
+    on_call_names = "Alice, Bob"
+
+    mock_datetime.datetime.now.return_value.strftime.return_value = "2023-10-01"
+    mock_google_docs.update_boilerplate_text(
+        document_id, name, product, slack_channel, on_call_names
+    )
+
+    expected_requests = [
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{date}}", "matchCase": "true"},
+                "replaceText": mock_datetime.datetime.now().strftime("%Y-%m-%d"),
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{name}}", "matchCase": "true"},
+                "replaceText": "John Doe",
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{on-call-names}}", "matchCase": "true"},
+                "replaceText": "Alice, Bob",
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{team}}", "matchCase": "true"},
+                "replaceText": "Product Test",
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{slack-channel}}", "matchCase": "true"},
+                "replaceText": "#general",
+            }
+        },
+        {
+            "replaceAllText": {
+                "containsText": {"text": "{{status}}", "matchCase": "true"},
+                "replaceText": "In Progress",
+            }
+        },
+    ]
+
+    incident_document.update_boilerplate_text(
+        document_id, name, product, slack_channel, on_call_names
+    )
+    mock_google_docs.batch_update.assert_called_once_with(
+        document_id, expected_requests
+    )
+
+
 @patch("modules.incident.incident_document.google_docs")
 def test_update_incident_document_status_changes_occurred(google_docs_mock):
     document_id = "test_document_id"

@@ -3,13 +3,18 @@ import re
 import datetime
 import i18n  # type: ignore
 from dotenv import load_dotenv
+from slack_sdk import WebClient
 
-from integrations import google_drive, opsgenie
+from integrations import opsgenie
 from integrations.slack import users as slack_users
 from integrations.sentinel import log_to_sentinel
 
-
-from modules.incident import incident_alert, incident_conversation
+from modules.incident import (
+    incident_alert,
+    incident_conversation,
+    incident_folder,
+    incident_document,
+)
 
 load_dotenv()
 
@@ -158,7 +163,7 @@ def open_modal(client, ack, command, body):
         ],
     }
     view = client.views_open(trigger_id=body["trigger_id"], view=loading_view)["view"]
-    folders = google_drive.list_folders()
+    folders = incident_folder.list_incident_folders()
     options = [
         {
             "text": {"type": "plain_text", "text": i["name"]},
@@ -172,7 +177,7 @@ def open_modal(client, ack, command, body):
 
 def handle_change_locale_button(ack, client, body):
     ack()
-    folders = google_drive.list_folders()
+    folders = incident_folder.list_incident_folders()
     options = [
         {
             "text": {"type": "plain_text", "text": i["name"]},
@@ -193,7 +198,7 @@ def handle_change_locale_button(ack, client, body):
     client.views_update(view_id=body["view"]["id"], view=view)
 
 
-def submit(ack, view, say, body, client, logger):
+def submit(ack, view, say, body, client: WebClient, logger):
     ack()
 
     errors = {}
@@ -219,7 +224,9 @@ def submit(ack, view, say, body, client, logger):
     log_to_sentinel("incident_called", body)
 
     # Get folder metadata
-    folder_metadata = google_drive.list_metadata(folder).get("appProperties", {})
+    folder_metadata = incident_folder.get_folder_metadata(folder).get(
+        "appProperties", {}
+    )
     oncall = []
 
     # Get OpsGenie data
@@ -281,11 +288,10 @@ def submit(ack, view, say, body, client, logger):
     say(text=text, channel=channel_id)
 
     # Create incident document
-    document_id = google_drive.create_new_incident(slug, folder)
+    document_id = incident_document.create_incident_document(slug, folder)
     logger.info(f"Created document: {slug} in folder: {folder} / {document_id}")
 
-    # Merge data
-    google_drive.merge_data(
+    incident_document.update_boilerplate_text(
         document_id,
         name,
         product,
@@ -295,8 +301,9 @@ def submit(ack, view, say, body, client, logger):
     document_link = f"https://docs.google.com/document/d/{document_id}/edit"
 
     # Update incident list
-    google_drive.update_incident_list(document_link, name, slug, product, channel_url)
-
+    incident_folder.add_new_incident_to_list(
+        document_link, name, slug, product, channel_url
+    )
     # Bookmark incident document
     client.bookmarks_add(
         channel_id=channel_id,

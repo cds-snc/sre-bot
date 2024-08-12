@@ -6,7 +6,12 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from . import incident_folder, incident_roles, incident_document, schedule_retro
+from . import (
+    incident_folder,
+    incident_roles,
+    incident_document,
+    schedule_retro,
+)
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -43,7 +48,7 @@ help_text = """
 def register(bot: App):
     bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
     bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
-    bot.view("view_folder_metadata_modal")(incident_folder.list_folders)
+    bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
     bot.action("archive_channel")(archive_channel_action)
@@ -69,7 +74,7 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
         case "help":
             respond(help_text)
         case "list-folders":
-            incident_folder.list_folders(client, body, ack)
+            incident_folder.list_folders_view(client, body, ack)
         case "roles":
             incident_roles.manage_roles(client, body, ack, respond)
         case "close":
@@ -134,8 +139,7 @@ def close_incident(client: WebClient, body, ack, respond):
             )
         except Exception as e:
             logging.error(
-                f"Could not post ephemeral message to user %s due to {e}.",
-                user_id,
+                f"Could not post ephemeral message to user {user_id} due to {e}.",
             )
         return
 
@@ -256,18 +260,12 @@ def schedule_incident_retro(client: WebClient, body, ack):
             )
         except Exception as e:
             logging.error(
-                f"Could not post ephemeral message to user %s due to {e}.",
-                user_id,
+                f"Could not post ephemeral message to user {user_id} due to {e}."
             )
         return
 
     # get all users in a channel
     users = client.conversations_members(channel=channel_id)["members"]
-
-    # If for some reason the channel topic is empty, set it to "Incident Retro"
-    if channel_name == "":
-        channel_name = "Incident Retro"
-        logging.warning("Channel topic is empty. Setting it to 'Incident Retro'")
 
     # get the incident document
     # get and update the incident document
