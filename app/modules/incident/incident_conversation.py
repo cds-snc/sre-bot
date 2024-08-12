@@ -93,9 +93,7 @@ def handle_forwarded_messages(message):
     """
     # get the forwarded message and get the attachments appeending the forwarded message to the original message
     if message.get("attachments"):
-        print("In forwarded message")
         attachments = message["attachments"]
-        print("Attachments: ", attachments)
         for attachment in attachments:
             fallback = attachment.get("fallback")
             if fallback:
