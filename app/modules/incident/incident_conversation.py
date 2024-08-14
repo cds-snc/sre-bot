@@ -17,7 +17,7 @@ def rearrange_by_datetime_ascending(text):
     lines = text.split("\n")
     entries = []
 
-    pattern = r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+)\)\s([\w\s]+):\s"
+    pattern = r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+(?:\?\w+=\d+\.\d+&\w+=\w+)?)\)\s([\w\s]+):\s"
 
     current_message = []
     for line in lines:
@@ -298,23 +298,30 @@ def handle_reaction_removed(client, ack, body, logger):
 
 # Function to return the messages from the conversation
 def return_messages(client, body, channel_id):
-    # Fetch the message that had the reaction removed
+
+    # Fetch the message that had the reaction added or removed
     result = client.conversations_history(
         channel=channel_id,
         limit=1,
         inclusive=True,
-        oldest=body["event"]["item"]["ts"],
+        include_all_metadata=True,
+        ts=body["event"]["item"]["ts"],
     )
     # get the messages
     messages = result["messages"]
-    # if the lenght is 0, then the message is part of a thread, so get the message from the thread
-    if messages.__len__() == 0:
-        # get thread messages
+
+    # if there are more messages in the conversation, get them
+    if result["has_more"]:
         result = client.conversations_replies(
             channel=channel_id,
             ts=body["event"]["item"]["ts"],
             inclusive=True,
-            include_all_metadata=True,
+            limit=1,
         )
         messages = result["messages"]
+
+        # get the parent massages if there are more threads
+        if messages.__len__() > 1:
+            return [messages[0]]
+
     return messages
