@@ -23,5 +23,5 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
             curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"*Review requested*: <$PR_URL|PR> - $PR_TITLE by $PR_CREATOR in $REPO_NAME.\"}" \
+            --data "{\"text\":\"*Review requested*: <$PR_URL|PR> - $PR_TITLE by $PR_CREATOR in $REPO_NAME.\n$PR_URL\"}" \
             $SLACK_SRE_CHANNEL_WEBHOOK_URL
