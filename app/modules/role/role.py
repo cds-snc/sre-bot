@@ -1,6 +1,9 @@
 import os
 import i18n  # type: ignore
-from integrations import google_drive
+
+from slack_bolt import Ack, App, Respond
+from slack_sdk import WebClient
+from integrations.google_workspace import google_drive
 from integrations.slack import users as slack_users, commands as slack_commands
 
 from dotenv import load_dotenv
@@ -14,9 +17,11 @@ i18n.set("locale", "en-US")
 i18n.set("fallback", "en-CA")
 
 PREFIX = os.environ.get("PREFIX", "")
+BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL", "")
+ROLE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
-def register(bot):
+def register(bot: App):
     bot.command(f"/{PREFIX}talent-role")(role_command)
     bot.view("role_view")(role_view_handler)
     bot.action("role_change_locale")(update_modal_locale)
@@ -28,7 +33,9 @@ def update_locale(locale):
         i18n.set("locale", locale)
 
 
-def role_command(ack, command, logger, respond, client, body):
+def role_command(
+    ack: Ack, command: dict, logger, respond: Respond, client: WebClient, body: dict
+):
     # Function to execute the role command based on the arguments provided
 
     # acknowledge to slack that the command was received
@@ -172,9 +179,13 @@ def role_view_handler(ack, body, say, logger, client):
     # 3. Create a new channel and invite users
 
     # Step 1: Create a new folder in the Google Drive
-    folder_id = google_drive.create_new_folder(
-        role_name, os.getenv("INTERNAL_TALENT_FOLDER")
-    )
+    folder_id = google_drive.create_folder(
+        role_name,
+        os.getenv("INTERNAL_TALENT_FOLDER"),
+        "id",
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
+    )["id"]
     logger.info(f"Created folder: {role_name} / {folder_id}")
 
     # Step 2: Copy the template files into the new folder (Scoring Guilde, Template for Core Values interview notes, Template for Technical interview notes
@@ -184,6 +195,8 @@ def role_view_handler(ack, body, say, logger, client):
         f"Template 2022/06 - {role_name} Interview Panel Scoring Document - <year/month> ",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: Scoring Guide in folder: Scoring Guide / {scoring_guide_id}"
@@ -194,6 +207,8 @@ def role_view_handler(ack, body, say, logger, client):
         f"Template EN+FR 2022/09- {role_name} - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: Core Values Interview Notes in folder: Core Values Interview Notes / {core_values_interview_notes_id}"
@@ -204,6 +219,8 @@ def role_view_handler(ack, body, say, logger, client):
         f"Template EN+FR 2022/09 - {role_name} - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: Technical Interview Notes in folder: Technical Interview Notes / {technical_interview_notes_id}"
@@ -214,6 +231,8 @@ def role_view_handler(ack, body, say, logger, client):
         f"TEMPLATE Month YYYY - {role_name} - Kick-off form",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: Intake Form in folder: Intake Form / {intake_form_id}"
@@ -224,6 +243,8 @@ def role_view_handler(ack, body, say, logger, client):
         "SoMC Template",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: SoMC Template in folder: SoMC Template / {somc_template_id}"
@@ -234,6 +255,8 @@ def role_view_handler(ack, body, say, logger, client):
         f"Recruitment Feedback - {role_name}",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
     )
     logger.info(
         f"Created document: Recruitment Feedback Template in folder: Recruitment Feedback/ {recruitment_feedback_template_id}"

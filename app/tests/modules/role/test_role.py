@@ -235,8 +235,10 @@ def test_update_modal_locale_to_FR():
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "fr-FR"
 
 
-@patch("integrations.google_drive.get_google_service")
-@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.BOT_EMAIL", "bot_email")
+@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
+@patch("modules.role.role.google_drive.copy_file_to_folder")
+@patch("modules.role.role.google_drive.create_folder")
 def test_create_new_folder(mock_create_new_folder, get_google_service_mock):
     # test creating a new folder
     ack = MagicMock()
@@ -244,14 +246,20 @@ def test_create_new_folder(mock_create_new_folder, get_google_service_mock):
     logger = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
-    mock_create_new_folder.return_value = "id"
+    mock_create_new_folder.return_value = {"id": "id"}
     role.role_view_handler(ack, body, say, logger, client)
     mock_create_new_folder.assert_called_once_with(
-        "foo", os.getenv("INTERNAL_TALENT_FOLDER")
+        "foo",
+        os.getenv("INTERNAL_TALENT_FOLDER"),
+        "id",
+        scopes=["https://www.googleapis.com/auth/drive"],
+        delegated_user_email="bot_email",
     )
 
 
-@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.BOT_EMAIL", "bot_email")
+@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
+@patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_copy_files_to_internal_talent_folder(
     mock_copy_file_to_folder, mock_create_new_folder
@@ -262,7 +270,7 @@ def test_copy_files_to_internal_talent_folder(
     logger = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
-    mock_create_new_folder.return_value = "folder_id"
+    mock_create_new_folder.return_value = {"id": "folder_id"}
     mock_copy_file_to_folder.return_value = "id"
     role.role_view_handler(ack, body, say, logger, client)
     mock_copy_file_to_folder.assert_has_calls(
@@ -272,36 +280,48 @@ def test_copy_files_to_internal_talent_folder(
                 "Template 2022/06 - foo Interview Panel Scoring Document - <year/month> ",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
             call(
                 os.getenv("CORE_VALUES_INTERVIEW_NOTES_TEMPLATE"),
                 "Template EN+FR 2022/09- foo - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
             call(
                 os.getenv("TECHNICAL_INTERVIEW_NOTES_TEMPLATE"),
                 "Template EN+FR 2022/09 - foo - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
             call(
                 os.getenv("INTAKE_FORM_TEMPLATE"),
                 "TEMPLATE Month YYYY - foo - Kick-off form",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
             call(
                 os.getenv("SOMC_TEMPLATE"),
                 "SoMC Template",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
             call(
                 os.getenv("RECRUITMENT_FEEDBACK_TEMPLATE"),
                 "Recruitment Feedback - foo",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
+                scopes=["https://www.googleapis.com/auth/drive"],
+                delegated_user_email="bot_email",
             ),
         ]
     )
@@ -329,7 +349,7 @@ def test_role_modal_view(mock_role_modal_view):
     mock_role_modal_view.assert_called_once()
 
 
-@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_role_creates_channel_and_sets_topic_and_announces_channel(
     mock_copy_file_to_folder, mock_create_new_folder
@@ -357,7 +377,7 @@ def test_role_creates_channel_and_sets_topic_and_announces_channel(
 
 
 # test that indicated users are invited to the channel
-@patch("modules.role.role.google_drive.create_new_folder")
+@patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 def test_role_add_invited_users_to_channel(
     mock_copy_file_to_folder, mock_create_new_folder
