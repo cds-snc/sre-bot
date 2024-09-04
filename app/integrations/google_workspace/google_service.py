@@ -19,8 +19,9 @@ import json
 from json import JSONDecodeError
 from dotenv import load_dotenv
 from functools import wraps
+from typing import Any, Callable
 from google.oauth2 import service_account  # type: ignore
-from googleapiclient.discovery import build  # type: ignore
+from googleapiclient.discovery import build, Resource  # type: ignore
 from googleapiclient.errors import HttpError, Error  # type: ignore
 from google.auth.exceptions import RefreshError  # type: ignore
 from integrations.utils.api import convert_kwargs_to_camel_case
@@ -32,7 +33,12 @@ DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER
 load_dotenv()
 
 
-def get_google_service(service, version, delegated_user_email=None, scopes=None):
+def get_google_service(
+    service: str,
+    version: str,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+) -> Resource:
     """
     Get an authenticated Google service.
 
@@ -43,12 +49,12 @@ def get_google_service(service, version, delegated_user_email=None, scopes=None)
         scopes (list): The list of scopes to request.
 
     Returns:
-        The authenticated Google service resource.
+        Resource: The authenticated Google service resource.
     """
 
-    creds_json = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", False)
+    creds_json = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
 
-    if creds_json is False:
+    if not creds_json:
         raise ValueError("Credentials JSON not set")
 
     try:
@@ -66,7 +72,7 @@ def get_google_service(service, version, delegated_user_email=None, scopes=None)
     return build(service, version, credentials=creds, cache_discovery=False)
 
 
-def handle_google_api_errors(func):
+def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to handle Google API errors.
 
     Args:
@@ -77,7 +83,7 @@ def handle_google_api_errors(func):
     """
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             result = func(*args, **kwargs)
             # Check if the result is a tuple and has two elements (for backward compatibility)
@@ -106,15 +112,15 @@ def handle_google_api_errors(func):
 
 
 def execute_google_api_call(
-    service_name,
-    version,
-    resource_path,
-    method,
-    scopes=None,
-    delegated_user_email=None,
-    paginate=False,
-    **kwargs,
-):
+    service_name: str,
+    version: str,
+    resource_path: str,
+    method: str,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+    paginate: bool = False,
+    **kwargs: Any,
+) -> Any:
     """Execute a Google API call on a resource.
 
     Args:
@@ -128,9 +134,14 @@ def execute_google_api_call(
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
-        dict or list: The result of the API call. If paginate is True, returns a list of all results.
+        Any: The result of the API call. If paginate is True, returns a list of all results.
     """
-    service = get_google_service(service_name, version, delegated_user_email, scopes)
+    service = get_google_service(
+        service_name,
+        version,
+        scopes,
+        delegated_user_email,
+    )
     resource_obj = service
 
     for resource in resource_path.split("."):
