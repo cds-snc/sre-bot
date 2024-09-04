@@ -14,7 +14,9 @@ INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
 
 
 @handle_google_api_errors
-def add_metadata(file_id, key, value, delegated_user_email=None):
+def add_metadata(
+    file_id: str, key: str, value: str, delegated_user_email: str | None = None
+):
     """Add metadata to a file in Google Drive.
 
     Args:
@@ -31,6 +33,7 @@ def add_metadata(file_id, key, value, delegated_user_email=None):
         "v3",
         "files",
         "update",
+        scopes=["https://www.googleapis.com/auth/drive"],
         delegated_user_email=delegated_user_email,
         fileId=file_id,
         body={"appProperties": {key: value}},
@@ -65,7 +68,7 @@ def delete_metadata(file_id, key, delegated_user_email=None):
 
 
 @handle_google_api_errors
-def list_metadata(file_id):
+def list_metadata(file_id: str):
     """List metadata of a file in Google Drive.
 
     Args:
@@ -86,7 +89,13 @@ def list_metadata(file_id):
 
 
 @handle_google_api_errors
-def create_folder(name, parent_folder, fields=None):
+def create_folder(
+    name: str,
+    parent_folder: str,
+    fields: str | None = None,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+):
     """Create a new folder in Google Drive.
 
     Args:
@@ -103,10 +112,12 @@ def create_folder(name, parent_folder, fields=None):
         "v3",
         "files",
         "create",
+        scopes=scopes,
+        delegated_user_email=delegated_user_email,
         body={
             "name": name,
-            "mimeType": "application/vnd.google-apps.folder",
             "parents": [parent_folder],
+            "mimeType": "application/vnd.google-apps.folder",
         },
         supportsAllDrives=True,
         fields=fields,
@@ -114,7 +125,14 @@ def create_folder(name, parent_folder, fields=None):
 
 
 @handle_google_api_errors
-def create_file_from_template(name, folder, template, fields=None):
+def create_file_from_template(
+    name: str,
+    folder: str,
+    template: str,
+    fields: str | None = None,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+):
     """Create a new file in Google Drive from a template
      (Docs, Sheets, Slides, Forms, or Sites.)
 
@@ -131,6 +149,8 @@ def create_file_from_template(name, folder, template, fields=None):
         "v3",
         "files",
         "copy",
+        scopes=scopes,
+        delegated_user_email=delegated_user_email,
         fileId=template,
         body={"name": name, "parents": [folder]},
         supportsAllDrives=True,
@@ -247,7 +267,11 @@ def list_folders_in_folder(folder, query=None):
 
 
 @handle_google_api_errors
-def list_files_in_folder(folder):
+def list_files_in_folder(
+    folder: str,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+):
     """List all files in a folder in Google Drive.
 
     Args:
@@ -261,6 +285,8 @@ def list_files_in_folder(folder):
         "v3",
         "files",
         "list",
+        scopes=scopes,
+        delegated_user_email=delegated_user_email,
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
@@ -272,7 +298,14 @@ def list_files_in_folder(folder):
 
 
 @handle_google_api_errors
-def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
+def copy_file_to_folder(
+    file_id: str,
+    name: str,
+    parent_folder_id: str,
+    destination_folder_id: str,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
+) -> str:
     """Copy a file to a new folder in Google Drive.
 
     Args:
@@ -289,11 +322,14 @@ def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
         "v3",
         "files",
         "copy",
+        scopes=scopes,
+        delegated_user_email=delegated_user_email,
         fileId=file_id,
         body={"name": name, "parents": [parent_folder_id]},
         supportsAllDrives=True,
         fields="id",
-    )
+    )[0]["id"]
+    print(f"Copied file: {copied_file}")
 
     # move the copy to the new folder
     updated_file = execute_google_api_call(
@@ -301,14 +337,17 @@ def copy_file_to_folder(file_id, name, parent_folder_id, destination_folder_id):
         "v3",
         "files",
         "update",
-        fileId=copied_file["id"],
+        scopes=scopes,
+        delegated_user_email=delegated_user_email,
+        fileId=copied_file,
         addParents=destination_folder_id,
         removeParents=parent_folder_id,
         supportsAllDrives=True,
         fields="id",
-    )
+    )[0]["id"]
+    print(f"Updated file: {updated_file}")
 
-    return updated_file["id"]
+    return updated_file
 
 
 @handle_google_api_errors

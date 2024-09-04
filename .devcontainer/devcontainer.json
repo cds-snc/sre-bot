@@ -21,7 +21,7 @@
 				"ms-python.black-formatter"
 			],
 			"settings": {
-				// "python.pythonPath": "/usr/local/bin/python",
+				"python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
 				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
 				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",

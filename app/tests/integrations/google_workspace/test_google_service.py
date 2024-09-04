@@ -216,8 +216,8 @@ def test_execute_google_api_call_calls_get_google_service_with_delegated_user_em
     mock_get_google_service.assert_called_once_with(
         "service_name",
         "version",
-        "admin.user@email.com",
         None,
+        "admin.user@email.com",
     )
 
 
