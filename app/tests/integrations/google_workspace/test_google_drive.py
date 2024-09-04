@@ -17,6 +17,7 @@ def test_add_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "update",
+        scopes=["https://www.googleapis.com/auth/drive"],
         delegated_user_email=None,
         fileId="file_id",
         body={"appProperties": {"key": "value"}},
@@ -86,6 +87,8 @@ def test_create_folder_returns_folder(execute_google_api_call_mock):
         "v3",
         "files",
         "create",
+        scopes=None,
+        delegated_user_email=None,
         body={
             "name": "test_folder",
             "mimeType": "application/vnd.google-apps.folder",
@@ -109,6 +112,8 @@ def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
         "v3",
         "files",
         "create",
+        scopes=None,
+        delegated_user_email=None,
         body={
             "name": "test_folder",
             "mimeType": "application/vnd.google-apps.folder",
@@ -167,6 +172,8 @@ def test_create_file_from_template_returns_file(execute_google_api_call_mock):
         "v3",
         "files",
         "copy",
+        scopes=None,
+        delegated_user_email=None,
         fileId="template_id",
         body={"name": "test_document", "parents": ["folder_id"]},
         supportsAllDrives=True,
@@ -303,8 +310,8 @@ def test_get_file_by_name_no_file_found_returns_empty_list(
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
 def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
     execute_google_api_call_mock.side_effect = [
-        {"id": "file_id"},  # Response from the "copy" method
-        {"id": "updated_file_id"},  # Response from the "update" method
+        [{"id": "file_id"}],  # Response from the "copy" method
+        [{"id": "updated_file_id"}],  # Response from the "update" method
     ]
     assert (
         google_drive.copy_file_to_folder(
@@ -319,6 +326,8 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
                 "v3",
                 "files",
                 "copy",
+                scopes=None,
+                delegated_user_email=None,
                 fileId="file_id",
                 body={"name": "name", "parents": ["parent_folder"]},
                 supportsAllDrives=True,
@@ -329,6 +338,8 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
                 "v3",
                 "files",
                 "update",
+                scopes=None,
+                delegated_user_email=None,
                 fileId="file_id",
                 addParents="destination_folder",
                 removeParents="parent_folder",
@@ -385,6 +396,8 @@ def test_list_files_in_folder_returns_files(execute_google_api_call_mock):
         "v3",
         "files",
         "list",
+        scopes=None,
+        delegated_user_email=None,
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
