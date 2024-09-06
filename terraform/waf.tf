@@ -162,9 +162,9 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                 }
                 text_transformation {
                   priority = 0
-                  type     = "NORMALIZE_PATH"
+                  type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -182,7 +182,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -200,7 +200,26 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -210,7 +229,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           not_statement {
             statement {
               byte_match_statement {
-                search_string = "/geolocate"
+                search_string = "/static"
                 field_to_match {
                   uri_path {}
                 }
@@ -224,6 +243,77 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           }
         }
 
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/user"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/request_access"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/active_requests"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/past_requests"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
         statement {
           not_statement {
             statement {
@@ -254,7 +344,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }

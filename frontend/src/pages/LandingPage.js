@@ -1,5 +1,5 @@
 import React, {} from 'react';
-import sre_bot_logo from '../sre_bot_logo.png';
+import sre_bot_logo from '../static/sre_bot_logo.png';
 
 // Landing page. This is the initial screen that the user sees when they visit the site, prompting them to log in. 
 // You can login with a google account tied only to the organization
