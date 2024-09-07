@@ -327,7 +327,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-         afo       positional_constraint = "STARTS_WITH"
+                positional_constraint = "STARTS_WITH"
               }
             }
           }
