@@ -162,9 +162,9 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                 }
                 text_transformation {
                   priority = 0
-                  type     = "NORMALIZE_PATH"
+                  type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -182,7 +182,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -200,7 +200,116 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/static"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
                 positional_constraint = "STARTS_WITH"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/user"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/request_access"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/active_requests"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
+              }
+            }
+          }
+        }
+
+        statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/past_requests"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -223,7 +332,6 @@ resource "aws_wafv2_web_acl" "sre-bot" {
             }
           }
         }
-
         statement {
           not_statement {
             statement {
@@ -254,7 +362,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
                   priority = 0
                   type     = "NONE"
                 }
-                positional_constraint = "STARTS_WITH"
+                positional_constraint = "EXACTLY"
               }
             }
           }
@@ -321,9 +429,9 @@ resource "aws_wafv2_web_acl_association" "sre-bot" {
   resource_arn = aws_lb.sre_bot.arn
   web_acl_arn  = aws_wafv2_web_acl.sre-bot.arn
 }
-
 resource "aws_cloudwatch_log_group" "sre_bot_waf_log_group" {
-  name = "aws-waf-logs-sre-bot"
+  name              = "aws-waf-logs-sre-bot"
+  retention_in_days = 30
 }
 resource "aws_wafv2_web_acl_logging_configuration" "sre-bot" {
   resource_arn            = aws_wafv2_web_acl.sre-bot.arn
