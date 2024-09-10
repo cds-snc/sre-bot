@@ -1,5 +1,3 @@
-# from jobs.revoke_aws_sso_access import revoke_aws_sso_access
-from jobs.notify_stale_incident_channels import notify_stale_incident_channels
 import threading
 import time
 import schedule
@@ -10,6 +8,7 @@ from integrations.google_workspace import google_drive
 
 from integrations.aws import identity_store
 from modules.aws import identity_center
+from modules.incident import notify_stale_incident_channels
 
 logging.basicConfig(level=logging.INFO)
 
