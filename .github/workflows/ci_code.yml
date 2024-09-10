@@ -22,40 +22,43 @@ jobs:
           DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
           DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
-      - name: Checkout
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      # - name: Checkout
+      #   uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
-      - name: Setup python
-        uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa # v4.8.0
-        with:
-          python-version: "3.11"
+      # - name: Setup python
+      #   uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa # v4.8.0
+      #   with:
+      #     python-version: "3.11"
 
-      - name: Install dev dependencies
-        working-directory: ./app
-        run: make install-dev
+      # - name: Install dev dependencies
+      #   working-directory: ./app
+      #   run: make install-dev
 
-      - name: Install dependencies
-        working-directory: ./app
-        run: make install
+      # - name: Install dependencies
+      #   working-directory: ./app
+      #   run: make install
 
-      - name: Lint
-        working-directory: ./app
-        run: make lint-ci
+      # - name: Lint
+      #   working-directory: ./app
+      #   run: make lint-ci
 
-      - name: Format
-        working-directory: ./app
-        run: make fmt-ci
+      # - name: Format
+      #   working-directory: ./app
+      #   run: make fmt-ci
 
-      - name: Test
-        working-directory: ./app
-        run: make test
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
-          NOTIFY_TEST_KEY: ${{ secrets.NOTIFY_TEST_KEY }}
-          NOTIFY_SRE_USER_NAME: ${{ secrets.NOTIFY_SRE_USER_NAME }}
-          NOTIFY_SRE_CLIENT_SECRET: ${{ secrets.NOTIFY_SRE_CLIENT_SECRET }}
-          NOTIFY_OPS_CHANNEL_ID: ${{ secrets.NOTIFY_OPS_CHANNEL_ID }}
-          SRE_BOT_EMAIL: ${{ secrets.SRE_BOT_EMAIL }}
-          AWS_ORG_ACCOUNT_ROLE_ARN: ${{ secrets.AWS_ORG_ACCOUNT_ROLE_ARN }}
+      # - name: Test
+      #   working-directory: ./app
+      #   run: make test
+      #   env:
+      #     GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      #     GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      #     SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
+      #     NOTIFY_TEST_KEY: ${{ secrets.NOTIFY_TEST_KEY }}
+      #     NOTIFY_SRE_USER_NAME: ${{ secrets.NOTIFY_SRE_USER_NAME }}
+      #     NOTIFY_SRE_CLIENT_SECRET: ${{ secrets.NOTIFY_SRE_CLIENT_SECRET }}
+      #     NOTIFY_OPS_CHANNEL_ID: ${{ secrets.NOTIFY_OPS_CHANNEL_ID }}
+      #     SRE_BOT_EMAIL: ${{ secrets.SRE_BOT_EMAIL }}
+      #     AWS_ORG_ACCOUNT_ROLE_ARN: ${{ secrets.AWS_ORG_ACCOUNT_ROLE_ARN }}
+
+      - name: Force error to test comment
+        run: echo "Error" && exit 1
