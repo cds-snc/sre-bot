@@ -3,7 +3,6 @@ import os
 from modules import incident_helper
 import logging
 
-
 from unittest.mock import ANY, MagicMock, call, patch
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
@@ -483,6 +482,91 @@ def test_close_incident_not_incident_channel():
     mock_client.chat_postEphemeral.assert_called_once_with(
         channel="C12345", user="12345", text=expected_text
     )
+
+
+@patch("modules.incident.incident_helper.logging")
+@patch(
+    "modules.incident.incident_helper.incident_document.update_incident_document_status"
+)
+@patch(
+    "modules.incident.incident_helper.incident_folder.update_spreadsheet_incident_status"
+)
+@patch(
+    "integrations.google_workspace.google_docs.extract_google_doc_id",
+    return_value="dummy_document_id",
+)
+def test_close_incident_when_client_not_in_channel(
+    mock_extract_id, mock_update_spreadsheet, mock_update_document_status, mock_logging
+):
+    # the client is not in the channel so it needs to be added
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    # Mock the response of the private message to have been posted as expected
+    mock_client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"id": "C12345", "name": "incident-channel", "is_member": False},
+    }
+    mock_client.conversations_join.return_value = {"ok": True}
+
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "user_id": "12345",
+            "channel_name": "incident-channel",
+        },
+        mock_ack,
+        mock_respond,
+    )
+
+    # Assert that ack was called
+    mock_ack.assert_called_once()
+
+    # Assert that the client was added to the channel
+    mock_client.conversations_join.assert_called_once_with(channel="C12345")
+
+
+def test_close_incident_when_client_not_in_channel_throws_error(
+    caplog,
+):
+    # the client is not in the channel so it needs to be added
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    # Mock the response of the private message to have been posted as expected
+    mock_client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"id": "C12345", "name": "incident-channel", "is_member": False},
+    }
+    mock_client.conversations_join.return_value = {"ok": False, "error": "is_archived"}
+
+    exception_message = "is_archived"
+    mock_client.conversations_join.side_effect = Exception(exception_message)
+
+    # Call close_incident
+    with caplog.at_level(logging.ERROR):
+        incident_helper.close_incident(
+            mock_client,
+            {
+                "channel_id": "C12345",
+                "user_id": "12345",
+                "channel_name": "incident-channel",
+            },
+            mock_ack,
+            mock_respond,
+        )
+
+        assert caplog.records
+
+        # Find the specific log message we're interested in
+        log_messages = [record.message for record in caplog.records]
+
+        expected_message = "Failed to join the channel C12345: is_archived"
+        assert (
+            expected_message in log_messages
+        ), "Expected error message not found in log records"
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.

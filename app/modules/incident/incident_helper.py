@@ -130,6 +130,16 @@ def close_incident(client: WebClient, body, ack, respond):
     channel_name = body["channel_name"]
     user_id = body["user_id"]
 
+    # ensure the bot is actually in the channel before performing actions
+    try:
+        response = client.conversations_info(channel=channel_id)
+        channel_info = response.get("channel", None)
+        if channel_info is None or not channel_info.get("is_member", False):
+            client.conversations_join(channel=channel_id)
+    except Exception as e:
+        logging.error(f"Failed to join the channel {channel_id}: {e}")
+        return
+
     if not channel_name.startswith("incident-"):
         try:
             response = client.chat_postEphemeral(
@@ -198,7 +208,7 @@ def close_incident(client: WebClient, body, ack, respond):
         )
 
 
-def stale_incidents(client, body, ack):
+def stale_incidents(client: WebClient, body, ack: Ack):
     ack()
 
     placeholder = {
