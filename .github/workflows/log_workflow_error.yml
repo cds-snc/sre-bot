@@ -1,31 +1,45 @@
 name: Log Workflow error in PR
 
 on:
-    workflow_run:
-      workflows:
-        - Source code security scan using Bandit 
-        - Build and Push to Container Registry
-        - Lint, format and test code
-        - Build containers CI
-        - Docker vulnerability scan
-        - GitHub repository metadata exporter
-        - Sync repository labels workflow
-        - Scorecards supply-chain security
-        - S3 backup
-        - Shellcheck
-        - Terraform Apply
-        - Terraform plan
-      types: [ completed ]
+  workflow_run:
+    workflows:
+      - Source code security scan using Bandit
+      - Build and Push to Container Registry
+      - Lint, format and test code
+      - Build containers CI
+      - Docker vulnerability scan
+      - GitHub repository metadata exporter
+      - Sync repository labels workflow
+      - Scorecards supply-chain security
+      - S3 backup
+      - Shellcheck
+      - Terraform Apply
+      - Terraform plan
+    types: [completed]
 
 jobs:
-    log-error:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Audit DNS requests
-          uses: cds-snc/dns-proxy-action@main
-          env:
-            DNS_PROXY_FORWARDTOSENTINEL: "true"
-            DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-            DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+  log-error:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
 
-        - uses: quipper/comment-failure-action@f524f18826b0aacbc0d61fd0b24287061365689c # v0.1.1
+      - name: Delete Previous Comments
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            console.log('Number of comments:', commentsToDelete.length);
+            const filteredComments = comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.includes('### Lint, format and test code'));
+            console.log('Number of comments to delete:', filteredComments.length);
+            const commentsToDelete = filteredComments.map(comment => comment.id);
+
+      - uses: quipper/comment-failure-action@f524f18826b0aacbc0d61fd0b24287061365689c # v0.1.1
