@@ -12,6 +12,8 @@ env:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    env:
+      COMMENT_ID: ""
     steps:
       - name: Audit DNS requests
         uses: cds-snc/dns-proxy-action@main
@@ -69,12 +71,23 @@ jobs:
               issue_number: context.issue.number,
             });
             comments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            const comment = comments.find(comment => comment.user.login === 'github-actions[bot]' && comment.body.includes('Lint, format and test code results'));
-            return comment ? comment.id : null;
+            const filteredComments = comments.filter(comment => comment.user.login === 'github-actions[bot]' && comment.body.includes('Lint, format and test code results'));
+            if (filteredComments.length > 0) {
+              core.exportVariable('COMMENT_ID', filteredComments[0].id);
+              const commentsToDelete = filteredComments.slice(1);
+              const deletePromises = commentsToDelete.map(comment => github.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: comment.id,
+              }));
+              const results = await Promise.all(deletePromises);
+              console.log('Number of comments deleted:', results.length);
+            } else {
+              console.log('No previous comments found');
+            }
 
       - name: Update comment
-        if: steps.find-comment.outputs.result != 'null'
+        if: env.COMMENT_ID != ''
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
@@ -86,7 +99,7 @@ jobs:
             });
 
       - name: Create comment
-        if: steps.find-comment.outputs.result == 'null'
+        if: env.COMMENT_ID == ''
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
