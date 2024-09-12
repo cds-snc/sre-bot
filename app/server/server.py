@@ -77,6 +77,7 @@ class AwsSnsPayload(BaseModel):
     SigningCertURL: str | None = None
     Subject: str | None = None
     UnsubscribeURL: str | None = None
+    text: str | None = None
 
     class Config:
         extra = Extra.forbid
