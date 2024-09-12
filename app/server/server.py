@@ -82,13 +82,6 @@ class AwsSnsPayload(BaseModel):
         extra = Extra.forbid
 
 
-class UpptimeStatusPayload(BaseModel):
-    text: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-
 class AccessRequest(BaseModel):
     """
     AccessRequest represents a request for access to an AWS account.
@@ -430,18 +423,10 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                         request.state.bot.client,
                         f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{payload}```",
                     )
-                    try:
-                        payload = UpptimeStatusPayload.parse_raw(payload)
-                    except Exception as e:
-                        logging.error(e)
-                        log_ops_message(
-                            request.state.bot.client,
-                            f"Error parsing Upptime status payload due to {e.__class__.__qualname__}: ```{payload}```",
-                        )
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to parse payload due to {e.__class__.__qualname__}: {e}",
-                        )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+                    )
                 if payload.Type == "SubscriptionConfirmation":
                     requests.get(payload.SubscribeURL, timeout=60)
                     logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
@@ -466,8 +451,6 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
                         logging.info("No blocks to post, returning")
                         return
                     payload = WebhookPayload(blocks=blocks)
-            else:
-                payload = WebhookPayload(**payload.dict())
             payload.channel = webhook["channel"]["S"]
             payload = append_incident_buttons(payload, id)
             try:
