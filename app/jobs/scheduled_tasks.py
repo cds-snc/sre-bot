@@ -8,7 +8,9 @@ from integrations.google_workspace import google_drive
 
 from integrations.aws import identity_store
 from modules.aws import identity_center
-from modules.incident.notify_stale_incident_channels import notify_stale_incident_channels
+from modules.incident.notify_stale_incident_channels import (
+    notify_stale_incident_channels,
+)
 
 logging.basicConfig(level=logging.INFO)
 
