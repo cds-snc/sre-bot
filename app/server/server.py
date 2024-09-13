@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from pydantic import BaseModel
 import requests
 
 from starlette.config import Config
@@ -10,13 +11,13 @@ from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Extra
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from models import webhooks
+from models.webhooks import WebhookPayload, AwsSnsPayload, AccessRequest
 from server.utils import (
     log_ops_message,
     create_access_token,
@@ -41,63 +42,6 @@ from modules.aws.aws_access_requests import get_active_requests, get_past_reques
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
-
-
-class WebhookPayload(BaseModel):
-    channel: str | None = None
-    text: str | None = None
-    as_user: bool | None = None
-    attachments: str | list | None = []
-    blocks: str | list | None = []
-    thread_ts: str | None = None
-    reply_broadcast: bool | None = None
-    unfurl_links: bool | None = None
-    unfurl_media: bool | None = None
-    icon_emoji: str | None = None
-    icon_url: str | None = None
-    mrkdwn: bool | None = None
-    link_names: bool | None = None
-    username: str | None = None
-    parse: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-
-class AwsSnsPayload(BaseModel):
-    Type: str | None = None
-    MessageId: str | None = None
-    Token: str | None = None
-    TopicArn: str | None = None
-    Message: str | None = None
-    SubscribeURL: str | None = None
-    Timestamp: str | None = None
-    SignatureVersion: str | None = None
-    Signature: str | None = None
-    SigningCertURL: str | None = None
-    Subject: str | None = None
-    UnsubscribeURL: str | None = None
-    text: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-
-class AccessRequest(BaseModel):
-    """
-    AccessRequest represents a request for access to an AWS account.
-
-    This class defines the schema for an access request, which includes the following fields:
-    - account: The name of the AWS account to which access is requested.
-    - reason: The reason for requesting access to the AWS account.
-    - startDate: The start date and time for the requested access period.
-    - endDate: The end date and time for the requested access period.
-    """
-
-    account: str
-    reason: str
-    startDate: datetime
-    endDate: datetime
 
 
 # initialize the limiter
