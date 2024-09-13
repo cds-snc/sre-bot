@@ -375,6 +375,9 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
         if webhooks.is_active(id):
             webhooks.increment_invocation_count(id)
             if isinstance(payload, str):
+                logging.info(
+                    f"Received message: {payload}"
+                )  # log the full message for debugging
                 try:
                     payload = AwsSnsPayload.parse_raw(payload)
                     sns_message_validator.validate_message(message=payload.dict())
