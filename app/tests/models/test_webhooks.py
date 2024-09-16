@@ -1,4 +1,5 @@
 from unittest.mock import ANY, patch
+import pytest
 
 from models import webhooks
 
@@ -228,3 +229,36 @@ def test_toggle_webhook(get_webhook_mock, client_mock):
         UpdateExpression="SET active = :active",
         ExpressionAttributeValues={":active": {"BOOL": ANY}},
     )
+
+
+@patch("models.webhooks.model_utils")
+def test_validate_string_payload_type_valid_json(
+    model_utils_mock,
+):
+    model_utils_mock.get_dict_of_parameters_from_models.return_value = {
+        "WrongModel": ["test"],
+        "TestModel": ["type"],
+        "TestModel2": ["type2"],
+    }
+    model_utils_mock.is_parameter_in_model.side_effect = [False, True]
+    assert webhooks.validate_string_payload_type('{"type": "test"}') == (
+        "TestModel",
+        {"type": "test"},
+    )
+    assert model_utils_mock.is_parameter_in_model.call_count == 2
+
+
+def test_validate_string_payload_type_error_loading_json(caplog):
+    with caplog.at_level("WARNING"):
+        assert webhooks.validate_string_payload_type("{") == (None, None)
+    assert "Invalid JSON payload" in caplog.text
+
+
+def test_validate_string_payload_type_unknown_payload_type(caplog):
+    with caplog.at_level("WARNING"):
+        assert webhooks.validate_string_payload_type('{"type": "unknown"}') == (
+            None,
+            None,
+        )
+    warning_message = 'Unknown type for payload: {"type": "unknown"}'
+    assert warning_message in caplog.text

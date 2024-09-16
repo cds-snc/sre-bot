@@ -1,8 +1,13 @@
+import json
+import logging
+from typing import List, Type
 import boto3  # type: ignore
 import os
 import uuid
 from datetime import datetime
 from pydantic import BaseModel
+
+from models import model_utils
 
 
 client = boto3.client(
@@ -70,6 +75,10 @@ class AccessRequest(BaseModel):
     reason: str
     startDate: datetime
     endDate: datetime
+
+
+class UpptimePayload(BaseModel):
+    text: str | None = None
 
 
 def create_webhook(channel, user_id, name):
@@ -161,3 +170,42 @@ def toggle_webhook(id):
         },
     )
     return response
+
+
+def validate_string_payload_type(payload: str) -> tuple:
+    """
+    This function takes a string payload and returns the type of webhook payload it is based on the parameters it contains.
+
+    Args:
+        payload (str): The payload to validate.
+
+    Returns:
+        tuple: A tuple containing the type of payload and the payload dictionary. If the payload is invalid, both values are None.
+    """
+
+    payload_type = None
+    payload_dict = None
+    try:
+        payload_dict = json.loads(payload)
+    except json.JSONDecodeError:
+        logging.warning("Invalid JSON payload")
+        return None, None
+
+    known_models: List[Type[BaseModel]] = [
+        WebhookPayload,
+        AwsSnsPayload,
+        AccessRequest,
+        UpptimePayload,
+    ]
+    model_params = model_utils.get_dict_of_parameters_from_models(known_models)
+
+    for model, params in model_params.items():
+        if model_utils.is_parameter_in_model(params, payload_dict):
+            payload_type = model
+            break
+
+    if payload_type:
+        return payload_type, payload_dict
+    else:
+        logging.warning("Unknown type for payload: %s", json.dumps(payload_dict))
+        return None, None
