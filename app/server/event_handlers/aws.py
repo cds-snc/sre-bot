@@ -5,7 +5,6 @@ import os
 import urllib.parse
 
 from fastapi import HTTPException
-from pydantic import ValidationError
 
 from server.utils import log_ops_message
 from integrations import notify
@@ -38,11 +37,10 @@ def handle_sns_payload(awsSnsPayload: AwsSnsPayload, client):
             log_message = f"Invalid message type ```{awsSnsPayload.Type}``` in message: ```{awsSnsPayload}```"
         elif isinstance(e, InvalidSignatureVersionException):
             log_message = f"Unexpected signature version ```{awsSnsPayload.SignatureVersion}``` in message: ```{awsSnsPayload}```"
-
-        elif isinstance(e, SignatureVerificationFailureException):
-            log_message = f"Failed to verify signature ```{awsSnsPayload.Signature}``` in message: ```{awsSnsPayload}```"
         elif isinstance(e, InvalidCertURLException):
             log_message = f"Invalid certificate URL ```{awsSnsPayload.SigningCertURL}``` in message: ```{awsSnsPayload}```"
+        elif isinstance(e, SignatureVerificationFailureException):
+            log_message = f"Failed to verify signature ```{awsSnsPayload.Signature}``` in message: ```{awsSnsPayload}```"
         log_ops_message(client, log_message)
         raise HTTPException(
             status_code=500,
