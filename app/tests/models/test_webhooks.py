@@ -1,5 +1,4 @@
 from unittest.mock import ANY, patch
-import pytest
 
 from models import webhooks
 
