@@ -287,13 +287,28 @@ def test_handle_string_payload_with_access_request(validate_string_payload_type_
 @patch("server.server.webhooks.validate_string_payload_type")
 def test_handle_string_payload_with_upptime_payload(validate_string_payload_type_mock):
     request = MagicMock()
+    payload = '{"text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"}'
     validate_string_payload_type_mock.return_value = (
         "UpptimePayload",
-        {"status": "up"},
+        {
+            "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
+        },
     )
-    payload = '{"status": "up"}'
     response = server.handle_string_payload(payload, request)
-    assert response.text == '{"status": "up"}'
+    assert response.blocks == [
+        {"text": {"text": " ", "type": "mrkdwn"}, "type": "section"},
+        {
+            "text": {"text": "🟥 Web Application Down!", "type": "plain_text"},
+            "type": "header",
+        },
+        {
+            "text": {
+                "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222",
+                "type": "mrkdwn",
+            },
+            "type": "section",
+        },
+    ]
 
 
 @patch("server.server.webhooks.validate_string_payload_type")

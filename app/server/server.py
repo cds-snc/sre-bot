@@ -391,8 +391,23 @@ def handle_string_payload(payload: str, request: Request) -> WebhookPayload | di
             webhook_payload = WebhookPayload(text=message)
         case "UpptimePayload":
             # Temporary fix for Upptime payloads
-            message = json.dumps(validated_payload)
-            webhook_payload = WebhookPayload(text=message)
+            text = validated_payload.get("text", "")
+            header_text = "🟥 Web Application Down!"
+            blocks = [
+                {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": f"{header_text}"},
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"{text}",
+                    },
+                },
+            ]
+            webhook_payload = WebhookPayload(blocks=blocks)
         case _:
             raise HTTPException(
                 status_code=500,
