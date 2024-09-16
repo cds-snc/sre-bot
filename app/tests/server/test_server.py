@@ -14,7 +14,7 @@ import datetime
 from fastapi.testclient import TestClient
 from fastapi import Request, HTTPException, status
 
-from models.webhooks import AwsSnsPayload
+from models.webhooks import AwsSnsPayload, WebhookPayload
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -625,27 +625,33 @@ async def test_user_rate_limiting():
         assert response.json() == {"message": "Rate limit exceeded"}
 
 
-# @pytest.mark.asyncio
-# async def test_webhooks_rate_limiting():
-#     async with AsyncClient(app=app, base_url="http://test") as client:
-#         # Mock the webhooks.get_webhook function
-#         with patch(
-#             "server.server.webhooks.get_webhook",
-#             return_value={"channel": {"S": "test-channel"}},
-#         ):
-#             with patch("server.server.webhooks.is_active", return_value=True):
-#                 with patch("server.server.webhooks.increment_invocation_count"):
-#                     with patch("server.server.sns_message_validator.validate_message"):
-#                         # Make 30 requests to the handle_webhook endpoint
-#                         payload = '{"Type": "Notification"}'
-#                         for _ in range(30):
-#                             response = await client.post("/hook/test-id", json=payload)
-#                             assert response.status_code == 200
+@patch(
+    "server.server.webhooks.get_webhook",
+    return_value={"channel": {"S": "test-channel"}},
+)
+@patch("server.server.webhooks.is_active", return_value=True)
+@patch("server.server.webhooks.increment_invocation_count")
+@patch("server.server.handle_string_payload", return_value=WebhookPayload())
+@pytest.mark.asyncio
+async def test_webhooks_rate_limiting(
+    get_webhook_mock,
+    is_active_mock,
+    increment_invocation_count_mock,
+    handle_string_payload_mock,
+):
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        get_webhook_mock.return_value = {"channel": {"S": "test-channel"}}
+        payload = '{"Type": "Notification"}'
+        handle_string_payload_mock.return_value = {"ok": True}
+        # Make 30 requests to the handle_webhook endpoint
+        for _ in range(30):
+            response = await client.post("/hook/test-id", json=payload)
+            assert response.status_code == 200
 
-#                         # The 31st request should be rate limited
-#                         response = await client.post("/hook/test-id", json=payload)
-#                         assert response.status_code == 429
-#                         assert response.json() == {"message": "Rate limit exceeded"}
+        # The 31st request should be rate limited
+        response = await client.post("/hook/test-id", json=payload)
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
 
 
 @pytest.mark.asyncio
