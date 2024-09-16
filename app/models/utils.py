@@ -9,6 +9,37 @@ def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:
 def get_dict_of_parameters_from_models(
     models: List[Type[BaseModel]],
 ) -> Dict[str, List[str]]:
+    """
+    Returns a dictionary of model names and their parameters as a list.
+
+    Args:
+        models (List[Type[BaseModel]]): A list of models to extract parameters from.
+
+    Returns:
+        Dict[str, List[str]]: A dictionary of model names and their parameters as a list.
+
+    Example:
+        ```python
+        class User(BaseModel):
+            id: str
+            username: str
+            password: str
+            email: str
+
+        class Webhook(BaseModel):
+            id: str
+            channel: str
+            name: str
+            created_at: str
+
+        get_dict_of_parameters_from_models([User, Webhook])
+        # Output:
+        # {
+        #     "User": ["id", "username", "password", "email"],
+        #     "Webhook": ["id", "channel", "name", "created_at"]
+        # }
+        ```
+    """
     return {model.__name__: get_parameters_from_model(model) for model in models}
 
 
