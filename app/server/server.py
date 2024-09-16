@@ -327,7 +327,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             webhook_payload = append_incident_buttons(payload, id)
             try:
                 request.state.bot.client.api_call(
-                    "chat.postMessage", json=webhook_payload
+                    "chat.postMessage", json=webhook_payload.model_dump()
                 )
                 log_to_sentinel(
                     "webhook_sent",
