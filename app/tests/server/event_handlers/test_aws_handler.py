@@ -1,9 +1,32 @@
-from server.event_handlers import aws
-
 import json
 import os
 import pytest
 from unittest.mock import MagicMock, patch
+
+from server.event_handlers import aws
+from server.event_handlers.aws import (
+    InvalidMessageTypeException,
+    InvalidCertURLException,
+    InvalidSignatureVersionException,
+    SignatureVerificationFailureException,
+    HTTPException,
+)
+from models.webhooks import AwsSnsPayload
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+@patch("server.event_handlers.aws.sns_message_validator")
+def test_handle_sns_payload_validates_model(
+    sns_message_validator_mock, log_ops_message_mock
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    sns_message_validator_mock.validate_message.return_value = None
+    response = aws.handle_sns_payload(payload, client)
+    assert sns_message_validator_mock.validate_message.call_count == 1
+    assert log_ops_message_mock.call_count == 0
+    assert response == payload
+
 
 
 @patch("server.event_handlers.aws.log_ops_message")
