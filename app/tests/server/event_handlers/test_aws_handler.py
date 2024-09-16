@@ -28,6 +28,30 @@ def test_handle_sns_payload_validates_model(
     assert response == payload
 
 
+@patch("server.event_handlers.aws.log_ops_message")
+def test_handle_sns_payload_invalid_message_type(
+    log_ops_message_mock,
+    caplog,
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    payload.Type = "InvalidType"
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.handle_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to InvalidMessageTypeException: InvalidType is not a valid message type."
+        )
+        assert log_ops_message_mock.call_count == 1
+        assert (
+            log_ops_message_mock.call_args[0][1]
+            == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
+        )
+
 
 @patch("server.event_handlers.aws.log_ops_message")
 def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mock):
