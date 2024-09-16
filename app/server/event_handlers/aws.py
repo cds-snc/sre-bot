@@ -20,7 +20,7 @@ from sns_message_validator import (
 sns_message_validator = SNSMessageValidator()
 
 
-def handle_sns_payload(awsSnsPayload: AwsSnsPayload, client):
+def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     try:
         valid_payload = AwsSnsPayload.model_validate(awsSnsPayload)
         sns_message_validator.validate_message(message=valid_payload.model_dump())
