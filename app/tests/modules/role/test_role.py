@@ -330,7 +330,7 @@ def test_copy_files_to_internal_talent_folder(
                 "folder_id",
                 scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
-            )
+            ),
         ]
     )
 
