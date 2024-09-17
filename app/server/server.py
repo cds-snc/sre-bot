@@ -324,7 +324,7 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             else:
                 webhook_payload = payload
             webhook_payload.channel = webhook["channel"]["S"]
-            webhook_payload = append_incident_buttons(payload, id)
+            webhook_payload = append_incident_buttons(webhook_payload, id)
             try:
                 request.state.bot.client.api_call(
                     "chat.postMessage", json=webhook_payload.model_dump()
@@ -378,7 +378,7 @@ def handle_string_payload(payload: str, request: Request) -> WebhookPayload | di
                 )
                 return {"ok": True}
             if awsSnsPayload.Type == "Notification":
-                blocks = aws.parse(awsSnsPayload.Message, request.state.bot.client)
+                blocks = aws.parse(awsSnsPayload, request.state.bot.client)
                 # if we have an empty message, log that we have an empty
                 # message and return without posting to slack
                 if not blocks:
