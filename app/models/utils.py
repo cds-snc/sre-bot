@@ -47,6 +47,11 @@ def is_parameter_in_model(model_params: List[str], payload: Dict[str, Any]) -> b
     return any(param in model_params for param in payload.keys())
 
 
+def has_parameters_in_model(model_params: List[str], payload: Dict[str, Any]) -> int:
+    """Returns the number of parameters in the payload that are in the model."""
+    return sum(1 for param in model_params if param in payload.keys())
+
+
 def are_all_parameters_in_model(
     model_params: List[str], payload: Dict[str, Any]
 ) -> bool:

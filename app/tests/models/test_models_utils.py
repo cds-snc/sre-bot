@@ -47,6 +47,27 @@ def test_is_parameter_in_model():
     assert not model_utils.is_parameter_in_model(model_params, non_string_keys_payload)
 
 
+def test_has_parameters_in_model():
+    model_params = ["field1", "field2", "field3"]
+
+    payload = {"field1": "value", "field2": "value"}
+    assert model_utils.has_parameters_in_model(model_params, payload) == 2
+
+    payload = {"field1": "value", "non_field": "value"}
+    assert model_utils.has_parameters_in_model(model_params, payload) == 1
+
+    empty_payload = {}
+    assert model_utils.has_parameters_in_model(model_params, empty_payload) == 0
+
+    partial_payload = {"field1": "value"}
+    assert model_utils.has_parameters_in_model(model_params, partial_payload) == 1
+
+    non_string_keys_payload = {1: "value", 2: "value"}
+    assert (
+        model_utils.has_parameters_in_model(model_params, non_string_keys_payload) == 0
+    )
+
+
 def test_are_all_parameters_in_model():
     model_params = ["field1", "field2", "field3"]
 
