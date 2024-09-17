@@ -1,10 +1,10 @@
 import json
 import logging
 import os
-import requests
+import requests  # type: ignore
 
 from starlette.config import Config
-from authlib.integrations.starlette_client import OAuth, OAuthError
+from authlib.integrations.starlette_client import OAuth, OAuthError  # type: ignore
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.responses import JSONResponse
@@ -26,7 +26,7 @@ from server.utils import (
 from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
-from sns_message_validator import (
+from sns_message_validator import (  # type: ignore
     SNSMessageValidator,
 )
 from fastapi import Depends
@@ -424,8 +424,12 @@ def get_version(request: Request):
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
 
-def append_incident_buttons(payload, webhook_id):
-    payload.attachments = payload.attachments + [
+def append_incident_buttons(payload: WebhookPayload, webhook_id):
+    if payload.attachments is None:
+        payload.attachments = []
+    elif isinstance(payload.attachments, str):
+        payload.attachments = [payload.attachments]
+    payload.attachments += [
         {
             "fallback": "Incident",
             "callback_id": "handle_incident_action_buttons",

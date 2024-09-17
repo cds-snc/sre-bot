@@ -367,7 +367,7 @@ def test_get_version_known():
     assert response.json() == {"version": "foo"}
 
 
-def test_append_incident_buttons():
+def test_append_incident_buttons_with_list_attachments():
     payload = MagicMock()
     attachments = PropertyMock(return_value=[])
     type(payload).attachments = attachments
@@ -375,8 +375,10 @@ def test_append_incident_buttons():
     webhook_id = "bar"
     resp = server.append_incident_buttons(payload, webhook_id)
     assert payload == resp
-    assert attachments.call_count == 2
+    assert attachments.call_count == 4
     assert attachments.call_args_list == [
+        call(),
+        call(),
         call(),
         call(
             [
@@ -404,6 +406,76 @@ def test_append_incident_buttons():
                 }
             ]
         ),
+    ]
+
+
+def test_append_incident_buttons_with_none_attachments():
+    payload = MagicMock()
+    payload.attachments = None
+    payload.text = "text"
+    webhook_id = "bar"
+
+    resp = server.append_incident_buttons(payload, webhook_id)
+
+    assert payload == resp
+    assert payload.attachments == [
+        {
+            "fallback": "Incident",
+            "callback_id": "handle_incident_action_buttons",
+            "color": "#3AA3E3",
+            "attachment_type": "default",
+            "actions": [
+                {
+                    "name": "call-incident",
+                    "text": "🎉   Call incident ",
+                    "type": "button",
+                    "value": "text",
+                    "style": "primary",
+                },
+                {
+                    "name": "ignore-incident",
+                    "text": "🙈   Acknowledge and ignore",
+                    "type": "button",
+                    "value": "bar",
+                    "style": "default",
+                },
+            ],
+        }
+    ]
+
+
+def test_append_incident_buttons_with_str_attachments():
+    payload = MagicMock()
+    payload.attachments = "existing_attachment"
+    payload.text = "text"
+    webhook_id = "bar"
+
+    resp = server.append_incident_buttons(payload, webhook_id)
+    assert payload == resp
+    assert payload.attachments == [
+        "existing_attachment",
+        {
+            "fallback": "Incident",
+            "callback_id": "handle_incident_action_buttons",
+            "color": "#3AA3E3",
+            "attachment_type": "default",
+            "actions": [
+                {
+                    "name": "call-incident",
+                    "text": "🎉   Call incident ",
+                    "type": "button",
+                    "value": "text",
+                    "style": "primary",
+                },
+                {
+                    "name": "ignore-incident",
+                    "text": "🙈   Acknowledge and ignore",
+                    "type": "button",
+                    "value": "bar",
+                    "style": "default",
+                },
+            ],
+        },
     ]
 
 
