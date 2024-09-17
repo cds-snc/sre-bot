@@ -262,6 +262,18 @@ def role_view_handler(ack, body, say, logger, client):
         f"Created document: Recruitment Feedback Template in folder: Recruitment Feedback/ {recruitment_feedback_template_id}"
     )
 
+    panelist_guidebook_template_id = google_drive.copy_file_to_folder(
+        os.getenv("PANELIST_GUIDEBOOK_TEMPLATE"),
+        f"Panelist Guidebook - Interview Best Practices - {role_name}",
+        os.getenv("TEMPLATES_FOLDER"),
+        folder_id,
+        scopes=ROLE_SCOPES,
+        delegated_user_email=BOT_EMAIL,
+    )
+    logger.info(
+        f"Created document: Panelist Guidebook Template in folder: Panelist Guidebook/ {panelist_guidebook_template_id}"
+    )
+
     # Create channel
     response = client.conversations_create(name=private_channel_name, is_private=True)
 
