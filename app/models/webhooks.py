@@ -192,10 +192,10 @@ def validate_string_payload_type(payload: str) -> tuple:
         return None, None
 
     known_models: List[Type[BaseModel]] = [
-        WebhookPayload,
         AwsSnsPayload,
         AccessRequest,
         UpptimePayload,
+        WebhookPayload,
     ]
     model_params = model_utils.get_dict_of_parameters_from_models(known_models)
 
