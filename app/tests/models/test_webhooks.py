@@ -239,12 +239,37 @@ def test_validate_string_payload_type_valid_json(
         "TestModel": ["type"],
         "TestModel2": ["type2"],
     }
-    model_utils_mock.is_parameter_in_model.side_effect = [False, True]
+    model_utils_mock.has_parameters_in_model.side_effect = [0, 1, 0]
     assert webhooks.validate_string_payload_type('{"type": "test"}') == (
         "TestModel",
         {"type": "test"},
     )
-    assert model_utils_mock.is_parameter_in_model.call_count == 2
+    assert model_utils_mock.has_parameters_in_model.call_count == 3
+
+
+@patch("models.webhooks.model_utils")
+def test_validate_string_payload_same_params_in_multiple_models_returns_first_found(
+    model_utils_mock, caplog
+):
+    model_utils_mock.get_dict_of_parameters_from_models.return_value = {
+        "WrongModel": ["test"],
+        "TestModel": ["type", "type2"],
+        "TestModel2": ["type2"],
+        "TestModel3": ["type"],
+    }
+    model_utils_mock.has_parameters_in_model.side_effect = [0, 2, 0, 1]
+    response = webhooks.validate_string_payload_type(
+        '{"type": "test", "type2": "test"}'
+    )
+    assert response == (
+        "TestModel",
+        {"type": "test", "type2": "test"},
+    )
+    assert response != (
+        "TestModel3",
+        {"type": "test"},
+    )
+    assert model_utils_mock.has_parameters_in_model.call_count == 4
 
 
 def test_validate_string_payload_type_error_loading_json(caplog):

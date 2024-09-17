@@ -199,10 +199,12 @@ def validate_string_payload_type(payload: str) -> tuple:
     ]
     model_params = model_utils.get_dict_of_parameters_from_models(known_models)
 
+    max_matches = 0
     for model, params in model_params.items():
-        if model_utils.is_parameter_in_model(params, payload_dict):
+        matches = model_utils.has_parameters_in_model(params, payload_dict)
+        if matches > max_matches:
+            max_matches = matches
             payload_type = model
-            break
 
     if payload_type:
         return payload_type, payload_dict
