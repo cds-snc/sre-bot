@@ -307,7 +307,11 @@ async def get_aws_past_requests(
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
-def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
+def handle_webhook(
+    id: str,
+    payload: WebhookPayload | str,
+    request: Request,
+):
     webhook = webhooks.get_webhook(id)
     webhook_payload = WebhookPayload()
     if webhook:
@@ -326,12 +330,13 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
             webhook_payload.channel = webhook["channel"]["S"]
             webhook_payload = append_incident_buttons(webhook_payload, id)
             try:
+                webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
                 request.state.bot.client.api_call(
-                    "chat.postMessage", json=webhook_payload.model_dump()
+                    "chat.postMessage", json=webhook_payload_parsed
                 )
                 log_to_sentinel(
                     "webhook_sent",
-                    {"webhook": webhook, "payload": webhook_payload.model_dump()},
+                    {"webhook": webhook, "payload": webhook_payload_parsed},
                 )
                 return {"ok": True}
             except Exception as e:
@@ -348,18 +353,22 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
         raise HTTPException(status_code=404, detail="Webhook not found")
 
 
-def handle_string_payload(payload: str, request: Request) -> WebhookPayload | dict:
+def handle_string_payload(
+    payload: str,
+    request: Request,
+) -> WebhookPayload | dict:
 
-    logging.info(f"Received message: {payload}")
     string_payload_type, validated_payload = webhooks.validate_string_payload_type(
         payload
     )
+    logging.info(f"String payload type: {string_payload_type}")
     match string_payload_type:
         case "WebhookPayload":
             webhook_payload = WebhookPayload(**validated_payload)
         case "AwsSnsPayload":
-            awsSnsPayload: AwsSnsPayload = aws.validate_sns_payload(
-                AwsSnsPayload(**validated_payload), request.state.bot.client
+            awsSnsPayload = aws.validate_sns_payload(
+                AwsSnsPayload(**validated_payload),
+                request.state.bot.client,
             )
             if awsSnsPayload.Type == "SubscriptionConfirmation":
                 requests.get(awsSnsPayload.SubscribeURL, timeout=60)
@@ -413,7 +422,7 @@ def handle_string_payload(payload: str, request: Request) -> WebhookPayload | di
                 status_code=500,
                 detail="Invalid payload type. Must be a WebhookPayload object or a recognized string payload type.",
             )
-    return WebhookPayload(**webhook_payload.model_dump())
+    return WebhookPayload(**webhook_payload.model_dump(exclude_none=True))
 
 
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
