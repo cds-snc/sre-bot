@@ -1,22 +1,22 @@
 import json
 import logging
 import os
-import requests
+import requests  # type: ignore
 
 from starlette.config import Config
-from authlib.integrations.starlette_client import OAuth, OAuthError
+from authlib.integrations.starlette_client import OAuth, OAuthError  # type: ignore
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import RedirectResponse, HTMLResponse
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, Extra
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from models import webhooks
+from models.webhooks import WebhookPayload, AccessRequest, AwsSnsPayload
 from server.utils import (
     log_ops_message,
     create_access_token,
@@ -26,12 +26,8 @@ from server.utils import (
 from integrations.sentinel import log_to_sentinel
 from integrations import maxmind
 from server.event_handlers import aws
-from sns_message_validator import (
+from sns_message_validator import (  # type: ignore
     SNSMessageValidator,
-    InvalidMessageTypeException,
-    InvalidCertURLException,
-    InvalidSignatureVersionException,
-    SignatureVerificationFailureException,
 )
 from fastapi import Depends
 from datetime import datetime, timezone, timedelta
@@ -41,63 +37,6 @@ from modules.aws.aws_access_requests import get_active_requests, get_past_reques
 
 logging.basicConfig(level=logging.INFO)
 sns_message_validator = SNSMessageValidator()
-
-
-class WebhookPayload(BaseModel):
-    channel: str | None = None
-    text: str | None = None
-    as_user: bool | None = None
-    attachments: str | list | None = []
-    blocks: str | list | None = []
-    thread_ts: str | None = None
-    reply_broadcast: bool | None = None
-    unfurl_links: bool | None = None
-    unfurl_media: bool | None = None
-    icon_emoji: str | None = None
-    icon_url: str | None = None
-    mrkdwn: bool | None = None
-    link_names: bool | None = None
-    username: str | None = None
-    parse: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-
-class AwsSnsPayload(BaseModel):
-    Type: str | None = None
-    MessageId: str | None = None
-    Token: str | None = None
-    TopicArn: str | None = None
-    Message: str | None = None
-    SubscribeURL: str | None = None
-    Timestamp: str | None = None
-    SignatureVersion: str | None = None
-    Signature: str | None = None
-    SigningCertURL: str | None = None
-    Subject: str | None = None
-    UnsubscribeURL: str | None = None
-    text: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-
-class AccessRequest(BaseModel):
-    """
-    AccessRequest represents a request for access to an AWS account.
-
-    This class defines the schema for an access request, which includes the following fields:
-    - account: The name of the AWS account to which access is requested.
-    - reason: The reason for requesting access to the AWS account.
-    - startDate: The start date and time for the requested access period.
-    - endDate: The end date and time for the requested access period.
-    """
-
-    account: str
-    reason: str
-    startDate: datetime
-    endDate: datetime
 
 
 # initialize the limiter
@@ -368,105 +307,41 @@ async def get_aws_past_requests(
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
-def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
+def handle_webhook(
+    id: str,
+    payload: WebhookPayload | str,
+    request: Request,
+):
     webhook = webhooks.get_webhook(id)
+    webhook_payload = WebhookPayload()
     if webhook:
         # if the webhook is active, then send forward the response to the webhook
         if webhooks.is_active(id):
             webhooks.increment_invocation_count(id)
             if isinstance(payload, str):
-                logging.info(
-                    f"Received message: {payload}"
-                )  # log the full message for debugging
-                try:
-                    payload = AwsSnsPayload.parse_raw(payload)
-                    sns_message_validator.validate_message(message=payload.dict())
-                except InvalidMessageTypeException as e:
-                    logging.error(e)
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Invalid message type ```{payload.Type}``` in message: ```{payload}```",
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                    )
-                except InvalidSignatureVersionException as e:
-                    logging.error(e)
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                    )
-                except SignatureVerificationFailureException as e:
-                    logging.error(e)
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                    )
-                except InvalidCertURLException as e:
-                    logging.error(e)
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                    )
-                except Exception as e:
-                    logging.error(e)
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{payload}```",
-                    )
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-                    )
-                if payload.Type == "SubscriptionConfirmation":
-                    requests.get(payload.SubscribeURL, timeout=60)
-                    logging.info(f"Subscribed webhook {id} to topic {payload.TopicArn}")
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"Subscribed webhook {id} to topic {payload.TopicArn}",
-                    )
-                    return {"ok": True}
-
-                if payload.Type == "UnsubscribeConfirmation":
-                    log_ops_message(
-                        request.state.bot.client,
-                        f"{payload.TopicArn} unsubscribed from webhook {id}",
-                    )
-                    return {"ok": True}
-
-                if payload.Type == "Notification":
-                    blocks = aws.parse(payload, request.state.bot.client)
-                    # if we have an empty message, log that we have an empty
-                    # message and return without posting to slack
-                    if not blocks:
-                        logging.info("No blocks to post, returning")
-                        return
-                    payload = WebhookPayload(blocks=blocks)
-            payload.channel = webhook["channel"]["S"]
-            payload = append_incident_buttons(payload, id)
+                processed_payload = handle_string_payload(payload, request)
+                if isinstance(processed_payload, dict):
+                    return processed_payload
+                else:
+                    logging.info(f"Processed payload: {processed_payload}")
+                    webhook_payload = processed_payload
+            else:
+                webhook_payload = payload
+            webhook_payload.channel = webhook["channel"]["S"]
+            webhook_payload = append_incident_buttons(webhook_payload, id)
             try:
-                message = json.loads(payload.json(exclude_none=True))
-                request.state.bot.client.api_call("chat.postMessage", json=message)
+                webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
+                request.state.bot.client.api_call(
+                    "chat.postMessage", json=webhook_payload_parsed
+                )
                 log_to_sentinel(
-                    "webhook_sent", {"webhook": webhook, "payload": payload.dict()}
+                    "webhook_sent",
+                    {"webhook": webhook, "payload": webhook_payload_parsed},
                 )
                 return {"ok": True}
             except Exception as e:
                 logging.error(e)
-                body = payload.json(exclude_none=True)
+                body = webhook_payload.model_dump(exclude_none=True)
                 log_ops_message(
                     request.state.bot.client, f"Error posting message: ```{body}```"
                 )
@@ -478,6 +353,78 @@ def handle_webhook(id: str, payload: WebhookPayload | str, request: Request):
         raise HTTPException(status_code=404, detail="Webhook not found")
 
 
+def handle_string_payload(
+    payload: str,
+    request: Request,
+) -> WebhookPayload | dict:
+
+    string_payload_type, validated_payload = webhooks.validate_string_payload_type(
+        payload
+    )
+    logging.info(f"String payload type: {string_payload_type}")
+    match string_payload_type:
+        case "WebhookPayload":
+            webhook_payload = WebhookPayload(**validated_payload)
+        case "AwsSnsPayload":
+            awsSnsPayload = aws.validate_sns_payload(
+                AwsSnsPayload(**validated_payload),
+                request.state.bot.client,
+            )
+            if awsSnsPayload.Type == "SubscriptionConfirmation":
+                requests.get(awsSnsPayload.SubscribeURL, timeout=60)
+                logging.info(
+                    f"Subscribed webhook {id} to topic {awsSnsPayload.TopicArn}"
+                )
+                log_ops_message(
+                    request.state.bot.client,
+                    f"Subscribed webhook {id} to topic {awsSnsPayload.TopicArn}",
+                )
+                return {"ok": True}
+            if awsSnsPayload.Type == "UnsubscribeConfirmation":
+                log_ops_message(
+                    request.state.bot.client,
+                    f"{awsSnsPayload.TopicArn} unsubscribed from webhook {id}",
+                )
+                return {"ok": True}
+            if awsSnsPayload.Type == "Notification":
+                blocks = aws.parse(awsSnsPayload, request.state.bot.client)
+                # if we have an empty message, log that we have an empty
+                # message and return without posting to slack
+                if not blocks:
+                    logging.info("No blocks to post, returning")
+                    return {"ok": True}
+                webhook_payload = WebhookPayload(blocks=blocks)
+        case "AccessRequest":
+            # Temporary fix for the Access Request payloads
+            message = json.dumps(validated_payload)
+            webhook_payload = WebhookPayload(text=message)
+        case "UpptimePayload":
+            # Temporary fix for Upptime payloads
+            text = validated_payload.get("text", "")
+            header_text = "🟥 Web Application Down!"
+            blocks = [
+                {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": f"{header_text}"},
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"{text}",
+                    },
+                },
+            ]
+            webhook_payload = WebhookPayload(blocks=blocks)
+        case _:
+            raise HTTPException(
+                status_code=500,
+                detail="Invalid payload type. Must be a WebhookPayload object or a recognized string payload type.",
+            )
+    return WebhookPayload(**webhook_payload.model_dump(exclude_none=True))
+
+
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
 # As a result, we are giving a generous rate limit of so that we don't run into any issues with the healthchecks
 @handler.get("/version")
@@ -486,8 +433,12 @@ def get_version(request: Request):
     return {"version": os.environ.get("GIT_SHA", "unknown")}
 
 
-def append_incident_buttons(payload, webhook_id):
-    payload.attachments = payload.attachments + [
+def append_incident_buttons(payload: WebhookPayload, webhook_id):
+    if payload.attachments is None:
+        payload.attachments = []
+    elif isinstance(payload.attachments, str):
+        payload.attachments = [payload.attachments]
+    payload.attachments += [
         {
             "fallback": "Incident",
             "callback_id": "handle_incident_action_buttons",

@@ -1,7 +1,14 @@
-import boto3
-import datetime
+import json
+import logging
+from typing import List, Type
+import boto3  # type: ignore
 import os
 import uuid
+from datetime import datetime
+from pydantic import BaseModel
+
+from models import model_utils
+
 
 client = boto3.client(
     "dynamodb",
@@ -14,6 +21,66 @@ client = boto3.client(
 table = "webhooks"
 
 
+class WebhookPayload(BaseModel):
+    channel: str | None = None
+    text: str | None = None
+    as_user: bool | None = None
+    attachments: str | list | None = []
+    blocks: str | list | None = []
+    thread_ts: str | None = None
+    reply_broadcast: bool | None = None
+    unfurl_links: bool | None = None
+    unfurl_media: bool | None = None
+    icon_emoji: str | None = None
+    icon_url: str | None = None
+    mrkdwn: bool | None = None
+    link_names: bool | None = None
+    username: str | None = None
+    parse: str | None = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AwsSnsPayload(BaseModel):
+    Type: str | None = None
+    MessageId: str | None = None
+    Token: str | None = None
+    TopicArn: str | None = None
+    Message: str | None = None
+    SubscribeURL: str | None = None
+    Timestamp: str | None = None
+    SignatureVersion: str | None = None
+    Signature: str | None = None
+    SigningCertURL: str | None = None
+    Subject: str | None = None
+    UnsubscribeURL: str | None = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AccessRequest(BaseModel):
+    """
+    AccessRequest represents a request for access to an AWS account.
+
+    This class defines the schema for an access request, which includes the following fields:
+    - account: The name of the AWS account to which access is requested.
+    - reason: The reason for requesting access to the AWS account.
+    - startDate: The start date and time for the requested access period.
+    - endDate: The end date and time for the requested access period.
+    """
+
+    account: str
+    reason: str
+    startDate: datetime
+    endDate: datetime
+
+
+class UpptimePayload(BaseModel):
+    text: str | None = None
+
+
 def create_webhook(channel, user_id, name):
     id = str(uuid.uuid4())
     response = client.put_item(
@@ -22,7 +89,7 @@ def create_webhook(channel, user_id, name):
             "id": {"S": id},
             "channel": {"S": channel},
             "name": {"S": name},
-            "created_at": {"S": str(datetime.datetime.now())},
+            "created_at": {"S": str(datetime.now())},
             "active": {"BOOL": True},
             "user_id": {"S": user_id},
             "invocation_count": {"N": "0"},
@@ -103,3 +170,42 @@ def toggle_webhook(id):
         },
     )
     return response
+
+
+def validate_string_payload_type(payload: str) -> tuple:
+    """
+    This function takes a string payload and returns the type of webhook payload it is based on the parameters it contains.
+
+    Args:
+        payload (str): The payload to validate.
+
+    Returns:
+        tuple: A tuple containing the type of payload and the payload dictionary. If the payload is invalid, both values are None.
+    """
+
+    payload_type = None
+    payload_dict = None
+    try:
+        payload_dict = json.loads(payload)
+    except json.JSONDecodeError:
+        logging.warning("Invalid JSON payload")
+        return None, None
+
+    known_models: List[Type[BaseModel]] = [
+        AwsSnsPayload,
+        AccessRequest,
+        UpptimePayload,
+        WebhookPayload,
+    ]
+    model_params = model_utils.get_dict_of_parameters_from_models(known_models)
+
+    for model, params in model_params.items():
+        if model_utils.is_parameter_in_model(params, payload_dict):
+            payload_type = model
+            break
+
+    if payload_type:
+        return payload_type, payload_dict
+    else:
+        logging.warning("Unknown type for payload: %s", json.dumps(payload_dict))
+        return None, None

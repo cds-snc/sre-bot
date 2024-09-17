@@ -3,13 +3,70 @@ import logging
 import re
 import os
 import urllib.parse
+
+from fastapi import HTTPException
+
 from server.utils import log_ops_message
 from integrations import notify
+from models.webhooks import AwsSnsPayload
+from sns_message_validator import (
+    SNSMessageValidator,
+    InvalidMessageTypeException,
+    InvalidCertURLException,
+    InvalidSignatureVersionException,
+    SignatureVerificationFailureException,
+)
+
+sns_message_validator = SNSMessageValidator()
 
 
-def parse(payload, client):
+def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     try:
-        msg = json.loads(payload.Message)
+        valid_payload = AwsSnsPayload.model_validate(awsSnsPayload)
+        sns_message_validator.validate_message(message=valid_payload.model_dump())
+    except (
+        InvalidMessageTypeException,
+        InvalidSignatureVersionException,
+        SignatureVerificationFailureException,
+        InvalidCertURLException,
+    ) as e:
+        logging.error(
+            f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}"
+        )
+        if isinstance(e, InvalidMessageTypeException):
+            log_message = f"Invalid message type ```{awsSnsPayload.Type}``` in message: ```{awsSnsPayload}```"
+        elif isinstance(e, InvalidSignatureVersionException):
+            log_message = f"Unexpected signature version ```{awsSnsPayload.SignatureVersion}``` in message: ```{awsSnsPayload}```"
+        elif isinstance(e, InvalidCertURLException):
+            log_message = f"Invalid certificate URL ```{awsSnsPayload.SigningCertURL}``` in message: ```{awsSnsPayload}```"
+        elif isinstance(e, SignatureVerificationFailureException):
+            log_message = f"Failed to verify signature ```{awsSnsPayload.Signature}``` in message: ```{awsSnsPayload}```"
+        log_ops_message(client, log_message)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+        )
+    except Exception as e:
+        logging.error(
+            f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}"
+        )
+        log_ops_message(
+            client,
+            f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{awsSnsPayload}```",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+        )
+    return valid_payload
+
+
+def parse(payload: AwsSnsPayload, client):
+    try:
+        message = payload.Message
+        if message is None:
+            raise Exception("Message is empty")
+        msg = json.loads(message)
     except Exception:
         msg = payload.Message
     if isinstance(msg, dict) and "AlarmArn" in msg:
@@ -32,10 +89,16 @@ def parse(payload, client):
         blocks = []
     else:
         blocks = []
-        log_ops_message(
-            client,
-            f"Unidentified AWS event received ```{payload.Message}```",
-        )
+        if payload.Message is None:
+            log_ops_message(
+                client,
+                f"Payload Message is empty ```{payload}```",
+            )
+        else:
+            log_ops_message(
+                client,
+                f"Unidentified AWS event received ```{payload.Message}```",
+            )
 
     return blocks
 
