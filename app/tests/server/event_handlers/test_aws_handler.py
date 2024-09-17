@@ -165,6 +165,17 @@ def test_validate_sns_payload_unexpected_exception(
 
 
 @patch("server.event_handlers.aws.log_ops_message")
+def test_parse_returns_empty_block_if_empty_message(log_ops_message_mock):
+    client = MagicMock()
+    payload = MagicMock(Message=None, Type="Notification")
+    response = aws.parse(payload, client)
+    assert response == []
+    log_ops_message_mock.assert_called_once_with(
+        client, f"Payload Message is empty ```{payload}```"
+    )
+
+
+@patch("server.event_handlers.aws.log_ops_message")
 def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mock):
     client = MagicMock()
     payload = MagicMock(Message='{"foo": "bar"}')

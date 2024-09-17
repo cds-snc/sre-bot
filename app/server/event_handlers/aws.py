@@ -61,9 +61,12 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     return valid_payload
 
 
-def parse(payload, client):
+def parse(payload: AwsSnsPayload, client):
     try:
-        msg = json.loads(payload.Message)
+        message = payload.Message
+        if message is None:
+            raise Exception("Message is empty")
+        msg = json.loads(message)
     except Exception:
         msg = payload.Message
     if isinstance(msg, dict) and "AlarmArn" in msg:
@@ -86,10 +89,16 @@ def parse(payload, client):
         blocks = []
     else:
         blocks = []
-        log_ops_message(
-            client,
-            f"Unidentified AWS event received ```{payload.Message}```",
-        )
+        if payload.Message is None:
+            log_ops_message(
+                client,
+                f"Payload Message is empty ```{payload}```",
+            )
+        else:
+            log_ops_message(
+                client,
+                f"Unidentified AWS event received ```{payload.Message}```",
+            )
 
     return blocks
 
