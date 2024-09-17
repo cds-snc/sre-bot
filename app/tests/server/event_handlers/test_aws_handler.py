@@ -1,9 +1,178 @@
-from server.event_handlers import aws
-
 import json
 import os
 import pytest
 from unittest.mock import MagicMock, patch
+
+from server.event_handlers import aws
+from server.event_handlers.aws import (
+    SignatureVerificationFailureException,
+    HTTPException,
+)
+from models.webhooks import AwsSnsPayload
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+@patch("server.event_handlers.aws.sns_message_validator")
+def test_validate_sns_payload_validates_model(
+    sns_message_validator_mock, log_ops_message_mock
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    sns_message_validator_mock.validate_message.return_value = None
+    response = aws.validate_sns_payload(payload, client)
+    assert sns_message_validator_mock.validate_message.call_count == 1
+    assert log_ops_message_mock.call_count == 0
+    assert response == payload
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+def test_validate_sns_payload_invalid_message_type(
+    log_ops_message_mock,
+    caplog,
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    payload.Type = "InvalidType"
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.validate_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to InvalidMessageTypeException: InvalidType is not a valid message type."
+        )
+        assert log_ops_message_mock.call_count == 1
+        assert (
+            log_ops_message_mock.call_args[0][1]
+            == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
+        )
+        caplog.clear()
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+def test_validate_sns_payload_invalid_signature_version(log_ops_message_mock, caplog):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    payload.Type = "Notification"
+    payload.SignatureVersion = "InvalidVersion"
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.validate_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to InvalidSignatureVersionException: Invalid signature version. Unable to verify signature."
+        )
+        log_ops_message_mock.assert_called_once_with(
+            client,
+            f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
+        )
+        caplog.clear()
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, caplog):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    payload.Type = "Notification"
+    payload.SignatureVersion = "1"
+    payload.SigningCertURL = "https://invalid.url"
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.validate_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to InvalidCertURLException: Invalid certificate URL."
+        )
+        log_ops_message_mock.assert_called_once_with(
+            client,
+            f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
+        )
+
+
+@patch("server.event_handlers.aws.sns_message_validator._verify_signature")
+@patch("server.event_handlers.aws.log_ops_message")
+def test_validate_sns_payload_signature_verification_failure(
+    log_ops_message_mock, verify_signature_mock, caplog
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+    payload.Type = "Notification"
+    payload.SignatureVersion = "1"
+    payload.SigningCertURL = "https://sns.us-east-1.amazonaws.com/valid-cert.pem"
+    payload.Signature = "invalid_signature"
+
+    # Mock the verify_signature method to raise the right exception to test
+    verify_signature_mock.side_effect = SignatureVerificationFailureException(
+        "Invalid signature."
+    )
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.validate_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        # Print the actual log messages captured
+        print("Captured log messages:")
+        for record in caplog.records:
+            print(record.message)
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to SignatureVerificationFailureException: Invalid signature."
+        )
+        log_ops_message_mock.assert_called_once_with(
+            client,
+            f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
+        )
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+@patch("server.event_handlers.aws.sns_message_validator.validate_message")
+def test_validate_sns_payload_unexpected_exception(
+    validate_message_mock, log_ops_message_mock, caplog
+):
+    client = MagicMock()
+    payload = AwsSnsPayload(**mock_budget_alert())
+
+    # Mock the validate_message method to raise a generic exception
+    validate_message_mock.side_effect = Exception("Unexpected error")
+
+    with caplog.at_level("ERROR"):
+        with pytest.raises(HTTPException) as e:
+            aws.validate_sns_payload(payload, client)
+        assert e.value.status_code == 500
+
+        # Print the actual log messages captured
+        print("Captured log messages:")
+        for record in caplog.records:
+            print(record.message)
+
+        assert (
+            caplog.records[0].message
+            == "Failed to parse AWS event message due to Exception: Unexpected error"
+        )
+        log_ops_message_mock.assert_called_once_with(
+            client,
+            f"Error parsing AWS event due to Exception: ```{payload}```",
+        )
+
+
+@patch("server.event_handlers.aws.log_ops_message")
+def test_parse_returns_empty_block_if_empty_message(log_ops_message_mock):
+    client = MagicMock()
+    payload = MagicMock(Message=None, Type="Notification")
+    response = aws.parse(payload, client)
+    assert response == []
+    log_ops_message_mock.assert_called_once_with(
+        client, f"Payload Message is empty ```{payload}```"
+    )
 
 
 @patch("server.event_handlers.aws.log_ops_message")
