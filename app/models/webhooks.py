@@ -1,22 +1,13 @@
 import json
 import logging
 from typing import List, Type
-import boto3  # type: ignore
-import os
+
 import uuid
 from datetime import datetime
 from pydantic import BaseModel
 
 from models import model_utils
-
-
-client = boto3.client(
-    "dynamodb",
-    endpoint_url=(
-        "http://dynamodb-local:8000" if os.environ.get("PREFIX", None) else None
-    ),
-    region_name="ca-central-1",
-)
+from integrations.aws import dynamodb
 
 table = "webhooks"
 
@@ -83,7 +74,7 @@ class UpptimePayload(BaseModel):
 
 def create_webhook(channel, user_id, name):
     id = str(uuid.uuid4())
-    response = client.put_item(
+    response = dynamodb.put_item(
         TableName=table,
         Item={
             "id": {"S": id},
@@ -104,12 +95,12 @@ def create_webhook(channel, user_id, name):
 
 
 def delete_webhook(id):
-    response = client.delete_item(TableName=table, Key={"id": {"S": id}})
+    response = dynamodb.delete_item(TableName=table, Key={"id": {"S": id}})
     return response
 
 
 def get_webhook(id):
-    response = client.get_item(TableName=table, Key={"id": {"S": id}})
+    response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
     if "Item" in response:
         return response["Item"]
     else:
@@ -117,7 +108,7 @@ def get_webhook(id):
 
 
 def increment_acknowledged_count(id):
-    response = client.update_item(
+    response = dynamodb.update_item(
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET acknowledged_count = acknowledged_count + :inc",
@@ -127,7 +118,7 @@ def increment_acknowledged_count(id):
 
 
 def increment_invocation_count(id):
-    response = client.update_item(
+    response = dynamodb.update_item(
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET invocation_count = invocation_count + :inc",
@@ -137,12 +128,12 @@ def increment_invocation_count(id):
 
 
 def list_all_webhooks():
-    response = client.scan(TableName=table, Select="ALL_ATTRIBUTES")
-    return response["Items"]
+    response = dynamodb.scan(TableName=table, Select="ALL_ATTRIBUTES")
+    return response
 
 
 def revoke_webhook(id):
-    response = client.update_item(
+    response = dynamodb.update_item(
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET active = :active",
@@ -153,7 +144,7 @@ def revoke_webhook(id):
 
 # function to return the status of the webhook (ie if it is active or not). If active, return True, else return False
 def is_active(id):
-    response = client.get_item(TableName=table, Key={"id": {"S": id}})
+    response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
     if "Item" in response:
         return response["Item"]["active"]["BOOL"]
     else:
@@ -161,7 +152,7 @@ def is_active(id):
 
 
 def toggle_webhook(id):
-    response = client.update_item(
+    response = dynamodb.update_item(
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET active = :active",
