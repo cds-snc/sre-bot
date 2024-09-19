@@ -131,15 +131,12 @@ def execute_aws_api_call(
     if client_config is None:
         client_config = {"region_name": AWS_REGION}
 
-    convert_kwargs = kwargs.pop("convert_kwargs", False)
     client = get_aws_service_client(
         service_name,
         role_arn,
         session_config=session_config,
         client_config=client_config,
     )
-    if kwargs and convert_kwargs:
-        kwargs = convert_kwargs_to_pascal_case(kwargs)
     api_method = getattr(client, method)
     if paginated:
         results = paginator(client, method, keys, **kwargs)
