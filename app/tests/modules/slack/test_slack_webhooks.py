@@ -1,9 +1,9 @@
 from unittest.mock import ANY, patch
 
-from models import webhooks
+from modules.slack import webhooks
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_create_webhook(dynamodb_mock):
     dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     assert webhooks.create_webhook("test_channel", "test_user_id", "test_name") == ANY
@@ -22,7 +22,7 @@ def test_create_webhook(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_create_webhook_return_none(dynamodb_mock):
     dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 401}}
     assert webhooks.create_webhook("test_channel", "test_user_id", "test_name") is None
@@ -41,7 +41,7 @@ def test_create_webhook_return_none(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_delete_webhook(dynamodb_mock):
     dynamodb_mock.delete_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
@@ -54,7 +54,7 @@ def test_delete_webhook(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_get_webhook(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
         "Item": {
@@ -83,7 +83,7 @@ def test_get_webhook(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_get_webhook_with_no_result(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {}
     assert webhooks.get_webhook("test_id") is None
@@ -92,7 +92,7 @@ def test_get_webhook_with_no_result(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_increment_acknowledged_count(dynamodb_mock):
     dynamodb_mock.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
@@ -108,7 +108,7 @@ def test_increment_acknowledged_count(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_increment_invocation_count(dynamodb_mock):
     dynamodb_mock.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
@@ -124,7 +124,7 @@ def test_increment_invocation_count(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_list_all_webhooks(dynamodb_mock):
     dynamodb_mock.scan.return_value = [
         {
@@ -155,7 +155,7 @@ def test_list_all_webhooks(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_revoke_webhook(dynamodb_mock):
     dynamodb_mock.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
@@ -171,7 +171,7 @@ def test_revoke_webhook(dynamodb_mock):
     )
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_is_active_returns_true(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
         "Item": {
@@ -188,7 +188,7 @@ def test_is_active_returns_true(dynamodb_mock):
     assert webhooks.is_active("test_id") is True
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_is_active_returns_false(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
         "Item": {
@@ -205,14 +205,14 @@ def test_is_active_returns_false(dynamodb_mock):
     assert webhooks.is_active("test_id") is False
 
 
-@patch("models.webhooks.dynamodb")
+@patch("modules.slack.webhooks.dynamodb")
 def test_is_active_not_found(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {}
     assert webhooks.is_active("test_id") is False
 
 
-@patch("models.webhooks.dynamodb")
-@patch("models.webhooks.get_webhook")
+@patch("modules.slack.webhooks.dynamodb")
+@patch("modules.slack.webhooks.get_webhook")
 def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
     dynamodb_mock.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
@@ -238,7 +238,7 @@ def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
     )
 
 
-@patch("models.webhooks.model_utils")
+@patch("modules.slack.webhooks.model_utils")
 def test_validate_string_payload_type_valid_json(
     model_utils_mock,
 ):
@@ -255,7 +255,7 @@ def test_validate_string_payload_type_valid_json(
     assert model_utils_mock.has_parameters_in_model.call_count == 3
 
 
-@patch("models.webhooks.model_utils")
+@patch("modules.slack.webhooks.model_utils")
 def test_validate_string_payload_same_params_in_multiple_models_returns_first_found(
     model_utils_mock, caplog
 ):

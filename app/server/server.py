@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from models import webhooks
+from modules.slack import webhooks
 from models.webhooks import WebhookPayload, AccessRequest, AwsSnsPayload
 from server.utils import (
     log_ops_message,

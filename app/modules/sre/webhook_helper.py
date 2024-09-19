@@ -2,7 +2,7 @@
 
 import re
 
-from models import webhooks
+from modules.slack import webhooks
 
 help_text = """
 \n `/sre webhooks create`

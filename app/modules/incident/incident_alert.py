@@ -1,6 +1,6 @@
 from integrations.sentinel import log_to_sentinel
 from modules.incident import incident
-from models import webhooks
+from modules.slack import webhooks
 
 
 def handle_incident_action_buttons(client, ack, body, logger):
