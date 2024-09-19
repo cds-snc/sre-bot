@@ -7,7 +7,7 @@ from integrations.aws import guard_duty
 def test_list_detectors_returns_list_when_success(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["foo", "bar"]
     assert len(guard_duty.list_detectors()) == 2
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
         "list_detectors",
         paginated=True,
@@ -21,7 +21,7 @@ def test_list_detectors_returns_list_when_success(mock_execute_aws_api_call):
 def test_list_detectors_returns_empty_list_when_no_detectors(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = []
     assert len(guard_duty.list_detectors()) == 0
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
         "list_detectors",
         paginated=True,
@@ -45,11 +45,10 @@ def test_get_findings_statistics_returns_statistics_when_success(
             "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
         }
     }
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
         "get_findings_statistics",
         role_arn="foo",
-        convert_kwargs=False,
         DetectorId="test_detector_id",
         FindingStatisticTypes=["COUNT_BY_SEVERITY"],
     )
@@ -62,11 +61,10 @@ def test_get_findings_statistics_returns_empty_object_if_no_statistics_found(
 ):
     mock_execute_aws_api_call.return_value = {}
     assert guard_duty.get_findings_statistics("test_detector_id") == {}
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
         "get_findings_statistics",
         role_arn="foo",
-        convert_kwargs=False,
         DetectorId="test_detector_id",
         FindingStatisticTypes=["COUNT_BY_SEVERITY"],
     )
@@ -89,11 +87,10 @@ def test_get_findings_statistics_parse_finding_criteria(
             "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
         }
     }
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
         "get_findings_statistics",
         role_arn="foo",
-        convert_kwargs=False,
         DetectorId="test_detector_id",
         FindingStatisticTypes=["COUNT_BY_SEVERITY"],
         FindingCriteria={"Criterion": {"foo": "bar"}},

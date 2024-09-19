@@ -2,10 +2,9 @@ import os
 import logging
 from functools import wraps
 import boto3  # type: ignore
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from botocore.client import BaseClient  # type: ignore
 from dotenv import load_dotenv
-from integrations.utils.api import convert_kwargs_to_pascal_case
 
 load_dotenv()
 
@@ -74,7 +73,11 @@ def assume_role_session(role_arn, session_name="DefaultSession"):
 
 @handle_aws_api_errors
 def get_aws_service_client(
-    service_name, role_arn=None, session_name="DefaultSession", **config
+    service_name,
+    role_arn=None,
+    session_name="DefaultSession",
+    session_config=None,
+    client_config=None,
 ):
     """Get an AWS service client. If a role_arn is provided in the config, assume the role to get temporary credentials.
 
@@ -85,12 +88,16 @@ def get_aws_service_client(
     Returns:
         botocore.client.BaseClient: The service client.
     """
+    if session_config is None:
+        session_config = {}
+    if client_config is None:
+        client_config = {}
 
     if role_arn:
         session = assume_role_session(role_arn, session_name)
     else:
-        session = boto3.Session(**config)
-    return session.client(service_name)
+        session = boto3.Session(**session_config)
+    return session.client(service_name, **client_config)
 
 
 def execute_aws_api_call(
@@ -99,6 +106,8 @@ def execute_aws_api_call(
     paginated=False,
     keys=None,
     role_arn=None,
+    session_config=None,
+    client_config=None,
     **kwargs,
 ):
     """Execute an AWS API call.
@@ -116,16 +125,34 @@ def execute_aws_api_call(
     Raises:
         ValueError: If the role_arn is not provided.
     """
-    config = kwargs.pop("config", dict(region_name=AWS_REGION))
-    convert_kwargs = kwargs.pop("convert_kwargs", True)
-    client = get_aws_service_client(service_name, role_arn, **config)
-    if kwargs and convert_kwargs:
-        kwargs = convert_kwargs_to_pascal_case(kwargs)
+    if session_config is None:
+        session_config = {"region_name": AWS_REGION}
+    if client_config is None:
+        client_config = {"region_name": AWS_REGION}
+
+    client = get_aws_service_client(
+        service_name,
+        role_arn,
+        session_config=session_config,
+        client_config=client_config,
+    )
     api_method = getattr(client, method)
     if paginated:
-        return paginator(client, method, keys, **kwargs)
+        results = paginator(client, method, keys, **kwargs)
     else:
-        return api_method(**kwargs)
+        results = api_method(**kwargs)
+
+    if (
+        "ResponseMetadata" in results
+        and results["ResponseMetadata"]["HTTPStatusCode"] != 200
+    ):
+        logger.error(
+            f"API call to {service_name}.{method} failed with status code {results['ResponseMetadata']['HTTPStatusCode']}"
+        )
+        raise Exception(
+            f"API call to {service_name}.{method} failed with status code {results['ResponseMetadata']['HTTPStatusCode']}"
+        )
+    return results
 
 
 def paginator(client: BaseClient, operation, keys=None, **kwargs):
@@ -147,7 +174,20 @@ def paginator(client: BaseClient, operation, keys=None, **kwargs):
 
     for page in paginator.paginate(**kwargs):
         if keys is None:
-            results.append(page)
+            for key, value in page.items():
+                if key != "ResponseMetadata":
+                    if isinstance(value, list):
+                        results.extend(value)
+                    else:
+                        results.append(value)
+                else:
+                    if key == "ResponseMetadata" and value["HTTPStatusCode"] != 200:
+                        logger.error(
+                            f"API call to {client.meta.service_model.service_name}.{operation} failed with status code {value['HTTPStatusCode']}"
+                        )
+                        raise Exception(
+                            f"API call to {client.meta.service_model.service_name}.{operation} failed with status code {value['HTTPStatusCode']}"
+                        )
         else:
             for key in keys:
                 if key in page:

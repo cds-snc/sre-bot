@@ -1,5 +1,5 @@
 import os
-from . import aws_dev, google
+from . import aws_dev, google, slack
 
 PREFIX = os.environ.get("PREFIX", "")
 
@@ -14,6 +14,8 @@ def dev_command(ack, logger, respond, client, body, args):
     logger.info("Dev command received: %s", action)
     match action:
         case "aws":
-            aws_dev.aws_dev_command(ack, client, body, respond)
+            aws_dev.aws_dev_command(ack, client, body, respond, logger)
         case "google":
             google.google_service_command(ack, client, body, respond, logger)
+        case "slack":
+            slack.slack_command(ack, client, body, respond, logger, args)

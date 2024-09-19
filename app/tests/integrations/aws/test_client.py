@@ -1,6 +1,9 @@
 import os
+from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from unittest.mock import MagicMock, patch
+
+import pytest
 from integrations.aws import client as aws_client
 
 ROLE_ARN = "test_role_arn"
@@ -48,7 +51,10 @@ def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logg
 @patch("integrations.aws.client.logger")
 def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
     mock_func = MagicMock(
-        side_effect=ClientError({"Error": {"Code": "OtherError"}}, "operation_name")
+        side_effect=ClientError(
+            {"Error": {"Code": "OtherError", "Message": "An error occurred"}},
+            "operation_name",
+        )
     )
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
@@ -59,7 +65,7 @@ def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
     assert result is False
     mock_func.assert_called_once()
     mock_logger.error.assert_called_once_with(
-        "mock_module.mock_func_name: An error occurred (OtherError) when calling the operation_name operation: Unknown"
+        "mock_module.mock_func_name: An error occurred (OtherError) when calling the operation_name operation: An error occurred"
     )
     mock_logger.info.assert_not_called()
 
@@ -106,7 +112,7 @@ def test_paginate_no_key(mock_boto3):
 
     result = aws_client.paginator(mock_boto3.client.return_value, "operation")
 
-    assert result == pages
+    assert result == ["Value1", "Value2", "Value3", "Value4", "Value5", "Value6"]
 
 
 @patch("integrations.aws.client.boto3.client")
@@ -176,6 +182,44 @@ def test_paginate_no_key_in_page(mock_client):
     assert result == []
 
 
+@patch("integrations.aws.client.logger")
+def test_paginator_raises_exception_on_non_200_status(mock_logger):
+    mock_client = MagicMock(spec=BaseClient)
+    mock_paginator = MagicMock()
+    mock_client.get_paginator.return_value = mock_paginator
+
+    # Add the meta attribute to the mock client
+    mock_client.meta = MagicMock()
+    mock_client.meta.service_model.service_name = "mock_service"
+
+    # Simulate a page with a non-200 status code
+    mock_paginator.paginate.return_value = [
+        {
+            "ResponseMetadata": {
+                "HTTPStatusCode": 500,
+                "RequestId": "test-request-id",
+                "HTTPHeaders": {
+                    "x-amzn-requestid": "test-request-id",
+                    "content-type": "application/x-amz-json-1.0",
+                    "content-length": "123",
+                    "date": "test-date",
+                },
+                "RetryAttempts": 0,
+            }
+        }
+    ]
+
+    with pytest.raises(Exception) as excinfo:
+        aws_client.paginator(mock_client, "operation")
+
+    assert str(excinfo.value) == (
+        "API call to mock_service.operation failed with status code 500"
+    )
+    mock_logger.error.assert_called_once_with(
+        "API call to mock_service.operation failed with status code 500"
+    )
+
+
 @patch("integrations.aws.client.boto3")
 def test_assume_role_session_returns_credentials(mock_boto3):
     mock_sts_client = MagicMock()
@@ -223,7 +267,7 @@ def test_get_aws_service_client_assumes_role(
     config = {"some_config": "value"}
 
     client = aws_client.get_aws_service_client(
-        service_name, role_arn, session_name, **config
+        service_name, role_arn, session_name, client_config=config
     )
 
     mock_assume_role_session.assert_called_once_with(role_arn, session_name)
@@ -248,14 +292,12 @@ def test_get_aws_service_client_no_role(mock_boto3, mock_assume_role_session):
 
 @patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_non_paginated(
-    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_paginator
 ):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -265,49 +307,51 @@ def test_execute_aws_api_call_non_paginated(
     )
 
     mock_get_aws_service_client.assert_called_once_with(
-        "service_name", None, region_name="ca-central-1"
+        "service_name",
+        None,
+        session_config={"region_name": "ca-central-1"},
+        client_config={"region_name": "ca-central-1"},
     )
-    mock_method.assert_called_once_with(Arg1="value1")
+    mock_method.assert_called_once_with(arg1="value1")
     assert result == {"key": "value"}
-    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
     mock_paginator.assert_not_called()
 
 
 @patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 @patch("integrations.aws.client.paginator")
-def test_execute_aws_api_call_paginated(
-    mock_paginator, mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case
-):
+def test_execute_aws_api_call_paginated(mock_paginator, mock_get_aws_service_client):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_paginator.return_value = ["value1", "value2", "value3"]
 
     result = aws_client.execute_aws_api_call(
-        "service_name", "some_method", paginated=True, arg1="value1"
+        "service_name",
+        "some_method",
+        paginated=True,
+        arg1="value1",
     )
 
     mock_get_aws_service_client.assert_called_once_with(
-        "service_name", None, region_name="ca-central-1"
+        "service_name",
+        None,
+        session_config={"region_name": "ca-central-1"},
+        client_config={"region_name": "ca-central-1"},
     )
     mock_paginator.assert_called_once_with(
-        mock_client, "some_method", None, Arg1="value1"
+        mock_client, "some_method", None, arg1="value1"
     )
-    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})
     assert result == ["value1", "value2", "value3"]
 
 
+@patch("integrations.aws.client.AWS_REGION", "ca-central-1")
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_with_role_arn(
-    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_paginator
 ):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -317,9 +361,11 @@ def test_execute_aws_api_call_with_role_arn(
     )
 
     mock_get_aws_service_client.assert_called_once_with(
-        "service_name", "test_role_arn", region_name="ca-central-1"
+        "service_name",
+        "test_role_arn",
+        session_config={"region_name": "ca-central-1"},
+        client_config={"region_name": "ca-central-1"},
     )
-    mock_method.assert_called_once_with(Arg1="value1")
+    mock_method.assert_called_once_with(arg1="value1")
     assert result == {"key": "value"}
     mock_paginator.assert_not_called()
-    mock_convert_kwargs_to_pascal_case.assert_called_once_with({"arg1": "value1"})

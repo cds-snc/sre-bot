@@ -12,12 +12,10 @@ def test_get_cost_and_usage_returns_cost_and_usage_list_when_success(
         {"CostAndUsage": "bar"},
     ]
     assert len(cost_explorer.get_cost_and_usage("foo", "bar", ["foo"])) == 2
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "ce",
         "get_cost_and_usage",
-        paginated=True,
         role_arn="foo",
-        convert_kwargs=False,
         TimePeriod="foo",
         Granularity="bar",
         Metrics=["foo"],
@@ -42,12 +40,10 @@ def test_get_cost_and_usage_adds_filters_and_group_by_if_provided(
         )
         == 1
     )
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "ce",
         "get_cost_and_usage",
-        paginated=True,
         role_arn="foo",
-        convert_kwargs=False,
         TimePeriod="foo",
         Granularity="bar",
         Metrics=["foo"],

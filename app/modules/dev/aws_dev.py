@@ -2,7 +2,7 @@
 
 import logging
 
-from integrations.aws import organizations
+from integrations.aws import dynamodb
 
 from dotenv import load_dotenv
 
@@ -11,17 +11,12 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-def aws_dev_command(ack, client, body, respond):
+def aws_dev_command(ack, client, body, respond, logger):
     ack()
-    response = organizations.list_organization_accounts()
-    accounts = {account["Id"]: account["Name"] for account in response}
-    accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
-    formatted_accounts = ""
-    for account in accounts.keys():
-        formatted_accounts += f"{account}: {accounts[account]}\n"
+    table = "webhooks"
+    webhooks = dynamodb.scan(TableName=table, Select="ALL_ATTRIBUTES")
+    webhook_id = webhooks[0]["id"]["S"]
 
-    if not response:
-        respond("Sync failed. See logs")
-    else:
-        logger.info(accounts)
-        respond("Sync successful. See logs\n" + formatted_accounts)
+    response = dynamodb.get_item(TableName=table, Key={"id": {"S": webhook_id}})
+
+    logger.info(response)

@@ -44,7 +44,6 @@ def get_findings_statistics(detector_id, finding_criteria=None):
         "guardduty",
         "get_findings_statistics",
         role_arn=LOGGING_ROLE_ARN,
-        convert_kwargs=False,
         **params,
     )
 

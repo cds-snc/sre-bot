@@ -14,29 +14,95 @@ if os.environ.get("PREFIX", None):
 
 @handle_aws_api_errors
 def query(
-    table_name,
-    key_condition_expression=None,
-    expression_attribute_values=None,
+    TableName,
     **kwargs,
 ):
-    params = {"TableName": table_name, "config": client_config}
-    if key_condition_expression:
-        params["KeyConditionExpression"] = key_condition_expression
-    if expression_attribute_values:
-        params["ExpressionAttributeValues"] = expression_attribute_values
-    if kwargs:
+    params = {
+        "TableName": TableName,
+    }
+    if params:
         params.update(kwargs)
-    response = execute_aws_api_call("dynamodb", "query", **params)
+    response = execute_aws_api_call(
+        "dynamodb", "query", paginated=True, client_config=client_config, **params
+    )
     return response
 
 
 @handle_aws_api_errors
-def scan(table, **kwargs):
+def scan(TableName, **kwargs):
     params = {
-        "TableName": table,
-        "config": client_config,
+        "TableName": TableName,
     }
     if kwargs:
         params.update(kwargs)
-    response = execute_aws_api_call("dynamodb", "scan", **params)
+    response = execute_aws_api_call(
+        "dynamodb",
+        "scan",
+        paginated=True,
+        keys=["Items"],
+        client_config=client_config,
+        **params,
+    )
+    return response
+
+
+@handle_aws_api_errors
+def put_item(TableName, **kwargs):
+    params = {
+        "TableName": TableName,
+    }
+    if kwargs:
+        params.update(kwargs)
+    response = execute_aws_api_call(
+        "dynamodb", "put_item", client_config=client_config, **params
+    )
+    return response
+
+
+@handle_aws_api_errors
+def get_item(TableName, **kwargs):
+    params = {
+        "TableName": TableName,
+    }
+    if kwargs:
+        params.update(kwargs)
+    response = execute_aws_api_call(
+        "dynamodb", "get_item", client_config=client_config, **params
+    )
+    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+        return response
+
+
+@handle_aws_api_errors
+def update_item(TableName, **kwargs):
+    params = {
+        "TableName": TableName,
+    }
+    if kwargs:
+        params.update(kwargs)
+    response = execute_aws_api_call(
+        "dynamodb", "update_item", client_config=client_config, **params
+    )
+    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+        return response
+
+
+@handle_aws_api_errors
+def delete_item(TableName, **kwargs):
+    params = {
+        "TableName": TableName,
+    }
+    if kwargs:
+        params.update(kwargs)
+    response = execute_aws_api_call(
+        "dynamodb", "delete_item", client_config=client_config, **params
+    )
+    return response
+
+
+@handle_aws_api_errors
+def list_tables(**kwargs):
+    response = execute_aws_api_call(
+        "dynamodb", "list_tables", client_config=client_config, **kwargs
+    )
     return response

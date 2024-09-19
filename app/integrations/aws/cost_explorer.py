@@ -22,6 +22,5 @@ def get_cost_and_usage(time_period, granularity, metrics, filter=None, group_by=
         "ce",
         "get_cost_and_usage",
         role_arn=ORG_ROLE_ARN,
-        convert_kwargs=False,
         **params,
     )

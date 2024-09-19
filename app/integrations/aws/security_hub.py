@@ -19,6 +19,6 @@ def get_findings(filters):
         "get_findings",
         paginated=True,
         role_arn=LOGGING_ROLE_ARN,
-        filters=filters,
+        Filters=filters,
     )
     return response
