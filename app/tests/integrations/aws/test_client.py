@@ -292,14 +292,12 @@ def test_get_aws_service_client_no_role(mock_boto3, mock_assume_role_session):
 
 @patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_non_paginated(
-    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_paginator
 ):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -316,20 +314,15 @@ def test_execute_aws_api_call_non_paginated(
     )
     mock_method.assert_called_once_with(arg1="value1")
     assert result == {"key": "value"}
-    mock_convert_kwargs_to_pascal_case.assert_not_called()
     mock_paginator.assert_not_called()
 
 
 @patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 @patch("integrations.aws.client.paginator")
-def test_execute_aws_api_call_paginated(
-    mock_paginator, mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case
-):
+def test_execute_aws_api_call_paginated(mock_paginator, mock_get_aws_service_client):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_paginator.return_value = ["value1", "value2", "value3"]
 
     result = aws_client.execute_aws_api_call(
@@ -348,20 +341,17 @@ def test_execute_aws_api_call_paginated(
     mock_paginator.assert_called_once_with(
         mock_client, "some_method", None, arg1="value1"
     )
-    mock_convert_kwargs_to_pascal_case.assert_not_called()
     assert result == ["value1", "value2", "value3"]
 
 
 @patch("integrations.aws.client.AWS_REGION", "ca-central-1")
 @patch("integrations.aws.client.paginator")
-@patch("integrations.aws.client.convert_kwargs_to_pascal_case")
 @patch("integrations.aws.client.get_aws_service_client")
 def test_execute_aws_api_call_with_role_arn(
-    mock_get_aws_service_client, mock_convert_kwargs_to_pascal_case, mock_paginator
+    mock_get_aws_service_client, mock_paginator
 ):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
-    mock_convert_kwargs_to_pascal_case.return_value = {"Arg1": "value1"}
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
@@ -379,4 +369,3 @@ def test_execute_aws_api_call_with_role_arn(
     mock_method.assert_called_once_with(arg1="value1")
     assert result == {"key": "value"}
     mock_paginator.assert_not_called()
-    mock_convert_kwargs_to_pascal_case.assert_not_called()
