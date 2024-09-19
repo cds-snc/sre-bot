@@ -25,7 +25,6 @@ def describe_aggregate_compliance_by_config_rules(config_aggregator_name, filter
         paginated=True,
         keys=["AggregateComplianceByConfigRules"],
         role_arn=AUDIT_ROLE_ARN,
-        convert_kwargs=False,
         **params,
     )
     return response if response else []
