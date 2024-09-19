@@ -10,12 +10,12 @@ def test_get_findings_returns_findings_list_when_success(mock_execute_aws_api_ca
         {"Findings": [{"Severity": {"Label": "MEDIUM"}}]},
     ]
     assert len(security_hub.get_findings({})) == 2
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "securityhub",
         "get_findings",
         paginated=True,
         role_arn="foo",
-        filters={},
+        Filters={},
     )
 
 
@@ -24,12 +24,12 @@ def test_get_findings_returns_findings_list_when_success(mock_execute_aws_api_ca
 def test_get_findings_returns_empty_findings_list(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = [{"Findings": []}]
     assert len(security_hub.get_findings({})) == 1
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "securityhub",
         "get_findings",
         paginated=True,
         role_arn="foo",
-        filters={},
+        Filters={},
     )
 
 
@@ -40,10 +40,10 @@ def test_get_findings_returns_empty_findings_list_when_no_findings(
 ):
     mock_execute_aws_api_call.return_value = []
     assert len(security_hub.get_findings({})) == 0
-    assert mock_execute_aws_api_call.called_with(
+    mock_execute_aws_api_call.assert_called_once_with(
         "securityhub",
         "get_findings",
         paginated=True,
         role_arn="foo",
-        filters={},
+        Filters={},
     )
