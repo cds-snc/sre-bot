@@ -3,5 +3,4 @@ locals {
   error_logged             = "SREBotErrorLogged"
   error_namespace          = "SREBot"
   warning_logged           = "SREBotWarningLogged"
-  scheduled_tasks_logged   = "SREBotScheduledTasksLogged"
 }
