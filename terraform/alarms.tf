@@ -55,34 +55,3 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
   alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
   ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
 }
-
-
-resource "aws_cloudwatch_log_metric_filter" "sre_bot_scheduled_tasks" {
-  name           = local.scheduled_tasks_logged
-  pattern        = "Scheduler is running at"
-  log_group_name = local.api_cloudwatch_log_group
-
-  metric_transformation {
-    name      = local.scheduled_tasks_logged
-    namespace = local.error_namespace
-    value     = "1"
-  }
-}
-
-
-resource "aws_cloudwatch_metric_alarm" "sre_bot_scheduled_tasks" {
-  alarm_name          = "SRE Bot Scheduled Tasks"
-  alarm_description   = "SRE Bot Scheduled Tasks logs missing"
-  comparison_operator = "LessThanThreshold"
-
-  metric_name        = aws_cloudwatch_log_metric_filter.sre_bot_scheduled_tasks.metric_transformation[0].name
-  namespace          = aws_cloudwatch_log_metric_filter.sre_bot_scheduled_tasks.metric_transformation[0].namespace
-  period             = "300"
-  evaluation_periods = "2"
-  statistic          = "Sum"
-  threshold          = "1"
-  treat_missing_data = "breaching"
-
-  alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
-  ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
-}
