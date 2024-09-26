@@ -15,6 +15,16 @@ from modules.incident.notify_stale_incident_channels import (
 logging.basicConfig(level=logging.INFO)
 
 
+def safe_run(job):
+    def wrapper(*args, **kwargs):
+        try:
+            job(*args, **kwargs)
+        except Exception as e:
+            logging.error(f"Error running job `{job.__name__}`: {e}")
+
+    return wrapper
+
+
 def init(bot):
     logging.info("Scheduled tasks initialized ...")
 
@@ -23,9 +33,9 @@ def init(bot):
     )
     # Commenting out the following line to avoid running the task every 10 seconds. Will be enabled at the time of deployment.
     # schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
-    schedule.every(5).minutes.do(scheduler_heartbeat)
-    schedule.every(5).minutes.do(integration_healthchecks)
-    schedule.every(2).hours.do(provision_aws_identity_center)
+    schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
+    schedule.every(5).minutes.do(safe_run(integration_healthchecks))
+    schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
 
 
 def scheduler_heartbeat():
