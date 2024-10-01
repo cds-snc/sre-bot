@@ -203,16 +203,26 @@ def list_groups_with_members(
     groups_with_members = []
     for group in groups:
         logger.info(f"Getting members for group: {group['email']}")
-        members = list_group_members(
-            group["email"], fields="members(email, role, type, status)"
-        )
+        try:
+            members = list_group_members(
+                group["email"], fields="members(email, role, type, status)"
+            )
+        except Exception as e:
+            logger.warning(f"Error getting members for group {group['email']}: {e}")
+            continue
         if members and members_details:
             detailed_members = []
-            for member in members:
-                logger.info(f"Getting user details for member: {member['email']}")
-                detailed_members.append(
-                    get_user(member["email"], fields="name, primaryEmail")
+            try:
+                for member in members:
+                    logger.info(f"Getting user details for member: {member['email']}")
+                    detailed_members.append(
+                        get_user(member["email"], fields="name, primaryEmail")
+                    )
+                group["members"] = detailed_members
+                groups_with_members.append(group)
+            except Exception as e:
+                logger.warning(
+                    f"Error getting user details for group {member['email']}: {e}"
                 )
-            group["members"] = detailed_members
-            groups_with_members.append(group)
+                continue
     return groups_with_members
