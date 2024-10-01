@@ -106,3 +106,42 @@ resource "aws_iam_role_policy_attachment" "sre_bot_bucket" {
   role       = aws_iam_role.sre-bot.name
   policy_arn = aws_iam_policy.sre_bot_bucket.arn
 }
+
+# Create an IAM role and policy to allow the SRE Bot to access the SQS queue
+resource "aws_iam_role" "sre_bot_sqs_access_role" {
+  name = "sre_bot_sqs_access_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com",
+        },
+        Action = "sts:AssumeRole",
+      },
+    ],
+  })
+}
+
+# Create an IAM policy to allow the SRE Bot to access the SQS queue via the role
+resource "aws_iam_role_policy" "sre_bot_sqs_access_policy" {
+  name = "sre_bot_sqs_access_policy"
+  role = aws_iam_role.sre_bot_sqs_access_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "sqs:SendMessage",
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+        ],
+        Resource = aws_sqs_queue.sre_bot_fifo_queue.arn,
+      },
+    ],
+  })
+}
