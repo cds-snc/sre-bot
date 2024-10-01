@@ -70,14 +70,21 @@ def google_group_members(google_users):
 
 # Fixture with users
 @pytest.fixture
-def google_groups_w_users(google_groups, google_users):
+def google_groups_w_users(google_groups, google_group_members, google_users):
     def _google_groups_w_users(
         n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
     ):
         groups = google_groups(n_groups, prefix=group_prefix, domain=domain)
+        members = google_group_members(n_users, prefix=user_prefix, domain=domain)
         users = google_users(n_users, prefix=user_prefix, domain=domain)
+
+        combined_members = []
+        for member, user in zip(members, users):
+            combined_member = {**member, **user}
+            combined_members.append(combined_member)
+
         for group in groups:
-            group["members"] = users
+            group["members"] = combined_members
         return groups
 
     return _google_groups_w_users
