@@ -195,9 +195,18 @@ def list_groups_with_members(
     if not groups:
         return []
 
+    filtered_keys_groups = [
+        {
+            k: v
+            for k, v in group.items()
+            if k in ["id", "email", "name", "directMembersCount", "description"]
+        }
+        for group in groups
+    ]
+
     if groups_filters is not None:
         for groups_filter in groups_filters:
-            groups = filters.filter_by_condition(groups, groups_filter)
+            groups = filters.filter_by_condition(filtered_keys_groups, groups_filter)
     logger.info(f"Found {len(groups)} groups.")
     if not group_members:
         return groups
@@ -219,9 +228,11 @@ def list_groups_with_members(
             for member in members:
                 try:
                     logger.info(f"Getting user details for member: {member['email']}")
-                    detailed_members.append(
-                        get_user(member["email"], fields="name, primaryEmail")
+                    user_details = get_user(
+                        member["email"], fields="name, primaryEmail"
                     )
+                    combined_user_details = {**member, **user_details}
+                    detailed_members.append(combined_user_details)
                 except Exception as e:
                     logger.warning(
                         f"Error getting user details for member {member['email']}: {e}"
