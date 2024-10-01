@@ -561,21 +561,20 @@ def test_list_groups_with_members_filtered_dataframe(
     groups_result = google_directory.list_groups_with_members(
         groups_filters=groups_filters
     )
-    result = google_directory.convert_group_members_to_dataframe(groups_result)
+    result = google_directory.convert_google_groups_members_to_dataframe(groups_result)
 
     assert isinstance(result, pd.DataFrame)
     assert not result.empty
     assert set(result.columns) == {
-        "id",
-        "email",
-        "name",
-        "directMembersCount",
-        "description",
-        "role",
-        "type",
-        "status",
-        "primaryEmail",
-        "emails",
-        "suspended",
-        "kind",
+        "group_email",
+        "group_name",
+        "group_direct_members_count",
+        "group_description",
+        "member_email",
+        "member_role",
+        "member_type",
+        "member_status",
+        "member_primary_email",
+        "member_given_name",
+        "member_family_name",
     }

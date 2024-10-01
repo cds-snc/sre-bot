@@ -250,8 +250,8 @@ def list_groups_with_members(
     return groups_with_members
 
 
-def convert_group_members_to_dataframe(groups):
-    """Converts a list of groups with members to a DataFrame.
+def convert_google_groups_members_to_dataframe(groups):
+    """Converts a list of Google groups with members to a DataFrame.
 
     Args:
         groups (list): A list of group objects with members.
@@ -261,8 +261,33 @@ def convert_group_members_to_dataframe(groups):
     """
     flattened_data = []
     for group in groups:
+        group_email = group.get("email")
+        group_name = group.get("name")
+        group_direct_members_count = group.get("directMembersCount")
+        group_description = group.get("description")
+
         for member in group.get("members", []):
-            flattened_record = {**group, **member}
-            flattened_record.pop("members", None)
+            member_email = member.get("email")
+            member_role = member.get("role")
+            member_type = member.get("type")
+            member_status = member.get("status")
+            member_primary_email = member.get("primaryEmail")
+            member_given_name = member.get("name", {}).get("givenName")
+            member_family_name = member.get("name", {}).get("familyName")
+
+            flattened_record = {
+                "group_email": group_email,
+                "group_name": group_name,
+                "group_direct_members_count": group_direct_members_count,
+                "group_description": group_description,
+                "member_email": member_email,
+                "member_role": member_role,
+                "member_type": member_type,
+                "member_status": member_status,
+                "member_primary_email": member_primary_email,
+                "member_given_name": member_given_name,
+                "member_family_name": member_family_name,
+            }
             flattened_data.append(flattened_record)
+
     return pd.DataFrame(flattened_data)
