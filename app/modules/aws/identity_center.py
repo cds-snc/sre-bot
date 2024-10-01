@@ -10,25 +10,30 @@ logger = getLogger(__name__)
 DRY_RUN = True
 
 
-def synchronize(**kwargs):
+def synchronize(
+    enable_users_sync: bool = True,
+    enable_user_create: bool = True,
+    enable_user_delete: bool = False,
+    enable_groups_sync: bool = True,
+    enable_membership_create: bool = True,
+    enable_membership_delete: bool = False,
+    query: str = "email:aws-*",
+    pre_processing_filters: list = [],
+):
     """Sync the AWS Identity Center with the Google Workspace.
 
     Args:
-        enable_users_sync (bool): Toggle to sync users.
-        enable_groups_sync (bool): Toggle to sync groups.
-        query (str): The query to filter the Google Groups.
-
+        enable_users_sync (bool): Enable the synchronization of users. Default is True.
+        enable_user_create (bool): Enable the creation of users. Default is True.
+        enable_user_delete (bool): Enable the deletion of users. Default is False.
+        enable_groups_sync (bool): Enable the synchronization of groups. Default is True.
+        enable_membership_create (bool): Enable the creation of group memberships. Default is True.
+        enable_membership_delete (bool): Enable the deletion of group memberships. Default is False.
+        query (str): The query to search for groups.
+        pre_processing_filters (list): List of filters to apply to the groups before processing the members.
     Returns:
         tuple: A tuple containing the users sync status and groups sync status.
     """
-    enable_users_sync = kwargs.pop("enable_users_sync", True)
-    enable_user_create = kwargs.pop("enable_user_create", True)
-    enable_user_delete = kwargs.pop("enable_user_delete", False)
-    enable_groups_sync = kwargs.pop("enable_groups_sync", True)
-    enable_membership_create = kwargs.pop("enable_membership_create", True)
-    enable_membership_delete = kwargs.pop("enable_membership_delete", False)
-    query = kwargs.pop("query", "email:aws-*")
-    pre_processing_filters = kwargs.pop("pre_processing_filters", [])
 
     users_sync_status = None
     groups_sync_status = None
@@ -56,7 +61,7 @@ def synchronize(**kwargs):
 
     if enable_users_sync:
         users_sync_status = sync_users(
-            source_users, target_users, enable_user_create, enable_user_delete, **kwargs
+            source_users, target_users, enable_user_create, enable_user_delete
         )
         target_users = identity_store.list_users()
 
@@ -67,7 +72,6 @@ def synchronize(**kwargs):
             target_users,
             enable_membership_create,
             enable_membership_delete,
-            **kwargs,
         )
     logger.info("synchronize:Sync Completed")
 
@@ -78,11 +82,11 @@ def synchronize(**kwargs):
 
 
 def sync_users(
-    source_users,
-    target_users,
-    enable_user_create=True,
-    enable_user_delete=False,
-    **kwargs,
+    source_users: list,
+    target_users: list,
+    enable_user_create: bool = True,
+    enable_user_delete: bool = False,
+    delete_target_all: bool = False,
 ):
     """Sync the users in the identity store.
 
@@ -90,14 +94,13 @@ def sync_users(
 
         source_users (list): A list of users from the source system.
         target_users (list): A list of users in the identity store.
-        enable_user_create (bool): Enable creation of users.
-        enable_user_delete (bool): Enable deletion of users.
-        delete_target_all (bool): Mark all target users for deletion.
+        enable_user_create (bool): Enable creation of users. Default is True.
+        enable_user_delete (bool): Enable deletion of users. Default is False.
+        delete_target_all (bool): Mark all target users for deletion. Default is False.
 
     Returns:
         tuple: A tuple containing the users created and deleted.
     """
-    delete_target_all = kwargs.get("delete_target_all", False)
 
     if delete_target_all:
         users_to_delete = target_users
@@ -150,12 +153,11 @@ def sync_users(
 
 
 def sync_groups(
-    source_groups,
-    target_groups,
-    target_users,
-    enable_membership_create=True,
-    enable_membership_delete=False,
-    **kwargs,
+    source_groups: list,
+    target_groups: list,
+    target_users: list,
+    enable_membership_create: bool = True,
+    enable_membership_delete: bool = False,
 ):
     """Sync the groups in the identity store.
 

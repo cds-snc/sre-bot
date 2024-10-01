@@ -175,6 +175,7 @@ def list_groups_with_members(
     members_details: bool = True,
     groups_filters: list = [],
     query: str | None = None,
+    tolerate_errors: bool = False,
 ):
     """List all groups in the Google Workspace domain with their members.
 
@@ -183,6 +184,7 @@ def list_groups_with_members(
         members_details (bool): Include the members details in the response.
         groups_filters (list): List of filters to apply to the groups.
         query (str): The query to search for groups.
+        tolerate_errors (bool): Whether to include groups that encountered errors during member detail retrieval.
 
     Returns:
         list: A list of group objects with members. Any group without members will not be included.
@@ -203,16 +205,32 @@ def list_groups_with_members(
     groups_with_members = []
     for group in groups:
         logger.info(f"Getting members for group: {group['email']}")
-        members = list_group_members(
-            group["email"], fields="members(email, role, type, status)"
-        )
+        try:
+            members = list_group_members(
+                group["email"], fields="members(email, role, type, status)"
+            )
+        except Exception as e:
+            logger.warning(f"Error getting members for group {group['email']}: {e}")
+            continue
+
         if members and members_details:
             detailed_members = []
+            error_occurred = False
             for member in members:
-                logger.info(f"Getting user details for member: {member['email']}")
-                detailed_members.append(
-                    get_user(member["email"], fields="name, primaryEmail")
-                )
+                try:
+                    logger.info(f"Getting user details for member: {member['email']}")
+                    detailed_members.append(
+                        get_user(member["email"], fields="name, primaryEmail")
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Error getting user details for member {member['email']}: {e}"
+                    )
+                    error_occurred = True
+                    if not tolerate_errors:
+                        break
+            if error_occurred and not tolerate_errors:
+                continue
             group["members"] = detailed_members
             groups_with_members.append(group)
     return groups_with_members
