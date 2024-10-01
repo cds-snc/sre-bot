@@ -13,6 +13,8 @@ def google_groups():
                 "id": f"{prefix}google_group_id{i+1}",
                 "name": f"{prefix}group-name{i+1}",
                 "email": f"{prefix}group-name{i+1}@{domain}",
+                "description": f"{prefix}description{i+1}",
+                "directMembersCount": i + 1,
             }
             for i in range(n)
         ]

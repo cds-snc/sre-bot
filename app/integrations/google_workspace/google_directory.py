@@ -1,6 +1,8 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
 from logging import getLogger
+
+import pandas as pd
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
@@ -244,4 +246,23 @@ def list_groups_with_members(
                 continue
             group["members"] = detailed_members
             groups_with_members.append(group)
+
     return groups_with_members
+
+
+def convert_group_members_to_dataframe(groups):
+    """Converts a list of groups with members to a DataFrame.
+
+    Args:
+        groups (list): A list of group objects with members.
+
+    Returns:
+        DataFrame: A DataFrame with group members.
+    """
+    flattened_data = []
+    for group in groups:
+        for member in group.get("members", []):
+            flattened_record = {**group, **member}
+            flattened_record.pop("members", None)
+            flattened_data.append(flattened_record)
+    return pd.DataFrame(flattened_data)
