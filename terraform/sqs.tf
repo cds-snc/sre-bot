@@ -1,3 +1,4 @@
+# Create a FIFO SQS queue for the SRE Bot
 resource "aws_sqs_queue" "sre_bot_fifo_queue" {
   name                        = "sre-bot-fifo-queue.fifo"
   fifo_queue                  = true # Make sure that it is FIFO queue
