@@ -403,7 +403,7 @@ def test_list_groups_with_members_error_in_list_group_members(
     google_groups,
     google_group_members,
     google_users,
-    google_groups_w_users
+    google_groups_w_users,
 ):
     groups = google_groups(2)
     group_members = [Exception("Error fetching group members"), google_group_members(2)]
@@ -485,6 +485,40 @@ def test_list_groups_with_members_error_in_get_user(
 
     # No groups should be processed due to error in get_user
     assert google_directory.list_groups_with_members() == []
+
+
+@patch("integrations.google_workspace.google_directory.list_groups")
+@patch("integrations.google_workspace.google_directory.list_group_members")
+@patch("integrations.google_workspace.google_directory.get_user")
+def test_list_groups_with_members_tolerate_errors(
+    mock_get_user,
+    mock_list_group_members,
+    mock_list_groups,
+    google_groups,
+    google_group_members,
+    google_users,
+):
+    groups = google_groups(2)
+    group_members = [google_group_members(2), google_group_members(2)]
+    users = [
+        Exception("Error fetching user details"),
+        google_users(1)[0],
+        Exception("Error fetching user details"),
+        google_users(1)[0],
+    ]
+
+    mock_list_groups.return_value = groups
+    mock_list_group_members.side_effect = group_members
+    mock_get_user.side_effect = users
+
+    # Expected result should include both groups, with the second group having one member
+    expected_groups_with_users = [groups[0], groups[1]]
+    expected_groups_with_users[0]["members"] = []
+    expected_groups_with_users[1]["members"] = [google_users(1)[0]]
+
+    result = google_directory.list_groups_with_members(tolerate_errors=True)
+
+    assert result == expected_groups_with_users
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")
