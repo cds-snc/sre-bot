@@ -1,5 +1,8 @@
+import json
 import os
 import logging
+
+import pandas as pd
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 from utils import filters
 
@@ -288,10 +291,8 @@ def list_group_memberships(group_id, **kwargs):
 
 @handle_aws_api_errors
 def list_groups_with_memberships(
-    group_members: bool = True,
-    members_details: bool = True,
-    include_empty_groups: bool = True,
     groups_filters: list | None = None,
+    tolerate_errors: bool = False,
 ):
     """Retrieves groups with their members from the AWS Identity Center (identitystore)
 
@@ -314,18 +315,85 @@ def list_groups_with_memberships(
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
     logger.info(f"Founds {len(groups)} groups in AWS Identity Store.")
-    if not group_members:
-        return groups
+
+    filtered_groups = [
+        {
+            k: v
+            for k, v in group.items()
+            if k in ["GroupId", "DisplayName", "Description"]
+        }
+        for group in groups
+    ]
 
     groups_with_memberships = []
-    for group in groups:
-        group["GroupMemberships"] = list_group_memberships(group["GroupId"])
+    for group in filtered_groups:
+        error_occurred = False
+        logger.info(f"Getting members for group: {group['DisplayName']}")
+        try:
+            # memberships = list_group_memberships(group["GroupId"])
+            group["GroupMemberships"] = list_group_memberships(group["GroupId"])
+        except Exception as error:
+            logger.warning(
+                f"Error getting members for group {group['GroupId']}: {error}"
+            )
+            continue
+
+        for membership in group["GroupMemberships"]:
+            member_details = {}
+            try:
+                logger.info(
+                    f"Getting details for member: {membership['MemberId']['UserId']}"
+                )
+                member_details = describe_user(membership["MemberId"]["UserId"])
+            except Exception as error:
+                logger.warning(
+                    f"Error getting details for member {membership['MemberId']['UserId']}: {error}"
+                )
+                error_occurred = True
+                if not tolerate_errors:
+                    break
+            if member_details and (not error_occurred or tolerate_errors):
+                membership.update(member_details)
         if group["GroupMemberships"]:
-            if members_details:
-                for membership in group["GroupMemberships"]:
-                    membership["MemberId"] = describe_user(
-                        membership["MemberId"]["UserId"]
-                    )
-        if group["GroupMemberships"] or include_empty_groups:
             groups_with_memberships.append(group)
     return groups_with_memberships
+
+
+def convert_aws_groups_members_to_dataframe(groups):
+    """Converts a list of AWS groups with members to a DataFrame.
+
+    Args:
+        groups (list): A list of group objects with members.
+
+    Returns:
+        DataFrame: A DataFrame with group members.
+    """
+    flattened_data = []
+    for group in groups:
+        group_id = group.get("GroupId")
+        group_name = group.get("DisplayName")
+        group_description = group.get("Description")
+        group_identity_store_id = group.get("IdentityStoreId")
+
+        for membership in group.get("GroupMemberships", []):
+            member = membership.get("MemberId", {})
+            member_user_id = member.get("UserId")
+            member_email = member.get("UserName")
+            member_given_name = member.get("Name", {}).get("GivenName")
+            member_family_name = member.get("Name", {}).get("FamilyName")
+            member_display_name = member.get("DisplayName")
+
+            flattened_record = {
+                "group_id": group_id,
+                "group_name": group_name,
+                "group_description": group_description,
+                "group_identity_store_id": group_identity_store_id,
+                "member_user_id": member_user_id,
+                "member_email": member_email,
+                "member_given_name": member_given_name,
+                "member_family_name": member_family_name,
+                "member_display_name": member_display_name,
+            }
+            flattened_data.append(flattened_record)
+
+    return pd.DataFrame(flattened_data)
