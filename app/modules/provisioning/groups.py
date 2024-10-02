@@ -12,8 +12,7 @@ def get_groups_from_integration(
     pre_processing_filters: list = [],
     post_processing_filters: list = [],
     query: str | None = None,
-    group_members: bool = True,
-    members_details: bool = True,
+    return_dataframe: bool = False,
 ) -> list:
     """Retrieve the users from an integration group source.
     Supported sources are:
@@ -39,11 +38,13 @@ def get_groups_from_integration(
         case "google_groups":
             logger.info("Getting Google Groups with members.")
             groups = google_directory.list_groups_with_members(
-                group_members=group_members,
-                members_details=members_details,
                 groups_filters=pre_processing_filters,
                 query=query,
             )
+            if return_dataframe:
+                groups_dataframe = (
+                    google_directory.convert_google_groups_members_to_dataframe(groups)
+                )
             integration_name = "Google"
             group_display_key = "name"
             members = "members"
@@ -51,10 +52,12 @@ def get_groups_from_integration(
         case "aws_identity_center":
             logger.info("Getting AWS Identity Center Groups with members.")
             groups = identity_store.list_groups_with_memberships(
-                group_members=group_members,
-                members_details=members_details,
                 groups_filters=pre_processing_filters,
             )
+            if return_dataframe:
+                groups_dataframe = (
+                    identity_store.convert_aws_groups_members_to_dataframe(groups)
+                )
             integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
@@ -69,18 +72,16 @@ def get_groups_from_integration(
         groups,
         group_display_key=group_display_key,
         members=members,
-        members_details=members_details,
         members_display_key=members_display_key,
         integration_name=integration_name,
     )
-    return groups
+    return groups_dataframe if return_dataframe else groups
 
 
 def log_groups(
     groups,
     group_display_key=None,
     members=None,
-    members_details=True,
     members_display_key=None,
     integration_name="No Integration Name Provided",
 ):
@@ -110,12 +111,9 @@ def log_groups(
                 members_display_name = filters.get_nested_value(
                     member, members_display_key
                 )
-                if not members_display_name and members_details:
+                if not members_display_name:
                     members_display_name = "<User Name not found>"
-                if members_details:
-                    logger.info(
-                        f"{integration_name}Group:Member: {members_display_name}"
-                    )
+                logger.info(f"{integration_name}Group:Member: {members_display_name}")
         else:
             logger.info(
                 f"{integration_name}Group: {group_display_name} has no members."
