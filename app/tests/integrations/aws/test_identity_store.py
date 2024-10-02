@@ -788,13 +788,6 @@ def test_list_groups_with_memberships(
     users = aws_users(2, prefix="test-", domain="test.com")
     expected_output = [
         {
-            "Description": "A group to test resolving AWS-group1 memberships",
-            "DisplayName": "test-group-name1",
-            "GroupId": "test-aws-group_id1",
-            "GroupMemberships": [],
-            "IdentityStoreId": "d-123412341234",
-        },
-        {
             "GroupId": "test-aws-group_id2",
             "DisplayName": "test-group-name2",
             "Description": "A group to test resolving AWS-group2 memberships",
@@ -900,13 +893,6 @@ def test_list_groups_with_memberships_filtered(
     users = aws_users(2, prefix="test-", domain="test.com")
 
     expected_output = [
-        {
-            "Description": "A group to test resolving AWS-group1 memberships",
-            "DisplayName": "test-group-name1",
-            "GroupId": "test-aws-group_id1",
-            "GroupMemberships": [],
-            "IdentityStoreId": "d-123412341234",
-        },
         {
             "GroupId": "test-aws-group_id2",
             "DisplayName": "test-group-name2",

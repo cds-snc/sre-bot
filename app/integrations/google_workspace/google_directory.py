@@ -235,7 +235,6 @@ def list_groups_with_members(
                 member.update(user_details)
         if members and (not error_occured or tolerate_errors):
             group.update({"members": members})
-            logger.info(f"Group {group['email']} has {len(members)} members.")
             groups_with_members.append(group)
 
     return groups_with_members

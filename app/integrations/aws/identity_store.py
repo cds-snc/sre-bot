@@ -1,4 +1,3 @@
-import json
 import os
 import logging
 
@@ -320,7 +319,7 @@ def list_groups_with_memberships(
         {
             k: v
             for k, v in group.items()
-            if k in ["GroupId", "DisplayName", "Description"]
+            if k in ["GroupId", "DisplayName", "Description", "IdentityStoreId"]
         }
         for group in groups
     ]
@@ -330,15 +329,13 @@ def list_groups_with_memberships(
         error_occurred = False
         logger.info(f"Getting members for group: {group['DisplayName']}")
         try:
-            # memberships = list_group_memberships(group["GroupId"])
-            group["GroupMemberships"] = list_group_memberships(group["GroupId"])
+            memberships = list_group_memberships(group["GroupId"])
         except Exception as error:
             logger.warning(
                 f"Error getting members for group {group['GroupId']}: {error}"
             )
             continue
-
-        for membership in group["GroupMemberships"]:
+        for membership in memberships:
             member_details = {}
             try:
                 logger.info(
@@ -352,9 +349,10 @@ def list_groups_with_memberships(
                 error_occurred = True
                 if not tolerate_errors:
                     break
-            if member_details and (not error_occurred or tolerate_errors):
-                membership.update(member_details)
-        if group["GroupMemberships"]:
+            if member_details:
+                membership['MemberId'].update(member_details)
+        if memberships and (not error_occurred or tolerate_errors):
+            group["GroupMemberships"] = memberships
             groups_with_memberships.append(group)
     return groups_with_memberships
 
