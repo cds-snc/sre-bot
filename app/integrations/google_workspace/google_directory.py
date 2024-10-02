@@ -1,6 +1,8 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
 from logging import getLogger
+
+import pandas as pd
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
@@ -171,8 +173,6 @@ def add_users_to_group(group, group_key):
 
 
 def list_groups_with_members(
-    group_members: bool = True,
-    members_details: bool = True,
     groups_filters: list = [],
     query: str | None = None,
     tolerate_errors: bool = False,
@@ -180,8 +180,6 @@ def list_groups_with_members(
     """List all groups in the Google Workspace domain with their members.
 
     Args:
-        group_members (bool): Include the group members in the response.
-        members_details (bool): Include the members details in the response.
         groups_filters (list): List of filters to apply to the groups.
         query (str): The query to search for groups.
         tolerate_errors (bool): Whether to include groups that encountered errors during member detail retrieval.
@@ -199,11 +197,19 @@ def list_groups_with_members(
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
     logger.info(f"Found {len(groups)} groups.")
-    if not group_members:
-        return groups
+
+    filtered_groups = [
+        {
+            k: v
+            for k, v in group.items()
+            if k in ["id", "email", "name", "directMembersCount", "description"]
+        }
+        for group in groups
+    ]
 
     groups_with_members = []
-    for group in groups:
+    for group in filtered_groups:
+        error_occured = False
         logger.info(f"Getting members for group: {group['email']}")
         try:
             members = list_group_members(
@@ -213,24 +219,65 @@ def list_groups_with_members(
             logger.warning(f"Error getting members for group {group['email']}: {e}")
             continue
 
-        if members and members_details:
-            detailed_members = []
-            error_occurred = False
-            for member in members:
-                try:
-                    logger.info(f"Getting user details for member: {member['email']}")
-                    detailed_members.append(
-                        get_user(member["email"], fields="name, primaryEmail")
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Error getting user details for member {member['email']}: {e}"
-                    )
-                    error_occurred = True
-                    if not tolerate_errors:
-                        break
-            if error_occurred and not tolerate_errors:
-                continue
-            group["members"] = detailed_members
+        for member in members:
+            user_details = {}
+            try:
+                logger.info(f"Getting user details for member: {member['email']}")
+                user_details = get_user(member["email"], fields="name, primaryEmail")
+            except Exception as e:
+                logger.warning(
+                    f"Error getting user details for member {member['email']}: {e}"
+                )
+                error_occured = True
+                if not tolerate_errors:
+                    break
+            if user_details:
+                member.update(user_details)
+        if members and (not error_occured or tolerate_errors):
+            group.update({"members": members})
             groups_with_members.append(group)
+
     return groups_with_members
+
+
+def convert_google_groups_members_to_dataframe(groups):
+    """Converts a list of Google groups with members to a DataFrame.
+
+    Args:
+        groups (list): A list of group objects with members.
+
+    Returns:
+        DataFrame: A DataFrame with group members.
+    """
+    flattened_data = []
+    for group in groups:
+        group_email = group.get("email")
+        group_name = group.get("name")
+        group_direct_members_count = group.get("directMembersCount")
+        group_description = group.get("description")
+
+        for member in group.get("members", []):
+            member_email = member.get("email")
+            member_role = member.get("role")
+            member_type = member.get("type")
+            member_status = member.get("status")
+            member_primary_email = member.get("primaryEmail")
+            member_given_name = member.get("name", {}).get("givenName")
+            member_family_name = member.get("name", {}).get("familyName")
+
+            flattened_record = {
+                "group_email": group_email,
+                "group_name": group_name,
+                "group_direct_members_count": group_direct_members_count,
+                "group_description": group_description,
+                "member_email": member_email,
+                "member_role": member_role,
+                "member_type": member_type,
+                "member_status": member_status,
+                "member_primary_email": member_primary_email,
+                "member_given_name": member_given_name,
+                "member_family_name": member_family_name,
+            }
+            flattened_data.append(flattened_record)
+
+    return pd.DataFrame(flattened_data)
