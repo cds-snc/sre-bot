@@ -173,8 +173,6 @@ def add_users_to_group(group, group_key):
 
 
 def list_groups_with_members(
-    group_members: bool = True,
-    members_details: bool = True,
     groups_filters: list = [],
     query: str | None = None,
     tolerate_errors: bool = False,
@@ -182,8 +180,6 @@ def list_groups_with_members(
     """List all groups in the Google Workspace domain with their members.
 
     Args:
-        group_members (bool): Include the group members in the response.
-        members_details (bool): Include the members details in the response.
         groups_filters (list): List of filters to apply to the groups.
         query (str): The query to search for groups.
         tolerate_errors (bool): Whether to include groups that encountered errors during member detail retrieval.
@@ -227,9 +223,7 @@ def list_groups_with_members(
             user_details = {}
             try:
                 logger.info(f"Getting user details for member: {member['email']}")
-                user_details = get_user(
-                    member["email"], fields="name, primaryEmail"
-                )
+                user_details = get_user(member["email"], fields="name, primaryEmail")
             except Exception as e:
                 logger.warning(
                     f"Error getting user details for member {member['email']}: {e}"
