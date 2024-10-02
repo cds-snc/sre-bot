@@ -417,53 +417,11 @@ def test_list_groups_with_members_error_in_list_group_members(
 
     # Only the second group should be processed
     expected_groups_with_users = [groups[1]]
-    expected_groups_with_users[0]["members"] = users
+    expected_groups_with_users[0]["members"] = group_members[1]
+    expected_groups_with_users[0]["members"][0].update(users[0])
+    expected_groups_with_users[0]["members"][1].update(users[1])
 
     assert google_directory.list_groups_with_members() == expected_groups_with_users
-
-
-@patch("integrations.google_workspace.google_directory.list_groups")
-@patch("integrations.google_workspace.google_directory.list_group_members")
-@patch("integrations.google_workspace.google_directory.get_user")
-def test_list_groups_with_members_without_details(
-    mock_get_user,
-    mock_list_group_members,
-    mock_list_groups,
-    google_groups,
-    google_group_members,
-    google_users,
-    google_groups_w_users,
-):
-    groups = google_groups(2)
-    group_members = [[], google_group_members(2)]
-    users = google_users(2)
-    groups_with_users = google_groups_w_users(2, 2)
-
-    groups_with_users[0].pop("members", None)
-    groups_with_users[1].pop("members", None)
-
-    mock_list_groups.return_value = groups
-    mock_list_group_members.side_effect = group_members
-    mock_get_user.side_effect = users
-
-    assert google_directory.list_groups_with_members(members_details=False) == []
-
-
-@patch("integrations.google_workspace.google_directory.list_groups")
-@patch("integrations.google_workspace.google_directory.list_group_members")
-@patch("integrations.google_workspace.google_directory.get_user")
-def test_list_groups_with_members_without_members_enabled(
-    mock_get_user,
-    mock_list_group_members,
-    mock_list_groups,
-    google_groups,
-):
-    groups = google_groups(2)
-    mock_list_groups.return_value = groups
-    assert google_directory.list_groups_with_members(group_members=False) == groups
-
-    mock_list_group_members.assert_not_called()
-    mock_get_user.assert_not_called()
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")
@@ -479,14 +437,24 @@ def test_list_groups_with_members_error_in_get_user(
 ):
     groups = google_groups(2)
     group_members = [google_group_members(2), google_group_members(2)]
-    users = [Exception("Error fetching user details"), google_users(1)[0]]
+    users = [
+        Exception("Error fetching user details"),
+        google_users(2)[1],
+        google_users(1)[0],
+        google_users(2)[1],
+    ]
 
     mock_list_groups.return_value = groups
     mock_list_group_members.side_effect = group_members
     mock_get_user.side_effect = users
 
-    # No groups should be processed due to error in get_user
-    assert google_directory.list_groups_with_members() == []
+    # Only the second group should be processed
+    expected_groups_with_users = [groups[1]]
+    expected_groups_with_users[0]["members"] = group_members[1]
+    expected_groups_with_users[0]["members"][0].update(users[2])
+    expected_groups_with_users[0]["members"][1].update(users[3])
+
+    assert google_directory.list_groups_with_members() == expected_groups_with_users
 
 
 @patch("integrations.google_workspace.google_directory.list_groups")
@@ -496,17 +464,40 @@ def test_list_groups_with_members_tolerate_errors(
     mock_get_user,
     mock_list_group_members,
     mock_list_groups,
-    google_groups,
-    google_group_members,
-    google_users,
+    google_groups_w_users,
 ):
-    groups = google_groups(2)
-    group_members = [google_group_members(2), google_group_members(2)]
+
+    groups = [
+        {
+            "id": "group1",
+            "email": "groupEmail1",
+            "name": "name1",
+            "directMembersCount": 2,
+        },
+        {
+            "id": "group2",
+            "email": "groupEmail2",
+            "name": "name2",
+            "directMembersCount": 2,
+        },
+    ]
+
+    group_members = [
+        [
+            {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+            {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+        ],
+        [
+            {"email": "email3", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+            {"email": "email4", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+        ],
+    ]
+
     users = [
         Exception("Error fetching user details"),
-        google_users(1)[0],
-        Exception("Error fetching user details"),
-        google_users(1)[0],
+        {"id": "user2", "name": "user2", "primaryEmail": "email2"},
+        {"id": "user3", "name": "user3", "primaryEmail": "email3"},
+        {"id": "user4", "name": "user4", "primaryEmail": "email4"},
     ]
 
     mock_list_groups.return_value = groups
@@ -514,9 +505,57 @@ def test_list_groups_with_members_tolerate_errors(
     mock_get_user.side_effect = users
 
     # Expected result should include both groups, with the second group having one member
-    expected_groups_with_users = [groups[0], groups[1]]
-    expected_groups_with_users[0]["members"] = []
-    expected_groups_with_users[1]["members"] = [google_users(1)[0]]
+    expected_groups_with_users = [
+        {
+            "id": "group1",
+            "email": "groupEmail1",
+            "name": "name1",
+            "directMembersCount": 2,
+            "members": [
+                {
+                    "email": "email1",
+                    "role": "MEMBER",
+                    "type": "USER",
+                    "status": "ACTIVE",
+                },
+                {
+                    "email": "email2",
+                    "primaryEmail": "email2",
+                    "role": "MEMBER",
+                    "type": "USER",
+                    "status": "ACTIVE",
+                    "id": "user2",
+                    "name": "user2",
+                },
+            ],
+        },
+        {
+            "id": "group2",
+            "email": "groupEmail2",
+            "name": "name2",
+            "directMembersCount": 2,
+            "members": [
+                {
+                    "email": "email3",
+                    "primaryEmail": "email3",
+                    "role": "MEMBER",
+                    "type": "USER",
+                    "status": "ACTIVE",
+                    "id": "user3",
+                    "name": "user3",
+                },
+                {
+                    "email": "email4",
+                    "primaryEmail": "email4",
+                    "role": "MEMBER",
+                    "type": "USER",
+                    "status": "ACTIVE",
+                    "id": "user4",
+                    "name": "user4",
+                },
+            ],
+        },
+    ]
 
     result = google_directory.list_groups_with_members(tolerate_errors=True)
 

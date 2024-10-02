@@ -197,7 +197,12 @@ def list_groups_with_members(
     if not groups:
         return []
 
-    filtered_keys_groups = [
+    if groups_filters is not None:
+        for groups_filter in groups_filters:
+            groups = filters.filter_by_condition(groups, groups_filter)
+    logger.info(f"Found {len(groups)} groups.")
+
+    filtered_groups = [
         {
             k: v
             for k, v in group.items()
@@ -206,15 +211,9 @@ def list_groups_with_members(
         for group in groups
     ]
 
-    if groups_filters is not None:
-        for groups_filter in groups_filters:
-            groups = filters.filter_by_condition(filtered_keys_groups, groups_filter)
-    logger.info(f"Found {len(groups)} groups.")
-    if not group_members:
-        return groups
-
     groups_with_members = []
-    for group in groups:
+    for group in filtered_groups:
+        error_occured = False
         logger.info(f"Getting members for group: {group['email']}")
         try:
             members = list_group_members(
@@ -224,27 +223,25 @@ def list_groups_with_members(
             logger.warning(f"Error getting members for group {group['email']}: {e}")
             continue
 
-        if members and members_details:
-            detailed_members = []
-            error_occurred = False
-            for member in members:
-                try:
-                    logger.info(f"Getting user details for member: {member['email']}")
-                    user_details = get_user(
-                        member["email"], fields="name, primaryEmail"
-                    )
-                    combined_user_details = {**member, **user_details}
-                    detailed_members.append(combined_user_details)
-                except Exception as e:
-                    logger.warning(
-                        f"Error getting user details for member {member['email']}: {e}"
-                    )
-                    error_occurred = True
-                    if not tolerate_errors:
-                        break
-            if error_occurred and not tolerate_errors:
-                continue
-            group["members"] = detailed_members
+        for member in members:
+            user_details = {}
+            try:
+                logger.info(f"Getting user details for member: {member['email']}")
+                user_details = get_user(
+                    member["email"], fields="name, primaryEmail"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Error getting user details for member {member['email']}: {e}"
+                )
+                error_occured = True
+                if not tolerate_errors:
+                    break
+            if user_details:
+                member.update(user_details)
+        if members and (not error_occured or tolerate_errors):
+            group.update({"members": members})
+            logger.info(f"Group {group['email']} has {len(members)} members.")
             groups_with_members.append(group)
 
     return groups_with_members
