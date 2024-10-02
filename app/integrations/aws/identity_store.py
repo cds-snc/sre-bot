@@ -350,7 +350,7 @@ def list_groups_with_memberships(
                 if not tolerate_errors:
                     break
             if member_details:
-                membership['MemberId'].update(member_details)
+                membership["MemberId"].update(member_details)
         if memberships and (not error_occurred or tolerate_errors):
             group["GroupMemberships"] = memberships
             groups_with_memberships.append(group)
