@@ -189,7 +189,7 @@ def role_view_handler(ack, body, say, logger, client):
     logger.info(f"Created folder: {role_name} / {folder_id}")
 
     # Step 2: Copy the template files into the new folder (Scoring Guilde, Template for Core Values interview notes, Template for Technical interview notes
-    # Intake form, SoMC template)
+    # Intake form, Phone screen template)
     scoring_guide_id = google_drive.copy_file_to_folder(
         os.getenv("SCORING_GUIDE_TEMPLATE"),
         f"Template 2022/06 - {role_name} Interview Panel Scoring Document - <year/month> ",
@@ -238,16 +238,16 @@ def role_view_handler(ack, body, say, logger, client):
         f"Created document: Intake Form in folder: Intake Form / {intake_form_id}"
     )
 
-    somc_template_id = google_drive.copy_file_to_folder(
-        os.getenv("SOMC_TEMPLATE"),
-        "SoMC Template",
+    phone_screen_template_id = google_drive.copy_file_to_folder(
+        os.getenv("PHONE_SCREEN_TEMPLATE"),
+        "Phone Screen - Template",
         os.getenv("TEMPLATES_FOLDER"),
         folder_id,
         scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     logger.info(
-        f"Created document: SoMC Template in folder: SoMC Template / {somc_template_id}"
+        f"Created document: Phone Screen Template in folder: Phone Screen Template / {phone_screen_template_id}"
     )
 
     recruitment_feedback_template_id = google_drive.copy_file_to_folder(
