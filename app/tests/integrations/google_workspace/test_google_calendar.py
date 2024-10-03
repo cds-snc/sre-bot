@@ -472,7 +472,7 @@ def test_insert_event_api_call_error(
     document_id = "test_document_id"
     google_calendar.insert_event(start, end, emails, title, document_id)
     assert (
-        "An unexpected error occurred in function 'insert_event': API call error"
+        "An unexpected error occurred in function 'integrations.google_workspace.google_calendar:insert_event': API call error"
         in caplog.text
     )
     assert not mock_convert_string_to_camel_case.called

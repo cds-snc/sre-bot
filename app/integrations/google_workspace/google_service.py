@@ -91,20 +91,20 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 result, unsupported_params = result
                 if unsupported_params:
                     logging.warning(
-                        f"Unknown parameters in '{func.__name__}' were detected: {', '.join(unsupported_params)}"
+                        f"Unknown parameters in '{func.__module__}:{func.__name__}' were detected: {', '.join(unsupported_params)}"
                     )
             return result
         except HttpError as e:
-            logging.error(f"An HTTP error occurred in function '{func.__name__}': {e}")
+            logging.error(f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}")
         except ValueError as e:
-            logging.error(f"A ValueError occurred in function '{func.__name__}': {e}")
+            logging.error(f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}")
         except RefreshError as e:
-            logging.error(f"A RefreshError occurred in function '{func.__name__}': {e}")
+            logging.error(f"A RefreshError occurred in function '{func.__module__}:{func.__name__}': {e}")
         except Error as e:
-            logging.error(f"An error occurred in function '{func.__name__}': {e}")
+            logging.error(f"An error occurred in function '{func.__module__}:{func.__name__}': {e}")
         except Exception as e:  # Catch-all for any other types of exceptions
             logging.error(
-                f"An unexpected error occurred in function '{func.__name__}': {e}"
+                f"An unexpected error occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
         return None
 

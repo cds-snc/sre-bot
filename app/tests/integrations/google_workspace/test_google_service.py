@@ -97,13 +97,14 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
     mock_resp.reason = "Bad Request"
     mock_func = MagicMock(side_effect=HttpError(resp=mock_resp, content=b""))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
 
     assert result is None
     mocked_logging_error.assert_called_once_with(
-        "An HTTP error occurred in function 'mock_func': <HttpError 400 \"Bad Request\">"
+        "An HTTP error occurred in function 'mock_module:mock_func': <HttpError 400 \"Bad Request\">"
     )
 
 
@@ -111,6 +112,7 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
 def test_handle_google_api_errors_catches_value_error(mocked_logging_error):
     mock_func = MagicMock(side_effect=ValueError("ValueError message"))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -118,7 +120,7 @@ def test_handle_google_api_errors_catches_value_error(mocked_logging_error):
     assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
-        "A ValueError occurred in function 'mock_func': ValueError message"
+        "A ValueError occurred in function 'mock_module:mock_func': ValueError message"
     )
 
 
@@ -126,6 +128,7 @@ def test_handle_google_api_errors_catches_value_error(mocked_logging_error):
 def test_handle_google_api_errors_catches_error(mocked_logging_error):
     mock_func = MagicMock(side_effect=Error("Error message"))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -133,7 +136,7 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
     assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
-        "An error occurred in function 'mock_func': Error message"
+        "An error occurred in function 'mock_module:mock_func': Error message"
     )
 
 
@@ -141,6 +144,7 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
 def test_handle_google_api_errors_catches_exception(mocked_logging_error):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -148,7 +152,7 @@ def test_handle_google_api_errors_catches_exception(mocked_logging_error):
     assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
-        "An unexpected error occurred in function 'mock_func': Exception message"
+        "An unexpected error occurred in function 'mock_module:mock_func': Exception message"
     )
 
 
@@ -156,6 +160,7 @@ def test_handle_google_api_errors_catches_exception(mocked_logging_error):
 def test_handle_google_api_errors_catches_refresh_error(mocked_logging_error):
     mock_func = MagicMock(side_effect=RefreshError("RefreshError message"))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -163,7 +168,7 @@ def test_handle_google_api_errors_catches_refresh_error(mocked_logging_error):
     assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
-        "A RefreshError occurred in function 'mock_func': RefreshError message"
+        "A RefreshError occurred in function 'mock_module:mock_func': RefreshError message"
     )
 
 
@@ -183,6 +188,7 @@ def test_handle_google_api_errors_processes_unsupported_params(
 ):
     mock_func = MagicMock(return_value=("test", {"unsupported"}))
     mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
@@ -190,7 +196,7 @@ def test_handle_google_api_errors_processes_unsupported_params(
     assert result == "test"
     mock_func.assert_called_once()
     mocked_logging_warning.assert_called_once_with(
-        "Unknown parameters in 'mock_func' were detected: unsupported"
+        "Unknown parameters in 'mock_module:mock_func' were detected: unsupported"
     )
 
 
