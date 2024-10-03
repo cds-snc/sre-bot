@@ -174,12 +174,12 @@ def test_handle_google_api_errors_catches_non_critical_error(mocked_logging_warn
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    result = decorated_func("arg1", "arg2", a="b")
 
     assert result is None
     mock_func.assert_called_once()
     mocked_logging_warning.assert_called_once_with(
-        "A non critical error occurred in function 'mock_module:get_user': timed out"
+        "A non critical error occurred in function 'mock_module:get_user('arg1', 'arg2', {'a': 'b'})': timed out"
     )
 
 

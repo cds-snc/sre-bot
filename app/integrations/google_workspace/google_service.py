@@ -121,7 +121,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 error in message for error in non_critical_errors[func_name]
             ):
                 logging.warning(
-                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{*args, kwargs}': {e}"
                 )
             else:
                 logging.error(
