@@ -87,6 +87,10 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
         non_critical_errors = {
             "get_user": ["timed out"],
         }
+        argument_string = ", ".join(
+            [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
+        )
+        argument_string = f"({argument_string})"
 
         try:
             result = func(*args, **kwargs)
@@ -121,7 +125,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 error in message for error in non_critical_errors[func_name]
             ):
                 logging.warning(
-                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{*args, kwargs}': {e}"
+                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
                 )
             else:
                 logging.error(
