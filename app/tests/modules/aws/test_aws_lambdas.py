@@ -1,7 +1,4 @@
 from unittest.mock import patch, MagicMock
-from slack_sdk.web import WebClient
-from slack_bolt import Respond
-from integrations.aws import lambdas as aws_lambdas
 from modules.aws import lambdas
 
 

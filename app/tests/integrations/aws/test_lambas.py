@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from integrations.aws.lambdas import list_functions, list_layers, get_layer_version
 
 
