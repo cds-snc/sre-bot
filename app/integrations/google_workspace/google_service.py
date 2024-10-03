@@ -84,6 +84,10 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        non_critical_errors = {
+            "get_user": ["timed out"],
+        }
+
         try:
             result = func(*args, **kwargs)
             # Check if the result is a tuple and has two elements (for backward compatibility)
@@ -95,17 +99,34 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                     )
             return result
         except HttpError as e:
-            logging.error(f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}")
-        except ValueError as e:
-            logging.error(f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}")
-        except RefreshError as e:
-            logging.error(f"A RefreshError occurred in function '{func.__module__}:{func.__name__}': {e}")
-        except Error as e:
-            logging.error(f"An error occurred in function '{func.__module__}:{func.__name__}': {e}")
-        except Exception as e:  # Catch-all for any other types of exceptions
             logging.error(
-                f"An unexpected error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
+        except ValueError as e:
+            logging.error(
+                f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}"
+            )
+        except RefreshError as e:
+            logging.error(
+                f"A RefreshError occurred in function '{func.__module__}:{func.__name__}': {e}"
+            )
+        except Error as e:
+            logging.error(
+                f"An error occurred in function '{func.__module__}:{func.__name__}': {e}"
+            )
+        except Exception as e:  # Catch-all for any other types of exceptions
+            message = str(e)
+            func_name = func.__name__
+            if func_name in non_critical_errors and any(
+                error in message for error in non_critical_errors[func_name]
+            ):
+                logging.warning(
+                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                )
+            else:
+                logging.error(
+                    f"An unexpected error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                )
         return None
 
     return wrapper

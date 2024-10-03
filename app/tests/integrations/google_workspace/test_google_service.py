@@ -141,7 +141,7 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
 
 
 @patch("logging.error")
-def test_handle_google_api_errors_catches_exception(mocked_logging_error):
+def test_handle_google_api_errors_catches_exception(mocked_logging_error: MagicMock):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
@@ -153,6 +153,33 @@ def test_handle_google_api_errors_catches_exception(mocked_logging_error):
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "An unexpected error occurred in function 'mock_module:mock_func': Exception message"
+    )
+
+    mock_func = MagicMock(side_effect=Exception("timed out"))
+    mock_func.__name__ = "list_groups"
+    mock_func.__module__ = "mock_module"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+    mock_func.assert_called_once()
+    mocked_logging_error.assert_called_with(
+        "An unexpected error occurred in function 'mock_module:list_groups': timed out"
+    )
+
+
+@patch("logging.warning")
+def test_handle_google_api_errors_catches_non_critical_error(mocked_logging_warning):
+    mock_func = MagicMock(side_effect=Exception("timed out"))
+    mock_func.__name__ = "get_user"
+    mock_func.__module__ = "mock_module"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    result = decorated_func()
+
+    assert result is None
+    mock_func.assert_called_once()
+    mocked_logging_warning.assert_called_once_with(
+        "A non critical error occurred in function 'mock_module:get_user': timed out"
     )
 
 
