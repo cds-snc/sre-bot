@@ -308,8 +308,8 @@ def test_copy_files_to_internal_talent_folder(
                 delegated_user_email="bot_email",
             ),
             call(
-                os.getenv("SOMC_TEMPLATE"),
-                "SoMC Template",
+                os.getenv("PHONE_SCREEN_TEMPLATE"),
+                "Phone Screen - Template",
                 os.getenv("TEMPLATES_FOLDER"),
                 "folder_id",
                 scopes=["https://www.googleapis.com/auth/drive"],
