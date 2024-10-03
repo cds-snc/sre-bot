@@ -11,7 +11,9 @@ def list_functions():
     Returns:
         list: A list of Lambda functions.
     """
-    return execute_aws_api_call("lambda", "list_functions", paginated=True, keys=["Functions"])
+    return execute_aws_api_call(
+        "lambda", "list_functions", paginated=True, keys=["Functions"]
+    )
 
 
 @handle_aws_api_errors
@@ -21,7 +23,9 @@ def list_layers():
     Returns:
         list: A list of Lambda layers.
     """
-    return execute_aws_api_call("lambda", "list_layers", paginated=True, keys=["Layers"])
+    return execute_aws_api_call(
+        "lambda", "list_layers", paginated=True, keys=["Layers"]
+    )
 
 
 @handle_aws_api_errors
@@ -35,4 +39,9 @@ def get_layer_version(layer_name, version_number):
     Returns:
         dict: The Lambda layer version.
     """
-    return execute_aws_api_call("lambda", "get_layer_version", LayerName=layer_name, VersionNumber=version_number)
+    return execute_aws_api_call(
+        "lambda",
+        "get_layer_version",
+        LayerName=layer_name,
+        VersionNumber=version_number,
+    )
