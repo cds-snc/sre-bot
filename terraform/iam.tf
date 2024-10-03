@@ -82,7 +82,7 @@ resource "aws_iam_role_policy_attachment" "secrets_manager" {
 
 resource "aws_iam_role_policy_attachment" "lambda_read_only" {
   role       = aws_iam_role.sre-bot.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSLambdaReadOnlyAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AWSLambda_ReadOnlyAccess"
 }
 
 # SRE Bot's S3 bucket policy
