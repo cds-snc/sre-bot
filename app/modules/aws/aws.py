@@ -16,7 +16,7 @@ from logging import Logger
 from integrations.aws.organizations import get_account_id_by_name
 from integrations.aws import identity_store
 from integrations.slack import commands as slack_commands
-from modules.aws import aws_access_requests, aws_account_health, groups, users
+from modules.aws import aws_access_requests, aws_account_health, groups, users, lambdas
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -33,6 +33,8 @@ help_text = """
 \n        `<operation>`: `sync`, `list`
 \n        `<group>`: name of the group | nom du groupe (sync only)
 \n        Usage: `/aws groups sync`, `/aws groups sync group-name` or/ou `/aws groups list`
+\n `/aws lambdas <operation>`
+\n     - Manage AWS Lambda functions | Gérer les fonctions Lambda AWS
 \n `/aws help | aide`
 \n      - Show this help text | montre le dialogue d'aide
 \n `/aws health`
@@ -92,6 +94,8 @@ def aws_command(
             users.command_handler(client, body, respond, args, logger)
         case "groups":
             groups.command_handler(client, body, respond, args, logger)
+        case "lambda" | "lambdas":
+            lambdas.command_handler(client, body, respond, args, logger)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
