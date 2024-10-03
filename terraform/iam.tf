@@ -80,6 +80,11 @@ resource "aws_iam_role_policy_attachment" "secrets_manager" {
   policy_arn = aws_iam_policy.sre-bot_secrets_manager.arn
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_read_only" {
+  role       = aws_iam_role.sre-bot.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSLambdaReadOnlyAccess"
+}
+
 # SRE Bot's S3 bucket policy
 
 data "aws_iam_policy_document" "sre_bot_bucket" {
@@ -144,48 +149,4 @@ resource "aws_iam_role_policy" "sre_bot_sqs_access_policy" {
       },
     ],
   })
-}
-
-
-# Create an IAM role and policy to allow the SRE Bot to perform actions in this account.
-data "aws_iam_policy_document" "sre_bot_role_integrations" {
-  statement {
-    sid     = "AssumeRole"
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "sre_bot_role_integrations" {
-  name               = "sre_bot_role"
-  assume_role_policy = sensitive(data.aws_iam_policy_document.sre_bot_role_integrations.json)
-
-  tags = {
-    "CostCentre" = var.billing_code
-  }
-}
-
-data "aws_iam_policy_document" "sre_bot_role_integrations_policy" {
-  statement {
-    sid = "ReadLambdas"
-    actions = [
-      "lambda:Get*",
-      "lambda:List*",
-    ]
-    effect    = "Allow"
-    resources = ["*"]
-  }
-}
-
-resource "aws_iam_policy" "sre_bot_role_integrations" {
-  name   = "sre_bot_role"
-  policy = data.aws_iam_policy_document.sre_bot_role_integrations_policy.json
-}
-
-resource "aws_iam_role_policy_attachment" "sre_bot_role_integrations" {
-  role       = aws_iam_role.sre_bot_role_integrations.name
-  policy_arn = aws_iam_policy.sre_bot_role_integrations.arn
 }
