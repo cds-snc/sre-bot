@@ -1,7 +1,6 @@
 import re
 from datetime import datetime
 import pytz  # type: ignore
-import boto3
 from integrations.google_workspace import google_docs
 from integrations.slack import users as slack_users
 
@@ -9,8 +8,6 @@ from modules.incident.incident_document import (
     get_timeline_section,
     replace_text_between_headings,
 )
-
-# Create a class that stores the message 
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
@@ -158,7 +155,6 @@ def get_incident_document_id(client, channel_id, logger):
                     logger.error("No incident document found for this channel.")
     return document_id
 
-def add_message_to_queue(client, ack, body, logger):
 
 def handle_reaction_added(client, ack, body, logger):
     ack()
@@ -207,7 +203,6 @@ def handle_reaction_added(client, ack, body, logger):
                 message = slack_users.replace_user_id_with_handle(
                     client, message["text"]
                 )
-
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
                     # append the new message to the content
@@ -302,7 +297,6 @@ def handle_reaction_removed(client, ack, body, logger):
 
 # Function to return the messages from the conversation
 def return_messages(client, body, channel_id):
-
     # Fetch the message that had the reaction added or removed
     result = client.conversations_history(
         channel=channel_id,
