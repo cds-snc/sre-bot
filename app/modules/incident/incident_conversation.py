@@ -203,6 +203,7 @@ def handle_reaction_added(client, ack, body, logger):
                 message = slack_users.replace_user_id_with_handle(
                     client, message["text"]
                 )
+
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
                     # append the new message to the content
