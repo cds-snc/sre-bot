@@ -37,12 +37,9 @@ def test_get_queue_url_invalid_queue_name(mock_execute_api_call):
     queue_name = ""  # Invalid queue name
     mock_execute_api_call.return_value = False
 
-    result = get_queue_url(queue_name)
-    # Act & Assert
-    mock_execute_api_call.assert_called_once_with(
-        "sqs", "get_queue_url", QueueName=queue_name
-    )
-    assert result is False
+    get_queue_url(queue_name)
+    # Assert
+    mock_execute_api_call.assert_not_called()
 
 
 @patch("integrations.aws.sqs.execute_aws_api_call")
