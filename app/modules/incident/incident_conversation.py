@@ -298,7 +298,6 @@ def handle_reaction_removed(client, ack, body, logger):
 
 # Function to return the messages from the conversation
 def return_messages(client, body, channel_id):
-
     # Fetch the message that had the reaction added or removed
     result = client.conversations_history(
         channel=channel_id,
