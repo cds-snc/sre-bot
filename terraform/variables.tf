@@ -10,7 +10,7 @@ variable "fargate_cpu" {
 
 variable "fargate_memory" {
   type    = number
-  default = 512
+  default = 1024
 }
 
 variable "google_oauth_pickle_string" {
