@@ -30,7 +30,7 @@ resource "aws_lb_listener" "sre_bot_listener" {
   load_balancer_arn = aws_lb.sre_bot.arn
   port              = "443"
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-FS-1-2-Res-2020-10"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-FIPS-2023-04"
   certificate_arn   = aws_acm_certificate.sre_bot.arn
 
   default_action {
