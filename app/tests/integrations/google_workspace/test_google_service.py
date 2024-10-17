@@ -100,7 +100,7 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    with pytest.raises(HttpError, match="<HttpError 400 \"Bad Request\">"):
+    with pytest.raises(HttpError, match='<HttpError 400 "Bad Request">'):
         result = decorated_func()
         assert result is None
 
