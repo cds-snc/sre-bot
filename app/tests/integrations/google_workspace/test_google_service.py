@@ -100,9 +100,10 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(HttpError, match="<HttpError 400 \"Bad Request\">"):
+        result = decorated_func()
+        assert result is None
 
-    assert result is None
     mocked_logging_error.assert_called_once_with(
         "An HTTP error occurred in function 'mock_module:mock_func': <HttpError 400 \"Bad Request\">"
     )
@@ -115,9 +116,10 @@ def test_handle_google_api_errors_catches_value_error(mocked_logging_error):
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(ValueError, match="ValueError message"):
+        result = decorated_func()
+        assert result is None
 
-    assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "A ValueError occurred in function 'mock_module:mock_func': ValueError message"
@@ -131,25 +133,30 @@ def test_handle_google_api_errors_catches_error(mocked_logging_error):
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(Error, match="Error message"):
+        result = decorated_func()
+        assert result is None
 
-    assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "An error occurred in function 'mock_module:mock_func': Error message"
     )
 
 
+@patch("logging.warning")
 @patch("logging.error")
-def test_handle_google_api_errors_catches_exception(mocked_logging_error: MagicMock):
+def test_handle_google_api_errors_catches_exception(
+    mocked_logging_error: MagicMock, mocked_logging_warning: MagicMock
+):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(Exception, match="Exception message"):
+        result = decorated_func()
+        assert result is None
 
-    assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "An unexpected error occurred in function 'mock_module:mock_func': Exception message"
@@ -160,23 +167,24 @@ def test_handle_google_api_errors_catches_exception(mocked_logging_error: MagicM
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(Exception, match="timed out"):
+        result = decorated_func()
+        assert result is None
+
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_with(
         "An unexpected error occurred in function 'mock_module:list_groups': timed out"
     )
 
-
-@patch("logging.warning")
-def test_handle_google_api_errors_catches_non_critical_error(mocked_logging_warning):
     mock_func = MagicMock(side_effect=Exception("timed out"))
     mock_func.__name__ = "get_user"
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func("arg1", "arg2", a="b")
+    with pytest.raises(Exception, match="timed out"):
+        result = decorated_func("arg1", "arg2", a="b")
+        assert result is None
 
-    assert result is None
     mock_func.assert_called_once()
     mocked_logging_warning.assert_called_once_with(
         "A non critical error occurred in function 'mock_module:get_user(arg1, arg2, a=b)': timed out"
@@ -190,9 +198,9 @@ def test_handle_google_api_errors_catches_refresh_error(mocked_logging_error):
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    result = decorated_func()
+    with pytest.raises(RefreshError, match="RefreshError message"):
+        decorated_func()
 
-    assert result is None
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
         "A RefreshError occurred in function 'mock_module:mock_func': RefreshError message"
