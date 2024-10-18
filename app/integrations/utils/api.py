@@ -115,5 +115,7 @@ def retry_request(
             if i == max_attempts - 1:
                 logging.warning(f"Error after {max_attempts} attempts: {e}")
                 raise e
+            else:
+                logging.warning(f"Error on attempt {i + 1}: {e}")
             time.sleep(delay)
             continue
