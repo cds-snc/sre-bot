@@ -213,9 +213,9 @@ def list_groups_with_members(
         try:
             members = retry_request(
                 list_group_members,
+                group["email"],
                 max_attempts=3,
                 delay=1,
-                email=group["email"],
                 fields="members(email, role, type, status)",
             )
         except Exception as e:
@@ -246,9 +246,9 @@ def get_members_details(members: list[dict], tolerate_errors=False):
             logger.info(f"Getting user details for member: {member['email']}")
             user_details = retry_request(
                 get_user,
+                member["email"],
                 max_attempts=3,
                 delay=1,
-                email=member["email"],
                 fields="name, primaryEmail",
             )
         except Exception as e:
