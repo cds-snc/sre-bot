@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import pandas as pd
-import pytest
 from integrations.google_workspace import google_directory
 
 
