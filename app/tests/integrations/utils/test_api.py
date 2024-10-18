@@ -290,3 +290,18 @@ def test_retry_request_logging(mock_logging_warning):
         retry_request(mock_func, max_attempts=3, delay=1)
     assert mock_func.call_count == 3
     mock_logging_warning.assert_called_once_with("Error after 3 attempts: fail")
+
+
+def test_retry_request_passes_args_and_kwargs():
+    mock_func = MagicMock(return_value="success")
+    result = retry_request(
+        mock_func,
+        "arg1",
+        "arg2",
+        max_attempts=3,
+        delay=1,
+        kwarg1="kwarg1",
+        kwarg2="kwarg2",
+    )
+    assert result == "success"
+    mock_func.assert_called_once_with("arg1", "arg2", kwarg1="kwarg1", kwarg2="kwarg2")

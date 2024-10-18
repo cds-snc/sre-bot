@@ -89,7 +89,13 @@ def generate_unique_id():
     return unique_id
 
 
-def retry_request(func, max_attempts=3, delay=1, *args, **kwargs):
+def retry_request(
+    func,
+    *args,
+    max_attempts=3,
+    delay=1,
+    **kwargs,
+):
     """Retry a function up to a maximum number of attempts with a delay between each attempt.
 
     Args:
