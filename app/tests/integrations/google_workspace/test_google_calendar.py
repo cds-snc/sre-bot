@@ -470,11 +470,12 @@ def test_insert_event_api_call_error(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = "test_document_id"
-    google_calendar.insert_event(start, end, emails, title, document_id)
-    assert (
-        "An unexpected error occurred in function 'integrations.google_workspace.google_calendar:insert_event': API call error"
-        in caplog.text
-    )
+    with pytest.raises(Exception):
+        google_calendar.insert_event(start, end, emails, title, document_id)
+        assert (
+            "An unexpected error occurred in function 'integrations.google_workspace.google_calendar:insert_event': API call error"
+            in caplog.text
+        )
     assert not mock_convert_string_to_camel_case.called
     assert mock_os_environ_get.called
     assert not mock_handle_errors.called

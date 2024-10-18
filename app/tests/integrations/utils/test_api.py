@@ -1,3 +1,4 @@
+from unittest.mock import MagicMock, patch
 import pytest
 import string
 from integrations.utils.api import (
@@ -8,6 +9,7 @@ from integrations.utils.api import (
     convert_dict_to_pascale_case,
     convert_kwargs_to_pascal_case,
     generate_unique_id,
+    retry_request,
 )
 
 
@@ -249,3 +251,57 @@ def test_no_illegal_characters():
     assert not any(
         char in illegal_chars for char in unique_id.replace("-", "")
     ), "ID should not have uppercase or special characters"
+
+
+def test_retry_request_success():
+    mock_func = MagicMock(return_value="success")
+    result = retry_request(mock_func, max_attempts=3, delay=1)
+    assert result == "success"
+    mock_func.assert_called_once()
+
+
+def test_retry_request_success_after_retries():
+    mock_func = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "success"])
+    result = retry_request(mock_func, max_attempts=3, delay=1)
+    assert result == "success"
+    assert mock_func.call_count == 3
+
+
+def test_retry_request_failure():
+    mock_func = MagicMock(side_effect=Exception("fail"))
+    with pytest.raises(Exception, match="fail"):
+        retry_request(mock_func, max_attempts=3, delay=1)
+    assert mock_func.call_count == 3
+
+
+@patch("time.sleep", return_value=None)
+def test_retry_request_delay(mock_sleep):
+    mock_func = MagicMock(side_effect=[Exception("fail"), "success"])
+    result = retry_request(mock_func, max_attempts=3, delay=2)
+    assert result == "success"
+    assert mock_func.call_count == 2
+    mock_sleep.assert_called_once_with(2)
+
+
+@patch("logging.warning")
+def test_retry_request_logging(mock_logging_warning):
+    mock_func = MagicMock(side_effect=Exception("fail"))
+    with pytest.raises(Exception, match="fail"):
+        retry_request(mock_func, max_attempts=3, delay=1)
+    assert mock_func.call_count == 3
+    mock_logging_warning.assert_called_once_with("Error after 3 attempts: fail")
+
+
+def test_retry_request_passes_args_and_kwargs():
+    mock_func = MagicMock(return_value="success")
+    result = retry_request(
+        mock_func,
+        "arg1",
+        "arg2",
+        max_attempts=3,
+        delay=1,
+        kwarg1="kwarg1",
+        kwarg2="kwarg2",
+    )
+    assert result == "success"
+    mock_func.assert_called_once_with("arg1", "arg2", kwarg1="kwarg1", kwarg2="kwarg2")

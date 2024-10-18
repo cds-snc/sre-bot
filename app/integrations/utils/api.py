@@ -3,6 +3,8 @@
 import re
 import string
 import random
+import time
+import logging
 
 
 def convert_string_to_camel_case(snake_str):
@@ -85,3 +87,33 @@ def generate_unique_id():
     unique_id = "-".join(segments)
 
     return unique_id
+
+
+def retry_request(
+    func,
+    *args,
+    max_attempts=3,
+    delay=1,
+    **kwargs,
+):
+    """Retry a function up to a maximum number of attempts with a delay between each attempt.
+
+    Args:
+        func (function): The function to call.
+        max_attempts (int): The maximum number of attempts to make.
+        delay (int): The delay between each attempt in seconds.
+        *args: Positional arguments to pass to the function.
+        **kwargs: Keyword arguments to pass to the function.
+
+    Returns:
+        Any: The result of the function call.
+    """
+    for i in range(max_attempts):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if i == max_attempts - 1:
+                logging.warning(f"Error after {max_attempts} attempts: {e}")
+                raise e
+            time.sleep(delay)
+            continue

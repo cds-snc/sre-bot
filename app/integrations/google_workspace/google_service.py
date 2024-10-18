@@ -106,18 +106,22 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
             logging.error(
                 f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
+            raise e
         except ValueError as e:
             logging.error(
                 f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
+            raise e
         except RefreshError as e:
             logging.error(
                 f"A RefreshError occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
+            raise e
         except Error as e:
             logging.error(
                 f"An error occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
+            raise e
         except Exception as e:  # Catch-all for any other types of exceptions
             message = str(e)
             func_name = func.__name__
@@ -131,7 +135,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 logging.error(
                     f"An unexpected error occurred in function '{func.__module__}:{func.__name__}': {e}"
                 )
-        return None
+            raise e
 
     return wrapper
 

@@ -9,7 +9,7 @@ from integrations.google_workspace.google_service import (
     DEFAULT_DELEGATED_ADMIN_EMAIL,
     DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
-from integrations.utils.api import convert_string_to_camel_case
+from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
 
 logger = getLogger(__name__)
@@ -209,35 +209,59 @@ def list_groups_with_members(
 
     groups_with_members = []
     for group in filtered_groups:
-        error_occured = False
         logger.info(f"Getting members for group: {group['email']}")
         try:
-            members = list_group_members(
-                group["email"], fields="members(email, role, type, status)"
+            members = retry_request(
+                list_group_members,
+                group["email"],
+                max_attempts=3,
+                delay=1,
+                fields="members(email, role, type, status)",
             )
         except Exception as e:
             logger.warning(f"Error getting members for group {group['email']}: {e}")
             continue
 
-        for member in members:
-            user_details = {}
-            try:
-                logger.info(f"Getting user details for member: {member['email']}")
-                user_details = get_user(member["email"], fields="name, primaryEmail")
-            except Exception as e:
-                logger.warning(
-                    f"Error getting user details for member {member['email']}: {e}"
-                )
-                error_occured = True
-                if not tolerate_errors:
-                    break
-            if user_details:
-                member.update(user_details)
-        if members and (not error_occured or tolerate_errors):
+        members = get_members_details(members, tolerate_errors)
+        if members:
             group.update({"members": members})
             groups_with_members.append(group)
 
     return groups_with_members
+
+
+def get_members_details(members: list[dict], tolerate_errors=False):
+    """Get user details for a list of members.
+
+    Args:
+        members (list): A list of member objects.
+        tolerate_errors (bool): Whether to tolerate errors when getting user details.
+
+    Returns:"""
+
+    error_occured = False
+    for member in members:
+        user_details = {}
+        try:
+            logger.info(f"Getting user details for member: {member['email']}")
+            user_details = retry_request(
+                get_user,
+                member["email"],
+                max_attempts=3,
+                delay=1,
+                fields="name, primaryEmail",
+            )
+        except Exception as e:
+            logger.warning(
+                f"Error getting user details for member {member['email']}: {e}"
+            )
+            error_occured = True
+            if not tolerate_errors:
+                break
+        if user_details:
+            member.update(user_details)
+
+    return members if not error_occured or tolerate_errors else []
 
 
 def convert_google_groups_members_to_dataframe(groups):

@@ -1,7 +1,7 @@
 """Unit tests for google_drive module."""
 
 from unittest.mock import patch, call
-
+import pytest
 from integrations.google_workspace import google_drive
 
 
@@ -152,9 +152,10 @@ def test_create_file_with_invalid_type_raises_value_error(
     execute_google_api_call_mock.side_effect = ValueError(
         "Invalid file_type: invalid_file_type"
     )
-    result = google_drive.create_file("name", "folder", "invalid_file_type")
+    with pytest.raises(ValueError):
+        result = google_drive.create_file("name", "folder", "invalid_file_type")
+        assert result is None
 
-    assert result is None
     mocked_logging_error.assert_called_once_with(
         "A ValueError occurred in function 'integrations.google_workspace.google_drive:create_file': Invalid file_type: invalid_file_type"
     )
