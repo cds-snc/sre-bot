@@ -142,6 +142,9 @@ def find_first_available_slot(
     # EST timezone
     est = pytz.timezone("US/Eastern")
 
+    starting_hour = get_utc_hour(13, 0, "US/Eastern")
+    ending_hour = get_utc_hour(15, 0, "US/Eastern")
+
     # Combine all busy times into a single list and sort them
     busy_times = []
     for calendar in freebusy_response["calendars"].values():
@@ -164,10 +167,10 @@ def find_first_available_slot(
             continue
 
         search_start = search_date.replace(
-            hour=17, minute=0, second=0, microsecond=0
+            hour=starting_hour, minute=0, second=0, microsecond=0
         )  # 1 PM EST, times are in UTC
         search_end = search_date.replace(
-            hour=19, minute=0, second=0, microsecond=0
+            hour=ending_hour, minute=0, second=0, microsecond=0
         )  # 3 PM EST, times are in UTC
 
         # if the day is a federal holiday, skip it
@@ -205,3 +208,33 @@ def get_federal_holidays():
     for holiday in response.json()["holidays"]:
         holidays.append(holiday["observedDate"])
     return holidays
+
+
+def get_utc_hour(hour, minute, tz_name, date=None):
+    """
+    Converts a specific time in a given time zone to UTC.
+
+    Args:
+        hour (int): The hour of the time in 24-hour format.
+        minute (int): The minute of the time.
+        tz_name (str): The name of the time zone (e.g., "US/Eastern").
+
+    Returns:
+        str: The corresponding UTC time as a string in HH:MM format.
+    """
+    # Define the local timezone
+    local_tz = pytz.timezone(tz_name)
+
+    # If we are not passing the date, then initialize it to the current date:w
+    if date is None:
+        date = datetime.utcnow()
+
+    # Create a datetime object for the given time in the local timezone
+    local_time = local_tz.localize(
+        datetime(date.year, date.month, date.day, hour, minute)
+    )
+
+    # Convert to UTC
+    utc_time = local_time.astimezone(pytz.utc)
+
+    return utc_time.hour
