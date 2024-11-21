@@ -212,7 +212,7 @@ def get_federal_holidays():
 
 def get_utc_hour(hour, minute, tz_name, date=None):
     """
-    Converts a specific time in a given time zone to UTC.
+    Converts a specific time in a given time zone to UTC and returns the hour.
 
     Args:
         hour (int): The hour of the time in 24-hour format.
@@ -220,7 +220,7 @@ def get_utc_hour(hour, minute, tz_name, date=None):
         tz_name (str): The name of the time zone (e.g., "US/Eastern").
 
     Returns:
-        str: The corresponding UTC time as a string in HH:MM format.
+        str: The corresponding UTC hour.
     """
     # Define the local timezone
     local_tz = pytz.timezone(tz_name)
