@@ -730,3 +730,86 @@ def test_leap_year_handling(requests_mock):
 
     # Verify leap year is considered
     assert "2024-02-29" in holidays, "Leap year date should be included in the holidays"
+
+
+def test_get_utc_hour_same_zone():
+    """
+    Test case for the same timezone (UTC).
+    """
+    assert (
+        google_calendar.get_utc_hour(13, 0, "UTC") == 13
+    )  # 1 PM UTC should remain 13 in UTC.
+
+
+def test_get_utc_hour_us_eastern_daylight_time_winter():
+    """
+    Test case for US Eastern Daylight Time during the winter
+    """
+    # Explicitly set a date in December when daylight saving time is not active
+    tz_name = "US/Eastern"
+    local_tz = pytz.timezone(tz_name)
+    test_date = datetime(2023, 12, 1, 13, 0)  # December 1, 2023, 1 PM EDT
+    localized_time = local_tz.localize(test_date)
+    utc_time = localized_time.astimezone(pytz.utc).hour
+
+    # Assert that 1 PM EDT is 6 PM UTC
+    assert google_calendar.get_utc_hour(13, 0, tz_name, test_date) == utc_time
+
+
+def test_get_utc_hour_us_eastern_daylight_time_summer():
+    """
+    Test case for US Eastern Daylight Time (EDT, UTC-4) during the summer.
+    """
+    # Explicitly set a date in August when daylight saving time is active
+    tz_name = "US/Eastern"
+    local_tz = pytz.timezone(tz_name)
+    test_date = datetime(2023, 8, 1, 13, 0)  # August 1, 2023, 1 PM EDT
+    localized_time = local_tz.localize(test_date)
+    utc_time = localized_time.astimezone(pytz.utc).hour
+
+    # Assert that 1 PM EDT is 5 PM UTC
+    assert google_calendar.get_utc_hour(13, 0, tz_name, test_date) == utc_time
+
+
+def test_get_utc_hour_pacific_time():
+    """
+    Test case for Pacific Standard Time (PST, UTC-8).
+    """
+    test_date = datetime(2023, 12, 1, 13, 0)  # December 1, 2023, 1 PM PDT
+
+    assert (
+        google_calendar.get_utc_hour(13, 0, "US/Pacific", test_date) == 21
+    )  # 1 PM PST should be 9 PM UTC.
+
+
+def test_get_utc_hour_with_invalid_timezone():
+    """
+    Test case for invalid timezone input.
+    """
+    with pytest.raises(pytz.UnknownTimeZoneError):
+        google_calendar.get_utc_hour(13, 0, "Invalid/Zone")
+
+
+def test_get_utc_hour_midnight_transition():
+    """
+    Test case for midnight transition.
+    """
+    assert (
+        google_calendar.get_utc_hour(23, 0, "US/Eastern") == 4
+    )  # 11 PM EST should be 4 AM UTC.
+
+
+def test_get_utc_hour_negative_hour():
+    """
+    Test case for invalid hour input.
+    """
+    with pytest.raises(ValueError):
+        google_calendar.get_utc_hour(-1, 0, "UTC")
+
+
+def test_get_utc_hour_invalid_minute():
+    """
+    Test case for invalid minute input.
+    """
+    with pytest.raises(ValueError):
+        google_calendar.get_utc_hour(13, 60, "UTC")
