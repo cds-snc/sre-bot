@@ -183,7 +183,7 @@ def test_create_file_from_template_returns_file(execute_google_api_call_mock):
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_with_folder_id_returns_object(execute_google_api_call_mock):
+def test_find_files_by_name_with_folder_id_returns_object(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = [
         {
             "name": "test_document",
@@ -191,7 +191,7 @@ def test_get_file_by_name_with_folder_id_returns_object(execute_google_api_call_
             "appProperties": {},
         }
     ]
-    result = google_drive.get_file_by_name("test_file_name", "folder_id")
+    result = google_drive.find_files_by_name("test_file_name", "folder_id")
     assert result == [
         {
             "name": "test_document",
@@ -216,7 +216,7 @@ def test_get_file_by_name_with_folder_id_returns_object(execute_google_api_call_
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_without_folder_id_returns_object(
+def test_find_files_by_name_without_folder_id_returns_object(
     execute_google_api_call_mock,
 ):
     execute_google_api_call_mock.return_value = [
@@ -226,7 +226,7 @@ def test_get_file_by_name_without_folder_id_returns_object(
             "appProperties": {},
         }
     ]
-    result = google_drive.get_file_by_name("test_file_name")
+    result = google_drive.find_files_by_name("test_file_name")
     assert result == [
         {
             "name": "test_document",
@@ -251,7 +251,7 @@ def test_get_file_by_name_without_folder_id_returns_object(
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_with_empty_folder_id_returns_object(
+def test_find_files_by_name_with_empty_folder_id_returns_object(
     execute_google_api_call_mock,
 ):
     execute_google_api_call_mock.return_value = [
@@ -261,7 +261,7 @@ def test_get_file_by_name_with_empty_folder_id_returns_object(
             "appProperties": {},
         }
     ]
-    result = google_drive.get_file_by_name("test_file_name", "")
+    result = google_drive.find_files_by_name("test_file_name", "")
     assert result == [
         {
             "name": "test_document",
@@ -286,11 +286,11 @@ def test_get_file_by_name_with_empty_folder_id_returns_object(
 
 
 @patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_get_file_by_name_no_file_found_returns_empty_list(
+def test_find_files_by_name_no_file_found_returns_empty_list(
     execute_google_api_call_mock,
 ):
     execute_google_api_call_mock.return_value = []
-    result = google_drive.get_file_by_name("test_file_name", "folder_id")
+    result = google_drive.find_files_by_name("test_file_name", "folder_id")
     assert result == []
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
