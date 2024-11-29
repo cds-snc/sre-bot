@@ -30,6 +30,49 @@ def get_values(spreadsheetId: str, range: str | None = None, fields=None):
     )
 
 
+def get_sheet(spreadsheetId: str, ranges: str):
+    """Gets a Google Sheet.
+
+    Args:
+        spreadsheetId (str): The id of the Google Sheet.
+        sheetId (int): The id of the sheet.
+
+    Returns:
+        dict: The response from the Google Sheets API.
+    """
+    return execute_google_api_call(
+        "sheets",
+        "v4",
+        "spreadsheets",
+        "get",
+        spreadsheetId=spreadsheetId,
+        ranges=ranges,
+        includeGridData=False,
+    )
+
+
+@handle_google_api_errors
+def batch_update(spreadsheetId: str, body: dict):
+    """Updates a Google Sheet.
+
+    Args:
+        spreadsheetId (str): The id of the Google Sheet.
+        body (dict): The request body.
+
+    Returns:
+        dict: The response from the Google Sheets API.
+    """
+    return execute_google_api_call(
+        "sheets",
+        "v4",
+        "spreadsheets",
+        "batchUpdate",
+        spreadsheetId=spreadsheetId,
+        body=body,
+    )
+
+
+@handle_google_api_errors
 def batch_update_values(
     spreadsheetId: str,
     range: str,
