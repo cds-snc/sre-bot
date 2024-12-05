@@ -86,7 +86,7 @@ def google_service_command(ack, client, body, respond, logger):
         sheet = sheets.get_sheet(file["id"], range)
         if sheet:
             logger.info(f"Sheet '{range}' already exists")
-            
+
         try:
             request = {
                 "requests": [
