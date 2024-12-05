@@ -30,6 +30,7 @@ def get_values(spreadsheetId: str, range: str | None = None, fields=None):
     )
 
 
+@handle_google_api_errors
 def get_sheet(spreadsheetId: str, ranges: str):
     """Gets a Google Sheet.
 
