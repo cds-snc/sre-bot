@@ -86,6 +86,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         non_critical_errors = {
             "get_user": ["timed out"],
+            "get_sheet": ["Unable to parse range"],
         }
         argument_string = ", ".join(
             [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
@@ -103,10 +104,19 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                     )
             return result
         except HttpError as e:
-            logging.error(
-                f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
-            )
-            raise e
+            message = str(e)
+            func_name = func.__name__
+            if func_name in non_critical_errors and any(
+                error in message for error in non_critical_errors[func_name]
+            ):
+                logging.warning(
+                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
+                )
+            else:
+                logging.error(
+                    f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                )
+                raise e
         except ValueError as e:
             logging.error(
                 f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}"
