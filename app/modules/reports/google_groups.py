@@ -42,7 +42,7 @@ def generate_group_members_report(args, respond, logger):
     groups = google_directory.list_groups()
     groups = [
         group
-        for group in groups[:5]
+        for group in groups
         if not any(exclude in group["name"] for exclude in exclude_groups)
     ]
 
@@ -100,3 +100,5 @@ def generate_group_members_report(args, respond, logger):
             logger.info(f"Sheet '{group['name']}' updated")
 
         time.sleep(1.1)
+
+    respond("Google Groups Members report generated.")
