@@ -1,4 +1,4 @@
-from slack_bolt import Ack, App, Respond
+from slack_bolt import Ack, Respond
 from slack_sdk import WebClient
 from logging import Logger
 
