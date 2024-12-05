@@ -128,7 +128,7 @@ def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
 def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {"id": "test_document_id"}
     result = google_drive.create_file("test_document", "folder_id", "document")
-    assert result == "test_document_id"
+    assert result == {"id": "test_document_id"}
     execute_google_api_call_mock.assert_called_once_with(
         "drive",
         "v3",
@@ -140,7 +140,7 @@ def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_moc
             "parents": ["folder_id"],
         },
         supportsAllDrives=True,
-        fields="id",
+        fields="id, name",
     )
 
 
