@@ -11,9 +11,7 @@ from integrations.google_workspace import (
 load_dotenv()
 
 DELEGATED_USER_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
-FOLDER_REPORTS_GOOGLE_GROUPS = os.environ.get(
-    "FOLDER_REPORTS_GOOGLE_GROUPS", ""
-)
+FOLDER_REPORTS_GOOGLE_GROUPS = os.environ.get("FOLDER_REPORTS_GOOGLE_GROUPS", "")
 
 
 def generate_report(args, respond):
