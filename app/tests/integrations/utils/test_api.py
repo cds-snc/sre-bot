@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 import pytest
 import string
 from integrations.utils.api import (
@@ -260,11 +260,17 @@ def test_retry_request_success():
     mock_func.assert_called_once()
 
 
-def test_retry_request_success_after_retries():
+@patch("logging.warning")
+def test_retry_request_success_after_retries(mock_logging_warning):
     mock_func = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "success"])
     result = retry_request(mock_func, max_attempts=3, delay=1)
     assert result == "success"
     assert mock_func.call_count == 3
+    assert mock_logging_warning.call_count == 2
+    assert mock_logging_warning.call_args_list == [
+        call("Error on attempt 1: fail"),
+        call("Error on attempt 2: fail"),
+    ]
 
 
 def test_retry_request_failure():
@@ -284,12 +290,19 @@ def test_retry_request_delay(mock_sleep):
 
 
 @patch("logging.warning")
-def test_retry_request_logging(mock_logging_warning):
+def test_retry_request_logging(mock_logging_warning: MagicMock):
     mock_func = MagicMock(side_effect=Exception("fail"))
     with pytest.raises(Exception, match="fail"):
         retry_request(mock_func, max_attempts=3, delay=1)
     assert mock_func.call_count == 3
-    mock_logging_warning.assert_called_once_with("Error after 3 attempts: fail")
+    assert mock_logging_warning.call_count == 3
+    mock_logging_warning.assert_has_calls(
+        [
+            call("Error on attempt 1: fail"),
+            call("Error on attempt 2: fail"),
+            call("Error after 3 attempts: fail"),
+        ]
+    )
 
 
 def test_retry_request_passes_args_and_kwargs():
