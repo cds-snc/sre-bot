@@ -12,7 +12,7 @@ load_dotenv()
 
 DELEGATED_USER_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
 FOLDER_REPORTS_GOOGLE_GROUPS = os.environ.get(
-    "FOLDER_REPORTS_GOOGLE_GROUPS", "18IYoyg5AFz3ZsZSSqvP1iaJur1V3Fmvi"
+    "FOLDER_REPORTS_GOOGLE_GROUPS", ""
 )
 
 
@@ -22,6 +22,9 @@ def generate_report(args, respond):
 
 def generate_group_members_report(args, respond, logger):
     """Generate a report of Google Groups members."""
+    if not FOLDER_REPORTS_GOOGLE_GROUPS:
+        respond("Google Drive folder for reports not set.")
+        return
     exclude_groups = ["AWS-"]
     logger.info("Generating Google Groups Members report...")
     filename = f"groups_report_{datetime.now().strftime('%Y-%m-%d')}"
