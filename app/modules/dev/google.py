@@ -13,8 +13,6 @@ load_dotenv()
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
-REPORT_GOOGLE_GROUPS_FOLDER = "18IYoyg5AFz3ZsZSSqvP1iaJur1V3Fmvi"
-GROUPS_MEMBERSHIPS_FOLDER = "1KPwrP-fWA0VVCrxW22Z4GJLcTb5-Avjf"
 
 
 def get_members(group):
