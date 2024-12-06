@@ -34,7 +34,7 @@ def manage_roles(client: WebClient, body, ack, respond):
         channel_name.startswith("incident-") and len("incident-") :
     ]
     channel_name = channel_name[channel_name.startswith("dev-") and len("dev-") :]
-    documents = google_drive.get_file_by_name(channel_name)
+    documents = google_drive.find_files_by_name(channel_name)
 
     if len(documents) == 0:
         respond(

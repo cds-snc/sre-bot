@@ -11,6 +11,7 @@ from logging import Logger
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
 from modules.dev import core as dev_core
+from modules.reports import core as reports
 from integrations.slack import commands as slack_commands
 
 help_text = """
@@ -66,6 +67,8 @@ def sre_command(
             dev_core.dev_command(ack, logger, respond, client, body, args)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
+        case "reports":
+            reports.reports_command(args, ack, command, logger, respond, client, body)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"

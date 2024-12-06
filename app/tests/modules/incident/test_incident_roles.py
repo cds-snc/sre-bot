@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch, ANY
 from modules.incident import incident_roles as incident_helper
 
 
-@patch("modules.incident.incident_roles.google_drive.get_file_by_name")
+@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
 def test_manage_roles(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {
@@ -22,7 +22,7 @@ def test_manage_roles(get_document_by_channel_name_mock):
     client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
 
 
-@patch("modules.incident.incident_roles.google_drive.get_file_by_name")
+@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
 def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {
@@ -40,7 +40,7 @@ def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     )
 
 
-@patch("modules.incident.incident_roles.google_drive.get_file_by_name")
+@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
 def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {

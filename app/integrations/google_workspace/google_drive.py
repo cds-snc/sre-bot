@@ -198,14 +198,26 @@ def create_file(name, folder, file_type):
         "create",
         body={"name": name, "parents": [folder], "mimeType": mime_type_value},
         supportsAllDrives=True,
-        fields="id",
+        fields="id, name",
     )
 
-    return result["id"]
+    return result
 
 
 @handle_google_api_errors
-def get_file_by_name(name, folder_id=None):
+def get_file_by_id(id):
+    return execute_google_api_call(
+        "drive",
+        "v3",
+        "files",
+        "get",
+        fileId=id,
+        supportsAllDrives=True,
+    )
+
+
+@handle_google_api_errors
+def find_files_by_name(name, folder_id=None):
     """Get a file by name in a specific Google Drive folder.
 
     This function requires the caller to have the necessary permissions to access the file in Google Workspace.
