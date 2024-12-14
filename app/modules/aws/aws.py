@@ -27,7 +27,7 @@ help_text = """
 \n        Supports multiple users for a single operation | Supporte plusieurs utilisateurs pour l'opération
 \n        `<operation>`: `create` or/ou `delete`
 \n        `<user>`: email address or Slack username of the user | adresse courriel ou identifiant Slack de l'utilisateur
-\n        Usage: `/aws user create @username user.name@email.com`
+\n        Usage: `/aws users create @username user.name@email.com`
 \n `/aws groups <operation> <group1> <group2> ...`
 \n      - Manage AWS groups | Gérer les groupes AWS
 \n        `<operation>`: `sync`, `list`
