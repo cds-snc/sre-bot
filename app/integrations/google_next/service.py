@@ -22,9 +22,7 @@ from functools import wraps
 from typing import Any, Callable
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import build, Resource  # type: ignore
-from googleapiclient.errors import HttpError, Error  # type: ignore
-from google.auth.exceptions import RefreshError  # type: ignore
-from integrations.utils.api import convert_kwargs_to_camel_case
+from googleapiclient.errors import HttpError  # type: ignore
 
 load_dotenv()
 # Define the default arguments
@@ -83,10 +81,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        non_critical_errors = {
-            "get_user": ["timed out"],
-            "get_sheet": ["Unable to parse range"],
-        }
+        warnings = ["timed out", "HttpError 404"]
         argument_string = ", ".join(
             [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
         )
@@ -94,56 +89,23 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 
         try:
             result = func(*args, **kwargs)
-            # Check if the result is a tuple and has two elements (for backward compatibility)
-            if isinstance(result, tuple) and len(result) == 2:
-                result, unsupported_params = result
-                if unsupported_params:
-                    logging.warning(
-                        f"Unknown parameters in '{func.__module__}:{func.__name__}' were detected: {', '.join(unsupported_params)}"
-                    )
             return result
         except HttpError as e:
             message = str(e)
-            func_name = func.__name__
-            if func_name in non_critical_errors and any(
-                error in message for error in non_critical_errors[func_name]
-            ):
+            if any(error in message for error in warnings):
                 logging.warning(
-                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
+                    f"An HTTP error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
                 )
             else:
                 logging.error(
                     f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
                 )
                 raise e
-        except ValueError as e:
-            logging.error(
-                f"A ValueError occurred in function '{func.__module__}:{func.__name__}': {e}"
-            )
-            raise e
-        except RefreshError as e:
-            logging.error(
-                f"A RefreshError occurred in function '{func.__module__}:{func.__name__}': {e}"
-            )
-            raise e
-        except Error as e:
+        except Exception as e:  # Catch-all for any other types of exceptions
+            message = str(e)
             logging.error(
                 f"An error occurred in function '{func.__module__}:{func.__name__}': {e}"
             )
-            raise e
-        except Exception as e:  # Catch-all for any other types of exceptions
-            message = str(e)
-            func_name = func.__name__
-            if func_name in non_critical_errors and any(
-                error in message for error in non_critical_errors[func_name]
-            ):
-                logging.warning(
-                    f"A non critical error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
-                )
-            else:
-                logging.error(
-                    f"An unexpected error occurred in function '{func.__module__}:{func.__name__}': {e}"
-                )
             raise e
 
     return wrapper

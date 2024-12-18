@@ -11,7 +11,6 @@ from integrations.google_next.service import (
 )
 from google.oauth2.service_account import Credentials
 from googleapiclient.errors import HttpError, Error  # type: ignore
-from google.auth.exceptions import RefreshError  # type: ignore
 from json import JSONDecodeError
 
 
@@ -110,23 +109,6 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
 
 
 @patch("logging.error")
-def test_handle_google_api_errors_catches_value_error(mocked_logging_error: MagicMock):
-    mock_func = MagicMock(side_effect=ValueError("ValueError message"))
-    mock_func.__name__ = "mock_func"
-    mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
-
-    with pytest.raises(ValueError, match="ValueError message"):
-        result = decorated_func()
-        assert result is None
-
-    mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "A ValueError occurred in function 'mock_module:mock_func': ValueError message"
-    )
-
-
-@patch("logging.error")
 def test_handle_google_api_errors_catches_error(mocked_logging_error: MagicMock):
     mock_func = MagicMock(side_effect=Error("Error message"))
     mock_func.__name__ = "mock_func"
@@ -159,7 +141,7 @@ def test_handle_google_api_errors_catches_exception(
 
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_once_with(
-        "An unexpected error occurred in function 'mock_module:mock_func': Exception message"
+        "An error occurred in function 'mock_module:mock_func': Exception message"
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
@@ -173,7 +155,7 @@ def test_handle_google_api_errors_catches_exception(
 
     mock_func.assert_called_once()
     mocked_logging_error.assert_called_with(
-        "An unexpected error occurred in function 'mock_module:list_groups': timed out"
+        "An error occurred in function 'mock_module:list_groups': timed out"
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
@@ -186,63 +168,23 @@ def test_handle_google_api_errors_catches_exception(
         assert result is None
 
     mock_func.assert_called_once()
-    mocked_logging_warning.assert_called_once_with(
-        "A non critical error occurred in function 'mock_module:get_user(arg1, arg2, a=b)': timed out"
-    )
-
-
-@patch("logging.error")
-def test_handle_google_api_errors_catches_refresh_error(
-    mocked_logging_error: MagicMock,
-):
-    mock_func = MagicMock(side_effect=RefreshError("RefreshError message"))
-    mock_func.__name__ = "mock_func"
-    mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
-
-    with pytest.raises(RefreshError, match="RefreshError message"):
-        decorated_func()
-
-    mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "A RefreshError occurred in function 'mock_module:mock_func': RefreshError message"
+    mocked_logging_error.assert_called_with(
+        "An error occurred in function 'mock_module:get_user': timed out"
     )
 
 
 def test_handle_google_api_errors_passes_through_return_value():
-    mock_func = MagicMock(return_value=("test", set()))
+    mock_func = MagicMock(return_value=("test"))
     decorated_func = handle_google_api_errors(mock_func)
 
     result = decorated_func()
 
     assert result == "test"
     mock_func.assert_called_once()
-
-
-@patch("logging.warning")
-def test_handle_google_api_errors_processes_unsupported_params(
-    mocked_logging_warning: MagicMock,
-):
-    mock_func = MagicMock(return_value=("test", {"unsupported"}))
-    mock_func.__name__ = "mock_func"
-    mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
-
-    result = decorated_func()
-
-    assert result == "test"
-    mock_func.assert_called_once()
-    mocked_logging_warning.assert_called_once_with(
-        "Unknown parameters in 'mock_module:mock_func' were detected: unsupported"
-    )
 
 
 @patch("integrations.google_next.service.getattr")
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
 def test_execute_google_api_call_calls_getattr_with_service_and_resource(
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
     mock_getattr: MagicMock,
 ):
     mock_service = MagicMock()
@@ -257,14 +199,7 @@ def test_execute_google_api_call_calls_getattr_with_service_and_resource(
     mock_getattr.assert_has_calls(calls)
 
 
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
-def test_execute_google_api_call_when_paginate_is_false(
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
-):
-    mock_get_google_api_command_parameters.return_value = ["arg1"]
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+def test_execute_google_api_call_when_paginate_is_false():
 
     mock_service = MagicMock()
 
@@ -284,14 +219,7 @@ def test_execute_google_api_call_when_paginate_is_false(
     assert result == ({"key": "value"})
 
 
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
-def test_execute_google_api_call_when_paginate_is_true(
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
-):
-    mock_get_google_api_command_parameters.return_value = ["arg1"]
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+def test_execute_google_api_call_when_paginate_is_true():
 
     mock_service = MagicMock()
 
@@ -341,14 +269,7 @@ def test_execute_google_api_call_when_paginate_is_true(
     assert mock_method_next.call_count == 2
 
 
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
-def test_execute_google_api_call_with_nested_resource_path(
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
-):
-    mock_get_google_api_command_parameters.return_value = ["arg1"]
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+def test_execute_google_api_call_with_nested_resource_path():
 
     mock_service = MagicMock()
 
@@ -372,14 +293,7 @@ def test_execute_google_api_call_with_nested_resource_path(
     assert result == ("result")
 
 
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
-def test_execute_google_api_call_with_nested_resource_path_throws_error(
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
-):
-    mock_get_google_api_command_parameters.return_value = ["arg1"]
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
+def test_execute_google_api_call_with_nested_resource_path_throws_error():
 
     mock_service = MagicMock()
 
@@ -397,16 +311,10 @@ def test_execute_google_api_call_with_nested_resource_path_throws_error(
     assert "Error accessing resource2 on resource object" in str(e.value)
 
 
-@patch("integrations.google_next.service.convert_kwargs_to_camel_case")
-@patch("integrations.google_next.service.get_google_api_command_parameters")
 @patch("integrations.google_next.service.getattr")
 def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
     mock_getattr,
-    mock_get_google_api_command_parameters,
-    mock_convert_kwargs_to_camel_case,
 ):
-    mock_get_google_api_command_parameters.return_value = ["arg1"]
-    mock_convert_kwargs_to_camel_case.return_value = {"arg1": "value1"}
 
     mock_service = MagicMock()
     mock_resource = MagicMock()
