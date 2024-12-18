@@ -121,7 +121,9 @@ def test_handle_google_api_errors_catches_http_warning(
     mock_func.__module__ = "mock_module"
     decorated_func = handle_google_api_errors(mock_func)
 
-    with pytest.raises(HttpError, match='<HttpError 404 "Resource Not Found: userKey">'):
+    with pytest.raises(
+        HttpError, match='<HttpError 404 "Resource Not Found: userKey">'
+    ):
         result = decorated_func(arg="value")
         assert result is None
 
