@@ -90,7 +90,7 @@ def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
 
 
 @patch("logging.error")
-def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
+def test_handle_google_api_errors_catches_http_error(mocked_logging_error: MagicMock):
     mock_resp = MagicMock()
     mock_resp.status = "400"
     mock_resp.reason = "Bad Request"
@@ -105,6 +105,28 @@ def test_handle_google_api_errors_catches_http_error(mocked_logging_error):
 
     mocked_logging_error.assert_called_once_with(
         "An HTTP error occurred in function 'mock_module:mock_func': <HttpError 400 \"Bad Request\">"
+    )
+
+
+@patch("logging.warning")
+def test_handle_google_api_errors_catches_http_warning(
+    mocked_logging_warning: MagicMock,
+):
+    mock_resp = MagicMock()
+    mock_resp.status = "404"
+    mock_resp.reason = "Resource Not Found: userKey"
+    mock_resp.getheaders.return_value = {}
+    mock_func = MagicMock(side_effect=HttpError(resp=mock_resp, content=b""))
+    mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
+    decorated_func = handle_google_api_errors(mock_func)
+
+    # with pytest.raises(HttpError, match='<HttpError 404 "Resource Not Found: userKey">'):
+    result = decorated_func(arg="value")
+    assert result is None
+
+    mocked_logging_warning.assert_called_once_with(
+        "An HTTP error occurred in function 'mock_module:mock_func(arg=value)': <HttpError 404 \"Resource Not Found: userKey\">"
     )
 
 
@@ -181,6 +203,12 @@ def test_handle_google_api_errors_passes_through_return_value():
 
     assert result == "test"
     mock_func.assert_called_once()
+
+
+def test_execute_google_api_call_raises_exception_if_service_is_none():
+    with pytest.raises(ValueError) as e:
+        execute_google_api_call(None, "resource", "method")
+    assert "Service not provided" in str(e.value)
 
 
 @patch("integrations.google_next.service.getattr")

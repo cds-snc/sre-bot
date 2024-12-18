@@ -81,7 +81,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        warnings = ["timed out", "HttpError 404"]
+        warnings = ["timed out", "resource not found"]
         argument_string = ", ".join(
             [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
         )
@@ -91,7 +91,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
             result = func(*args, **kwargs)
             return result
         except HttpError as e:
-            message = str(e)
+            message = str(e).lower()
             if any(error in message for error in warnings):
                 logging.warning(
                     f"An HTTP error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
