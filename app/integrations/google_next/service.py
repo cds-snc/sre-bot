@@ -100,7 +100,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 logging.error(
                     f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
                 )
-                raise e
+            raise e
         except Exception as e:  # Catch-all for any other types of exceptions
             message = str(e)
             logging.error(
