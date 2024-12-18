@@ -281,7 +281,7 @@ def test_execute_google_api_call_when_paginate_is_false(
     result = execute_google_api_call(mock_service, "resource", "method", arg1="value1")
 
     mock_resource.method.assert_called_once_with(arg1="value1")
-    assert result == ({"key": "value"}, set())
+    assert result == ({"key": "value"})
 
 
 @patch("integrations.google_next.service.convert_kwargs_to_camel_case")
@@ -333,7 +333,7 @@ def test_execute_google_api_call_when_paginate_is_true(
         mock_service, "resource", "method", paginate=True, arg1="value1"
     )
 
-    assert result == (["value1", "value2", "value3"], set())
+    assert result == (["value1", "value2", "value3"])
     mock_resource.method.assert_called_once_with(arg1="value1")
     mock_resource.method_next.assert_any_call(
         mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"}
@@ -369,7 +369,7 @@ def test_execute_google_api_call_with_nested_resource_path(
     )
 
     mock_resource2.method.assert_called_once_with(arg1="value1")
-    assert result == ("result", set())
+    assert result == ("result")
 
 
 @patch("integrations.google_next.service.convert_kwargs_to_camel_case")

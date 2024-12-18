@@ -187,23 +187,17 @@ def execute_google_api_call(
     except Exception as e:
         raise AttributeError(f"Error executing API method {method}. Exception: {e}")
 
-    supported_params = get_google_api_command_parameters(service, method)
-    formatted_kwargs = convert_kwargs_to_camel_case(kwargs) if kwargs else {}
-    filtered_params = {
-        k: v for k, v in formatted_kwargs.items() if k in supported_params
-    }
-    unsupported_params = set(formatted_kwargs.keys()) - set(filtered_params.keys())
     if paginate:
         all_results = []
-        request = api_method(**filtered_params)
+        request = api_method(**kwargs)
         while request is not None:
             results = request.execute()
             if results is not None:
                 all_results.extend(results.get(resource, []))
             request = getattr(service, method + "_next")(request, results)
-        return all_results, unsupported_params
+        return all_results
     else:
-        return api_method(**filtered_params).execute(), unsupported_params
+        return api_method(**kwargs).execute()
 
 
 def get_google_api_command_parameters(service, method):
