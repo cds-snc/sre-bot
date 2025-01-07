@@ -3,7 +3,7 @@ version: '3'
 services:
   dynamodb-local:
     command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
-    image: "amazon/dynamodb-local:latest@sha256:c884c806c3de4b9aa05dea0b3827137bd16e70bb5b72f14ad132cbe27a786d26"
+    image: "amazon/dynamodb-local:latest@sha256:cf8cebd061f988628c02daff10fdb950a54478feff9c52f6ddf84710fe3c3906"
     container_name: dynamodb-local
     ports:
       - "9000:8000"
