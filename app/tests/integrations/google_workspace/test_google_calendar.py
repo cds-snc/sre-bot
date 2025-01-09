@@ -714,31 +714,34 @@ def test_api_returns_empty_list(requests_mock):
     assert holidays == [], "Expected an empty list when there are no holidays"
 
 
-# Test that a leap year is correctly handled
 def test_leap_year_handling(requests_mock):
-    # set the timeout to 10s
+    # Set the timeout to 10s
     requests_mock.DEFAULT_TIMEOUT = 10
 
-    # get the curent year
-    current_year = datetime.now().year
-    # Mock response for a leap year with an extra day
-    # Bandit skip security check for the requests_mock.get call
-    requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
-        json={
-            "holidays": [
-                {
-                    "observedDate": "2024-02-29"
-                }  # Assuming this is a special leap year holiday
-            ]
-        },
-    )
+    # Mock the current date to a date in 2024
+    with patch('integrations.google_workspace.google_calendar.datetime') as mock_datetime:
+        # Configure the mock to return 2024 when .now() is called
+        mock_now = datetime(2024, 6, 15)  # Any date in 2024
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime.datetime(*args, **kwargs)
 
-    # Execute
-    holidays = google_calendar.get_federal_holidays()
+        # Mock the API response for 2024
+        requests_mock.get(  # nosec
+            "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+            json={
+                "holidays": [
+                    {
+                        "observedDate": "2024-02-29"
+                    }  # Assuming this is a special leap year holiday
+                ]
+            },
+        )
 
-    # Verify leap year is considered
-    assert "2024-02-29" in holidays, "Leap year date should be included in the holidays"
+        # Execute the function
+        holidays = google_calendar.get_federal_holidays()
+
+        # Verify leap year is considered
+        assert "2024-02-29" in holidays, "Leap year date should be included in the holidays"
 
 
 def test_get_utc_hour_same_zone():
