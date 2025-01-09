@@ -645,6 +645,9 @@ def test_no_available_slots_within_search_limit(
 def test_get_federal_holidays(requests_mock):
     # set the timeout to 10s
     requests_mock.DEFAULT_TIMEOUT = 10
+
+    # get the current year
+    current_year = datetime.now().year
     # Mock the API response
     mocked_response = {
         "holidays": [
@@ -655,7 +658,7 @@ def test_get_federal_holidays(requests_mock):
     }
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
         json=mocked_response,
     )
 
@@ -694,10 +697,13 @@ def test_get_federal_holidays_with_different_year(requests_mock):
 def test_api_returns_empty_list(requests_mock):
     # set the timeout to 10s
     requests_mock.DEFAULT_TIMEOUT = 10
+
+    # get the current year
+    current_year = datetime.now().year
     # Mock no holidays
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
         json={"holidays": []},
     )
 
@@ -712,10 +718,14 @@ def test_api_returns_empty_list(requests_mock):
 def test_leap_year_handling(requests_mock):
     # set the timeout to 10s
     requests_mock.DEFAULT_TIMEOUT = 10
+
+    # get the curent year
+    current_year = datetime.now().year
+    
     # Mock response for a leap year with an extra day
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
         json={
             "holidays": [
                 {
