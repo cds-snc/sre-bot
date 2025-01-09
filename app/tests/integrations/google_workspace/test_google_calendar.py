@@ -721,7 +721,6 @@ def test_leap_year_handling(requests_mock):
 
     # get the curent year
     current_year = datetime.now().year
-    
     # Mock response for a leap year with an extra day
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
