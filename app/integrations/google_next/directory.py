@@ -165,6 +165,8 @@ def list_groups_with_members(
     if len(groups) == 0:
         return []
 
+    users = list_users(service)
+
     if groups_filters is not None:
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
@@ -187,14 +189,14 @@ def list_groups_with_members(
             group["error"] = f"Error getting members: {e}"
             logger.warning(f"Error getting members for group {group['email']}: {e}")
             continue
-        members = get_members_details(service, members)
+        members = get_members_details(members, users)
         if members:
             group.update({"members": members})
             groups_with_members.append(group)
     return groups_with_members
 
 
-def get_members_details(service: Resource, members: list[dict]):
+def get_members_details(members: list[dict], users: list[dict]):
     """Get user details for a list of members.
 
     Args:
@@ -206,24 +208,13 @@ def get_members_details(service: Resource, members: list[dict]):
     """
 
     for member in members:
-        user_details = {}
-        try:
-            logger.info(f"Getting user details for member: {member['email']}")
-            user_details = retry_request(
-                get_user,
-                service,
-                member["email"],
-                max_attempts=3,
-                delay=1,
-                fields="name, primaryEmail",
-            )
-        except Exception as e:
-            member["error"] = f"{e}"
-            logger.warning(
-                f"Error getting user details for member {member['email']}: {e}"
-            )
-            continue
+        logger.info(f"Getting user details for member: {member}")
+        user_details = next(
+            (user for user in users if user["primaryEmail"] == member["email"]), None
+        )
         if user_details:
             member.update(user_details)
+        else:
+            raise ValueError(f"User not found: {member['email']}")
 
     return members
