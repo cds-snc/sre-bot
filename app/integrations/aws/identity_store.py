@@ -313,7 +313,7 @@ def list_groups_with_memberships(
     if groups_filters is not None:
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
-    logger.info(f"Founds {len(groups)} groups in AWS Identity Store.")
+    logger.info(f"Found {len(groups)} groups in AWS Identity Store.")
 
     filtered_groups = [
         {
@@ -323,6 +323,9 @@ def list_groups_with_memberships(
         }
         for group in groups
     ]
+
+    users = list_users()
+    logger.info(f"Found {len(users)} users in AWS Identity Store.")
 
     groups_with_memberships = []
     for group in filtered_groups:
@@ -338,10 +341,11 @@ def list_groups_with_memberships(
         for membership in memberships:
             member_details = {}
             try:
-                logger.info(
-                    f"Getting details for member: {membership['MemberId']['UserId']}"
+                member_details = next(
+                    member
+                    for member in users
+                    if member["UserId"] == membership["MemberId"]["UserId"]
                 )
-                member_details = describe_user(membership["MemberId"]["UserId"])
             except Exception as error:
                 logger.warning(
                     f"Error getting details for member {membership['MemberId']['UserId']}: {error}"

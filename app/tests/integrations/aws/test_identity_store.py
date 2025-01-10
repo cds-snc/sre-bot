@@ -771,9 +771,9 @@ def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):
 
 @patch("integrations.aws.identity_store.list_groups")
 @patch("integrations.aws.identity_store.list_group_memberships")
-@patch("integrations.aws.identity_store.describe_user")
+@patch("integrations.aws.identity_store.list_users")
 def test_list_groups_with_memberships(
-    mock_describe_user,
+    mock_list_users,
     mock_list_group_memberships,
     mock_list_groups,
     aws_groups,
@@ -844,11 +844,7 @@ def test_list_groups_with_memberships(
 
     mock_list_group_memberships.side_effect = memberships
 
-    user_side_effect = []
-    for user in users:
-        user_side_effect.append(user)
-
-    mock_describe_user.side_effect = user_side_effect
+    mock_list_users.return_value = users
 
     result = identity_store.list_groups_with_memberships()
 
@@ -870,21 +866,21 @@ def test_list_groups_with_memberships_empty_groups(
     assert mock_describe_user.call_count == 0
 
 
-@patch("integrations.aws.identity_store.filters.filter_by_condition")
 @patch("integrations.aws.identity_store.list_groups")
 @patch("integrations.aws.identity_store.list_group_memberships")
-@patch("integrations.aws.identity_store.describe_user")
+@patch("integrations.aws.identity_store.list_users")
 def test_list_groups_with_memberships_filtered(
-    mock_describe_user,
+    mock_list_users,
     mock_list_group_memberships,
     mock_list_groups,
-    mock_filter_by_condition,
     aws_groups,
     aws_groups_memberships,
     aws_users,
 ):
     groups = aws_groups(2, prefix="test-")
+    # create two groups without the prefix with positions 3 and 4
     groups_to_filter_out = aws_groups(4)[2:]
+    # add the groups to filter out to the groups list
     groups.extend(groups_to_filter_out)
     memberships = [
         [],
@@ -950,12 +946,10 @@ def test_list_groups_with_memberships_filtered(
 
     mock_list_group_memberships.side_effect = memberships
 
-    mock_describe_user.side_effect = [users[0], users[1], users[0], users[1]]
-    mock_filter_by_condition.return_value = groups[:2]
+    mock_list_users.return_value = users
     groups_filters = [lambda group: "test-" in group["DisplayName"]]
     result = identity_store.list_groups_with_memberships(groups_filters=groups_filters)
 
     assert result == expected_output
-    assert mock_filter_by_condition.call_count == 1
     assert mock_list_group_memberships.call_count == 2
-    assert mock_describe_user.call_count == 2
+    assert mock_list_users.call_count == 1
