@@ -310,7 +310,6 @@ def test_list_groups_with_members_updates_group_with_group_error(
     mock_list_users.side_effect = users
     mock_retry_request.side_effect = [Exception("Exception"), group_members[1]]
     mock_get_members_details.side_effect = [
-        
         [
             {
                 "id": "test_member_id2",
@@ -537,4 +536,6 @@ def test_get_members_details_returns_members_with_error(
             call("Getting user details for member: email2"),
         ]
     )
-    mock_logger.warning.assert_called_once_with("User details not found for member: email1")
+    mock_logger.warning.assert_called_once_with(
+        "User details not found for member: email1"
+    )

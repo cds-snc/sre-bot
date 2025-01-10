@@ -192,7 +192,9 @@ def list_groups_with_members(
         members = get_members_details(members, users)
         if members:
             group.update({"members": members})
-            if any(member.get("error") for member in members) and not group.get("error"):
+            if any(member.get("error") for member in members) and not group.get(
+                "error"
+            ):
                 group["error"] = "Error getting members details."
             groups_with_members.append(group)
     return groups_with_members
