@@ -333,9 +333,9 @@ def test_add_users_to_group_skips_when_no_members(mock_list_group_members):
 
 @patch("integrations.google_workspace.google_directory.list_groups")
 @patch("integrations.google_workspace.google_directory.list_group_members")
-@patch("integrations.google_workspace.google_directory.get_user")
+@patch("integrations.google_workspace.google_directory.list_users")
 def test_list_groups_with_members(
-    mock_get_user,
+    mock_list_users,
     mock_list_group_members,
     mock_list_groups,
     google_groups,
@@ -352,7 +352,7 @@ def test_list_groups_with_members(
 
     mock_list_groups.return_value = groups
     mock_list_group_members.side_effect = group_members
-    mock_get_user.side_effect = users
+    mock_list_users.return_value = users
 
     assert google_directory.list_groups_with_members() == groups_with_users
 
@@ -360,9 +360,9 @@ def test_list_groups_with_members(
 @patch("integrations.google_workspace.google_directory.filters.filter_by_condition")
 @patch("integrations.google_workspace.google_directory.list_groups")
 @patch("integrations.google_workspace.google_directory.list_group_members")
-@patch("integrations.google_workspace.google_directory.get_user")
+@patch("integrations.google_workspace.google_directory.list_users")
 def test_list_groups_with_members_filtered(
-    mock_get_user,
+    mock_list_users,
     mock_list_group_members,
     mock_list_groups,
     mock_filter_by_condition,
@@ -382,7 +382,7 @@ def test_list_groups_with_members_filtered(
 
     mock_list_groups.return_value = groups
     mock_list_group_members.side_effect = group_members
-    mock_get_user.side_effect = users
+    mock_list_users.return_value = users
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
 
@@ -392,14 +392,16 @@ def test_list_groups_with_members_filtered(
     )
     assert mock_filter_by_condition.called_once_with(groups, groups_filters)
     assert mock_list_group_members.call_count == 2
-    assert mock_get_user.call_count == 2
+    assert mock_list_users.call_count == 1
 
 
+@patch("integrations.google_workspace.google_directory.list_users")
 @patch("integrations.google_workspace.google_directory.retry_request")
 @patch("integrations.google_workspace.google_directory.list_groups")
 def test_list_groups_with_members_error_in_list_group_members(
     mock_list_groups,
     mock_retry_request,
+    mock_list_users,
     google_groups,
     google_group_members,
     google_users,
@@ -416,6 +418,7 @@ def test_list_groups_with_members_error_in_list_group_members(
         users[0],
         users[1],
     ]
+    mock_list_users.return_value = users
 
     # Only the second group should be processed
     expected_groups_with_users = [groups[1]]
@@ -426,6 +429,7 @@ def test_list_groups_with_members_error_in_list_group_members(
     assert google_directory.list_groups_with_members() == expected_groups_with_users
 
 
+@patch("integrations.google_workspace.google_directory.list_users")
 @patch("integrations.google_workspace.google_directory.get_members_details")
 @patch("integrations.google_workspace.google_directory.retry_request")
 @patch("integrations.google_workspace.google_directory.list_groups")
@@ -433,6 +437,7 @@ def test_list_groups_with_members_error_in_get_user(
     mock_list_groups,
     mock_retry_request,
     mock_get_members_details,
+    mock_list_users,
     google_groups,
     google_group_members,
     google_users,
@@ -455,6 +460,7 @@ def test_list_groups_with_members_error_in_get_user(
         [],
         group_members[1],
     ]
+    mock_list_users.return_value = users
 
     # Only the second group should be processed
     expected_groups_with_users = [groups[1]]
@@ -465,11 +471,13 @@ def test_list_groups_with_members_error_in_get_user(
     assert google_directory.list_groups_with_members() == expected_groups_with_users
 
 
+@patch("integrations.google_workspace.google_directory.list_users")
 @patch("integrations.google_workspace.google_directory.retry_request")
 @patch("integrations.google_workspace.google_directory.list_groups")
 def test_list_groups_with_members_tolerate_errors(
     mock_list_groups,
     mock_retry_request,
+    mock_list_users,
     google_groups_w_users,
 ):
 
@@ -500,7 +508,7 @@ def test_list_groups_with_members_tolerate_errors(
     ]
 
     users = [
-        Exception("Error fetching user details"),
+        # Exception("Error fetching user details"),
         {"id": "user2", "name": "user2", "primaryEmail": "email2"},
         {"id": "user3", "name": "user3", "primaryEmail": "email3"},
         {"id": "user4", "name": "user4", "primaryEmail": "email4"},
@@ -509,12 +517,10 @@ def test_list_groups_with_members_tolerate_errors(
     mock_list_groups.return_value = groups
     mock_retry_request.side_effect = [
         group_members[0],
-        users[0],
-        users[1],
         group_members[1],
-        users[2],
-        users[3],
     ]
+
+    mock_list_users.return_value = users
 
     # Expected result should include both groups, with the second group having one member
     expected_groups_with_users = [
@@ -583,9 +589,9 @@ def test_list_groups_with_members_skips_when_no_groups(mock_list_groups):
 @patch("integrations.google_workspace.google_directory.filters.filter_by_condition")
 @patch("integrations.google_workspace.google_directory.list_groups")
 @patch("integrations.google_workspace.google_directory.list_group_members")
-@patch("integrations.google_workspace.google_directory.get_user")
+@patch("integrations.google_workspace.google_directory.list_users")
 def test_list_groups_with_members_filtered_dataframe(
-    mock_get_user,
+    mock_list_users,
     mock_list_group_members,
     mock_list_groups,
     mock_filter_by_condition,
@@ -605,7 +611,7 @@ def test_list_groups_with_members_filtered_dataframe(
 
     mock_list_groups.return_value = groups
     mock_list_group_members.side_effect = group_members
-    mock_get_user.side_effect = users
+    mock_list_users.return_value = users
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
 
@@ -631,40 +637,32 @@ def test_list_groups_with_members_filtered_dataframe(
     }
 
 
-@patch("integrations.google_workspace.google_directory.retry_request")
-def test_get_members_details_breaks_on_error(mock_retry_request):
+def test_get_members_details_breaks_on_error():
     members = [
         {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
         {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
     ]
 
     users = [
-        Exception("Error fetching user details"),
         {"name": "user2", "primaryEmail": "email2"},
     ]
 
-    mock_retry_request.side_effect = [users[0], users[1]]
-
-    result = google_directory.get_members_details(members)
+    result = google_directory.get_members_details(members, users)
 
     assert result == []
 
 
-@patch("integrations.google_workspace.google_directory.retry_request")
-def test_get_members_details_continues_on_tolerate_errors(mock_retry_request):
+def test_get_members_details_continues_on_tolerate_errors():
     members = [
         {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
         {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
     ]
 
     users = [
-        Exception("Error fetching user details"),
         {"name": "user2", "primaryEmail": "email2"},
     ]
 
-    mock_retry_request.side_effect = [users[0], users[1]]
-
-    result = google_directory.get_members_details(members, tolerate_errors=True)
+    result = google_directory.get_members_details(members, users, tolerate_errors=True)
 
     expected_result = [
         members[0],
