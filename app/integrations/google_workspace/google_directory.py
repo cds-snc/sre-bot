@@ -246,7 +246,8 @@ def get_members_details(members: list[dict], users: list[dict], tolerate_errors=
         user_details = None
         try:
             user_details = next(
-                (user for user in users if user["primaryEmail"] == member["email"]), None
+                (user for user in users if user["primaryEmail"] == member["email"]),
+                None,
             )
             if not user_details:
                 raise Exception("User details not found.")
