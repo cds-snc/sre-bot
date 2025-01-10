@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
@@ -62,12 +63,18 @@ def request_groups_sync(client, body, respond, args, logger):
         )
         logger.info("Synchronizing AWS Identity Center Groups.")
         respond("AWS Groups Memberships Synchronization Initiated.")
+        start_time = datetime.now()
         identity_center.synchronize(
             enable_users_sync=False,
             enable_user_create=False,
             enable_membership_create=True,
             enable_membership_delete=True,
             pre_processing_filters=pre_processing_filters,
+        )
+        end_time = datetime.now()
+        time = end_time - start_time
+        respond(
+            f"AWS Groups Memberships Synchronization Completed in {time.total_seconds():.6f} seconds."
         )
     else:
         logger.error(f"User {requestor_email} does not have permission to sync groups.")

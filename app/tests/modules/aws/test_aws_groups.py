@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock, call, ANY
+import datetime
 from modules.aws import groups
 
 
@@ -62,11 +63,12 @@ def test_aws_groups_command_handles_list_command(mock_request_groups_list):
     logger.info.assert_not_called()
 
 
+@patch("modules.aws.groups.datetime")
 @patch("modules.aws.groups.slack_users")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.identity_center")
 def test_request_groups_sync_synchronizes_groups(
-    mock_identity_center, mock_permissions, mock_slack_users
+    mock_identity_center, mock_permissions, mock_slack_users, mock_datetime
 ):
     client = MagicMock()
     body = MagicMock()
@@ -77,6 +79,10 @@ def test_request_groups_sync_synchronizes_groups(
     mock_slack_users.get_user_email_from_body.return_value = "admin.user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
     mock_identity_center.synchronize.return_value = None
+    mock_datetime.now.side_effect = [
+        datetime.datetime(2021, 1, 1, 0, 0, 0),
+        datetime.datetime(2021, 1, 1, 0, 0, 20),
+    ]
 
     groups.request_groups_sync(client, body, respond, args, logger)
 
@@ -92,24 +98,37 @@ def test_request_groups_sync_synchronizes_groups(
         enable_membership_delete=True,
         pre_processing_filters=[],
     )
-    respond.assert_called_once_with("AWS Groups Memberships Synchronization Initiated.")
+    respond.assert_has_calls(
+        [
+            call("AWS Groups Memberships Synchronization Initiated."),
+            call(
+                "AWS Groups Memberships Synchronization Completed in 20.000000 seconds."
+            ),
+        ]
+    )
 
 
+@patch("modules.aws.groups.datetime")
 @patch("modules.aws.groups.slack_users")
-@patch("modules.aws.groups.permissions")
+@patch(
+    "modules.aws.groups.permissions",
+)
 @patch("modules.aws.groups.identity_center")
 def test_request_groups_sync_synchronizes_groups_with_args(
-    mock_identity_center, mock_permissions, mock_slack_users
+    mock_identity_center, mock_permissions, mock_slack_users, mock_datetime
 ):
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
     args = ["group1", "group2"]
     logger = MagicMock()
-
     mock_slack_users.get_user_email_from_body.return_value = "admin.user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
     mock_identity_center.synchronize.return_value = None
+    mock_datetime.now.side_effect = [
+        datetime.datetime(2021, 1, 1, 0, 0, 0),
+        datetime.datetime(2021, 1, 1, 0, 0, 20),
+    ]
 
     groups.request_groups_sync(client, body, respond, args, logger)
 
@@ -125,7 +144,14 @@ def test_request_groups_sync_synchronizes_groups_with_args(
         enable_membership_delete=True,
         pre_processing_filters=ANY,
     )
-    respond.assert_called_once_with("AWS Groups Memberships Synchronization Initiated.")
+    respond.assert_has_calls(
+        [
+            call("AWS Groups Memberships Synchronization Initiated."),
+            call(
+                "AWS Groups Memberships Synchronization Completed in 20.000000 seconds."
+            ),
+        ]
+    )
 
 
 @patch("modules.aws.groups.slack_users")
