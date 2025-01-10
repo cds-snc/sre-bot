@@ -198,6 +198,7 @@ def list_groups_with_members(
             groups = filters.filter_by_condition(groups, groups_filter)
     logger.info(f"Found {len(groups)} groups.")
 
+    users = list_users()
     filtered_groups = [
         {
             k: v
@@ -222,7 +223,7 @@ def list_groups_with_members(
             logger.warning(f"Error getting members for group {group['email']}: {e}")
             continue
 
-        members = get_members_details(members, tolerate_errors)
+        members = get_members_details(members, users, tolerate_errors)
         if members:
             group.update({"members": members})
             groups_with_members.append(group)
@@ -230,27 +231,25 @@ def list_groups_with_members(
     return groups_with_members
 
 
-def get_members_details(members: list[dict], tolerate_errors=False):
+def get_members_details(members: list[dict], users: list[dict], tolerate_errors=False):
     """Get user details for a list of members.
 
     Args:
         members (list): A list of member objects.
+        users (list): A list of user objects.
         tolerate_errors (bool): Whether to tolerate errors when getting user details.
 
     Returns:"""
 
     error_occured = False
     for member in members:
-        user_details = {}
+        user_details = None
         try:
-            logger.info(f"Getting user details for member: {member['email']}")
-            user_details = retry_request(
-                get_user,
-                member["email"],
-                max_attempts=3,
-                delay=1,
-                fields="name, primaryEmail",
+            user_details = next(
+                (user for user in users if user["primaryEmail"] == member["email"]), None
             )
+            if not user_details:
+                raise Exception("User details not found.")
         except Exception as e:
             logger.warning(
                 f"Error getting user details for member {member['email']}: {e}"
@@ -260,7 +259,6 @@ def get_members_details(members: list[dict], tolerate_errors=False):
                 break
         if user_details:
             member.update(user_details)
-
     return members if not error_occured or tolerate_errors else []
 
 
