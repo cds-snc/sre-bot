@@ -1,6 +1,6 @@
 """"Unit tests for the Google Directory API."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from integrations.google_next import directory
@@ -232,7 +232,6 @@ def test_list_groups_with_members_filtered_by_condition(
     group_members = [[], google_group_members(2)]
     users = google_users(2)
     groups_with_users = google_groups_w_users(4, 2, group_prefix="test-")[:2]
-    print("DEBUG: groups_with_users", groups_with_users)
     groups_with_users.remove(groups_with_users[0])
 
     mock_list_groups.return_value = groups
@@ -257,7 +256,7 @@ def test_list_groups_with_members_filtered_by_condition(
 @patch("integrations.google_next.directory.list_groups")
 @patch("integrations.google_next.directory.list_group_members")
 @patch("integrations.google_next.directory.list_users")
-def test_list_groups_with_members_update_group_with_error(
+def test_list_groups_with_members_updates_group_with_group_error(
     mock_list_users: MagicMock,
     mock_list_group_members: MagicMock,
     mock_list_groups: MagicMock,
@@ -270,8 +269,8 @@ def test_list_groups_with_members_update_group_with_error(
     mock_service = MagicMock()
 
     groups = [
-        {"id": "test_group_id1", "name": "test_group1", "email": "email1"},
-        {"id": "test_group_id2", "name": "test_group2", "email": "email2"},
+        {"id": "test_group_id1", "name": "test_group1", "email": "group_email1"},
+        {"id": "test_group_id2", "name": "test_group2", "email": "group_email2"},
     ]
 
     group_members = [
@@ -288,13 +287,13 @@ def test_list_groups_with_members_update_group_with_error(
         {
             "id": "test_group_id1",
             "name": "test_group1",
-            "email": "email1",
+            "email": "group_email1",
             "error": "Error getting members: Exception",
         },
         {
             "id": "test_group_id2",
             "name": "test_group2",
-            "email": "email2",
+            "email": "group_email2",
             "members": [
                 {
                     "id": "test_member_id2",
@@ -311,7 +310,7 @@ def test_list_groups_with_members_update_group_with_error(
     mock_list_users.side_effect = users
     mock_retry_request.side_effect = [Exception("Exception"), group_members[1]]
     mock_get_members_details.side_effect = [
-        Exception("Exception"),
+        
         [
             {
                 "id": "test_member_id2",
@@ -325,87 +324,217 @@ def test_list_groups_with_members_update_group_with_error(
     with pytest.raises(Exception):
         assert directory.list_groups_with_members(mock_service) == expected_output
 
-    mock_logger.warning.assert_called_once_with(
-        "Error getting members for group email1: Exception"
+    mock_logger.info.assert_has_calls(
+        [
+            call("Found 2 groups."),
+            call("Found 2 groups after filtering."),
+            call("Getting members for group: group_email1"),
+            call("Getting members for group: group_email2"),
+        ]
     )
+    mock_logger.warning.assert_called_once_with(
+        "Error getting members for group group_email1: Exception"
+    )
+    mock_logger.error.assert_not_called()
 
 
-# @patch("integrations.google_next.directory.retry_request")
-# @patch("integrations.google_next.directory.list_users")
-# def test_get_members_details_returns_members(
-#     mock_list_users: MagicMock, mock_retry_request: MagicMock
-# ):
-#     """Test get_members_details returns members."""
-#     mock_service = MagicMock()
-#     members = [
-#         {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
-#         {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
-#     ]
+@patch("integrations.google_next.directory.logger")
+@patch("integrations.google_next.directory.get_members_details")
+@patch("integrations.google_next.directory.retry_request")
+@patch("integrations.google_next.directory.list_groups")
+@patch("integrations.google_next.directory.list_group_members")
+@patch("integrations.google_next.directory.list_users")
+def test_list_groups_with_members_updates_group_with_user_details_error(
+    mock_list_users: MagicMock,
+    mock_list_group_members: MagicMock,
+    mock_list_groups: MagicMock,
+    mock_retry_request: MagicMock,
+    mock_get_members_details: MagicMock,
+    mock_logger: MagicMock,
+):
+    """Test list_groups_with_members returns groups with members."""
 
-#     users = [
-#         {"name": "user1", "primaryEmail": "email1"},
-#         {"name": "user2", "primaryEmail": "email2"},
-#     ]
+    mock_service = MagicMock()
 
-#     mock_retry_request.side_effect = [users[0], users[1]]
+    groups = [
+        {"id": "test_group_id1", "name": "test_group1", "email": "group_email1"},
+        {"id": "test_group_id2", "name": "test_group2", "email": "group_email2"},
+    ]
 
-#     expected_result = [
-#         {
-#             "email": "email1",
-#             "role": "MEMBER",
-#             "type": "USER",
-#             "status": "ACTIVE",
-#             "name": "user1",
-#             "primaryEmail": "email1",
-#         },
-#         {
-#             "email": "email2",
-#             "role": "MEMBER",
-#             "type": "USER",
-#             "status": "ACTIVE",
-#             "name": "user2",
-#             "primaryEmail": "email2",
-#         },
-#     ]
+    group_members1 = [
+        [{"id": "test_member_id1", "email": "email1"}],
+        [{"id": "test_member_id2", "email": "email2"}],
+    ]
+    group_members2 = [
+        [{"id": "test_member_id2", "email": "email2"}],
+        [{"id": "test_member_id3", "email": "email3"}],
+    ]
 
-#     assert directory.get_members_details(mock_service, members) == expected_result
+    users = [
+        {"id": "test_user_id2", "name": "test_user2", "email": "email2"},
+        {"id": "test_user_id3", "name": "test_user3", "email": "email3"},
+    ]
+
+    expected_output = [
+        {
+            "id": "test_group_id1",
+            "name": "test_group1",
+            "email": "group_email1",
+            "members": [
+                {
+                    "id": "test_member_id1",
+                    "email": "email1",
+                    "error": "User details not found",
+                },
+                {
+                    "id": "test_member_id2",
+                    "email": "email2",
+                    "name": "test_user2",
+                    "primaryEmail": "email2",
+                },
+            ],
+            "error": "Error getting members details.",
+        },
+        {
+            "id": "test_group_id2",
+            "name": "test_group2",
+            "email": "group_email2",
+            "members": [
+                {
+                    "id": "test_member_id2",
+                    "email": "email2",
+                    "name": "test_user2",
+                    "primaryEmail": "email2",
+                },
+                {
+                    "id": "test_member_id3",
+                    "email": "email3",
+                    "name": "test_user3",
+                    "primaryEmail": "email3",
+                },
+            ],
+        },
+    ]
+
+    mock_list_groups.return_value = groups
+    mock_list_users.side_effect = users
+    mock_retry_request.side_effect = [group_members1, group_members2]
+    mock_get_members_details.side_effect = [
+        [
+            {
+                "id": "test_member_id1",
+                "email": "email1",
+                "error": "User details not found",
+            },
+            {
+                "id": "test_member_id2",
+                "email": "email2",
+                "name": "test_user2",
+                "primaryEmail": "email2",
+            },
+        ],
+        [
+            {
+                "id": "test_member_id2",
+                "email": "email2",
+                "name": "test_user2",
+                "primaryEmail": "email2",
+            },
+            {
+                "id": "test_member_id3",
+                "email": "email3",
+                "name": "test_user3",
+                "primaryEmail": "email3",
+            },
+        ],
+    ]
+
+    assert directory.list_groups_with_members(mock_service) == expected_output
+
+    mock_logger.info.assert_has_calls(
+        [
+            call("Found 2 groups."),
+            call("Found 2 groups after filtering."),
+            call("Getting members for group: group_email1"),
+            call("Getting members for group: group_email2"),
+        ]
+    )
+    mock_logger.warning.assert_not_called()
+    mock_logger.error.assert_not_called()
 
 
-# @patch("integrations.google_next.directory.retry_request")
-# @patch("integrations.google_next.directory.list_users")
-# def test_get_members_details_returns_members_with_error(
-#     mock_get_user: MagicMock, mock_retry_request: MagicMock
-# ):
-#     """Test get_members_details returns members."""
-#     mock_service = MagicMock()
-#     members = [
-#         {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
-#         {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
-#     ]
+def test_get_members_details_returns_members():
+    """Test get_members_details returns members."""
+    members = [
+        {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+        {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+    ]
 
-#     users = [
-#         Exception("Error fetching user details"),
-#         {"name": "user2", "primaryEmail": "email2"},
-#     ]
+    users = [
+        {"name": "user1", "primaryEmail": "email1"},
+        {"name": "user2", "primaryEmail": "email2"},
+    ]
 
-#     mock_retry_request.side_effect = [users[0], users[1]]
+    expected_result = [
+        {
+            "email": "email1",
+            "role": "MEMBER",
+            "type": "USER",
+            "status": "ACTIVE",
+            "name": "user1",
+            "primaryEmail": "email1",
+        },
+        {
+            "email": "email2",
+            "role": "MEMBER",
+            "type": "USER",
+            "status": "ACTIVE",
+            "name": "user2",
+            "primaryEmail": "email2",
+        },
+    ]
 
-#     expected_result = [
-#         {
-#             "email": "email1",
-#             "role": "MEMBER",
-#             "type": "USER",
-#             "status": "ACTIVE",
-#             "error": "Error fetching user details",
-#         },
-#         {
-#             "email": "email2",
-#             "role": "MEMBER",
-#             "type": "USER",
-#             "status": "ACTIVE",
-#             "name": "user2",
-#             "primaryEmail": "email2",
-#         },
-#     ]
+    assert directory.get_members_details(members, users) == expected_result
 
-#     assert directory.get_members_details(mock_service, members) == expected_result
+
+@patch("integrations.google_next.directory.logger")
+def test_get_members_details_returns_members_with_error(
+    mock_logger: MagicMock,
+):
+    """Test get_members_details returns members."""
+    members = [
+        {"email": "email1", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+        {"email": "email2", "role": "MEMBER", "type": "USER", "status": "ACTIVE"},
+    ]
+
+    users = [
+        {"name": "user2", "primaryEmail": "email2"},
+    ]
+
+    expected_result = [
+        {
+            "email": "email1",
+            "role": "MEMBER",
+            "type": "USER",
+            "status": "ACTIVE",
+            "error": "User details not found",
+        },
+        {
+            "email": "email2",
+            "role": "MEMBER",
+            "type": "USER",
+            "status": "ACTIVE",
+            "name": "user2",
+            "primaryEmail": "email2",
+        },
+    ]
+
+    assert directory.get_members_details(members, users) == expected_result
+
+    mock_logger.info.assert_has_calls(
+        [
+            call("Getting user details for member: email1"),
+            call("Getting user details for member: email2"),
+        ]
+    )
+    mock_logger.warning.assert_called_once_with("User details not found for member: email1")
