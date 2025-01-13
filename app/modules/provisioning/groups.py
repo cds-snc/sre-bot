@@ -1,5 +1,5 @@
 from logging import getLogger
-from integrations.google_workspace import google_directory
+from integrations.google_next import directory
 from integrations.aws import identity_store
 from utils import filters
 
@@ -37,14 +37,17 @@ def get_groups_from_integration(
     match integration_source:
         case "google_groups":
             logger.info("Getting Google Groups with members.")
-            groups = google_directory.list_groups_with_members(
+            google_dir_scopes = [
+                "https://www.googleapis.com/auth/admin.directory.group.readonly",
+                "https://www.googleapis.com/auth/admin.directory.group.member.readonly",
+                "https://www.googleapis.com/auth/admin.directory.user.readonly",
+            ]
+            directory_service = directory.get_directory_service(scopes=google_dir_scopes)
+            groups = directory.list_groups_with_members(
+                directory_service,
                 groups_filters=pre_processing_filters,
                 query=query,
             )
-            if return_dataframe:
-                groups_dataframe = (
-                    google_directory.convert_google_groups_members_to_dataframe(groups)
-                )
             integration_name = "Google"
             group_display_key = "name"
             members = "members"

@@ -1,26 +1,28 @@
 import logging
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from modules.provisioning import groups
 
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_google(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
     google_groups_w_users,
 ):
     google_groups = google_groups_w_users(n_groups=3, n_users=3)
-    mock_google_list_groups_with_members.return_value = google_groups
+    mock_service = MagicMock
+    mock_google_directory.get_directory_service.return_value = mock_service
+    mock_google_directory.list_groups_with_members.return_value = google_groups
 
     response = groups.get_groups_from_integration("google_groups")
 
     assert response == google_groups
 
-    assert mock_google_list_groups_with_members.called_once_with(
-        query=None, members_details=True
+    assert mock_google_directory.list_groups_with_members.called_once_with(
+        mock_service, query=None, members_details=True
     )
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
@@ -28,23 +30,25 @@ def test_get_groups_from_integration_google(
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_google_query(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
     google_groups_w_users,
 ):
     google_groups = google_groups_w_users(n_groups=3, n_users=3, group_prefix="aws-")
     google_groups.extend(google_groups_w_users(n_groups=3, n_users=3))
-    mock_google_list_groups_with_members.return_value = google_groups[:3]
+    mock_service = MagicMock
+    mock_google_directory.get_directory_service.return_value = mock_service
+    mock_google_directory.list_groups_with_members.return_value = google_groups[:3]
 
     query = "email:aws-*"
     response = groups.get_groups_from_integration("google_groups", query=query)
 
     assert response == google_groups[:3]
 
-    assert mock_google_list_groups_with_members.called_once_with(
+    assert mock_google_directory.called_once_with(
         query="email:aws-*", members_details=True
     )
     assert not mock_filters.filter_by_condition.called
@@ -53,9 +57,9 @@ def test_get_groups_from_integration_google_query(
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_case_aws(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
     aws_groups_w_users,
@@ -69,25 +73,27 @@ def test_get_groups_from_integration_case_aws(
 
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
     assert not mock_filters.filter_by_condition.called
-    assert not mock_google_list_groups_with_members.called
+    assert not mock_google_directory.called
 
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_empty_groups(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
 ):
     google_groups = []
-    mock_google_list_groups_with_members.return_value = google_groups
+    mock_service = MagicMock
+    mock_google_directory.get_directory_service.return_value = mock_service
+    mock_google_directory.list_groups_with_members.return_value = google_groups
 
     response = groups.get_groups_from_integration("google_groups")
 
     assert response == google_groups
 
-    assert mock_google_list_groups_with_members.called_once_with(
+    assert mock_google_directory.called_once_with(
         query=None, members_details=True
     )
     assert not mock_filters.filter_by_condition.called
@@ -96,9 +102,9 @@ def test_get_groups_from_integration_empty_groups(
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_case_invalid(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
 ):
@@ -108,14 +114,14 @@ def test_get_groups_from_integration_case_invalid(
 
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
-    assert not mock_google_list_groups_with_members.called
+    assert not mock_google_directory.called
 
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_filters_applied(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
     aws_groups_w_users,
@@ -146,14 +152,14 @@ def test_get_groups_from_integration_filters_applied(
         aws_groups_prefix, post_processing_filters
     )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
-    assert not mock_google_list_groups_with_members.called
+    assert not mock_google_directory.called
 
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-@patch("modules.provisioning.groups.google_directory.list_groups_with_members")
+@patch("modules.provisioning.groups.directory")
 def test_get_groups_from_integration_filters_returns_subset(
-    mock_google_list_groups_with_members,
+    mock_google_directory,
     mock_aws_list_groups_with_memberships,
     mock_filters,
     aws_groups_w_users,
@@ -183,7 +189,7 @@ def test_get_groups_from_integration_filters_returns_subset(
         aws_groups_prefix, post_processing_filters
     )
     assert mock_aws_list_groups_with_memberships.called_once_with(members_details=True)
-    assert not mock_google_list_groups_with_members.called
+    assert not mock_google_directory.called
 
 
 @patch("modules.provisioning.groups.filters")
