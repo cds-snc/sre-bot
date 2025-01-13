@@ -42,7 +42,9 @@ def get_groups_from_integration(
                 "https://www.googleapis.com/auth/admin.directory.group.member.readonly",
                 "https://www.googleapis.com/auth/admin.directory.user.readonly",
             ]
-            directory_service = directory.get_directory_service(scopes=google_dir_scopes)
+            directory_service = directory.get_directory_service(
+                scopes=google_dir_scopes
+            )
             groups = directory.list_groups_with_members(
                 directory_service,
                 groups_filters=pre_processing_filters,
