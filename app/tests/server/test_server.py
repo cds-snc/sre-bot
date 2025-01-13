@@ -5,7 +5,6 @@ from server.server import AccessRequest
 import urllib.parse
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
-# from httpx import AsyncClient
 from starlette.types import Scope
 from starlette.datastructures import Headers, MutableHeaders
 import os
