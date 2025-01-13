@@ -18,8 +18,6 @@ logger = getLogger(__name__)
 
 def get_directory_service(scopes=None, delegated_email=None):
     """Get authenticated directory service for Google Workspace."""
-    if not scopes:
-        scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
     if not delegated_email:
         delegated_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     return get_google_service("admin", "directory_v1", scopes, delegated_email)

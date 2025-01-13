@@ -8,6 +8,33 @@ from integrations.google_next import directory
 GOOGLE_WORKSPACE_CUSTOMER_ID = "test_customer_id"
 
 
+@patch("integrations.google_next.directory.get_google_service")
+def test_get_directory_service_returns_service(mock_get_google_service: MagicMock):
+    """Test get_directory_service returns a service."""
+    mock_get_google_service.return_value = MagicMock()
+    mock_delegated_email = "email@test.com"
+    assert (
+        directory.get_directory_service(delegated_email=mock_delegated_email)
+        is not None
+    )
+    mock_get_google_service.assert_called_once_with(
+        "admin", "directory_v1", None, "email@test.com"
+    )
+
+
+@patch("integrations.google_next.directory.GOOGLE_DELEGATED_ADMIN_EMAIL", new="test_email")
+@patch("integrations.google_next.directory.get_google_service")
+def test_get_directory_service_returns_service_with_default_email(
+    mock_get_google_service: MagicMock,
+):
+    """Test get_directory_service returns a service with default email."""
+    mock_get_google_service.return_value = MagicMock()
+    assert directory.get_directory_service() is not None
+    mock_get_google_service.assert_called_once_with(
+        "admin", "directory_v1", None, "test_email"
+    )
+
+
 @patch("integrations.google_next.directory.execute_google_api_call")
 def test_get_user_returns_user(mock_execute_google_api_call: MagicMock):
     """Test get_user returns a user."""
