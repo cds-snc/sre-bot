@@ -20,6 +20,7 @@ app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
 client = TestClient(app)
 
+
 @patch("server.server.maxmind.geolocate")
 def test_geolocate_success(mock_geolocate):
     mock_geolocate.return_value = "country", "city", "latitude", "longitude"
@@ -624,21 +625,6 @@ async def test_rate_limit_handler():
     # Assert the content of the response
     assert response.body.decode("utf-8") == '{"message":"Rate limit exceeded"}'
 
-
-# @pytest.mark.asyncio
-# async def test_logout_rate_limiting():
-#     transport = httpx.MockTransport(app)
-#     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-#         # Make 5 requests to the logout endpoint
-#         for _ in range(5):
-#             response = await client.get("/logout")
-#             assert response.status_code == 307
-#             assert response.url.path == "/logout"
-
-#         # The 6th request should be rate limited
-#         response = await client.get("/logout")
-#         assert response.status_code == 429
-#         assert response.json() == {"message": "Rate limit exceeded"}
 
 @pytest.mark.asyncio
 async def test_logout_rate_limiting():
