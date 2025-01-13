@@ -5,7 +5,7 @@ from server.server import AccessRequest
 import urllib.parse
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
-from httpx import AsyncClient
+# from httpx import AsyncClient
 from starlette.types import Scope
 from starlette.datastructures import Headers, MutableHeaders
 import os
@@ -13,13 +13,13 @@ import pytest
 import datetime
 from fastapi.testclient import TestClient
 from fastapi import Request, HTTPException, status
+import httpx
 
 from models.webhooks import AwsSnsPayload, WebhookPayload
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
 client = TestClient(app)
-
 
 @patch("server.server.maxmind.geolocate")
 def test_geolocate_success(mock_geolocate):
@@ -626,9 +626,28 @@ async def test_rate_limit_handler():
     assert response.body.decode("utf-8") == '{"message":"Rate limit exceeded"}'
 
 
+# @pytest.mark.asyncio
+# async def test_logout_rate_limiting():
+#     transport = httpx.MockTransport(app)
+#     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+#         # Make 5 requests to the logout endpoint
+#         for _ in range(5):
+#             response = await client.get("/logout")
+#             assert response.status_code == 307
+#             assert response.url.path == "/logout"
+
+#         # The 6th request should be rate limited
+#         response = await client.get("/logout")
+#         assert response.status_code == 429
+#         assert response.json() == {"message": "Rate limit exceeded"}
+
 @pytest.mark.asyncio
 async def test_logout_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    # Use the MockTransport in the AsyncClient
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Make 5 requests to the logout endpoint
         for _ in range(5):
             response = await client.get("/logout")
@@ -643,7 +662,10 @@ async def test_logout_rate_limiting():
 
 @pytest.mark.asyncio
 async def test_login_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Set the environment variable for the test
         os.environ["ENVIRONMENT"] = "dev"
 
@@ -660,7 +682,10 @@ async def test_login_rate_limiting():
 
 @pytest.mark.asyncio
 async def test_auth_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Mock the OAuth process
         with patch(
             "server.server.oauth.google.authorize_access_token", new_callable=AsyncMock
@@ -682,7 +707,10 @@ async def test_auth_rate_limiting():
 
 @pytest.mark.asyncio
 async def test_user_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Simulate a logged in session
         session_data = {"user": {"given_name": "FirstName", "email": "test@test.com"}}
         headers = {"Cookie": f"session={session_data}"}
@@ -711,7 +739,10 @@ async def test_webhooks_rate_limiting(
     increment_invocation_count_mock,
     handle_string_payload_mock,
 ):
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         get_webhook_mock.return_value = {"channel": {"S": "test-channel"}}
         payload = '{"Type": "Notification"}'
         handle_string_payload_mock.return_value = {"ok": True}
@@ -728,7 +759,10 @@ async def test_webhooks_rate_limiting(
 
 @pytest.mark.asyncio
 async def test_version_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Make 5 requests to the version endpoint
         for _ in range(50):
             response = await client.get("/version")
@@ -742,7 +776,9 @@ async def test_version_rate_limiting():
 
 @pytest.mark.asyncio
 async def test_react_app_rate_limiting():
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Make 20 requests to the react_app endpoint
         for _ in range(20):
             response = await client.get("/some-path")
