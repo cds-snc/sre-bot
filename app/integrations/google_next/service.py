@@ -121,12 +121,9 @@ def execute_google_api_call(
     """Execute a Google API call on a resource.
 
     Args:
-        service_name (str): The name of the Google service.
-        version (str): The version of the Google service.
+        service (Resource): The Google service resource.
         resource_path (str): The path to the resource, which can include nested resources separated by dots.
         method (str): The method to call on the resource.
-        scopes (list, optional): The scopes for the Google service.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
         paginate (bool, optional): Whether to paginate the API call.
         **kwargs: Additional keyword arguments for the API call.
 
