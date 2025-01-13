@@ -93,9 +93,7 @@ def test_get_groups_from_integration_empty_groups(
 
     assert response == google_groups
 
-    assert mock_google_directory.called_once_with(
-        query=None, members_details=True
-    )
+    assert mock_google_directory.called_once_with(query=None, members_details=True)
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
 
