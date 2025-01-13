@@ -5,6 +5,8 @@ from googleapiclient.discovery import Resource  # type: ignore
 from integrations.google_next.service import (
     execute_google_api_call,
     handle_google_api_errors,
+    get_google_service,
+    GOOGLE_DELEGATED_ADMIN_EMAIL,
     GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
 from integrations.utils.api import retry_request
@@ -12,6 +14,15 @@ from utils import filters
 
 
 logger = getLogger(__name__)
+
+
+def get_directory_service(scopes=None, delegated_email=None):
+    """Get authenticated directory service for Google Workspace."""
+    if not scopes:
+        scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
+    if not delegated_email:
+        delegated_email = GOOGLE_DELEGATED_ADMIN_EMAIL
+    return get_google_service("admin", "directory_v1", scopes, delegated_email)
 
 
 @handle_google_api_errors
