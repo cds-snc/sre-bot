@@ -1,6 +1,5 @@
 """"Unit tests for the Google Directory API."""
 
-# import unittest
 from unittest.mock import MagicMock, call, patch
 
 import pytest
