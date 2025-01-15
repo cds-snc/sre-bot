@@ -2,6 +2,7 @@
 Google Service Module.
 
 This module provides a function to get an authenticated Google service, a decorator to handle Google API errors, and a generic function to execute the Google API call.
+The module can be used with the other Google Workspace modules or as a standalone module to interact with any Google Discovery API.
 
 Functions:
     get_google_service(service: str, version: str) -> googleapiclient.discovery.Resource:
@@ -37,7 +38,7 @@ def get_google_service(
     delegated_user_email: str | None = None,
 ) -> Resource:
     """
-    Get an authenticated Google service.
+    Get an authenticated Google service for the specified service and version.
 
     Args:
         service (str): The Google service to get.
@@ -47,6 +48,9 @@ def get_google_service(
 
     Returns:
         Resource: The authenticated Google service resource.
+
+    References:
+    https://developers.google.com/admin-sdk
     """
 
     creds_json = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
