@@ -1,6 +1,5 @@
 """"Unit tests for the Google Meet API."""
 
-# import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
