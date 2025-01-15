@@ -8,6 +8,7 @@ from slack_sdk import WebClient
 from integrations import opsgenie
 from integrations.slack import users as slack_users
 from integrations.sentinel import log_to_sentinel
+from integrations.google_next.meet import GoogleMeet
 
 from modules.incident import (
     incident_alert,
@@ -201,6 +202,8 @@ def handle_change_locale_button(ack, client, body):
 def submit(ack, view, say, body, client: WebClient, logger):
     ack()
 
+    gmeet_scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
+    gmeet = GoogleMeet(scopes=gmeet_scopes)
     errors = {}
 
     name = view["state"]["values"]["name"]["name"]["value"]
@@ -276,15 +279,15 @@ def submit(ack, view, say, body, client: WebClient, logger):
     client.conversations_invite(channel=channel_id, users=user_id)
 
     # Add meeting link
-    meet_link = f"https://g.co/meet/incident-{slug}"
-    # Max character length for Google Meet nickname is 60, 78 with constant URI
-    if len(meet_link) > 78:
-        meet_link = meet_link[:78]
+    meet_link = gmeet.create_space()
     client.bookmarks_add(
-        channel_id=channel_id, title="Meet link", type="link", link=meet_link
+        channel_id=channel_id,
+        title="Meet link",
+        type="link",
+        link=meet_link["meetingUri"],
     )
 
-    text = f"A hangout has been created at: {meet_link}"
+    text = f"A hangout has been created at: {meet_link['meetingUri']}"
     say(text=text, channel=channel_id)
 
     # Create incident document

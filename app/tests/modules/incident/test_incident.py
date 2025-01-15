@@ -205,6 +205,7 @@ def test_incident_local_button_calls_views_update(mock_list_incident_folders):
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -216,6 +217,7 @@ def test_incident_submit_calls_ack(
     _mock_create_incident_document,
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
+    _mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -227,6 +229,7 @@ def test_incident_submit_calls_ack(
     ack.assert_called()
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.generate_success_modal")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
@@ -240,6 +243,7 @@ def test_incident_submit_calls_views_open(
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
     _mock_generate_success_modal,
+    _mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -252,7 +256,10 @@ def test_incident_submit_calls_views_open(
     client.views_open.assert_called_once()
 
 
-def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
+@patch("modules.incident.incident.GoogleMeet")
+def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
+    _mock_google_meet,
+):
     ack = MagicMock()
     logger = MagicMock()
     view = helper_generate_view("!@#$%%^&*()_+-=[]{};':,./<>?\\|`~")
@@ -268,7 +275,10 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric():
     )
 
 
-def test_incident_submit_returns_error_if_description_is_too_long():
+@patch("modules.incident.incident.GoogleMeet")
+def test_incident_submit_returns_error_if_description_is_too_long(
+    _mock_google_meet,
+):
     ack = MagicMock()
     logger = MagicMock()
     view = helper_generate_view("a" * 61)
@@ -284,6 +294,7 @@ def test_incident_submit_returns_error_if_description_is_too_long():
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -295,6 +306,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _mock_create_incident_document,
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
+    _mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -316,6 +328,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -327,6 +340,7 @@ def test_incident_submit_creates_channel_sets_description(
     _mock_create_incident_document,
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
+    _mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -344,6 +358,7 @@ def test_incident_submit_creates_channel_sets_description(
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -355,6 +370,7 @@ def test_incident_submit_adds_creator_to_channel(
     _mock_create_incident_document,
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
+    _mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -378,45 +394,46 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
-@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
-@patch("modules.incident.incident.incident_document.update_boilerplate_text")
-@patch("modules.incident.incident.incident_document.create_incident_document")
-@patch("modules.incident.incident.incident_folder.get_folder_metadata")
-@patch("modules.incident.incident.log_to_sentinel")
-def test_incident_submit_truncates_meet_link_if_too_long(
-    _log_to_sentinel_mock,
-    _mock_get_folder_metadata,
-    _mock_create_incident_document,
-    _mock_update_boilerplate_text,
-    _mock_add_new_incident_to_list,
-):
-    ack = MagicMock()
-    logger = MagicMock()
-    name = "a" * 60
-    view = helper_generate_view(name)
-    meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
-    say = MagicMock()
-    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
-    client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": f"channel_{name}"}
-    }
-    incident.submit(ack, view, say, body, client, logger)
+# @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+# @patch("modules.incident.incident.incident_document.update_boilerplate_text")
+# @patch("modules.incident.incident.incident_document.create_incident_document")
+# @patch("modules.incident.incident.incident_folder.get_folder_metadata")
+# @patch("modules.incident.incident.log_to_sentinel")
+# def test_incident_submit_truncates_meet_link_if_too_long(
+#     _log_to_sentinel_mock,
+#     _mock_get_folder_metadata,
+#     _mock_create_incident_document,
+#     _mock_update_boilerplate_text,
+#     _mock_add_new_incident_to_list,
+# ):
+#     ack = MagicMock()
+#     logger = MagicMock()
+#     name = "a" * 60
+#     view = helper_generate_view(name)
+#     meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
+#     say = MagicMock()
+#     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+#     client = MagicMock()
+#     client.conversations_create.return_value = {
+#         "channel": {"id": "channel_id", "name": f"channel_{name}"}
+#     }
+#     incident.submit(ack, view, say, body, client, logger)
 
-    ack.assert_called()
-    client.bookmarks_add.assert_any_call(
-        channel_id="channel_id",
-        title="Meet link",
-        type="link",
-        link=meet_link,
-    )
+#     ack.assert_called()
+#     client.bookmarks_add.assert_any_call(
+#         channel_id="channel_id",
+#         title="Meet link",
+#         type="link",
+#         link=meet_link,
+#     )
 
-    args = client.bookmarks_add.call_args_list
-    _, kwargs = args[0]
+#     args = client.bookmarks_add.call_args_list
+#     _, kwargs = args[0]
 
-    assert len(kwargs["link"]) <= 78
+#     assert len(kwargs["link"]) <= 78
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -428,6 +445,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _mock_create_incident_document,
     _mock_update_boilerplate_text,
     _mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -438,21 +456,28 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
+    mock_google_meet_instance = mock_google_meet.return_value
+    mock_google_meet_instance.create_space.return_value = {
+        "name": "spaces/asdfasdf",
+        "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
+        "meetingCode": "aaa-bbbb-ccc",
+        "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
+    }
     incident.submit(ack, view, say, body, client, logger)
 
     client.bookmarks_add.assert_any_call(
         channel_id="channel_id",
         title="Meet link",
         type="link",
-        link=f"https://g.co/meet/incident-{DATE}-name",
+        link="https://meet.google.com/aaa-bbbb-ccc",
     )
-
     say.assert_any_call(
-        text=f"A hangout has been created at: https://g.co/meet/incident-{DATE}-name",
+        text="A hangout has been created at: https://meet.google.com/aaa-bbbb-ccc",
         channel="channel_id",
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -464,6 +489,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -494,6 +520,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -507,6 +534,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -552,6 +580,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -565,6 +594,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -609,6 +639,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -622,6 +653,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -664,6 +696,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -678,6 +711,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_google_meet,
 ):
     ack = MagicMock()
     logger = MagicMock()
