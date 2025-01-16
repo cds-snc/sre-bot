@@ -3,6 +3,7 @@ checkov==3.2.347
 coverage==6.5.0
 flake8==6.1.0
 freezegun==1.5.1
+httpx==0.28.1
 setuptools==70.3.0
 pytest==8.3.4
 pytest-asyncio==0.25.2
