@@ -55,3 +55,20 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
   alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
   ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
 }
+
+resource "aws_cloudwatch_metric_alarm" "sre_bot_failed_deployment" {
+  alarm_name          = "SRE Bot Failed Deployment"
+  alarm_description   = "Warnings logged by the SRE Bot"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+
+  metric_name               = "CPUUtilization"
+  namespace                 = "AWS/ECS"
+  period                    = "60"
+  evaluation_periods        = "120"
+  statistic                 = "Average"
+  threshold                 = "80"
+  insufficient_data_actions = []
+
+  alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
+  ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
+}

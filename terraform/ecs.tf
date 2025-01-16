@@ -60,6 +60,13 @@ resource "aws_ecs_service" "main" {
     container_port   = 8000
   }
 
+  # Enable deployment alarms
+  alarms {
+    enable      = true
+    rollback    = true
+    alarm_names = [aws_cloudwatch_metric_alarm.sre_bot_failed_deployment.alarm_name]
+  }
+
   tags = {
     "CostCentre" = var.billing_code
   }
