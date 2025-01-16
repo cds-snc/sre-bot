@@ -64,8 +64,8 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_high_cpu" {
   metric_name               = "CPUUtilization"
   namespace                 = "AWS/ECS"
   period                    = "60" # for 60 seconds
-  evaluation_periods        = "120"
-  statistic                 = "Average"
+  evaluation_periods        = "30"
+  statistic                 = "Maximum"
   threshold                 = "80" # trigger if cpu usage is above 80%
   insufficient_data_actions = []
 
