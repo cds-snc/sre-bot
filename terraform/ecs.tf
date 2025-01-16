@@ -64,7 +64,7 @@ resource "aws_ecs_service" "main" {
   alarms {
     enable      = true
     rollback    = true
-    alarm_names = [aws_cloudwatch_metric_alarm.sre_bot_failed_deployment.alarm_name]
+    alarm_names = [aws_cloudwatch_metric_alarm.sre_bot_high_cpu.alarm_name, aws_cloudwatch_metric_alarm.sre_bot_high_memory.alarm_name]
   }
 
   tags = {
