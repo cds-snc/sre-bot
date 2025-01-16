@@ -58,7 +58,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_failed_deployment" {
   alarm_name          = "SRE Bot Failed Deployment"
-  alarm_description   = "Warnings logged by the SRE Bot"
+  alarm_description   = "Deployement error for the SRE Bot"
   comparison_operator = "GreaterThanOrEqualToThreshold"
 
   metric_name               = "CPUUtilization"
