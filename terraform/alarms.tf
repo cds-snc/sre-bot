@@ -58,16 +58,21 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_high_cpu" {
   alarm_name          = "SRE Bot ECS High CPU Utilization"
-  alarm_description   = "ECS High CPU Utilization for the SRE Bot"
+  alarm_description   = "ECS High CPU Utilization has been detected"
   comparison_operator = "GreaterThanOrEqualToThreshold"
 
   metric_name               = "CPUUtilization"
   namespace                 = "AWS/ECS"
-  period                    = "60" # for 60 seconds
-  evaluation_periods        = "30"
+  period                    = "60" # for 1 minute period
+  evaluation_periods        = "5"
   statistic                 = "Maximum"
   threshold                 = "80" # trigger if cpu usage is above 80%
   insufficient_data_actions = []
+  treat_missing_data        = "notBreaching"
+  dimensions = {
+    ClusterName = "sre-bot-cluster"
+    ServiceName = "sre-bot-service"
+  }
 
   alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
   ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
@@ -75,16 +80,21 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_high_cpu" {
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_high_memory" {
   alarm_name          = "SRE Bot ECS High Memory Utilization"
-  alarm_description   = "ECS High Memory Utilization for the SRE Bot"
+  alarm_description   = "ECS High Memory Utilization has been detected"
   comparison_operator = "GreaterThanOrEqualToThreshold"
 
   metric_name               = "MemoryUtilization"
   namespace                 = "AWS/ECS"
   period                    = "60"
-  evaluation_periods        = "120"
-  statistic                 = "Average"
+  evaluation_periods        = "5"
+  statistic                 = "Maximum"
   threshold                 = "80" # trigger if memory usage is > 80% for 60 seconds period. 
   insufficient_data_actions = []
+  treat_missing_data        = "notBreaching"
+  dimensions = {
+    ClusterName = "sre-bot-cluster"
+    ServiceName = "sre-bot-service"
+  }
 
   alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
   ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
