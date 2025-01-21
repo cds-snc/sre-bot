@@ -265,7 +265,13 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
     Returns:
         bool: True if the status was updated successfully, False otherwise.
     """
-    valid_statuses = ["Open", "Closed", "In Progress", "Resolved"]
+    valid_statuses = [
+        "In Progress",
+        "Open",
+        "Ready to be Reviewed",
+        "Reviewed",
+        "Closed",
+    ]
     if status not in valid_statuses:
         logging.warning("Invalid status %s", status)
         return False
@@ -288,3 +294,14 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
             if updated_sheet:
                 return True
     return False
+
+
+def return_channel_name(input_str: str):
+    # return the channel name without the incident- prefix and appending a # to the channel name
+    prefix = "incident-"
+    dev_prefix = prefix + "dev-"
+    if input_str.startswith(dev_prefix):
+        return "#" + input_str[len(dev_prefix) :]
+    if input_str.startswith(prefix):
+        return "#" + input_str[len(prefix) :]
+    return input_str

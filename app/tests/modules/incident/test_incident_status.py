@@ -1,0 +1,225 @@
+from unittest.mock import MagicMock, call, patch
+from slack_sdk import WebClient
+from slack_bolt import Ack
+from modules.incident.incident_status import update_status
+
+
+@patch("modules.incident.incident_status.incident_folder")
+@patch("modules.incident.incident_status.incident_document")
+@patch("modules.incident.incident_status.google_docs")
+def test_update_status_success(
+    mock_google_docs,
+    mock_incident_document,
+    mock_incident_folder,
+):
+    client = MagicMock(spec=WebClient)
+    ack = MagicMock(spec=Ack)
+    respond = MagicMock()
+    incident_status = "Reviewed"
+    channel_id = "C123456"
+    channel_name = "incident-123"
+    user_id = "U123456"
+
+    client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/1234567890/edit",
+            }
+        ],
+    }
+    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_incident_folder.update_spreadsheet_incident_status.return_value = True
+    mock_incident_folder.return_channel_name.return_value = "123"
+
+    update_status(
+        client, ack, respond, incident_status, channel_id, channel_name, user_id
+    )
+
+    ack.assert_called_once()
+
+    client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
+    mock_google_docs.extract_google_doc_id.assert_called_once_with(
+        "https://docs.google.com/document/d/1234567890/edit"
+    )
+    mock_incident_document.update_incident_document_status.assert_called_once_with(
+        "1234567890", incident_status
+    )
+
+    mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
+        mock_incident_folder.return_channel_name.return_value, incident_status
+    )
+    client.chat_postMessage.assert_called_once_with(
+        channel=channel_id,
+        text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+    )
+    respond.assert_not_called()
+
+
+@patch("modules.incident.incident_status.incident_document")
+@patch("modules.incident.incident_status.incident_folder")
+@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.logging")
+def test_update_status_handles_bookmarks_list_errors(
+    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+):
+    client = MagicMock(spec=WebClient)
+    ack = MagicMock(spec=Ack)
+    respond = MagicMock()
+    incident_status = "Reviewed"
+    channel_id = "C123456"
+    channel_name = "incident-123"
+    user_id = "U123456"
+
+    client.bookmarks_list.side_effect = (Exception("error_bookmarks"),)
+
+    update_status(
+        client, ack, respond, incident_status, channel_id, channel_name, user_id
+    )
+
+    calls = [
+        call("Could not get bookmarks for channel incident-123: error_bookmarks"),
+        call(
+            "No bookmark link for the incident document found for channel incident-123"
+        ),
+    ]
+    client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
+    mock_logging.warning.assert_has_calls(calls)
+    respond.assert_has_calls(calls)
+    client.chat_postMessage.assert_called_once_with(
+        channel=channel_id,
+        text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+    )
+
+
+@patch("modules.incident.incident_status.incident_document")
+@patch("modules.incident.incident_status.incident_folder")
+@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.logging")
+def test_update_status_handles_update_document_errors(
+    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+):
+    client = MagicMock(spec=WebClient)
+    ack = MagicMock(spec=Ack)
+    respond = MagicMock()
+    incident_status = "Reviewed"
+    channel_id = "C123456"
+    channel_name = "incident-123"
+    user_id = "U123456"
+
+    client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/1234567890/edit",
+            }
+        ],
+    }
+    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_incident_document.update_incident_document_status.side_effect = Exception(
+        "error_document"
+    )
+    update_status(
+        client, ack, respond, incident_status, channel_id, channel_name, user_id
+    )
+
+    calls = [
+        call(
+            "Could not update the incident status in the document for channel incident-123: error_document"
+        ),
+    ]
+    client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
+    mock_logging.warning.assert_has_calls(calls)
+    respond.assert_has_calls(calls)
+    client.chat_postMessage.assert_called_once_with(
+        channel=channel_id,
+        text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+    )
+
+
+@patch("modules.incident.incident_status.incident_document")
+@patch("modules.incident.incident_status.incident_folder")
+@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.logging")
+def test_update_status_handles_update_spreadsheet_errors(
+    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+):
+    client = MagicMock(spec=WebClient)
+    ack = MagicMock(spec=Ack)
+    respond = MagicMock()
+    incident_status = "Reviewed"
+    channel_id = "C123456"
+    channel_name = "incident-123"
+    user_id = "U123456"
+
+    client.bookmarks_list.return_value = (
+        {
+            "ok": True,
+            "bookmarks": [
+                {
+                    "title": "Incident report",
+                    "link": "https://docs.google.com/document/d/1234567890/edit",
+                }
+            ],
+        },
+    )
+    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_incident_folder.update_spreadsheet_incident_status.side_effect = Exception(
+        "error_spreadsheet"
+    )
+    update_status(
+        client, ack, respond, incident_status, channel_id, channel_name, user_id
+    )
+
+    calls = [
+        call(
+            "Could not update the incident status in the spreadsheet for channel incident-123: error_spreadsheet"
+        ),
+    ]
+    client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
+    mock_logging.warning.assert_has_calls(calls)
+    respond.assert_has_calls(calls)
+    client.chat_postMessage.assert_called_once_with(
+        channel=channel_id,
+        text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+    )
+
+
+def test_update_status_handles_chat_postMessage_errors():
+    client = MagicMock(spec=WebClient)
+    ack = MagicMock(spec=Ack)
+    respond = MagicMock()
+    incident_status = "Reviewed"
+    channel_id = "C123456"
+    channel_name = "incident-123"
+    user_id = "U123456"
+
+    client.bookmarks_list.return_value = (
+        {
+            "ok": True,
+            "bookmarks": [
+                {
+                    "title": "Incident report",
+                    "link": "https://docs.google.com/document/d/1234567890/edit",
+                }
+            ],
+        },
+    )
+    client.chat_postMessage.side_effect = Exception("error_chat_postMessage")
+    update_status(
+        client, ack, respond, incident_status, channel_id, channel_name, user_id
+    )
+
+    calls = [
+        call(
+            "Could not post the incident status update to the channel incident-123: error_chat_postMessage"
+        ),
+    ]
+    client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
+    client.chat_postMessage.assert_called_once_with(
+        channel=channel_id,
+        text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+    )
+    respond.assert_has_calls(calls)
