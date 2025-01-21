@@ -9,9 +9,9 @@ from integrations.sentinel import log_to_sentinel
 from . import (
     incident_folder,
     incident_roles,
-    incident_document,
     schedule_retro,
 )
+from modules.incident import incident_status
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -142,7 +142,7 @@ def close_incident(client: WebClient, body, ack, respond):
 
     if not channel_name.startswith("incident-"):
         try:
-            response = client.chat_postEphemeral(
+            client.chat_postEphemeral(
                 text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
                 channel=channel_id,
                 user=user_id,
@@ -153,59 +153,36 @@ def close_incident(client: WebClient, body, ack, respond):
             )
         return
 
-    # get and update the incident document
-    document_id = ""
-    response = client.bookmarks_list(channel_id=channel_id)
-    if response["ok"]:
-        for item in range(len(response["bookmarks"])):
-            if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = google_docs.extract_google_doc_id(
-                    response["bookmarks"][item]["link"]
-                )
-    else:
-        warning_message = f"No bookmark link for the incident document found for channel {channel_name}"
-        logging.warning(warning_message)
-        respond(warning_message)
-
-    # Update the document status to "Closed" if we can get the document
-    if document_id != "":
-        incident_document.update_incident_document_status(document_id)
-    else:
-        warning_message = (
-            "Could not close the incident document - the document was not found."
-        )
-        logging.warning(warning_message)
-        respond(warning_message)
-
-    # Update the spreadsheet with the current incident with status = closed
-    update_succeeded = incident_folder.update_spreadsheet_incident_status(
-        return_channel_name(channel_name), "Closed"
+    incident_status.update_status(
+        client, ack, respond, "Closed", channel_id, channel_name, user_id
     )
-
-    if not update_succeeded:
-        warning_message = f"Could not update the incident status in the spreadsheet for channel {channel_name}"
-        logging.warning(warning_message)
-        respond(warning_message)
 
     # Need to post the message before the channel is archived so that the message can be delivered.
-    client.chat_postMessage(
-        channel=channel_id,
-        text=f"<@{user_id}> has archived this channel 👋",
-    )
+    try:
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"<@{user_id}> has archived this channel 👋",
+        )
+    except Exception as e:
+        logging.error(
+            f"Could not post message to channel {channel_name} due to error: {e}.",
+        )
 
     # archive the channel
-    response = client.conversations_archive(channel=channel_id)
-
-    # if the response is not successful, then we have to log the message
-    if not response["ok"]:
-        logging.error(
-            "Could not archive the channel %s - %s", channel_name, response["error"]
-        )
-    else:
-        # Log the message that the user has archived the channel.
+    try:
+        client.conversations_archive(channel=channel_id)
         logging.info(
             "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
         )
+        log_to_sentinel("incident_channel_archived", body)
+    except Exception as e:
+        error_message = (
+            f"Could not archive the channel {channel_name} due to error: {e}"
+        )
+        logging.error(
+            "Could not archive the channel %s due to error: %s", channel_name, e
+        )
+        respond(error_message)
 
 
 def stale_incidents(client: WebClient, body, ack: Ack):
