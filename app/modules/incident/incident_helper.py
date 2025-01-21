@@ -83,6 +83,8 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
             stale_incidents(client, body, ack)
         case "schedule":
             schedule_incident_retro(client, body, ack)
+        case "status":
+            handle_update_status_command(client, body, respond, ack, args)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -505,3 +507,31 @@ def return_channel_name(input_str: str):
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str
+
+
+def handle_update_status_command(
+    client: WebClient, body, respond: Respond, ack: Ack, args
+):
+    ack()
+    status = str.join(" ", args)
+    valid_statuses = [
+        "In Progress",
+        "Open",
+        "Ready to be Reviewed",
+        "Reviewed",
+        "Closed",
+    ]
+
+    if status not in valid_statuses:
+        respond("Invalid status. Valid statuses are: " + ", ".join(valid_statuses))
+    else:
+        respond(f"Updating incident status to {status}...")
+        incident_status.update_status(
+            client,
+            ack,
+            respond,
+            status,
+            body["channel_id"],
+            body["channel_name"],
+            body["user_id"],
+        )

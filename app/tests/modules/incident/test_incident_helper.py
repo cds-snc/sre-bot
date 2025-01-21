@@ -3,7 +3,7 @@ import os
 from modules import incident_helper
 import logging
 
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import ANY, MagicMock, patch
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
@@ -104,6 +104,22 @@ def test_handle_incident_command_with_retro(schedule_incident_retro_mock):
     ack = MagicMock()
     incident_helper.handle_incident_command(["schedule"], client, body, respond, ack)
     schedule_incident_retro_mock.assert_called_once_with(client, body, ack)
+
+
+@patch("modules.incident.incident_helper.handle_update_status_command")
+def test_handle_incident_command_with_update_status_command(
+    mock_handle_update_status_command,
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+    args = ["status", "Ready", "to", "be", "Reviewed"]
+    incident_helper.handle_incident_command(args, client, body, respond, ack)
+    args.pop(0)
+    mock_handle_update_status_command.assert_called_once_with(
+        client, body, respond, ack, args
+    )
 
 
 def test_handle_incident_command_with_unknown_command():
@@ -1187,4 +1203,63 @@ def test_save_incident_retro_failure(schedule_event_mock):
     assert (
         mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
         == "*Could not schedule event - no free time was found!*"
+    )
+
+
+@patch("modules.incident.incident_helper.incident_status")
+def test_handle_update_status_command(mock_incident_status):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+
+    args = ["Closed"]
+    # Call the function
+    incident_helper.handle_update_status_command(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+            "text": "Closed",
+        },
+        mock_respond,
+        mock_ack,
+        args,
+    )
+
+    mock_ack.assert_called_once()
+    mock_incident_status.update_status.assert_called_once_with(
+        mock_client,
+        mock_ack,
+        mock_respond,
+        "Closed",
+        "C12345",
+        "incident-2024-01-12-test",
+        "U12345",
+    )
+
+
+def test_handle_update_status_command_invalid_status():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+
+    args = ["InvalidStatus"]
+    # Call the function
+    incident_helper.handle_update_status_command(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+            "text": "InvalidStatus",
+        },
+        mock_respond,
+        mock_ack,
+        args,
+    )
+
+    mock_ack.assert_called_once()
+    mock_respond.assert_called_once_with(
+        "Invalid status. Valid statuses are: In Progress, Open, Ready to be Reviewed, Reviewed, Closed"
     )
