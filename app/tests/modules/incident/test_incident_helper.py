@@ -557,36 +557,6 @@ def test_close_incident_handles_post_message_failure(mock_incident_status, caplo
     assert error_message in caplog.text
 
 
-def test_return_channel_name_with_prefix():
-    # Test the function with a string that includes the prefix.
-    assert incident_helper.return_channel_name("incident-abc123") == "#abc123"
-
-
-def test_return_channel_name_with_dev_prefix():
-    # Test the function with a string that includes the incident-dev prefix.
-    assert incident_helper.return_channel_name("incident-dev-abc123") == "#abc123"
-
-
-def test_return_channel_name_without_prefix():
-    # Test the function with a string that does not include the prefix.
-    assert incident_helper.return_channel_name("general") == "general"
-
-
-def test_return_channel_name_empty_string():
-    # Test the function with an empty string.
-    assert incident_helper.return_channel_name("") == ""
-
-
-def test_return_channel_name_prefix_only():
-    # Test the function with a string that is only the prefix.
-    assert incident_helper.return_channel_name("incident-") == "#"
-
-
-def test_return_channel_name_dev_prefix_only():
-    # Test the function with a string that is only the incident-dev prefix.
-    assert incident_helper.return_channel_name("incident-dev-") == "#"
-
-
 @patch("modules.incident.incident_helper.logging.error")
 def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_error):
     mock_ack = MagicMock()

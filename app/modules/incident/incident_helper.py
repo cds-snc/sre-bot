@@ -42,6 +42,9 @@ help_text = """
 \n `/sre incident stale`
 \n      - lists all incidents older than 14 days with no activity
 \n      - lister tous les incidents plus vieux que 14 jours sans activité
+\n `/sre incident status <status>`
+\n      - update the status of the incident with the provided status. Supported statuses are: Open, In Progress, Ready to be Reviewed, Reviewed, Closed
+\n      - mettre à jour le statut de l'incident avec le statut fourni. Les statuts pris en charge sont : Open, In Progress, Ready to be Reviewed, Reviewed, Closed
 """
 
 
@@ -496,17 +499,6 @@ def channel_item(channel):
         },
         {"type": "divider"},
     ]
-
-
-def return_channel_name(input_str: str):
-    # return the channel name without the incident- prefix and appending a # to the channel name
-    prefix = "incident-"
-    dev_prefix = prefix + "dev-"
-    if input_str.startswith(dev_prefix):
-        return "#" + input_str[len(dev_prefix) :]
-    if input_str.startswith(prefix):
-        return "#" + input_str[len(prefix) :]
-    return input_str
 
 
 def handle_update_status_command(
