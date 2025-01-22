@@ -401,7 +401,7 @@ def handle_string_payload(
         case "UpptimePayload":
             # Temporary fix for Upptime payloads
             text = validated_payload.get("text", "")
-            header_text = "📈 Web Application Down!"
+            header_text = "📈 Web Application Status Changed!"
             blocks = [
                 {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
                 {

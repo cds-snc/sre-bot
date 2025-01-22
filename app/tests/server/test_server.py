@@ -298,7 +298,7 @@ def test_handle_string_payload_with_upptime_payload(validate_string_payload_type
     assert response.blocks == [
         {"text": {"text": " ", "type": "mrkdwn"}, "type": "section"},
         {
-            "text": {"text": "📈 Web Application Down!", "type": "plain_text"},
+            "text": {"text": "📈 Web Application Status Changed!", "type": "plain_text"},
             "type": "header",
         },
         {
