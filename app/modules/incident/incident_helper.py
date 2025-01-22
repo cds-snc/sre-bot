@@ -498,17 +498,6 @@ def channel_item(channel):
     ]
 
 
-def return_channel_name(input_str: str):
-    # return the channel name without the incident- prefix and appending a # to the channel name
-    prefix = "incident-"
-    dev_prefix = prefix + "dev-"
-    if input_str.startswith(dev_prefix):
-        return "#" + input_str[len(dev_prefix) :]
-    if input_str.startswith(prefix):
-        return "#" + input_str[len(prefix) :]
-    return input_str
-
-
 def handle_update_status_command(
     client: WebClient, body, respond: Respond, ack: Ack, args
 ):
