@@ -287,6 +287,15 @@ def submit(ack, view, say, body, client: WebClient, logger):
         link=meet_link["meetingUri"],
     )
 
+    # Create a canvas for the channel
+    client.conversations_canvas_create(
+        channel_id=channel_id,
+        document_content={
+            "type": "markdown",
+            "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want! All you need to do is to start typing",
+        },
+    )
+
     text = f"A hangout has been created at: {meet_link['meetingUri']}"
     say(text=text, channel=channel_id)
 
