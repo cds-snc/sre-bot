@@ -1209,12 +1209,16 @@ def test_handle_update_status_command(mock_incident_status):
     )
 
 
-def test_handle_update_status_command_invalid_status():
+@patch("modules.incident.incident_helper.incident_folder")
+def test_handle_update_status_command_invalid_status(mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
 
     args = ["InvalidStatus"]
+    mock_incident_folder.lookup_incident.return_value = [
+        {"id": {"S": "incident-2024-01-12-test"}}
+    ]
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,

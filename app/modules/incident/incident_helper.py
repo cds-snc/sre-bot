@@ -513,7 +513,20 @@ def handle_update_status_command(
         "Reviewed",
         "Closed",
     ]
-
+    incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
+    if not incidents:
+        respond(
+            "No incident found for this channel. Will not update status in DB record."
+        )
+    else:
+        if len(incidents) > 1:
+            respond(
+                "More than one incident found for this channel. Will not update status in DB record."
+            )
+        else:
+            incident_folder.update_incident_field(
+                incidents[0]["id"]["S"], "status", status
+            )
     if status not in valid_statuses:
         respond("Invalid status. Valid statuses are: " + ", ".join(valid_statuses))
     else:
