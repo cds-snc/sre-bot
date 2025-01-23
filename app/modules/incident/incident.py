@@ -348,6 +348,17 @@ def submit(ack, view, say, body, client: WebClient, logger):
     text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
     say(text=text, channel=channel_id)
 
+    if PREFIX == "dev-":
+        teams = [folder]
+        incident_folder.create_incident(
+            channel_id,
+            channel_name,
+            user_id,
+            teams,
+            document_link,
+            meet_link["meetingUri"],
+        )
+
 
 def generate_success_modal(body, channel_id, channel_name):
     locale = body["view"]["blocks"][0]["elements"][0]["value"]
