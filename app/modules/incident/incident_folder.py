@@ -361,11 +361,6 @@ def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
     return dynamodb.scan(TableName="incidents", Select=select, **kwargs)
 
 
-def delete_incident(id):
-    """Not to be implemented in production"""
-    return dynamodb.delete_item(TableName="incidents", Key={"id": {"S": id}})
-
-
 def update_incident_field(id, field, value, type="S"):
     """Update an attribute in an incident item.
 
