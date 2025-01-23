@@ -50,8 +50,8 @@ resource "aws_dynamodb_table" "sre_bot_data" {
 resource "aws_dynamodb_table" "incidents_table" {
   name           = "incidents"
   hash_key       = "id"
-  read_capacity  = 1
-  write_capacity = 1
+  read_capacity  = 2
+  write_capacity = 2
 
   attribute {
     name = "id"
