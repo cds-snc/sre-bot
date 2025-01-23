@@ -21,3 +21,4 @@ create_table() {
 create_table "webhooks"
 create_table "aws_access_requests"
 create_table "sre_bot_data"
+create_table "incidents"
