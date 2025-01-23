@@ -317,3 +317,298 @@ def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
 def test_update_spreadsheet_incident_status_channel_not_found(sheets_mock):
     sheets_mock.get_values.return_value = {"values": [["bar", "baz", "qux"]]}
     assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+
+
+def test_return_channel_name_with_prefix():
+    # Test the function with a string that includes the prefix.
+    assert incident_folder.return_channel_name("incident-abc123") == "#abc123"
+
+
+def test_return_channel_name_with_dev_prefix():
+    # Test the function with a string that includes the incident-dev prefix.
+    assert incident_folder.return_channel_name("incident-dev-abc123") == "#abc123"
+
+
+def test_return_channel_name_without_prefix():
+    # Test the function with a string that does not include the prefix.
+    assert incident_folder.return_channel_name("general") == "general"
+
+
+def test_return_channel_name_empty_string():
+    # Test the function with an empty string.
+    assert incident_folder.return_channel_name("") == ""
+
+
+def test_return_channel_name_prefix_only():
+    # Test the function with a string that is only the prefix.
+    assert incident_folder.return_channel_name("incident-") == "#"
+
+
+def test_return_channel_name_dev_prefix_only():
+    # Test the function with a string that is only the incident-dev prefix.
+    assert incident_folder.return_channel_name("incident-dev-") == "#"
+
+
+@patch("modules.incident.incident_folder.uuid")
+@patch("modules.incident.incident_folder.datetime")
+@patch("modules.incident.incident_folder.dynamodb")
+def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
+    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
+    mock_created_at = mock_datetime.datetime.now.return_value = (
+        "2025-01-22 21:58:18.689313"
+    )
+    mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert incident_folder.create_incident(
+        "channel_id", "channel_name", "user_id", ["teams"], "report_url", "meet_url"
+    )
+    mock_dynamodb.put_item.assert_called_once_with(
+        TableName="incidents",
+        Item={
+            "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
+            "created_at": {"S": str(mock_created_at)},
+            "channel_id": {"S": "channel_id"},
+            "channel_name": {"S": "channel_name"},
+            "status": {"S": "Open"},
+            "user_id": {"S": "user_id"},
+            "teams": {"SS": ["teams"]},
+            "report_url": {"S": "report_url"},
+            "meet_url": {"S": "meet_url"},
+            "environment": {"S": "prod"},
+        },
+    )
+
+
+@patch("modules.incident.incident_folder.uuid")
+@patch("modules.incident.incident_folder.datetime")
+@patch("modules.incident.incident_folder.dynamodb")
+def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_uuid):
+    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
+    mock_created_at = mock_datetime.datetime.now.return_value = (
+        "2025-01-22 21:58:18.689313"
+    )
+    mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert incident_folder.create_incident(
+        "channel_id",
+        "channel_name",
+        "user_id",
+        ["teams"],
+        "report_url",
+        "meet_url",
+        "start_time",
+        "end_time",
+        "detection_time",
+        "retro_url",
+        "dev",
+    )
+    mock_dynamodb.put_item.assert_called_once_with(
+        TableName="incidents",
+        Item={
+            "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
+            "created_at": {"S": str(mock_created_at)},
+            "channel_id": {"S": "channel_id"},
+            "channel_name": {"S": "channel_name"},
+            "status": {"S": "Open"},
+            "user_id": {"S": "user_id"},
+            "teams": {"SS": ["teams"]},
+            "report_url": {"S": "report_url"},
+            "meet_url": {"S": "meet_url"},
+            "environment": {"S": "dev"},
+            "start_impact_time": {"S": "start_time"},
+            "end_impact_time": {"S": "end_time"},
+            "detection_time": {"S": "detection_time"},
+            "retrospective_url": {"S": "retro_url"},
+        },
+    )
+
+
+@patch("modules.incident.incident_folder.uuid")
+@patch("modules.incident.incident_folder.datetime")
+@patch("modules.incident.incident_folder.dynamodb")
+def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_uuid):
+    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
+    mock_created_at = mock_datetime.datetime.now.return_value = (
+        "2025-01-22 21:58:18.689313"
+    )
+    mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
+    response = incident_folder.create_incident(
+        "channel_id", "channel_name", "user_id", ["teams"], "report_url", "meet_url"
+    )
+    assert response is None
+    mock_dynamodb.put_item.assert_called_once_with(
+        TableName="incidents",
+        Item={
+            "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
+            "created_at": {"S": str(mock_created_at)},
+            "channel_id": {"S": "channel_id"},
+            "channel_name": {"S": "channel_name"},
+            "status": {"S": "Open"},
+            "user_id": {"S": "user_id"},
+            "teams": {"SS": ["teams"]},
+            "report_url": {"S": "report_url"},
+            "meet_url": {"S": "meet_url"},
+            "environment": {"S": "prod"},
+        },
+    )
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_list_incidents(
+    mock_dynamodb,
+):
+    mock_dynamodb.scan.return_value = [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+            "user_id": {"S": "qux"},
+            "teams": {"SS": ["quux"]},
+            "report_url": {"S": "corge"},
+            "meet_url": {"S": "grault"},
+            "status": {"S": "garply"},
+            "start_impact_time": {"S": "waldo"},
+            "end_impact_time": {"S": "fred"},
+            "environment": {"S": "plugh"},
+            "retrospective_url": {"S": "xyzzy"},
+        }
+    ]
+    assert incident_folder.list_incidents() == [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+            "user_id": {"S": "qux"},
+            "teams": {"SS": ["quux"]},
+            "report_url": {"S": "corge"},
+            "meet_url": {"S": "grault"},
+            "status": {"S": "garply"},
+            "start_impact_time": {"S": "waldo"},
+            "end_impact_time": {"S": "fred"},
+            "environment": {"S": "plugh"},
+            "retrospective_url": {"S": "xyzzy"},
+        }
+    ]
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_list_incidents_empty(
+    mock_dynamodb,
+):
+    mock_dynamodb.scan.return_value = []
+    assert incident_folder.list_incidents() == []
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_update_incident_field(mock_dynamodb):
+    mock_dynamodb.update_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200}
+    }
+    assert incident_folder.update_incident_field("foo", "bar", "baz")
+    mock_dynamodb.update_item.assert_called_once_with(
+        TableName="incidents",
+        Key={"id": {"S": "foo"}},
+        UpdateExpression="SET #bar = :bar",
+        ExpressionAttributeNames={"#bar": "bar"},
+        ExpressionAttributeValues={":bar": {"S": "baz"}},
+    )
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_update_incident_field_with_type(mock_dynamodb):
+    mock_dynamodb.update_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200}
+    }
+    assert incident_folder.update_incident_field("foo", "bar", "baz", "M")
+    mock_dynamodb.update_item.assert_called_once_with(
+        TableName="incidents",
+        Key={"id": {"S": "foo"}},
+        UpdateExpression="SET #bar = :bar",
+        ExpressionAttributeNames={"#bar": "bar"},
+        ExpressionAttributeValues={":bar": {"M": "baz"}},
+    )
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_update_incident_field_handles_failure(mock_dynamodb):
+    mock_dynamodb.update_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 400}
+    }
+    response = incident_folder.update_incident_field("foo", "bar", "baz")
+    assert response is None
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_get_incident(mock_dynamodb):
+    mock_dynamodb.get_item.return_value = {
+        "id": {"S": "foo"},
+        "channel_id": {"S": "bar"},
+        "channel_name": {"S": "baz"},
+        "user_id": {"S": "qux"},
+        "teams": {"SS": ["quux"]},
+        "report_url": {"S": "corge"},
+        "meet_url": {"S": "grault"},
+        "status": {"S": "garply"},
+        "start_impact_time": {"S": "waldo"},
+        "end_impact_time": {"S": "fred"},
+        "environment": {"S": "plugh"},
+        "retrospective_url": {"S": "xyzzy"},
+    }
+
+    assert incident_folder.get_incident("foo") == {
+        "id": {"S": "foo"},
+        "channel_id": {"S": "bar"},
+        "channel_name": {"S": "baz"},
+        "user_id": {"S": "qux"},
+        "teams": {"SS": ["quux"]},
+        "report_url": {"S": "corge"},
+        "meet_url": {"S": "grault"},
+        "status": {"S": "garply"},
+        "start_impact_time": {"S": "waldo"},
+        "end_impact_time": {"S": "fred"},
+        "environment": {"S": "plugh"},
+        "retrospective_url": {"S": "xyzzy"},
+    }
+
+
+@patch("modules.incident.incident_folder.dynamodb")
+def test_lookup_incident(
+    mock_dynamodb,
+):
+    incidents = [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+            "user_id": {"S": "qux"},
+            "teams": {"SS": ["quux"]},
+            "report_url": {"S": "corge"},
+            "meet_url": {"S": "grault"},
+            "status": {"S": "garply"},
+            "start_impact_time": {"S": "waldo"},
+            "end_impact_time": {"S": "fred"},
+            "environment": {"S": "plugh"},
+            "retrospective_url": {"S": "xyzzy"},
+        },
+    ]
+    mock_dynamodb.scan.return_value = incidents
+    assert incident_folder.lookup_incident("channel_id", "bar") == [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+            "user_id": {"S": "qux"},
+            "teams": {"SS": ["quux"]},
+            "report_url": {"S": "corge"},
+            "meet_url": {"S": "grault"},
+            "status": {"S": "garply"},
+            "start_impact_time": {"S": "waldo"},
+            "end_impact_time": {"S": "fred"},
+            "environment": {"S": "plugh"},
+            "retrospective_url": {"S": "xyzzy"},
+        }
+    ]
+
+    mock_dynamodb.scan.assert_called_once_with(
+        TableName="incidents",
+        FilterExpression="channel_id = :channel_id",
+        ExpressionAttributeValues={":channel_id": {"S": "bar"}},
+    )

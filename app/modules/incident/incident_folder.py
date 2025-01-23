@@ -5,10 +5,12 @@ Includes functions to manage the folders, the metadata, and the list of incident
 
 import datetime
 import os
+import logging
+import uuid
 from slack_sdk.web import WebClient
 from slack_bolt import Ack
 from integrations.google_workspace import google_drive, sheets
-import logging
+from integrations.aws import dynamodb
 
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
@@ -305,3 +307,91 @@ def return_channel_name(input_str: str):
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str
+
+
+def create_incident(
+    channel_id,
+    channel_name,
+    user_id,
+    teams,
+    report_url,
+    meet_url,
+    start_impact_time=None,
+    end_impact_time=None,
+    detection_time=None,
+    retrospective_url=None,
+    environment="prod",
+):
+    id = str(uuid.uuid4())
+    incident_data = {
+        "id": {"S": id},
+        "created_at": {"S": str(datetime.datetime.now())},
+        "channel_id": {"S": channel_id},
+        "channel_name": {"S": channel_name},
+        "status": {"S": "Open"},
+        "user_id": {"S": user_id},
+        "teams": {"SS": teams},
+        "report_url": {"S": report_url},
+        "meet_url": {"S": meet_url},
+        "environment": {"S": environment},
+    }
+    for key, value in [
+        ("start_impact_time", start_impact_time),
+        ("end_impact_time", end_impact_time),
+        ("detection_time", detection_time),
+        ("retrospective_url", retrospective_url),
+    ]:
+        if value:
+            incident_data[key] = {"S": value}
+
+    response = dynamodb.put_item(
+        TableName="incidents",
+        Item=incident_data,
+    )
+
+    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        logging.info(f"Created incident {id}")
+        return id
+    else:
+        return None
+
+
+def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
+    """List all incidents in the incidents table."""
+    return dynamodb.scan(TableName="incidents", Select=select, **kwargs)
+
+
+def update_incident_field(id, field, value, type="S"):
+    """Update an attribute in an incident item.
+
+    Default type is string, but it can be changed to other types like N for numbers, SS for string sets, etc.
+
+    Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
+    """
+    expression_attribute_names = {f"#{field}": field}
+    expression_attribute_values = {f":{field}": {type: value}}
+
+    response = dynamodb.update_item(
+        TableName="incidents",
+        Key={"id": {"S": id}},
+        UpdateExpression=f"SET #{field} = :{field}",
+        ExpressionAttributeNames=expression_attribute_names,
+        ExpressionAttributeValues=expression_attribute_values,
+    )
+    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+        return response
+    else:
+        return None
+
+
+def get_incident(id):
+    return dynamodb.get_item(TableName="incidents", Key={"id": {"S": id}})
+
+
+def lookup_incident(field, value, field_type="S"):
+    """Lookup incidents by a specific field value."""
+    return dynamodb.scan(
+        TableName="incidents",
+        FilterExpression=f"{field} = :{field}",
+        ExpressionAttributeValues={f":{field}": {f"{field_type}": value}},
+    )

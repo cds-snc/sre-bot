@@ -30,6 +30,7 @@ def query(
 
 @handle_aws_api_errors
 def scan(TableName, **kwargs):
+    """Scan a DynamoDB table. Will return only the list of items found in the table that match the query."""
     params = {
         "TableName": TableName,
     }
@@ -61,6 +62,10 @@ def put_item(TableName, **kwargs):
 
 @handle_aws_api_errors
 def get_item(TableName, **kwargs):
+    """Get an item from a DynamoDB table
+
+    Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
+    """
     params = {
         "TableName": TableName,
     }
@@ -70,7 +75,9 @@ def get_item(TableName, **kwargs):
         "dynamodb", "get_item", client_config=client_config, **params
     )
     if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
-        return response
+        return response.get("Item")
+    else:
+        return None
 
 
 @handle_aws_api_errors
