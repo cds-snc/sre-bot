@@ -13,6 +13,7 @@ def update_status(
     channel_id: str,
     channel_name: str,
     user_id: str,
+    incident_id: str | None = None,
 ):
     ack()
 
@@ -48,6 +49,10 @@ def update_status(
         incident_folder.update_spreadsheet_incident_status(
             incident_folder.return_channel_name(channel_name), incident_status
         )
+        if incident_id:
+            incident_folder.update_incident_field(
+                incident_id, "status", incident_status
+            )
     except Exception as e:
         warning_message = f"Could not update the incident status in the spreadsheet for channel {channel_name}: {e}"
         logging.warning(warning_message)
