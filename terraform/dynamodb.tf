@@ -45,3 +45,16 @@ resource "aws_dynamodb_table" "sre_bot_data" {
     type = "S"
   }
 }
+
+
+resource "aws_dynamodb_table" "incidents_table" {
+  name           = "incidents"
+  hash_key       = "id"
+  read_capacity  = 1
+  write_capacity = 1
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+}
