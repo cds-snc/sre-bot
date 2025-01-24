@@ -394,45 +394,6 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
-# @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
-# @patch("modules.incident.incident.incident_document.update_boilerplate_text")
-# @patch("modules.incident.incident.incident_document.create_incident_document")
-# @patch("modules.incident.incident.incident_folder.get_folder_metadata")
-# @patch("modules.incident.incident.log_to_sentinel")
-# def test_incident_submit_truncates_meet_link_if_too_long(
-#     _log_to_sentinel_mock,
-#     _mock_get_folder_metadata,
-#     _mock_create_incident_document,
-#     _mock_update_boilerplate_text,
-#     _mock_add_new_incident_to_list,
-# ):
-#     ack = MagicMock()
-#     logger = MagicMock()
-#     name = "a" * 60
-#     view = helper_generate_view(name)
-#     meet_link = f"https://g.co/meet/incident-{DATE}-{name}"[:78]
-#     say = MagicMock()
-#     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
-#     client = MagicMock()
-#     client.conversations_create.return_value = {
-#         "channel": {"id": "channel_id", "name": f"channel_{name}"}
-#     }
-#     incident.submit(ack, view, say, body, client, logger)
-
-#     ack.assert_called()
-#     client.bookmarks_add.assert_any_call(
-#         channel_id="channel_id",
-#         title="Meet link",
-#         type="link",
-#         link=meet_link,
-#     )
-
-#     args = client.bookmarks_add.call_args_list
-#     _, kwargs = args[0]
-
-#     assert len(kwargs["link"]) <= 78
-
-
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
