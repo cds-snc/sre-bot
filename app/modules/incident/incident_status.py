@@ -10,7 +10,7 @@ from modules.incident import incident_document, incident_folder
 def update_status(
     client: WebClient,
     respond: Respond,
-    incident_status: str,
+    status: str,
     channel_id: str,
     channel_name: str,
     user_id: str,
@@ -33,9 +33,7 @@ def update_status(
 
     if document_id != "":
         try:
-            incident_document.update_incident_document_status(
-                document_id, incident_status
-            )
+            incident_document.update_incident_document_status(document_id, status)
         except Exception as e:
             warning_message = f"Could not update the incident status in the document for channel {channel_name}: {e}"
             logging.warning(warning_message)
@@ -47,12 +45,10 @@ def update_status(
 
     try:
         incident_folder.update_spreadsheet_incident_status(
-            incident_folder.return_channel_name(channel_name), incident_status
+            incident_folder.return_channel_name(channel_name), status
         )
         if incident_id:
-            incident_folder.update_incident_field(
-                incident_id, "status", incident_status
-            )
+            incident_folder.update_incident_field(incident_id, "status", status)
     except Exception as e:
         warning_message = f"Could not update the incident status in the spreadsheet for channel {channel_name}: {e}"
         logging.warning(warning_message)
@@ -61,7 +57,7 @@ def update_status(
     try:
         client.chat_postMessage(
             channel=channel_id,
-            text=f"<@{user_id}> has updated the incident status to {incident_status}.",
+            text=f"<@{user_id}> has updated the incident status to {status}.",
         )
     except Exception as e:
         warning_message = f"Could not post the incident status update to the channel {channel_name}: {e}"
@@ -69,7 +65,7 @@ def update_status(
         respond(warning_message)
 
 
-def status_view(incident):
+def incident_information_view(incident):
     logging.info(f"Loading Status View for:\n{incident}")
     incident_name = incident.get("channel_name", "Unknown").get("S", "Unknown")
     incident_id = incident.get("id", "Unknown").get("S", "Unknown")

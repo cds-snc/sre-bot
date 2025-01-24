@@ -276,7 +276,7 @@ def test_update_status_handles_chat_postMessage_errors():
 
 @patch("modules.incident.incident_status.parse_incident_datetime_string")
 @patch("modules.incident.incident_status.logging")
-def test_status_view(mock_logging, mock_parse_incident_datetime_string):
+def test_incident_information_view(mock_logging, mock_parse_incident_datetime_string):
     incident_data = generate_incident_data()
     id = incident_data["id"]["S"]
     mock_parse_incident_datetime_string.side_effect = [
@@ -285,7 +285,7 @@ def test_status_view(mock_logging, mock_parse_incident_datetime_string):
         "Unknown",
         "Unknown",
     ]
-    view = incident_status.status_view(incident_data)
+    view = incident_status.incident_information_view(incident_data)
     mock_logging.info.assert_called_once_with(
         f"Loading Status View for:\n{incident_data}"
     )
