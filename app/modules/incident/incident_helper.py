@@ -56,6 +56,12 @@ help_text = """
 \n `/sre incident status <status>`
 \n      - update the status of the incident with the provided status. Supported statuses are: Open, In Progress, Ready to be Reviewed, Reviewed, Closed
 \n      - mettre à jour le statut de l'incident avec le statut fourni. Les statuts pris en charge sont : Open, In Progress, Ready to be Reviewed, Reviewed, Closed
+\n `/sre incident add_summary`
+\n      - encourages the IC to give freeform summary on what has been done to resolve the incident so far
+\n      - encourage l'IC à donner un résumé libre sur ce qui a été fait pour résoudre l'incident jusqu'à présent
+\n `/sre incident summary`
+\n      - displays the summary of the incident
+\n      - affiche le résumé de l'incident
 """
 
 
@@ -88,6 +94,7 @@ def register(bot: App):
     bot.event("reaction_removed")(
         incident_conversation.just_ack_the_rest_of_reaction_events
     )
+    bot.view("incident_updates_view")(handle_updates_submission)
 
 
 def handle_incident_command(
@@ -122,6 +129,10 @@ def handle_incident_command(
             schedule_retro.schedule_incident_retro(client, body, ack)
         case "status":
             handle_update_status_command(client, logger, body, respond, ack, args)
+        case "add_summary":
+            open_updates_dialog(client, body, ack)
+        case "summary":
+            display_current_updates(client, body, respond, ack)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -477,3 +488,62 @@ def convert_timestamp(timestamp: str) -> str:
     except ValueError:
         datetime_str = "Unknown"
     return datetime_str
+
+
+def open_updates_dialog(client: WebClient, body, ack: Ack):
+    ack()
+    channel_id = body["channel_id"]  # Extract channel_id directly from body
+    incident = incident_folder.lookup_incident("channel_id", body["channel_id"])[0]
+    incident_id = incident.get("id", "Unknown").get("S", "Unknown")
+    dialog = {
+        "type": "modal",
+        "callback_id": "incident_updates_view",
+        "private_metadata": json.dumps(
+            {
+                "incident_id": incident_id,  # Set the incident_id here
+                "channel_id": channel_id,
+            }
+        ),
+        "title": {"type": "plain_text", "text": "SRE - Incident Updates"},
+        "submit": {"type": "plain_text", "text": "Submit"},
+        "close": {"type": "plain_text", "text": "Cancel"},
+        "blocks": [
+            {
+                "type": "input",
+                "block_id": "updates_block",
+                "element": {
+                    "type": "plain_text_input",
+                    "multiline": True,
+                    "action_id": "updates_input",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Enter your updates",
+                },
+            },
+        ],
+    }
+    client.views_open(trigger_id=body["trigger_id"], view=dialog)
+
+
+def handle_updates_submission(client: WebClient, ack, respond: Respond, view):
+    ack()
+    private_metadata = json.loads(view["private_metadata"])
+    incident_id = private_metadata["incident_id"]
+    updates_text = view["state"]["values"]["updates_block"]["updates_input"]["value"]
+    incident_folder.store_update(incident_id, updates_text)
+    channel_id = private_metadata["channel_id"]
+    client.chat_postMessage(channel=channel_id, text="Summary has been updated.")
+
+
+def display_current_updates(client: WebClient, body, respond: Respond, ack: Ack):
+    ack()
+    incident_id = body["channel_id"]
+    updates = incident_folder.fetch_updates(incident_id)
+    if updates:
+        updates_text = "\n".join(updates)
+        client.chat_postMessage(
+            channel=incident_id, text=f"Current updates:\n{updates_text}"
+        )
+    else:
+        respond("No updates found for this incident.")

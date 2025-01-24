@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 
@@ -910,3 +911,47 @@ def generate_incident_data(
             incident_data[key] = {"S": value}
 
     return incident_data
+
+
+@patch("modules.incident.incident_helper.incident_folder.store_update")
+def test_handle_updates_submission(mock_store_update):
+    client = MagicMock()
+    ack = MagicMock()
+    respond = MagicMock()
+    view = {
+        "private_metadata": json.dumps(
+            {
+                "incident_id": "incident_id",
+                "channel_id": "channel_id",
+            }
+        ),
+        "state": {
+            "values": {"updates_block": {"updates_input": {"value": "Test update"}}}
+        },
+    }
+    incident_helper.handle_updates_submission(client, ack, respond, view)
+    ack.assert_called_once()
+    mock_store_update.assert_called_once_with("incident_id", "Test update")
+    client.chat_postMessage.assert_called_once_with(
+        channel="channel_id", text="Summary has been updated."
+    )
+
+
+@patch("modules.incident.incident_helper.incident_folder.fetch_updates")
+def test_display_current_updates(mock_fetch_updates):
+    client = MagicMock()
+    ack = MagicMock()
+    respond = MagicMock()
+    body = {"channel_id": "incident_id"}
+    mock_fetch_updates.return_value = ["Update 1", "Update 2"]
+    incident_helper.display_current_updates(client, body, respond, ack)
+    ack.assert_called_once()
+    mock_fetch_updates.assert_called_once_with("incident_id")
+    client.chat_postMessage.assert_called_once_with(
+        channel="incident_id", text="Current updates:\nUpdate 1\nUpdate 2"
+    )
+
+    # Test case when no updates are found
+    mock_fetch_updates.return_value = []
+    incident_helper.display_current_updates(client, body, respond, ack)
+    respond.assert_called_once_with("No updates found for this incident.")
