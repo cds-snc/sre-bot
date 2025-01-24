@@ -5,7 +5,7 @@ import json
 import logging
 from dotenv import load_dotenv
 
-from modules.incident import incident_folder
+from modules.incident import incident_folder, incident_status
 
 load_dotenv()
 
@@ -90,3 +90,7 @@ def aws_dev_command(ack, client, body, respond, logger):
 
     incidents = incident_folder.list_incidents()
     logger.info(json.dumps(incidents, indent=2))
+    if len(incidents) == 0:
+        respond("No incidents found")
+    else:
+        incident_status.update_status_view(incidents[0])
