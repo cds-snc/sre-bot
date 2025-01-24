@@ -499,7 +499,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     canvas_data = {
         "type": "markdown",
-        "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want! All you need to do is to start typing",
+        "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want. All you need to do is to start typing below!️",
     }
 
     client.conversations_create.return_value = {
