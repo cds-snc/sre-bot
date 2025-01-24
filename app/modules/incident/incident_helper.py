@@ -18,6 +18,13 @@ SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+VALID_STATUS = [
+    "In Progress",
+    "Open",
+    "Ready to be Reviewed",
+    "Reviewed",
+    "Closed",
+]
 
 
 help_text = """
@@ -62,7 +69,6 @@ def register(bot: App):
     bot.action("update_detection_time")(open_update_field_view)
     bot.action("update_start_impact_time")(open_update_field_view)
     bot.action("update_end_impact_time")(open_update_field_view)
-    # bot.action("update_status")(incident_status.update_field_view)
 
 
 def handle_incident_command(args, client: WebClient, body, respond: Respond, ack: Ack):
@@ -70,7 +76,7 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
 
     # If no arguments are provided, open the update status view
     if len(args) == 0:
-        open_update_status_view(client, body, ack, respond)
+        open_incident_info_view(client, body, ack, respond)
         return
     action, *args = args
     match action:
@@ -513,8 +519,6 @@ def handle_update_status_command(
 ):
     ack()
     status = str.join(" ", args)
-    if not status:
-        respond()
     valid_statuses = [
         "In Progress",
         "Open",
@@ -522,55 +526,55 @@ def handle_update_status_command(
         "Reviewed",
         "Closed",
     ]
+    if status not in valid_statuses:
+        respond(
+            "A valid status must be used with this command:\n"
+            + ", ".join(valid_statuses)
+        )
+        return
     incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
     if not incidents:
         respond(
             "No incident found for this channel. Will not update status in DB record."
         )
+        return
     else:
         if len(incidents) > 1:
             respond(
                 "More than one incident found for this channel. Will not update status in DB record."
             )
+            return
         else:
+            respond(f"Updating incident status to {status}...")
+
             incident_folder.update_incident_field(
                 incidents[0]["id"]["S"], "status", status
             )
-    if status not in valid_statuses:
-        respond("Invalid status. Valid statuses are: " + ", ".join(valid_statuses))
-    else:
-        respond(f"Updating incident status to {status}...")
-        incident_status.update_status(
-            client,
-            respond,
-            status,
-            body["channel_id"],
-            body["channel_name"],
-            body["user_id"],
-        )
+
+            incident_status.update_status(
+                client,
+                respond,
+                status,
+                body["channel_id"],
+                body["channel_name"],
+                body["user_id"],
+            )
 
 
-def open_update_status_view(client: WebClient, body, ack: Ack, respond: Respond):
-    valid_statuses = [
-        "In Progress",
-        "Open",
-        "Ready to be Reviewed",
-        "Reviewed",
-        "Closed",
-    ]
+def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond):
+
     incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
     if not incidents:
         respond(
-            "This is command is only available in incident channels. No incident found for this channel."
+            "This is command is only available in incident channels. No incident records found for this channel."
         )
+        return
     else:
         if len(incidents) > 1:
-            respond(
-                "More than one incident found for this channel. Will not update status in DB record."
-            )
+            respond("More than one incident found for this channel.")
         else:
-            blocks = incident_status.status_view(incidents[0])
-            client.views_open(trigger_id=body["trigger_id"], view=blocks)
+            view = incident_status.incident_information_view(incidents[0])
+            client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
 def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
