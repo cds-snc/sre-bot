@@ -316,6 +316,9 @@ def create_incident(
     teams,
     report_url,
     meet_url,
+    incident_commander=None,
+    operations_lead=None,
+    severity=None,
     start_impact_time=None,
     end_impact_time=None,
     detection_time=None,
@@ -336,6 +339,9 @@ def create_incident(
         "environment": {"S": environment},
     }
     for key, value in [
+        ("incident_commander", incident_commander),
+        ("operations_lead", operations_lead),
+        ("severity", severity),
         ("start_impact_time", start_impact_time),
         ("end_impact_time", end_impact_time),
         ("detection_time", detection_time),
