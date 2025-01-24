@@ -8,11 +8,16 @@ from unittest.mock import ANY, MagicMock, patch
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
 
-def test_handle_incident_command_with_empty_args():
+@patch("modules.incident.incident_helper.open_incident_info_view")
+def test_handle_incident_command_with_empty_args(mock_open_incident_info_view):
+    client = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command([], MagicMock(), MagicMock(), respond, ack)
-    respond.assert_called_once_with(incident_helper.help_text)
+    body = {
+        "channel_id": "channel_id",
+    }
+    incident_helper.handle_incident_command([], client, body, respond, ack)
+    mock_open_incident_info_view.assert_called_once_with(client, body, ack, respond)
 
 
 @patch("modules.incident.incident_helper.google_drive.create_folder")
@@ -289,7 +294,6 @@ def test_close_incident(mock_incident_status):
     mock_client.chat_postEphemeral.assert_not_called()
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",
@@ -365,7 +369,6 @@ def test_close_incident_when_client_not_in_channel(mock_incident_status):
     mock_client.conversations_join.assert_called_once_with(channel="C12345")
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",
@@ -1176,14 +1179,17 @@ def test_save_incident_retro_failure(schedule_event_mock):
     )
 
 
+@patch("modules.incident.incident_helper.incident_folder")
 @patch("modules.incident.incident_helper.incident_status")
-def test_handle_update_status_command(mock_incident_status):
+def test_handle_update_status_command(mock_incident_status, mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
 
     args = ["Closed"]
-    # Call the function
+    mock_incident_folder.lookup_incident.return_value = [
+        {"id": {"S": "incident-2024-01-12-test"}}
+    ]
     incident_helper.handle_update_status_command(
         mock_client,
         {
@@ -1200,7 +1206,6 @@ def test_handle_update_status_command(mock_incident_status):
     mock_ack.assert_called_once()
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",
@@ -1209,12 +1214,16 @@ def test_handle_update_status_command(mock_incident_status):
     )
 
 
-def test_handle_update_status_command_invalid_status():
+@patch("modules.incident.incident_helper.incident_folder")
+def test_handle_update_status_command_invalid_status(mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
 
     args = ["InvalidStatus"]
+    mock_incident_folder.lookup_incident.return_value = [
+        {"id": {"S": "incident-2024-01-12-test"}}
+    ]
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
@@ -1231,5 +1240,159 @@ def test_handle_update_status_command_invalid_status():
 
     mock_ack.assert_called_once()
     mock_respond.assert_called_once_with(
-        "Invalid status. Valid statuses are: In Progress, Open, Ready to be Reviewed, Reviewed, Closed"
+        "A valid status must be used with this command:\nIn Progress, Open, Ready to be Reviewed, Reviewed, Closed"
+    )
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_handle_update_status_command_no_incidents_found(mock_incident_folder):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+
+    args = ["Closed"]
+    mock_incident_folder.lookup_incident.return_value = []
+    # Call the function
+    incident_helper.handle_update_status_command(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+            "text": "Closed",
+        },
+        mock_respond,
+        mock_ack,
+        args,
+    )
+
+    mock_ack.assert_called_once()
+    mock_respond.assert_called_once_with(
+        "No incident found for this channel. Will not update status in DB record."
+    )
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_handle_update_status_command_too_many_incidents(mock_incident_folder):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+
+    args = ["Closed"]
+    mock_incident_folder.lookup_incident.return_value = [
+        {"id": {"S": "incident-2024-01-12-test"}}
+    ] * 2
+    # Call the function
+    incident_helper.handle_update_status_command(
+        mock_client,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+            "text": "Closed",
+        },
+        mock_respond,
+        mock_ack,
+        args,
+    )
+
+    mock_ack.assert_called_once()
+    mock_respond.assert_called_once_with(
+        "More than one incident found for this channel. Will not update status in DB record."
+    )
+
+
+@patch("modules.incident.incident_helper.incident_status")
+@patch("modules.incident.incident_helper.incident_folder")
+def test_open_incident_info_view(mock_incident_folder, mock_incident_status):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_incident_folder.lookup_incident.return_value = [
+        {
+            "id": {"S": "incident-2024-01-12-test"},
+            "channel_id": {"S": "C1234567890"},
+        }
+    ]
+    mock_incident_status.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
+    incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
+    mock_client.views_open.assert_called_once_with(
+        trigger_id="T12345",
+        view={"view": [{"block": "block_id"}]},
+    )
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_open_incident_view_no_incident_found(mock_incident_folder):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_incident_folder.lookup_incident.return_value = []
+    incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
+    mock_respond.assert_called_once_with(
+        "This is command is only available in incident channels. No incident records found for this channel."
+    )
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_open_incident_view_multiple_incidents_found(mock_incident_folder):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_incident_folder.lookup_incident.return_value = [
+        {"id": {"S": "incident-2024-01-12-test"}}
+    ] * 2
+    incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
+
+    mock_respond.assert_called_once_with(
+        "More than one incident found for this channel."
+    )
+
+
+@patch("modules.incident.incident_helper.logging")
+@patch("modules.incident.incident_helper.incident_status")
+def test_open_update_field_view(mock_incident_status, mock_logging):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+        "actions": [{"action_id": "action_to_perform"}],
+    }
+    mock_incident_status.update_field_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
+    incident_helper.open_update_field_view(mock_client, body, mock_ack, mock_respond)
+    mock_incident_status.update_field_view.assert_called_once_with("action_to_perform")
+    mock_client.views_push.assert_called_once_with(
+        trigger_id="T12345",
+        view_id="V12345",
+        view={"view": [{"block": "block_id"}]},
     )
