@@ -288,7 +288,7 @@ def submit(ack, view, say, body, client: WebClient, logger):
     )
 
     # Create a canvas for the channel
-    client.conversations_canvas_create(
+    client.conversations_canvases_create(
         channel_id=channel_id,
         document_content={
             "type": "markdown",

@@ -514,7 +514,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     }
     incident.submit(ack, view, say, body, client, logger)
 
-    client.conversations_canvas_create.assert_called_once_with(
+    client.conversations_canvases_create.assert_called_once_with(
         channel_id="channel_id", document_content=canvas_data
     )
 
@@ -540,7 +540,7 @@ def test_incident_canvas_create_returns_successful_response(
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     expected_response = {"ok": True, "canvas_id": "canvas_id"}
-    client.conversations_canvas_create.return_value = expected_response
+    client.conversations_canvases_create.return_value = expected_response
 
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -554,7 +554,7 @@ def test_incident_canvas_create_returns_successful_response(
     }
     incident.submit(ack, view, say, body, client, logger)
 
-    assert client.conversations_canvas_create.return_value == expected_response
+    assert client.conversations_canvases_create.return_value == expected_response
     ack.assert_called_once()
 
 
@@ -579,7 +579,7 @@ def test_incident_canvas_create_unsuccessful_called(
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     expected_response = {"ok": False, "error": "invalid_type"}
-    client.conversations_canvas_create.return_value = expected_response
+    client.conversations_canvases_create.return_value = expected_response
 
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
@@ -593,7 +593,7 @@ def test_incident_canvas_create_unsuccessful_called(
     }
     incident.submit(ack, view, say, body, client, logger)
 
-    assert client.conversations_canvas_create.return_value == expected_response
+    assert client.conversations_canvases_create.return_value == expected_response
 
 
 @patch("modules.incident.incident.GoogleMeet")
