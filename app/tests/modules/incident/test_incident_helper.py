@@ -8,11 +8,16 @@ from unittest.mock import ANY, MagicMock, patch
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
 
-def test_handle_incident_command_with_empty_args():
+@patch("modules.incident.incident_helper.open_update_status_view")
+def test_handle_incident_command_with_empty_args(mock_open_update_status_view):
+    client = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command([], MagicMock(), MagicMock(), respond, ack)
-    respond.assert_called_once_with(incident_helper.help_text)
+    body = {
+        "channel_id": "channel_id",
+    }
+    incident_helper.handle_incident_command([], client, body, respond, ack)
+    mock_open_update_status_view.assert_called_once_with(client, body, ack, respond)
 
 
 @patch("modules.incident.incident_helper.google_drive.create_folder")
@@ -289,7 +294,6 @@ def test_close_incident(mock_incident_status):
     mock_client.chat_postEphemeral.assert_not_called()
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",
@@ -365,7 +369,6 @@ def test_close_incident_when_client_not_in_channel(mock_incident_status):
     mock_client.conversations_join.assert_called_once_with(channel="C12345")
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",
@@ -1200,7 +1203,6 @@ def test_handle_update_status_command(mock_incident_status):
     mock_ack.assert_called_once()
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
-        mock_ack,
         mock_respond,
         "Closed",
         "C12345",

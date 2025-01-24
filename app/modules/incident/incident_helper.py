@@ -58,13 +58,20 @@ def register(bot: App):
     bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
     bot.view("view_save_event")(save_incident_retro)
     bot.action("confirm_click")(confirm_click)
+    bot.action("update_status")(open_update_field_view)
+    bot.action("update_detection_time")(open_update_field_view)
+    bot.action("update_start_impact_time")(open_update_field_view)
+    bot.action("update_end_impact_time")(open_update_field_view)
+    # bot.action("update_status")(incident_status.update_field_view)
 
 
 def handle_incident_command(args, client: WebClient, body, respond: Respond, ack: Ack):
-    if len(args) == 0:
-        respond(help_text)
-        return
+    """Handle the /sre incident command."""
 
+    # If no arguments are provided, open the update status view
+    if len(args) == 0:
+        open_update_status_view(client, body, ack, respond)
+        return
     action, *args = args
     match action:
         case "create-folder":
@@ -159,7 +166,7 @@ def close_incident(client: WebClient, body, ack, respond):
         return
 
     incident_status.update_status(
-        client, ack, respond, "Closed", channel_id, channel_name, user_id
+        client, respond, "Closed", channel_id, channel_name, user_id
     )
 
     # Need to post the message before the channel is archived so that the message can be delivered.
@@ -506,6 +513,8 @@ def handle_update_status_command(
 ):
     ack()
     status = str.join(" ", args)
+    if not status:
+        respond()
     valid_statuses = [
         "In Progress",
         "Open",
@@ -533,10 +542,43 @@ def handle_update_status_command(
         respond(f"Updating incident status to {status}...")
         incident_status.update_status(
             client,
-            ack,
             respond,
             status,
             body["channel_id"],
             body["channel_name"],
             body["user_id"],
         )
+
+
+def open_update_status_view(client: WebClient, body, ack: Ack, respond: Respond):
+    valid_statuses = [
+        "In Progress",
+        "Open",
+        "Ready to be Reviewed",
+        "Reviewed",
+        "Closed",
+    ]
+    incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
+    if not incidents:
+        respond(
+            "This is command is only available in incident channels. No incident found for this channel."
+        )
+    else:
+        if len(incidents) > 1:
+            respond(
+                "More than one incident found for this channel. Will not update status in DB record."
+            )
+        else:
+            blocks = incident_status.status_view(incidents[0])
+            client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+
+def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
+    ack()
+    logging.info("Opening field view")
+    logging.info(json.dumps(body, indent=2))
+    action = body["actions"][0]["action_id"]
+    view = incident_status.update_field_view(action)
+    client.views_push(
+        view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"]
+    )
