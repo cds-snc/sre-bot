@@ -42,8 +42,8 @@ def delete_webhook(id):
 
 def get_webhook(id):
     response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
-    if "Item" in response:
-        return response["Item"]
+    if response:
+        return response
     else:
         return None
 
@@ -86,8 +86,8 @@ def revoke_webhook(id):
 # function to return the status of the webhook (ie if it is active or not). If active, return True, else return False
 def is_active(id):
     response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
-    if "Item" in response:
-        return response["Item"]["active"]["BOOL"]
+    if response:
+        return response["active"]["BOOL"]
     else:
         return False
 
