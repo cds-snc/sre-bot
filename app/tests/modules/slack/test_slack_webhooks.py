@@ -57,16 +57,14 @@ def test_delete_webhook(dynamodb_mock):
 @patch("modules.slack.webhooks.dynamodb")
 def test_get_webhook(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
-        "Item": {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        }
+        "id": {"S": "test_id"},
+        "channel": {"S": "test_channel"},
+        "name": {"S": "test_name"},
+        "created_at": {"S": "test_created_at"},
+        "active": {"BOOL": True},
+        "user_id": {"S": "test_user_id"},
+        "invocation_count": {"N": "0"},
+        "acknowledged_count": {"N": "0"},
     }
     assert webhooks.get_webhook("test_id") == {
         "id": {"S": "test_id"},
@@ -174,16 +172,14 @@ def test_revoke_webhook(dynamodb_mock):
 @patch("modules.slack.webhooks.dynamodb")
 def test_is_active_returns_true(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
-        "Item": {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        }
+        "id": {"S": "test_id"},
+        "channel": {"S": "test_channel"},
+        "name": {"S": "test_name"},
+        "created_at": {"S": "test_created_at"},
+        "active": {"BOOL": True},
+        "user_id": {"S": "test_user_id"},
+        "invocation_count": {"N": "0"},
+        "acknowledged_count": {"N": "0"},
     }
     assert webhooks.is_active("test_id") is True
 
@@ -191,16 +187,14 @@ def test_is_active_returns_true(dynamodb_mock):
 @patch("modules.slack.webhooks.dynamodb")
 def test_is_active_returns_false(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {
-        "Item": {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": False},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        }
+        "id": {"S": "test_id"},
+        "channel": {"S": "test_channel"},
+        "name": {"S": "test_name"},
+        "created_at": {"S": "test_created_at"},
+        "active": {"BOOL": False},
+        "user_id": {"S": "test_user_id"},
+        "invocation_count": {"N": "0"},
+        "acknowledged_count": {"N": "0"},
     }
     assert webhooks.is_active("test_id") is False
 
