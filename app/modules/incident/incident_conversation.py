@@ -1,13 +1,16 @@
 import re
 from datetime import datetime
 import pytz  # type: ignore
+from slack_sdk import WebClient  # type: ignore
 from integrations.google_workspace import google_docs
 from integrations.slack import users as slack_users
+from integrations.sentinel import log_to_sentinel
 
 from modules.incident.incident_document import (
     get_timeline_section,
     replace_text_between_headings,
 )
+from modules.incident import incident_helper, schedule_retro
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
@@ -334,3 +337,37 @@ def return_messages(client, body, channel_id):
             return [messages[0]]
 
     return messages
+
+
+def archive_channel_action(client: WebClient, body, ack, respond):
+    ack()
+    channel_id = body["channel"]["id"]
+    action = body["actions"][0]["value"]
+    channel_name = body["channel"]["name"]
+    user = body["user"]["id"]
+
+    # get the current chanel id and name and make up the body with those 2 values
+    channel_info = {
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "user_id": user,
+    }
+
+    if action == "ignore":
+        msg = (
+            f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
+        )
+        client.chat_update(
+            channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
+        )
+        log_to_sentinel("incident_channel_archive_delayed", body)
+    elif action == "archive":
+        # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
+        incident_helper.close_incident(client, channel_info, ack, respond)
+        # log the event to sentinel
+        log_to_sentinel("incident_channel_archived", body)
+    elif action == "schedule_retro":
+        channel_info["trigger_id"] = body["trigger_id"]
+        schedule_retro.schedule_incident_retro(client, channel_info, ack)
+        # log the event to sentinel
+        log_to_sentinel("incident_retro_scheduled", body)

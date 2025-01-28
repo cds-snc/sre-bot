@@ -68,7 +68,6 @@ def register(bot: App):
     bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
-    bot.action("archive_channel")(archive_channel_action)
     bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
     bot.view("view_save_event")(schedule_retro.save_incident_retro)
     bot.action("confirm_click")(schedule_retro.confirm_click)
@@ -76,6 +75,7 @@ def register(bot: App):
     bot.action("update_detection_time")(open_update_field_view)
     bot.action("update_start_impact_time")(open_update_field_view)
     bot.action("update_end_impact_time")(open_update_field_view)
+    bot.action("archive_channel")(incident_conversation.archive_channel_action)
     bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(
         incident_conversation.handle_reaction_added
     )
@@ -124,40 +124,6 @@ def handle_incident_command(args, client: WebClient, body, respond: Respond, ack
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
             )
-
-
-def archive_channel_action(client: WebClient, body, ack, respond):
-    ack()
-    channel_id = body["channel"]["id"]
-    action = body["actions"][0]["value"]
-    channel_name = body["channel"]["name"]
-    user = body["user"]["id"]
-
-    # get the current chanel id and name and make up the body with those 2 values
-    channel_info = {
-        "channel_id": channel_id,
-        "channel_name": channel_name,
-        "user_id": user,
-    }
-
-    if action == "ignore":
-        msg = (
-            f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
-        )
-        client.chat_update(
-            channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
-        )
-        log_to_sentinel("incident_channel_archive_delayed", body)
-    elif action == "archive":
-        # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        close_incident(client, channel_info, ack, respond)
-        # log the event to sentinel
-        log_to_sentinel("incident_channel_archived", body)
-    elif action == "schedule_retro":
-        channel_info["trigger_id"] = body["trigger_id"]
-        schedule_retro.schedule_incident_retro(client, channel_info, ack)
-        # log the event to sentinel
-        log_to_sentinel("incident_retro_scheduled", body)
 
 
 def close_incident(client: WebClient, body, ack, respond):
