@@ -2,6 +2,22 @@ from unittest.mock import MagicMock, patch
 from modules.incident import incident_conversation
 
 
+def test_is_floppy_disk_true():
+    # Test case where the reaction is 'floppy_disk'
+    event = {"reaction": "floppy_disk"}
+    assert (
+        incident_conversation.is_floppy_disk(event) is True
+    ), "The function should return True for 'floppy_disk' reaction"
+
+
+def test_is_floppy_disk_false():
+    # Test case where the reaction is not 'floppy_disk'
+    event = {"reaction": "thumbs_up"}
+    assert (
+        incident_conversation.is_floppy_disk(event) is False
+    ), "The function should return False for reactions other than 'floppy_disk'"
+
+
 def test_multiline_entries_rearrange_by_datetime_ascending():
     input_text = """
     ➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one

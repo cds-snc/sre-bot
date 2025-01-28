@@ -13,6 +13,16 @@ START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholde
 END_HEADING = "Trigger"
 
 
+# Make sure that we are listening only on floppy disk reaction
+def is_floppy_disk(event: dict) -> bool:
+    return event["reaction"] == "floppy_disk"
+
+
+# We need to ack all other reactions so that they don't get processed
+def just_ack_the_rest_of_reaction_events():
+    pass
+
+
 def rearrange_by_datetime_ascending(text):
     lines = text.split("\n")
     entries = []
