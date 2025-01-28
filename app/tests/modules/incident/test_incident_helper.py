@@ -1,9 +1,12 @@
 import json
 import os
+import uuid
+
+import pytest
 from modules import incident_helper
 import logging
 
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
@@ -1302,9 +1305,9 @@ def test_handle_update_status_command_too_many_incidents(mock_incident_folder):
     )
 
 
-@patch("modules.incident.incident_helper.incident_status")
+@patch("modules.incident.incident_helper.incident_information_view")
 @patch("modules.incident.incident_helper.incident_folder")
-def test_open_incident_info_view(mock_incident_folder, mock_incident_status):
+def test_open_incident_info_view(mock_incident_folder, mock_incident_information_view):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -1321,9 +1324,7 @@ def test_open_incident_info_view(mock_incident_folder, mock_incident_status):
             "channel_id": {"S": "C1234567890"},
         }
     ]
-    mock_incident_status.incident_information_view.return_value = {
-        "view": [{"block": "block_id"}]
-    }
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
     incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
     mock_client.views_open.assert_called_once_with(
         trigger_id="T12345",
@@ -1373,8 +1374,8 @@ def test_open_incident_view_multiple_incidents_found(mock_incident_folder):
 
 
 @patch("modules.incident.incident_helper.logging")
-@patch("modules.incident.incident_helper.incident_status")
-def test_open_update_field_view(mock_incident_status, mock_logging):
+@patch("modules.incident.incident_helper.update_field_view")
+def test_open_update_field_view(mock_update_field_view, mock_logging):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -1386,13 +1387,202 @@ def test_open_update_field_view(mock_incident_status, mock_logging):
         "view": {"id": "V12345"},
         "actions": [{"action_id": "action_to_perform"}],
     }
-    mock_incident_status.update_field_view.return_value = {
-        "view": [{"block": "block_id"}]
-    }
+    mock_update_field_view.return_value = {"view": [{"block": "block_id"}]}
     incident_helper.open_update_field_view(mock_client, body, mock_ack, mock_respond)
-    mock_incident_status.update_field_view.assert_called_once_with("action_to_perform")
+    mock_update_field_view.assert_called_once_with("action_to_perform")
     mock_client.views_push.assert_called_once_with(
         trigger_id="T12345",
         view_id="V12345",
         view={"view": [{"block": "block_id"}]},
     )
+
+
+@patch("modules.incident.incident_helper.parse_incident_datetime_string")
+@patch("modules.incident.incident_helper.logging")
+def test_incident_information_view(mock_logging, mock_parse_incident_datetime_string):
+    incident_data = generate_incident_data()
+    id = incident_data["id"]["S"]
+    mock_parse_incident_datetime_string.side_effect = [
+        "2025-01-23 17:02",
+        "Unknown",
+        "Unknown",
+        "Unknown",
+    ]
+    view = incident_helper.incident_information_view(incident_data)
+    mock_logging.info.assert_called_once_with(
+        f"Loading Status View for:\n{incident_data}"
+    )
+    mock_parse_incident_datetime_string.assert_has_calls(
+        [
+            call("2025-01-23 17:02:16.915368"),
+            call("Unknown"),
+            call("Unknown"),
+            call("Unknown"),
+        ]
+    )
+    assert view == {
+        "type": "modal",
+        "callback_id": "incident_information_view",
+        "title": {
+            "type": "plain_text",
+            "text": "Incident Information",
+            "emoji": True,
+        },
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "channel_name",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*ID*: " + id,
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Status*:\nstatus",
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_status",
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Time Created*:\n2025-01-23 17:02",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Detection Time*:\nUnknown",
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_detection_time",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Start of Impact*:\nUnknown",
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_start_impact_time",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*End of Impact*:\nUnknown",
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_end_impact_time",
+                },
+            },
+        ],
+    }
+
+
+@patch("modules.incident.incident_helper.logging")
+def test_update_field_view(mock_logging):
+    view = incident_helper.update_field_view("update_status")
+    mock_logging.info.assert_called_once_with(
+        "Loading Update Field View for update_status"
+    )
+    assert view == {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "update_status",
+                    "emoji": True,
+                },
+            }
+        ],
+    }
+
+
+def test_parse_incident_datetime_string():
+    assert (
+        incident_helper.parse_incident_datetime_string("2025-01-23 17:02:16.915368")
+        == "2025-01-23 17:02"
+    )
+    assert (
+        incident_helper.parse_incident_datetime_string("2025-01-23 17:02") == "Unknown"
+    )
+    assert incident_helper.parse_incident_datetime_string("") == "Unknown"
+    assert incident_helper.parse_incident_datetime_string("asdf") == "Unknown"
+    with pytest.raises(TypeError):
+        incident_helper.parse_incident_datetime_string(None)
+
+
+def generate_incident_data(
+    created_at="2025-01-23 17:02:16.915368",
+    incident_commander=None,
+    operations_lead=None,
+    severity=None,
+    start_impact_time=None,
+    end_impact_time=None,
+    detection_time=None,
+    retrospective_url=None,
+    environment="prod",
+):
+    id = str(uuid.uuid4())
+    incident_data = {
+        "id": {"S": id},
+        "created_at": {"S": created_at},
+        "channel_id": {"S": "channel_id"},
+        "channel_name": {"S": "channel_name"},
+        "status": {"S": "status"},
+        "user_id": {"S": "user_id"},
+        "teams": {"SS": ["team1", "team2"]},
+        "report_url": {"S": "report_url"},
+        "meet_url": {"S": "meet_url"},
+        "environment": {"S": environment},
+        "incident_commander": {"S": "incident_commander"},
+    }
+
+    for key, value in [
+        ("incident_commander", incident_commander),
+        ("operations_lead", operations_lead),
+        ("severity", severity),
+        ("start_impact_time", start_impact_time),
+        ("end_impact_time", end_impact_time),
+        ("detection_time", detection_time),
+        ("retrospective_url", retrospective_url),
+    ]:
+        if value:
+            incident_data[key] = {"S": value}
+
+    return incident_data

@@ -1,6 +1,8 @@
+from datetime import datetime
 import json
 import logging
 import os
+import re
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
@@ -590,7 +592,7 @@ def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond)
         if len(incidents) > 1:
             respond("More than one incident found for this channel.")
         else:
-            view = incident_status.incident_information_view(incidents[0])
+            view = incident_information_view(incidents[0])
             client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
@@ -599,7 +601,139 @@ def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
     logging.info("Opening field view")
     logging.info(json.dumps(body, indent=2))
     action = body["actions"][0]["action_id"]
-    view = incident_status.update_field_view(action)
+    view = update_field_view(action)
     client.views_push(
         view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"]
     )
+
+
+def incident_information_view(incident):
+    logging.info(f"Loading Status View for:\n{incident}")
+    incident_name = incident.get("channel_name", "Unknown").get("S", "Unknown")
+    incident_id = incident.get("id", "Unknown").get("S", "Unknown")
+    incident_status = incident.get("status", "Unknown").get("S", "Unknown")
+    incident_created_at = parse_incident_datetime_string(
+        incident.get("created_at", {}).get("S", "Unknown")
+    )
+    incident_start_impact_time = parse_incident_datetime_string(
+        incident.get("start_impact_time", {}).get("S", "Unknown")
+    )
+    incident_end_impact_time = parse_incident_datetime_string(
+        incident.get("end_impact_time", {}).get("S", "Unknown")
+    )
+    incident_detection_time = parse_incident_datetime_string(
+        incident.get("detection_time", {}).get("S", "Unknown")
+    )
+    return {
+        "type": "modal",
+        "callback_id": "incident_information_view",
+        "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": incident_name,
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*ID*: " + incident_id,
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Status*:\n" + incident_status,
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_status",
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Time Created*:\n" + incident_created_at,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Detection Time*:\n" + incident_detection_time,
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_detection_time",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Start of Impact*:\n" + incident_start_impact_time,
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_start_impact_time",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*End of Impact*:\n" + incident_end_impact_time,
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "click_me_123",
+                    "action_id": "update_end_impact_time",
+                },
+            },
+        ],
+    }
+
+
+def update_field_view(action):
+    logging.info(f"Loading Update Field View for {action}")
+    return {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": action,
+                    "emoji": True,
+                },
+            }
+        ],
+    }
+
+
+def parse_incident_datetime_string(datetime_string: str) -> str:
+    pattern = r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$"
+
+    if re.match(pattern, datetime_string):
+        parsed_datetime = datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S.%f")
+        return parsed_datetime.strftime("%Y-%m-%d %H:%M")
+    else:
+        return "Unknown"
