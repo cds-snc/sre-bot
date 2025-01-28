@@ -6,12 +6,14 @@ from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_docs, google_drive
 from integrations.slack import channels as slack_channels
 from integrations.sentinel import log_to_sentinel
-from . import (
+from modules.incident import (
+    incident_status,
+    incident_alert,
     incident_folder,
     incident_roles,
+    incident_conversation,
     schedule_retro,
 )
-from modules.incident import incident_status
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -56,6 +58,9 @@ help_text = """
 
 
 def register(bot: App):
+    bot.action("handle_incident_action_buttons")(
+        incident_alert.handle_incident_action_buttons
+    )
     bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
     bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
     bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
@@ -69,6 +74,18 @@ def register(bot: App):
     bot.action("update_detection_time")(open_update_field_view)
     bot.action("update_start_impact_time")(open_update_field_view)
     bot.action("update_end_impact_time")(open_update_field_view)
+    bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(
+        incident_conversation.handle_reaction_added
+    )
+    bot.event("reaction_removed", matchers=[incident_conversation.is_floppy_disk])(
+        incident_conversation.handle_reaction_removed
+    )
+    bot.event("reaction_added")(
+        incident_conversation.just_ack_the_rest_of_reaction_events
+    )
+    bot.event("reaction_removed")(
+        incident_conversation.just_ack_the_rest_of_reaction_events
+    )
 
 
 def handle_incident_command(args, client: WebClient, body, respond: Respond, ack: Ack):
