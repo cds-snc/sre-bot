@@ -187,13 +187,6 @@ def submit(ack, view, say, body, client: WebClient, logger):
     document_id = incident_document.create_incident_document(slug, folder)
     logger.info(f"Created document: {slug} in folder: {folder} / {document_id}")
 
-    incident_document.update_boilerplate_text(
-        document_id,
-        name,
-        product,
-        channel_url,
-        ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
-    )
     document_link = f"https://docs.google.com/document/d/{document_id}/edit"
 
     # Update incident list
@@ -250,6 +243,14 @@ def submit(ack, view, say, body, client: WebClient, logger):
 
     text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
     say(text=text, channel=channel_id)
+
+    incident_document.update_boilerplate_text(
+        document_id,
+        name,
+        product,
+        channel_url,
+        ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
+    )
 
 
 def generate_incident_modal_view(command, options=[], locale="en-US"):
