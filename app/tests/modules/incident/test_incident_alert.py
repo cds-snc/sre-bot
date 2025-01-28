@@ -21,7 +21,7 @@ def test_handle_incident_action_buttons_call_incident(
         "user": {"id": "user_id"},
     }
     incident_alert.handle_incident_action_buttons(client, ack, body, logger)
-    incident_mock.open_modal.assert_called_with(
+    incident_mock.open_create_incident_modal.assert_called_with(
         client, ack, {"text": "incident_id"}, body
     )
     log_to_sentinel_mock.assert_called_with("call_incident_button_pressed", body)

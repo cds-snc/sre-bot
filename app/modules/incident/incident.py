@@ -11,8 +11,6 @@ from integrations.sentinel import log_to_sentinel
 from integrations.google_next.meet import GoogleMeet
 
 from modules.incident import (
-    incident_alert,
-    incident_conversation,
     incident_folder,
     incident_document,
 )
@@ -25,122 +23,17 @@ i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
-SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID")
+SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID", "")
 PREFIX = os.environ.get("PREFIX", "")
 
 
 def register(bot):
-    bot.command(f"/{PREFIX}incident")(open_modal)
+    bot.command(f"/{PREFIX}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
-    bot.action("handle_incident_action_buttons")(
-        incident_alert.handle_incident_action_buttons
-    )
     bot.action("incident_change_locale")(handle_change_locale_button)
-    bot.event("reaction_added", matchers=[is_floppy_disk])(
-        incident_conversation.handle_reaction_added
-    )
-    bot.event("reaction_removed", matchers=[is_floppy_disk])(
-        incident_conversation.handle_reaction_removed
-    )
-    bot.event("reaction_added")(just_ack_the_rest_of_reaction_events)
-    bot.event("reaction_removed")(just_ack_the_rest_of_reaction_events)
 
 
-# Make sure that we are listening only on floppy disk reaction
-def is_floppy_disk(event: dict) -> bool:
-    return event["reaction"] == "floppy_disk"
-
-
-# We need to ack all other reactions so that they don't get processed
-def just_ack_the_rest_of_reaction_events():
-    pass
-
-
-def generate_incident_modal_view(command, options=[], locale="en-US"):
-    return {
-        "type": "modal",
-        "callback_id": "incident_view",
-        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
-        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
-        "blocks": [
-            {
-                "type": "actions",
-                "block_id": "locale",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": i18n.t("incident.locale_button"),
-                            "emoji": True,
-                        },
-                        "value": locale,
-                        "action_id": "incident_change_locale",
-                    }
-                ],
-            },
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": i18n.t("incident.modal.congratulations"),
-                    "emoji": True,
-                },
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": i18n.t("incident.modal.something_wrong"),
-                },
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": i18n.t("incident.modal.app_help"),
-                },
-            },
-            {"type": "divider"},
-            {
-                "type": "section",
-                "text": {
-                    "type": "plain_text",
-                    "text": i18n.t("incident.modal.fill_the_fields"),
-                },
-            },
-            {
-                "block_id": "name",
-                "type": "input",
-                "element": {
-                    "type": "plain_text_input",
-                    "action_id": "name",
-                    "initial_value": command["text"],
-                },
-                "label": {
-                    "type": "plain_text",
-                    "text": i18n.t("incident.modal.description"),
-                },
-            },
-            {
-                "block_id": "product",
-                "type": "input",
-                "element": {
-                    "type": "static_select",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": i18n.t("incident.modal.product"),
-                    },
-                    "options": options,
-                    "action_id": "product",
-                },
-                "label": {"type": "plain_text", "text": "Product", "emoji": True},
-            },
-        ],
-    }
-
-
-def open_modal(client, ack, command, body):
+def open_create_incident_modal(client, ack, command, body):
     ack()
     if "user" in body:
         user_id = body["user"]["id"]
@@ -357,6 +250,90 @@ def submit(ack, view, say, body, client: WebClient, logger):
 
     text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
     say(text=text, channel=channel_id)
+
+
+def generate_incident_modal_view(command, options=[], locale="en-US"):
+    return {
+        "type": "modal",
+        "callback_id": "incident_view",
+        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
+        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "blocks": [
+            {
+                "type": "actions",
+                "block_id": "locale",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": i18n.t("incident.locale_button"),
+                            "emoji": True,
+                        },
+                        "value": locale,
+                        "action_id": "incident_change_locale",
+                    }
+                ],
+            },
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.congratulations"),
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.something_wrong"),
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": i18n.t("incident.modal.app_help"),
+                },
+            },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.fill_the_fields"),
+                },
+            },
+            {
+                "block_id": "name",
+                "type": "input",
+                "element": {
+                    "type": "plain_text_input",
+                    "action_id": "name",
+                    "initial_value": command["text"],
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.description"),
+                },
+            },
+            {
+                "block_id": "product",
+                "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("incident.modal.product"),
+                    },
+                    "options": options,
+                    "action_id": "product",
+                },
+                "label": {"type": "plain_text", "text": "Product", "emoji": True},
+            },
+        ],
+    }
 
 
 def generate_success_modal(body, channel_id, channel_name):

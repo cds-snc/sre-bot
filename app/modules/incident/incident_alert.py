@@ -9,7 +9,7 @@ def handle_incident_action_buttons(client, ack, body, logger):
     value = body["actions"][0]["value"]
     user = body["user"]["id"]
     if name == "call-incident":
-        incident.open_modal(client, ack, {"text": value}, body)
+        incident.open_create_incident_modal(client, ack, {"text": value}, body)
         log_to_sentinel("call_incident_button_pressed", body)
     elif name == "ignore-incident":
         ack()

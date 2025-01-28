@@ -9,22 +9,6 @@ from unittest.mock import call, MagicMock, patch, ANY
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
 
-def test_is_floppy_disk_true():
-    # Test case where the reaction is 'floppy_disk'
-    event = {"reaction": "floppy_disk"}
-    assert (
-        incident.is_floppy_disk(event) is True
-    ), "The function should return True for 'floppy_disk' reaction"
-
-
-def test_is_floppy_disk_false():
-    # Test case where the reaction is not 'floppy_disk'
-    event = {"reaction": "thumbs_up"}
-    assert (
-        incident.is_floppy_disk(event) is False
-    ), "The function should return False for reactions other than 'floppy_disk'"
-
-
 @patch("modules.incident.incident.generate_incident_modal_view")
 @patch("modules.incident.incident.i18n")
 @patch("modules.incident.incident.slack_users.get_user_locale")
@@ -47,7 +31,7 @@ def test_incident_open_modal_calls_ack(
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
-    incident.open_modal(client, ack, command, body)
+    incident.open_create_incident_modal(client, ack, command, body)
     args = client.views_open.call_args_list
     _, kwargs = args[0]
     ack.assert_called_once()
@@ -76,7 +60,7 @@ def test_incident_open_modal_calls_generate_incident_modal_view(
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
-    incident.open_modal(client, ack, command, body)
+    incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_generate_incident_modal_view.assert_called_once()
 
@@ -98,7 +82,7 @@ def test_incident_open_modal_calls_i18n_set(
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user_id": "user_id"}
-    incident.open_modal(client, ack, command, body)
+    incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_generate_incident_modal_view.assert_called_once()
     mock_i18n_set.assert_called_once_with("locale", "en-US")
@@ -121,7 +105,7 @@ def test_incident_open_modal_calls_get_user_locale(
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
-    incident.open_modal(client, ack, command, body)
+    incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_get_user_locale.assert_called_once_with(client, "user_id")
     mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "fr-FR")
@@ -138,7 +122,7 @@ def test_incident_open_modal_displays_localized_strings(
     ack = MagicMock()
     command = {"text": "incident description"}
     body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
-    incident.open_modal(client, ack, command, body)
+    incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_i18n.t.assert_called()
 
