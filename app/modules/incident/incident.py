@@ -193,16 +193,16 @@ def submit(ack, view, say, body, client: WebClient, logger):
     incident_folder.add_new_incident_to_list(
         document_link, name, slug, product, channel_url
     )
-    if PREFIX == "dev-":
-        teams = [folder]
-        incident_folder.create_incident(
-            channel_id,
-            slug,
-            user_id,
-            teams,
-            document_link,
-            meet_link["meetingUri"],
-        )
+
+    teams = [folder]
+    incident_folder.create_incident(
+        channel_id,
+        slug,
+        user_id,
+        teams,
+        document_link,
+        meet_link["meetingUri"],
+    )
     # Bookmark incident document
     client.bookmarks_add(
         channel_id=channel_id,
