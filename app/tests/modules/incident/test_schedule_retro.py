@@ -4,7 +4,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 import pytest
-import pytz
+import pytz  # type: ignore
 
 # from integrations.google_workspace import google_calendar
 from modules.incident import schedule_retro
@@ -140,3 +140,635 @@ def test_schedule_event_no_available_slots(
     insert_event_mock.assert_not_called()
 
     assert event_link is None
+
+
+@patch("modules.incident.schedule_retro.logging.error")
+def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_error):
+    mock_ack = MagicMock()
+    mock_client = MagicMock()
+
+    # Mock the response of the private message to have been posted as expected
+    mock_client.chat_postEphemeral.return_value = {
+        "ok": False,
+        "error": "not_in_channel",
+    }
+
+    # Mock the exception and exception message
+    exception_message = "not_in_channel"
+    mock_client.chat_postEphemeral.side_effect = Exception(exception_message)
+
+    # The test channel and user IDs
+    channel_id = "C12345"
+    user_id = "U12345"
+    channel_name = "general"  # Not an incident channel
+
+    # Prepare the request body
+    body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
+
+    # Call the function being tested
+    schedule_retro.schedule_incident_retro(client=mock_client, body=body, ack=mock_ack)
+
+    # Ensure the ack method was called
+    mock_ack.assert_called_once()
+
+    # Ensure the correct error message was posted to the channel
+    expected_text = "Channel general is not an incident channel. Please use this command in an incident channel."
+    mock_client.chat_postEphemeral.assert_called_once_with(
+        text=expected_text,
+        channel=channel_id,
+        user=user_id,
+    )
+
+    # Check that the expected error message was logged
+    expected_log_message = f"Could not post ephemeral message to user {user_id} due to {exception_message}."
+    mock_logging_error.assert_called_once_with(expected_log_message)
+
+
+@patch("modules.incident.schedule_retro.logging")
+def test_schedule_incident_retro_no_bookmarks(mock_logging):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.bookmarks_list.return_value = {"ok": False, "error": "not_in_channel"}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    mock_ack.assert_called_once()
+    mock_logging.warning.assert_called_once_with(
+        "No bookmark link for the incident document found for channel %s",
+        "incident-2024-01-12-test",
+    )
+
+
+def test_schedule_incident_retro_successful_no_bots():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U34333"]}
+    mock_client.conversations_members.return_value = {"members": ["U12345", "U67890"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+    mock_client.users_info.side_effect = [
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
+        {
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
+    ]
+
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    mock_ack.assert_called_once()
+
+    # Verify the correct API calls were made
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
+
+    # Check the users_info method was called correctly
+    calls = [call for call in mock_client.users_info.call_args_list]
+    assert (
+        len(calls) == 2
+    )  # Ensure we tried to fetch info for two users, one being a bot
+
+    # Verify the modal payload contains the correct data
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_successful_bots():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U3333"]}
+    mock_client.conversations_members.return_value = {
+        "members": ["U12345", "U67890", "U54321"]
+    }
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+
+    mock_client.users_info.side_effect = [
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
+        {
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
+    ]
+
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    mock_ack.assert_called_once()
+
+    # Verify the correct API calls were made
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
+
+    # Check the users_info method was called correctly
+    calls = [call for call in mock_client.users_info.call_args_list]
+    assert (
+        len(calls) == 3
+    )  # Ensure we tried to fetch info for three users, one being a bot
+
+    # Verify the modal payload contains the correct data
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_successful_no_security_group():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": []}
+    mock_client.conversations_members.return_value = {
+        "members": ["U12345", "U67890", "U54321"]
+    }
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+    mock_client.users_info.side_effect = [
+        {"user": {"id": "U12345", "real_name": "User1", "email": "user1@example.com"}},
+        {"user": {"id": "U6789", "real_name": "User2", "email": "user2@example.com"}},
+        {
+            "user": {
+                "id": "U12345",
+                "real_name": "BotUser",
+                "email": "user3@example.com",
+                "bot_id": "B12345",
+            }
+        },  # this simulates a bot user
+    ]
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    mock_ack.assert_called_once()
+
+    # Verify the correct API calls were made
+    mock_client.conversations_members.assert_called_with(channel="C1234567890")
+
+    # Check the users_info method was called correctly
+    calls = [call for call in mock_client.users_info.call_args_list]
+    assert (
+        len(calls) == 3
+    )  # Ensure we tried to fetch info for two users, minus the user being in the security group
+
+    # Verify the modal payload contains the correct data
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_users():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "topic": {"value": "Retro Topic"},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+    mock_client.users_info.side_effect = []
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_topic():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {"topic": {"value": ""}, "purpose": {"value": "Retro Purpose"}}
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+    mock_client.users_info.side_effect = []
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object and set the topic to a default one
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_name():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {
+            "name": "",
+            "topic": {"value": ""},
+            "purpose": {"value": "Retro Purpose"},
+        }
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+    mock_client.users_info.side_effect = []
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object and set the topic to a default one
+    expected_data = json.dumps(
+        {
+            "name": "incident-",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+def test_schedule_incident_retro_with_no_purpose():
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
+    mock_client.conversations_info.return_value = {
+        "channel": {"topic": {"value": ""}, "purpose": {"value": ""}}
+    }
+    mock_client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {
+                "title": "Incident report",
+                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
+            }
+        ],
+    }
+    mock_client.users_info.side_effect = []
+
+    # Adjust the mock to simulate no users in the channel
+    mock_client.conversations_members.return_value = {"members": []}
+
+    body = {
+        "channel_id": "C1234567890",
+        "trigger_id": "T1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+    }
+
+    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+
+    # construct the expected data object and set the topic to a default one
+    expected_data = json.dumps(
+        {
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    # Assertions to validate behavior when no users are present in the channel
+    assert (
+        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
+    )
+
+
+@patch("modules.incident.schedule_retro.schedule_event")
+def test_save_incident_retro_success(schedule_event_mock):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    schedule_event_mock.return_value = {
+        "event_link": "http://example.com/event",
+        "event_info": "event_info",
+    }
+    body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    view_mock_with_link = {
+        "private_metadata": data_to_send,
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    # Call the function
+    schedule_retro.save_incident_retro(
+        mock_client, mock_ack, body_mock, view_mock_with_link
+    )
+
+    # Assertions
+    mock_ack.assert_called_once()  # Ensure ack() was called
+    mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+    mock_client.views_update.assert_called_once()  # Ensure the modal was updated
+
+    assert (
+        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success message is updated
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == "*Successfully scheduled calender event!*"
+    )
+
+
+@patch("modules.incident.schedule_retro.schedule_event")
+def test_save_incident_retro_success_post_message_to_channel(schedule_event_mock):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    schedule_event_mock.return_value = {
+        "event_link": "http://example.com/event",
+        "event_info": "event_info",
+    }
+    body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    view_mock_with_link = {
+        "private_metadata": data_to_send,
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    # Call the function
+    schedule_retro.save_incident_retro(
+        mock_client, mock_ack, body_mock, view_mock_with_link
+    )
+
+    # Assertions
+    mock_ack.assert_called_once()  # Ensure ack() was called
+    mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+
+    # Verify that the chat message was sent to the channel
+    mock_client.chat_postMessage.assert_called_once()
+    mock_client.chat_postMessage.assert_any_call(
+        channel="C1234567890", text="event_info", unfurl_links=False
+    )
+
+    assert (
+        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == "*Successfully scheduled calender event!*"
+    )
+
+
+@patch("modules.incident.schedule_retro.schedule_event")
+def test_save_incident_retro_failure(schedule_event_mock):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    schedule_event_mock.return_value = None
+    body_mock = {"trigger_id": "some_trigger_id"}
+    data_to_send = json.dumps(
+        {
+            "emails": [],
+            "name": "incident-2024-01-12-test",
+            "incident_document": "dummy_document_id",
+            "channel_id": "C1234567890",
+        }
+    )
+    view_mock_with_link = {
+        "private_metadata": data_to_send,
+        "state": {
+            "values": {
+                "number_of_days": {"number_of_days": {"value": "1"}},
+                "user_select_block": {
+                    "user_select_action": {
+                        "selected_options": [
+                            {"value": "U0123456789"},
+                            {"value": "U9876543210"},
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    # Call the function
+    schedule_retro.save_incident_retro(
+        mock_client, mock_ack, body_mock, view_mock_with_link
+    )
+
+    # Assertions
+    mock_ack.assert_called_once()  # Ensure ack() was called
+    mock_client.views_open.assert_called_once()  # Ensure the modal was opened
+    mock_client.views_update.assert_called_once()
+
+    assert (
+        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == ":beach-ball: *Scheduling the retro...*"
+    )
+    # Verify the modal content for success
+    assert (
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
+        == "*Could not schedule event - no free time was found!*"
+    )
+
+
+@patch("modules.incident.schedule_retro.logging")
+def test_confirm_click(mock_logging):
+    ack = MagicMock()
+    body = {
+        "user": {"id": "user_id", "username": "username"},
+    }
+    schedule_retro.confirm_click(ack, body, client=MagicMock())
+    ack.assert_called_once()
+    mock_logging.info.assert_called_once_with(
+        "User username viewed the calendar event."
+    )

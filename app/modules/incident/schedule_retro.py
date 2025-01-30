@@ -3,11 +3,14 @@ from datetime import datetime, timedelta
 
 import json
 
+from slack_sdk import WebClient
+from integrations.slack import channels as slack_channels
 from integrations.google_workspace.google_calendar import (
     get_freebusy,
     insert_event,
     find_first_available_slot,
 )
+from integrations.google_workspace import google_docs
 
 
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
@@ -68,3 +71,245 @@ def schedule_event(event_details, days, user_emails):
         **event_config,
     )
     return result  # Return the HTML link and event info
+
+
+# Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
+# that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
+# submit button is clicked.
+def schedule_incident_retro(client: WebClient, body, ack):
+    ack()
+    channel_id = body["channel_id"]
+    channel_name = body["channel_name"]
+    user_id = body["user_id"]
+
+    # if we are not in an incident channel, then we need to display a message to the user that they need to use this command in an incident channel
+    if not channel_name.startswith("incident-"):
+        try:
+            response = client.chat_postEphemeral(
+                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
+                channel=channel_id,
+                user=user_id,
+            )
+        except Exception as e:
+            logging.error(
+                f"Could not post ephemeral message to user {user_id} due to {e}."
+            )
+        return
+
+    # get all users in a channel
+    users = client.conversations_members(channel=channel_id)["members"]
+
+    # get the incident document
+    # get and update the incident document
+    document_id = ""
+    response = client.bookmarks_list(channel_id=channel_id)
+    if response["ok"]:
+        for item in range(len(response["bookmarks"])):
+            if response["bookmarks"][item]["title"] == "Incident report":
+                document_id = google_docs.extract_google_doc_id(
+                    response["bookmarks"][item]["link"]
+                )
+    else:
+        logging.warning(
+            "No bookmark link for the incident document found for channel %s",
+            channel_name,
+        )
+
+    # convert the data to string so that we can send it as private metadata
+    data_to_send = json.dumps(
+        {
+            "name": channel_name,
+            "incident_document": document_id,
+            "channel_id": channel_id,
+        }
+    )
+
+    # Fetch user details from all members of the channel
+    users = slack_channels.fetch_user_details(client, channel_id)
+
+    blocks = {
+        "type": "modal",
+        "callback_id": "view_save_event",
+        "private_metadata": data_to_send,
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "submit": {"type": "plain_text", "text": "Schedule"},
+        "blocks": (
+            [
+                {
+                    "type": "input",
+                    "block_id": "number_of_days",
+                    "element": {
+                        "type": "number_input",
+                        "is_decimal_allowed": False,
+                        "min_value": "1",
+                        "max_value": "60",
+                        "action_id": "number_of_days",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "How many days from now should I start checking the calendar for availability?",
+                    },
+                },
+                {
+                    "type": "input",
+                    "block_id": "user_select_block",
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Select everyone you want to include in the retro calendar invite",
+                        "emoji": True,
+                    },
+                    "element": {
+                        "type": "multi_static_select",
+                        "action_id": "user_select_action",
+                        "options": users,
+                    },
+                },
+                {"type": "divider"},
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "2. A proposed event will be added to everyone's calendar that is selected.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+                    },
+                },
+            ]
+        ),
+    }
+    # Open the modal window
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view=blocks,
+    )
+
+
+# Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
+# a message is displayed to the user that the event could not be scheduled.
+def save_incident_retro(client: WebClient, ack, body, view):
+    ack()
+    blocks = {
+        "type": "modal",
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "blocks": (
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": ":beach-ball: *Scheduling the retro...*",
+                    },
+                }
+            ]
+        ),
+    }
+    loading_view = client.views_open(trigger_id=body["trigger_id"], view=blocks)["view"]
+
+    # get the number of days data from the view and convert to an integer
+    days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
+
+    # get all the users selected in the multi select block
+    users = view["state"]["values"]["user_select_block"]["user_select_action"][
+        "selected_options"
+    ]
+    user_emails = []
+    for user in users:
+        user_id = user["value"].strip()
+        user_email = client.users_info(user=user_id)["user"]["profile"]["email"]
+        user_emails.append(user_email)
+
+    # pass the data using the view["private_metadata"] to the schedule_event function
+    result = schedule_event(view["private_metadata"], days, user_emails)
+    # if we could not schedule the event, display a message to the user that the event could not be scheduled
+    if result is None:
+        blocks = {
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+            "blocks": (
+                [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Could not schedule event - no free time was found!*",
+                        },
+                    }
+                ]
+            ),
+        }
+        logging.info(
+            "The event could not be scheduled since schedule_event returned None"
+        )
+
+    # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
+    else:
+        channel_id = json.loads(view["private_metadata"])["channel_id"]
+        event_link = result["event_link"]
+        event_info = result["event_info"]
+        blocks = {
+            "type": "modal",
+            "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+            "blocks": (
+                [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Successfully scheduled calender event!*",
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "View Calendar Event",
+                            },
+                            "value": "view_event",
+                            "url": f"{event_link}",
+                            "action_id": "confirm_click",
+                        },
+                    },
+                ]
+            ),
+        }
+        logging.info("Event has been scheduled successfully. Link: %s", event_link)
+
+        # post the message in the channel
+        client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
+
+    # Open the modal and log that the event was scheduled successfully
+    client.views_update(
+        view_id=loading_view["id"], hash=loading_view["hash"], view=blocks
+    )
+
+
+# We just need to handle the action here and record who clicked on it
+def confirm_click(ack, body, client):
+    ack()
+    username = body["user"]["username"]
+    logging.info(f"User {username} viewed the calendar event.")

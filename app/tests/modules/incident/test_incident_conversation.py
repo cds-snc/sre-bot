@@ -2,6 +2,22 @@ from unittest.mock import MagicMock, patch
 from modules.incident import incident_conversation
 
 
+def test_is_floppy_disk_true():
+    # Test case where the reaction is 'floppy_disk'
+    event = {"reaction": "floppy_disk"}
+    assert (
+        incident_conversation.is_floppy_disk(event) is True
+    ), "The function should return True for 'floppy_disk' reaction"
+
+
+def test_is_floppy_disk_false():
+    # Test case where the reaction is not 'floppy_disk'
+    event = {"reaction": "thumbs_up"}
+    assert (
+        incident_conversation.is_floppy_disk(event) is False
+    ), "The function should return False for reactions other than 'floppy_disk'"
+
+
 def test_multiline_entries_rearrange_by_datetime_ascending():
     input_text = """
     ➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one
@@ -982,3 +998,82 @@ def test_handle_reaction_removed_forwarded_message():
         )
         is None
     )
+
+
+@patch("modules.incident.incident_conversation.incident_helper")
+@patch("modules.incident.incident_conversation.log_to_sentinel")
+def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helper):
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "ignore"}],
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+    }
+    ack = MagicMock()
+    respond = MagicMock()
+    incident_conversation.archive_channel_action(client, body, ack, respond)
+    ack.assert_called_once()
+    client.chat_update.assert_called_once_with(
+        channel="channel_id",
+        text="<@user_id> has delayed scheduling and archiving this channel for 14 days.",
+        ts="message_ts",
+        attachments=[],
+    )
+    mock_log_to_sentinel.assert_called_once_with(
+        "incident_channel_archive_delayed", body
+    )
+
+
+@patch("modules.incident.incident_conversation.incident_helper")
+@patch("modules.incident.incident_conversation.log_to_sentinel")
+def test_archive_channel_action_archive(
+    mock_log_to_sentinel,
+    mock_incident_helper,
+):
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "archive"}],
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+    }
+    channel_info = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    ack = MagicMock()
+    respond = MagicMock()
+    incident_conversation.archive_channel_action(client, body, ack, respond)
+    assert ack.call_count == 1
+    mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
+    mock_incident_helper.close_incident.assert_called_once_with(
+        client, channel_info, ack, respond
+    )
+
+
+@patch("modules.incident.incident_conversation.schedule_retro")
+@patch("modules.incident.incident_conversation.log_to_sentinel")
+def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_schedule):
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "schedule_retro"}],
+        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
+        "message_ts": "message_ts",
+        "user": {"id": "user_id"},
+        "trigger_id": "trigger_id",
+    }
+    channel_info = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+        "trigger_id": "trigger_id",
+    }
+    ack = MagicMock()
+    incident_conversation.archive_channel_action(client, body, ack, MagicMock())
+    assert ack.call_count == 1
+    mock_schedule.schedule_incident_retro.assert_called_once_with(
+        client, channel_info, ack
+    )
+    mock_log_to_sentinel.assert_called_once_with("incident_retro_scheduled", body)
