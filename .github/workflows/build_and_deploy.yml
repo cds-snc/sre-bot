@@ -76,7 +76,7 @@ jobs:
         run: |
           curl -X POST -H 'Content-type: application/json' \
           --data '{"text": "✅ ECS deployment for sre-bot succeeded!"}' \
-          ${{ secrets.SLACK_SRE_CHANNEL_WEBHOOK_URL}}
+          ${{ secrets.SLACK_WEBHOOK_URL}}
 
       # Slack notification on failed ECS wait
       - name: Slack Notify Failure
@@ -84,7 +84,7 @@ jobs:
         run: |
           curl -X POST -H 'Content-type: application/json' \
           --data '{"text": "❌ ECS deployment for sre-bot failed to stabilize."}' \
-          ${{ secrets.SLACK_SRE_CHANNEL_WEBHOOK_URL}}
+          ${{ secrets.SLACK_WEBHOOK_URL}}
 
       - name: Report deployment to Sentinel
         if: steps.ecs_wait.outcome == 'success'
