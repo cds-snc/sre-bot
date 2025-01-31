@@ -402,6 +402,125 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+def test_incident_canvas_create_successful_called_with_correct_params(
+    _log_to_sentinel_mock,
+    mock_list_metadata,
+    mock_create_new_incident,
+    mock_merge_data,
+    mock_add_new_incident_to_list,
+    mock_google_meet,
+):
+    client = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    canvas_data = {
+        "type": "markdown",
+        "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want. All you need to do is to start typing below!️",
+    }
+
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    mock_google_meet_instance = mock_google_meet.return_value
+    mock_google_meet_instance.create_space.return_value = {
+        "name": "spaces/asdfasdf",
+        "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
+        "meetingCode": "aaa-bbbb-ccc",
+        "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
+    }
+    incident.submit(ack, view, say, body, client, logger)
+
+    client.conversations_canvases_create.assert_called_once_with(
+        channel_id="channel_id", document_content=canvas_data
+    )
+
+
+@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
+def test_incident_canvas_create_returns_successful_response(
+    _log_to_sentinel_mock,
+    mock_list_metadata,
+    mock_create_new_incident,
+    mock_merge_data,
+    mock_add_new_incident_to_list,
+    mock_google_meet,
+):
+    client = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    expected_response = {"ok": True, "canvas_id": "canvas_id"}
+    client.conversations_canvases_create.return_value = expected_response
+
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    mock_google_meet_instance = mock_google_meet.return_value
+    mock_google_meet_instance.create_space.return_value = {
+        "name": "spaces/asdfasdf",
+        "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
+        "meetingCode": "aaa-bbbb-ccc",
+        "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
+    }
+    incident.submit(ack, view, say, body, client, logger)
+
+    assert client.conversations_canvases_create.return_value == expected_response
+    ack.assert_called_once()
+
+
+@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
+def test_incident_canvas_create_unsuccessful_called(
+    _log_to_sentinel_mock,
+    mock_list_metadata,
+    mock_create_new_incident,
+    mock_merge_data,
+    mock_add_new_incident_to_list,
+    mock_google_meet,
+):
+    client = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    expected_response = {"ok": False, "error": "invalid_type"}
+    client.conversations_canvases_create.return_value = expected_response
+
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    mock_google_meet_instance = mock_google_meet.return_value
+    mock_google_meet_instance.create_space.return_value = {
+        "name": "spaces/asdfasdf",
+        "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
+        "meetingCode": "aaa-bbbb-ccc",
+        "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
+    }
+    incident.submit(ack, view, say, body, client, logger)
+
+    assert client.conversations_canvases_create.return_value == expected_response
+
+
+@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
+@patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.incident_folder.get_folder_metadata")
+@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_a_document_and_announces_it(
     _log_to_sentinel_mock,
     mock_incident_folder,
