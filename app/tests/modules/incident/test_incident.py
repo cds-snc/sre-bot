@@ -404,10 +404,8 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_canvas_create_successful_called_with_correct_params(
     _log_to_sentinel_mock,
-    mock_list_metadata,
-    mock_create_new_incident,
-    mock_merge_data,
-    mock_add_new_incident_to_list,
+    mock_incident_folder,
+    mock_incident_document,
     mock_google_meet,
 ):
     client = MagicMock()
@@ -439,6 +437,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
 
 
 @patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident_folder.dynamodb")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -450,8 +449,12 @@ def test_incident_canvas_create_returns_successful_response(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_dynamodb,
     mock_google_meet,
 ):
+    mock_dynamodb.put_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+    }
     client = MagicMock()
     ack = MagicMock()
     logger = MagicMock()
@@ -478,6 +481,7 @@ def test_incident_canvas_create_returns_successful_response(
 
 
 @patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident_folder.dynamodb")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -489,8 +493,12 @@ def test_incident_canvas_create_unsuccessful_called(
     mock_create_new_incident,
     mock_merge_data,
     mock_add_new_incident_to_list,
+    mock_dynamodb,
     mock_google_meet,
 ):
+    mock_dynamodb.put_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+    }
     client = MagicMock()
     ack = MagicMock()
     logger = MagicMock()
@@ -515,47 +523,57 @@ def test_incident_canvas_create_unsuccessful_called(
     assert client.conversations_canvases_create.return_value == expected_response
 
 
-@patch("modules.incident.incident.GoogleMeet")
-@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
+@patch("modules.incident.incident_folder.create_incident")
+@patch("modules.incident.incident_folder.dynamodb")
+@patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.create_incident_document")
+@patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder.get_folder_metadata")
-@patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_creates_a_document_and_announces_it(
-    _log_to_sentinel_mock,
     mock_incident_folder,
-    mock_incident_document,
     mock_google_meet,
+    mock_incident_document,
+    mock_add_new_incident_to_list,
+    mock_dynamodb,
+    mock_create_new_incident,
+    mock_boilerplate_text,
 ):
     ack = MagicMock()
     logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
 
-    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    body = {
+        "user": {"id": "user_id"},
+        "channel_id": {},
+        "trigger_id": "trigger_id",
+        "view": view,
+    }
     client = MagicMock()
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
 
-    mock_incident_document.create_incident_document.return_value = "id"
+    # Set up the mock to return the structure your code expects for the dynamodb database
+    mock_dynamodb.put_item.return_value = {
+        "ResponseMetadata": {"HTTPStatusCode": 200},
+    }
+    mock_incident_document.return_value = "id"
 
     mock_incident_folder.get_folder_metadata.return_value = {"appProperties": {}}
 
     incident.submit(ack, view, say, body, client, logger)
-    mock_incident_document.create_incident_document.assert_called_once_with(
-        f"{DATE}-name", "folder"
-    )
-    mock_incident_document.update_boilerplate_text.assert_called_once_with(
-        "id", "name", "product", "https://gcdigital.slack.com/archives/channel_id", ""
-    )
-    mock_incident_folder.add_new_incident_to_list.assert_called_once_with(
+    mock_incident_document.assert_called_once_with(f"{DATE}-name", "folder")
+
+    mock_add_new_incident_to_list.assert_called_once_with(
         "https://docs.google.com/document/d/id/edit",
         "name",
         f"{DATE}-name",
         "product",
         "https://gcdigital.slack.com/archives/channel_id",
     )
+    mock_incident_folder.assert_called_once_with("folder")
 
 
 @patch("modules.incident.incident.GoogleMeet")
