@@ -60,8 +60,34 @@ jobs:
       - name: Restart ECS
         run: |
           aws ecs update-service --cluster sre-bot-cluster --service sre-bot-service --force-new-deployment > /dev/null 2>&1
+      
+     # Allow this step to fail so we can handle success/failure and report it to slack. By default it waits for 10 minutes
+      - name: Wait for ECS Stability
+        id: ecs_wait
+        continue-on-error: true
+        run: |
+          aws ecs wait services-stable \
+            --cluster sre-bot-cluster \
+            --services sre-bot-service 
+
+      # Slack notification on successful ECS wait
+      - name: Slack Notify Success
+        if: steps.ecs_wait.outcome == 'success'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text": "✅ ECS deployment for sre-bot succeeded!"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL}}
+
+      # Slack notification on failed ECS wait
+      - name: Slack Notify Failure
+        if: steps.ecs_wait.outcome == 'failure'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text": "❌ ECS deployment for sre-bot failed to stabilize."}' \
+          ${{ secrets.SLACK_WEBHOOK_URL}}
 
       - name: Report deployment to Sentinel
+        if: steps.ecs_wait.outcome == 'success'
         uses: cds-snc/sentinel-forward-data-action@main
         with:
           input_data: '{"product": "sre-bot", "version": "${{ github.sha }}", "repository": "${{ github.repository }}", "environment": "production"}'
