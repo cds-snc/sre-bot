@@ -437,7 +437,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
 
 
 @patch("modules.incident.incident.GoogleMeet")
-@patch("modules.incident.incident_folder.dynamodb")
+@patch("modules.incident.incident.incident_folder.dynamodb")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -481,7 +481,7 @@ def test_incident_canvas_create_returns_successful_response(
 
 
 @patch("modules.incident.incident.GoogleMeet")
-@patch("modules.incident.incident_folder.dynamodb")
+@patch("modules.incident.incident.incident_folder.dynamodb")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -525,7 +525,7 @@ def test_incident_canvas_create_unsuccessful_called(
 
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident_folder.create_incident")
-@patch("modules.incident.incident_folder.dynamodb")
+@patch("modules.incident.incident.incident_folder.dynamodb")
 @patch("modules.incident.incident.incident_folder.add_new_incident_to_list")
 @patch("modules.incident.incident.incident_document.create_incident_document")
 @patch("modules.incident.incident.GoogleMeet")
