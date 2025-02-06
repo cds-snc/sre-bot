@@ -207,10 +207,11 @@ def submit(ack, view, say, body, client: WebClient, logger):
     incident_folder.create_incident(
         channel_id,
         slug,
+        name,
         user_id,
         teams,
         document_link,
-        meet_link["meetingUri"],
+        meet_url=meet_link["meetingUri"],
     )
     # Bookmark incident document
     client.bookmarks_add(
