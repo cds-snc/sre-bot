@@ -6,6 +6,7 @@ Includes functions to manage the folders, the metadata, and the list of incident
 import datetime
 import os
 import logging
+import re
 import uuid
 from slack_sdk.web import WebClient
 from slack_bolt import Ack
@@ -307,6 +308,116 @@ def return_channel_name(input_str: str):
     if input_str.startswith(prefix):
         return "#" + input_str[len(prefix) :]
     return input_str
+
+
+def get_incidents_from_sheet(days=0) -> list:
+    """Get incidents from Google Sheet"""
+    date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
+    date_lookback_str = date_lookback.strftime("%Y-%m-%d")
+    incidents = sheets.get_sheet(INCIDENT_LIST, "Sheet1", includeGridData=True)
+    if incidents and isinstance(incidents, dict):
+        row_data = incidents.get("sheets")[0].get("data")[0].get("rowData")
+        incidents_details = []
+        for row in row_data[1:]:
+            values = row.get("values")
+            if not values or len(values) < 5:
+                continue
+            channel_url = values[4].get("hyperlink")
+            channel_id = None
+            if channel_url:
+                match = re.search(
+                    r"https://gcdigital\.slack\.com/archives/(\w+)", channel_url
+                )
+                if match:
+                    channel_id = match.group(1)
+            channel_name = values[4].get("formattedValue")
+            if not channel_name:
+                channel_name = "TBC"
+            else:
+                channel_name = channel_name[1:]
+            incident_details = {
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "name": values[1].get("formattedValue"),
+                "user_id": "",
+                "teams": [values[2].get("formattedValue")],
+                "report_url": values[1].get("hyperlink"),
+                "status": values[3].get("formattedValue"),
+                "created_at": values[0].get("formattedValue"),
+                "meet_url": "TBC",
+            }
+            if incident_details["channel_id"] is None:
+                continue
+            if days > 0:
+                if incident_details["created_at"] < date_lookback_str:
+                    continue
+            else:
+                incidents_details.append(incident_details)
+        return incidents_details
+    return []
+
+
+def complete_incidents_details(client: WebClient, logger, incidents):
+    """Complete incidents details with channel info"""
+    for incident in incidents:
+        response = client.conversations_info(channel=incident["channel_id"])
+        if response.get("ok"):
+            channel_info = response.get("channel")
+            incident["channel_name"] = channel_info.get("name")
+
+            if (
+                "incident-dev-" in incident["channel_name"]
+                or "Development" in incident["teams"]
+            ):
+                incident["environment"] = "dev"
+            else:
+                incident["environment"] = "prod"
+            logger.info(f"incident environment: {incident['environment']}")
+            created_at = channel_info.get("created", incident["created_at"])
+            incident["created_at"] = str(created_at)
+
+            is_archived = channel_info.get("is_archived")
+            is_member = channel_info.get("is_member")
+
+            meet_url = ""
+            if not is_archived:
+                if not is_member:
+                    client.conversations_join(channel=incident["channel_id"])
+                response = client.bookmarks_list(channel_id=incident["channel_id"])
+                if response["ok"]:
+                    for item in range(len(response["bookmarks"])):
+                        if response["bookmarks"][item]["title"] == "Meet link":
+                            meet_url = response["bookmarks"][item]["link"]
+            if meet_url:
+                incident["meet_url"] = meet_url
+    return incidents
+
+
+def create_missing_incidents(logger, incidents):
+    """Create missing incidents"""
+    count = 0
+    for incident in incidents:
+        incident_exists = lookup_incident("channel_id", incident["channel_id"])
+        if len(incident_exists) == 0:
+            incident_id = create_incident(
+                channel_id=incident["channel_id"],
+                channel_name=incident["channel_name"],
+                name=incident["name"],
+                user_id=incident["user_id"],
+                teams=incident["teams"],
+                report_url=incident["report_url"],
+                status=incident["status"],
+                created_at=incident["created_at"],
+                meet_url=incident["meet_url"],
+                environment=incident["environment"],
+            )
+            logger.info(f"created incident: {incident['name']}: {incident_id}")
+            count += 1
+        else:
+            logger.info(
+                f"incident {incident['name']} already exists: {incident_exists[0]['id']['S']}"
+            )
+    return count
 
 
 def create_incident(
