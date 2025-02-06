@@ -354,12 +354,18 @@ def test_return_channel_name_dev_prefix_only():
 @patch("modules.incident.incident_folder.dynamodb")
 def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
-    mock_created_at = mock_datetime.datetime.now.return_value = (
-        "2025-01-22 21:58:18.689313"
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
+        1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     assert incident_folder.create_incident(
-        "channel_id", "channel_name", "user_id", ["teams"], "report_url", "meet_url"
+        "channel_id",
+        "channel_name",
+        "name",
+        "user_id",
+        ["teams"],
+        "report_url",
+        meet_url="meet_url",
     )
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
@@ -368,6 +374,7 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
             "created_at": {"S": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
+            "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
             "teams": {"SS": ["teams"]},
@@ -383,25 +390,26 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
 @patch("modules.incident.incident_folder.dynamodb")
 def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_uuid):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
-    mock_created_at = mock_datetime.datetime.now.return_value = (
-        "2025-01-22 21:58:18.689313"
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
+        1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     assert incident_folder.create_incident(
         "channel_id",
         "channel_name",
+        "name",
         "user_id",
         ["teams"],
         "report_url",
-        "meet_url",
-        "incident_commander",
-        "operations_lead",
-        "severity",
-        "start_time",
-        "end_time",
-        "detection_time",
-        "retro_url",
-        "dev",
+        meet_url="meet_url",
+        incident_commander="incident_commander",
+        operations_lead="operations_lead",
+        severity="severity",
+        start_impact_time="start_time",
+        end_impact_time="end_time",
+        detection_time="detection_time",
+        retrospective_url="retro_url",
+        environment="dev",
     )
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
@@ -410,6 +418,7 @@ def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_u
             "created_at": {"S": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
+            "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
             "teams": {"SS": ["teams"]},
@@ -432,12 +441,18 @@ def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_u
 @patch("modules.incident.incident_folder.dynamodb")
 def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_uuid):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
-    mock_created_at = mock_datetime.datetime.now.return_value = (
-        "2025-01-22 21:58:18.689313"
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
+        1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
     response = incident_folder.create_incident(
-        "channel_id", "channel_name", "user_id", ["teams"], "report_url", "meet_url"
+        "channel_id",
+        "channel_name",
+        "name",
+        "user_id",
+        ["teams"],
+        "report_url",
+        meet_url="meet_url",
     )
     assert response is None
     mock_dynamodb.put_item.assert_called_once_with(
@@ -447,6 +462,7 @@ def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_uuid):
             "created_at": {"S": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
+            "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
             "teams": {"SS": ["teams"]},

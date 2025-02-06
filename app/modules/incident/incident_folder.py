@@ -312,10 +312,13 @@ def return_channel_name(input_str: str):
 def create_incident(
     channel_id,
     channel_name,
+    name,
     user_id,
     teams,
     report_url,
-    meet_url,
+    status="Open",
+    meet_url=None,
+    created_at=None,
     incident_commander=None,
     operations_lead=None,
     severity=None,
@@ -325,13 +328,16 @@ def create_incident(
     retrospective_url=None,
     environment="prod",
 ):
+    if not created_at:
+        created_at = str(datetime.datetime.now().timestamp())
     id = str(uuid.uuid4())
     incident_data = {
         "id": {"S": id},
-        "created_at": {"S": str(datetime.datetime.now())},
+        "created_at": {"S": created_at},
         "channel_id": {"S": channel_id},
         "channel_name": {"S": channel_name},
-        "status": {"S": "Open"},
+        "name": {"S": name},
+        "status": {"S": status},
         "user_id": {"S": user_id},
         "teams": {"SS": teams},
         "report_url": {"S": report_url},
@@ -356,10 +362,9 @@ def create_incident(
     )
 
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        logging.info(f"Created incident {id}")
+        logging.info("Created incident %s", id)
         return id
-    else:
-        return None
+    return None
 
 
 def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
