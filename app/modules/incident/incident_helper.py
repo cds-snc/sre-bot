@@ -332,22 +332,23 @@ def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
 
 
 def incident_information_view(incident):
-    logging.info(f"Loading Status View for:\n{incident}")
-    incident_name = incident.get("channel_name", "Unknown").get("S", "Unknown")
+    logging.info("Loading Status View for:\n%s", incident)
+    name = incident.get("name", "Unknown").get("S", "Unknown")
     incident_id = incident.get("id", "Unknown").get("S", "Unknown")
-    incident_status = incident.get("status", "Unknown").get("S", "Unknown")
-    incident_created_at = parse_incident_datetime_string(
-        incident.get("created_at", {}).get("S", "Unknown")
-    )
-    incident_start_impact_time = parse_incident_datetime_string(
-        incident.get("start_impact_time", {}).get("S", "Unknown")
-    )
-    incident_end_impact_time = parse_incident_datetime_string(
-        incident.get("end_impact_time", {}).get("S", "Unknown")
-    )
-    incident_detection_time = parse_incident_datetime_string(
-        incident.get("detection_time", {}).get("S", "Unknown")
-    )
+    status = incident.get("status", "Unknown").get("S", "Unknown")
+    created_at = incident.get("created_at", {}).get("S", "Unknown")
+    if created_at != "Unknown":
+        created_at = convert_timestamp(created_at)
+    impact_start_timestamp = incident.get("start_impact_time", {}).get("S", "Unknown")
+    if impact_start_timestamp != "Unknown":
+        impact_start_timestamp = convert_timestamp(impact_start_timestamp)
+
+    impact_end_timestamp = incident.get("end_impact_time", {}).get("S", "Unknown")
+    if impact_end_timestamp != "Unknown":
+        impact_end_timestamp = convert_timestamp(impact_end_timestamp)
+    detection_timestamp = incident.get("detection_time", {}).get("S", "Unknown")
+    if detection_timestamp != "Unknown":
+        detection_timestamp = convert_timestamp(detection_timestamp)
     return {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -358,7 +359,7 @@ def incident_information_view(incident):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": incident_name,
+                    "text": name,
                     "emoji": True,
                 },
             },
@@ -374,7 +375,7 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Status*:\n" + incident_status,
+                    "text": "*Status*:\n" + status,
                 },
                 "accessory": {
                     "type": "button",
@@ -388,14 +389,14 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Time Created*:\n" + incident_created_at,
+                    "text": "*Time Created*:\n" + created_at,
                 },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Detection Time*:\n" + incident_detection_time,
+                    "text": "*Detection Time*:\n" + detection_timestamp,
                 },
                 "accessory": {
                     "type": "button",
@@ -408,7 +409,7 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Start of Impact*:\n" + incident_start_impact_time,
+                    "text": "*Start of Impact*:\n" + impact_start_timestamp,
                 },
                 "accessory": {
                     "type": "button",
@@ -421,7 +422,7 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*End of Impact*:\n" + incident_end_impact_time,
+                    "text": "*End of Impact*:\n" + impact_end_timestamp,
                 },
                 "accessory": {
                     "type": "button",
@@ -461,3 +462,13 @@ def parse_incident_datetime_string(datetime_string: str) -> str:
         return parsed_datetime.strftime("%Y-%m-%d %H:%M")
     else:
         return "Unknown"
+
+
+def convert_timestamp(timestamp: str) -> str:
+    try:
+        datetime_str = datetime.fromtimestamp(float(timestamp)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+    except ValueError:
+        datetime_str = "Unknown"
+    return datetime_str

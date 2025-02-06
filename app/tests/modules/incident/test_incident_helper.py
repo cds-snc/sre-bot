@@ -697,24 +697,11 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
 def test_incident_information_view(mock_logging, mock_parse_incident_datetime_string):
     incident_data = generate_incident_data()
     id = incident_data["id"]["S"]
-    mock_parse_incident_datetime_string.side_effect = [
-        "2025-01-23 17:02",
-        "Unknown",
-        "Unknown",
-        "Unknown",
-    ]
     view = incident_helper.incident_information_view(incident_data)
     mock_logging.info.assert_called_once_with(
-        f"Loading Status View for:\n{incident_data}"
+        "Loading Status View for:\n%s", incident_data
     )
-    mock_parse_incident_datetime_string.assert_has_calls(
-        [
-            call("2025-01-23 17:02:16.915368"),
-            call("Unknown"),
-            call("Unknown"),
-            call("Unknown"),
-        ]
-    )
+    mock_parse_incident_datetime_string.assert_not_called()
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -729,7 +716,7 @@ def test_incident_information_view(mock_logging, mock_parse_incident_datetime_st
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "channel_name",
+                    "text": "name",
                     "emoji": True,
                 },
             },
@@ -759,7 +746,7 @@ def test_incident_information_view(mock_logging, mock_parse_incident_datetime_st
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Time Created*:\n2025-01-23 17:02",
+                    "text": "*Time Created*:\n2009-02-13 23:31:30",
                 },
             },
             {
@@ -843,7 +830,7 @@ def test_parse_incident_datetime_string():
 
 
 def generate_incident_data(
-    created_at="2025-01-23 17:02:16.915368",
+    created_at="1234567890",
     incident_commander=None,
     operations_lead=None,
     severity=None,
@@ -859,6 +846,7 @@ def generate_incident_data(
         "created_at": {"S": created_at},
         "channel_id": {"S": "channel_id"},
         "channel_name": {"S": "channel_name"},
+        "name": {"S": "name"},
         "status": {"S": "status"},
         "user_id": {"S": "user_id"},
         "teams": {"SS": ["team1", "team2"]},
