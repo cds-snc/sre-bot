@@ -1,5 +1,8 @@
 from unittest.mock import MagicMock, patch
 from modules.incident import incident_conversation
+import pytest
+
+from slack_sdk.errors import SlackApiError
 
 
 def test_is_floppy_disk_true():
@@ -16,6 +19,118 @@ def test_is_floppy_disk_false():
     assert (
         incident_conversation.is_floppy_disk(event) is False
     ), "The function should return False for reactions other than 'floppy_disk'"
+
+
+def test_is_incident_channel_false():
+    # Test case where the channel name does not contain 'incident'
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "general", "is_archived": False, "is_member": False},
+    }
+    client.conversations_join.return_value = {"ok": True}
+    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+        False,
+        False,
+    )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_not_called()
+
+
+def test_is_incident_channel_true_archived_not_member():
+    # Test case where the channel name contains 'incident'
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "incident-123", "is_archived": True, "is_member": False},
+    }
+
+    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+        True,
+        False,
+    )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_not_called()
+
+
+def test_is_incident_channel_true_not_archived_member():
+    # Test case where the channel name contains 'incident'
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "incident-123", "is_archived": False, "is_member": True},
+    }
+
+    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+        True,
+        False,
+    )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_not_called()
+
+
+def test_is_incident_channel_raises_slack_api_error():
+    # Test case where the Slack API call raises an exception
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.side_effect = SlackApiError(
+        message="error", response={"ok": False, "error": "error"}
+    )
+
+    with pytest.raises(SlackApiError):
+        assert incident_conversation.is_incident_channel(
+            client, logger, channel_id
+        ) == (
+            False,
+            False,
+        )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_not_called()
+
+
+def test_is_incident_channel_true_not_archived_not_member():
+    # Test case where the channel name contains 'incident'
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "incident-123", "is_archived": False, "is_member": False},
+    }
+
+    client.conversations_join.return_value = {"ok": True}
+    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+        True,
+        False,
+    )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_called_once_with(channel=channel_id)
+
+
+def test_is_incident_dev_channel_true():
+    # Test case where the channel name contains 'incident-dev'
+    client = MagicMock()
+    logger = MagicMock()
+    channel_id = "C123456"
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "incident-dev-123"},
+    }
+    client.conversations_join.return_value = {"ok": True}
+
+    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+        True,
+        True,
+    )
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_called_once_with(channel=channel_id)
 
 
 def test_multiline_entries_rearrange_by_datetime_ascending():

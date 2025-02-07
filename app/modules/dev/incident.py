@@ -2,13 +2,24 @@ import json
 import os
 
 from slack_sdk import WebClient
-from modules.incident import incident_folder
+from modules.incident import incident_folder, incident_conversation
 
 INCIDENT_LIST = os.getenv("INCIDENT_LIST")
 
 
 def list_incidents(ack, logger, respond, client: WebClient, body):
     """List incidents"""
+    logger.info(body)
+    channel_id = body.get("channel_id")
+    if not channel_id:
+        respond("Channel not found")
+        return
+    else:
+        is_incident, is_dev_incident = incident_conversation.is_incident_channel(
+            client, channel_id
+        )
+        message = f"Is this an incident channel? {is_incident}\nIs dev channel? {is_dev_incident}"
+        respond(message)
     logger.info("Listing incidents...")
     incidents = incident_folder.list_incidents()
     respond(f"Found {len(incidents)} incidents")

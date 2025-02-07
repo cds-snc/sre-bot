@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
+from slack_sdk.errors import SlackApiError  # type: ignore
 from integrations.google_workspace import google_docs
 from integrations.slack import users as slack_users
 from integrations.sentinel import log_to_sentinel
@@ -24,6 +25,30 @@ def is_floppy_disk(event: dict) -> bool:
 # We need to ack all other reactions so that they don't get processed
 def just_ack_the_rest_of_reaction_events():
     pass
+
+
+def is_incident_channel(client: WebClient, logger, channel_id: str):
+    is_incident = False
+    is_dev_incident = False
+    try:
+        channel_info = client.conversations_info(channel=channel_id)
+        if channel_info.get("ok"):
+            channel: dict = channel_info.get("channel", {})
+            name: str = channel.get("name", "")
+            is_member = channel.get("is_member")
+            is_archived = channel.get("is_archived")
+            is_incident = name.startswith("incident-")
+            is_dev_incident = name.startswith("incident-dev-")
+            if is_incident and not is_archived and not is_member:
+                response = client.conversations_join(channel=channel_id)
+                if not response.get("ok"):
+                    raise SlackApiError("Error joining the channel", response)
+        else:
+            raise SlackApiError("Error getting the channel info", channel_info)
+    except SlackApiError as e:
+        logger.error(f"Error with client request: {e}")
+        raise e
+    return is_incident, is_dev_incident
 
 
 def rearrange_by_datetime_ascending(text):
