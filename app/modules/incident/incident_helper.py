@@ -121,7 +121,7 @@ def handle_incident_command(
         case "schedule":
             schedule_retro.schedule_incident_retro(client, body, ack)
         case "status":
-            handle_update_status_command(client, body, respond, ack, args)
+            handle_update_status_command(client, logger, body, respond, ack, args)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -260,7 +260,7 @@ def channel_item(channel):
 
 
 def handle_update_status_command(
-    client: WebClient, body, respond: Respond, ack: Ack, args
+    client: WebClient, logger, body, respond: Respond, ack: Ack, args
 ):
     ack()
     status = str.join(" ", args)
@@ -293,7 +293,7 @@ def handle_update_status_command(
             respond(f"Updating incident status to {status}...")
 
             incident_folder.update_incident_field(
-                incidents[0]["id"]["S"], "status", status
+                logger, incidents[0]["id"]["S"], "status", status
             )
 
             incident_status.update_status(
