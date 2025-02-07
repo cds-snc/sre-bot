@@ -101,12 +101,6 @@ def submit(ack, view, say, body, client: WebClient, logger):
 
     name = view["state"]["values"]["name"]["name"]["value"]
     folder = view["state"]["values"]["product"]["product"]["selected_option"]["value"]
-    folders = incident_folder.list_incident_folders()
-    team_name = "Unknown"
-    for f in folders:
-        if f["id"] == folder:
-            team_name = f["name"]
-            break
     product = view["state"]["values"]["product"]["product"]["selected_option"]["text"][
         "text"
     ]
