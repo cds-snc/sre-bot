@@ -66,6 +66,8 @@ jobs:
         id: ecs_wait
         continue-on-error: true
         run: |
+          echo "Wait for 15 minutes for ECS to stabilize.."
+          sleep 300 # Sleep for 5 minutes and ecs wait waits for 10 minutes
           aws ecs wait services-stable \
             --cluster sre-bot-cluster \
             --services sre-bot-service 
