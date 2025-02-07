@@ -216,7 +216,7 @@ def submit(ack, view, say, body, client: WebClient, logger):
         slug,
         name,
         user_id,
-        team_name,
+        [team_name],
         document_link,
         meet_url=meet_link["meetingUri"],
         environment=environment,
