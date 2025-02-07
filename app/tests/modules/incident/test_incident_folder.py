@@ -575,6 +575,75 @@ def test_get_incident(mock_dynamodb):
     }
 
 
+@patch("modules.incident.incident_folder.lookup_incident")
+def test_get_incident_by_channel_id(mock_lookup_incident):
+    mock_lookup_incident.return_value = [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+            "user_id": {"S": "qux"},
+            "teams": {"SS": ["quux"]},
+            "report_url": {"S": "corge"},
+            "meet_url": {"S": "grault"},
+            "status": {"S": "garply"},
+            "start_impact_time": {"S": "waldo"},
+            "end_impact_time": {"S": "fred"},
+            "environment": {"S": "plugh"},
+            "retrospective_url": {"S": "xyzzy"},
+        }
+    ]
+
+    assert incident_folder.get_incident_by_channel_id("bar") == {
+        "id": {"S": "foo"},
+        "channel_id": {"S": "bar"},
+        "channel_name": {"S": "baz"},
+        "user_id": {"S": "qux"},
+        "teams": {"SS": ["quux"]},
+        "report_url": {"S": "corge"},
+        "meet_url": {"S": "grault"},
+        "status": {"S": "garply"},
+        "start_impact_time": {"S": "waldo"},
+        "end_impact_time": {"S": "fred"},
+        "environment": {"S": "plugh"},
+        "retrospective_url": {"S": "xyzzy"},
+    }
+    mock_lookup_incident.assert_called_once_with("channel_id", "bar")
+
+
+@patch("modules.incident.incident_folder.lookup_incident")
+def test_get_incident_by_channel_id_multiple_results(mock_lookup_incident):
+    mock_lookup_incident.return_value = [
+        {
+            "id": {"S": "foo"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "baz"},
+        },
+        {
+            "id": {"S": "qux"},
+            "channel_id": {"S": "bar"},
+            "channel_name": {"S": "quux"},
+        },
+    ]
+
+    assert incident_folder.get_incident_by_channel_id("bar") == {
+        "id": {"S": "foo"},
+        "channel_id": {"S": "bar"},
+        "channel_name": {"S": "baz"},
+    }
+
+    mock_lookup_incident.assert_called_once_with("channel_id", "bar")
+
+
+@patch("modules.incident.incident_folder.lookup_incident")
+def test_get_incident_by_channel_id_no_results(mock_lookup_incident):
+    mock_lookup_incident.return_value = []
+
+    assert incident_folder.get_incident_by_channel_id("bar") == None
+
+    mock_lookup_incident.assert_called_once_with("channel_id", "bar")
+
+
 @patch("modules.incident.incident_folder.dynamodb")
 def test_lookup_incident(
     mock_dynamodb,
