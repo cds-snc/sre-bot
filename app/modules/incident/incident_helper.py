@@ -90,7 +90,9 @@ def register(bot: App):
     )
 
 
-def handle_incident_command(args, client: WebClient, body, respond: Respond, ack: Ack):
+def handle_incident_command(
+    args, client: WebClient, body, respond: Respond, ack: Ack, logger
+):
     """Handle the /sre incident command."""
 
     # If no arguments are provided, open the update status view
