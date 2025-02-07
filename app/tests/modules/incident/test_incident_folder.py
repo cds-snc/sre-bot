@@ -639,7 +639,7 @@ def test_get_incident_by_channel_id_multiple_results(mock_lookup_incident):
 def test_get_incident_by_channel_id_no_results(mock_lookup_incident):
     mock_lookup_incident.return_value = []
 
-    assert incident_folder.get_incident_by_channel_id("bar") == None
+    assert incident_folder.get_incident_by_channel_id("bar") is None
 
     mock_lookup_incident.assert_called_once_with("channel_id", "bar")
 
