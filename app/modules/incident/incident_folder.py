@@ -379,6 +379,9 @@ def get_incident_details(client: WebClient, logger, incident):
                 channel_info = response.get("channel")
                 incident["channel_name"] = channel_info.get("name")
 
+                creator = channel_info.get("creator")
+                incident["user_id"] = creator
+
                 if (
                     "incident-dev-" in incident["channel_name"]
                     or "Development" in incident["teams"]
@@ -403,6 +406,8 @@ def get_incident_details(client: WebClient, logger, incident):
                                 meet_url = response["bookmarks"][item]["link"]
                 if meet_url:
                     incident["meet_url"] = meet_url
+            return incident
+
         except SlackApiError as e:
             if retry_attempts < max_retries:
                 logger.error(f"Error getting incident details: {e}")
@@ -432,6 +437,9 @@ def create_missing_incidents(logger, incidents):
                 meet_url=incident["meet_url"],
                 environment=incident["environment"],
             )
+            if incident_id:
+                message = "Automated import of the incident from the Google Sheet via the SRE Bot"
+                log_activity(incident_id, message)
             logger.info(f"created incident: {incident['name']}: {incident_id}")
             count += 1
         else:
@@ -479,6 +487,7 @@ def create_incident(
         "report_url": {"S": report_url},
         "meet_url": {"S": meet_url},
         "environment": {"S": environment},
+        "logs": {"L": []},
     }
     for key, value in [
         ("incident_commander", incident_commander),
@@ -498,6 +507,8 @@ def create_incident(
     )
 
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+        message = f"User `{user_id}` created incident `{name}` in channel `{channel_id}`: {id}"
+        log_activity(id, message)
         logging.info("Created incident %s", id)
         return id
     return None
@@ -508,13 +519,17 @@ def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
     return dynamodb.scan(TableName="incidents", Select=select, **kwargs)
 
 
-def update_incident_field(id, field, value, type="S"):
+def update_incident_field(logger, id, field, value, user_id, type="S"):
     """Update an attribute in an incident item.
 
     Default type is string, but it can be changed to other types like N for numbers, SS for string sets, etc.
 
     Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
     """
+    protected_fields = ["id", "created_at", "channel_id", "logs"]
+    if field in protected_fields:
+        logger.warn("Field `%s` is protected and cannot be updated", field)
+        return None
     expression_attribute_names = {f"#{field}": field}
     expression_attribute_values = {f":{field}": {type: value}}
 
@@ -525,10 +540,42 @@ def update_incident_field(id, field, value, type="S"):
         ExpressionAttributeNames=expression_attribute_names,
         ExpressionAttributeValues=expression_attribute_values,
     )
-    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+    if response:
+        message = f"field `{field}` updated to `{value}` by user: {user_id}"
+        log_activity(id, message)
         return response
     else:
         return None
+
+
+def log_activity(incident_id, message):
+
+    response = dynamodb.update_item(
+        TableName="incidents",
+        Key={"id": {"S": incident_id}},
+        UpdateExpression="SET logs = list_append(if_not_exists(logs, :empty_list), :logs)",
+        ExpressionAttributeValues={
+            ":logs": {
+                "L": [
+                    {
+                        "M": {
+                            "timestamp": {
+                                "S": str(datetime.datetime.now().timestamp())
+                            },
+                            "message": {"S": message},
+                        }
+                    }
+                ]
+            },
+            ":empty_list": {"L": []},
+        },
+        ReturnValues="UPDATED_NEW",
+    )
+
+    if response:
+        return True
+    else:
+        return False
 
 
 def get_incident(id):
