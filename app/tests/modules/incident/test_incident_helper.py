@@ -5,20 +5,25 @@ import pytest
 from modules import incident_helper
 import logging
 
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import ANY, MagicMock, patch
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
 
+@patch("modules.incident.incident_helper.incident_conversation")
 @patch("modules.incident.incident_helper.open_incident_info_view")
-def test_handle_incident_command_with_empty_args(mock_open_incident_info_view):
+def test_handle_incident_command_with_empty_args(
+    mock_open_incident_info_view, mock_incident_conversation
+):
     client = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
     body = {
         "channel_id": "channel_id",
     }
-    incident_helper.handle_incident_command([], client, body, respond, ack)
+    mock_incident_conversation.is_incident_channel.return_value = (True, False)
+    incident_helper.handle_incident_command([], client, body, respond, ack, logger)
     mock_open_incident_info_view.assert_called_once_with(client, body, ack, respond)
 
 
@@ -27,8 +32,10 @@ def test_handle_incident_command_with_create_command(create_folder_mock):
     create_folder_mock.return_value = {"id": "test_id", "name": "foo bar"}
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     incident_helper.handle_incident_command(
-        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
+        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack, logger
     )
     respond.assert_called_once_with("Folder `foo bar` created.")
 
@@ -38,8 +45,10 @@ def test_handle_incident_command_with_create_command_error(create_folder_mock):
     create_folder_mock.return_value = None
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     incident_helper.handle_incident_command(
-        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
+        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack, logger
     )
     respond.assert_called_once_with("Failed to create folder `foo bar`.")
 
@@ -47,8 +56,10 @@ def test_handle_incident_command_with_create_command_error(create_folder_mock):
 def test_handle_incident_command_with_help():
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     incident_helper.handle_incident_command(
-        ["help"], MagicMock(), MagicMock(), respond, ack
+        ["help"], MagicMock(), MagicMock(), respond, ack, logger
     )
     respond.assert_called_once_with(incident_helper.help_text)
 
@@ -59,8 +70,10 @@ def test_handle_incident_command_with_list_folders(list_folders_mock):
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     incident_helper.handle_incident_command(
-        ["list-folders"], client, body, respond, ack
+        ["list-folders"], client, body, respond, ack, logger
     )
     list_folders_mock.assert_called_once_with(client, body, ack)
 
@@ -71,7 +84,11 @@ def test_handle_incident_command_with_roles(manage_roles_mock):
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command(["roles"], client, body, respond, ack)
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["roles"], client, body, respond, ack, logger
+    )
     manage_roles_mock.assert_called_once_with(client, body, ack, respond)
 
 
@@ -85,7 +102,11 @@ def test_handle_incident_command_with_close(close_incident_mock):
     }
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command(["close"], client, body, respond, ack)
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["close"], client, body, respond, ack, logger
+    )
     close_incident_mock.assert_called_once_with(client, body, ack, respond)
 
 
@@ -95,7 +116,11 @@ def test_handle_incident_command_with_stale(stale_incidents_mock):
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command(["stale"], client, body, respond, ack)
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["stale"], client, body, respond, ack, logger
+    )
     stale_incidents_mock.assert_called_once_with(client, body, ack)
 
 
@@ -109,7 +134,11 @@ def test_handle_incident_command_with_retro(schedule_retro_mock):
     }
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command(["schedule"], client, body, respond, ack)
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["schedule"], client, body, respond, ack, logger
+    )
     schedule_retro_mock.schedule_incident_retro.assert_called_once_with(
         client, body, ack
     )
@@ -123,8 +152,10 @@ def test_handle_incident_command_with_update_status_command(
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     args = ["status", "Ready", "to", "be", "Reviewed"]
-    incident_helper.handle_incident_command(args, client, body, respond, ack)
+    incident_helper.handle_incident_command(args, client, body, respond, ack, logger)
     args.pop(0)
     mock_handle_update_status_command.assert_called_once_with(
         client, body, respond, ack, args
@@ -134,8 +165,10 @@ def test_handle_incident_command_with_update_status_command(
 def test_handle_incident_command_with_unknown_command():
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     incident_helper.handle_incident_command(
-        ["foo"], MagicMock(), MagicMock(), respond, ack
+        ["foo"], MagicMock(), MagicMock(), respond, ack, logger
     )
     respond.assert_called_once_with(
         "Unknown command: foo. Type `/sre incident help` to see a list of commands."
@@ -697,24 +730,11 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
 def test_incident_information_view(mock_logging, mock_parse_incident_datetime_string):
     incident_data = generate_incident_data()
     id = incident_data["id"]["S"]
-    mock_parse_incident_datetime_string.side_effect = [
-        "2025-01-23 17:02",
-        "Unknown",
-        "Unknown",
-        "Unknown",
-    ]
     view = incident_helper.incident_information_view(incident_data)
     mock_logging.info.assert_called_once_with(
-        f"Loading Status View for:\n{incident_data}"
+        "Loading Status View for:\n%s", incident_data
     )
-    mock_parse_incident_datetime_string.assert_has_calls(
-        [
-            call("2025-01-23 17:02:16.915368"),
-            call("Unknown"),
-            call("Unknown"),
-            call("Unknown"),
-        ]
-    )
+    mock_parse_incident_datetime_string.assert_not_called()
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -729,7 +749,7 @@ def test_incident_information_view(mock_logging, mock_parse_incident_datetime_st
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "channel_name",
+                    "text": "name",
                     "emoji": True,
                 },
             },
@@ -759,7 +779,7 @@ def test_incident_information_view(mock_logging, mock_parse_incident_datetime_st
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Time Created*:\n2025-01-23 17:02",
+                    "text": "*Time Created*:\n2009-02-13 23:31:30",
                 },
             },
             {
@@ -843,7 +863,7 @@ def test_parse_incident_datetime_string():
 
 
 def generate_incident_data(
-    created_at="2025-01-23 17:02:16.915368",
+    created_at="1234567890",
     incident_commander=None,
     operations_lead=None,
     severity=None,
@@ -859,6 +879,7 @@ def generate_incident_data(
         "created_at": {"S": created_at},
         "channel_id": {"S": "channel_id"},
         "channel_name": {"S": "channel_name"},
+        "name": {"S": "name"},
         "status": {"S": "status"},
         "user_id": {"S": "user_id"},
         "teams": {"SS": ["team1", "team2"]},

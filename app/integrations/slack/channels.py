@@ -6,8 +6,10 @@ import re
 import time
 from datetime import datetime, timedelta
 
+from slack_sdk import WebClient
 
-def get_channels(client, pattern=None):
+
+def get_channels(client: WebClient, pattern=None, exclude_archived=True):
     channels = []
     cursor = None
 
@@ -16,7 +18,10 @@ def get_channels(client, pattern=None):
     # and the way it hanles retrieval of channels.
     while True:
         response = client.conversations_list(
-            exclude_archived=True, limit=100, types="public_channel", cursor=cursor
+            exclude_archived=exclude_archived,
+            limit=100,
+            types="public_channel",
+            cursor=cursor,
         )
 
         # if we did not get a successful response, break out of the loop

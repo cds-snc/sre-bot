@@ -85,15 +85,17 @@ def test_sre_command_with_incident_argument(command_runner):
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
+    logger = MagicMock()
+
     sre.sre_command(
         ack,
         {"text": "incident"},
-        MagicMock(),
+        logger,
         respond,
         clientMock,
         body,
     )
-    command_runner.assert_called_once_with([], clientMock, body, respond, ack)
+    command_runner.assert_called_once_with([], clientMock, body, respond, ack, logger)
 
 
 @patch("modules.sre.webhook_helper.handle_webhook_command")

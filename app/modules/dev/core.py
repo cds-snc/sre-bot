@@ -1,5 +1,5 @@
 import os
-from . import aws_dev, google, slack
+from . import aws_dev, google, slack, incident
 
 PREFIX = os.environ.get("PREFIX", "")
 
@@ -21,6 +21,10 @@ def dev_command(ack, logger, respond, client, body, args):
             slack.slack_command(ack, client, body, respond, logger, args)
         case "stale":
             test_stale_channel_notification(ack, logger, respond, client, body)
+        case "incident":
+            incident.list_incidents(ack, logger, respond, client, body)
+        case "load-incidents":
+            incident.load_incidents(ack, logger, respond, client, body)
 
 
 def test_stale_channel_notification(ack, logger, respond, client, body):

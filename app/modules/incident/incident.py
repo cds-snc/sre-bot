@@ -136,9 +136,11 @@ def submit(ack, view, say, body, client: WebClient, logger):
     slug = f"{date} {name}".replace(" ", "-").lower()
 
     # Create channel
-    # if we are testing ie PREFIX is "dev" then create the channel with name incident-dev-{slug}. Otherwisse create the channel with name incident-{slug}
+    # if we are testing ie PREFIX is "dev" then create the channel with name incident-dev-{slug}. Otherwise create the channel with name incident-{slug}
+    environment = "prod"
     if PREFIX == "dev-":
         response = client.conversations_create(name=f"incident-dev-{slug}")
+        environment = "dev"
     else:
         response = client.conversations_create(name=f"incident-{slug}")
     channel_id = response["channel"]["id"]
@@ -203,14 +205,21 @@ def submit(ack, view, say, body, client: WebClient, logger):
         document_link, name, slug, product, channel_url
     )
 
-    teams = [folder]
+    folders = incident_folder.list_incident_folders()
+    team_name = "Unknown"
+    for f in folders:
+        if f["id"] == folder:
+            team_name = f["name"]
+            break
     incident_folder.create_incident(
         channel_id,
         slug,
+        name,
         user_id,
-        teams,
+        team_name,
         document_link,
-        meet_link["meetingUri"],
+        meet_url=meet_link["meetingUri"],
+        environment=environment,
     )
     # Bookmark incident document
     client.bookmarks_add(

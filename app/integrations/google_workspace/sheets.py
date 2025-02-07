@@ -7,7 +7,7 @@ from integrations.google_workspace.google_service import (
 
 
 @handle_google_api_errors
-def get_values(spreadsheetId: str, range: str | None = None, fields=None):
+def get_values(spreadsheetId: str, range: str | None = None, fields=None) -> dict:
     """Gets the values from a Google Sheet.
 
     Args:
@@ -31,7 +31,7 @@ def get_values(spreadsheetId: str, range: str | None = None, fields=None):
 
 
 @handle_google_api_errors
-def get_sheet(spreadsheetId: str, ranges: str):
+def get_sheet(spreadsheetId: str, ranges: str, includeGridData: bool = False) -> dict:
     """Gets a Google Sheet.
 
     Args:
@@ -40,6 +40,8 @@ def get_sheet(spreadsheetId: str, ranges: str):
 
     Returns:
         dict: The response from the Google Sheets API.
+    Reference:
+    https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get
     """
     return execute_google_api_call(
         "sheets",
@@ -48,7 +50,7 @@ def get_sheet(spreadsheetId: str, ranges: str):
         "get",
         spreadsheetId=spreadsheetId,
         ranges=ranges,
-        includeGridData=False,
+        includeGridData=includeGridData,
     )
 
 
