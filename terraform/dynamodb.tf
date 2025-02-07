@@ -59,7 +59,7 @@ resource "aws_dynamodb_table" "incidents_table" {
   }
 }
 
-# The following code adds a backup configuration DynamoDB table.
+# The following code adds a backup configuration to the DynamoDB table.
 
 # Define a KMS key to encrypt the backup.
 resource "aws_kms_key" "sre_bot_backup_vault_key" {
