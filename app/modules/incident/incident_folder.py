@@ -394,6 +394,21 @@ def get_incident(id):
     return dynamodb.get_item(TableName="incidents", Key={"id": {"S": id}})
 
 
+def get_incident_by_channel_id(channel_id) -> dict | None:
+    """Get an incident by its channel ID.
+
+    Args:
+        channel_id (str): The channel ID.
+
+    Returns:
+        dict: The incident item. None if not found.
+    """
+    incidents = lookup_incident("channel_id", channel_id)
+    if len(incidents) > 0:
+        return incidents[0]
+    return None
+
+
 def lookup_incident(field, value, field_type="S"):
     """Lookup incidents by a specific field value."""
     return dynamodb.scan(
