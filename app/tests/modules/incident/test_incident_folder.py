@@ -349,10 +349,11 @@ def test_return_channel_name_dev_prefix_only():
     assert incident_folder.return_channel_name("incident-dev-") == "#"
 
 
+@patch("modules.incident.incident_folder.log_activity")
 @patch("modules.incident.incident_folder.uuid")
 @patch("modules.incident.incident_folder.datetime")
 @patch("modules.incident.incident_folder.dynamodb")
-def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
+def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
@@ -381,14 +382,22 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid):
             "report_url": {"S": "report_url"},
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "prod"},
+            "logs": {"L": []},
         },
+    )
+    mock_log_activity.assert_called_once_with(
+        "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "User `user_id` created incident `name` in channel `channel_id`: 978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
     )
 
 
+@patch("modules.incident.incident_folder.log_activity")
 @patch("modules.incident.incident_folder.uuid")
 @patch("modules.incident.incident_folder.datetime")
 @patch("modules.incident.incident_folder.dynamodb")
-def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_uuid):
+def test_create_incident_with_optional_args(
+    mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity
+):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
@@ -432,14 +441,22 @@ def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_u
             "end_impact_time": {"S": "end_time"},
             "detection_time": {"S": "detection_time"},
             "retrospective_url": {"S": "retro_url"},
+            "logs": {"L": []},
         },
+    )
+    mock_log_activity.assert_called_once_with(
+        "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "User `user_id` created incident `name` in channel `channel_id`: 978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
     )
 
 
+@patch("modules.incident.incident_folder.log_activity")
 @patch("modules.incident.incident_folder.uuid")
 @patch("modules.incident.incident_folder.datetime")
 @patch("modules.incident.incident_folder.dynamodb")
-def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_uuid):
+def test_create_incident_handle_error(
+    mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity
+):
     mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
@@ -469,8 +486,10 @@ def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_uuid):
             "report_url": {"S": "report_url"},
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "prod"},
+            "logs": {"L": []},
         },
     )
+    mock_log_activity.assert_not_called()
 
 
 @patch("modules.incident.incident_folder.dynamodb")
@@ -519,12 +538,16 @@ def test_list_incidents_empty(
     assert incident_folder.list_incidents() == []
 
 
+@patch("modules.incident.incident_folder.log_activity")
 @patch("modules.incident.incident_folder.dynamodb")
-def test_update_incident_field(mock_dynamodb):
+def test_update_incident_field(mock_dynamodb, mock_log_activity):
+    mock_logger = MagicMock()
     mock_dynamodb.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
     }
-    assert incident_folder.update_incident_field("foo", "bar", "baz")
+    assert incident_folder.update_incident_field(
+        mock_logger, "foo", "bar", "baz", "user_id"
+    )
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
         Key={"id": {"S": "foo"}},
@@ -532,14 +555,21 @@ def test_update_incident_field(mock_dynamodb):
         ExpressionAttributeNames={"#bar": "bar"},
         ExpressionAttributeValues={":bar": {"S": "baz"}},
     )
+    mock_log_activity.assert_called_once_with(
+        "foo", "field `bar` updated to `baz` by user: user_id"
+    )
 
 
+@patch("modules.incident.incident_folder.log_activity")
 @patch("modules.incident.incident_folder.dynamodb")
-def test_update_incident_field_with_type(mock_dynamodb):
+def test_update_incident_field_with_type(mock_dynamodb, mock_log_activity):
+    mock_logger = MagicMock()
     mock_dynamodb.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
     }
-    assert incident_folder.update_incident_field("foo", "bar", "baz", "M")
+    assert incident_folder.update_incident_field(
+        mock_logger, "foo", "bar", "baz", "user_id", "M"
+    )
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
         Key={"id": {"S": "foo"}},
@@ -547,14 +577,18 @@ def test_update_incident_field_with_type(mock_dynamodb):
         ExpressionAttributeNames={"#bar": "bar"},
         ExpressionAttributeValues={":bar": {"M": "baz"}},
     )
+    mock_log_activity.assert_called_once_with(
+        "foo", "field `bar` updated to `baz` by user: user_id"
+    )
 
 
 @patch("modules.incident.incident_folder.dynamodb")
 def test_update_incident_field_handles_failure(mock_dynamodb):
-    mock_dynamodb.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 400}
-    }
-    response = incident_folder.update_incident_field("foo", "bar", "baz")
+    mock_logger = MagicMock()
+    mock_dynamodb.update_item.return_value = None
+    response = incident_folder.update_incident_field(
+        mock_logger, "foo", "bar", "baz", "user_id"
+    )
     assert response is None
 
 

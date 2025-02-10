@@ -549,7 +549,7 @@ def update_incident_field(logger, id, field, value, user_id, type="S"):
 
 
 def log_activity(incident_id, message):
-
+    """Log an activity in an incident."""
     response = dynamodb.update_item(
         TableName="incidents",
         Key={"id": {"S": incident_id}},
