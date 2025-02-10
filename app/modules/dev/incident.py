@@ -16,7 +16,7 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
         return
     else:
         is_incident, is_dev_incident = incident_conversation.is_incident_channel(
-            client, channel_id
+            client, logger, channel_id
         )
         message = f"Is this an incident channel? {is_incident}\nIs dev channel? {is_dev_incident}"
         respond(message)
@@ -39,9 +39,10 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
 def load_incidents(ack, logger, respond, client: WebClient, body):
     """Load incidents from Google Sheet"""
     logger.info("Loading incidents...")
-    incidents = incident_folder.get_incidents_from_sheet(15)
+    incidents = incident_folder.get_incidents_from_sheet(1)[:5]
+    logger.info(f"Loaded {len(incidents)} incidents")
     incidents = incident_folder.complete_incidents_details(client, logger, incidents)
     count = incident_folder.create_missing_incidents(logger, incidents)
-    respond(f"Loaded {count} incidents")
+    respond(f"Created {count} new incidents")
     logger.info(f"{len(incidents)} incidents")
-    logger.info("finished loading incidents")
+    logger.info("Finished loading incidents")

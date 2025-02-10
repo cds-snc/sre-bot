@@ -158,7 +158,7 @@ def test_handle_incident_command_with_update_status_command(
     incident_helper.handle_incident_command(args, client, body, respond, ack, logger)
     args.pop(0)
     mock_handle_update_status_command.assert_called_once_with(
-        client, body, respond, ack, args
+        client, logger, body, respond, ack, args
     )
 
 
@@ -516,6 +516,7 @@ def test_handle_update_status_command(mock_incident_status, mock_incident_folder
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
     args = ["Closed"]
     mock_incident_folder.lookup_incident.return_value = [
@@ -523,6 +524,7 @@ def test_handle_update_status_command(mock_incident_status, mock_incident_folder
     ]
     incident_helper.handle_update_status_command(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",
@@ -550,6 +552,7 @@ def test_handle_update_status_command_invalid_status(mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
     args = ["InvalidStatus"]
     mock_incident_folder.lookup_incident.return_value = [
@@ -558,6 +561,7 @@ def test_handle_update_status_command_invalid_status(mock_incident_folder):
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",
@@ -580,12 +584,14 @@ def test_handle_update_status_command_no_incidents_found(mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
     args = ["Closed"]
     mock_incident_folder.lookup_incident.return_value = []
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",
@@ -608,6 +614,7 @@ def test_handle_update_status_command_too_many_incidents(mock_incident_folder):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
     args = ["Closed"]
     mock_incident_folder.lookup_incident.return_value = [
@@ -616,6 +623,7 @@ def test_handle_update_status_command_too_many_incidents(mock_incident_folder):
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",

@@ -121,7 +121,7 @@ def handle_incident_command(
         case "schedule":
             schedule_retro.schedule_incident_retro(client, body, ack)
         case "status":
-            handle_update_status_command(client, body, respond, ack, args)
+            handle_update_status_command(client, logger, body, respond, ack, args)
         case _:
             respond(
                 f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
@@ -260,7 +260,7 @@ def channel_item(channel):
 
 
 def handle_update_status_command(
-    client: WebClient, body, respond: Respond, ack: Ack, args
+    client: WebClient, logger, body, respond: Respond, ack: Ack, args
 ):
     ack()
     status = str.join(" ", args)
@@ -278,6 +278,9 @@ def handle_update_status_command(
         )
         return
     incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
+
+    # get the user id from the body. if not found, use "Unknown" as the default
+    user_id = body.get("user_id", "Unknown")
     if not incidents:
         respond(
             "No incident found for this channel. Will not update status in DB record."
@@ -293,7 +296,7 @@ def handle_update_status_command(
             respond(f"Updating incident status to {status}...")
 
             incident_folder.update_incident_field(
-                incidents[0]["id"]["S"], "status", status
+                logger, incidents[0]["id"]["S"], "status", status, user_id
             )
 
             incident_status.update_status(
