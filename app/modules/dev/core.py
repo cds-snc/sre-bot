@@ -25,6 +25,8 @@ def dev_command(ack, logger, respond, client, body, args):
             incident.list_incidents(ack, logger, respond, client, body)
         case "load-incidents":
             incident.load_incidents(ack, logger, respond, client, body)
+        case "add-incident":
+            incident.add_incident(ack, logger, respond, client, body)
 
 
 def test_stale_channel_notification(ack, logger, respond, client, body):
