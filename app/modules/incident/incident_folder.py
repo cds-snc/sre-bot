@@ -370,6 +370,7 @@ def complete_incidents_details(client: WebClient, logger, incidents: list[dict])
 
 
 def get_incident_details(client: WebClient, logger, incident):
+    """Get incident details from Slack"""
     max_retries = 5
     retry_attempts = 0
     while retry_attempts < max_retries:
@@ -380,7 +381,8 @@ def get_incident_details(client: WebClient, logger, incident):
                 incident["channel_name"] = channel_info.get("name")
 
                 creator = channel_info.get("creator")
-                incident["user_id"] = creator
+                if incident.get("user_id") == "":
+                    incident["user_id"] = creator
 
                 if (
                     "incident-dev-" in incident["channel_name"]
