@@ -278,6 +278,9 @@ def handle_update_status_command(
         )
         return
     incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
+
+    # get the user id from the body. if not found, use "Unknown" as the default
+    user_id = body.get("user_id", "Unknown")
     if not incidents:
         respond(
             "No incident found for this channel. Will not update status in DB record."
@@ -293,7 +296,7 @@ def handle_update_status_command(
             respond(f"Updating incident status to {status}...")
 
             incident_folder.update_incident_field(
-                logger, incidents[0]["id"]["S"], "status", status
+                logger, incidents[0]["id"]["S"], "status", status, user_id
             )
 
             incident_status.update_status(
