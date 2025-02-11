@@ -383,6 +383,7 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid, mock_log_activ
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "prod"},
             "logs": {"L": []},
+            "incident_updates": {"L": []},
         },
     )
     mock_log_activity.assert_called_once_with(
@@ -442,6 +443,7 @@ def test_create_incident_with_optional_args(
             "detection_time": {"S": "detection_time"},
             "retrospective_url": {"S": "retro_url"},
             "logs": {"L": []},
+            "incident_updates": {"L": []},
         },
     )
     mock_log_activity.assert_called_once_with(
@@ -487,6 +489,7 @@ def test_create_incident_handle_error(
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "prod"},
             "logs": {"L": []},
+            "incident_updates": {"L": []},
         },
     )
     mock_log_activity.assert_not_called()
@@ -737,3 +740,42 @@ def test_lookup_incident(
         FilterExpression="channel_id = :channel_id",
         ExpressionAttributeValues={":channel_id": {"S": "bar"}},
     )
+
+
+@patch("modules.incident.incident_folder.dynamodb.scan")
+@patch("modules.incident.incident_folder.dynamodb.update_item")
+@patch("modules.incident.incident_folder.current_time_est")
+def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
+    mock_current_time_est.return_value = "2025-01-31 11:17:06"
+    mock_scan_item.return_value = [
+        {"incident_updates": {"L": [{"S": "Previous update"}]}}
+    ]
+    mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+
+    response = incident_folder.store_update("incident_id", "New update")
+    assert response is not None
+    mock_scan_item.assert_called_once()
+    mock_update_item.assert_called_once()
+
+    expected_update = "2025-01-31 11:17:06 EST\nNew update\nPrevious update"
+    actual_updates = mock_update_item.call_args[1]["ExpressionAttributeValues"][
+        ":updates"
+    ]["L"]
+    assert len(actual_updates) == 1
+    assert actual_updates[0]["S"] == expected_update
+
+
+@patch("modules.incident.incident_folder.dynamodb.scan")
+def test_fetch_updates(mock_scan_item):
+    mock_scan_item.return_value = [
+        {"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}
+    ]
+
+    updates = incident_folder.fetch_updates("incident_id")
+    assert updates == ["Update 1\n Update 2"]
+
+    # Test case when no updates are found
+    mock_scan_item.return_value = {}
+    updates = incident_folder.fetch_updates("incident_id")
+    assert updates == []
+    assert mock_scan_item.call_count == 2

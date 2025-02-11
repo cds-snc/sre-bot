@@ -5,6 +5,7 @@ Includes functions to manage the folders, the metadata, and the list of incident
 
 import datetime
 import os
+import pytz
 import logging
 import re
 import time
@@ -490,6 +491,7 @@ def create_incident(
         "meet_url": {"S": meet_url},
         "environment": {"S": environment},
         "logs": {"L": []},
+        "incident_updates": {"L": []},
     }
     for key, value in [
         ("incident_commander", incident_commander),
@@ -606,3 +608,48 @@ def lookup_incident(field, value, field_type="S"):
         FilterExpression=f"{field} = :{field}",
         ExpressionAttributeValues={f":{field}": {f"{field_type}": value}},
     )
+
+
+def current_time_est():
+    est_tz = pytz.timezone("US/Eastern")
+    current_time_est = datetime.datetime.now(est_tz)
+    return current_time_est.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def store_update(incident_id, update_text):
+    existing_incident = lookup_incident("id", incident_id)
+    # Check if the incident exists and has incident_updates
+    current_updates = ""
+    if existing_incident:
+        existing_incident = existing_incident[0]
+        if "incident_updates" in existing_incident and (
+            existing_incident["incident_updates"]["L"] != []
+        ):
+            current_updates = existing_incident["incident_updates"]["L"][0]["S"]
+
+    current_time_in_est = current_time_est() + " EST\n"
+    update_text = current_time_in_est + update_text + "\n" + current_updates
+    current_updates = [{"S": update_text}]
+
+    response = dynamodb.update_item(
+        TableName="incidents",
+        Key={"id": {"S": incident_id}},
+        UpdateExpression="SET incident_updates = :updates",
+        ExpressionAttributeValues={":updates": {"L": current_updates}},
+        ReturnValues="UPDATED_NEW",
+    )
+    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
+        return response
+    else:
+        return None
+
+
+def fetch_updates(channel_id):
+    response = lookup_incident("channel_id", channel_id)
+    if response:
+        response = response[0]
+        if "incident_updates" in response and response["incident_updates"]["L"] != []:
+            updates = [update["S"] for update in response["incident_updates"]["L"]]
+            return updates
+    else:
+        return []

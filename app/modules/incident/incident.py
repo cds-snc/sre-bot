@@ -221,6 +221,8 @@ def submit(ack, view, say, body, client: WebClient, logger):
         meet_url=meet_link["meetingUri"],
         environment=environment,
     )
+    logger.info(f"Created incident in dynamodb: {slug}")
+
     # Bookmark incident document
     client.bookmarks_add(
         channel_id=channel_id,
