@@ -108,7 +108,7 @@ def test_handle_incident_command_with_close(close_incident_mock):
     incident_helper.handle_incident_command(
         ["close"], client, body, respond, ack, logger
     )
-    close_incident_mock.assert_called_once_with(client, body, ack, respond)
+    close_incident_mock.assert_called_once_with(client, logger, body, ack, respond)
 
 
 @patch("modules.incident.incident_helper.stale_incidents")
@@ -215,12 +215,14 @@ def test_channel_item():
     ]
 
 
+@patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident(mock_incident_status):
+def test_close_incident(mock_incident_status, mock_slack_users):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
-
+    mock_logger = MagicMock()
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     mock_client.conversations_info.return_value = {
         "channel": {"name": "incident-2024-01-12-test", "is_member": True}
     }
@@ -230,6 +232,7 @@ def test_close_incident(mock_incident_status):
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",
@@ -246,6 +249,7 @@ def test_close_incident(mock_incident_status):
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
+        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",
@@ -262,19 +266,25 @@ def test_close_incident(mock_incident_status):
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.
-def test_close_incident_not_incident_channel():
+@patch("modules.incident.incident_helper.slack_users")
+@patch("modules.incident.incident_helper.incident_status")
+def test_close_incident_not_incident_channel(mock_incident_status, mock_slack_users):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
+
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     # Mock the response of the private message to have been posted as expected
     mock_client.chat_postEphemeral.return_value = {"ok": True}
 
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
-            "user_id": "12345",
+            "user_id": "U12345",
             "channel_name": "some-other-channel",
         },
         mock_ack,
@@ -287,16 +297,23 @@ def test_close_incident_not_incident_channel():
     # Assert that the private message was posted as expected with the expected text
     expected_text = "Channel some-other-channel is not an incident channel. Please use this command in an incident channel."
     mock_client.chat_postEphemeral.assert_called_once_with(
-        channel="C12345", user="12345", text=expected_text
+        channel="C12345", user="U12345", text=expected_text
     )
 
+    mock_incident_status.update_status.assert_not_called()
 
+
+@patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident_when_client_not_in_channel(mock_incident_status):
+def test_close_incident_when_client_not_in_channel(
+    mock_incident_status, mock_slack_users
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     mock_client.conversations_info.return_value = {
         "channel": {"name": "incident-2024-01-12-test", "is_member": False}
     }
@@ -306,6 +323,7 @@ def test_close_incident_when_client_not_in_channel(mock_incident_status):
     # Call close_incident
     incident_helper.close_incident(
         mock_client,
+        mock_logger,
         {
             "channel_id": "C12345",
             "channel_name": "incident-2024-01-12-test",
@@ -321,6 +339,7 @@ def test_close_incident_when_client_not_in_channel(mock_incident_status):
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
+        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",
@@ -328,13 +347,18 @@ def test_close_incident_when_client_not_in_channel(mock_incident_status):
     )
 
 
+@patch("modules.incident.incident_helper.slack_users")
 def test_close_incident_when_client_not_in_channel_throws_error(
+    mock_slack_users,
     caplog,
 ):
     # the client is not in the channel so it needs to be added
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
+
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     # Mock the response of the private message to have been posted as expected
     mock_client.conversations_info.return_value = {
         "ok": True,
@@ -349,9 +373,10 @@ def test_close_incident_when_client_not_in_channel_throws_error(
     with caplog.at_level(logging.ERROR):
         incident_helper.close_incident(
             mock_client,
+            mock_logger,
             {
                 "channel_id": "C12345",
-                "user_id": "12345",
+                "user_id": "U12345",
                 "channel_name": "incident-channel",
             },
             mock_ack,
@@ -370,12 +395,17 @@ def test_close_incident_when_client_not_in_channel_throws_error(
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.
+@patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident_cant_send_private_message(mock_incident_status, caplog):
+def test_close_incident_cant_send_private_message(
+    mock_incident_status, mock_slack_users, caplog
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     # Mock the response of the private message to have been posted as expected
     mock_client.chat_postEphemeral.return_value = {
         "ok": False,
@@ -398,7 +428,7 @@ def test_close_incident_cant_send_private_message(mock_incident_status, caplog):
     with caplog.at_level(logging.ERROR):
         # Call the function being tested
         incident_helper.close_incident(
-            client=mock_client, body=body, ack=mock_ack, respond=mock_respond
+            mock_client, mock_logger, body, mock_ack, mock_respond
         )
         mock_client.chat_postEphemeral.assert_called_once_with(
             text="Channel general is not an incident channel. Please use this command in an incident channel.",
@@ -421,14 +451,17 @@ def test_close_incident_cant_send_private_message(mock_incident_status, caplog):
     mock_incident_status.update_status.assert_not_called()
 
 
+@patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
 def test_close_incident_handles_conversations_archive_failure(
-    mock_incident_status, caplog
+    mock_incident_status, mock_slack_users, caplog
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     # Mock the response of client.bookmarks_list with a valid bookmark
     mock_client.bookmarks_list.return_value = {
         "ok": True,
@@ -451,6 +484,7 @@ def test_close_incident_handles_conversations_archive_failure(
         # Call close_incident
         incident_helper.close_incident(
             mock_client,
+            mock_logger,
             {
                 "channel_id": "C12345",
                 "channel_name": "incident-2024-01-12-test",
@@ -467,12 +501,17 @@ def test_close_incident_handles_conversations_archive_failure(
     mock_respond.assert_called_once_with(error_message)
 
 
+@patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident_handles_post_message_failure(mock_incident_status, caplog):
+def test_close_incident_handles_post_message_failure(
+    mock_incident_status, mock_slack_users, caplog
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    mock_logger = MagicMock()
 
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
     # Mock the response of client.bookmarks_list with a valid bookmark
     mock_client.bookmarks_list.return_value = {
         "ok": True,
@@ -495,6 +534,7 @@ def test_close_incident_handles_post_message_failure(mock_incident_status, caplo
         # Call close_incident
         incident_helper.close_incident(
             mock_client,
+            mock_logger,
             {
                 "channel_id": "C12345",
                 "channel_name": "incident-2024-01-12-test",
@@ -511,16 +551,20 @@ def test_close_incident_handles_post_message_failure(mock_incident_status, caplo
     assert error_message in caplog.text
 
 
-@patch("modules.incident.incident_helper.incident_folder")
+@patch("modules.incident.incident_helper.slack_users")
+@patch("modules.incident.incident_helper.db_operations")
 @patch("modules.incident.incident_helper.incident_status")
-def test_handle_update_status_command(mock_incident_status, mock_incident_folder):
+def test_handle_update_status_command(
+    mock_incident_status, mock_db_operations, mock_slack_users
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
     mock_logger = MagicMock()
 
     args = ["Closed"]
-    mock_incident_folder.lookup_incident.return_value = [
+    mock_slack_users.get_user_id_from_request.return_value = "U12345"
+    mock_db_operations.get_incident_by_channel_id.return_value = [
         {"id": {"S": "incident-2024-01-12-test"}}
     ]
     incident_helper.handle_update_status_command(
@@ -541,6 +585,7 @@ def test_handle_update_status_command(mock_incident_status, mock_incident_folder
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
+        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",
@@ -548,17 +593,21 @@ def test_handle_update_status_command(mock_incident_status, mock_incident_folder
     )
 
 
-@patch("modules.incident.incident_helper.incident_folder")
-def test_handle_update_status_command_invalid_status(mock_incident_folder):
+@patch("modules.incident.incident_helper.slack_users")
+@patch("modules.incident.incident_helper.incident_status")
+@patch("modules.incident.incident_helper.db_operations")
+def test_handle_update_status_command_invalid_status(
+    mock_db_operations, mock_incident_status, mock_slack_users
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
     mock_logger = MagicMock()
 
     args = ["InvalidStatus"]
-    mock_incident_folder.lookup_incident.return_value = [
-        {"id": {"S": "incident-2024-01-12-test"}}
-    ]
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        "id": {"S": "incident-2024-01-12-test"}
+    }
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
@@ -578,17 +627,22 @@ def test_handle_update_status_command_invalid_status(mock_incident_folder):
     mock_respond.assert_called_once_with(
         "A valid status must be used with this command:\nIn Progress, Open, Ready to be Reviewed, Reviewed, Closed"
     )
+    mock_incident_status.update_status.assert_not_called()
 
 
-@patch("modules.incident.incident_helper.incident_folder")
-def test_handle_update_status_command_no_incidents_found(mock_incident_folder):
+@patch("modules.incident.incident_helper.slack_users")
+@patch("modules.incident.incident_helper.incident_status")
+@patch("modules.incident.incident_helper.db_operations")
+def test_handle_update_status_command_no_incidents_found(
+    mock_db_operations, mock_incident_status, mock_slack_users
+):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
     mock_logger = MagicMock()
 
     args = ["Closed"]
-    mock_incident_folder.lookup_incident.return_value = []
+    mock_db_operations.get_incident_by_channel_id.return_value = []
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
@@ -608,43 +662,12 @@ def test_handle_update_status_command_no_incidents_found(mock_incident_folder):
     mock_respond.assert_called_once_with(
         "No incident found for this channel. Will not update status in DB record."
     )
-
-
-@patch("modules.incident.incident_helper.incident_folder")
-def test_handle_update_status_command_too_many_incidents(mock_incident_folder):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_respond = MagicMock()
-    mock_logger = MagicMock()
-
-    args = ["Closed"]
-    mock_incident_folder.lookup_incident.return_value = [
-        {"id": {"S": "incident-2024-01-12-test"}}
-    ] * 2
-    # Call the function
-    incident_helper.handle_update_status_command(
-        mock_client,
-        mock_logger,
-        {
-            "channel_id": "C12345",
-            "channel_name": "incident-2024-01-12-test",
-            "user_id": "U12345",
-            "text": "Closed",
-        },
-        mock_respond,
-        mock_ack,
-        args,
-    )
-
-    mock_ack.assert_called_once()
-    mock_respond.assert_called_once_with(
-        "More than one incident found for this channel. Will not update status in DB record."
-    )
+    mock_incident_status.update_status.assert_not_called()
 
 
 @patch("modules.incident.incident_helper.incident_information_view")
-@patch("modules.incident.incident_helper.incident_folder")
-def test_open_incident_info_view(mock_incident_folder, mock_incident_information_view):
+@patch("modules.incident.incident_helper.db_operations")
+def test_open_incident_info_view(mock_db_operations, mock_incident_information_view):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -655,12 +678,11 @@ def test_open_incident_info_view(mock_incident_folder, mock_incident_information
         "trigger_id": "T12345",
         "view": {"id": "V12345"},
     }
-    mock_incident_folder.lookup_incident.return_value = [
-        {
-            "id": {"S": "incident-2024-01-12-test"},
-            "channel_id": {"S": "C1234567890"},
-        }
-    ]
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        "id": {"S": "incident-2024-01-12-test"},
+        "channel_id": {"S": "C1234567890"},
+    }
+
     mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
     incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
     mock_client.views_open.assert_called_once_with(
@@ -669,8 +691,8 @@ def test_open_incident_info_view(mock_incident_folder, mock_incident_information
     )
 
 
-@patch("modules.incident.incident_helper.incident_folder")
-def test_open_incident_view_no_incident_found(mock_incident_folder):
+@patch("modules.incident.incident_helper.db_operations")
+def test_open_incident_view_no_incident_found(mock_db_operations):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -681,32 +703,10 @@ def test_open_incident_view_no_incident_found(mock_incident_folder):
         "trigger_id": "T12345",
         "view": {"id": "V12345"},
     }
-    mock_incident_folder.lookup_incident.return_value = []
+    mock_db_operations.get_incident_by_channel_id.return_value = []
     incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
     mock_respond.assert_called_once_with(
         "This is command is only available in incident channels. No incident records found for this channel."
-    )
-
-
-@patch("modules.incident.incident_helper.incident_folder")
-def test_open_incident_view_multiple_incidents_found(mock_incident_folder):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_respond = MagicMock()
-    body = {
-        "channel_id": "C12345",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "U12345",
-        "trigger_id": "T12345",
-        "view": {"id": "V12345"},
-    }
-    mock_incident_folder.lookup_incident.return_value = [
-        {"id": {"S": "incident-2024-01-12-test"}}
-    ] * 2
-    incident_helper.open_incident_info_view(mock_client, body, mock_ack, mock_respond)
-
-    mock_respond.assert_called_once_with(
-        "More than one incident found for this channel."
     )
 
 
