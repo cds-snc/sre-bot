@@ -13,6 +13,7 @@ from integrations.google_next.meet import GoogleMeet
 from modules.incident import (
     incident_folder,
     incident_document,
+    db_operations,
 )
 
 load_dotenv()
@@ -211,7 +212,7 @@ def submit(ack, view, say, body, client: WebClient, logger):
         if f["id"] == folder:
             team_name = f["name"]
             break
-    incident_folder.create_incident(
+    db_operations.create_incident(
         channel_id,
         slug,
         name,

@@ -1127,7 +1127,8 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helpe
     }
     ack = MagicMock()
     respond = MagicMock()
-    incident_conversation.archive_channel_action(client, body, ack, respond)
+    logger = MagicMock()
+    incident_conversation.archive_channel_action(client, logger, body, ack, respond)
     ack.assert_called_once()
     client.chat_update.assert_called_once_with(
         channel="channel_id",
@@ -1147,6 +1148,7 @@ def test_archive_channel_action_archive(
     mock_incident_helper,
 ):
     client = MagicMock()
+    logger = MagicMock()
     body = {
         "actions": [{"value": "archive"}],
         "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
@@ -1160,11 +1162,11 @@ def test_archive_channel_action_archive(
     }
     ack = MagicMock()
     respond = MagicMock()
-    incident_conversation.archive_channel_action(client, body, ack, respond)
+    incident_conversation.archive_channel_action(client, logger, body, ack, respond)
     assert ack.call_count == 1
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
     mock_incident_helper.close_incident.assert_called_once_with(
-        client, channel_info, ack, respond
+        client, logger, channel_info, ack, respond
     )
 
 
@@ -1172,6 +1174,7 @@ def test_archive_channel_action_archive(
 @patch("modules.incident.incident_conversation.log_to_sentinel")
 def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_schedule):
     client = MagicMock()
+    logger = MagicMock()
     body = {
         "actions": [{"value": "schedule_retro"}],
         "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
@@ -1186,7 +1189,7 @@ def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_sch
         "trigger_id": "trigger_id",
     }
     ack = MagicMock()
-    incident_conversation.archive_channel_action(client, body, ack, MagicMock())
+    incident_conversation.archive_channel_action(client, logger, body, ack, MagicMock())
     assert ack.call_count == 1
     mock_schedule.schedule_incident_retro.assert_called_once_with(
         client, channel_info, ack

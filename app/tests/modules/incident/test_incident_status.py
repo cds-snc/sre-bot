@@ -3,6 +3,7 @@ from slack_sdk import WebClient
 from modules.incident import incident_status
 
 
+@patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.google_docs")
@@ -10,9 +11,11 @@ def test_update_status_success(
     mock_google_docs,
     mock_incident_document,
     mock_incident_folder,
+    mock_db_operations,
 ):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -32,7 +35,7 @@ def test_update_status_success(
     mock_incident_folder.return_channel_name.return_value = "123"
 
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
+        client, respond, logger, status, channel_id, channel_name, user_id
     )
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
@@ -46,7 +49,7 @@ def test_update_status_success(
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
         mock_incident_folder.return_channel_name.return_value, status
     )
-    mock_incident_folder.update_incident_field.assert_not_called()
+    mock_db_operations.update_incident_field.assert_not_called()
     client.chat_postMessage.assert_called_once_with(
         channel=channel_id,
         text=f"<@{user_id}> has updated the incident status to {status}.",
@@ -54,6 +57,7 @@ def test_update_status_success(
     respond.assert_not_called()
 
 
+@patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.google_docs")
@@ -61,9 +65,11 @@ def test_update_status_success_with_incident_id(
     mock_google_docs,
     mock_incident_document,
     mock_incident_folder,
+    mock_db_operations,
 ):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -84,7 +90,7 @@ def test_update_status_success_with_incident_id(
     mock_incident_folder.return_channel_name.return_value = "123"
 
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id, incident_id
+        client, respond, logger, status, channel_id, channel_name, user_id, incident_id
     )
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
@@ -98,8 +104,8 @@ def test_update_status_success_with_incident_id(
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
         mock_incident_folder.return_channel_name.return_value, status
     )
-    mock_incident_folder.update_incident_field.assert_called_once_with(
-        incident_id, "status", status
+    mock_db_operations.update_incident_field.assert_called_once_with(
+        logger, incident_id, "status", status, user_id
     )
     client.chat_postMessage.assert_called_once_with(
         channel=channel_id,
@@ -108,15 +114,21 @@ def test_update_status_success_with_incident_id(
     respond.assert_not_called()
 
 
+@patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.google_docs")
 @patch("modules.incident.incident_status.logging")
 def test_update_status_handles_bookmarks_list_errors(
-    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+    mock_logging,
+    mock_google_docs,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_db_operations,
 ):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -125,7 +137,7 @@ def test_update_status_handles_bookmarks_list_errors(
     client.bookmarks_list.side_effect = (Exception("error_bookmarks"),)
 
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
+        client, respond, logger, status, channel_id, channel_name, user_id
     )
 
     calls = [
@@ -143,15 +155,21 @@ def test_update_status_handles_bookmarks_list_errors(
     )
 
 
+@patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.google_docs")
 @patch("modules.incident.incident_status.logging")
 def test_update_status_handles_update_document_errors(
-    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+    mock_logging,
+    mock_google_docs,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_db_operations,
 ):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -171,7 +189,7 @@ def test_update_status_handles_update_document_errors(
         "error_document"
     )
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
+        client, respond, logger, status, channel_id, channel_name, user_id
     )
 
     calls = [
@@ -188,15 +206,21 @@ def test_update_status_handles_update_document_errors(
     )
 
 
+@patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.google_docs")
 @patch("modules.incident.incident_status.logging")
 def test_update_status_handles_update_spreadsheet_errors(
-    mock_logging, mock_google_docs, mock_incident_folder, mock_incident_document
+    mock_logging,
+    mock_google_docs,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_db_operations,
 ):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -218,7 +242,7 @@ def test_update_status_handles_update_spreadsheet_errors(
         "error_spreadsheet"
     )
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
+        client, respond, logger, status, channel_id, channel_name, user_id
     )
 
     calls = [
@@ -235,9 +259,21 @@ def test_update_status_handles_update_spreadsheet_errors(
     )
 
 
-def test_update_status_handles_chat_postMessage_errors():
+@patch("modules.incident.incident_status.db_operations")
+@patch("modules.incident.incident_status.incident_document")
+@patch("modules.incident.incident_status.incident_folder")
+@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.logging")
+def test_update_status_handles_chat_postMessage_errors(
+    mock_logging,
+    mock_google_docs,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_db_operations,
+):
     client = MagicMock(spec=WebClient)
     respond = MagicMock()
+    logger = MagicMock()
     status = "Reviewed"
     channel_id = "C123456"
     channel_name = "incident-123"
@@ -256,7 +292,7 @@ def test_update_status_handles_chat_postMessage_errors():
     )
     client.chat_postMessage.side_effect = Exception("error_chat_postMessage")
     incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
+        client, respond, logger, status, channel_id, channel_name, user_id
     )
 
     calls = [

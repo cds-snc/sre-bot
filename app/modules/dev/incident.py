@@ -2,7 +2,8 @@ import json
 import os
 
 from slack_sdk import WebClient
-from modules.incident import incident_folder, incident_conversation
+from boto3.dynamodb.types import TypeDeserializer
+from modules.incident import incident_folder, incident_conversation, db_operations
 
 INCIDENT_LIST = os.getenv("INCIDENT_LIST")
 
@@ -10,6 +11,7 @@ INCIDENT_LIST = os.getenv("INCIDENT_LIST")
 def list_incidents(ack, logger, respond, client: WebClient, body):
     """List incidents"""
     logger.info(body)
+    deserializer = TypeDeserializer()
     channel_id = body.get("channel_id")
     if not channel_id:
         respond("Channel not found")
@@ -21,15 +23,16 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
         message = f"Is this an incident channel? {is_incident}\nIs dev channel? {is_dev_incident}"
         respond(message)
     logger.info("Listing incidents...")
-    incidents = incident_folder.list_incidents()
+    incidents = db_operations.list_incidents()
     respond(f"Found {len(incidents)} incidents")
     if len(incidents) > 10:
         incidents = incidents[:10]
     logger.info(json.dumps(incidents, indent=2))
     formatted_incidents = []
     for incident in incidents:
+        incident = {k: deserializer.deserialize(v) for k, v in incident.items()}
         formatted_incidents.append(
-            f"ID: {incident['id']['S']}\nName: {incident['name']['S']}\nStatus: {incident['status']['S']}\nEnvironment: {incident['environment']['S']}\nChannel: <#{incident['channel_id']['S']}>\n"
+            f"ID: {incident['id']}\nName: {incident['name']}\nStatus: {incident['status']}\nEnvironment: {incident['environment']}\nChannel: <#{incident['channel_id']}>\n"
         )
     message = "\n\n".join(formatted_incidents)
     respond(f"listing the 10 first incidents:\n\n{message}")
@@ -56,7 +59,7 @@ def add_incident(ack, logger, respond, client: WebClient, body):
     if not (is_incident and is_dev_incident):
         respond("This is not an incident dev channel")
         return
-    incident_id = incident_folder.get_incident_by_channel_id(body["channel_id"])
+    incident_id = db_operations.get_incident_by_channel_id(body["channel_id"])
     if incident_id:
         respond(f"This channel is already associated with incident:\n{incident_id}")
         return
@@ -80,7 +83,7 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         incident["report_url"] = incident_conversation.get_incident_document_id(
             client, incident["channel_id"], logger
         )
-    incident_folder.create_incident(
+    db_operations.create_incident(
         incident["channel_id"],
         incident["channel_name"],
         incident["name"],
