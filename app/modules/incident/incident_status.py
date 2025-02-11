@@ -2,12 +2,13 @@ import logging
 from slack_sdk import WebClient
 from slack_bolt import Respond
 from integrations.google_workspace import google_docs
-from modules.incident import incident_document, incident_folder
+from modules.incident import incident_document, incident_folder, db_operations
 
 
 def update_status(
     client: WebClient,
     respond: Respond,
+    logger,
     status: str,
     channel_id: str,
     channel_name: str,
@@ -46,7 +47,9 @@ def update_status(
             incident_folder.return_channel_name(channel_name), status
         )
         if incident_id:
-            incident_folder.update_incident_field(incident_id, "status", status)
+            db_operations.update_incident_field(
+                logger, incident_id, "status", status, user_id
+            )
     except Exception as e:
         warning_message = f"Could not update the incident status in the spreadsheet for channel {channel_name}: {e}"
         logging.warning(warning_message)
