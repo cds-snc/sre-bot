@@ -771,16 +771,25 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
     )
 
 
-@patch("modules.incident.incident_helper.parse_incident_datetime_string")
+@patch("modules.incident.incident_helper.convert_timestamp")
 @patch("modules.incident.incident_helper.logging")
-def test_incident_information_view(mock_logging, mock_parse_incident_datetime_string):
-    incident_data = generate_incident_data()
+def test_incident_information_view(mock_logging, mock_convert_timestamp):
+    incident_data = generate_incident_data(
+        start_impact_time="1234567890",
+        end_impact_time="1234567890",
+        detection_time="1234567890",
+    )
     id = incident_data["id"]["S"]
+    mock_convert_timestamp.side_effect = [
+        "2009-02-13 23:31:30",
+        "Unknown",
+        "Unknown",
+        "Unknown",
+    ]
     view = incident_helper.incident_information_view(incident_data)
     mock_logging.info.assert_called_once_with(
         "Loading Status View for:\n%s", incident_data
     )
-    mock_parse_incident_datetime_string.assert_not_called()
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -908,6 +917,15 @@ def test_parse_incident_datetime_string():
         incident_helper.parse_incident_datetime_string(None)
 
 
+def test_convert_timestamp():
+    assert incident_helper.convert_timestamp("1234567890") == "2009-02-13 23:31:30"
+    assert (
+        incident_helper.convert_timestamp("1234567890.123456") == "2009-02-13 23:31:30"
+    )
+
+    assert incident_helper.convert_timestamp("asdf") == "Unknown"
+
+
 def generate_incident_data(
     created_at="1234567890",
     incident_commander=None,
@@ -948,6 +966,26 @@ def generate_incident_data(
             incident_data[key] = {"S": value}
 
     return incident_data
+
+
+@patch("modules.incident.incident_helper.db_operations")
+def test_open_updates_dialog(mock_db_operations):
+    client = MagicMock()
+    ack = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+        "trigger_id": "trigger_id",
+    }
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        "id": {"S": "incident_id"}
+    }
+    incident_helper.open_updates_dialog(client, body, ack)
+    client.views_open.assert_called_once_with(
+        trigger_id="trigger_id",
+        view=ANY,
+    )
 
 
 @patch("modules.incident.incident_helper.incident_folder.store_update")
