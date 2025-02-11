@@ -9,12 +9,12 @@ import pytz
 import logging
 import re
 import time
-import uuid
 from slack_sdk.web import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_bolt import Ack
 from integrations.google_workspace import google_drive, sheets
 from integrations.aws import dynamodb
+from modules.incident import db_operations
 
 SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
 INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
@@ -426,9 +426,11 @@ def create_missing_incidents(logger, incidents):
     """Create missing incidents"""
     count = 0
     for incident in incidents:
-        incident_exists = lookup_incident("channel_id", incident["channel_id"])
+        incident_exists = db_operations.lookup_incident(
+            "channel_id", incident["channel_id"]
+        )
         if len(incident_exists) == 0:
-            incident_id = create_incident(
+            incident_id = db_operations.create_incident(
                 channel_id=incident["channel_id"],
                 channel_name=incident["channel_name"],
                 name=incident["name"],
@@ -442,7 +444,7 @@ def create_missing_incidents(logger, incidents):
             )
             if incident_id:
                 message = "Automated import of the incident from the Google Sheet via the SRE Bot"
-                log_activity(incident_id, message)
+                db_operations.log_activity(incident_id, message)
             logger.info(f"created incident: {incident['name']}: {incident_id}")
             count += 1
         else:
@@ -459,7 +461,7 @@ def current_time_est():
 
 
 def store_update(incident_id, update_text):
-    existing_incident = lookup_incident("id", incident_id)
+    existing_incident = db_operations.lookup_incident("id", incident_id)
     # Check if the incident exists and has incident_updates
     current_updates = ""
     if existing_incident:
@@ -487,7 +489,7 @@ def store_update(incident_id, update_text):
 
 
 def fetch_updates(channel_id):
-    response = lookup_incident("channel_id", channel_id)
+    response = db_operations.lookup_incident("channel_id", channel_id)
     if response:
         response = response[0]
         if "incident_updates" in response and response["incident_updates"]["L"] != []:
