@@ -488,6 +488,7 @@ def test_incident_canvas_create_returns_successful_response(
     ack.assert_called_once()
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -497,6 +498,7 @@ def test_incident_canvas_create_unsuccessful_called(
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    mock_db_operations,
 ):
     mock_incident_folder.create_item.return_value = "incident_id"
 
@@ -524,6 +526,7 @@ def test_incident_canvas_create_unsuccessful_called(
     assert client.conversations_canvases_create.return_value == expected_response
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder")
@@ -531,6 +534,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     mock_incident_folder,
     mock_google_meet,
     mock_incident_document,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -569,6 +573,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     mock_incident_folder.get_folder_metadata.assert_called_once_with("folder")
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -580,6 +585,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -627,6 +633,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -638,6 +645,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -684,6 +692,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -695,6 +704,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -739,6 +749,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
@@ -753,6 +764,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     mock_create_new_incident,
     mock_merge_data,
     mock_google_meet,
+    mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
