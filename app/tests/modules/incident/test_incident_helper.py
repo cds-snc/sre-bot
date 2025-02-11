@@ -163,6 +163,43 @@ def test_handle_incident_command_with_update_status_command(
     )
 
 
+@patch("modules.incident.incident_helper.open_updates_dialog")
+def test_handle_incident_command_with_add_summary(open_updates_dialog_mock):
+
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["add_summary"], client, body, respond, ack, logger
+    )
+    open_updates_dialog_mock.assert_called_once_with(client, body, ack)
+
+
+@patch("modules.incident.incident_helper.display_current_updates")
+def test_handle_incident_command_with_summary(display_current_updates_mock):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+    logger = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["summary"], client, body, respond, ack, logger
+    )
+    display_current_updates_mock.assert_called_once_with(client, body, respond, ack)
+
+
 def test_handle_incident_command_with_unknown_command():
     respond = MagicMock()
     ack = MagicMock()
