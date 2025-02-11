@@ -6,7 +6,7 @@ import re
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_drive
-from integrations.slack import channels as slack_channels
+from integrations.slack import channels as slack_channels, users as slack_users
 from integrations.sentinel import log_to_sentinel
 from modules.incident import (
     incident_status,
@@ -15,6 +15,7 @@ from modules.incident import (
     incident_roles,
     incident_conversation,
     schedule_retro,
+    db_operations,
 )
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
@@ -122,7 +123,7 @@ def handle_incident_command(
         case "roles":
             incident_roles.manage_roles(client, body, ack, respond)
         case "close":
-            close_incident(client, body, ack, respond)
+            close_incident(client, logger, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case "schedule":
@@ -139,12 +140,12 @@ def handle_incident_command(
             )
 
 
-def close_incident(client: WebClient, body, ack, respond):
+def close_incident(client: WebClient, logger, body, ack, respond):
     ack()
     # get the current chanel id and name
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
-    user_id = body["user_id"]
+    user_id = slack_users.get_user_id_from_request(body)
 
     # ensure the bot is actually in the channel before performing actions
     try:
@@ -153,7 +154,7 @@ def close_incident(client: WebClient, body, ack, respond):
         if channel_info is None or not channel_info.get("is_member", False):
             client.conversations_join(channel=channel_id)
     except Exception as e:
-        logging.error(f"Failed to join the channel {channel_id}: {e}")
+        logging.error("Failed to join the channel %s: %s", channel_id, e)
         return
 
     if not channel_name.startswith("incident-"):
@@ -165,12 +166,12 @@ def close_incident(client: WebClient, body, ack, respond):
             )
         except Exception as e:
             logging.error(
-                f"Could not post ephemeral message to user {user_id} due to {e}.",
+                "Could not post ephemeral message to user %s due to %s.", user_id, e
             )
         return
 
     incident_status.update_status(
-        client, respond, "Closed", channel_id, channel_name, user_id
+        client, respond, logger, "Closed", channel_id, channel_name, user_id
     )
 
     # Need to post the message before the channel is archived so that the message can be delivered.
@@ -181,7 +182,7 @@ def close_incident(client: WebClient, body, ack, respond):
         )
     except Exception as e:
         logging.error(
-            f"Could not post message to channel {channel_name} due to error: {e}.",
+            "Could not post message to channel %s due to error: %s.", channel_name, e
         )
 
     # archive the channel
@@ -195,9 +196,7 @@ def close_incident(client: WebClient, body, ack, respond):
         error_message = (
             f"Could not archive the channel {channel_name} due to error: {e}"
         )
-        logging.error(
-            "Could not archive the channel %s due to error: %s", channel_name, e
-        )
+        logging.error(error_message)
         respond(error_message)
 
 
@@ -275,6 +274,7 @@ def handle_update_status_command(
 ):
     ack()
     status = str.join(" ", args)
+    user_id = slack_users.get_user_id_from_request(body)
     valid_statuses = [
         "In Progress",
         "Open",
@@ -288,52 +288,38 @@ def handle_update_status_command(
             + ", ".join(valid_statuses)
         )
         return
-    incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
+    incident = db_operations.get_incident_by_channel_id(body["channel_id"])
 
-    # get the user id from the body. if not found, use "Unknown" as the default
-    user_id = body.get("user_id", "Unknown")
-    if not incidents:
+    if not incident:
         respond(
             "No incident found for this channel. Will not update status in DB record."
         )
         return
     else:
-        if len(incidents) > 1:
-            respond(
-                "More than one incident found for this channel. Will not update status in DB record."
-            )
-            return
-        else:
-            respond(f"Updating incident status to {status}...")
+        respond(f"Updating incident status to {status}...")
 
-            incident_folder.update_incident_field(
-                logger, incidents[0]["id"]["S"], "status", status, user_id
-            )
-
-            incident_status.update_status(
-                client,
-                respond,
-                status,
-                body["channel_id"],
-                body["channel_name"],
-                body["user_id"],
-            )
+        incident_status.update_status(
+            client,
+            respond,
+            logger,
+            status,
+            body["channel_id"],
+            body["channel_name"],
+            user_id,
+        )
 
 
 def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond):
 
-    incidents = incident_folder.lookup_incident("channel_id", body["channel_id"])
-    if not incidents:
+    incident = db_operations.get_incident_by_channel_id(body["channel_id"])
+    if not incident:
         respond(
             "This is command is only available in incident channels. No incident records found for this channel."
         )
         return
     else:
-        if len(incidents) > 1:
-            respond("More than one incident found for this channel.")
-        else:
-            view = incident_information_view(incidents[0])
-            client.views_open(trigger_id=body["trigger_id"], view=view)
+        view = incident_information_view(incident)
+        client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
 def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
@@ -493,7 +479,7 @@ def convert_timestamp(timestamp: str) -> str:
 def open_updates_dialog(client: WebClient, body, ack: Ack):
     ack()
     channel_id = body["channel_id"]  # Extract channel_id directly from body
-    incident = incident_folder.lookup_incident("channel_id", body["channel_id"])[0]
+    incident = db_operations.get_incident_by_channel_id(channel_id)
     incident_id = incident.get("id", "Unknown").get("S", "Unknown")
     dialog = {
         "type": "modal",
