@@ -373,6 +373,22 @@ def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
 
 
 @patch("modules.incident.incident_folder.dynamodb.scan")
+@patch("modules.incident.incident_folder.dynamodb.update_item")
+@patch("modules.incident.incident_folder.current_time_est")
+def test_store_update_failed(mock_current_time_est, mock_update_item, mock_scan_item):
+    mock_current_time_est.return_value = "2025-01-31 11:17:06"
+    mock_scan_item.return_value = [
+        {"incident_updates": {"L": [{"S": "Previous update"}]}}
+    ]
+    mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
+
+    response = incident_folder.store_update("incident_id", "New update")
+    assert response is None
+    mock_scan_item.assert_called_once()
+    mock_update_item.assert_called_once()
+
+
+@patch("modules.incident.incident_folder.dynamodb.scan")
 def test_fetch_updates(mock_scan_item):
     mock_scan_item.return_value = [
         {"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}
