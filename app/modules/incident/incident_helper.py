@@ -146,7 +146,10 @@ def close_incident(client: WebClient, logger, body, ack, respond):
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
     user_id = slack_users.get_user_id_from_request(body)
-
+    incident_id = None
+    incident = db_operations.get_incident_by_channel_id(channel_id)
+    if incident:
+        incident_id = incident.get("id", {}).get("S", None)
     # ensure the bot is actually in the channel before performing actions
     try:
         response = client.conversations_info(channel=channel_id)
@@ -171,7 +174,14 @@ def close_incident(client: WebClient, logger, body, ack, respond):
         return
 
     incident_status.update_status(
-        client, respond, logger, "Closed", channel_id, channel_name, user_id
+        client,
+        respond,
+        logger,
+        "Closed",
+        channel_id,
+        channel_name,
+        user_id,
+        incident_id,
     )
 
     # Need to post the message before the channel is archived so that the message can be delivered.
