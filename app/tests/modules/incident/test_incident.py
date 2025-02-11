@@ -189,6 +189,7 @@ def test_incident_local_button_calls_views_update(mock_list_incident_folders):
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.incident_document")
@@ -198,6 +199,7 @@ def test_incident_submit_calls_ack(
     _mock_incident_document,
     _mock_incident_folder,
     _mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -209,6 +211,7 @@ def test_incident_submit_calls_ack(
     ack.assert_called()
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.generate_success_modal")
 @patch("modules.incident.incident.incident_document")
@@ -220,6 +223,7 @@ def test_incident_submit_calls_views_open(
     _mock_incident_document,
     _mock_generate_success_modal,
     _mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -270,6 +274,7 @@ def test_incident_submit_returns_error_if_description_is_too_long(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -279,6 +284,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _mock_incident_folder,
     _mock_incident_document,
     _mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -300,6 +306,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -309,6 +316,7 @@ def test_incident_submit_creates_channel_sets_description(
     _mock_incident_folder,
     _mock_incident_document,
     _mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -326,6 +334,7 @@ def test_incident_submit_creates_channel_sets_description(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -335,6 +344,7 @@ def test_incident_submit_adds_creator_to_channel(
     _mock_incident_folder,
     _mock_incident_document,
     _mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -358,6 +368,7 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -367,6 +378,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _mock_incident_folder,
     _mock_incident_document,
     mock_google_meet,
+    _mock_db_operations,
 ):
     ack = MagicMock()
     logger = MagicMock()
@@ -398,6 +410,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -407,6 +420,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    _mock_db_operations,
 ):
     client = MagicMock()
     ack = MagicMock()
@@ -436,6 +450,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     )
 
 
+@patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -445,6 +460,7 @@ def test_incident_canvas_create_returns_successful_response(
     mock_incident_folder,
     mock_incident_document,
     mock_google_meet,
+    mock_db_operations,
 ):
     mock_incident_folder.create_item.return_value = "incident_id"
     client = MagicMock()
