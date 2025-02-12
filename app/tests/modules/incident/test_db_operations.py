@@ -1,39 +1,48 @@
 from unittest.mock import patch, MagicMock
 from modules.incident import db_operations
+from models.incidents import Incident
 
 
 @patch("modules.incident.db_operations.log_activity")
-@patch("modules.incident.db_operations.uuid")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
-def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity):
-    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
+def test_create_incident(mock_dynamodb, mock_datetime, mock_log_activity):
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert db_operations.create_incident(
-        "channel_id",
-        "channel_name",
-        "name",
-        "user_id",
-        ["teams"],
-        "report_url",
-        meet_url="meet_url",
-    )
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "created_at": mock_created_at,
+    }
+    assert db_operations.create_incident(Incident(**incident_data))
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
         Item={
             "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
-            "created_at": {"S": str(mock_created_at)},
+            "created_at": {"N": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
             "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
-            "teams": {"SS": ["teams"]},
+            "teams": {"L": [{"S": "teams"}]},
             "report_url": {"S": "report_url"},
             "meet_url": {"S": "meet_url"},
+            "incident_commander": {"NULL": True},
+            "operations_lead": {"NULL": True},
+            "severity": {"NULL": True},
+            "start_impact_time": {"NULL": True},
+            "end_impact_time": {"NULL": True},
+            "detection_time": {"NULL": True},
+            "retrospective_url": {"NULL": True},
             "environment": {"S": "prod"},
             "logs": {"L": []},
             "incident_updates": {"L": []},
@@ -41,59 +50,63 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_uuid, mock_log_activ
     )
     mock_log_activity.assert_called_once_with(
         "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
-        "User `user_id` created incident `name` in channel `channel_id`: 978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "User `user_id` created incident `name` in channel `channel_id`",
     )
 
 
 @patch("modules.incident.db_operations.log_activity")
-@patch("modules.incident.db_operations.uuid")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
 def test_create_incident_with_optional_args(
-    mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity
+    mock_dynamodb, mock_datetime, mock_log_activity
 ):
-    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert db_operations.create_incident(
-        "channel_id",
-        "channel_name",
-        "name",
-        "user_id",
-        ["teams"],
-        "report_url",
-        meet_url="meet_url",
-        incident_commander="incident_commander",
-        operations_lead="operations_lead",
-        severity="severity",
-        start_impact_time="start_time",
-        end_impact_time="end_time",
-        detection_time="detection_time",
-        retrospective_url="retro_url",
-        environment="dev",
-    )
+
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "created_at": mock_created_at,
+        "incident_commander": "incident_commander",
+        "operations_lead": "operations_lead",
+        "severity": "severity",
+        "start_impact_time": mock_created_at + 1000,
+        "end_impact_time": mock_created_at + 2000,
+        "detection_time": mock_created_at + 1500,
+        "retrospective_url": "retro_url",
+        "environment": "dev",
+    }
+
+    assert db_operations.create_incident(Incident(**incident_data))
+
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
         Item={
             "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
-            "created_at": {"S": str(mock_created_at)},
+            "created_at": {"N": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
             "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
-            "teams": {"SS": ["teams"]},
+            "teams": {"L": [{"S": "teams"}]},
             "report_url": {"S": "report_url"},
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "dev"},
             "incident_commander": {"S": "incident_commander"},
             "operations_lead": {"S": "operations_lead"},
             "severity": {"S": "severity"},
-            "start_impact_time": {"S": "start_time"},
-            "end_impact_time": {"S": "end_time"},
-            "detection_time": {"S": "detection_time"},
+            "start_impact_time": {"N": str(mock_created_at + 1000)},
+            "end_impact_time": {"N": str(mock_created_at + 2000)},
+            "detection_time": {"N": str(mock_created_at + 1500)},
             "retrospective_url": {"S": "retro_url"},
             "logs": {"L": []},
             "incident_updates": {"L": []},
@@ -101,51 +114,79 @@ def test_create_incident_with_optional_args(
     )
     mock_log_activity.assert_called_once_with(
         "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
-        "User `user_id` created incident `name` in channel `channel_id`: 978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "User `user_id` created incident `name` in channel `channel_id`",
     )
 
 
 @patch("modules.incident.db_operations.log_activity")
-@patch("modules.incident.db_operations.uuid")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
-def test_create_incident_handle_error(
-    mock_dynamodb, mock_datetime, mock_uuid, mock_log_activity
-):
-    mock_uuid.uuid4.return_value = "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"
+def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_log_activity):
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
     )
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
-    response = db_operations.create_incident(
-        "channel_id",
-        "channel_name",
-        "name",
-        "user_id",
-        ["teams"],
-        "report_url",
-        meet_url="meet_url",
-    )
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "created_at": mock_created_at,
+    }
+    response = db_operations.create_incident(Incident(**incident_data))
     assert response is None
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
         Item={
             "id": {"S": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d"},
-            "created_at": {"S": str(mock_created_at)},
+            "created_at": {"N": str(mock_created_at)},
             "channel_id": {"S": "channel_id"},
             "channel_name": {"S": "channel_name"},
             "name": {"S": "name"},
             "status": {"S": "Open"},
             "user_id": {"S": "user_id"},
-            "teams": {"SS": ["teams"]},
+            "teams": {"L": [{"S": "teams"}]},
             "report_url": {"S": "report_url"},
             "meet_url": {"S": "meet_url"},
             "environment": {"S": "prod"},
             "logs": {"L": []},
             "incident_updates": {"L": []},
+            "incident_commander": {"NULL": True},
+            "operations_lead": {"NULL": True},
+            "severity": {"NULL": True},
+            "start_impact_time": {"NULL": True},
+            "end_impact_time": {"NULL": True},
+            "detection_time": {"NULL": True},
+            "retrospective_url": {"NULL": True},
         },
     )
     mock_log_activity.assert_not_called()
+
+
+@patch("modules.incident.db_operations.dynamodb")
+@patch("modules.incident.db_operations.get_incident_by_channel_id")
+def test_create_incident_already_exists(mock_get_incident_by_channel_id, mock_dynamodb):
+    mock_get_incident_by_channel_id.return_value = {
+        "id": {"S": "foo"},
+        "channel_id": {"S": "bar"},
+    }
+    incident_data = {
+        "id": "foo",
+        "channel_id": "bar",
+        "channel_name": "baz",
+        "name": "qux",
+        "user_id": "quux",
+        "teams": ["corge"],
+        "report_url": "grault",
+        "meet_url": "garply",
+    }
+    assert db_operations.create_incident(Incident(**incident_data)) == "foo"
+    mock_get_incident_by_channel_id.assert_called_once_with("bar")
+    mock_dynamodb.put_item.assert_not_called()
 
 
 @patch("modules.incident.db_operations.dynamodb")

@@ -1,74 +1,44 @@
 import datetime
-import uuid
 import logging
+from boto3.dynamodb.types import TypeSerializer
 
+from models.incidents import Incident
 from integrations.aws import dynamodb
 
 
-def create_incident(
-    channel_id,
-    channel_name,
-    name,
-    user_id,
-    teams,
-    report_url,
-    status="Open",
-    meet_url=None,
-    created_at=None,
-    incident_commander=None,
-    operations_lead=None,
-    severity=None,
-    start_impact_time=None,
-    end_impact_time=None,
-    detection_time=None,
-    retrospective_url=None,
-    environment="prod",
-):
-    incident_exists = lookup_incident("channel_id", channel_id)
-    if len(incident_exists) > 0:
-        return incident_exists[0]["id"]["S"]
+def create_incident(incident_data: Incident) -> str | None:
+    """Create an incident in the incidents table.
 
-    if not created_at:
-        created_at = str(datetime.datetime.now().timestamp())
-    id = str(uuid.uuid4())
-    incident_data = {
-        "id": {"S": id},
-        "created_at": {"S": created_at},
-        "channel_id": {"S": channel_id},
-        "channel_name": {"S": channel_name},
-        "name": {"S": name},
-        "status": {"S": status},
-        "user_id": {"S": user_id},
-        "teams": {"SS": teams},
-        "report_url": {"S": report_url},
-        "meet_url": {"S": meet_url},
-        "environment": {"S": environment},
-        "logs": {"L": []},
-        "incident_updates": {"L": []},
+    Args:
+        incident_data (Incident): The incident data.
+
+    Returns:
+        str: The incident ID.
+    """
+
+    incident = get_incident_by_channel_id(incident_data.channel_id)
+    if incident:
+        return incident["id"]["S"]
+
+    serializer = TypeSerializer()
+    serialized_data = {
+        k: serializer.serialize(v) for k, v in incident_data.model_dump().items()
     }
-    for key, value in [
-        ("incident_commander", incident_commander),
-        ("operations_lead", operations_lead),
-        ("severity", severity),
-        ("start_impact_time", start_impact_time),
-        ("end_impact_time", end_impact_time),
-        ("detection_time", detection_time),
-        ("retrospective_url", retrospective_url),
-    ]:
-        if value:
-            incident_data[key] = {"S": value}
 
     response = dynamodb.put_item(
         TableName="incidents",
-        Item=incident_data,
+        Item=serialized_data,
     )
 
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        message = f"User `{user_id}` created incident `{name}` in channel `{channel_id}`: {id}"
-        log_activity(id, message)
-        logging.info("Created incident %s", id)
-        return id
-    return None
+        message = f"User `{incident_data.user_id}` created incident `{incident_data.name}` in channel `{incident_data.channel_id}`"
+        log_activity(incident_data.id, message)
+        logging.info("Created incident %s", incident_data.id)
+        return incident_data.id
+    else:
+        message = f"Failed to create incident in database for channel `{incident_data.channel_id}`"
+        logging.error(message)
+        return None
 
 
 def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
@@ -135,7 +105,8 @@ def log_activity(incident_id, message):
         return False
 
 
-def get_incident(id):
+def get_incident(id) -> dict:
+    """Get an incident by its ID."""
     return dynamodb.get_item(TableName="incidents", Key={"id": {"S": id}})
 
 
