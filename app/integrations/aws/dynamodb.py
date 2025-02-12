@@ -83,7 +83,7 @@ def get_item(TableName, **kwargs) -> dict:
 @handle_aws_api_errors
 def update_item(TableName, **kwargs):
     """Update an item in a DynamoDB table
-    
+
     Args:
         TableName: str - The name of the table to update
         **kwargs: dict - The parameters to pass to the update_item call
