@@ -28,8 +28,8 @@ class Incident(BaseModel):
     detection_time: Optional[Decimal] = None
     retrospective_url: Optional[str] = None
     environment: Optional[str] = "prod"
-    logs: Optional[List[str]] = []
-    incident_updates: Optional[List[str]] = []
+    logs: Optional[List[str | dict]] = []
+    incident_updates: Optional[List[str | dict]] = []
 
-    class Config:
+    class Config:  # noqa
         extra = "forbid"
