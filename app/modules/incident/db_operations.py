@@ -6,23 +6,30 @@ from models.incidents import Incident
 from integrations.aws import dynamodb
 
 
-def create_incident(incident_data: Incident) -> str | None:
+def create_incident(incident_data: dict) -> str | None:
     """Create an incident in the incidents table.
 
     Args:
-        incident_data (Incident): The incident data.
+        incident_data (dict): The incident data.
 
     Returns:
         str: The incident ID.
     """
 
-    incident = get_incident_by_channel_id(incident_data.channel_id)
-    if incident:
-        return incident["id"]["S"]
+    try:
+        incident = Incident(**incident_data)
+    except ValueError as e:
+        message = f"Invalid incident data: {e}"
+        logging.error(message)
+        raise ValueError(message) from e
+
+    existing_incident = get_incident_by_channel_id(incident.channel_id)
+    if existing_incident:
+        return existing_incident["id"]["S"]
 
     serializer = TypeSerializer()
     serialized_data = {
-        k: serializer.serialize(v) for k, v in incident_data.model_dump().items()
+        k: serializer.serialize(v) for k, v in incident.model_dump().items()
     }
 
     response = dynamodb.put_item(
@@ -31,12 +38,14 @@ def create_incident(incident_data: Incident) -> str | None:
     )
 
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        message = f"User `{incident_data.user_id}` created incident `{incident_data.name}` in channel `{incident_data.channel_id}`"
-        log_activity(incident_data.id, message)
-        logging.info("Created incident %s", incident_data.id)
-        return incident_data.id
+        message = f"User `{incident.user_id}` created incident `{incident.name}` in channel `{incident.channel_id}`"
+        log_activity(incident.id, message)
+        logging.info("Created incident %s", incident.id)
+        return incident.id
     else:
-        message = f"Failed to create incident in database for channel `{incident_data.channel_id}`"
+        message = (
+            f"Failed to create incident in database for channel `{incident.channel_id}`"
+        )
         logging.error(message)
         return None
 

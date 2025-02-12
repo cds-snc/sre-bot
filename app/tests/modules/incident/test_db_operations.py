@@ -1,6 +1,7 @@
+import logging
 from unittest.mock import patch, MagicMock
 from modules.incident import db_operations
-from models.incidents import Incident
+import pytest
 
 
 @patch("modules.incident.db_operations.log_activity")
@@ -22,7 +23,7 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_log_activity):
         "meet_url": "meet_url",
         "created_at": mock_created_at,
     }
-    assert db_operations.create_incident(Incident(**incident_data))
+    assert db_operations.create_incident(incident_data)
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
         Item={
@@ -85,7 +86,7 @@ def test_create_incident_with_optional_args(
         "environment": "dev",
     }
 
-    assert db_operations.create_incident(Incident(**incident_data))
+    assert db_operations.create_incident(incident_data)
 
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
@@ -118,10 +119,27 @@ def test_create_incident_with_optional_args(
     )
 
 
+def test_create_incident_with_invalid_data(caplog):
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+    }
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(ValueError, match="Invalid incident data"):
+            db_operations.create_incident(incident_data)
+
+    assert "Invalid incident data" in caplog.text
+
+
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
-def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_log_activity):
+def test_create_incident_handle_creation_error(
+    mock_dynamodb, mock_datetime, mock_log_activity
+):
     mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
         1234567890
     )
@@ -137,7 +155,7 @@ def test_create_incident_handle_error(mock_dynamodb, mock_datetime, mock_log_act
         "meet_url": "meet_url",
         "created_at": mock_created_at,
     }
-    response = db_operations.create_incident(Incident(**incident_data))
+    response = db_operations.create_incident(incident_data)
     assert response is None
     mock_dynamodb.put_item.assert_called_once_with(
         TableName="incidents",
@@ -184,7 +202,7 @@ def test_create_incident_already_exists(mock_get_incident_by_channel_id, mock_dy
         "report_url": "grault",
         "meet_url": "garply",
     }
-    assert db_operations.create_incident(Incident(**incident_data)) == "foo"
+    assert db_operations.create_incident(incident_data) == "foo"
     mock_get_incident_by_channel_id.assert_called_once_with("bar")
     mock_dynamodb.put_item.assert_not_called()
 
