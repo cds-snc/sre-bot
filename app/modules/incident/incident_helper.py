@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from boto3.dynamodb.types import TypeDeserializer
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_drive
@@ -17,6 +18,7 @@ from modules.incident import (
     schedule_retro,
     db_operations,
 )
+from models.incidents import Incident
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
@@ -328,7 +330,9 @@ def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond)
         )
         return
     else:
-        view = incident_information_view(incident)
+        deserialize = TypeDeserializer()
+        incident_data = {k: deserialize.deserialize(v) for k, v in incident.items()}
+        view = incident_information_view(Incident(**incident_data))
         client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
@@ -343,24 +347,20 @@ def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
     )
 
 
-def incident_information_view(incident):
+def incident_information_view(incident: Incident):
     logging.info("Loading Status View for:\n%s", incident)
-    name = incident.get("name", "Unknown").get("S", "Unknown")
-    incident_id = incident.get("id", "Unknown").get("S", "Unknown")
-    status = incident.get("status", "Unknown").get("S", "Unknown")
-    created_at = incident.get("created_at", {}).get("S", "Unknown")
-    if created_at != "Unknown":
-        created_at = convert_timestamp(created_at)
-    impact_start_timestamp = incident.get("start_impact_time", {}).get("S", "Unknown")
-    if impact_start_timestamp != "Unknown":
-        impact_start_timestamp = convert_timestamp(impact_start_timestamp)
-
-    impact_end_timestamp = incident.get("end_impact_time", {}).get("S", "Unknown")
-    if impact_end_timestamp != "Unknown":
-        impact_end_timestamp = convert_timestamp(impact_end_timestamp)
-    detection_timestamp = incident.get("detection_time", {}).get("S", "Unknown")
-    if detection_timestamp != "Unknown":
-        detection_timestamp = convert_timestamp(detection_timestamp)
+    created_at = "Unknown"
+    impact_start_timestamp = "Unknown"
+    impact_end_timestamp = "Unknown"
+    detection_timestamp = "Unknown"
+    if incident.created_at:
+        created_at = convert_timestamp(str(incident.created_at))
+    if incident.start_impact_time:
+        impact_start_timestamp = convert_timestamp(str(incident.start_impact_time))
+    if incident.end_impact_time:
+        impact_end_timestamp = convert_timestamp(str(incident.end_impact_time))
+    if incident.detection_time:
+        detection_timestamp = convert_timestamp(str(incident.detection_time))
     return {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -371,7 +371,7 @@ def incident_information_view(incident):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": name,
+                    "text": incident.name,
                     "emoji": True,
                 },
             },
@@ -379,7 +379,7 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*ID*: " + incident_id,
+                    "text": "*ID*: " + incident.id,
                 },
             },
             {"type": "divider"},
@@ -387,7 +387,7 @@ def incident_information_view(incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Status*:\n" + status,
+                    "text": "*Status*:\n" + incident.status,
                 },
                 "accessory": {
                     "type": "button",
@@ -448,7 +448,7 @@ def incident_information_view(incident):
 
 
 def update_field_view(action):
-    logging.info(f"Loading Update Field View for {action}")
+    logging.info("Loading Update Field View for action: %s", action)
     return {
         "type": "modal",
         "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},

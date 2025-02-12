@@ -1,12 +1,13 @@
+from decimal import Decimal
 import json
 import os
 import uuid
-
-import pytest
-from modules import incident_helper
 import logging
-
 from unittest.mock import ANY, MagicMock, patch
+import pytest
+
+from modules import incident_helper
+from models.incidents import Incident
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
 
@@ -740,6 +741,47 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
     mock_db_operations.get_incident_by_channel_id.return_value = {
         "id": {"S": "incident-2024-01-12-test"},
         "channel_id": {"S": "C1234567890"},
+        "channel_name": {"S": "incident-2024-01-12-test"},
+        "name": {"S": "Test Incident"},
+        "user_id": {"S": "U12345"},
+        "teams": {"L": [{"S": "team1"}, {"S": "team2"}]},
+        "report_url": {"S": "http://example.com/report"},
+        "status": {"S": "Open"},
+        "meet_url": {"S": "http://example.com/meet"},
+        "created_at": {"N": "1234567890"},
+        "incident_commander": {"S": "Commander"},
+        "operations_lead": {"S": "Lead"},
+        "severity": {"S": "High"},
+        "start_impact_time": {"N": "1234567890"},
+        "end_impact_time": {"N": "1234567890"},
+        "detection_time": {"N": "1234567890"},
+        "retrospective_url": {"S": "http://example.com/retrospective"},
+        "environment": {"S": "prod"},
+        "logs": {"L": []},
+        "incident_updates": {"L": []},
+    }
+
+    incident_data = {
+        "id": "incident-2024-01-12-test",
+        "channel_id": "C1234567890",
+        "channel_name": "incident-2024-01-12-test",
+        "name": "Test Incident",
+        "user_id": "U12345",
+        "teams": ["team1", "team2"],
+        "report_url": "http://example.com/report",
+        "status": "Open",
+        "meet_url": "http://example.com/meet",
+        "created_at": Decimal("1234567890"),
+        "incident_commander": "Commander",
+        "operations_lead": "Lead",
+        "severity": "High",
+        "start_impact_time": Decimal("1234567890"),
+        "end_impact_time": Decimal("1234567890"),
+        "detection_time": Decimal("1234567890"),
+        "retrospective_url": "http://example.com/retrospective",
+        "environment": "prod",
+        "logs": [],
+        "incident_updates": [],
     }
 
     mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
@@ -748,6 +790,7 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         trigger_id="T12345",
         view={"view": [{"block": "block_id"}]},
     )
+    mock_incident_information_view.assert_called_once_with(Incident(**incident_data))
 
 
 @patch("modules.incident.incident_helper.db_operations")
@@ -801,17 +844,16 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
         end_impact_time="1234567890",
         detection_time="1234567890",
     )
-    id = incident_data["id"]["S"]
+    id = incident_data["id"]
     mock_convert_timestamp.side_effect = [
         "2009-02-13 23:31:30",
         "Unknown",
         "Unknown",
         "Unknown",
     ]
-    view = incident_helper.incident_information_view(incident_data)
-    mock_logging.info.assert_called_once_with(
-        "Loading Status View for:\n%s", incident_data
-    )
+    incident = Incident(**incident_data)
+    view = incident_helper.incident_information_view(incident)
+    mock_logging.info.assert_called_once_with("Loading Status View for:\n%s", incident)
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -906,7 +948,7 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
 def test_update_field_view(mock_logging):
     view = incident_helper.update_field_view("update_status")
     mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for update_status"
+        "Loading Update Field View for action: %s", "update_status"
     )
     assert view == {
         "type": "modal",
@@ -961,18 +1003,18 @@ def generate_incident_data(
 ):
     id = str(uuid.uuid4())
     incident_data = {
-        "id": {"S": id},
-        "created_at": {"S": created_at},
-        "channel_id": {"S": "channel_id"},
-        "channel_name": {"S": "channel_name"},
-        "name": {"S": "name"},
-        "status": {"S": "status"},
-        "user_id": {"S": "user_id"},
-        "teams": {"SS": ["team1", "team2"]},
-        "report_url": {"S": "report_url"},
-        "meet_url": {"S": "meet_url"},
-        "environment": {"S": environment},
-        "incident_commander": {"S": "incident_commander"},
+        "id": id,
+        "created_at": created_at,
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "status": "status",
+        "user_id": "user_id",
+        "teams": ["team1", "team2"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "environment": environment,
+        "incident_commander": "incident_commander",
     }
 
     for key, value in [
@@ -985,7 +1027,7 @@ def generate_incident_data(
         ("retrospective_url", retrospective_url),
     ]:
         if value:
-            incident_data[key] = {"S": value}
+            incident_data[key] = value
 
     return incident_data
 

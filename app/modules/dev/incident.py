@@ -83,14 +83,16 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         incident["report_url"] = incident_conversation.get_incident_document_id(
             client, incident["channel_id"], logger
         )
-    db_operations.create_incident(
-        incident["channel_id"],
-        incident["channel_name"],
-        incident["name"],
-        incident["user_id"],
-        incident["teams"],
-        incident["report_url"],
-        meet_url=incident["meet_url"],
-        created_at=incident["created_at"],
-    )
+    incident_data = {
+        "channel_id": incident["channel_id"],
+        "channel_name": incident["channel_name"],
+        "name": incident["name"],
+        "user_id": incident["user_id"],
+        "teams": incident["teams"],
+        "report_url": incident["report_url"],
+        "meet_url": incident["meet_url"],
+        "created_at": incident["created_at"],
+    }
+    db_operations.create_incident(incident_data)
+
     logger.info(incident)

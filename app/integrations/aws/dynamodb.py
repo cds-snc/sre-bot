@@ -61,7 +61,7 @@ def put_item(TableName, **kwargs):
 
 
 @handle_aws_api_errors
-def get_item(TableName, **kwargs):
+def get_item(TableName, **kwargs) -> dict:
     """Get an item from a DynamoDB table
 
     Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
@@ -82,6 +82,16 @@ def get_item(TableName, **kwargs):
 
 @handle_aws_api_errors
 def update_item(TableName, **kwargs):
+    """Update an item in a DynamoDB table
+
+    Args:
+        TableName: str - The name of the table to update
+        **kwargs: dict - The parameters to pass to the update_item call
+
+    Returns:
+        dict: Response from the AWS API call
+    Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
+    """
     params = {
         "TableName": TableName,
     }

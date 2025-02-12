@@ -212,16 +212,18 @@ def submit(ack, view, say, body, client: WebClient, logger):
         if f["id"] == folder:
             team_name = f["name"]
             break
-    db_operations.create_incident(
-        channel_id,
-        slug,
-        name,
-        user_id,
-        [team_name],
-        document_link,
-        meet_url=meet_link["meetingUri"],
-        environment=environment,
-    )
+
+    incident_data = {
+        "channel_id": channel_id,
+        "channel_name": slug,
+        "name": name,
+        "user_id": user_id,
+        "teams": [team_name],
+        "report_url": document_link,
+        "meet_url": meet_link["meetingUri"],
+        "environment": environment,
+    }
+    db_operations.create_incident(incident_data)
     logger.info(f"Created incident in dynamodb: {slug}")
 
     # Bookmark incident document
