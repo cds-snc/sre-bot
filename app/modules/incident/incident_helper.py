@@ -80,10 +80,7 @@ def register(bot: App):
     bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
     bot.view("view_save_event")(schedule_retro.save_incident_retro)
     bot.action("confirm_click")(schedule_retro.confirm_click)
-    bot.action("update_status")(open_update_field_view)
-    bot.action("update_detection_time")(open_update_field_view)
-    bot.action("update_start_impact_time")(open_update_field_view)
-    bot.action("update_end_impact_time")(open_update_field_view)
+    bot.action("update_incident_field")(open_update_field_view)
     bot.action("archive_channel")(incident_conversation.archive_channel_action)
     bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(
         incident_conversation.handle_reaction_added
@@ -98,6 +95,7 @@ def register(bot: App):
         incident_conversation.just_ack_the_rest_of_reaction_events
     )
     bot.view("incident_updates_view")(handle_updates_submission)
+    bot.view("update_field_modal")(handle_update_field_submission)
 
 
 def handle_incident_command(
@@ -322,7 +320,7 @@ def handle_update_status_command(
 
 
 def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond):
-
+    """Open the incident information view. This view displays the incident details where certain fields can be updated."""
     incident = db_operations.get_incident_by_channel_id(body["channel_id"])
     if not incident:
         respond(
@@ -337,35 +335,40 @@ def open_incident_info_view(client: WebClient, body, ack: Ack, respond: Respond)
 
 
 def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
+    """Open the view to update the incident field"""
     ack()
-    logging.info("Opening field view")
-    logging.info(json.dumps(body, indent=2))
-    action = body["actions"][0]["action_id"]
-    view = update_field_view(action)
+    action = body["actions"][0]["value"]
+    incident_data = json.loads(body["view"]["private_metadata"])
+    view = update_field_view(action, incident_data)
     client.views_push(
         view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"]
     )
 
 
 def incident_information_view(incident: Incident):
-    logging.info("Loading Status View for:\n%s", incident)
+    """Create the view for the incident information modal. It should receive a valid Incident object"""
     created_at = "Unknown"
     impact_start_timestamp = "Unknown"
     impact_end_timestamp = "Unknown"
     detection_timestamp = "Unknown"
     if incident.created_at:
-        created_at = convert_timestamp(str(incident.created_at))
+        created_at = convert_timestamp(incident.created_at)
     if incident.start_impact_time:
-        impact_start_timestamp = convert_timestamp(str(incident.start_impact_time))
+        impact_start_timestamp = convert_timestamp(incident.start_impact_time)
     if incident.end_impact_time:
-        impact_end_timestamp = convert_timestamp(str(incident.end_impact_time))
+        impact_end_timestamp = convert_timestamp(incident.end_impact_time)
     if incident.detection_time:
-        detection_timestamp = convert_timestamp(str(incident.detection_time))
+        detection_timestamp = convert_timestamp(incident.detection_time)
+
+    incident_data = incident.model_dump()
+    private_metadata = json.dumps(incident_data)
+
     return {
         "type": "modal",
         "callback_id": "incident_information_view",
         "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": private_metadata,
         "blocks": [
             {
                 "type": "header",
@@ -392,8 +395,8 @@ def incident_information_view(incident: Incident):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_status",
+                    "value": "status",
+                    "action_id": "update_incident_field",
                 },
             },
             {"type": "divider"},
@@ -413,8 +416,8 @@ def incident_information_view(incident: Incident):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_detection_time",
+                    "value": "detection_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -427,7 +430,7 @@ def incident_information_view(incident: Incident):
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
                     "value": "click_me_123",
-                    "action_id": "update_start_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -440,30 +443,145 @@ def incident_information_view(incident: Incident):
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
                     "value": "click_me_123",
-                    "action_id": "update_end_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
         ],
     }
 
 
-def update_field_view(action):
+def update_field_view(action, incident_data):
     logging.info("Loading Update Field View for action: %s", action)
-    return {
-        "type": "modal",
-        "title": {"type": "plain_text", "text": "Incident Information", "emoji": True},
-        "close": {"type": "plain_text", "text": "OK", "emoji": True},
-        "blocks": [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": action,
-                    "emoji": True,
-                },
-            }
-        ],
+    # logging.info(json.dumps(incident_data, indent=2))
+    date_actions = {
+        "detection_time",
+        "start_impact_time",
+        "end_impact_time",
     }
+    if action in date_actions:
+        now = datetime.now()
+        if incident_data[action] != "Unknown":
+            now = datetime.fromtimestamp(float(incident_data[action]))
+        initial_date = now.strftime("%Y-%m-%d")
+        initial_time = now.strftime("%H:%M")
+        return {
+            "type": "modal",
+            "callback_id": "update_field_modal",
+            "title": {
+                "type": "plain_text",
+                "text": "Incident Information",
+                "emoji": True,
+            },
+            "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
+            "close": {"type": "plain_text", "text": "OK", "emoji": True},
+            "private_metadata": json.dumps(
+                {"action": action, "incident_data": incident_data}
+            ),
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": action,
+                        "emoji": True,
+                    },
+                },
+                {
+                    "type": "input",
+                    "block_id": "date_input",
+                    "element": {
+                        "type": "datepicker",
+                        "initial_date": initial_date,
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select a date",
+                        },
+                        "action_id": "date_picker",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Select a date",
+                    },
+                },
+                {
+                    "type": "input",
+                    "block_id": "time_input",
+                    "element": {
+                        "type": "timepicker",
+                        "initial_time": initial_time,
+                        "placeholder": {
+                            "type": "plain_text",
+                            "text": "Select time",
+                            "emoji": True,
+                        },
+                        "action_id": "time_picker",
+                    },
+                    "label": {
+                        "type": "plain_text",
+                        "text": "Select time",
+                        "emoji": True,
+                    },
+                },
+            ],
+        }
+    else:
+        return {
+            "type": "modal",
+            "title": {
+                "type": "plain_text",
+                "text": "Incident Information",
+                "emoji": True,
+            },
+            "close": {"type": "plain_text", "text": "OK", "emoji": True},
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": action,
+                        "emoji": True,
+                    },
+                }
+            ],
+        }
+
+
+def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logger):
+    ack()
+    user_id = body["user"]["id"]
+    logging.info("Body: %s", body)
+
+    private_metadata = json.loads(view["private_metadata"])
+    action = private_metadata["action"]
+    incident_data = private_metadata["incident_data"]
+    incident_id = incident_data["id"]
+    channel_id = incident_data["channel_id"]
+
+    date = view["state"]["values"]["date_input"]["date_picker"]["selected_date"]
+    time = view["state"]["values"]["time_input"]["time_picker"]["selected_time"]
+    timestamp = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M").timestamp()
+
+    field_map = {
+        "detection_time",
+        "start_impact_time",
+        "end_impact_time",
+    }
+
+    if action in field_map:
+        db_operations.update_incident_field(
+            logger, incident_id, action, str(timestamp), user_id, type="S"
+        )
+        client.chat_postMessage(
+            channel=channel_id,
+            text=f"<@{user_id}> has updated the field {action} to {date} {time}",
+        )
+
+        incident_data[action] = str(timestamp)
+        view = incident_information_view(Incident(**incident_data))
+        client.views_update(view_id=body["view"]["root_view_id"], view=view)
+
+    else:
+        logger.error("Unknown action: %s", action)
 
 
 def parse_incident_datetime_string(datetime_string: str) -> str:
