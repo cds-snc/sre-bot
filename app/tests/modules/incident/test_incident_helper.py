@@ -852,8 +852,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
         "Unknown",
     ]
     incident = Incident(**incident_data)
+    private_metadata = json.dumps(incident.model_dump())
     view = incident_helper.incident_information_view(incident)
-    mock_logging.info.assert_called_once_with("Loading Status View for:\n%s", incident)
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -863,6 +863,7 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
             "emoji": True,
         },
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": private_metadata,
         "blocks": [
             {
                 "type": "header",
@@ -889,8 +890,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_status",
+                    "value": "status",
+                    "action_id": "update_incident_field",
                 },
             },
             {"type": "divider"},
@@ -910,8 +911,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_detection_time",
+                    "value": "detection_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -923,8 +924,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_start_impact_time",
+                    "value": "start_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -936,8 +937,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_end_impact_time",
+                    "value": "end_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
         ],
