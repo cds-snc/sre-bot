@@ -946,9 +946,9 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
 
 @patch("modules.incident.incident_helper.logging")
 def test_update_field_view(mock_logging):
-    view = incident_helper.update_field_view("update_status")
+    view = incident_helper.update_field_view("status", {"status": "data"})
     mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "update_status"
+        "Loading Update Field View for action: %s", "status"
     )
     assert view == {
         "type": "modal",
@@ -959,7 +959,7 @@ def test_update_field_view(mock_logging):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "update_status",
+                    "text": "status",
                     "emoji": True,
                 },
             }
