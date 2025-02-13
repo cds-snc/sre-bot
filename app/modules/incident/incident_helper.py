@@ -429,7 +429,7 @@ def incident_information_view(incident: Incident):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
+                    "value": "start_impact_time",
                     "action_id": "update_incident_field",
                 },
             },
@@ -442,7 +442,7 @@ def incident_information_view(incident: Incident):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
+                    "value": "end_impact_time",
                     "action_id": "update_incident_field",
                 },
             },
