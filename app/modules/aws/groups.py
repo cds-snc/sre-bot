@@ -89,7 +89,7 @@ def request_groups_list(client, body, respond, args, logger):
         respond("AWS Groups List request received.")
         logger.info("Listing AWS Identity Center Groups.")
         response = provisioning_groups.get_groups_from_integration(
-            "aws_identity_center", members_details=False
+            "aws_identity_center"
         )
         response.sort(key=lambda x: x["DisplayName"])
         formatted_string = "Groups found:\n"
