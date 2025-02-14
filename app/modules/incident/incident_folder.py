@@ -430,18 +430,19 @@ def create_missing_incidents(logger, incidents):
             "channel_id", incident["channel_id"]
         )
         if len(incident_exists) == 0:
-            incident_id = db_operations.create_incident(
-                channel_id=incident["channel_id"],
-                channel_name=incident["channel_name"],
-                name=incident["name"],
-                user_id=incident["user_id"],
-                teams=incident["teams"],
-                report_url=incident["report_url"],
-                status=incident["status"],
-                created_at=incident["created_at"],
-                meet_url=incident["meet_url"],
-                environment=incident["environment"],
-            )
+            incident_data = {
+                "channel_id": incident["channel_id"],
+                "channel_name": incident["channel_name"],
+                "name": incident["name"],
+                "user_id": incident["user_id"],
+                "teams": incident["teams"],
+                "report_url": incident["report_url"],
+                "status": incident["status"],
+                "created_at": incident["created_at"],
+                "meet_url": incident["meet_url"],
+                "environment": incident["environment"],
+            }
+            incident_id = db_operations.create_incident(incident_data)
             if incident_id:
                 message = "Automated import of the incident from the Google Sheet via the SRE Bot"
                 db_operations.log_activity(incident_id, message)
