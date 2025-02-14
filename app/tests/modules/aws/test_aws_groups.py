@@ -218,6 +218,9 @@ def test_request_groups_list_handles_user_with_permission(
     ]
     respond.assert_has_calls(respond_calls)
     logger.info.assert_called_once_with("Listing AWS Identity Center Groups.")
+    mock_provisioning_groups.get_groups_from_integration.assert_called_once_with(
+        "aws_identity_center"
+    )
 
 
 @patch("modules.aws.groups.slack_users")

@@ -20,11 +20,11 @@ def get_groups_from_integration(
     - AWS Identity Center (Identity Store)
 
     Args:
-        integration_source (str): The source of the groups.
-        pre_processing_filters (list): List of filters to apply directly after the groups are retrieved, before processing members.
-        post_processing_filters (list): List of filters to apply to the groups after processing members (optional).
-        query (str): The query to search for groups (only supported by Google Groups).
-        members_details (bool): Include the members details in the groups.
+        integration_source (str): The integration source to get the groups from.
+        pre_processing_filters (list, optional): A list of filters to apply before processing the groups. Defaults to [].
+        post_processing_filters (list, optional): A list of filters to apply after processing the groups. Defaults to [].
+        query (str, optional): A query to filter the groups. Defaults to None.
+        return_dataframe (bool, optional): Return the groups as a DataFrame. Defaults to False.
 
     Returns:
         list: A list of groups with members, empty list if no groups are found.
