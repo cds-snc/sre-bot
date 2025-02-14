@@ -42,7 +42,7 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
 def load_incidents(ack, logger, respond, client: WebClient, body):
     """Load incidents from Google Sheet"""
     logger.info("Loading incidents...")
-    incidents = incident_folder.get_incidents_from_sheet(1)[:5]
+    incidents = incident_folder.get_incidents_from_sheet()[:30]
     logger.info(f"Loaded {len(incidents)} incidents")
     incidents = incident_folder.complete_incidents_details(client, logger, incidents)
     count = incident_folder.create_missing_incidents(logger, incidents)
