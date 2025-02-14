@@ -346,7 +346,8 @@ def open_update_field_view(client: WebClient, body, ack: Ack, respond: Respond):
 
 
 def incident_information_view(incident: Incident):
-    """Create the view for the incident information modal. It should receive a valid Incident object"""
+    """Create the view for the incident information modal.
+    It should receive a valid Incident object"""
     created_at = "Unknown"
     impact_start_timestamp = "Unknown"
     impact_end_timestamp = "Unknown"
@@ -452,7 +453,6 @@ def incident_information_view(incident: Incident):
 
 def update_field_view(action, incident_data):
     logging.info("Loading Update Field View for action: %s", action)
-    # logging.info(json.dumps(incident_data, indent=2))
     date_actions = {
         "detection_time",
         "start_impact_time",
@@ -549,7 +549,6 @@ def update_field_view(action, incident_data):
 def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logger):
     ack()
     user_id = body["user"]["id"]
-    logging.info("Body: %s", body)
 
     private_metadata = json.loads(view["private_metadata"])
     action = private_metadata["action"]
