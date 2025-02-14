@@ -1,4 +1,3 @@
-from decimal import Decimal
 import json
 import os
 import uuid
@@ -748,13 +747,13 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "report_url": {"S": "http://example.com/report"},
         "status": {"S": "Open"},
         "meet_url": {"S": "http://example.com/meet"},
-        "created_at": {"N": "1234567890"},
+        "created_at": {"S": "1234567890"},
         "incident_commander": {"S": "Commander"},
         "operations_lead": {"S": "Lead"},
         "severity": {"S": "High"},
-        "start_impact_time": {"N": "1234567890"},
-        "end_impact_time": {"N": "1234567890"},
-        "detection_time": {"N": "1234567890"},
+        "start_impact_time": {"S": "1234567890"},
+        "end_impact_time": {"S": "1234567890"},
+        "detection_time": {"S": "1234567890"},
         "retrospective_url": {"S": "http://example.com/retrospective"},
         "environment": {"S": "prod"},
         "logs": {"L": []},
@@ -771,13 +770,13 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "report_url": "http://example.com/report",
         "status": "Open",
         "meet_url": "http://example.com/meet",
-        "created_at": Decimal("1234567890"),
+        "created_at": "1234567890",
         "incident_commander": "Commander",
         "operations_lead": "Lead",
         "severity": "High",
-        "start_impact_time": Decimal("1234567890"),
-        "end_impact_time": Decimal("1234567890"),
-        "detection_time": Decimal("1234567890"),
+        "start_impact_time": "1234567890",
+        "end_impact_time": "1234567890",
+        "detection_time": "1234567890",
         "retrospective_url": "http://example.com/retrospective",
         "environment": "prod",
         "logs": [],
@@ -818,17 +817,22 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    private_metadata = json.dumps({"status": "data"})
     body = {
         "channel_id": "C12345",
         "channel_name": "incident-2024-01-12-test",
         "user_id": "U12345",
         "trigger_id": "T12345",
-        "view": {"id": "V12345"},
-        "actions": [{"action_id": "action_to_perform"}],
+        "view": {"id": "V12345", "private_metadata": private_metadata},
+        "actions": [
+            {"action_id": "update_incident_field", "value": "action_to_perform"}
+        ],
     }
     mock_update_field_view.return_value = {"view": [{"block": "block_id"}]}
     incident_helper.open_update_field_view(mock_client, body, mock_ack, mock_respond)
-    mock_update_field_view.assert_called_once_with("action_to_perform")
+    mock_update_field_view.assert_called_once_with(
+        "action_to_perform", {"status": "data"}
+    )
     mock_client.views_push.assert_called_once_with(
         trigger_id="T12345",
         view_id="V12345",
