@@ -1,4 +1,3 @@
-from decimal import Decimal
 import json
 import os
 import uuid
@@ -748,13 +747,13 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "report_url": {"S": "http://example.com/report"},
         "status": {"S": "Open"},
         "meet_url": {"S": "http://example.com/meet"},
-        "created_at": {"N": "1234567890"},
+        "created_at": {"S": "1234567890"},
         "incident_commander": {"S": "Commander"},
         "operations_lead": {"S": "Lead"},
         "severity": {"S": "High"},
-        "start_impact_time": {"N": "1234567890"},
-        "end_impact_time": {"N": "1234567890"},
-        "detection_time": {"N": "1234567890"},
+        "start_impact_time": {"S": "1234567890"},
+        "end_impact_time": {"S": "1234567890"},
+        "detection_time": {"S": "1234567890"},
         "retrospective_url": {"S": "http://example.com/retrospective"},
         "environment": {"S": "prod"},
         "logs": {"L": []},
@@ -771,13 +770,13 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "report_url": "http://example.com/report",
         "status": "Open",
         "meet_url": "http://example.com/meet",
-        "created_at": Decimal("1234567890"),
+        "created_at": "1234567890",
         "incident_commander": "Commander",
         "operations_lead": "Lead",
         "severity": "High",
-        "start_impact_time": Decimal("1234567890"),
-        "end_impact_time": Decimal("1234567890"),
-        "detection_time": Decimal("1234567890"),
+        "start_impact_time": "1234567890",
+        "end_impact_time": "1234567890",
+        "detection_time": "1234567890",
         "retrospective_url": "http://example.com/retrospective",
         "environment": "prod",
         "logs": [],
@@ -818,17 +817,22 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
+    private_metadata = json.dumps({"status": "data"})
     body = {
         "channel_id": "C12345",
         "channel_name": "incident-2024-01-12-test",
         "user_id": "U12345",
         "trigger_id": "T12345",
-        "view": {"id": "V12345"},
-        "actions": [{"action_id": "action_to_perform"}],
+        "view": {"id": "V12345", "private_metadata": private_metadata},
+        "actions": [
+            {"action_id": "update_incident_field", "value": "action_to_perform"}
+        ],
     }
     mock_update_field_view.return_value = {"view": [{"block": "block_id"}]}
     incident_helper.open_update_field_view(mock_client, body, mock_ack, mock_respond)
-    mock_update_field_view.assert_called_once_with("action_to_perform")
+    mock_update_field_view.assert_called_once_with(
+        "action_to_perform", {"status": "data"}
+    )
     mock_client.views_push.assert_called_once_with(
         trigger_id="T12345",
         view_id="V12345",
@@ -852,8 +856,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
         "Unknown",
     ]
     incident = Incident(**incident_data)
+    private_metadata = json.dumps(incident.model_dump())
     view = incident_helper.incident_information_view(incident)
-    mock_logging.info.assert_called_once_with("Loading Status View for:\n%s", incident)
     assert view == {
         "type": "modal",
         "callback_id": "incident_information_view",
@@ -863,6 +867,7 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
             "emoji": True,
         },
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": private_metadata,
         "blocks": [
             {
                 "type": "header",
@@ -889,8 +894,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_status",
+                    "value": "status",
+                    "action_id": "update_incident_field",
                 },
             },
             {"type": "divider"},
@@ -910,8 +915,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_detection_time",
+                    "value": "detection_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -923,8 +928,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_start_impact_time",
+                    "value": "start_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
             {
@@ -936,8 +941,8 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
                 "accessory": {
                     "type": "button",
                     "text": {"type": "plain_text", "text": "Update", "emoji": True},
-                    "value": "click_me_123",
-                    "action_id": "update_end_impact_time",
+                    "value": "end_impact_time",
+                    "action_id": "update_incident_field",
                 },
             },
         ],
@@ -946,9 +951,9 @@ def test_incident_information_view(mock_logging, mock_convert_timestamp):
 
 @patch("modules.incident.incident_helper.logging")
 def test_update_field_view(mock_logging):
-    view = incident_helper.update_field_view("update_status")
+    view = incident_helper.update_field_view("status", {"status": "data"})
     mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "update_status"
+        "Loading Update Field View for action: %s", "status"
     )
     assert view == {
         "type": "modal",
@@ -959,12 +964,168 @@ def test_update_field_view(mock_logging):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "update_status",
+                    "text": "status",
                     "emoji": True,
                 },
             }
         ],
     }
+
+
+@patch("modules.incident.incident_helper.logging")
+def test_update_field_view_date_field(mock_logging):
+    incident_data = {"status": "data", "detection_time": "1234567890"}
+    view = incident_helper.update_field_view("detection_time", incident_data)
+    mock_logging.info.assert_called_once_with(
+        "Loading Update Field View for action: %s", "detection_time"
+    )
+    assert view == {
+        "type": "modal",
+        "callback_id": "update_field_modal",
+        "title": {
+            "type": "plain_text",
+            "text": "Incident Information",
+            "emoji": True,
+        },
+        "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": json.dumps(
+            {"action": "detection_time", "incident_data": incident_data}
+        ),
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "detection_time",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "date_input",
+                "element": {
+                    "type": "datepicker",
+                    "initial_date": "2009-02-13",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select a date",
+                    },
+                    "action_id": "date_picker",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Select a date",
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "time_input",
+                "element": {
+                    "type": "timepicker",
+                    "initial_time": "23:31",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select time",
+                        "emoji": True,
+                    },
+                    "action_id": "time_picker",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Select time",
+                    "emoji": True,
+                },
+            },
+        ],
+    }
+
+
+@patch("modules.incident.incident_helper.incident_information_view")
+@patch("modules.incident.incident_helper.db_operations")
+def test_handle_update_field_submission(
+    mock_db_operations, mock_incident_information_view
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_logger = MagicMock()
+    # update value as a string based on date and time input 2024-01-12 12:00
+    updated_value = "1705060800.0"
+    incident_data = generate_incident_data()
+    view = {
+        "state": {
+            "values": {
+                "date_input": {"date_picker": {"selected_date": "2024-01-12"}},
+                "time_input": {"time_picker": {"selected_time": "12:00"}},
+            }
+        },
+        "private_metadata": json.dumps(
+            {
+                "action": "detection_time",
+                "incident_data": incident_data,
+            }
+        ),
+    }
+    body = {
+        "user": {"id": incident_data["user_id"]},
+        "view": {"root_view_id": "root_view_id"},
+    }
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+
+    incident_helper.handle_update_field_submission(
+        mock_client, body, mock_ack, view, mock_logger
+    )
+    mock_db_operations.update_incident_field.assert_called_once_with(
+        mock_logger,
+        incident_data["id"],
+        "detection_time",
+        updated_value,
+        incident_data["user_id"],
+        type="S",
+    )
+    mock_client.chat_postMessage.assert_called_once_with(
+        channel=incident_data["channel_id"],
+        text="<@user_id> has updated the field detection_time to 2024-01-12 12:00",
+    )
+
+
+@patch("modules.incident.incident_helper.incident_information_view")
+@patch("modules.incident.incident_helper.db_operations")
+def test_handle_update_field_submission_not_supported(
+    mock_db_operations, mock_incident_information_view
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_logger = MagicMock()
+    incident_data = generate_incident_data()
+    view = {
+        "state": {
+            "values": {
+                "date_input": {"date_picker": {"selected_date": "2024-01-12"}},
+                "time_input": {"time_picker": {"selected_time": "12:00"}},
+            }
+        },
+        "private_metadata": json.dumps(
+            {
+                "action": "unsupported_field",
+                "incident_data": incident_data,
+            }
+        ),
+    }
+    body = {
+        "user": {"id": incident_data["user_id"]},
+        "view": {"root_view_id": "root_view_id"},
+    }
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+
+    incident_helper.handle_update_field_submission(
+        mock_client, body, mock_ack, view, mock_logger
+    )
+    mock_db_operations.update_incident_field.assert_not_called()
+    mock_client.chat_postMessage.assert_not_called()
+    mock_incident_information_view.assert_not_called()
+    mock_client.views_update.assert_not_called()
+    mock_logger.error.assert_called_once_with("Unknown action: %s", "unsupported_field")
 
 
 def test_parse_incident_datetime_string():
