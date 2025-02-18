@@ -127,5 +127,23 @@ def incident_information_view(incident: Incident):
                     "action_id": "update_incident_field",
                 },
             },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": (
+                        "*Retro Link*:\n" + incident.retrospective_url
+                        if incident.retrospective_url
+                        else "*Retro Link*:\n" + "Unknown"
+                    ),
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "retrospective_url",
+                    "action_id": "update_incident_field",
+                },
+            },
         ],
     }

@@ -194,6 +194,17 @@ def test_incident_information_view(mock_convert_timestamp):
                     "action_id": "update_incident_field",
                 },
             },
+            {"type": "divider"},
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "*Retro Link*:\nUnknown"},
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "retrospective_url",
+                    "action_id": "update_incident_field",
+                },
+            },
         ],
     }
 
