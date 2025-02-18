@@ -4,11 +4,10 @@ import uuid
 from modules.incident import information_update
 
 
-@patch("modules.incident.information_update.logging")
 @patch("modules.incident.information_update.update_field_view")
-def test_open_update_field_view(mock_update_field_view, mock_logging):
+def test_open_update_field_view(mock_update_field_view):
     mock_client = MagicMock()
-    mock_respond = MagicMock()
+    mock_ack = MagicMock()
     private_metadata = json.dumps({"status": "data"})
     body = {
         "channel_id": "C12345",
@@ -21,7 +20,7 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
         ],
     }
     mock_update_field_view.return_value = {"view": [{"block": "block_id"}]}
-    information_update.open_update_field_view(mock_client, body, mock_respond)
+    information_update.open_update_field_view(mock_client, body, mock_ack)
     mock_update_field_view.assert_called_once_with(
         "action_to_perform", {"status": "data"}
     )
@@ -33,10 +32,10 @@ def test_open_update_field_view(mock_update_field_view, mock_logging):
 
 
 @patch("modules.incident.information_update.logging")
-def test_update_field_view(mock_logging):
-    view = information_update.update_field_view("status", {"status": "data"})
+def test_update_field_view_default(mock_logging):
+    view = information_update.update_field_view("some_action", {"some_action": "data"})
     mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "status"
+        "Loading Update Field View for action: %s", "some_action"
     )
     assert view == {
         "type": "modal",
@@ -47,7 +46,7 @@ def test_update_field_view(mock_logging):
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "status",
+                    "text": "some_action",
                     "emoji": True,
                 },
             }
@@ -124,10 +123,123 @@ def test_update_field_view_date_field(mock_logging):
     }
 
 
-@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_update.logging")
+def test_update_field_view_text_field(mock_logging):
+    incident_data = {"status": "data", "retrospective_url": "unknown"}
+    view = information_update.update_field_view("retrospective_url", incident_data)
+    mock_logging.info.assert_called_once_with(
+        "Loading Update Field View for action: %s", "retrospective_url"
+    )
+    assert view == {
+        "type": "modal",
+        "callback_id": "update_field_modal",
+        "title": {
+            "type": "plain_text",
+            "text": "Incident Information",
+            "emoji": True,
+        },
+        "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": json.dumps(
+            {"action": "retrospective_url", "incident_data": incident_data}
+        ),
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "retrospective_url",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "plain_text_input",
+                "element": {
+                    "type": "plain_text_input",
+                    "initial_value": "unknown",
+                    "action_id": "text_input",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Enter text",
+                },
+            },
+        ],
+    }
+
+
+@patch(
+    "modules.incident.information_update.FIELD_SCHEMA",
+    new={"status": {"type": "dropdown", "options": ["Open", "Closed"]}},
+)
+@patch("modules.incident.information_update.logging")
+def test_update_field_view_dropdown_field(mock_logging):
+    incident_data = {"status": "Open", "retrospective_url": "unknown"}
+    view = information_update.update_field_view("status", incident_data)
+    mock_logging.info.assert_called_once_with(
+        "Loading Update Field View for action: %s", "status"
+    )
+    assert view == {
+        "type": "modal",
+        "callback_id": "update_field_modal",
+        "title": {
+            "type": "plain_text",
+            "text": "Incident Information",
+            "emoji": True,
+        },
+        "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
+        "close": {"type": "plain_text", "text": "OK", "emoji": True},
+        "private_metadata": json.dumps(
+            {"action": "status", "incident_data": incident_data}
+        ),
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "status",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "input",
+                "block_id": "drop_down_input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": "Select an item",
+                    },
+                    "initial_option": {
+                        "text": {"type": "plain_text", "text": "Open"},
+                        "value": "Open",
+                    },
+                    "options": [
+                        {
+                            "text": {"type": "plain_text", "text": "Open"},
+                            "value": "Open",
+                        },
+                        {
+                            "text": {"type": "plain_text", "text": "Closed"},
+                            "value": "Closed",
+                        },
+                    ],
+                    "action_id": "static_select",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": "Select an item",
+                },
+            },
+        ],
+    }
+
+
+@patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
-def test_handle_update_field_submission(
-    mock_db_operations, mock_incident_information_view
+def test_handle_update_field_submission_date_type(
+    mock_db_operations, mock_information_display
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -153,7 +265,9 @@ def test_handle_update_field_submission(
         "user": {"id": incident_data["user_id"]},
         "view": {"root_view_id": "root_view_id"},
     }
-    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    mock_information_display.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
 
     information_update.handle_update_field_submission(
         mock_client, body, mock_ack, view, mock_logger
@@ -172,10 +286,106 @@ def test_handle_update_field_submission(
     )
 
 
-@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_update.information_display")
+@patch("modules.incident.information_update.db_operations")
+def test_handle_update_field_submission_text_type(
+    mock_db_operations, mock_information_display
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_logger = MagicMock()
+    incident_data = generate_incident_data()
+    view = {
+        "state": {
+            "values": {
+                "plain_text_input": {"text_input": {"value": "new_value"}},
+            }
+        },
+        "private_metadata": json.dumps(
+            {
+                "action": "retrospective_url",
+                "incident_data": incident_data,
+            }
+        ),
+    }
+    body = {
+        "user": {"id": incident_data["user_id"]},
+        "view": {"root_view_id": "root_view_id"},
+    }
+    mock_information_display.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
+
+    information_update.handle_update_field_submission(
+        mock_client, body, mock_ack, view, mock_logger
+    )
+    mock_db_operations.update_incident_field.assert_called_once_with(
+        mock_logger,
+        incident_data["id"],
+        "retrospective_url",
+        "new_value",
+        incident_data["user_id"],
+        type="S",
+    )
+    mock_client.chat_postMessage.assert_called_once_with(
+        channel=incident_data["channel_id"],
+        text="<@user_id> has updated the field retrospective_url to new_value",
+    )
+
+
+@patch("modules.incident.information_update.information_display")
+@patch("modules.incident.information_update.db_operations")
+def test_handle_update_field_submission_dropdown_type(
+    mock_db_operations, mock_information_display
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_logger = MagicMock()
+    incident_data = generate_incident_data()
+    view = {
+        "state": {
+            "values": {
+                "drop_down_input": {
+                    "static_select": {"selected_option": {"value": "Closed"}}
+                }
+            }
+        },
+        "private_metadata": json.dumps(
+            {
+                "action": "status",
+                "incident_data": incident_data,
+            }
+        ),
+    }
+    body = {
+        "user": {"id": incident_data["user_id"]},
+        "view": {"root_view_id": "root_view_id"},
+    }
+    mock_information_display.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
+
+    information_update.handle_update_field_submission(
+        mock_client, body, mock_ack, view, mock_logger
+    )
+    mock_db_operations.update_incident_field.assert_called_once_with(
+        mock_logger,
+        incident_data["id"],
+        "status",
+        "Closed",
+        incident_data["user_id"],
+        type="S",
+    )
+    mock_client.chat_postMessage.assert_called_once_with(
+        channel=incident_data["channel_id"],
+        text="<@user_id> has updated the field status to Closed",
+    )
+
+
+@patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_not_supported(
-    mock_db_operations, mock_incident_information_view
+    mock_db_operations, mock_information_display
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -199,16 +409,64 @@ def test_handle_update_field_submission_not_supported(
         "user": {"id": incident_data["user_id"]},
         "view": {"root_view_id": "root_view_id"},
     }
-    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    mock_information_display.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
 
     information_update.handle_update_field_submission(
         mock_client, body, mock_ack, view, mock_logger
     )
     mock_db_operations.update_incident_field.assert_not_called()
     mock_client.chat_postMessage.assert_not_called()
-    mock_incident_information_view.assert_not_called()
+    mock_information_display.incident_information_view.assert_not_called()
     mock_client.views_update.assert_not_called()
-    mock_logger.error.assert_called_once_with("Unknown action: %s", "unsupported_field")
+    mock_logger.error.assert_called_once_with(
+        "Unsupported action: %s", "unsupported_field"
+    )
+
+
+@patch(
+    "modules.incident.information_update.FIELD_SCHEMA",
+    new={"status": {"type": "some_type"}},
+)
+@patch("modules.incident.information_update.information_display")
+@patch("modules.incident.information_update.db_operations")
+def test_handle_update_field_submission_with_unknown_type(
+    mock_db_operations, mock_incident_information_display
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    mock_logger = MagicMock()
+    incident_data = generate_incident_data()
+    view = {
+        "state": {
+            "values": {
+                "plain_text_input": {"text_input": {"value": "new_value"}},
+            }
+        },
+        "private_metadata": json.dumps(
+            {
+                "action": "status",
+                "incident_data": incident_data,
+            }
+        ),
+    }
+    body = {
+        "user": {"id": incident_data["user_id"]},
+        "view": {"root_view_id": "root_view_id"},
+    }
+    mock_incident_information_display.incident_information_view.return_value = {
+        "view": [{"block": "block_id"}]
+    }
+
+    information_update.handle_update_field_submission(
+        mock_client, body, mock_ack, view, mock_logger
+    )
+    mock_logger.error.assert_called_once_with("Unknown field type: %s", "some_type")
+    mock_db_operations.update_incident_field.assert_not_called()
+    mock_client.chat_postMessage.assert_not_called()
+    mock_incident_information_display.incident_information_view.assert_not_called()
+    mock_client.views_update.assert_not_called()
 
 
 def generate_incident_data(
