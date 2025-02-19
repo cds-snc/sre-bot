@@ -9,6 +9,7 @@ from modules.incident import (
     information_display,
     incident_document,
     incident_folder,
+    utils,
 )
 
 FIELD_SCHEMA = {
@@ -34,13 +35,13 @@ def open_update_field_view(client: WebClient, body, ack: Ack):
     ack()
     action = body["actions"][0]["value"]
     incident_data = json.loads(body["view"]["private_metadata"])
-    view = update_field_view(action, incident_data)
+    view = update_field_view(client, body, action, incident_data)
     client.views_push(
         view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"]
     )
 
 
-def update_field_view(action, incident_data):
+def update_field_view(client, body, action, incident_data):
     """Update the incident field view based on the action clicked by the user.
     Will return the default view if the action is not recognized,
     or the view associated with the field type."""
@@ -49,7 +50,7 @@ def update_field_view(action, incident_data):
         return generate_default_field_update_view(action)
     field_info = FIELD_SCHEMA[action]
     if field_info["type"] == "datetime":
-        return generate_date_field_update_view(action, incident_data)
+        return generate_date_field_update_view(client, body, action, incident_data)
     if field_info["type"] == "text":
         return generate_text_field_update_view(action, incident_data)
     if field_info["type"] == "dropdown":
@@ -83,11 +84,16 @@ def generate_default_field_update_view(action):
     }
 
 
-def generate_date_field_update_view(action, incident_data):
+def generate_date_field_update_view(client: WebClient, body, action, incident_data):
     """Generate the view for updating the incident field with a date picker for fields that require a date"""
-    now = datetime.now()
+
+    user_info = client.users_info(user=body["user"]["id"])["user"]
+    tz = user_info["tz"]
+    now = utils.convert_utc_datetime_to_tz(datetime.now(), tz)
     if incident_data[action] != "Unknown":
-        now = datetime.fromtimestamp(float(incident_data[action]))
+        now = utils.convert_utc_datetime_to_tz(
+            datetime.fromtimestamp(float(incident_data[action])), tz
+        )
     initial_date = now.strftime("%Y-%m-%d")
     initial_time = now.strftime("%H:%M")
     return {
@@ -253,6 +259,7 @@ def generate_drop_down_field_update_view(action, incident_data, options):
 def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logger):
     ack()
     user_id = body["user"]["id"]
+    tz = client.users_info(user=user_id)["user"]["tz"]
 
     private_metadata = json.loads(view["private_metadata"])
     action = private_metadata["action"]
@@ -275,9 +282,8 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
         case "datetime":
             date = view["state"]["values"]["date_input"]["date_picker"]["selected_date"]
             time = view["state"]["values"]["time_input"]["time_picker"]["selected_time"]
-            value = str(
-                datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M").timestamp()
-            )
+            date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+            value = str(utils.convert_tz_datetime_to_utc(date_time, tz).timestamp())
             value_type = "S"
             message += f"{date} {time}"
         case "text":
