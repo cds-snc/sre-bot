@@ -7,9 +7,9 @@ from models.incidents import Incident
 from modules.incident import db_operations, information_display
 
 FIELD_SCHEMA = {
-    "detection_time": {"type": "date"},
-    "start_impact_time": {"type": "date"},
-    "end_impact_time": {"type": "date"},
+    "detection_time": {"type": "datetime"},
+    "start_impact_time": {"type": "datetime"},
+    "end_impact_time": {"type": "datetime"},
     "retrospective_url": {"type": "text"},
     "status": {
         "type": "dropdown",
@@ -43,7 +43,7 @@ def update_field_view(action, incident_data):
     if action not in FIELD_SCHEMA:
         return generate_default_field_update_view(action)
     field_info = FIELD_SCHEMA[action]
-    if field_info["type"] == "date":
+    if field_info["type"] == "datetime":
         return generate_date_field_update_view(action, incident_data)
     if field_info["type"] == "text":
         return generate_text_field_update_view(action, incident_data)
@@ -268,7 +268,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
     value_type = None
     message = f"<@{user_id}> has updated the field {action} to "
     match field_info["type"]:
-        case "date":
+        case "datetime":
             date = view["state"]["values"]["date_input"]["date_picker"]["selected_date"]
             time = view["state"]["values"]["time_input"]["time_picker"]["selected_time"]
             value = str(
