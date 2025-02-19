@@ -11,7 +11,7 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
     incident = db_operations.get_incident_by_channel_id(body["channel_id"])
     if not incident:
         respond(
-            "This is command is only available in incident channels. No incident records found for this channel."
+            "This command is only available in incident channels. No incident records found for this channel."
         )
         return
     else:

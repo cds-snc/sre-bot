@@ -86,7 +86,7 @@ def test_open_incident_view_no_incident_found(mock_db_operations):
     mock_db_operations.get_incident_by_channel_id.return_value = []
     information_display.open_incident_info_view(mock_client, body, mock_respond)
     mock_respond.assert_called_once_with(
-        "This is command is only available in incident channels. No incident records found for this channel."
+        "This command is only available in incident channels. No incident records found for this channel."
     )
 
 
