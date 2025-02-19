@@ -105,7 +105,9 @@ def test_incident_information_view(mock_convert_timestamp):
         "Unknown",
     ]
     incident = Incident(**incident_data)
-    private_metadata = json.dumps(incident.model_dump())
+    incident_dump = incident.model_dump()
+    incident_dump.pop("logs")
+    private_metadata = json.dumps(incident_dump)
     view = information_display.incident_information_view(incident)
     assert view == {
         "type": "modal",
@@ -132,6 +134,19 @@ def test_incident_information_view(mock_convert_timestamp):
                     "type": "mrkdwn",
                     "text": "*ID*: " + id,
                 },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {
+                        "text": "<https://docs.google.com/document/d/report_url|:memo: Incident Report>",
+                        "type": "mrkdwn",
+                    },
+                    {
+                        "text": "<meet_url|:headphones: Google Meet>",
+                        "type": "mrkdwn",
+                    },
+                ],
             },
             {"type": "divider"},
             {

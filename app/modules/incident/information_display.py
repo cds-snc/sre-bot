@@ -41,7 +41,10 @@ def incident_information_view(incident: Incident):
     if incident.detection_time:
         detection_timestamp = incident_helper.convert_timestamp(incident.detection_time)
 
+    report_string = f"<https://docs.google.com/document/d/{incident.report_url}|:memo: Incident Report>"
+    meet_string = f"<{incident.meet_url}|:headphones: Google Meet>"
     incident_data = incident.model_dump()
+    incident_data.pop("logs")
     private_metadata = json.dumps(incident_data)
 
     return {
@@ -65,6 +68,19 @@ def incident_information_view(incident: Incident):
                     "type": "mrkdwn",
                     "text": "*ID*: " + incident.id,
                 },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": report_string,
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": meet_string,
+                    },
+                ],
             },
             {"type": "divider"},
             {
