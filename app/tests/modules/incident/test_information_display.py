@@ -167,14 +167,14 @@ def test_incident_information_view(mock_convert_timestamp):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Time Created*:\n2009-02-13 23:31:30",
+                    "text": "*Creation Time*:\n<!date^1234567890^{date} at {time}|Unknown>",
                 },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Detection Time*:\nUnknown",
+                    "text": "*Detection Time*:\n<!date^1234567890^{date} at {time}|Unknown>",
                 },
                 "accessory": {
                     "type": "button",
@@ -187,7 +187,7 @@ def test_incident_information_view(mock_convert_timestamp):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Start of Impact*:\nUnknown",
+                    "text": "*Start of Impact*:\n<!date^1234567890^{date} at {time}|Unknown>",
                 },
                 "accessory": {
                     "type": "button",
@@ -200,7 +200,7 @@ def test_incident_information_view(mock_convert_timestamp):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*End of Impact*:\nUnknown",
+                    "text": "*End of Impact*:\n<!date^1234567890^{date} at {time}|Unknown>",
                 },
                 "accessory": {
                     "type": "button",

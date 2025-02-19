@@ -3,7 +3,7 @@ from boto3.dynamodb.types import TypeDeserializer
 from slack_bolt import Respond
 from slack_sdk import WebClient
 from models.incidents import Incident
-from modules.incident import db_operations, incident_helper
+from modules.incident import db_operations
 
 
 def open_incident_info_view(client: WebClient, body, respond: Respond):
@@ -24,22 +24,16 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
 def incident_information_view(incident: Incident):
     """Create the view for the incident information modal.
     It should receive a valid Incident object"""
-    created_at = "Unknown"
+    created_at = f"<!date^{incident.created_at}^{{date}} at {{time}}|Unknown>"
     impact_start_timestamp = "Unknown"
     impact_end_timestamp = "Unknown"
     detection_timestamp = "Unknown"
-    if incident.created_at:
-        created_at = incident_helper.convert_timestamp(incident.created_at)
-    if incident.start_impact_time:
-        impact_start_timestamp = incident_helper.convert_timestamp(
-            incident.start_impact_time
-        )
-    if incident.end_impact_time:
-        impact_end_timestamp = incident_helper.convert_timestamp(
-            incident.end_impact_time
-        )
-    if incident.detection_time:
-        detection_timestamp = incident_helper.convert_timestamp(incident.detection_time)
+    if incident.detection_time != "Unknown":
+        detection_timestamp = f"<!date^{int(float(incident.detection_time))}^{{date}} at {{time}}|Unknown>"
+    if incident.start_impact_time != "Unknown":
+        impact_start_timestamp = f"<!date^{int(float(incident.start_impact_time))}^{{date}} at {{time}}|Unknown>"
+    if incident.end_impact_time != "Unknown":
+        impact_end_timestamp = f"<!date^{int(float(incident.end_impact_time))}^{{date}} at {{time}}|Unknown>"
 
     report_string = f"<https://docs.google.com/document/d/{incident.report_url}|:memo: Incident Report>"
     meet_string = f"<{incident.meet_url}|:headphones: Google Meet>"
@@ -101,7 +95,7 @@ def incident_information_view(incident: Incident):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Time Created*:\n" + created_at,
+                    "text": "*Creation Time*:\n" + created_at,
                 },
             },
             {
