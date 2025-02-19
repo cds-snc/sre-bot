@@ -4,7 +4,12 @@ import logging
 from slack_bolt import Ack
 from slack_sdk import WebClient
 from models.incidents import Incident
-from modules.incident import db_operations, information_display
+from modules.incident import (
+    db_operations,
+    information_display,
+    incident_document,
+    incident_folder,
+)
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -254,15 +259,14 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
     incident_data = private_metadata["incident_data"]
     incident_id = incident_data["id"]
     channel_id = incident_data["channel_id"]
+    channel_name = incident_data["channel_name"]
+    report_url = incident_data["report_url"]
 
     if action not in FIELD_SCHEMA or not FIELD_SCHEMA[action]["type"]:
         logger.error("Unsupported action: %s", action)
         return
 
     field_info = FIELD_SCHEMA.get(action, None)
-    # if not field_info or not field_info["type"]:
-    #     logger.error("Unknown field: %s", action)
-    #     return
 
     value = None
     value_type = None
@@ -290,6 +294,10 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
             logger.error("Unknown field type: %s", field_info["type"])
             return
     if value and value_type:
+        if action == "status" and isinstance(value, str):
+            incident_document.update_incident_document_status(report_url, value)
+            incident_folder.update_spreadsheet_incident_status(channel_name, value)
+        
         db_operations.update_incident_field(
             logger, incident_id, action, value, user_id, type=value_type
         )

@@ -236,10 +236,15 @@ def test_update_field_view_dropdown_field(mock_logging):
     }
 
 
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_date_type(
-    mock_db_operations, mock_information_display
+    mock_db_operations,
+    mock_information_display,
+    mock_incident_folder,
+    mock_incident_document,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -284,12 +289,19 @@ def test_handle_update_field_submission_date_type(
         channel=incident_data["channel_id"],
         text="<@user_id> has updated the field detection_time to 2024-01-12 12:00",
     )
+    mock_incident_document.update_incident_document_status.assert_not_called()
+    mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_text_type(
-    mock_db_operations, mock_information_display
+    mock_db_operations,
+    mock_information_display,
+    mock_incident_folder,
+    mock_incident_document,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -331,12 +343,19 @@ def test_handle_update_field_submission_text_type(
         channel=incident_data["channel_id"],
         text="<@user_id> has updated the field retrospective_url to new_value",
     )
+    mock_incident_document.update_incident_document_status.assert_not_called()
+    mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_dropdown_type(
-    mock_db_operations, mock_information_display
+    mock_db_operations,
+    mock_information_display,
+    mock_incident_folder,
+    mock_incident_document,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -380,12 +399,24 @@ def test_handle_update_field_submission_dropdown_type(
         channel=incident_data["channel_id"],
         text="<@user_id> has updated the field status to Closed",
     )
+    # update incident document and spreadsheet if the action is "status"
+    mock_incident_document.update_incident_document_status.assert_called_once_with(
+        incident_data["report_url"], "Closed"
+    )
+    mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
+        incident_data["channel_name"], "Closed"
+    )
 
 
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_not_supported(
-    mock_db_operations, mock_information_display
+    mock_db_operations,
+    mock_information_display,
+    mock_incident_folder,
+    mock_incident_document,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -423,16 +454,23 @@ def test_handle_update_field_submission_not_supported(
     mock_logger.error.assert_called_once_with(
         "Unsupported action: %s", "unsupported_field"
     )
+    mock_incident_document.update_incident_document_status.assert_not_called()
+    mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
 @patch(
     "modules.incident.information_update.FIELD_SCHEMA",
     new={"status": {"type": "some_type"}},
 )
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
 @patch("modules.incident.information_update.db_operations")
 def test_handle_update_field_submission_with_unknown_type(
-    mock_db_operations, mock_incident_information_display
+    mock_db_operations,
+    mock_incident_information_display,
+    mock_incident_folder,
+    mock_incident_document,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -467,6 +505,8 @@ def test_handle_update_field_submission_with_unknown_type(
     mock_client.chat_postMessage.assert_not_called()
     mock_incident_information_display.incident_information_view.assert_not_called()
     mock_client.views_update.assert_not_called()
+    mock_incident_document.update_incident_document_status.assert_not_called()
+    mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
 def generate_incident_data(
