@@ -297,7 +297,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
         if action == "status" and isinstance(value, str):
             incident_document.update_incident_document_status(report_url, value)
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
-        
+
         db_operations.update_incident_field(
             logger, incident_id, action, value, user_id, type=value_type
         )
