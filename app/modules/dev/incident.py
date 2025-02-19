@@ -93,6 +93,11 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         "meet_url": incident["meet_url"],
         "created_at": incident["created_at"],
     }
+    if incident_data["name"].startswith("Incident: "):
+        incident_data["name"] = incident_data["name"][9:].strip()
+        incident_data["name"] = incident_data["name"].rsplit("/", 1)[0].strip()
+
+    logger.info(json.dumps(incident_data, indent=2))
     db_operations.create_incident(incident_data)
 
     logger.info(incident)
