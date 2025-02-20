@@ -11,6 +11,7 @@ from modules.incident import (
     incident_folder,
     utils,
 )
+from integrations.google_workspace import google_docs
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -301,7 +302,8 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
             return
     if value and value_type:
         if action == "status" and isinstance(value, str):
-            incident_document.update_incident_document_status(report_url, value)
+            document_id = google_docs.extract_google_doc_id(report_url)
+            incident_document.update_incident_document_status(document_id, value)
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
 
         db_operations.update_incident_field(
