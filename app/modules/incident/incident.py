@@ -46,7 +46,6 @@ def open_create_incident_modal(client, ack, command, body):
         "type": "modal",
         "callback_id": "incident_view",
         "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
-        "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
         "blocks": [
             {
                 "type": "section",
