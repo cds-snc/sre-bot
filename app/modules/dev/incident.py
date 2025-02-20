@@ -42,7 +42,7 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
 def load_incidents(ack, logger, respond, client: WebClient, body):
     """Load incidents from Google Sheet"""
     logger.info("Loading incidents...")
-    incidents = incident_folder.get_incidents_from_sheet(1)[:5]
+    incidents = incident_folder.get_incidents_from_sheet()[:30]
     logger.info(f"Loaded {len(incidents)} incidents")
     incidents = incident_folder.complete_incidents_details(client, logger, incidents)
     count = incident_folder.create_missing_incidents(logger, incidents)
@@ -93,6 +93,11 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         "meet_url": incident["meet_url"],
         "created_at": incident["created_at"],
     }
+    if incident_data["name"].startswith("Incident: "):
+        incident_data["name"] = incident_data["name"][9:].strip()
+        incident_data["name"] = incident_data["name"].rsplit("/", 1)[0].strip()
+
+    logger.info(json.dumps(incident_data, indent=2))
     db_operations.create_incident(incident_data)
 
     logger.info(incident)
