@@ -467,6 +467,7 @@ def test_handle_update_field_submission_text_type(
     mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
+@patch("modules.incident.information_update.google_docs")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -476,6 +477,7 @@ def test_handle_update_field_submission_dropdown_type(
     mock_information_display,
     mock_incident_folder,
     mock_incident_document,
+    mock_google_docs,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -500,6 +502,7 @@ def test_handle_update_field_submission_dropdown_type(
         "user": {"id": incident_data["user_id"]},
         "view": {"root_view_id": "root_view_id"},
     }
+    mock_google_docs.extract_google_doc_id.return_value = "document_id"
     mock_information_display.incident_information_view.return_value = {
         "view": [{"block": "block_id"}]
     }
@@ -519,9 +522,9 @@ def test_handle_update_field_submission_dropdown_type(
         channel=incident_data["channel_id"],
         text="<@user_id> has updated the field status to Closed",
     )
-    # update incident document and spreadsheet if the action is "status"
+    mock_google_docs.extract_google_doc_id.assert_called_once_with("report_url")
     mock_incident_document.update_incident_document_status.assert_called_once_with(
-        incident_data["report_url"], "Closed"
+        "document_id", "Closed"
     )
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
         incident_data["channel_name"], "Closed"
