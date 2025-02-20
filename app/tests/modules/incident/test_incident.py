@@ -22,7 +22,6 @@ def test_incident_open_modal_calls_ack(
     loaded_view = mock_generate_incident_modal_view.return_value = ANY
     mock_i18n.t.side_effect = [
         "SRE - Start an incident",
-        "Submit",
         "Launching incident process...",
     ]
     mock_get_user_locale.return_value = "en-US"
@@ -40,7 +39,6 @@ def test_incident_open_modal_calls_ack(
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
     assert kwargs["view"]["title"]["text"] == "SRE - Start an incident"
-    assert kwargs["view"]["submit"]["text"] == "Submit"
     assert (
         kwargs["view"]["blocks"][0]["text"]["text"]
         == ":beach-ball: Launching incident process..."
