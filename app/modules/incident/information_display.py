@@ -24,7 +24,9 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
 def incident_information_view(incident: Incident):
     """Create the view for the incident information modal.
     It should receive a valid Incident object"""
-    created_at = f"<!date^{incident.created_at}^{{date}} at {{time}}|Unknown>"
+    created_at = (
+        f"<!date^{int(float(incident.created_at))}^{{date}} at {{time}}|Unknown>"
+    )
     impact_start_timestamp = "Unknown"
     impact_end_timestamp = "Unknown"
     detection_timestamp = "Unknown"
