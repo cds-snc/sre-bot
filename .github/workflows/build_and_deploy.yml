@@ -78,7 +78,7 @@ jobs:
         run: |
           curl -X POST -H 'Content-type: application/json' \
           --data '{"text": "✅ ECS deployment for sre-bot succeeded!"}' \
-          ${{ secrets.SLACK_SRE_CHANNEL_WEBHOOK_URL }}
+          ${{ secrets.SLACK_INTERNAL_SRE_ALERTS_WEBHOOK_URL }}
 
       # Slack notification on failed ECS wait
       - name: Slack Notify Failure
