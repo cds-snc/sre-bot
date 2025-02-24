@@ -235,6 +235,7 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock):
         "channel",
         "user",
         "foo",
+        "alert",
     )
     logger.info.assert_called_with(
         "Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/id"
@@ -273,6 +274,7 @@ def test_create_webhook_with_creation_error(create_webhook_mock):
         "channel",
         "user",
         "foo",
+        "alert",
     )
     logger.error.assert_called_with("Error creating webhook: channel, user, foo")
 
@@ -349,7 +351,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         {
                             "type": "plain_text",
                             "emoji": True,
-                            "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
+                            "text": "2020-01-01T00:00:00.000Z | Type: Alert\n 0 invocations | 0 acknowledged",
                         }
                     ],
                 },
@@ -386,7 +388,7 @@ def test_list_all_webhooks(list_all_webhooks_mock):
                         {
                             "type": "plain_text",
                             "emoji": True,
-                            "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
+                            "text": "2020-01-01T00:00:00.000Z | Type: Alert\n 0 invocations | 0 acknowledged",
                         }
                     ],
                 },
@@ -571,7 +573,7 @@ def test_webhook_list_item():
                 {
                     "type": "plain_text",
                     "emoji": True,
-                    "text": "2020-01-01T00:00:00.000Z \n 0 invocations | 0 acknowledged",
+                    "text": "2020-01-01T00:00:00.000Z | Type: Alert\n 0 invocations | 0 acknowledged",
                 }
             ],
         },
@@ -585,6 +587,7 @@ def helper_generate_view(name="name"):
             "values": {
                 "name": {"name": {"value": name}},
                 "channel": {"channel": {"selected_channel": "channel"}},
+                "hook_type": {"hook_type": {"selected_option": {"value": "alert"}}},
             }
         }
     }
