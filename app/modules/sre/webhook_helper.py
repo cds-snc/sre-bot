@@ -68,6 +68,8 @@ def create_webhook(ack, view, body, logger, client, say):
     hook_type = view["state"]["values"]["hook_type"]["hook_type"]["selected_option"][
         "value"
     ]
+    hook_type = hook_type if hook_type else "alert"
+    hook_type = hook_type.lower()
     user = body["user"]["id"]
 
     if not re.match(r"^[\w\-\s]+$", name):

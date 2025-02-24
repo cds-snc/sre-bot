@@ -587,7 +587,7 @@ def helper_generate_view(name="name"):
             "values": {
                 "name": {"name": {"value": name}},
                 "channel": {"channel": {"selected_channel": "channel"}},
-                "hook_type": {"hook_type": {"selected_option": {"value": "alert"}}},
+                "hook_type": {"hook_type": {"selected_option": {"value": "Alert"}}},
             }
         }
     }
