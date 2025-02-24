@@ -13,7 +13,7 @@ from integrations.aws import dynamodb
 table = "webhooks"
 
 
-def create_webhook(channel, user_id, name):
+def create_webhook(channel, user_id, name, hook_type="alert"):
     id = str(uuid.uuid4())
     response = dynamodb.put_item(
         TableName=table,
@@ -26,6 +26,7 @@ def create_webhook(channel, user_id, name):
             "user_id": {"S": user_id},
             "invocation_count": {"N": "0"},
             "acknowledged_count": {"N": "0"},
+            "hook_type": {"S": hook_type},
         },
     )
 

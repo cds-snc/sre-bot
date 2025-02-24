@@ -1,6 +1,7 @@
 """Webhook helper functions for the SRE Bot."""
 
 import re
+import logging
 
 from modules.slack import webhooks
 
@@ -26,6 +27,12 @@ def register(bot):
     bot.action("toggle_webhook")(toggle_webhook)
     bot.action("reveal_webhook")(reveal_webhook)
     bot.action("next_page")(next_page)
+    bot.action("channel")(ack_action)
+    bot.action("hook_type")(ack_action)
+
+
+def ack_action(ack, body):
+    ack()
 
 
 def handle_webhook_command(args, client, body, respond):
@@ -53,10 +60,16 @@ def handle_webhook_command(args, client, body, respond):
 def create_webhook(ack, view, body, logger, client, say):
     ack()
 
+    logging.info(view)
     errors = {}
 
     name = view["state"]["values"]["name"]["name"]["value"]
     channel = view["state"]["values"]["channel"]["channel"]["selected_channel"]
+    hook_type = view["state"]["values"]["hook_type"]["hook_type"]["selected_option"][
+        "value"
+    ]
+    hook_type = hook_type if hook_type else "alert"
+    hook_type = hook_type.lower()
     user = body["user"]["id"]
 
     if not re.match(r"^[\w\-\s]+$", name):
@@ -67,7 +80,7 @@ def create_webhook(ack, view, body, logger, client, say):
         ack(response_action="errors", errors=errors)
         return
 
-    id = webhooks.create_webhook(channel, user, name)
+    id = webhooks.create_webhook(channel, user, name, hook_type)
     client.conversations_join(channel=channel)
     if id:
         message = f"Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/{id}"
@@ -134,6 +147,39 @@ def create_webhook_modal(client, body):
                             },
                             "initial_channel": body["channel_id"],
                             "action_id": "channel",
+                        }
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Select a type of webhook (defaults to alert)",
+                        "emoji": True,
+                    },
+                },
+                {
+                    "type": "actions",
+                    "block_id": "hook_type",
+                    "elements": [
+                        {
+                            "type": "static_select",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "Select a type",
+                                "emoji": True,
+                            },
+                            "options": [
+                                {
+                                    "text": {"type": "plain_text", "text": "Alert"},
+                                    "value": "alert",
+                                },
+                                {
+                                    "text": {"type": "plain_text", "text": "Info"},
+                                    "value": "info",
+                                },
+                            ],
+                            "action_id": "hook_type",
                         }
                     ],
                 },
@@ -330,7 +376,9 @@ def toggle_webhook(ack, body, logger, client):
     list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", update=True)
 
 
-def webhook_list_item(hook):
+def webhook_list_item(hook: dict):
+    hook_type: str = hook.get("hook_type", {"S": "alert"})["S"]
+    hook_type = hook_type.capitalize()
     return [
         {
             "type": "section",
@@ -367,7 +415,7 @@ def webhook_list_item(hook):
                 {
                     "type": "plain_text",
                     "emoji": True,
-                    "text": f"{hook['created_at']['S']} \n {hook['invocation_count']['N']} invocations | {hook['acknowledged_count']['N']} acknowledged",
+                    "text": f"{hook['created_at']['S']} | Type: {hook_type}\n {hook['invocation_count']['N']} invocations | {hook['acknowledged_count']['N']} acknowledged",
                 }
             ],
         },

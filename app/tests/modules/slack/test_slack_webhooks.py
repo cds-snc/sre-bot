@@ -18,6 +18,32 @@ def test_create_webhook(dynamodb_mock):
             "user_id": {"S": "test_user_id"},
             "invocation_count": {"N": "0"},
             "acknowledged_count": {"N": "0"},
+            "hook_type": {"S": "alert"},
+        },
+    )
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_create_webhook_with_type(dynamodb_mock):
+    dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert (
+        webhooks.create_webhook(
+            "test_channel", "test_user_id", "test_name", "test_type"
+        )
+        == ANY
+    )
+    dynamodb_mock.put_item.assert_called_once_with(
+        TableName="webhooks",
+        Item={
+            "id": {"S": ANY},
+            "channel": {"S": "test_channel"},
+            "name": {"S": "test_name"},
+            "created_at": {"S": ANY},
+            "active": {"BOOL": True},
+            "user_id": {"S": "test_user_id"},
+            "invocation_count": {"N": "0"},
+            "acknowledged_count": {"N": "0"},
+            "hook_type": {"S": "test_type"},
         },
     )
 
@@ -37,6 +63,7 @@ def test_create_webhook_return_none(dynamodb_mock):
             "user_id": {"S": "test_user_id"},
             "invocation_count": {"N": "0"},
             "acknowledged_count": {"N": "0"},
+            "hook_type": {"S": "alert"},
         },
     )
 
@@ -65,6 +92,7 @@ def test_get_webhook(dynamodb_mock):
         "user_id": {"S": "test_user_id"},
         "invocation_count": {"N": "0"},
         "acknowledged_count": {"N": "0"},
+        "type": {"S": "alert"},
     }
     assert webhooks.get_webhook("test_id") == {
         "id": {"S": "test_id"},
@@ -75,6 +103,7 @@ def test_get_webhook(dynamodb_mock):
         "user_id": {"S": "test_user_id"},
         "invocation_count": {"N": "0"},
         "acknowledged_count": {"N": "0"},
+        "type": {"S": "alert"},
     }
     dynamodb_mock.get_item.assert_called_once_with(
         TableName="webhooks", Key={"id": {"S": "test_id"}}

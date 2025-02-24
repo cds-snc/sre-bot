@@ -315,6 +315,7 @@ def handle_webhook(
     webhook = webhooks.get_webhook(id)
     webhook_payload = WebhookPayload()
     if webhook:
+        hook_type: str = webhook.get("hook_type", {"S": "alert"})["S"]
         # if the webhook is active, then send forward the response to the webhook
         if webhooks.is_active(id):
             webhooks.increment_invocation_count(id)
@@ -328,7 +329,8 @@ def handle_webhook(
             else:
                 webhook_payload = payload
             webhook_payload.channel = webhook["channel"]["S"]
-            webhook_payload = append_incident_buttons(webhook_payload, id)
+            if hook_type == "alert":
+                webhook_payload = append_incident_buttons(webhook_payload, id)
             try:
                 webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
                 request.state.bot.client.api_call(
