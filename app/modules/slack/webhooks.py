@@ -49,6 +49,15 @@ def get_webhook(id):
         return None
 
 
+def lookup_webhooks(field, value, field_type="S"):
+    """Lookup webhooks by a specific field value."""
+    return dynamodb.scan(
+        TableName=table,
+        FilterExpression=f"{field} = :{field}",
+        ExpressionAttributeValues={f":{field}": {f"{field_type}": value}},
+    )
+
+
 def increment_acknowledged_count(id):
     response = dynamodb.update_item(
         TableName=table,
