@@ -179,6 +179,10 @@ def create_webhook_modal(client, body):
                                     "value": "info",
                                 },
                             ],
+                            "initial_option": {
+                                "text": {"type": "plain_text", "text": "Alert"},
+                                "value": "alert",
+                            },
                             "action_id": "hook_type",
                         }
                     ],
