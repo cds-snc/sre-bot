@@ -1,6 +1,5 @@
 """Webhook helper functions for the SRE Bot."""
 
-import logging
 from modules.slack import webhooks_create, webhooks_list, webhooks
 
 help_text = """
@@ -29,13 +28,27 @@ def register(bot):
     bot.action("hook_type")(ack_action)
 
 
-def ack_action(ack, body):
+def ack_action(ack):
     ack()
 
 
 def handle_webhook_command(args, client, body, respond):
     if len(args) == 0:
-        respond(help_text)
+        hooks = webhooks.lookup_webhooks("channel", body["channel_id"])
+        if hooks:
+            webhooks_list.list_all_webhooks(
+                client,
+                body,
+                0,
+                MAX_BLOCK_SIZE,
+                "all",
+                hooks,
+                channel=body["channel_id"],
+            )
+        else:
+            respond(
+                "No webhooks found for this channel. Type `/sre webhooks help` to see a list of commands."
+            )
         return
 
     action, *args = args
@@ -45,7 +58,13 @@ def handle_webhook_command(args, client, body, respond):
         case "help":
             respond(help_text)
         case "list":
-            webhooks_list.list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all")
+            hooks = webhooks.list_all_webhooks()
+            if hooks:
+                webhooks_list.list_all_webhooks(
+                    client, body, 0, MAX_BLOCK_SIZE, "all", hooks
+                )
+            else:
+                respond("No webhooks found.")
         case _:
             respond(
                 f"Unknown command: `{action}`. "
