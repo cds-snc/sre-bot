@@ -1,4 +1,4 @@
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from modules.slack import webhooks_create
 from tests.modules.slack.test_webhooks_list import helper_generate_view
