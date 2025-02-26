@@ -1,3 +1,4 @@
+from decimal import Decimal
 import json
 import logging
 from typing import List, Type
@@ -5,6 +6,7 @@ from typing import List, Type
 import uuid
 from datetime import datetime
 from pydantic import BaseModel
+from boto3.dynamodb.types import TypeDeserializer
 
 from models import model_utils
 from models.webhooks import WebhookPayload, AwsSnsPayload, AccessRequest, UpptimePayload
@@ -112,6 +114,18 @@ def toggle_webhook(id):
         },
     )
     return response
+
+
+def decimal_default(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError
+
+
+def deserialize_webhook(webhook):
+    deserialize = TypeDeserializer()
+    deserialized_webhook = {k: deserialize.deserialize(v) for k, v in webhook.items()}
+    return json.loads(json.dumps(deserialized_webhook, default=decimal_default))
 
 
 def validate_string_payload_type(payload: str) -> tuple:
