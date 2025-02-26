@@ -3,6 +3,9 @@
 from modules.slack import webhooks_create, webhooks_list, webhooks
 
 help_text = """
+\n `/sre webhooks`
+\n      - lists webhooks for the current channel (if any)
+\n      - lister les webhooks pour le canal actuel (le cas échéant)
 \n `/sre webhooks create`
 \n      - create a new webhook
 \n      - créer un nouveau webhook
