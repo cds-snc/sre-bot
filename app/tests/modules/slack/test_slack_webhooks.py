@@ -120,6 +120,40 @@ def test_get_webhook_with_no_result(dynamodb_mock):
 
 
 @patch("modules.slack.webhooks.dynamodb")
+def test_lookup_webhooks(mock_dynamodb):
+    expected_results = [
+        {
+            "id": {"S": "test_id"},
+            "channel": {"S": "test_channel"},
+            "name": {"S": "test_name"},
+            "created_at": {"S": "test_created_at"},
+            "active": {"BOOL": True},
+            "user_id": {"S": "test_user_id"},
+            "invocation_count": {"N": "10"},
+            "acknowledged_count": {"N": "0"},
+        },
+        {
+            "id": {"S": "test_id"},
+            "channel": {"S": "test_channel"},
+            "name": {"S": "test_name"},
+            "created_at": {"S": "test_created_at"},
+            "active": {"BOOL": False},
+            "user_id": {"S": "test_user_id"},
+            "invocation_count": {"N": "0"},
+            "acknowledged_count": {"N": "0"},
+        },
+    ]
+    mock_dynamodb.scan.return_value = expected_results
+    result = webhooks.lookup_webhooks("channel", "test_channel")
+    assert len(result) == 2
+    mock_dynamodb.scan.assert_called_once_with(
+        TableName="webhooks",
+        FilterExpression="channel = :channel",
+        ExpressionAttributeValues={":channel": {"S": "test_channel"}},
+    )
+
+
+@patch("modules.slack.webhooks.dynamodb")
 def test_increment_acknowledged_count(dynamodb_mock):
     dynamodb_mock.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
