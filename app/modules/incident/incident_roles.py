@@ -1,5 +1,6 @@
 import json
 from slack_sdk.web import WebClient
+import re
 from integrations.google_workspace import google_drive
 
 
@@ -21,9 +22,31 @@ def save_incident_roles(client: WebClient, ack, view):
             text=f"<@{selected_ol}> has been assigned as operations lead for this incident.",
             channel=metadata["channel_id"],
         )
-    client.conversations_setTopic(
-        topic=f"IC: <@{selected_ic}> / OL: <@{selected_ol}>",
-        channel=metadata["channel_id"],
+    # Get the current channel description and append the new roles
+    description = client.conversations_info(channel=metadata["channel_id"])["channel"][
+        "purpose"
+    ]["value"]
+
+    # Regular expression to detect any existing "IC: <@user> / OL: <@user>"
+    ic_ol_pattern = r"IC: <@[\w]+> / OL: <@[\w]+>"
+
+    # New replacement text
+    new_ic_ol_text = f"\nIC: <@{selected_ic}> / OL: <@{selected_ol}>"
+
+    if re.search(ic_ol_pattern, description):
+        # If there's an existing IC/OL, replace it with the new one
+        updated_description = re.sub(ic_ol_pattern, new_ic_ol_text, description)
+    else:
+        # Otherwise, append it to the description
+        updated_description = f"{description} {new_ic_ol_text}"
+
+    # Ensure the purpose does not exceed 250 characters
+    max_length = 250
+    purpose_text = updated_description[:max_length]
+
+    # Update the Slack channel purpose
+    client.conversations_setPurpose(
+        channel=metadata["channel_id"], purpose=purpose_text
     )
 
 
