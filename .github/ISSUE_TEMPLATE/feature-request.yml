@@ -1,0 +1,36 @@
+name: "🚀 Feature Request"
+description: "Submit a new feature or enhancement request."
+title: "🚀 New Feature Request"
+labels: ["Enhancement"]
+assignees: 
+  - gcharest
+  - sylviamclaughlin
+  - wanpengyang 
+
+body:
+  - type: input 
+    id: requested_feature
+    attributes:
+      label: "🔖 Requested Feature"
+      description: "Briefly describe the feature you would like to see."
+      placeholder: "What new feature or improvement do you propose?"
+    validations:
+      required: true 
+
+  - type: input 
+    id: acceptance_criteria
+    attributes:
+      label: "💻 Acceptance Criteria"
+      description: "What must be true for this feature to be considered complete?"
+      placeholder: "List your acceptance criteria here..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: "💬 Additional Context"
+      description: "Provide any other context or examples here (e.g., screenshots, mockups, related links)."
+      placeholder: "Anything else that may help us better understand the request."
+    validations:
+      required: false
