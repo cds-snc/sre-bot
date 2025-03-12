@@ -812,11 +812,16 @@ def test_get_utc_hour_with_invalid_timezone():
 
 def test_get_utc_hour_midnight_transition():
     """
-    Test case for midnight transition.
+    Test case for midnight transition without having to change for DST.
     """
-    assert (
-        google_calendar.get_utc_hour(23, 0, "US/Eastern") == 4
-    )  # 11 PM EST should be 4 AM UTC.
+    tz = pytz.timezone("US/Eastern")
+    # Create a datetime for today at 23:00 in US/Eastern
+    local_dt = datetime.now(tz).replace(hour=23, minute=0, second=0, microsecond=0)
+    # Convert that time to UTC
+    expected_utc_hour = local_dt.astimezone(pytz.utc).hour
+
+    # Compare the function's output to the dynamically computed expected value
+    assert google_calendar.get_utc_hour(23, 0, "US/Eastern") == expected_utc_hour
 
 
 def test_get_utc_hour_negative_hour():
