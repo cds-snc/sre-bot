@@ -170,3 +170,14 @@ def update_spending_data(spending_data_df: DataFrame):
         values=values,
         valueInputOption="USER_ENTERED",
     )
+
+
+def execute_spending_data_update_job(logger):
+    """Executes the spending data update job"""
+    logger.info("Starting spending data update job")
+    spending_data = generate_spending_data(logger)
+    if spending_data.empty:
+        logger.error("No spending data to update")
+        return
+    update_spending_data(spending_data)
+    logger.info("Spending data update job completed")

@@ -267,3 +267,39 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     assert values[0] == ["Linked account", "Cost Amount"]
     assert values[1] == ["123", 100]
     assert values[2] == ["456", 200]
+
+
+@patch("modules.aws.spending.update_spending_data")
+@patch("modules.aws.spending.generate_spending_data")
+def test_schedule_spending_data_update(mock_generate, mock_update):
+    """Test the schedule_spending_data_update function."""
+
+    mock_logger = MagicMock()
+    dummy_data = MagicMock()
+    dummy_data.empty = False
+    mock_generate.return_value = dummy_data
+
+    spending.execute_spending_data_update_job(mock_logger)
+
+    mock_logger.info.assert_any_call("Starting spending data update job")
+    mock_logger.info.assert_any_call("Spending data update job completed")
+    mock_generate.assert_called_once_with(mock_logger)
+    mock_update.assert_called_once_with(dummy_data)
+
+
+@patch("modules.aws.spending.update_spending_data")
+@patch("modules.aws.spending.generate_spending_data")
+def test_schedule_spending_data_update_empty(mock_generate, mock_update):
+    """Test the schedule_spending_data_update function with empty data."""
+
+    mock_logger = MagicMock()
+    dummy_data = MagicMock()
+    dummy_data.empty = True
+    mock_generate.return_value = dummy_data
+
+    spending.execute_spending_data_update_job(mock_logger)
+
+    mock_logger.info.assert_any_call("Starting spending data update job")
+    mock_logger.error.assert_any_call("No spending data to update")
+    mock_generate.assert_called_once_with(mock_logger)
+    mock_update.assert_not_called()
