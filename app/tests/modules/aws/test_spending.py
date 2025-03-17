@@ -198,7 +198,7 @@ def test_update_spending_data(mock_batch_update):
     spending.update_spending_data(df, mock_logger)
 
     # Assertions
-    assert mock_batch_update.called
+    mock_batch_update.assert_called_once()
     args, kwargs = mock_batch_update.call_args
     assert kwargs["spreadsheetId"] == spending.SPENDING_SHEET_ID
     assert kwargs["range"] == "Sheet1"
@@ -256,7 +256,7 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     )
 
     # Verify batch_update_values was called with correct values
-    assert mock_batch_update.called
+    mock_batch_update.assert_called_once()
     args, kwargs = mock_batch_update.call_args
     values = kwargs["values"]
 
