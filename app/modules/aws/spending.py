@@ -139,13 +139,17 @@ def spending_to_df(spending: list):
     return pd.DataFrame(flattened_data)
 
 
-def update_spending_data(spending_data_df: DataFrame):
+def update_spending_data(spending_data_df: DataFrame, logger):
     """
     Updates the entire Sheet1 with new spending data
 
     Args:
         spending_data_df: pandas DataFrame containing the data to upload
     """
+    if not SPENDING_SHEET_ID:
+        logger.error("Error: SPENDING_SHEET_ID is not set")
+        return
+
     # Convert DataFrame to list of lists for Google Sheets API
     header = spending_data_df.columns.tolist()
 
@@ -158,7 +162,9 @@ def update_spending_data(spending_data_df: DataFrame):
         values.extend(data_values)
     else:
         # Handle the case where values.tolist() might not return a list
-        print(f"Warning: DataFrame values conversion issue. Type: {type(data_values)}")
+        logger.warning(
+            f"Warning: DataFrame values conversion issue. Type: {type(data_values)}"
+        )
         # Alternative approach if needed:
         for _, row in spending_data_df.iterrows():
             values.append(row.tolist())
@@ -170,6 +176,7 @@ def update_spending_data(spending_data_df: DataFrame):
         values=values,
         valueInputOption="USER_ENTERED",
     )
+    logger.info("Spending data updated successfully")
 
 
 def execute_spending_data_update_job(logger):
@@ -179,5 +186,5 @@ def execute_spending_data_update_job(logger):
     if spending_data.empty:
         logger.error("No spending data to update")
         return
-    update_spending_data(spending_data)
+    update_spending_data(spending_data, logger)
     logger.info("Spending data update job completed")

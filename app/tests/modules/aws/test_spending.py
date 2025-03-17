@@ -192,9 +192,10 @@ def test_update_spending_data(mock_batch_update):
             {"Linked account": "456", "Cost Amount": 200},
         ]
     )
+    mock_logger = MagicMock()
 
     # Call the function
-    spending.update_spending_data(df)
+    spending.update_spending_data(df, mock_logger)
 
     # Assertions
     assert mock_batch_update.called
@@ -214,6 +215,7 @@ def test_update_spending_data(mock_batch_update):
     assert values[1][1] == 100  # First row, second column
     assert values[2][0] == "456"  # Second row, first column
     assert values[2][1] == 200  # Second row, second column
+    mock_logger.info.assert_called_once_with("Spending data updated successfully")
 
 
 @patch("modules.aws.spending.sheets.batch_update_values")
@@ -221,6 +223,7 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     """Test the update_spending_data function with fallback path."""
     # Create a fully-mocked DataFrame
     mock_df = MagicMock()
+    mock_logger = MagicMock()
 
     # Configure the mock's structure
     mock_df.columns.tolist.return_value = ["Linked account", "Cost Amount"]
@@ -246,16 +249,11 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     # Set up iterrows to return tuples with our mock Series
     mock_df.iterrows.return_value = [(0, mock_row1), (1, mock_row2)]
 
-    # Capture print output
-    with patch("builtins.print") as mock_print:
-        # Call the function with our mock DataFrame
-        spending.update_spending_data(mock_df)
+    spending.update_spending_data(mock_df, mock_logger)
 
-        # Verify warning was printed
-        assert mock_print.called
-        assert "Warning: DataFrame values conversion issue" in str(
-            mock_print.call_args[0][0]
-        )
+    mock_logger.warning.assert_called_once_with(
+        "Warning: DataFrame values conversion issue. Type: <class 'str'>"
+    )
 
     # Verify batch_update_values was called with correct values
     assert mock_batch_update.called
@@ -267,6 +265,17 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     assert values[0] == ["Linked account", "Cost Amount"]
     assert values[1] == ["123", 100]
     assert values[2] == ["456", 200]
+
+
+def test_update_spending_data_no_sheet_id():
+    """Test the update_spending_data function with no sheet ID."""
+    mock_df = MagicMock()
+    mock_logger = MagicMock()
+    spending.SPENDING_SHEET_ID = None
+
+    spending.update_spending_data(mock_df, mock_logger)
+
+    mock_logger.error.assert_called_once_with("Error: SPENDING_SHEET_ID is not set")
 
 
 @patch("modules.aws.spending.update_spending_data")
@@ -284,7 +293,7 @@ def test_schedule_spending_data_update(mock_generate, mock_update):
     mock_logger.info.assert_any_call("Starting spending data update job")
     mock_logger.info.assert_any_call("Spending data update job completed")
     mock_generate.assert_called_once_with(mock_logger)
-    mock_update.assert_called_once_with(dummy_data)
+    mock_update.assert_called_once_with(dummy_data, mock_logger)
 
 
 @patch("modules.aws.spending.update_spending_data")
