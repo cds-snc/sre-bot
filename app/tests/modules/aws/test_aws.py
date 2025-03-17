@@ -1,6 +1,6 @@
 from modules import aws
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 
 def test_aws_command_handles_empty_command():
@@ -63,6 +63,58 @@ def test_aws_command_handles_health_command(
     aws.aws_command(ack, {"text": "health"}, MagicMock(), respond, client, body)
     ack.assert_called()
     request_health_modal.assert_called_with(client, body)
+
+
+@patch("modules.aws.aws.spending")
+@patch("modules.aws.aws.slack_commands.parse_command")
+def test_aws_command_handles_spending_command(
+    mock_parse_command: MagicMock, mock_spending: MagicMock
+):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    logger = MagicMock()
+    body = MagicMock()
+    mock_parse_command.return_value = ["spending"]
+    mock_spending.generate_spending_data.return_value = "spending_data"
+    aws.aws_command(ack, {"text": "spending"}, logger, respond, client, body)
+    ack.assert_called()
+    respond.assert_has_calls(
+        [
+            call("Generating spending data...\nGénération des données de dépenses..."),
+            call(
+                "Spending data has been updated.\nLes données de dépenses ont été mises à jour."
+            ),
+        ]
+    )
+    mock_spending.generate_spending_data.assert_called_with(logger)
+    mock_spending.update_spending_data.assert_called_with("spending_data")
+
+
+@patch("modules.aws.aws.spending")
+@patch("modules.aws.aws.slack_commands.parse_command")
+def test_aws_command_handles_spending_command_without_data(
+    mock_parse_command: MagicMock, mock_spending: MagicMock
+):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    logger = MagicMock()
+    body = MagicMock()
+    mock_parse_command.return_value = ["spending"]
+    mock_spending.generate_spending_data.return_value = None
+    aws.aws_command(ack, {"text": "spending"}, logger, respond, client, body)
+    ack.assert_called()
+    respond.assert_has_calls(
+        [
+            call("Generating spending data...\nGénération des données de dépenses..."),
+            call(
+                "Failed to generate spending data. Please try again later.\nÉchec de la génération des données de dépenses. Veuillez réessayer plus tard."
+            ),
+        ]
+    )
+    mock_spending.generate_spending_data.assert_called_with(logger)
+    mock_spending.update_spending_data.assert_not_called()
 
 
 @patch("modules.aws.aws.slack_commands.parse_command")

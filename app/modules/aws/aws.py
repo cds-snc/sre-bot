@@ -104,7 +104,9 @@ def aws_command(
         case "lambda" | "lambdas":
             lambdas.command_handler(client, body, respond, args, logger)
         case "spending":
-            respond("Generating spending data...\nGénération des données de dépenses...")
+            respond(
+                "Generating spending data...\nGénération des données de dépenses..."
+            )
             spending_df = spending.generate_spending_data(logger)
             if spending_df is None:
                 respond(
