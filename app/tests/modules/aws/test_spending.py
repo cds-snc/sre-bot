@@ -193,14 +193,15 @@ def test_update_spending_data(mock_batch_update):
         ]
     )
     mock_logger = MagicMock()
+    mock_spreadsheet_id = "test_spreadsheet_id"
 
     # Call the function
-    spending.update_spending_data(df, mock_logger)
+    spending.update_spending_data(df, mock_logger, mock_spreadsheet_id)
 
     # Assertions
     mock_batch_update.assert_called_once()
     args, kwargs = mock_batch_update.call_args
-    assert kwargs["spreadsheetId"] == spending.SPENDING_SHEET_ID
+    assert kwargs["spreadsheetId"] == "test_spreadsheet_id"
     assert kwargs["range"] == "Sheet1"
     assert kwargs["valueInputOption"] == "USER_ENTERED"
 
@@ -224,6 +225,7 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     # Create a fully-mocked DataFrame
     mock_df = MagicMock()
     mock_logger = MagicMock()
+    mock_spreadsheet_id = "test_spreadsheet_id"
 
     # Configure the mock's structure
     mock_df.columns.tolist.return_value = ["Linked account", "Cost Amount"]
@@ -249,7 +251,7 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     # Set up iterrows to return tuples with our mock Series
     mock_df.iterrows.return_value = [(0, mock_row1), (1, mock_row2)]
 
-    spending.update_spending_data(mock_df, mock_logger)
+    spending.update_spending_data(mock_df, mock_logger, mock_spreadsheet_id)
 
     mock_logger.warning.assert_called_once_with(
         "Warning: DataFrame values conversion issue. Type: <class 'str'>"
