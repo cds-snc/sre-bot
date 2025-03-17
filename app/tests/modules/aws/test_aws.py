@@ -88,7 +88,7 @@ def test_aws_command_handles_spending_command(
         ]
     )
     mock_spending.generate_spending_data.assert_called_with(logger)
-    mock_spending.update_spending_data.assert_called_with("spending_data")
+    mock_spending.update_spending_data.assert_called_with("spending_data", logger)
 
 
 @patch("modules.aws.aws.spending")

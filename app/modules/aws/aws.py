@@ -114,7 +114,7 @@ def aws_command(
                     "Échec de la génération des données de dépenses. Veuillez réessayer plus tard."
                 )
                 return
-            spending.update_spending_data(spending_df)
+            spending.update_spending_data(spending_df, logger)
             respond(
                 "Spending data has been updated.\nLes données de dépenses ont été mises à jour."
             )
