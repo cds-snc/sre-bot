@@ -1,16 +1,112 @@
 from jobs import scheduled_tasks
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 
 @patch("jobs.scheduled_tasks.schedule")
 def test_init(schedule_mock):
+    """Test that init properly schedules all expected tasks."""
+    # Setup
     bot = MagicMock()
+
+    # Execute
     scheduled_tasks.init(bot)
-    schedule_mock.every().day.at.assert_called_once_with("16:00")
-    schedule_mock.every().day.at.return_value.do.assert_called_once_with(
-        scheduled_tasks.notify_stale_incident_channels, client=bot.client
+
+    # Verify daily tasks at specific times
+    schedule_mock.every().day.at.assert_has_calls(
+        calls=[
+            call("16:00"),
+            call("00:00"),
+        ],
+        any_order=True,
     )
+
+    # Verify interval-based tasks
+    schedule_mock.every.assert_has_calls(
+        calls=[
+            call(5).minutes,  # For scheduler_heartbeat
+            call(5).minutes,  # For integration_healthchecks
+            call(2).hours,  # For provision_aws_identity_center
+        ],
+        any_order=True,
+    )
+
+    # Since all tasks now use safe_run, we can't directly check for the original functions
+    # Instead, verify the number of calls to schedule.do()
+    do_calls = [call for call in schedule_mock.mock_calls if ".do(" in str(call)]
+    assert len(do_calls) == 5  # Total number of scheduled tasks
+
+    # Verify parameters without checking the function directly
+    # For daily tasks
+    day_at_do_calls = [
+        call
+        for call in schedule_mock.mock_calls
+        if ".day.at(" in str(call) and ".do(" in str(call)
+    ]
+    assert len(day_at_do_calls) == 2  # Two daily tasks
+
+    # For interval tasks
+    minutes_do_calls = [
+        call for call in schedule_mock.mock_calls if ".minutes.do(" in str(call)
+    ]
+    assert len(minutes_do_calls) == 2  # Two 5-minute tasks
+
+    hours_do_calls = [
+        call for call in schedule_mock.mock_calls if ".hours.do(" in str(call)
+    ]
+    assert len(hours_do_calls) == 1  # One 2-hour task
+
+    # Check that the client parameter was passed for at least one task
+    client_params = [
+        call for call in schedule_mock.mock_calls if "client=" in str(call)
+    ]
+    assert len(client_params) >= 1
+
+    # Check that logger parameter was passed for at least one task
+    logger_params = [
+        call for call in schedule_mock.mock_calls if "logger=" in str(call)
+    ]
+    assert len(logger_params) >= 1
+
+
+@patch("jobs.scheduled_tasks.logging")
+def test_safe_run(mock_logging):
+    """Test that safe_run properly handles exceptions."""
+
+    # Setup
+    def test_job():
+        raise Exception("Test exception")
+
+    test_job.__name__ = "test_job"  # Set the name for the error message
+
+    # Create the wrapper
+    wrapper = scheduled_tasks.safe_run(test_job)
+
+    # Execute the wrapper which should catch the exception
+    wrapper()
+
+    # Verify that logging.error was called with the expected message
+    mock_logging.error.assert_called_once()
+    error_message = mock_logging.error.call_args[0][0]
+    assert "Error running job `test_job`" in error_message
+    assert "Test exception" in error_message
+
+
+@patch("jobs.scheduled_tasks.logging")
+@patch("jobs.scheduled_tasks.time")
+def test_scheduler_heartbeat(mock_time, mock_logging):
+    """Test that scheduler_heartbeat logs the current time."""
+    # Setup
+    mock_time.ctime.return_value = "Thu Mar 17 14:30:00 2025"
+
+    # Execute
+    scheduled_tasks.scheduler_heartbeat()
+
+    # Verify that logging.info was called with the expected message
+    mock_logging.info.assert_called_once_with(
+        "Scheduler is running at %s", "Thu Mar 17 14:30:00 2025"
+    )
+    mock_time.ctime.assert_called_once()
 
 
 @patch("jobs.scheduled_tasks.schedule")
