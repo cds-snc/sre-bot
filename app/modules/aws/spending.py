@@ -147,7 +147,21 @@ def update_spending_data(spending_data_df: DataFrame):
         spending_data_df: pandas DataFrame containing the data to upload
     """
     # Convert DataFrame to list of lists for Google Sheets API
-    values = [spending_data_df.columns.tolist()] + spending_data_df.values.tolist()
+    header = spending_data_df.columns.tolist()
+
+    # Ensure values is a list of lists
+    data_values = spending_data_df.values.tolist()
+
+    # Combine header and data
+    values = [header]
+    if isinstance(data_values, list):
+        values.extend(data_values)
+    else:
+        # Handle the case where values.tolist() might not return a list
+        print(f"Warning: DataFrame values conversion issue. Type: {type(data_values)}")
+        # Alternative approach if needed:
+        for _, row in spending_data_df.iterrows():
+            values.append(row.tolist())
 
     # Update the entire sheet with new values
     sheets.batch_update_values(
