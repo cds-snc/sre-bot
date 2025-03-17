@@ -54,6 +54,7 @@ def get_account_id_by_name(account_name):
     )
 
 
+@handle_aws_api_errors
 def get_account_details(account_id) -> dict:
     """Retrieves the details for a given account ID.
 
@@ -69,6 +70,7 @@ def get_account_details(account_id) -> dict:
     )
 
 
+@handle_aws_api_errors
 def get_account_tags(account_id) -> list:
     """Retrieves the tags for a given account ID.
 

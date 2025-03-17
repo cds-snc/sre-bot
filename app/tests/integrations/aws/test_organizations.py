@@ -3,6 +3,8 @@ from integrations.aws.organizations import (
     list_organization_accounts,
     get_active_account_names,
     get_account_id_by_name,
+    get_account_details,
+    get_account_tags,
     healthcheck,
 )
 
@@ -191,6 +193,128 @@ def test_get_active_account_names_none_response(mock_list_organization_accounts)
 
     # Verify the result
     assert result == []
+
+
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_details_success(mock_execute_aws_api_call):
+    # Mock return value
+    mock_account = {
+        "Account": {
+            "Id": "123456789012",
+            "Arn": "arn:aws:organizations::123456789012:account/o-exampleorgid/123456789012",
+            "Email": "example@example.com",
+            "Name": "ExampleAccount",
+            "Status": "ACTIVE",
+            "JoinedMethod": "INVITED",
+            "JoinedTimestamp": "2022-09-20T15:09:16.541000+00:00",
+        }
+    }
+
+    # Mock the execute_aws_api_call function
+    mock_execute_aws_api_call.return_value = mock_account
+
+    # Execute the function
+    result = get_account_details("123456789012")
+
+    mock_execute_aws_api_call.assert_called_with(
+        "organizations",
+        "describe_account",
+        role_arn=ORG_ROLE_ARN,
+        AccountId="123456789012",
+    )
+
+    # Verify the result
+    assert result == mock_account["Account"]
+
+
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_details_empty_response(mock_execute_aws_api_call):
+    # Mock empty response
+    mock_execute_aws_api_call.return_value = {}
+
+    # Execute the function
+    result = get_account_details("123456789012")
+
+    # Verify the result
+    assert result == {}
+
+
+# @patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_details_exception(mock_execute_aws_api_call):
+    # Mock exception
+    mock_execute_aws_api_call.side_effect = Exception("AWS API Error")
+
+    # Execute function and expect the handle_aws_api_errors decorator to catch the exception
+    result = get_account_details("123456789012")
+
+    # The decorator should return None when exception is caught
+    assert result is False
+
+
+# Adding tests for the get_account_tags function
+
+
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_tags_success(mock_execute_aws_api_call):
+    # Mock return value
+    mock_tags = {
+        "Tags": [
+            {
+                "Key": "business_unit",
+                "Value": "Engineering",
+            },
+            {
+                "Key": "product",
+                "Value": "CloudServices",
+            },
+        ]
+    }
+
+    # Mock the execute_aws_api_call function
+    mock_execute_aws_api_call.return_value = mock_tags
+
+    # Execute the function
+    result = get_account_tags("123456789012")
+
+    mock_execute_aws_api_call.assert_called_with(
+        "organizations",
+        "list_tags_for_resource",
+        role_arn=ORG_ROLE_ARN,
+        ResourceId="123456789012",
+    )
+
+    # Verify the result
+    assert result == mock_tags["Tags"]
+
+
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_tags_empty_response(mock_execute_aws_api_call):
+    # Mock empty response
+    mock_execute_aws_api_call.return_value = {}
+
+    # Execute the function
+    result = get_account_tags("123456789012")
+
+    # Verify the result
+    assert result == []
+
+
+@patch("integrations.aws.organizations.ORG_ROLE_ARN", ORG_ROLE_ARN)
+@patch("integrations.aws.organizations.execute_aws_api_call")
+def test_get_account_tags_exception(mock_execute_aws_api_call):
+    # Mock exception
+    mock_execute_aws_api_call.side_effect = Exception("AWS API Error")
+
+    # Execute function and expect the handle_aws_api_errors decorator to catch the exception
+    result = get_account_tags("123456789012")
+
+    # The decorator should return None when exception is caught
+    assert result is False
 
 
 @patch("integrations.aws.organizations.list_organization_accounts")
