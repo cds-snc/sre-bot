@@ -139,14 +139,16 @@ def spending_to_df(spending: list):
     return pd.DataFrame(flattened_data)
 
 
-def update_spending_data(spending_data_df: DataFrame, logger):
+def update_spending_data(
+    spending_data_df: DataFrame, logger, spreadsheet_id=SPENDING_SHEET_ID
+):
     """
     Updates the entire Sheet1 with new spending data
 
     Args:
         spending_data_df: pandas DataFrame containing the data to upload
     """
-    if not SPENDING_SHEET_ID:
+    if not spreadsheet_id:
         logger.error("Error: SPENDING_SHEET_ID is not set")
         return
 
@@ -171,7 +173,7 @@ def update_spending_data(spending_data_df: DataFrame, logger):
 
     # Update the entire sheet with new values
     sheets.batch_update_values(
-        spreadsheetId=SPENDING_SHEET_ID,
+        spreadsheetId=spreadsheet_id,
         range="Sheet1",
         values=values,
         valueInputOption="USER_ENTERED",

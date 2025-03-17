@@ -271,9 +271,8 @@ def test_update_spending_data_no_sheet_id():
     """Test the update_spending_data function with no sheet ID."""
     mock_df = MagicMock()
     mock_logger = MagicMock()
-    spending.SPENDING_SHEET_ID = None
 
-    spending.update_spending_data(mock_df, mock_logger)
+    spending.update_spending_data(mock_df, mock_logger, spreadsheet_id=None)
 
     mock_logger.error.assert_called_once_with("Error: SPENDING_SHEET_ID is not set")
 
