@@ -54,6 +54,38 @@ def get_account_id_by_name(account_name):
     )
 
 
+@handle_aws_api_errors
+def get_account_details(account_id) -> dict:
+    """Retrieves the details for a given account ID.
+
+    Args:
+        account_id (str): The ID of the account.
+
+    Returns:
+        dict: The account details.
+    """
+    params = {"role_arn": ORG_ROLE_ARN, "AccountId": account_id}
+    return execute_aws_api_call("organizations", "describe_account", **params).get(
+        "Account", {}
+    )
+
+
+@handle_aws_api_errors
+def get_account_tags(account_id) -> list:
+    """Retrieves the tags for a given account ID.
+
+    Args:
+        account_id (str): The ID of the account.
+
+    Returns:
+        list: The account tags.
+    """
+    params = {"role_arn": ORG_ROLE_ARN, "ResourceId": account_id}
+    return execute_aws_api_call(
+        "organizations", "list_tags_for_resource", **params
+    ).get("Tags", [])
+
+
 def healthcheck():
     """Check the health of the AWS integration.
 

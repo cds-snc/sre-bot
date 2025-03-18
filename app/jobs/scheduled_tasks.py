@@ -7,7 +7,7 @@ from integrations import maxmind, opsgenie
 from integrations.google_workspace import google_drive
 
 from integrations.aws import identity_store
-from modules.aws import identity_center
+from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
@@ -36,6 +36,9 @@ def init(bot):
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
+    schedule.every().day.at("00:00").do(
+        safe_run(spending.generate_spending_data), logger=logging
+    )
 
 
 def scheduler_heartbeat():

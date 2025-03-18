@@ -16,7 +16,14 @@ from logging import Logger
 from integrations.aws.organizations import get_account_id_by_name
 from integrations.aws import identity_store
 from integrations.slack import commands as slack_commands
-from modules.aws import aws_access_requests, aws_account_health, groups, users, lambdas
+from modules.aws import (
+    aws_access_requests,
+    aws_account_health,
+    groups,
+    users,
+    lambdas,
+    spending,
+)
 
 PREFIX = os.environ.get("PREFIX", "")
 AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
@@ -96,6 +103,21 @@ def aws_command(
             groups.command_handler(client, body, respond, args, logger)
         case "lambda" | "lambdas":
             lambdas.command_handler(client, body, respond, args, logger)
+        case "spending":
+            respond(
+                "Generating spending data...\nGénération des données de dépenses..."
+            )
+            spending_df = spending.generate_spending_data(logger)
+            if spending_df is None:
+                respond(
+                    "Failed to generate spending data. Please try again later.\n"
+                    "Échec de la génération des données de dépenses. Veuillez réessayer plus tard."
+                )
+                return
+            spending.update_spending_data(spending_df, logger)
+            respond(
+                "Spending data has been updated.\nLes données de dépenses ont été mises à jour."
+            )
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
