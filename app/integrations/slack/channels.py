@@ -82,7 +82,7 @@ def get_messages_in_time_period(client, channel_id, time_delta):
         return []
 
 
-def fetch_user_details(client, channel_id):
+def fetch_user_details(client: WebClient, channel_id):
     """
     Fetches user details from a Slack channel, excluding users with the real names 'SRE' and 'SRE Dev'.
 
