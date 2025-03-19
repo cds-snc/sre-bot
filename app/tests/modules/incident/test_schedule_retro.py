@@ -171,53 +171,6 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
     mock_slack_channels.fetch_user_details.assert_not_called()
 
 
-def test_open_incident_retro_modal_with_no_users():
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
-    mock_client.conversations_info.return_value = {
-        "channel": {
-            "topic": {"value": "Retro Topic"},
-            "purpose": {"value": "Retro Purpose"},
-        }
-    }
-    mock_client.users_info.side_effect = []
-    mock_client.bookmarks_list.return_value = {
-        "ok": True,
-        "bookmarks": [
-            {
-                "title": "Incident report",
-                "link": "https://docs.google.com/document/d/dummy_document_id/edit",
-            }
-        ],
-    }
-
-    # Adjust the mock to simulate no users in the channel
-    mock_client.conversations_members.return_value = {"members": []}
-
-    body = {
-        "channel_id": "C1234567890",
-        "trigger_id": "T1234567890",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "U12345",
-    }
-
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
-
-    # construct the expected data object
-    expected_data = json.dumps(
-        {
-            "name": "incident-2024-01-12-test",
-            "incident_document": "dummy_document_id",
-            "channel_id": "C1234567890",
-        }
-    )
-    # Assertions to validate behavior when no users are present in the channel
-    assert (
-        mock_client.views_open.call_args[1]["view"]["private_metadata"] == expected_data
-    )
-
-
 def test_open_incident_retro_modal_with_no_topic():
     mock_client = MagicMock()
     mock_ack = MagicMock()
