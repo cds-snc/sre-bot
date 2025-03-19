@@ -77,6 +77,7 @@ def schedule_event(event_details, days, user_emails):
 # that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
 # submit button is clicked.
 def open_incident_retro_modal(client: WebClient, body, ack, logger):
+    """Open the modal for scheduling a retro meeting."""
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
@@ -116,7 +117,7 @@ def open_incident_retro_modal(client: WebClient, body, ack, logger):
 def generate_retro_options_view(
     private_metadata, all_users, unavailable_users: list | None = None
 ):
-    """Create the modal for the schedule retro options."""
+    """Create the modal for the schedule retro options. Adds a warning message if there are unavailable users."""
     # First part of blocks (before divider)
     top_blocks = [
         {
