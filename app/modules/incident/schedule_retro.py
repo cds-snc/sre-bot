@@ -108,7 +108,7 @@ def open_incident_retro_modal(client: WebClient, body, ack, logger):
     # Fetch user details from all members of the channel
     users = slack_channels.fetch_user_details(client, channel_id)
     # Generate the modal view
-    view = generate_retro_options_modal_view(private_metadata, users)
+    view = generate_retro_options_view(private_metadata, users)
     # Open the modal window
     client.views_open(
         trigger_id=body["trigger_id"],
@@ -116,7 +116,7 @@ def open_incident_retro_modal(client: WebClient, body, ack, logger):
     )
 
 
-def generate_retro_options_modal_view(
+def generate_retro_options_view(
     private_metadata, all_users, unavailable_users: list | None = None
 ):
     """Create the modal for the schedule retro options."""
