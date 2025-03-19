@@ -890,7 +890,9 @@ def test_identify_unavailable_users_within_threshold(time_range):
     )
 
     close_start = (start_dt + timedelta(minutes=30)).isoformat() + "Z"
-    far_end = (end_dt - timedelta(minutes=61)).isoformat() + "Z"  # Just outside 1-hour threshold
+    far_end = (
+        end_dt - timedelta(minutes=61)
+    ).isoformat() + "Z"  # Just outside 1-hour threshold
 
     freebusy_response = {
         "calendars": {

@@ -360,19 +360,27 @@ def test_generate_retro_options_view_with_unavailable_users():
     assert result["blocks"][0]["type"] == "input"  # Days input
     assert result["blocks"][1]["type"] == "section"  # User select
     assert result["blocks"][2]["type"] == "divider"  # Divider
-    
+
     # The unavailable users information is in the LAST block (index 6), not index 2
     last_block = result["blocks"][-1]
     assert last_block["type"] == "section"
     assert "calendar availability issues" in last_block["text"]["text"]
     assert "user1@example.com" in last_block["text"]["text"]
     assert "user2@example.com" in last_block["text"]["text"]
-    
+
     # Verify there are the right number of rule blocks
-    assert len([block for block in result["blocks"] if 
-                block["type"] == "section" and 
-                "text" in block and 
-                block["text"]["type"] == "mrkdwn"]) == 5  # 3 rule blocks + 1 intro + 1 unavailable
+    assert (
+        len(
+            [
+                block
+                for block in result["blocks"]
+                if block["type"] == "section"
+                and "text" in block
+                and block["text"]["type"] == "mrkdwn"
+            ]
+        )
+        == 5
+    )  # 3 rule blocks + 1 intro + 1 unavailable
 
 
 @patch("modules.incident.schedule_retro.save_retro_event")

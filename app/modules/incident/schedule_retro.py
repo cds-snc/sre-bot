@@ -378,4 +378,3 @@ def incident_selected_users_updated(client: WebClient, body, ack):
             private_metadata, all_users, unavailable_users
         )
     client.views_update(view_id=view_id, view=view)
-    logging.info("Updated the view with the unavailable users")
