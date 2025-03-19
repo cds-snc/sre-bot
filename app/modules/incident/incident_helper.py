@@ -81,8 +81,9 @@ def register(bot: App):
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
     bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
-    bot.view("view_save_event")(schedule_retro.save_incident_retro)
+    bot.view("view_save_event")(schedule_retro.handle_schedule_retro_submit)
     bot.action("confirm_click")(schedule_retro.confirm_click)
+    bot.action("user_select_action")(schedule_retro.incident_selected_users_updated)
     bot.action("archive_channel")(incident_conversation.archive_channel_action)
     bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(
         incident_conversation.handle_reaction_added
