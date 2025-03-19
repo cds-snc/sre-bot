@@ -294,8 +294,8 @@ def test_generate_retro_options_view_no_unavailable_users():
     assert result["private_metadata"] == private_metadata
     assert result["submit"]["text"] == "Schedule"
 
-    # Check blocks - there should be exactly 7 blocks (2 top blocks + divider + 5 rule blocks)
-    assert len(result["blocks"]) == 8
+    # Check blocks - there should be exactly 6 blocks (2 top blocks + divider + 3 rule blocks)
+    assert len(result["blocks"]) == 6
 
     # Verify the blocks structure
     assert result["blocks"][0]["type"] == "input"  # Days input
@@ -352,21 +352,27 @@ def test_generate_retro_options_view_with_unavailable_users():
     assert result["private_metadata"] == private_metadata
     assert result["submit"]["text"] == "Schedule"
 
-    # Check blocks - there should be exactly 9 blocks (2 top blocks + unavailable users block + divider + 5 rule blocks)
-    assert len(result["blocks"]) == 9
+    # Check blocks - there should be exactly 7 blocks
+    # (2 top blocks + divider + 3 rule blocks + unavailable users block)
+    assert len(result["blocks"]) == 7
 
     # Verify the blocks structure
     assert result["blocks"][0]["type"] == "input"  # Days input
     assert result["blocks"][1]["type"] == "section"  # User select
-
-    # Verify unavailable users block exists and has the correct content
-    assert result["blocks"][2]["type"] == "section"
-    assert "calendar availability issues" in result["blocks"][2]["text"]["text"]
-    assert "user1@example.com" in result["blocks"][2]["text"]["text"]
-    assert "user2@example.com" in result["blocks"][2]["text"]["text"]
-
-    # Verify divider and rules follow
-    assert result["blocks"][3]["type"] == "divider"
+    assert result["blocks"][2]["type"] == "divider"  # Divider
+    
+    # The unavailable users information is in the LAST block (index 6), not index 2
+    last_block = result["blocks"][-1]
+    assert last_block["type"] == "section"
+    assert "calendar availability issues" in last_block["text"]["text"]
+    assert "user1@example.com" in last_block["text"]["text"]
+    assert "user2@example.com" in last_block["text"]["text"]
+    
+    # Verify there are the right number of rule blocks
+    assert len([block for block in result["blocks"] if 
+                block["type"] == "section" and 
+                "text" in block and 
+                block["text"]["type"] == "mrkdwn"]) == 5  # 3 rule blocks + 1 intro + 1 unavailable
 
 
 @patch("modules.incident.schedule_retro.save_retro_event")

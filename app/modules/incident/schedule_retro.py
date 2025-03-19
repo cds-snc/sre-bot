@@ -102,8 +102,7 @@ def generate_retro_options_view(
     private_metadata, all_users, unavailable_users: list | None = None
 ):
     """Create the modal for the schedule retro options. Adds a warning message if there are unavailable users."""
-    # First part of blocks (before divider)
-    top_blocks = [
+    blocks = [
         {
             "type": "input",
             "block_id": "number_of_days",
@@ -132,21 +131,6 @@ def generate_retro_options_view(
                 "options": all_users,
             },
         },
-    ]
-
-    # Add unavailable users section above divider if there are any
-    if unavailable_users and len(unavailable_users) > 0:
-        unavailable_users_block = {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"_⚠️ The following users may have calendar availability issues that will prevent the successful scheduling of the event:_\n{', '.join(unavailable_users)}",
-            },
-        }
-        top_blocks.append(unavailable_users_block)
-
-    # Divider and bottom part of blocks
-    divider_and_rules_blocks = [
         {"type": "divider"},
         {
             "type": "section",
@@ -159,41 +143,37 @@ def generate_retro_options_view(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
+                "text": "1. The event will be scheduled for the first available 30 minutes timeslot starting the after the number of days selected above between 1:00pm and 3:00pm EDT to accomodate all time differences.",
             },
         },
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "2. A proposed event will be added to everyone's calendar that is selected.",
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
-            },
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+                "text": "2. A proposed event will be added to everyone's calendar that is selected, unless free time isn't found within the next 2 months.",
             },
         },
     ]
 
-    # Combine all blocks
-    all_blocks = top_blocks + divider_and_rules_blocks
+    # Add unavailable users section if there are any
+    if unavailable_users and len(unavailable_users) > 0:
+        unavailable_users_block = {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"_⚠️ The following users may have calendar availability issues that will prevent the successful scheduling of the event:_\n{', '.join(unavailable_users)}",
+            },
+        }
+        # top_blocks.append(unavailable_users_block)
+        blocks.append(unavailable_users_block)
+
     view = {
         "type": "modal",
         "callback_id": "view_save_event",
         "private_metadata": private_metadata,
         "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
         "submit": {"type": "plain_text", "text": "Schedule"},
-        "blocks": all_blocks,
+        "blocks": blocks,
     }
     # Return the completed modal
     return view
