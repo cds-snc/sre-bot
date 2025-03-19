@@ -10,7 +10,7 @@ from integrations.google_workspace.google_calendar import (
     insert_event,
     find_first_available_slot,
 )
-from integrations.google_workspace import google_docs
+from modules.incident import incident_conversation
 
 
 # Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
@@ -76,24 +76,15 @@ def schedule_event(event_details, days, user_emails):
 # Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
 # that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
 # submit button is clicked.
-def open_incident_retro_modal(client: WebClient, body, ack):
+def open_incident_retro_modal(client: WebClient, body, ack, logger):
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
-    user_id = body["user_id"]
 
-    # if we are not in an incident channel, then we need to display a message to the user that they need to use this command in an incident channel
-    if not channel_name.startswith("incident-"):
-        try:
-            response = client.chat_postEphemeral(
-                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
-                channel=channel_id,
-                user=user_id,
-            )
-        except Exception as e:
-            logging.error(
-                f"Could not post ephemeral message to user {user_id} due to {e}."
-            )
+    is_incident, _is_dev_incident = incident_conversation.is_incident_channel(
+        client, logger, channel_id
+    )
+    if not is_incident:
         return
 
     # get all users in a channel
@@ -101,19 +92,9 @@ def open_incident_retro_modal(client: WebClient, body, ack):
 
     # get the incident document
     # get and update the incident document
-    document_id = ""
-    response = client.bookmarks_list(channel_id=channel_id)
-    if response["ok"]:
-        for item in range(len(response["bookmarks"])):
-            if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = google_docs.extract_google_doc_id(
-                    response["bookmarks"][item]["link"]
-                )
-    else:
-        logging.warning(
-            "No bookmark link for the incident document found for channel %s",
-            channel_name,
-        )
+    document_id = incident_conversation.get_incident_document_id(
+        client, channel_id, logger
+    )
 
     # convert the data to string so that we can send it as private metadata
     private_metadata = json.dumps(
