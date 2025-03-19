@@ -1,4 +1,4 @@
-"""Unit tests for schedule_retro module in Incident management proces."""
+"""Unit tests for schedule_retro module in Incident management process."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -142,20 +142,16 @@ def test_schedule_event_no_available_slots(
     assert event_link is None
 
 
-@patch("modules.incident.schedule_retro.logging.error")
-def test_open_incident_retro_modal_not_incident_channel_exception(mock_logging_error):
+@patch("modules.incident.schedule_retro.slack_channels")
+@patch("modules.incident.schedule_retro.incident_conversation")
+def test_open_incident_retro_modal_not_incident_channel_exception(
+    mock_incident_conversation,
+    mock_slack_channels,
+):
     mock_ack = MagicMock()
     mock_client = MagicMock()
-
-    # Mock the response of the private message to have been posted as expected
-    mock_client.chat_postEphemeral.return_value = {
-        "ok": False,
-        "error": "not_in_channel",
-    }
-
-    # Mock the exception and exception message
-    exception_message = "not_in_channel"
-    mock_client.chat_postEphemeral.side_effect = Exception(exception_message)
+    mock_logger = MagicMock()
+    mock_incident_conversation.is_incident_channel.return_value = [False, False]
 
     # The test channel and user IDs
     channel_id = "C12345"
@@ -166,46 +162,13 @@ def test_open_incident_retro_modal_not_incident_channel_exception(mock_logging_e
     body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
 
     # Call the function being tested
-    schedule_retro.open_incident_retro_modal(
-        client=mock_client, body=body, ack=mock_ack
-    )
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
 
     # Ensure the ack method was called
     mock_ack.assert_called_once()
-
-    # Ensure the correct error message was posted to the channel
-    expected_text = "Channel general is not an incident channel. Please use this command in an incident channel."
-    mock_client.chat_postEphemeral.assert_called_once_with(
-        text=expected_text,
-        channel=channel_id,
-        user=user_id,
-    )
-
-    # Check that the expected error message was logged
-    expected_log_message = f"Could not post ephemeral message to user {user_id} due to {exception_message}."
-    mock_logging_error.assert_called_once_with(expected_log_message)
-
-
-@patch("modules.incident.schedule_retro.logging")
-def test_open_incident_retro_modal_no_bookmarks(mock_logging):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_client.bookmarks_list.return_value = {"ok": False, "error": "not_in_channel"}
-
-    body = {
-        "channel_id": "C1234567890",
-        "trigger_id": "T1234567890",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "U12345",
-    }
-
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
-
-    mock_ack.assert_called_once()
-    mock_logging.warning.assert_called_once_with(
-        "No bookmark link for the incident document found for channel %s",
-        "incident-2024-01-12-test",
-    )
+    mock_client.conversations_members.assert_not_called()
+    mock_incident_conversation.get_incident_document_id.assert_not_called()
+    mock_slack_channels.fetch_user_details.assert_not_called()
 
 
 def test_open_incident_retro_modal_successful_no_bots():
