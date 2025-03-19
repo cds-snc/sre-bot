@@ -171,7 +171,7 @@ def generate_retro_options_modal_view(
         },
     ]
 
-    # Add unavailable users section above divider if available
+    # Add unavailable users section above divider if there are any
     if unavailable_users and len(unavailable_users) > 0:
         unavailable_users_block = {
             "type": "section",
