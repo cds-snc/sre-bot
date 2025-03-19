@@ -401,6 +401,6 @@ def archive_channel_action(client: WebClient, logger, body, ack, respond):
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
         channel_info["trigger_id"] = body["trigger_id"]
-        schedule_retro.open_incident_retro_modal(client, channel_info, ack)
+        schedule_retro.open_incident_retro_modal(client, channel_info, ack, logger)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)
