@@ -14,24 +14,33 @@ from integrations.google_workspace.google_calendar import (
 from modules.incident import incident_conversation
 
 
-# Schedule a calendar event by finding the first available slot in the next 60 days that all participants are free in and book the event
-def schedule_event(days, user_emails, days_lookup=60):
+def schedule_event(client: WebClient, days, users, days_lookup=60):
+    """Schedules the event based on the users provided and the number of days to look ahead.
+    Returns the first available slot, or None if no slot is found.
+    Also returns a list of unavailable users where no slot was found for the entire period to help identify possible issues.
+    """
     # Define the time range for the query
     now = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     # time_min is the current time + days and time_max is the current time + 60 days + days
     time_min = (now + timedelta(days=days)).isoformat() + "Z"
     time_max = (now + timedelta(days=(days_lookup + days))).isoformat() + "Z"
 
-    # Construct the items array
+    user_emails = []
     items = []
-    for email in user_emails:
-        email = email.strip()
-        items.append({"id": email})
+    for user in users:
+        user_id = user["value"].strip()
+        user_email = client.users_info(user=user_id)["user"]["profile"]["email"]
+        user_emails.append(user_email)
+        user["email"] = user_email
+        user_emails.append(user_email)
+        items.append({"id": user_email})
 
     # Execute the query to find all the busy times for all the participants
     freebusy_result = get_freebusy(time_min, time_max, items)
-    unavailable_users = identify_unavailable_users(freebusy_result, time_min, time_max)
-    if set(unavailable_users) == set(user_emails):
+    unavailable_users_emails = identify_unavailable_users(
+        freebusy_result, time_min, time_max
+    )
+    if set(unavailable_users_emails) == set(user_emails):
         logging.warning(
             "All users are unavailable for the next %s days starting from %s. Please check the user emails or the calendar settings.",
             days_lookup,
@@ -44,7 +53,7 @@ def schedule_event(days, user_emails, days_lookup=60):
     return {
         "first_available_start": first_available_start,
         "first_available_end": first_available_end,
-        "unavailable_users": unavailable_users,
+        "unavailable_users": unavailable_users_emails,
     }
 
 
@@ -131,7 +140,7 @@ def generate_retro_options_view(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"_⚠️ The following users may have calendar availability issues:_ {', '.join(unavailable_users)}",
+                "text": f"_⚠️ The following users may have calendar availability issues that will prevent the successful scheduling of the event:_\n{', '.join(unavailable_users)}",
             },
         }
         top_blocks.append(unavailable_users_block)
@@ -269,17 +278,11 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
     users = view["state"]["values"]["user_select_block"]["user_select_action"][
         "selected_options"
     ]
-    user_emails = []
-    for user in users:
-        user_id = user["value"].strip()
-        user_email = client.users_info(user=user_id)["user"]["profile"]["email"]
-        user_emails.append(user_email)
 
     # pass the data using the view["private_metadata"] to the schedule_event function
-    scheduled_event_details = schedule_event(days, user_emails)
+    scheduled_event_details = schedule_event(client, days, users)
     first_available_start = scheduled_event_details["first_available_start"]
     first_available_end = scheduled_event_details["first_available_end"]
-    unavailable_users = scheduled_event_details["unavailable_users"]
     if first_available_start is None:
         saving_view = generate_retro_saving_view(status=2)
         logging.info(
@@ -289,6 +292,7 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
             view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view
         )
         return
+    user_emails = get_users_emails_from_selected_options(client, users)
     result = save_retro_event(
         first_available_start,
         first_available_end,
@@ -359,3 +363,39 @@ def confirm_click(ack, body, client):
     ack()
     username = body["user"]["username"]
     logging.info(f"User {username} viewed the calendar event.")
+
+
+def get_users_emails_from_selected_options(client: WebClient, selected_options):
+    user_emails = []
+    for user in selected_options:
+        user_id = user["value"].strip()
+        user_email = client.users_info(user=user_id)["user"]["profile"]["email"]
+        user_emails.append(user_email)
+    return user_emails
+
+
+def incident_selected_users_updated(client: WebClient, body, ack):
+    ack()
+    view_id = body["view"]["id"]
+    all_users = body["view"]["blocks"][1]["accessory"]["options"]
+    private_metadata = body["view"]["private_metadata"]
+    selected_options = body["actions"][0]["selected_options"]
+    if len(selected_options) == 0:
+        view = generate_retro_options_view(private_metadata, all_users)
+    else:
+        scheduled_event_data = schedule_event(client, 1, selected_options)
+        unavailable_users_emails = scheduled_event_data["unavailable_users"]
+
+        unavailable_users = []
+        for user in unavailable_users_emails:
+            user_data = client.users_lookupByEmail(email=user)
+            details: dict = user_data.get("user", {})
+            if details:
+                user_id = details.get("id")
+                formatted_user = f"<@{user_id}>"
+                unavailable_users.append(formatted_user)
+        view = generate_retro_options_view(
+            private_metadata, all_users, unavailable_users
+        )
+    client.views_update(view_id=view_id, view=view)
+    logging.info("Updated the view with the unavailable users")
