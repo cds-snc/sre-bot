@@ -87,9 +87,6 @@ def open_incident_retro_modal(client: WebClient, body, ack, logger):
     if not is_incident:
         return
 
-    # get all users in a channel
-    users = client.conversations_members(channel=channel_id)["members"]
-
     # get the incident document
     # get and update the incident document
     document_id = incident_conversation.get_incident_document_id(
