@@ -139,7 +139,7 @@ def test_handle_incident_command_with_retro(schedule_retro_mock):
     incident_helper.handle_incident_command(
         ["schedule"], client, body, respond, ack, logger
     )
-    schedule_retro_mock.schedule_incident_retro.assert_called_once_with(
+    schedule_retro_mock.open_incident_retro_modal.assert_called_once_with(
         client, body, ack
     )
 

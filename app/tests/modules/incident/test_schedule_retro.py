@@ -143,7 +143,7 @@ def test_schedule_event_no_available_slots(
 
 
 @patch("modules.incident.schedule_retro.logging.error")
-def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_error):
+def test_open_incident_retro_modal_not_incident_channel_exception(mock_logging_error):
     mock_ack = MagicMock()
     mock_client = MagicMock()
 
@@ -166,7 +166,9 @@ def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_err
     body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
 
     # Call the function being tested
-    schedule_retro.schedule_incident_retro(client=mock_client, body=body, ack=mock_ack)
+    schedule_retro.open_incident_retro_modal(
+        client=mock_client, body=body, ack=mock_ack
+    )
 
     # Ensure the ack method was called
     mock_ack.assert_called_once()
@@ -185,7 +187,7 @@ def test_schedule_incident_retro_not_incident_channel_exception(mock_logging_err
 
 
 @patch("modules.incident.schedule_retro.logging")
-def test_schedule_incident_retro_no_bookmarks(mock_logging):
+def test_open_incident_retro_modal_no_bookmarks(mock_logging):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.bookmarks_list.return_value = {"ok": False, "error": "not_in_channel"}
@@ -197,7 +199,7 @@ def test_schedule_incident_retro_no_bookmarks(mock_logging):
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
     mock_logging.warning.assert_called_once_with(
@@ -206,7 +208,7 @@ def test_schedule_incident_retro_no_bookmarks(mock_logging):
     )
 
 
-def test_schedule_incident_retro_successful_no_bots():
+def test_open_incident_retro_modal_successful_no_bots():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U34333"]}
@@ -247,7 +249,7 @@ def test_schedule_incident_retro_successful_no_bots():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
 
@@ -273,7 +275,7 @@ def test_schedule_incident_retro_successful_no_bots():
     )
 
 
-def test_schedule_incident_retro_successful_bots():
+def test_open_incident_retro_modal_successful_bots():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U3333"]}
@@ -317,7 +319,7 @@ def test_schedule_incident_retro_successful_bots():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
 
@@ -343,7 +345,7 @@ def test_schedule_incident_retro_successful_bots():
     )
 
 
-def test_schedule_incident_retro_successful_no_security_group():
+def test_open_incident_retro_modal_successful_no_security_group():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": []}
@@ -385,7 +387,7 @@ def test_schedule_incident_retro_successful_no_security_group():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
 
@@ -411,7 +413,7 @@ def test_schedule_incident_retro_successful_no_security_group():
     )
 
 
-def test_schedule_incident_retro_with_no_users():
+def test_open_incident_retro_modal_with_no_users():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
@@ -442,7 +444,7 @@ def test_schedule_incident_retro_with_no_users():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # construct the expected data object
     expected_data = json.dumps(
@@ -458,7 +460,7 @@ def test_schedule_incident_retro_with_no_users():
     )
 
 
-def test_schedule_incident_retro_with_no_topic():
+def test_open_incident_retro_modal_with_no_topic():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
@@ -486,7 +488,7 @@ def test_schedule_incident_retro_with_no_topic():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
@@ -502,7 +504,7 @@ def test_schedule_incident_retro_with_no_topic():
     )
 
 
-def test_schedule_incident_retro_with_no_name():
+def test_open_incident_retro_modal_with_no_name():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
@@ -534,7 +536,7 @@ def test_schedule_incident_retro_with_no_name():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(
@@ -550,7 +552,7 @@ def test_schedule_incident_retro_with_no_name():
     )
 
 
-def test_schedule_incident_retro_with_no_purpose():
+def test_open_incident_retro_modal_with_no_purpose():
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_client.usergroups_users_list.return_value = {"users": ["U444444"]}
@@ -578,7 +580,7 @@ def test_schedule_incident_retro_with_no_purpose():
         "user_id": "U12345",
     }
 
-    schedule_retro.schedule_incident_retro(mock_client, body, mock_ack)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # construct the expected data object and set the topic to a default one
     expected_data = json.dumps(

@@ -76,7 +76,7 @@ def schedule_event(event_details, days, user_emails):
 # Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
 # that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
 # submit button is clicked.
-def schedule_incident_retro(client: WebClient, body, ack):
+def open_incident_retro_modal(client: WebClient, body, ack):
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
