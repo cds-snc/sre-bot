@@ -116,7 +116,7 @@ def open_incident_retro_modal(client: WebClient, body, ack):
         )
 
     # convert the data to string so that we can send it as private metadata
-    data_to_send = json.dumps(
+    private_metadata = json.dumps(
         {
             "name": channel_name,
             "incident_document": document_id,
@@ -126,88 +126,115 @@ def open_incident_retro_modal(client: WebClient, body, ack):
 
     # Fetch user details from all members of the channel
     users = slack_channels.fetch_user_details(client, channel_id)
-
-    blocks = {
-        "type": "modal",
-        "callback_id": "view_save_event",
-        "private_metadata": data_to_send,
-        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
-        "submit": {"type": "plain_text", "text": "Schedule"},
-        "blocks": (
-            [
-                {
-                    "type": "input",
-                    "block_id": "number_of_days",
-                    "element": {
-                        "type": "number_input",
-                        "is_decimal_allowed": False,
-                        "min_value": "1",
-                        "max_value": "60",
-                        "action_id": "number_of_days",
-                    },
-                    "label": {
-                        "type": "plain_text",
-                        "text": "How many days from now should I start checking the calendar for availability?",
-                    },
-                },
-                {
-                    "type": "input",
-                    "block_id": "user_select_block",
-                    "label": {
-                        "type": "plain_text",
-                        "text": "Select everyone you want to include in the retro calendar invite",
-                        "emoji": True,
-                    },
-                    "element": {
-                        "type": "multi_static_select",
-                        "action_id": "user_select_action",
-                        "options": users,
-                    },
-                },
-                {"type": "divider"},
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "2. A proposed event will be added to everyone's calendar that is selected.",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
-                    },
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
-                    },
-                },
-            ]
-        ),
-    }
+    # Generate the modal view
+    view = generate_retro_options_modal_view(private_metadata, users)
     # Open the modal window
     client.views_open(
         trigger_id=body["trigger_id"],
-        view=blocks,
+        view=view,
     )
+
+
+def generate_retro_options_modal_view(
+    private_metadata, all_users, unavailable_users: list | None = None
+):
+    """Create the modal for the schedule retro options."""
+    # First part of blocks (before divider)
+    top_blocks = [
+        {
+            "type": "input",
+            "block_id": "number_of_days",
+            "element": {
+                "type": "number_input",
+                "is_decimal_allowed": False,
+                "min_value": "1",
+                "max_value": "60",
+                "action_id": "number_of_days",
+            },
+            "label": {
+                "type": "plain_text",
+                "text": "How many days from now should I start checking the calendar for availability?",
+            },
+        },
+        {
+            "type": "section",
+            "block_id": "user_select_block",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Select everyone you want to include in the retro calendar invite",
+            },
+            "accessory": {
+                "type": "multi_static_select",
+                "action_id": "user_select_action",
+                "options": all_users,
+            },
+        },
+    ]
+
+    # Add unavailable users section above divider if available
+    if unavailable_users and len(unavailable_users) > 0:
+        unavailable_users_block = {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"_⚠️ The following users may have calendar availability issues:_ {', '.join(unavailable_users)}",
+            },
+        }
+        top_blocks.append(unavailable_users_block)
+
+    # Divider and bottom part of blocks
+    divider_and_rules_blocks = [
+        {"type": "divider"},
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*By clicking this button an event will be scheduled.* The following rules will be followed:",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "1. The event will be scheduled for the first available 30 minute timeslot starting the number of days selected above.",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "2. A proposed event will be added to everyone's calendar that is selected.",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "3. The retro will be scheduled only between 1:00pm and 3:00pm EDT to accomodate all time differences.",
+            },
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "4. If no free time exists for the next 2 months, the event will not be scheduled.",
+            },
+        },
+    ]
+
+    # Combine all blocks
+    all_blocks = top_blocks + divider_and_rules_blocks
+    view = {
+        "type": "modal",
+        "callback_id": "view_save_event",
+        "private_metadata": private_metadata,
+        "title": {"type": "plain_text", "text": "SRE - Schedule Retro 🗓️"},
+        "submit": {"type": "plain_text", "text": "Schedule"},
+        "submit_disabled": False,
+        "blocks": all_blocks,
+    }
+    # Return the completed modal
+    return view
 
 
 # Function to create the calendar event and bring up a modal that contains a link to the event. If the event could not be scheduled,
