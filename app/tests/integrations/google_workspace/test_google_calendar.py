@@ -2,7 +2,7 @@
 
 import json
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytest
 import pytz
 from integrations.google_workspace import google_calendar
@@ -74,6 +74,15 @@ def items():
 @pytest.fixture
 def mock_year():
     return 2024
+
+
+@pytest.fixture
+def time_range():
+    """Fixture providing standard time range for tests."""
+    return {
+        "time_min": "2023-04-01T00:00:00Z",
+        "time_max": "2023-05-01T00:00:00Z",
+    }
 
 
 @patch(
@@ -838,3 +847,261 @@ def test_get_utc_hour_invalid_minute():
     """
     with pytest.raises(ValueError):
         google_calendar.get_utc_hour(13, 60, "UTC")
+
+
+def test_identify_unavailable_users_exact_match(time_range):
+    """Test identifying users with busy periods exactly matching the search range."""
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    }
+                ]
+            },
+            "user2@example.com": {
+                "busy": [
+                    {
+                        "start": "2023-04-05T00:00:00Z",
+                        "end": "2023-04-10T00:00:00Z",
+                    }
+                ]
+            },
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    assert result == ["user1@example.com"]
+
+
+def test_identify_unavailable_users_within_threshold(time_range):
+    """Test identifying users with busy periods just outside the 1-hour threshold for end time."""
+    # Create a time 30 minutes after start but more than 1 hour before end
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+
+    close_start = (start_dt + timedelta(minutes=30)).isoformat() + "Z"
+    far_end = (
+        end_dt - timedelta(minutes=61)
+    ).isoformat() + "Z"  # Just outside 1-hour threshold
+
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "busy": [
+                    {
+                        "start": close_start,
+                        "end": far_end,
+                    }
+                ]
+            }
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # Should not be identified as problematic since end is more than 1 hour from range end
+    assert result == []
+
+
+def test_identify_unavailable_users_outside_threshold(time_range):
+    """Test users with busy periods outside the 1-hour threshold."""
+    # Create a time 2 hours after start
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+
+    far_start = (start_dt + timedelta(hours=2)).isoformat() + "Z"
+    far_end = (end_dt - timedelta(hours=2)).isoformat() + "Z"
+
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "busy": [
+                    {
+                        "start": far_start,
+                        "end": far_end,
+                    }
+                ]
+            }
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    assert result == []
+
+
+def test_identify_unavailable_users_multiple_busy_periods(time_range):
+    """Test users with multiple busy periods are not identified."""
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    }
+                ]
+            },
+            "user2@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    },
+                    {
+                        "start": "2023-04-05T00:00:00Z",
+                        "end": "2023-04-10T00:00:00Z",
+                    },
+                ]
+            },
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # Only user1 should be identified, not user2 (who has multiple entries)
+    assert result == ["user1@example.com"]
+
+
+def test_identify_unavailable_users_with_errors(time_range):
+    """Test users with calendar errors are skipped."""
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "errors": [{"domain": "global", "reason": "notFound"}],
+            },
+            "user2@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    }
+                ]
+            },
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # user1 should be skipped due to errors
+    assert result == ["user2@example.com"]
+
+
+def test_identify_unavailable_users_no_busy_data(time_range):
+    """Test users with no busy data are skipped."""
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                # No "busy" key
+            },
+            "user2@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    }
+                ]
+            },
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # user1 should be skipped due to no busy data
+    assert result == ["user2@example.com"]
+
+
+def test_identify_unavailable_users_empty_busy_list(time_range):
+    """Test users with empty busy list are not identified."""
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {"busy": []},
+            "user2@example.com": {
+                "busy": [
+                    {
+                        "start": time_range["time_min"],
+                        "end": time_range["time_max"],
+                    }
+                ]
+            },
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # user1 should not be identified as problematic
+    assert result == ["user2@example.com"]
+
+
+def test_identify_unavailable_users_edge_case_threshold(time_range):
+    """Test edge cases exactly at the 1-hour threshold."""
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
+        tzinfo=timezone.utc
+    )
+
+    threshold_start = (
+        start_dt + timedelta(seconds=3599)
+    ).isoformat() + "Z"  # Just under 1 hour
+    threshold_end = (
+        end_dt - timedelta(seconds=3599)
+    ).isoformat() + "Z"  # Just under 1 hour
+
+    freebusy_response = {
+        "calendars": {
+            "user1@example.com": {
+                "busy": [
+                    {
+                        "start": threshold_start,
+                        "end": threshold_end,
+                    }
+                ]
+            }
+        }
+    }
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    # Should be identified as problematic (both within threshold)
+    assert result == ["user1@example.com"]
+
+
+def test_identify_unavailable_users_empty_response(time_range):
+    """Test with empty response."""
+    freebusy_response = {"calendars": {}}
+
+    result = google_calendar.identify_unavailable_users(
+        freebusy_response, time_range["time_min"], time_range["time_max"]
+    )
+
+    assert result == []

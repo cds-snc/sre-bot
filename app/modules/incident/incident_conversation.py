@@ -27,7 +27,10 @@ def just_ack_the_rest_of_reaction_events():
     pass
 
 
-def is_incident_channel(client: WebClient, logger, channel_id: str):
+def is_incident_channel(
+    client: WebClient, logger, channel_id: str, notify: bool = True
+) -> tuple[bool, bool]:
+    """Check if the channel is an incident channel."""
     is_incident = False
     is_dev_incident = False
     try:
@@ -48,6 +51,11 @@ def is_incident_channel(client: WebClient, logger, channel_id: str):
     except SlackApiError as e:
         logger.error(f"Error with client request: {e}")
         raise e
+    if notify and not is_incident:
+        client.chat_postMessage(
+            channel=channel_id,
+            text="This channel is not an incident channel. Please use this command in an incident channel.",
+        )
     return is_incident, is_dev_incident
 
 
@@ -393,6 +401,6 @@ def archive_channel_action(client: WebClient, logger, body, ack, respond):
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
         channel_info["trigger_id"] = body["trigger_id"]
-        schedule_retro.schedule_incident_retro(client, channel_info, ack)
+        schedule_retro.open_incident_retro_modal(client, channel_info, ack, logger)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)

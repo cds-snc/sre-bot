@@ -1191,7 +1191,7 @@ def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_sch
     ack = MagicMock()
     incident_conversation.archive_channel_action(client, logger, body, ack, MagicMock())
     assert ack.call_count == 1
-    mock_schedule.schedule_incident_retro.assert_called_once_with(
-        client, channel_info, ack
+    mock_schedule.open_incident_retro_modal.assert_called_once_with(
+        client, channel_info, ack, logger
     )
     mock_log_to_sentinel.assert_called_once_with("incident_retro_scheduled", body)

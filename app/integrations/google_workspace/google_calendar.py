@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import requests
 import pytz
 
@@ -238,3 +238,50 @@ def get_utc_hour(hour, minute, tz_name, date=None):
     utc_time = local_time.astimezone(pytz.utc)
 
     return utc_time.hour
+
+
+def identify_unavailable_users(freebusy_response, time_min: str, time_max: str):
+    """
+    Identifies users who appear to have calendar configuration issues
+    or are completely unavailable during the entire specified time range.
+
+    Args:
+        freebusy_response (dict): Response from the freebusy API
+        time_min (str): ISO format string for start time with 'Z' suffix
+        time_max (str): ISO format string for end time with 'Z' suffix
+
+    Returns:
+        list: List of emails of users with potential calendar issues
+    """
+    unavailable_user_emails = []
+
+    # Convert time_min and time_max to datetime objects
+    start_dt = datetime.fromisoformat(time_min[:-1]).replace(tzinfo=timezone.utc)
+    end_dt = datetime.fromisoformat(time_max[:-1]).replace(tzinfo=timezone.utc)
+
+    # Check each calendar
+    for email, calendar_data in freebusy_response["calendars"].items():
+        # Skip if there are errors or no busy data
+        if "errors" in calendar_data or "busy" not in calendar_data:
+            continue
+
+        busy_periods = calendar_data["busy"]
+
+        if len(busy_periods) == 1:
+            busy_start = datetime.fromisoformat(busy_periods[0]["start"][:-1]).replace(
+                tzinfo=timezone.utc
+            )
+            busy_end = datetime.fromisoformat(busy_periods[0]["end"][:-1]).replace(
+                tzinfo=timezone.utc
+            )
+
+            # Calculate how close the busy period is to the search period boundaries
+            start_diff = abs((busy_start - start_dt).total_seconds())
+            end_diff = abs((busy_end - end_dt).total_seconds())
+
+            # If within 1 hour of both boundaries, this is likely a configuration issue
+            if start_diff < 3600 and end_diff < 3600:
+                unavailable_user_emails.append(email)
+                continue
+
+    return unavailable_user_emails
