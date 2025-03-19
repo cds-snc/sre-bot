@@ -67,10 +67,23 @@ def test_schedule_event_successful(
         end,
     )
     mock_days = 1
-    mock_emails = ["user1@example.com", "user2@example.com"]
-
+    mock_users = [
+        {
+            "text": {"type": "plain_text", "text": "User 1", "emoji": True},
+            "value": "U1",
+        },
+        {
+            "text": {"type": "plain_text", "text": "User 2", "emoji": True},
+            "value": "U2",
+        },
+    ]
+    mock_client = MagicMock()
+    mock_client.users_info.side_effect = [
+        {"user": {"profile": {"email": "user1@example.com"}}},
+        {"user": {"profile": {"email": "user2@example.com"}}},
+    ]
     # Call the function under test
-    result = schedule_retro.schedule_event(mock_days, mock_emails)
+    result = schedule_retro.schedule_event(mock_client, mock_days, mock_users)
 
     # Assertions
     get_freebusy_mock.assert_called_once()
@@ -97,11 +110,26 @@ def test_schedule_event_no_available_slots(
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
     find_first_available_slot_mock.return_value = (None, None)
     mock_days = 1
-    mock_emails = ["test1@test.com", "test2@test.com"]
+    mock_users = [
+        {
+            "text": {"type": "plain_text", "text": "User 1", "emoji": True},
+            "value": "U1",
+        },
+        {
+            "text": {"type": "plain_text", "text": "User 2", "emoji": True},
+            "value": "U2",
+        },
+    ]
+    mock_client = MagicMock()
+    mock_client.users_info.side_effect = [
+        {"user": {"profile": {"email": "user1@example.com"}}},
+        {"user": {"profile": {"email": "user2@example.com"}}},
+    ]
+    mock_emails = ["user1@example.com", "user2@example.com"]
     identifiy_unavailable_users_mock.return_value = mock_emails
 
     # Call the function under test
-    result = schedule_retro.schedule_event(mock_days, mock_emails)
+    result = schedule_retro.schedule_event(mock_client, mock_days, mock_users)
 
     # Assertions
     get_freebusy_mock.assert_called_once()
