@@ -159,16 +159,216 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
     channel_name = "general"  # Not an incident channel
 
     # Prepare the request body
-    body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
+    body = {
+        "trigger_id": "trigger_id",
+        "channel_id": channel_id,
+        "user_id": user_id,
+        "channel_name": channel_name,
+    }
 
     # Call the function being tested
     schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
 
     # Ensure the ack method was called
     mock_ack.assert_called_once()
-    mock_client.conversations_members.assert_not_called()
     mock_incident_conversation.get_incident_document_id.assert_not_called()
     mock_slack_channels.fetch_user_details.assert_not_called()
+    mock_client.views_open.assert_not_called()
+
+
+@patch("modules.incident.schedule_retro.generate_retro_options_view")
+@patch("modules.incident.schedule_retro.slack_channels")
+@patch("modules.incident.schedule_retro.incident_conversation")
+def test_open_incident_retro_modal(
+    mock_incident_conversation,
+    mock_slack_channels,
+    mock_generate_retro_options_view,
+):
+    mock_ack = MagicMock()
+    mock_client = MagicMock()
+    mock_logger = MagicMock()
+    mock_incident_conversation.is_incident_channel.return_value = [True, False]
+    mock_incident_conversation.get_incident_document_id.return_value = (
+        "dummy_document_id"
+    )
+    # The test channel and user IDs
+    channel_id = "C12345"
+    channel_name = "incident-some-channel-name"
+    user_id = "U12345"
+
+    # Prepare the request body
+    body = {
+        "trigger_id": "trigger_id",
+        "channel_id": channel_id,
+        "user_id": user_id,
+        "channel_name": channel_name,
+    }
+    users_details = [
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 1",
+                "emoji": True,
+            },
+            "value": "U0123456789",
+        },
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 2",
+                "emoji": True,
+            },
+            "value": "U9876543210",
+        },
+    ]
+    mock_slack_channels.fetch_user_details.return_value = users_details
+    mocked_view = {
+        "type": "modal",
+        "callback_id": "schedule_retro",
+    }
+    mock_generate_retro_options_view.return_value = mocked_view
+    metadata_json = json.dumps(
+        {
+            "name": channel_name,
+            "incident_document": "dummy_document_id",
+            "channel_id": channel_id,
+        }
+    )
+    # Call the function being tested
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
+
+    mock_ack.assert_called_once()
+    mock_incident_conversation.get_incident_document_id.assert_called_once_with(
+        mock_client,
+        channel_id,
+        mock_logger,
+    )
+    mock_slack_channels.fetch_user_details.assert_called_once_with(
+        mock_client, channel_id
+    )
+    mock_generate_retro_options_view.assert_called_once_with(
+        metadata_json, users_details
+    )
+    mock_client.views_open.assert_called_once_with(
+        trigger_id="trigger_id",
+        view=mock_generate_retro_options_view.return_value,
+    )
+
+
+def test_generate_retro_options_view_no_unavailable_users():
+    """Test that the modal is correctly generated with no unavailable users."""
+    # Setup
+    private_metadata = json.dumps(
+        {
+            "name": "incident-test-channel",
+            "incident_document": "test-doc-id",
+            "channel_id": "C12345",
+        }
+    )
+
+    all_users = [
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 1",
+                "emoji": True,
+            },
+            "value": "U0123456789",
+        },
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 2",
+                "emoji": True,
+            },
+            "value": "U9876543210",
+        },
+    ]
+
+    # Call the function
+    result = schedule_retro.generate_retro_options_view(private_metadata, all_users)
+
+    # Assertions
+    assert result["type"] == "modal"
+    assert result["callback_id"] == "view_save_event"
+    assert result["private_metadata"] == private_metadata
+    assert result["submit"]["text"] == "Schedule"
+    assert result["submit_disabled"] is False
+
+    # Check blocks - there should be exactly 7 blocks (2 top blocks + divider + 5 rule blocks)
+    assert len(result["blocks"]) == 8
+
+    # Verify the blocks structure
+    assert result["blocks"][0]["type"] == "input"  # Days input
+    assert result["blocks"][1]["type"] == "section"  # User select
+    assert result["blocks"][2]["type"] == "divider"  # Divider
+
+    # Verify no unavailable users block
+    for block in result["blocks"]:
+        if block["type"] == "section" and "text" in block:
+            text = block["text"].get("text", "")
+            assert "calendar availability issues" not in text
+
+
+def test_generate_retro_options_view_with_unavailable_users():
+    """Test that the modal is correctly generated with unavailable users."""
+    # Setup
+    private_metadata = json.dumps(
+        {
+            "name": "incident-test-channel",
+            "incident_document": "test-doc-id",
+            "channel_id": "C12345",
+        }
+    )
+
+    all_users = [
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 1",
+                "emoji": True,
+            },
+            "value": "U0123456789",
+        },
+        {
+            "text": {
+                "type": "plain_text",
+                "text": "User 2",
+                "emoji": True,
+            },
+            "value": "U9876543210",
+        },
+    ]
+
+    unavailable_users = ["user1@example.com", "user2@example.com"]
+
+    # Call the function
+    result = schedule_retro.generate_retro_options_view(
+        private_metadata, all_users, unavailable_users
+    )
+
+    # Assertions
+    assert result["type"] == "modal"
+    assert result["callback_id"] == "view_save_event"
+    assert result["private_metadata"] == private_metadata
+    assert result["submit"]["text"] == "Schedule"
+    assert result["submit_disabled"] is False
+
+    # Check blocks - there should be exactly 9 blocks (2 top blocks + unavailable users block + divider + 5 rule blocks)
+    assert len(result["blocks"]) == 9
+
+    # Verify the blocks structure
+    assert result["blocks"][0]["type"] == "input"  # Days input
+    assert result["blocks"][1]["type"] == "section"  # User select
+
+    # Verify unavailable users block exists and has the correct content
+    assert result["blocks"][2]["type"] == "section"
+    assert "calendar availability issues" in result["blocks"][2]["text"]["text"]
+    assert "user1@example.com" in result["blocks"][2]["text"]["text"]
+    assert "user2@example.com" in result["blocks"][2]["text"]["text"]
+
+    # Verify divider and rules follow
+    assert result["blocks"][3]["type"] == "divider"
 
 
 @patch("modules.incident.schedule_retro.schedule_event")
