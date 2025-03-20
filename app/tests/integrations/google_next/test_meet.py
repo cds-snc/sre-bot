@@ -1,4 +1,4 @@
-""""Unit tests for the Google Meet API."""
+""" "Unit tests for the Google Meet API."""
 
 from unittest.mock import MagicMock, patch
 

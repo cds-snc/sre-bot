@@ -26,6 +26,7 @@ i18n.set("fallback", "en-US")
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID", "")
 PREFIX = os.environ.get("PREFIX", "")
+INCIDENT_HANDBOOK_URL = os.environ.get("INCIDENT_HANDBOOK_URL")
 
 
 def register(bot):
@@ -92,7 +93,8 @@ def handle_change_locale_button(ack, client, body):
     client.views_update(view_id=body["view"]["id"], view=view)
 
 
-def submit(ack, view, say, body, client: WebClient, logger):
+def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
+    # Complexity of function is too high for flake8 but currently we are ignoring this until we refactor this function.
     ack()
 
     gmeet_scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
@@ -104,6 +106,9 @@ def submit(ack, view, say, body, client: WebClient, logger):
     product = view["state"]["values"]["product"]["product"]["selected_option"]["text"][
         "text"
     ]
+    security_incident = view["state"]["values"]["security_incident"][
+        "security_incident"
+    ]["selected_option"]["value"]
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
@@ -245,7 +250,10 @@ def submit(ack, view, say, body, client: WebClient, logger):
             users_to_invite.append(user["id"])
 
     # Get users from the @security group
-    response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
+    if security_incident == "yes":
+        # If this is a security incident, get users from the security user group
+        # and add them to the list of users to invite
+        response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
 
     # if we are testing, ie PREFIX is "dev" then don't add the security group users since we don't want to spam them
     if response.get("ok") and PREFIX == "":
@@ -354,6 +362,57 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
                     "action_id": "product",
                 },
                 "label": {"type": "plain_text", "text": "Product", "emoji": True},
+            },
+            {
+                "block_id": "security_incident",
+                "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("incident.modal.security_incident_placeholder"),
+                        "emoji": True,
+                    },
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.security_yes"),
+                                "emoji": True,
+                            },
+                            "value": "yes",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.security_no"),
+                                "emoji": True,
+                            },
+                            "value": "no",
+                        },
+                    ],
+                    "action_id": "security_incident",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.security_incident"),
+                    "emoji": True,
+                },
+                "hint": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.security_incident_hint"),
+                },
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "For more details on what constitutes a security incident, visit our <"
+                        + INCIDENT_HANDBOOK_URL
+                        + "|Incident Management Handbook>.",
+                    }
+                ],
             },
         ],
     }

@@ -767,6 +767,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     ack = MagicMock()
     logger = MagicMock()
     view = helper_generate_view()
+
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
@@ -788,6 +789,66 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     }
 
     mock_create_new_incident.return_value = "id"
+
+    mock_get_on_call_users.return_value = ["email"]
+    mock_incident_folder.get_folder_metadata.return_value = {
+        "appProperties": {"genie_schedule": "oncall"}
+    }
+
+    incident.submit(ack, view, say, body, client, logger)
+    mock_get_on_call_users.assert_called_once_with("oncall")
+    client.users_lookupByEmail.assert_any_call(email="email")
+    client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
+    client.conversations_invite.assert_has_calls(
+        [
+            call(channel="channel_id", users="creator_user_id"),
+            call(channel="channel_id", users=["on_call_user_id"]),
+        ]
+    )
+
+
+@patch("modules.incident.incident.db_operations")
+@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.incident_document")
+@patch("modules.incident.incident.incident_folder")
+@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.incident.log_to_sentinel")
+def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
+    _log_to_sentinel_mock,
+    mock_get_on_call_users,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    _mock_db_operations,
+):
+    ack = MagicMock()
+    logger = MagicMock()
+    view = helper_generate_view()
+
+    # override the security incident selection to "no"
+    view["state"]["values"]["security_incident"]["security_incident"][
+        "selected_option"
+    ]["value"] = "no"
+
+    say = MagicMock()
+    body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "channel_id", "name": "channel_name"}
+    }
+    client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {
+            "id": "on_call_user_id",
+            "profile": {"display_name_normalized": "name"},
+        },
+    }
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": ["creator_user_id"],
+    }
+
+    mock_incident_document.create_incident_document.return_value = "id"
 
     mock_get_on_call_users.return_value = ["email"]
     mock_incident_folder.get_folder_metadata.return_value = {
@@ -883,6 +944,14 @@ def helper_generate_view(name="name", locale="en-US"):
                         "selected_option": {
                             "text": {"text": "product"},
                             "value": "folder",
+                        }
+                    }
+                },
+                "security_incident": {
+                    "security_incident": {
+                        "selected_option": {
+                            "text": {"text": "yes"},
+                            "value": "yes",
                         }
                     }
                 },

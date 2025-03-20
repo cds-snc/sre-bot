@@ -1,4 +1,4 @@
-""""Unit tests for the Google Directory API."""
+""" "Unit tests for the Google Directory API."""
 
 from unittest.mock import MagicMock, call, patch
 

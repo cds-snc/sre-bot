@@ -8,6 +8,7 @@ import pytest
 from modules import incident_helper
 
 SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
+INCIDENT_HANDBOOK_URL = os.getenv("INCIDENT_HANDBOOK_URL")
 
 
 @patch("modules.incident.incident_helper.incident_conversation")
