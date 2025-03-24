@@ -2,6 +2,7 @@
 
 import logging
 import structlog
+from structlog.stdlib import BoundLogger
 from .config import settings
 
 
@@ -32,7 +33,7 @@ def configure_logging():
         level=logging.INFO,
     )
 
-    return structlog.get_logger()
+    return structlog.stdlib.get_logger()
 
 
-logger = configure_logging()
+logger: BoundLogger = configure_logging()
