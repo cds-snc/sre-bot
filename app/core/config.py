@@ -2,6 +2,9 @@
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import structlog
+
+logger = structlog.stdlib.get_logger().bind(component="config")
 
 
 class SlackSettings(BaseSettings):
@@ -89,3 +92,15 @@ class Settings(BaseSettings):
 
 # Create the settings instance
 settings = Settings()
+
+logger.info("config_initialized", prefix=settings.PREFIX, git_sha=settings.GIT_SHA)
+logger.info(
+    "aws_config_loaded",
+    config_keys=list(settings.aws.model_dump().keys()),
+    region=settings.aws.AWS_REGION,
+)
+logger.info("slack_config_loaded", config_keys=list(settings.slack.model_dump().keys()))
+logger.info(
+    "google_workspace_config_loaded",
+    config_keys=list(settings.google_workspace.model_dump().keys()),
+)
