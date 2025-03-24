@@ -1,7 +1,9 @@
-import os
+"""AWS GuardDuty integration module."""
+
+from core.config import settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-LOGGING_ROLE_ARN = os.environ.get("AWS_LOGGING_ACCOUNT_ROLE_ARN")
+LOGGING_ROLE_ARN = settings.aws.LOGGING_ROLE_ARN
 
 
 @handle_aws_api_errors

@@ -25,6 +25,7 @@ class SlackSettings(BaseSettings):
 class AwsSettings(BaseSettings):
     """AWS configuration settings."""
 
+    AWS_REGION: str = Field(default="ca-central-1", alias="AWS_REGION")
     SYSTEM_ADMIN_PERMISSIONS: str = Field(
         default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS"
     )
@@ -32,7 +33,12 @@ class AwsSettings(BaseSettings):
     VIEW_ONLY_PERMISSIONS: str = Field(
         default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS"
     )
-    AWS_REGION: str = Field(default="ca-central-1", alias="AWS_REGION")
+    AUDIT_ROLE_ARN: str = Field(default="", alias="AWS_AUDIT_ACCOUNT_ROLE_ARN")
+    ORG_ROLE_ARN: str = Field(default="", alias="AWS_ORG_ACCOUNT_ROLE_ARN")
+    LOGGING_ROLE_ARN: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
+
+    INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
+    INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
 
     THROTTLING_ERRORS: list[str] = [
         "Throttling",

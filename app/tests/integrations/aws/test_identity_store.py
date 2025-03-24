@@ -30,7 +30,7 @@ def user(user_number=1):
     }
 
 
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 def test_resolve_identity_store_id():
     assert identity_store.resolve_identity_store_id({}) == {
         "IdentityStoreId": "test_instance_id"
@@ -43,7 +43,7 @@ def test_resolve_identity_store_id():
     }
 
 
-@patch.dict(os.environ, clear=True)
+@patch("integrations.aws.identity_store.INSTANCE_ID", None)
 def test_resolve_identity_store_id_no_env():
     with pytest.raises(ValueError):
         identity_store.resolve_identity_store_id({})
@@ -316,7 +316,7 @@ def test_delete_user_not_found(
 
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_users(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
@@ -357,7 +357,7 @@ def test_list_users_with_identity_store_id(
 
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_users_with_kwargs(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
@@ -376,7 +376,7 @@ def test_list_users_with_kwargs(mock_execute_aws_api_call):
 
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_get_group_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = {"GroupId": "test_group_id"}
@@ -400,7 +400,7 @@ def test_get_group_id(mock_execute_aws_api_call):
 
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_get_group_id_no_group(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = False
@@ -424,7 +424,7 @@ def test_get_group_id_no_group(mock_execute_aws_api_call):
 
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_groups(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["Group1", "Group2"]
@@ -443,8 +443,8 @@ def test_list_groups(mock_execute_aws_api_call):
     assert result == ["Group1", "Group2"]
 
 
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_groups_returns_empty_array_if_no_groups(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = False
@@ -463,8 +463,8 @@ def test_list_groups_returns_empty_array_if_no_groups(mock_execute_aws_api_call)
     assert result == []
 
 
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
-@patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_groups_custom_identity_store_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["Group1", "Group2"]
@@ -668,10 +668,7 @@ def test_delete_group_membership_resource_not_found(
     assert result is False
 
 
-@patch.dict(
-    os.environ,
-    {"AWS_SSO_INSTANCE_ID": "test_instance_id"},
-)
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_group_memberships(mock_execute_aws_api_call):
@@ -718,10 +715,7 @@ def test_list_group_memberships(mock_execute_aws_api_call):
     ]
 
 
-@patch.dict(
-    os.environ,
-    {"AWS_SSO_INSTANCE_ID": "test_instance_id"},
-)
+@patch("integrations.aws.identity_store.INSTANCE_ID", "test_instance_id")
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
 def test_list_group_memberships_with_custom_id(mock_execute_aws_api_call):

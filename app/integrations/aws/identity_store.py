@@ -1,23 +1,22 @@
-import os
-import logging
+"""AWS Identity Store module"""
+
+from core.config import settings
+from core.logging import get_module_logger
 
 import pandas as pd
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 from utils import filters
 
-INSTANCE_ID = os.environ.get("AWS_SSO_INSTANCE_ID", "")
-INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
-ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN", "")
+INSTANCE_ID = settings.aws.INSTANCE_ID
+ROLE_ARN = settings.aws.ORG_ROLE_ARN
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger()
 
 
 def resolve_identity_store_id(kwargs):
     """Resolve IdentityStoreId and add it to kwargs if not present."""
     if "IdentityStoreId" not in kwargs:
-        kwargs["IdentityStoreId"] = kwargs.get(
-            "identity_store_id", os.environ.get("AWS_SSO_INSTANCE_ID", None)
-        )
+        kwargs["IdentityStoreId"] = kwargs.get("identity_store_id", INSTANCE_ID)
         kwargs.pop("identity_store_id", None)
     if kwargs["IdentityStoreId"] is None:
         error_message = "IdentityStoreId must be provided either as a keyword argument or as the AWS_SSO_INSTANCE_ID environment variable"
