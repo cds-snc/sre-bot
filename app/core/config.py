@@ -15,6 +15,7 @@ class SlackSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
+        extra="ignore",
     )
 
 
@@ -39,6 +40,7 @@ class AwsSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
+        extra="ignore",
     )
 
 
@@ -46,6 +48,11 @@ class GoogleWorkspaceSettings(BaseSettings):
     """Google Workspace configuration settings."""
 
     INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 class Settings(BaseSettings):
@@ -68,6 +75,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
+        extra="ignore",
     )
 
 
