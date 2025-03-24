@@ -62,16 +62,24 @@ class Settings(BaseSettings):
     GIT_SHA: str = "Unknown"
 
     # Nested settings
-    slack: SlackSettings = SlackSettings()
-    aws: AwsSettings = AwsSettings()
-    google_workspace: GoogleWorkspaceSettings = GoogleWorkspaceSettings()
+    slack: SlackSettings
+    aws: AwsSettings
+    google_workspace: GoogleWorkspaceSettings
 
     @property
     def is_production(self) -> bool:
         """Check if the application is running in production."""
         return not bool(self.PREFIX)
 
-    # This is the key configuration
+    def __init__(self, **kwargs):
+        if "slack" not in kwargs:
+            kwargs["slack"] = SlackSettings()
+        if "aws" not in kwargs:
+            kwargs["aws"] = AwsSettings()
+        if "google_workspace" not in kwargs:
+            kwargs["google_workspace"] = GoogleWorkspaceSettings()
+        super().__init__(**kwargs)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
