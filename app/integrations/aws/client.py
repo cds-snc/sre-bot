@@ -1,7 +1,8 @@
-import boto3  # type: ignore
 from functools import wraps
-from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+
+import boto3  # type: ignore
 from botocore.client import BaseClient  # type: ignore
+from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from core.config import settings
 from core.logging import get_module_logger
 
