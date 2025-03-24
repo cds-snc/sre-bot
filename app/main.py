@@ -1,6 +1,4 @@
 import os
-import json
-import logging
 from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
@@ -15,24 +13,24 @@ from modules import (
     incident,
     incident_helper,
 )
+from core.config import settings
+from core.logging import logger
 from server import bot_middleware, server
 
 from jobs import scheduled_tasks
 
 server_app = server.handler
 
-logging.basicConfig(level=logging.INFO)
-
 load_dotenv()
 
 
 def main(bot):
     # Log startup output
-    logging.info(f"Starting up with SHA {os.environ.get('GIT_SHA', 'unknown')}")
-    logging.info(f"ENV keys: {json.dumps(list(os.environ.keys()))}")
+    logger.info("application_startup", git_sha=settings.GIT_SHA)
+    logger.info("environment_variables", keys=list(os.environ.keys()))
 
-    APP_TOKEN = os.environ.get("APP_TOKEN")
-    PREFIX = os.environ.get("PREFIX", "")
+    APP_TOKEN = settings.slack.APP_TOKEN
+    PREFIX = settings.PREFIX
 
     # Register Roles commands
     role.register(bot)
@@ -68,7 +66,7 @@ def main(bot):
 
 
 def get_bot():
-    SLACK_TOKEN = os.environ.get("SLACK_TOKEN", None)
+    SLACK_TOKEN = settings.slack.SLACK_TOKEN
     if not bool(SLACK_TOKEN):
         return False
     return App(token=SLACK_TOKEN)

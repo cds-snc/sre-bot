@@ -26,5 +26,6 @@ requests==2.32.3
 slowapi==0.1.9
 schedule==1.2.2
 slack-bolt==1.22.0
+structlog==25.2.0
 trello==0.9.7.3
 uvicorn==0.34.0
