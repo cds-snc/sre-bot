@@ -30,6 +30,7 @@ GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOM
 GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
     settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 )
+SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 logger = get_module_logger()
 
 
