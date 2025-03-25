@@ -6,8 +6,8 @@ import pandas as pd
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
-    DEFAULT_DELEGATED_ADMIN_EMAIL,
-    DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
+    GOOGLE_DELEGATED_ADMIN_EMAIL,
+    GOOGLE_WORKSPACE_CUSTOMER_ID,
 )
 from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
@@ -30,7 +30,7 @@ def get_user(user_key, delegated_user_email=None, fields=None):
     """
 
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
     return execute_google_api_call(
         "admin",
@@ -56,9 +56,9 @@ def list_users(
         list: A list of user objects.
     """
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     if not customer:
-        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
+        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
     return execute_google_api_call(
         "admin",
@@ -88,9 +88,9 @@ def list_groups(
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/list
     """
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     if not customer:
-        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
+        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
 
     kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
@@ -124,7 +124,7 @@ def list_group_members(group_key, delegated_user_email=None, fields=None):
     """
 
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"]
     return execute_google_api_call(
         "admin",
@@ -149,7 +149,7 @@ def get_group(group_key, fields=None):
         "groups",
         "get",
         scopes,
-        DEFAULT_DELEGATED_ADMIN_EMAIL,
+        GOOGLE_DELEGATED_ADMIN_EMAIL,
         groupKey=group_key,
         fields=fields,
     )
