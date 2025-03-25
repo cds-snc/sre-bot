@@ -56,6 +56,16 @@ class AwsSettings(BaseSettings):
 class GoogleWorkspaceSettings(BaseSettings):
     """Google Workspace configuration settings."""
 
+    GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(
+        default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL"
+    )
+    GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
+        default="", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
+    )
+
+    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
+        default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
+    )
     INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
     model_config = SettingsConfigDict(
         env_file=".env",
