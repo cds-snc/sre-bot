@@ -5,7 +5,9 @@ import pytest
 from integrations.google_workspace import google_drive
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_add_metadata_returns_result(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "name": "test_folder",
@@ -27,7 +29,9 @@ def test_add_metadata_returns_result(execute_google_api_call_mock):
     assert result == {"name": "test_folder", "appProperties": {"key": "value"}}
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_delete_metadata_returns_result(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "name": "test_folder",
@@ -48,7 +52,9 @@ def test_delete_metadata_returns_result(execute_google_api_call_mock):
     assert result == {"name": "test_folder", "appProperties": {}}
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_list_metadata_returns_result(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "name": "test_folder",
@@ -70,7 +76,9 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
     }
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_create_folder_returns_folder(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "id": "test_folder_id",
@@ -99,7 +107,9 @@ def test_create_folder_returns_folder(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "id": "test_folder_id",
@@ -124,7 +134,9 @@ def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {"id": "test_document_id"}
     result = google_drive.create_file("test_document", "folder_id", "document")
@@ -144,11 +156,10 @@ def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_moc
     )
 
 
-@patch("logging.error")
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
-def test_create_file_with_invalid_type_raises_value_error(
-    execute_google_api_call_mock, mocked_logging_error
-):
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
+def test_create_file_with_invalid_type_raises_value_error(execute_google_api_call_mock):
     execute_google_api_call_mock.side_effect = ValueError(
         "Invalid file_type: invalid_file_type"
     )
@@ -156,12 +167,10 @@ def test_create_file_with_invalid_type_raises_value_error(
         result = google_drive.create_file("name", "folder", "invalid_file_type")
         assert result is None
 
-    # mocked_logging_error.assert_called_once_with(
-    #     "A ValueError occurred in function 'integrations.google_workspace.google_drive:create_file': Invalid file_type: invalid_file_type"
-    # )
 
-
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_create_file_from_template_returns_file(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {"id": "test_document_id"}
     result = google_drive.create_file_from_template(
@@ -182,7 +191,34 @@ def test_create_file_from_template_returns_file(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
+def test_get_file_by_id(execute_google_api_call_mock):
+    execute_google_api_call_mock.return_value = {
+        "name": "test_document",
+        "id": "test_document_id",
+        "appProperties": {},
+    }
+    result = google_drive.get_file_by_id("test_document_id")
+    assert result == {
+        "name": "test_document",
+        "id": "test_document_id",
+        "appProperties": {},
+    }
+    execute_google_api_call_mock.assert_called_once_with(
+        "drive",
+        "v3",
+        "files",
+        "get",
+        fileId="test_document_id",
+        supportsAllDrives=True,
+    )
+
+
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_find_files_by_name_with_folder_id_returns_object(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = [
         {
@@ -215,7 +251,9 @@ def test_find_files_by_name_with_folder_id_returns_object(execute_google_api_cal
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_find_files_by_name_without_folder_id_returns_object(
     execute_google_api_call_mock,
 ):
@@ -250,7 +288,9 @@ def test_find_files_by_name_without_folder_id_returns_object(
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_find_files_by_name_with_empty_folder_id_returns_object(
     execute_google_api_call_mock,
 ):
@@ -285,7 +325,9 @@ def test_find_files_by_name_with_empty_folder_id_returns_object(
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_find_files_by_name_no_file_found_returns_empty_list(
     execute_google_api_call_mock,
 ):
@@ -308,7 +350,9 @@ def test_find_files_by_name_no_file_found_returns_empty_list(
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
     execute_google_api_call_mock.side_effect = [
         [{"id": "file_id"}],  # Response from the "copy" method
@@ -351,7 +395,9 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_list_folders_in_folder_returns_folders(execute_google_api_call_mock):
     # Mock the results
     results = [
@@ -379,7 +425,40 @@ def test_list_folders_in_folder_returns_folders(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_drive.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
+def test_list_folders_in_folder_with_query(execute_google_api_call_mock):
+    # Mock the results
+    results = [
+        {"id": "test_folder_id", "name": "test_folder"},
+        {"id": "test_folder_id2", "name": "test_folder2"},
+    ]
+    query = "some_query"
+
+    # Mock execute_google_api_call to return the results
+    execute_google_api_call_mock.return_value = results
+
+    assert google_drive.list_folders_in_folder("parent_folder", query) == results
+
+    execute_google_api_call_mock.assert_called_once_with(
+        "drive",
+        "v3",
+        "files",
+        "list",
+        paginate=True,
+        pageSize=25,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+        corpora="user",
+        q="parents in 'parent_folder' and mimeType = 'application/vnd.google-apps.folder' and trashed=false and some_query",
+        fields="files(id, name)",
+    )
+
+
+@patch(
+    "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
+)
 def test_list_files_in_folder_returns_files(execute_google_api_call_mock):
     # Mock the results
     results = [

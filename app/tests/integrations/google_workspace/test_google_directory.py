@@ -10,7 +10,9 @@ from integrations.google_workspace import google_directory
     "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
     new="default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_get_user_returns_user(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "id": "test_user_id",
@@ -36,7 +38,9 @@ def test_get_user_returns_user(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_get_user_uses_custom_delegated_user_email_if_provided(
     execute_google_api_call_mock,
 ):
@@ -73,7 +77,9 @@ def test_get_user_uses_custom_delegated_user_email_if_provided(
     "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
     new="default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_users_returns_users(execute_google_api_call_mock):
     # Mock the results
     results = [
@@ -99,7 +105,9 @@ def test_list_users_returns_users(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided(
     execute_google_api_call_mock,
 ):
@@ -141,7 +149,9 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
     "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
     new="default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_groups_calls_execute_google_api_call(
     mock_execute_google_api_call,
 ):
@@ -169,7 +179,9 @@ def test_list_groups_calls_execute_google_api_call(
     new="default_delegated_admin_email",
 )
 @patch("integrations.google_workspace.google_directory.convert_string_to_camel_case")
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_groups_calls_execute_google_api_call_with_kwargs(
     mock_execute_google_api_call, mock_convert_string_to_camel_case
 ):
@@ -191,7 +203,9 @@ def test_list_groups_calls_execute_google_api_call_with_kwargs(
     assert mock_convert_string_to_camel_case.called_once
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provided(
     execute_google_api_call_mock,
 ):
@@ -229,7 +243,9 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
     "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
     new="default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_group_members_calls_execute_google_api_call_with_correct_args(
     mock_execute_google_api_call,
 ):
@@ -249,7 +265,9 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     execute_google_api_call_mock,
 ):
@@ -287,7 +305,9 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
     "default_delegated_admin_email",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
+)
 def test_get_group_calls_execute_google_api_call_with_correct_args(
     mock_execute_google_api_call,
 ):

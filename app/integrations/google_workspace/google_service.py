@@ -31,6 +31,8 @@ GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
     settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 )
 SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
+INCIDENT_TEMPLATE = settings.google_workspace.INCIDENT_TEMPLATE
+
 logger = get_module_logger()
 
 
