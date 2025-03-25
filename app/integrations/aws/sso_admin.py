@@ -1,14 +1,14 @@
-import os
-import logging
+from core.config import settings
+from core.logging import get_module_logger
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger()
 
-ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN", "")
-INSTANCE_ARN = os.environ.get("AWS_SSO_INSTANCE_ARN", "")
-SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
-VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
+ROLE_ARN = settings.aws.ORG_ROLE_ARN
+INSTANCE_ARN = settings.aws.INSTANCE_ARN
+SYSTEM_ADMIN_PERMISSIONS = settings.aws.SYSTEM_ADMIN_PERMISSIONS
+VIEW_ONLY_PERMISSIONS = settings.aws.VIEW_ONLY_PERMISSIONS
 
 
 def get_predefined_permission_sets(permission_set_name):

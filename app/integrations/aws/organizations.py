@@ -1,10 +1,10 @@
-import os
-import logging
+from core.config import settings
+from core.logging import get_module_logger
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN", "")
+ORG_ROLE_ARN = settings.aws.ORG_ROLE_ARN
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger()
 
 
 @handle_aws_api_errors

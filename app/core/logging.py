@@ -1,7 +1,9 @@
 """SRE Bot structure logging module."""
 
 import logging
+import inspect
 import structlog
+from structlog.stdlib import BoundLogger
 from .config import settings
 
 
@@ -32,7 +34,20 @@ def configure_logging():
         level=logging.INFO,
     )
 
-    return structlog.get_logger()
+    return structlog.stdlib.get_logger()
 
 
-logger = configure_logging()
+logger: BoundLogger = configure_logging()
+
+
+def get_module_logger() -> BoundLogger:
+    """Get a logger for the calling module."""
+    current_frame = inspect.currentframe()
+    if current_frame is None:
+        return logger
+    frame = current_frame.f_back
+    module = inspect.getmodule(frame)
+    module_name = "unknown"
+    if module:
+        module_name = module.__name__.split(".")[-1]
+    return logger.bind(component=module_name)

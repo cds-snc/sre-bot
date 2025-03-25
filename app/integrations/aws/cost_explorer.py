@@ -1,9 +1,9 @@
 """Cost Explorer API integration."""
 
-import os
-from .client import execute_aws_api_call, handle_aws_api_errors
+from core.config import settings
+from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-ORG_ROLE_ARN = os.environ.get("AWS_ORG_ACCOUNT_ROLE_ARN")
+ORG_ROLE_ARN = settings.aws.ORG_ROLE_ARN
 
 
 @handle_aws_api_errors

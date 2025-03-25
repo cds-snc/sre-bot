@@ -1,20 +1,18 @@
-import os
-import logging
 from functools import wraps
+
 import boto3  # type: ignore
-from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from botocore.client import BaseClient  # type: ignore
-from dotenv import load_dotenv
+from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+from core.config import settings
+from core.logging import get_module_logger
 
-load_dotenv()
+logger = get_module_logger()
 
-SYSTEM_ADMIN_PERMISSIONS = os.environ.get("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
-VIEW_ONLY_PERMISSIONS = os.environ.get("AWS_SSO_VIEW_ONLY_PERMISSIONS")
-AWS_REGION = os.environ.get("AWS_REGION", "ca-central-1")
-THROTTLING_ERRORS = ["Throttling", "ThrottlingException", "RequestLimitExceeded"]
-RESOURCE_NOT_FOUND_ERRORS = ["ResourceNotFoundException", "NoSuchEntity"]
-
-logger = logging.getLogger()
+SYSTEM_ADMIN_PERMISSIONS = settings.aws.SYSTEM_ADMIN_PERMISSIONS
+VIEW_ONLY_PERMISSIONS = settings.aws.VIEW_ONLY_PERMISSIONS
+AWS_REGION = settings.aws.AWS_REGION
+THROTTLING_ERRORS = settings.aws.THROTTLING_ERRORS
+RESOURCE_NOT_FOUND_ERRORS = settings.aws.RESOURCE_NOT_FOUND_ERRORS
 
 
 def handle_aws_api_errors(func):
@@ -32,16 +30,41 @@ def handle_aws_api_errors(func):
         try:
             return func(*args, **kwargs)
         except BotoCoreError as e:
-            logger.error(f"{func.__module__}.{func.__name__}:BotoCore error: {e}")
+            logger.error(
+                "boto_core_error",
+                module=func.__module__,
+                function=func.__name__,
+                error=str(e),
+            )
         except ClientError as e:
             if e.response["Error"]["Code"] in THROTTLING_ERRORS:
-                logger.info(f"{func.__module__}.{func.__name__}: {e}")
+                logger.info(
+                    "aws_throttling_error",
+                    module=func.__module__,
+                    function=func.__name__,
+                    error=str(e),
+                )
             elif e.response["Error"]["Code"] in RESOURCE_NOT_FOUND_ERRORS:
-                logger.warning(f"{func.__module__}.{func.__name__}: {e}")
+                logger.warning(
+                    "aws_resource_not_found",
+                    module=func.__module__,
+                    function=func.__name__,
+                    error=str(e),
+                )
             else:
-                logger.error(f"{func.__module__}.{func.__name__}: {e}")
+                logger.error(
+                    "aws_client_error",
+                    module=func.__module__,
+                    function=func.__name__,
+                    error=str(e),
+                )
         except Exception as e:  # Catch-all for any other types of exceptions
-            logger.error(f"{func.__module__}.{func.__name__}: {e}")
+            logger.error(
+                "unexpected_error",
+                module=func.__module__,
+                function=func.__name__,
+                error=str(e),
+            )
         return False
 
     return wrapper
@@ -147,9 +170,12 @@ def execute_aws_api_call(
         and results["ResponseMetadata"]["HTTPStatusCode"] != 200
     ):
         logger.error(
-            f"API call to {service_name}.{method} failed with status code {results['ResponseMetadata']['HTTPStatusCode']}"
+            "api_call_failed",
+            service=service_name,
+            method=method,
+            status_code=results["ResponseMetadata"]["HTTPStatusCode"],
         )
-        raise Exception(
+        raise RuntimeError(
             f"API call to {service_name}.{method} failed with status code {results['ResponseMetadata']['HTTPStatusCode']}"
         )
     return results
@@ -183,9 +209,12 @@ def paginator(client: BaseClient, operation, keys=None, **kwargs):
                 else:
                     if key == "ResponseMetadata" and value["HTTPStatusCode"] != 200:
                         logger.error(
-                            f"API call to {client.meta.service_model.service_name}.{operation} failed with status code {value['HTTPStatusCode']}"
+                            "api_call_failed_during_pagination",
+                            service=client.meta.service_model.service_name,
+                            operation=operation,
+                            status_code=value["HTTPStatusCode"],
                         )
-                        raise Exception(
+                        raise RuntimeError(
                             f"API call to {client.meta.service_model.service_name}.{operation} failed with status code {value['HTTPStatusCode']}"
                         )
         else:

@@ -1,7 +1,7 @@
-import os
+from core.config import settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-AUDIT_ROLE_ARN = os.environ.get("AWS_AUDIT_ACCOUNT_ROLE_ARN")
+AUDIT_ROLE_ARN = settings.aws.AUDIT_ROLE_ARN
 
 
 @handle_aws_api_errors

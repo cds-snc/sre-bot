@@ -14,20 +14,24 @@ from modules import (
     incident_helper,
 )
 from core.config import settings
-from core.logging import logger
+from core.logging import get_module_logger
 from server import bot_middleware, server
 
 from jobs import scheduled_tasks
 
 server_app = server.handler
+logger = get_module_logger()
 
 load_dotenv()
 
 
 def main(bot):
+    """Main function to start the application."""
     # Log startup output
-    logger.info("application_startup", git_sha=settings.GIT_SHA)
-    logger.info("environment_variables", keys=list(os.environ.keys()))
+    logger.info(
+        "application_startup",
+    )
+    logger.info("environment_checked", config_keys=list(os.environ.keys()))
 
     APP_TOKEN = settings.slack.APP_TOKEN
     PREFIX = settings.PREFIX

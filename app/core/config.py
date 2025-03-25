@@ -2,6 +2,9 @@
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import structlog
+
+logger = structlog.stdlib.get_logger().bind(component="config")
 
 
 class SlackSettings(BaseSettings):
@@ -22,6 +25,7 @@ class SlackSettings(BaseSettings):
 class AwsSettings(BaseSettings):
     """AWS configuration settings."""
 
+    AWS_REGION: str = Field(default="ca-central-1", alias="AWS_REGION")
     SYSTEM_ADMIN_PERMISSIONS: str = Field(
         default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS"
     )
@@ -29,7 +33,12 @@ class AwsSettings(BaseSettings):
     VIEW_ONLY_PERMISSIONS: str = Field(
         default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS"
     )
-    AWS_REGION: str = Field(default="ca-central-1", alias="AWS_REGION")
+    AUDIT_ROLE_ARN: str = Field(default="", alias="AWS_AUDIT_ACCOUNT_ROLE_ARN")
+    ORG_ROLE_ARN: str = Field(default="", alias="AWS_ORG_ACCOUNT_ROLE_ARN")
+    LOGGING_ROLE_ARN: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
+
+    INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
+    INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
 
     THROTTLING_ERRORS: list[str] = [
         "Throttling",
@@ -89,3 +98,15 @@ class Settings(BaseSettings):
 
 # Create the settings instance
 settings = Settings()
+
+logger.info("config_initialized", prefix=settings.PREFIX, git_sha=settings.GIT_SHA)
+logger.info(
+    "aws_config_loaded",
+    config_keys=list(settings.aws.model_dump().keys()),
+    region=settings.aws.AWS_REGION,
+)
+logger.info("slack_config_loaded", config_keys=list(settings.slack.model_dump().keys()))
+logger.info(
+    "google_workspace_config_loaded",
+    config_keys=list(settings.google_workspace.model_dump().keys()),
+)

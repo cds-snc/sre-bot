@@ -21,7 +21,10 @@ def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
     assert result is False
     mock_func.assert_called_once()
     mock_logger.error.assert_called_once_with(
-        "mock_module.mock_func_name:BotoCore error: An unspecified error occurred"
+        "boto_core_error",
+        module="mock_module",
+        function="mock_func_name",
+        error="An unspecified error occurred",
     )
     mock_logger.info.assert_not_called()
 
@@ -42,7 +45,10 @@ def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logg
     assert result is False
     mock_func.assert_called_once()
     mock_logger.warning.assert_called_once_with(
-        "mock_module.mock_func_name: An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown"
+        "aws_resource_not_found",
+        module="mock_module",
+        function="mock_func_name",
+        error="An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown",
     )
     mock_logger.error.assert_not_called()
     mock_logger.info.assert_not_called()
@@ -65,7 +71,10 @@ def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
     assert result is False
     mock_func.assert_called_once()
     mock_logger.error.assert_called_once_with(
-        "mock_module.mock_func_name: An error occurred (OtherError) when calling the operation_name operation: An error occurred"
+        "aws_client_error",
+        module="mock_module",
+        function="mock_func_name",
+        error="An error occurred (OtherError) when calling the operation_name operation: An error occurred",
     )
     mock_logger.info.assert_not_called()
 
@@ -82,7 +91,10 @@ def test_handle_aws_api_errors_catches_exception(mock_logger):
     assert result is False
     mock_func.assert_called_once()
     mock_logger.error.assert_called_once_with(
-        "mock_module.mock_func_name: Exception message"
+        "unexpected_error",
+        module="mock_module",
+        function="mock_func_name",
+        error="Exception message",
     )
     mock_logger.info.assert_not_called()
 
@@ -216,7 +228,10 @@ def test_paginator_raises_exception_on_non_200_status(mock_logger):
         "API call to mock_service.operation failed with status code 500"
     )
     mock_logger.error.assert_called_once_with(
-        "API call to mock_service.operation failed with status code 500"
+        "api_call_failed_during_pagination",
+        service="mock_service",
+        operation="operation",
+        status_code=500,
     )
 
 

@@ -1,14 +1,16 @@
-import os
+"""AWS DynamoDB API client"""
+
+from core.config import settings
 from integrations.aws.client import (
     execute_aws_api_call,
     handle_aws_api_errors,
 )
 
 client_config = dict(
-    region_name=os.environ.get("AWS_REGION", "ca-central-1"),
+    region_name=settings.aws.AWS_REGION,
 )
 
-if os.environ.get("PREFIX", None):
+if settings.PREFIX:
     client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
 
