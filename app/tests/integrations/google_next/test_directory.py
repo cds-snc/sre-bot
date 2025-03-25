@@ -344,14 +344,17 @@ class TestGoogleDirectory:
 
         mock_logger.info.assert_has_calls(
             [
-                call("Found 2 groups."),
-                call("Found 2 groups after filtering."),
-                call("Getting members for group: group_email1"),
-                call("Getting members for group: group_email2"),
+                call("listing_groups_with_members", query=None, groups_filters=None),
+                call("groups_found", count=2, query=None),
+                call("getting_members_for_group", group_email="group_email1"),
+                call("getting_members_for_group", group_email="group_email2"),
+                call("groups_with_members_listed", count=1),
             ]
         )
         mock_logger.warning.assert_called_once_with(
-            "Error getting members for group group_email1: Retry Exception"
+            "error_getting_group_members",
+            group_email="group_email1",
+            error="Retry Exception",
         )
         mock_logger.error.assert_not_called()
 
@@ -461,10 +464,11 @@ class TestGoogleDirectory:
 
         mock_logger.info.assert_has_calls(
             [
-                call("Found 2 groups."),
-                call("Found 2 groups after filtering."),
-                call("Getting members for group: group_email1"),
-                call("Getting members for group: group_email2"),
+                call("listing_groups_with_members", query=None, groups_filters=None),
+                call("groups_found", count=2, query=None),
+                call("getting_members_for_group", group_email="group_email1"),
+                call("getting_members_for_group", group_email="group_email2"),
+                call("groups_with_members_listed", count=2),
             ]
         )
         mock_logger.warning.assert_not_called()
@@ -536,12 +540,13 @@ class TestGoogleDirectory:
         assert (
             self.google_directory.get_members_details(members, users) == expected_result
         )
-        mock_logger.info.assert_has_calls(
+        mock_logger.debug.assert_has_calls(
             [
-                call("Getting user details for member: email1"),
-                call("Getting user details for member: email2"),
+                call("getting_user_details_for_member", member_email="email1"),
+                call("getting_user_details_for_member", member_email="email2"),
+                call("user_details_found", member_email="email2"),
             ]
         )
         mock_logger.warning.assert_called_once_with(
-            "User details not found for member: email1"
+            "user_details_not_found", member_email="email1"
         )
