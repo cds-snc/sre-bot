@@ -1,18 +1,15 @@
-import os
 from datetime import datetime, timedelta, timezone
 import requests
 import pytz
 
-from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
-    execute_google_api_call,
-)
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
 # Get the email for the SRE bot and the email for the delegated admin
 SRE_BOT_EMAIL = google_service.SRE_BOT_EMAIL
 GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
+
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
@@ -38,7 +35,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
     }
     body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
 
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "calendar",
         "v3",
         "freebusy",
@@ -99,9 +96,9 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
     if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
         delegated_user_email = kwargs["delegated_user_email"]
     else:
-        delegated_user_email = os.environ.get("SRE_BOT_EMAIL")
+        delegated_user_email = SRE_BOT_EMAIL
 
-    result = execute_google_api_call(
+    result = google_service.execute_google_api_call(
         "calendar",
         "v3",
         "events",
