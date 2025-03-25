@@ -1,60 +1,59 @@
 """Unit tests for the next Google Service module."""
 
-import json
 from json import JSONDecodeError
 from unittest.mock import MagicMock, call, patch
 
 import pytest
-from google.oauth2.service_account import Credentials
 from googleapiclient.errors import Error, HttpError  # type: ignore
 from integrations.google_next import service
 
 
 @patch("integrations.google_next.service.build")
-@patch.object(Credentials, "from_service_account_info")
-def test_get_google_service_returns_build_object(credentials_mock, build_mock):
+@patch("integrations.google_next.service.service_account")
+def test_get_google_service_returns_build_object(mock_service_account, build_mock):
     """
     Test case to verify that the function returns a build object.
     """
-    credentials_mock.return_value = MagicMock()
-    with patch.dict(
-        "os.environ",
-        {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
-    ):
-        service.get_google_service("drive", "v3")
+    mock_service_account.Credentials.from_service_account_info.return_value = (
+        MagicMock()
+    )
+    service.get_google_service("drive", "v3")
     build_mock.assert_called_once_with(
-        "drive", "v3", credentials=credentials_mock.return_value, cache_discovery=False
+        "drive",
+        "v3",
+        credentials=mock_service_account.Credentials.from_service_account_info.return_value,
+        cache_discovery=False,
     )
 
 
 @patch("integrations.google_next.service.build")
-@patch.object(Credentials, "from_service_account_info")
-def test_get_google_service_with_delegated_user_email(credentials_mock, build_mock):
+@patch("integrations.google_next.service.service_account")
+def test_get_google_service_with_delegated_user_email(mock_service_account, build_mock):
     """
     Test case to verify that the function works correctly with a delegated user email.
     """
-    credentials_mock.return_value = MagicMock()
-    with patch.dict(
-        "os.environ",
-        {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
-    ):
-        service.get_google_service("drive", "v3", delegated_user_email="test@test.com")
-    credentials_mock.return_value.with_subject.assert_called_once_with("test@test.com")
+    # credentials_mock.return_value = MagicMock()
+    mock_service_account.Credentials.from_service_account_info.return_value = (
+        MagicMock()
+    )
+
+    service.get_google_service("drive", "v3", delegated_user_email="test@test.com")
+    mock_service_account.Credentials.from_service_account_info.return_value.with_subject.assert_called_once_with(
+        "test@test.com"
+    )
 
 
 @patch("integrations.google_next.service.build")
-@patch.object(Credentials, "from_service_account_info")
-def test_get_google_service_with_scopes(credentials_mock, build_mock):
+@patch("integrations.google_next.service.service_account")
+def test_get_google_service_with_scopes(mock_service_account, build_mock):
     """
     Test case to verify that the function works correctly with scopes.
     """
-    credentials_mock.return_value = MagicMock()
-    with patch.dict(
-        "os.environ",
-        {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
-    ):
-        service.get_google_service("drive", "v3", scopes=["scope1", "scope2"])
-    credentials_mock.return_value.with_scopes.assert_called_once_with(
+    mock_service_account.Credentials.from_service_account_info.return_value = (
+        MagicMock()
+    )
+    service.get_google_service("drive", "v3", scopes=["scope1", "scope2"])
+    mock_service_account.Credentials.from_service_account_info.return_value.with_scopes.assert_called_once_with(
         ["scope1", "scope2"]
     )
 
@@ -87,7 +86,7 @@ def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
     Test case to verify that the function raises an exception if:
      - GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is invalid.
     """
-    mocked_service_account = MagicMock()
+    # mocked_service_account = MagicMock()
     mocked_service_account.Credentials.from_service_account_info.side_effect = (
         JSONDecodeError("Invalid credentials JSON", "", 0)
     )
