@@ -11,8 +11,8 @@ logger = get_module_logger()
 SYSTEM_ADMIN_PERMISSIONS = settings.aws.SYSTEM_ADMIN_PERMISSIONS
 VIEW_ONLY_PERMISSIONS = settings.aws.VIEW_ONLY_PERMISSIONS
 AWS_REGION = settings.aws.AWS_REGION
-THROTTLING_ERRORS = settings.aws.THROTTLING_ERRORS
-RESOURCE_NOT_FOUND_ERRORS = settings.aws.RESOURCE_NOT_FOUND_ERRORS
+THROTTLING_ERRS = settings.aws.THROTTLING_ERRS
+RESOURCE_NOT_FOUND_ERRS = settings.aws.RESOURCE_NOT_FOUND_ERRS
 
 
 def handle_aws_api_errors(func):
@@ -37,14 +37,14 @@ def handle_aws_api_errors(func):
                 error=str(e),
             )
         except ClientError as e:
-            if e.response["Error"]["Code"] in THROTTLING_ERRORS:
+            if e.response["Error"]["Code"] in THROTTLING_ERRS:
                 logger.info(
                     "aws_throttling_error",
                     module=func.__module__,
                     function=func.__name__,
                     error=str(e),
                 )
-            elif e.response["Error"]["Code"] in RESOURCE_NOT_FOUND_ERRORS:
+            elif e.response["Error"]["Code"] in RESOURCE_NOT_FOUND_ERRS:
                 logger.warning(
                     "aws_resource_not_found",
                     module=func.__module__,
