@@ -2,15 +2,12 @@
 
 import base64
 from email.message import EmailMessage
-import logging
-from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
-    execute_google_api_call,
-    DEFAULT_DELEGATED_ADMIN_EMAIL,
-)
+from integrations.google_workspace import google_service
+from core.logging import get_module_logger
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
+logger = get_module_logger()
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 def create_email_message(subject: str, message: str, sender: str, recipient: str):
@@ -32,12 +29,13 @@ def create_email_message(subject: str, message: str, sender: str, recipient: str
     email["To"] = recipient
     encoded_message = base64.urlsafe_b64encode(email.as_bytes()).decode()
     email_message = {"message": {"raw": encoded_message}}
+    logger.debug("email_message_created", email_message=email_message)
     return email_message
 
 
 @handle_google_api_errors
 def create_draft(
-    message, user_id="me", delegated_user_email=DEFAULT_DELEGATED_ADMIN_EMAIL
+    message, user_id="me", delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL
 ):
     """Creates a new draft with the specified message.
 
@@ -49,12 +47,18 @@ def create_draft(
     Returns:
         dict: The draft object.
     """
+    logger.debug(
+        "creating_draft",
+        user_id=user_id,
+        delegated_user_email=delegated_user_email,
+        message=message,
+    )
     scopes = [
         "https://www.googleapis.com/auth/gmail.compose",
         "https://www.googleapis.com/auth/gmail.modify",
     ]
 
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         service_name="gmail",
         version="v1",
         resource_path="users.drafts",
