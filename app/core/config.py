@@ -59,6 +59,7 @@ class GoogleWorkspaceSettings(BaseSettings):
     GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(
         default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL"
     )
+    SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
     GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
         default="", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
     )
