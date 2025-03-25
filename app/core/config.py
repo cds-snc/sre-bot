@@ -40,12 +40,12 @@ class AwsSettings(BaseSettings):
     INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
     INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
 
-    THROTTLING_ERRORS: list[str] = [
+    THROTTLING_ERRS: list[str] = [
         "Throttling",
         "ThrottlingException",
         "RequestLimitExceeded",
     ]
-    RESOURCE_NOT_FOUND_ERRORS: list[str] = ["ResourceNotFoundException", "NoSuchEntity"]
+    RESOURCE_NOT_FOUND_ERRS: list[str] = ["ResourceNotFoundException", "NoSuchEntity"]
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
