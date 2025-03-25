@@ -12,10 +12,10 @@ def test_create_email_message():
 
 
 @patch(
-    "integrations.google_workspace.gmail.DEFAULT_DELEGATED_ADMIN_EMAIL",
+    "integrations.google_workspace.gmail.google_service.GOOGLE_DELEGATED_ADMIN_EMAIL",
     "delegated_user_email",
 )
-@patch("integrations.google_workspace.gmail.execute_google_api_call")
+@patch("integrations.google_workspace.gmail.google_service.execute_google_api_call")
 def test_create_draft(
     mock_execute_google_api_call,
 ):

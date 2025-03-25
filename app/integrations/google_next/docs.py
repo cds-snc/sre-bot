@@ -1,4 +1,3 @@
-from logging import getLogger
 import re
 from googleapiclient.discovery import Resource  # type: ignore
 from integrations.google_next.service import (
@@ -7,9 +6,6 @@ from integrations.google_next.service import (
     get_google_service,
     GOOGLE_DELEGATED_ADMIN_EMAIL,
 )
-
-
-logger = getLogger(__name__)
 
 
 class GoogleDocs:

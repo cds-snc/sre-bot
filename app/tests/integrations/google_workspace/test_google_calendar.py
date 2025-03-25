@@ -85,11 +85,10 @@ def time_range():
     }
 
 
+@patch.object(google_calendar, "GOOGLE_DELEGATED_ADMIN_EMAIL", "test_email")
 @patch(
-    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
-    "test_email",
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -112,11 +111,10 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     )
 
 
+@patch.object(google_calendar, "GOOGLE_DELEGATED_ADMIN_EMAIL", "test_email")
 @patch(
-    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
-    "test_email",
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
 def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -152,7 +150,9 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     )
 
 
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 def test_get_freebusy_returns_object(mock_execute):
     mock_execute.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -164,15 +164,16 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
-@patch("os.environ.get", return_value="test_email")
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_no_kwargs_no_delegated_email(
     mock_unique_id,
     mock_convert_string_to_camel_case,
     mock_execute_google_api_call,
-    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {
         "htmlLink": "test_link",
@@ -230,18 +231,18 @@ def test_insert_event_no_kwargs_no_delegated_email(
         conferenceDataVersion=1,
     )
     assert not mock_convert_string_to_camel_case.called
-    assert mock_os_environ_get.called_once_with("SRE_BOT_EMAIL")
 
 
-@patch("os.environ.get", return_value="test_email")
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_kwargs(
     mock_unique_id,
     mock_convert_string_to_camel_case,
     mock_execute_google_api_call,
-    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {
         "htmlLink": "test_link",
@@ -313,18 +314,17 @@ def test_insert_event_with_kwargs(
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
-    assert not mock_os_environ_get.called
 
-
-@patch("os.environ.get", return_value="test_email")
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_no_document(
     mock_unique_id,
     mock_convert_string_to_camel_case,
     mock_execute_google_api_call,
-    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {
         "htmlLink": "test_link",
@@ -389,18 +389,17 @@ def test_insert_event_with_no_document(
     for key in kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
-    assert not mock_os_environ_get.called
 
-
-@patch("os.environ.get", return_value="test_email")
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_google_hangout_link_created(
     mock_unique_id,
     mock_convert_string_to_camel_case,
     mock_execute_google_api_call,
-    mock_os_environ_get,
 ):
     mock_execute_google_api_call.return_value = {
         "htmlLink": "test_link",
@@ -462,14 +461,15 @@ def test_insert_event_google_hangout_link_created(
     assert mock_execute_google_api_call.contains(mock_unique_id.return_value)
 
 
+@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
-@patch("os.environ.get", return_value="test_email")
-@patch("integrations.google_workspace.google_calendar.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
+)
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 def test_insert_event_api_call_error(
     mock_convert_string_to_camel_case,
     mock_execute_google_api_call,
-    mock_os_environ_get,
     mock_handle_errors,
     caplog,
 ):
@@ -486,7 +486,6 @@ def test_insert_event_api_call_error(
             in caplog.text
         )
     assert not mock_convert_string_to_camel_case.called
-    assert mock_os_environ_get.called
     assert not mock_handle_errors.called
 
 

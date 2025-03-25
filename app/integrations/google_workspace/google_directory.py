@@ -1,18 +1,15 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
-from logging import getLogger
-
 import pandas as pd
-from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
-    execute_google_api_call,
-    DEFAULT_DELEGATED_ADMIN_EMAIL,
-    DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID,
-)
+from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
+from core.logging import get_module_logger
 
-logger = getLogger(__name__)
+GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
+GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
+logger = get_module_logger()
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
@@ -30,9 +27,9 @@ def get_user(user_key, delegated_user_email=None, fields=None):
     """
 
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
@@ -56,11 +53,11 @@ def list_users(
         list: A list of user objects.
     """
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     if not customer:
-        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
+        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
     scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
@@ -88,13 +85,13 @@ def list_groups(
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/list
     """
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     if not customer:
-        customer = DEFAULT_GOOGLE_WORKSPACE_CUSTOMER_ID
+        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
 
     kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
@@ -124,9 +121,9 @@ def list_group_members(group_key, delegated_user_email=None, fields=None):
     """
 
     if not delegated_user_email:
-        delegated_user_email = DEFAULT_DELEGATED_ADMIN_EMAIL
+        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"]
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "members",
@@ -143,13 +140,13 @@ def list_group_members(group_key, delegated_user_email=None, fields=None):
 @handle_google_api_errors
 def get_group(group_key, fields=None):
     scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
         "get",
         scopes,
-        DEFAULT_DELEGATED_ADMIN_EMAIL,
+        GOOGLE_DELEGATED_ADMIN_EMAIL,
         groupKey=group_key,
         fields=fields,
     )
@@ -173,7 +170,7 @@ def add_users_to_group(group, group_key):
 
 
 def list_groups_with_members(
-    groups_filters: list = [],
+    groups_filters: list | None = None,
     query: str | None = None,
     tolerate_errors: bool = False,
 ):
@@ -187,16 +184,21 @@ def list_groups_with_members(
     Returns:
         list: A list of group objects with members. Any group without members will not be included.
     """
+    logger.info(
+        "listing_groups_with_members", query=query, groups_filters=groups_filters
+    )
     groups = list_groups(
         query=query, fields="groups(email, name, directMembersCount, description)"
     )
+    logger.info("groups_found", count=len(groups), query=query)
+
     if not groups:
         return []
 
     if groups_filters is not None:
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
-    logger.info(f"Found {len(groups)} groups.")
+        logger.info("groups_filtered", count=len(groups), groups_filters=groups_filters)
 
     users = list_users()
     filtered_groups = [
@@ -210,23 +212,30 @@ def list_groups_with_members(
 
     groups_with_members = []
     for group in filtered_groups:
-        logger.info(f"Getting members for group: {group['email']}")
+        group_email = group.get("email", "unknown")
+        logger.info("getting_members_for_group", group_email=group_email)
         try:
             members = retry_request(
                 list_group_members,
-                group["email"],
+                group_email,
                 max_attempts=3,
                 delay=1,
                 fields="members(email, role, type, status)",
             )
         except Exception as e:
-            logger.warning(f"Error getting members for group {group['email']}: {e}")
+            error_message = str(e)
+            logger.warning(
+                "error_getting_group_members",
+                group_email=group_email,
+                error=error_message,
+            )
             continue
 
         members = get_members_details(members, users, tolerate_errors)
         if members:
             group.update({"members": members})
             groups_with_members.append(group)
+    logger.info("groups_with_members_listed", count=len(groups_with_members))
 
     return groups_with_members
 
@@ -243,6 +252,7 @@ def get_members_details(members: list[dict], users: list[dict], tolerate_errors=
 
     error_occured = False
     for member in members:
+        logger.debug("getting_user_details", member=member)
         user_details = None
         try:
             user_details = next(
@@ -250,10 +260,12 @@ def get_members_details(members: list[dict], users: list[dict], tolerate_errors=
                 None,
             )
             if not user_details:
-                raise Exception("User details not found.")
+                raise ValueError("User details not found.")
         except Exception as e:
             logger.warning(
-                f"Error getting user details for member {member['email']}: {e}"
+                "getting_user_details_error",
+                member=member,
+                error=str(e),
             )
             error_occured = True
             if not tolerate_errors:

@@ -4,13 +4,11 @@ Google Drive Module.
 This module provides functionalities to interact with Google Drive. It includes functions to add metadata to a file, create a new folder, create a new document from a template, and copy a file to a new folder.
 """
 
-import os
-from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
-    execute_google_api_call,
-)
+from integrations.google_workspace import google_service
 
-INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
+INCIDENT_TEMPLATE = google_service.INCIDENT_TEMPLATE
+
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
@@ -28,7 +26,7 @@ def add_metadata(
     Returns:
         dict: The updated file metadata.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -54,7 +52,7 @@ def delete_metadata(file_id, key, delegated_user_email=None):
     Returns:
         dict: The updated file metadata.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -77,7 +75,7 @@ def list_metadata(file_id: str):
     Returns:
         dict: The file metadata.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -107,7 +105,7 @@ def create_folder(
         dict: A File resource representing the new folder.
         (https://developers.google.com/drive/api/reference/rest/v3/files#File)
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -144,7 +142,7 @@ def create_file_from_template(
     Returns:
         dict: A File resource representing the new file with a mask of 'id'.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -191,7 +189,7 @@ def create_file(name, folder, file_type):
 
     mime_type_value = mime_type[file_type]
 
-    result = execute_google_api_call(
+    result = google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -205,13 +203,21 @@ def create_file(name, folder, file_type):
 
 
 @handle_google_api_errors
-def get_file_by_id(id):
-    return execute_google_api_call(
+def get_file_by_id(fileId: str) -> dict:
+    """Get a file by id in Google Drive.
+
+    Args:
+        fileId (str): The id of the file to get.
+
+    Returns:
+        dict: The file metadata.
+    """
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
         "get",
-        fileId=id,
+        fileId=fileId,
         supportsAllDrives=True,
     )
 
@@ -232,7 +238,7 @@ def find_files_by_name(name, folder_id=None):
     q = f"trashed=false and name='{name}'"
     if folder_id:
         q += f" and '{folder_id}' in parents"
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -263,7 +269,7 @@ def list_folders_in_folder(folder, query=None):
     if query:
         base_query += f" and {query}"
 
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -292,7 +298,7 @@ def list_files_in_folder(
     Returns:
         list: A list of files in the folder.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -329,7 +335,7 @@ def copy_file_to_folder(
     Returns:
         str: The id of the new file.
     """
-    copied_file = execute_google_api_call(
+    copied_file = google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",
@@ -344,7 +350,7 @@ def copy_file_to_folder(
     print(f"Copied file: {copied_file}")
 
     # move the copy to the new folder
-    updated_file = execute_google_api_call(
+    updated_file = google_service.execute_google_api_call(
         "drive",
         "v3",
         "files",

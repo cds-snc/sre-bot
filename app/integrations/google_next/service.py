@@ -12,22 +12,26 @@ Functions:
 
 """
 
-import os
-import logging
 import json
-
-from json import JSONDecodeError
-from dotenv import load_dotenv
 from functools import wraps
+from json import JSONDecodeError
 from typing import Any, Callable
+
 from google.oauth2 import service_account  # type: ignore
-from googleapiclient.discovery import build, Resource  # type: ignore
+from googleapiclient.discovery import Resource, build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
-load_dotenv()
+from core.config import settings
+from core.logging import get_module_logger
+
+
 # Define the default arguments
-GOOGLE_DELEGATED_ADMIN_EMAIL = os.environ.get("GOOGLE_DELEGATED_ADMIN_EMAIL")
-GOOGLE_WORKSPACE_CUSTOMER_ID = os.environ.get("GOOGLE_WORKSPACE_CUSTOMER_ID")
+GOOGLE_DELEGATED_ADMIN_EMAIL = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
+GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
+GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
+    settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+)
+logger = get_module_logger()
 
 
 def get_google_service(
@@ -49,9 +53,10 @@ def get_google_service(
         Resource: The authenticated Google service resource.
     """
 
-    creds_json = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
+    creds_json = GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 
     if not creds_json:
+        logger.error("credentials_json_missing")
         raise ValueError("Credentials JSON not set")
 
     try:
@@ -62,7 +67,7 @@ def get_google_service(
         if scopes:
             creds = creds.with_scopes(scopes)
     except JSONDecodeError as json_decode_exception:
-        logging.error("Error while loading credentials JSON: %s", json_decode_exception)
+        logger.error("invalid_credentials_json", error=str(json_decode_exception))
         raise JSONDecodeError(
             msg="Invalid credentials JSON", doc="Credentials JSON", pos=0
         ) from json_decode_exception
@@ -88,23 +93,44 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
         argument_string = f"({argument_string})"
 
         try:
+            logger.debug(
+                "executing_google_api_call",
+                function=func.__name__,
+                module=func.__module__,
+                arguments=argument_string,
+            )
             result = func(*args, **kwargs)
+            logger.debug(
+                "google_api_call_success",
+                function=func.__name__,
+                module=func.__module__,
+            )
             return result
         except HttpError as e:
             message = str(e).lower()
             if any(error in message for error in warnings):
-                logging.warning(
-                    f"An HTTP error occurred in function '{func.__module__}:{func.__name__}{argument_string}': {e}"
+                logger.warning(
+                    "google_api_http_warning",
+                    function=func.__name__,
+                    module=func.__module__,
+                    arguments=argument_string,
+                    error=str(e),
                 )
             else:
-                logging.error(
-                    f"An HTTP error occurred in function '{func.__module__}:{func.__name__}': {e}"
+                logger.error(
+                    "google_api_http_error",
+                    function=func.__name__,
+                    module=func.__module__,
+                    error=str(e),
                 )
             raise e
         except Exception as e:  # Catch-all for any other types of exceptions
             message = str(e)
-            logging.error(
-                f"An error occurred in function '{func.__module__}:{func.__name__}': {e}"
+            logger.error(
+                "google_api_generic_error",
+                function=func.__name__,
+                module=func.__module__,
+                error=str(e),
             )
             raise e
 
@@ -131,20 +157,33 @@ def execute_google_api_call(
         Any: The result of the API call. If p/aginate is True, returns a list of all results.
     """
     if not service:
+        logger.error("service_missing")
         raise ValueError("Service not provided")
 
     for resource in resource_path.split("."):
         try:
             service = getattr(service, resource)()
         except Exception as e:
+            logger.error(
+                "resource_access_error",
+                resource=resource,
+                error=str(e),
+            )
             raise AttributeError(
                 f"Error accessing {resource} on resource object. Exception: {e}"
-            )
+            ) from e
 
     try:
         api_method = getattr(service, method)
     except Exception as e:
-        raise AttributeError(f"Error executing API method {method}. Exception: {e}")
+        logger.error(
+            "api_method_error",
+            method=method,
+            error=str(e),
+        )
+        raise AttributeError(
+            f"Error executing API method {method}. Exception: {e}"
+        ) from e
 
     if paginate:
         all_results = []
@@ -170,6 +209,10 @@ def get_google_api_command_parameters(service, method):
     Returns:
         list: The names of the parameters for the API method, excluding non-parameter documentation.
     """
+    logger.debug(
+        "getting_api_command_parameters",
+        method=method,
+    )
     api_method = getattr(service, method)
     # Add known parameters not documented in the docstring
     parameter_names = ["fields"]
@@ -185,5 +228,9 @@ def get_google_api_command_parameters(service, method):
             elif parsing_parameters and ":" in line:
                 param, _ = line.split(":", 1)
                 parameter_names.append(param.strip())
-
+    logger.debug(
+        "api_command_parameters_obtained",
+        method=method,
+        parameters=parameter_names,
+    )
     return parameter_names
