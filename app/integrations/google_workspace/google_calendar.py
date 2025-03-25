@@ -6,12 +6,13 @@ import pytz
 from integrations.google_workspace.google_service import (
     handle_google_api_errors,
     execute_google_api_call,
-    DEFAULT_DELEGATED_ADMIN_EMAIL,
 )
+from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
-# Get the email for the SRE bot
-SRE_BOT_EMAIL = os.environ.get("SRE_BOT_EMAIL")
+# Get the email for the SRE bot and the email for the delegated admin
+SRE_BOT_EMAIL = google_service.SRE_BOT_EMAIL
+GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
 
 
 @handle_google_api_errors
@@ -42,7 +43,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "v3",
         "freebusy",
         "query",
-        delegated_user_email=DEFAULT_DELEGATED_ADMIN_EMAIL,
+        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
         scopes=["https://www.googleapis.com/auth/calendar"],
         body=body,
     )

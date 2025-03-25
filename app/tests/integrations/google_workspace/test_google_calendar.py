@@ -86,7 +86,7 @@ def time_range():
 
 
 @patch(
-    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
+    "integrations.google_workspace.google_calendar.GOOGLE_DELEGATED_ADMIN_EMAIL",
     "test_email",
 )
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
@@ -113,7 +113,7 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
 
 
 @patch(
-    "integrations.google_workspace.google_calendar.DEFAULT_DELEGATED_ADMIN_EMAIL",
+    "integrations.google_workspace.google_calendar.GOOGLE_DELEGATED_ADMIN_EMAIL",
     "test_email",
 )
 @patch("integrations.google_workspace.google_calendar.execute_google_api_call")
