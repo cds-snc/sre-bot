@@ -7,12 +7,12 @@ from integrations.google_workspace.google_service import (
 
 
 @handle_google_api_errors
-def get_values(spreadsheetId: str, range: str | None = None, fields=None) -> dict:
+def get_values(spreadsheetId: str, cell_range: str | None = None, fields=None) -> dict:
     """Gets the values from a Google Sheet.
 
     Args:
         spreadsheetId (str): The id of the Google Sheet.
-        range (str, optional): The range of the values to retrieve.
+        cell_range (str, optional): The range of the values to retrieve.
         includeGridData (bool, optional): Whether to include grid data.
         fields (str, optional): The fields to include in the response.
 
@@ -25,7 +25,7 @@ def get_values(spreadsheetId: str, range: str | None = None, fields=None) -> dic
         "spreadsheets.values",
         "get",
         spreadsheetId=spreadsheetId,
-        range=range,
+        range=cell_range,
         fields=fields,
     )
 
@@ -78,7 +78,7 @@ def batch_update(spreadsheetId: str, body: dict):
 @handle_google_api_errors
 def batch_update_values(
     spreadsheetId: str,
-    range: str,
+    cell_range: str,
     values: list,
     valueInputOption: str = "USER_ENTERED",
 ) -> dict:
@@ -86,7 +86,7 @@ def batch_update_values(
 
     Args:
         spreadsheetId (str): The id of the Google Sheet.
-        range (str): The range to update.
+        cell_range (str): The range to update.
         values (list): The values to update.
         valueInputOption (str, optional): The value input option.
 
@@ -101,7 +101,7 @@ def batch_update_values(
         spreadsheetId=spreadsheetId,
         body={
             "valueInputOption": valueInputOption,
-            "data": [{"range": range, "values": values}],
+            "data": [{"range": cell_range, "values": values}],
         },
     )
 
@@ -109,7 +109,7 @@ def batch_update_values(
 @handle_google_api_errors
 def append_values(
     spreadsheetId: str,
-    range: str,
+    cell_range: str,
     body: dict,
     valueInputOption: str = "USER_ENTERED",
     insertDataOption: str = "INSERT_ROWS",
@@ -118,7 +118,7 @@ def append_values(
 
     Args:
         spreadsheetId (str): The id of the Google Sheet.
-        range (str): The range to append to.
+        cell_range (str): The range to append to.
         body (dict): The values to append.
 
     Returns:
@@ -130,7 +130,7 @@ def append_values(
         "spreadsheets.values",
         "append",
         spreadsheetId=spreadsheetId,
-        range=range,
+        range=cell_range,
         body=body,
         valueInputOption=valueInputOption,
         insertDataOption=insertDataOption,
