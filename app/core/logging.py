@@ -41,13 +41,24 @@ logger: BoundLogger = configure_logging()
 
 
 def get_module_logger() -> BoundLogger:
-    """Get a logger for the calling module."""
+    """Get a logger for the calling module with full path context."""
     current_frame = inspect.currentframe()
     if current_frame is None:
         return logger
+
     frame = current_frame.f_back
     module = inspect.getmodule(frame)
-    module_name = "unknown"
+
     if module:
-        module_name = module.__name__.split(".")[-1]
-    return logger.bind(component=module_name)
+        module_name = module.__name__
+
+        parts = module_name.split(".")
+
+        context = {
+            "component": parts[-1],
+            "module_path": module_name,
+        }
+
+        return logger.bind(**context)
+
+    return logger.bind(component="unknown")
