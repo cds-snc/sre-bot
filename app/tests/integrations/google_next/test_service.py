@@ -1,17 +1,13 @@
 """Unit tests for the next Google Service module."""
 
 import json
-import pytest
-from unittest.mock import MagicMock, patch, call
-from integrations.google_next.service import (
-    get_google_service,
-    execute_google_api_call,
-    handle_google_api_errors,
-    get_google_api_command_parameters,
-)
-from google.oauth2.service_account import Credentials
-from googleapiclient.errors import HttpError, Error  # type: ignore
 from json import JSONDecodeError
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+from google.oauth2.service_account import Credentials
+from googleapiclient.errors import Error, HttpError  # type: ignore
+from integrations.google_next import service
 
 
 @patch("integrations.google_next.service.build")
@@ -25,7 +21,7 @@ def test_get_google_service_returns_build_object(credentials_mock, build_mock):
         "os.environ",
         {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
     ):
-        get_google_service("drive", "v3")
+        service.get_google_service("drive", "v3")
     build_mock.assert_called_once_with(
         "drive", "v3", credentials=credentials_mock.return_value, cache_discovery=False
     )
@@ -42,7 +38,7 @@ def test_get_google_service_with_delegated_user_email(credentials_mock, build_mo
         "os.environ",
         {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
     ):
-        get_google_service("drive", "v3", delegated_user_email="test@test.com")
+        service.get_google_service("drive", "v3", delegated_user_email="test@test.com")
     credentials_mock.return_value.with_subject.assert_called_once_with("test@test.com")
 
 
@@ -57,60 +53,74 @@ def test_get_google_service_with_scopes(credentials_mock, build_mock):
         "os.environ",
         {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": json.dumps({"type": "service_account"})},
     ):
-        get_google_service("drive", "v3", scopes=["scope1", "scope2"])
+        service.get_google_service("drive", "v3", scopes=["scope1", "scope2"])
     credentials_mock.return_value.with_scopes.assert_called_once_with(
         ["scope1", "scope2"]
     )
 
 
+@patch.object(
+    service,
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    new="",
+)
 def test_get_google_service_raises_exception_if_credentials_json_not_set():
     """
     Test case to verify that the function raises an exception if:
      - GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is not set.
     """
-    with patch.dict("os.environ", clear=True):
-        with pytest.raises(ValueError) as e:
-            get_google_service("drive", "v3")
-        assert "Credentials JSON not set" in str(e.value)
+    with pytest.raises(ValueError) as e:
+        service.get_google_service("drive", "v3")
+    assert "Credentials JSON not set" in str(e.value)
 
 
-@patch("integrations.google_next.service.build")
-@patch.object(Credentials, "from_service_account_info")
+@patch.object(
+    service,
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    new="invalid",
+)
+@patch("integrations.google_next.service.service_account")
 def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
-    credentials_mock, build_mock
+    mocked_service_account,
 ):
     """
     Test case to verify that the function raises an exception if:
      - GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is invalid.
     """
-    with patch.dict("os.environ", {"GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": "invalid"}):
-        with pytest.raises(JSONDecodeError) as e:
-            get_google_service("drive", "v3")
-        assert "Invalid credentials JSON" in str(e.value)
+    mocked_service_account = MagicMock()
+    mocked_service_account.Credentials.from_service_account_info.side_effect = (
+        JSONDecodeError("Invalid credentials JSON", "", 0)
+    )
+    with pytest.raises(JSONDecodeError) as e:
+        service.get_google_service("drive", "v3")
+    assert "Invalid credentials JSON" in str(e.value)
 
 
-@patch("logging.error")
-def test_handle_google_api_errors_catches_http_error(mocked_logging_error: MagicMock):
+@patch("integrations.google_next.service.logger")
+def test_handle_google_api_errors_catches_http_error(mocked_logger: MagicMock):
     mock_resp = MagicMock()
     mock_resp.status = "400"
     mock_resp.reason = "Bad Request"
     mock_func = MagicMock(side_effect=HttpError(resp=mock_resp, content=b""))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(HttpError, match='<HttpError 400 "Bad Request">'):
         result = decorated_func()
         assert result is None
 
-    mocked_logging_error.assert_called_once_with(
-        "An HTTP error occurred in function 'mock_module:mock_func': <HttpError 400 \"Bad Request\">"
+    mocked_logger.error.assert_called_once_with(
+        "google_api_http_error",
+        function="mock_func",
+        module="mock_module",
+        error='<HttpError 400 "Bad Request">',
     )
 
 
-@patch("logging.warning")
+@patch("integrations.google_next.service.logger")
 def test_handle_google_api_errors_catches_http_warning(
-    mocked_logging_warning: MagicMock,
+    mocked_logger: MagicMock,
 ):
     mock_resp = MagicMock()
     mock_resp.status = "404"
@@ -119,7 +129,7 @@ def test_handle_google_api_errors_catches_http_warning(
     mock_func = MagicMock(side_effect=HttpError(resp=mock_resp, content=b""))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(
         HttpError, match='<HttpError 404 "Resource Not Found: userKey">'
@@ -127,79 +137,94 @@ def test_handle_google_api_errors_catches_http_warning(
         result = decorated_func(arg="value")
         assert result is None
 
-    mocked_logging_warning.assert_called_once_with(
-        "An HTTP error occurred in function 'mock_module:mock_func(arg=value)': <HttpError 404 \"Resource Not Found: userKey\">"
+    mocked_logger.warning.assert_called_once_with(
+        "google_api_http_warning",
+        function="mock_func",
+        module="mock_module",
+        arguments="(arg=value)",
+        error='<HttpError 404 "Resource Not Found: userKey">',
     )
 
 
-@patch("logging.error")
-def test_handle_google_api_errors_catches_error(mocked_logging_error: MagicMock):
+@patch("integrations.google_next.service.logger")
+def test_handle_google_api_errors_catches_error(mocked_logging: MagicMock):
     mock_func = MagicMock(side_effect=Error("Error message"))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(Error, match="Error message"):
         result = decorated_func()
         assert result is None
 
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "An error occurred in function 'mock_module:mock_func': Error message"
+    mocked_logging.error.assert_called_once_with(
+        "google_api_generic_error",
+        function="mock_func",
+        module="mock_module",
+        error="Error message",
     )
 
 
-@patch("logging.warning")
-@patch("logging.error")
-def test_handle_google_api_errors_catches_exception(
-    mocked_logging_error: MagicMock, mocked_logging_warning: MagicMock
-):
+@patch("integrations.google_next.service.logger")
+def test_handle_google_api_errors_catches_exception(mocked_logging: MagicMock):
     mock_func = MagicMock(side_effect=Exception("Exception message"))
     mock_func.__name__ = "mock_func"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(Exception, match="Exception message"):
         result = decorated_func()
         assert result is None
 
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_once_with(
-        "An error occurred in function 'mock_module:mock_func': Exception message"
+    mocked_logging.error.assert_called_once_with(
+        "google_api_generic_error",
+        function="mock_func",
+        module="mock_module",
+        error="Exception message",
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
     mock_func.__name__ = "list_groups"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(Exception, match="timed out"):
         result = decorated_func()
         assert result is None
 
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_with(
-        "An error occurred in function 'mock_module:list_groups': timed out"
+    mocked_logging.error.assert_called_with(
+        "google_api_generic_error",
+        function="list_groups",
+        module="mock_module",
+        error="timed out",
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
     mock_func.__name__ = "get_user"
     mock_func.__module__ = "mock_module"
-    decorated_func = handle_google_api_errors(mock_func)
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     with pytest.raises(Exception, match="timed out"):
         result = decorated_func("arg1", "arg2", a="b")
         assert result is None
 
     mock_func.assert_called_once()
-    mocked_logging_error.assert_called_with(
-        "An error occurred in function 'mock_module:get_user': timed out"
+    mocked_logging.error.assert_called_with(
+        "google_api_generic_error",
+        function="get_user",
+        module="mock_module",
+        error="timed out",
     )
 
 
 def test_handle_google_api_errors_passes_through_return_value():
-    mock_func = MagicMock(return_value=("test"))
-    decorated_func = handle_google_api_errors(mock_func)
+    mock_func = MagicMock(return_value="test")
+    mock_func.__name__ = "mock_func"
+    mock_func.__module__ = "mock_module"
+    decorated_func = service.handle_google_api_errors(mock_func)
 
     result = decorated_func()
 
@@ -209,7 +234,7 @@ def test_handle_google_api_errors_passes_through_return_value():
 
 def test_execute_google_api_call_raises_exception_if_service_is_none():
     with pytest.raises(ValueError) as e:
-        execute_google_api_call(None, "resource", "method")
+        service.execute_google_api_call(None, "resource", "method")
     assert "Service not provided" in str(e.value)
 
 
@@ -220,7 +245,7 @@ def test_execute_google_api_call_calls_getattr_with_service_and_resource(
     mock_service = MagicMock()
     mock_service.resource = MagicMock()
 
-    execute_google_api_call(mock_service, "resource", "method")
+    service.execute_google_api_call(mock_service, "resource", "method")
 
     calls = [
         call(mock_service, "resource"),
@@ -243,7 +268,9 @@ def test_execute_google_api_call_when_paginate_is_false():
     # Set up the MagicMock for method
     mock_resource.method.return_value = mock_request
 
-    result = execute_google_api_call(mock_service, "resource", "method", arg1="value1")
+    result = service.execute_google_api_call(
+        mock_service, "resource", "method", arg1="value1"
+    )
 
     mock_resource.method.assert_called_once_with(arg1="value1")
     assert result == ({"key": "value"})
@@ -287,7 +314,7 @@ def test_execute_google_api_call_when_paginate_is_true():
 
     mock_method_next.side_effect = side_effect
 
-    result = execute_google_api_call(
+    result = service.execute_google_api_call(
         mock_service, "resource", "method", paginate=True, arg1="value1"
     )
 
@@ -315,7 +342,7 @@ def test_execute_google_api_call_with_nested_resource_path():
 
     mock_method.execute.return_value = "result"
 
-    result = execute_google_api_call(
+    result = service.execute_google_api_call(
         mock_service, "resource1.resource2", "method", arg1="value1"
     )
 
@@ -334,7 +361,7 @@ def test_execute_google_api_call_with_nested_resource_path_throws_error():
     mock_service.resource1.return_value = mock_resource1
 
     with pytest.raises(AttributeError) as e:
-        execute_google_api_call(
+        service.execute_google_api_call(
             mock_service, "resource1.resource2", "method", arg1="value1"
         )
 
@@ -356,7 +383,9 @@ def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
     ]
 
     with pytest.raises(AttributeError) as e:
-        execute_google_api_call(mock_service, "resource", "method", arg1="value1")
+        service.execute_google_api_call(
+            mock_service, "resource", "method", arg1="value1"
+        )
 
     assert (
         "Error executing API method method. Exception: method cannot be accessed"
@@ -377,6 +406,6 @@ Returns:
     """
     mock_resource.method = mock_method
 
-    result = get_google_api_command_parameters(mock_resource, "method")
+    result = service.get_google_api_command_parameters(mock_resource, "method")
 
     assert result == ["fields", "arg1", "arg2"]
