@@ -1,21 +1,16 @@
 """Google Workspace Directory API methods."""
 
 from googleapiclient.discovery import Resource  # type: ignore
-from integrations.google_next.service import (
-    execute_google_api_call,
-    handle_google_api_errors,
-    get_google_service,
-    GOOGLE_DELEGATED_ADMIN_EMAIL,
-    GOOGLE_WORKSPACE_CUSTOMER_ID,
-)
 
-# from integrations.google_next import service as google_service
+from integrations.google_next import service as google_service
 from integrations.utils.api import retry_request
 from utils import filters
 from core.logging import get_module_logger
 
-
+GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
+GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 logger = get_module_logger()
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 class GoogleDirectory:
@@ -59,7 +54,7 @@ class GoogleDirectory:
             scopes=self.scopes,
             delegated_email=self.delegated_email,
         )
-        return get_google_service(
+        return google_service.get_google_service(
             "admin", "directory_v1", self.scopes, self.delegated_email
         )
 
@@ -78,7 +73,7 @@ class GoogleDirectory:
         Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/get
         """
         logger.debug("getting_user", user_key=user_key, kwargs=kwargs)
-        return execute_google_api_call(
+        return google_service.execute_google_api_call(
             self.service, "users", "get", userKey=user_key, **kwargs
         )
 
@@ -105,7 +100,7 @@ class GoogleDirectory:
         if not customer:
             customer = GOOGLE_WORKSPACE_CUSTOMER_ID
 
-        return execute_google_api_call(
+        return google_service.execute_google_api_call(
             self.service,
             "users",
             "list",
@@ -131,7 +126,7 @@ class GoogleDirectory:
         """
         logger.debug("getting_group", group_key=group_key, kwargs=kwargs)
 
-        return execute_google_api_call(
+        return google_service.execute_google_api_call(
             self.service, "groups", "get", groupKey=group_key, **kwargs
         )
 
@@ -156,7 +151,7 @@ class GoogleDirectory:
 
         if not customer:
             customer = GOOGLE_WORKSPACE_CUSTOMER_ID
-        return execute_google_api_call(
+        return google_service.execute_google_api_call(
             self.service,
             "groups",
             "list",
@@ -182,7 +177,7 @@ class GoogleDirectory:
         """
         logger.debug("listing_group_members", group_key=group_key, kwargs=kwargs)
 
-        return execute_google_api_call(
+        return google_service.execute_google_api_call(
             self.service,
             "members",
             "list",
