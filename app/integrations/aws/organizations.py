@@ -96,7 +96,10 @@ def healthcheck():
     try:
         response = list_organization_accounts()
         healthy = True if response else False
-        logger.info(f"AWS Organizations healthcheck result: {response}")
+        logger.info(
+            "aws_organizations_healthcheck_success",
+            status="healthy" if healthy else "unhealthy",
+        )
     except Exception as error:
-        logger.error(f"AWS Organizations healthcheck failed: {error}")
+        logger.error("aws_organizations_healthcheck_failed", error=str(error))
     return healthy
