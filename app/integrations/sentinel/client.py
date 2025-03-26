@@ -3,20 +3,24 @@ import datetime
 import hmac
 import hashlib
 import json
-import logging
-import os
 import requests
 
-logging.basicConfig(level=logging.INFO)
+from core.logging import get_module_logger
+from core.config import settings
+
+logger = get_module_logger()
+SENTINEL_CUSTOMER_ID = settings.sentinel.SENTINEL_CUSTOMER_ID
+SENTINEL_LOG_TYPE = settings.sentinel.SENTINEL_LOG_TYPE
+SENTINEL_SHARED_KEY = settings.sentinel.SENTINEL_SHARED_KEY
 
 
 def send_event(payload):
-    customer_id = os.environ.get("SENTINEL_CUSTOMER_ID", False)
-    log_type = os.environ.get("SENTINEL_LOG_TYPE", "DevSREBot")
-    shared_key = os.environ.get("SENTINEL_SHARED_KEY", False)
+    customer_id = SENTINEL_CUSTOMER_ID
+    log_type = SENTINEL_LOG_TYPE
+    shared_key = SENTINEL_SHARED_KEY
 
-    if customer_id is False or shared_key is False:
-        logging.error("customer_id, log_type, or shared_key is missing")
+    if customer_id is None or shared_key is None:
+        logger.error("send_event_error", error="customer_id or shared_key is missing")
         return False
 
     post_data(customer_id, shared_key, json.dumps(payload), log_type)
@@ -79,11 +83,11 @@ def post_data(customer_id, shared_key, body, log_type):
 
     response = requests.post(uri, data=body, headers=headers, timeout=60)
     if response.status_code >= 200 and response.status_code <= 299:
-        logging.info(f"Response code: {response.status_code}, log type: {log_type}")
+        logger.info(f"Response code: {response.status_code}, log type: {log_type}")
         return True
     else:
         print(response.text)
-        logging.error(f"Response code: {response.status_code}, log type: {log_type}")
+        logger.error(f"Response code: {response.status_code}, log type: {log_type}")
         return False
 
 
@@ -94,9 +98,9 @@ def log_to_sentinel(event, message):
     try:
         is_event_sent = send_event(payload)
     except Exception as e:
-        logging.error(e)
+        logger.exception("log_to_sentinel_error", error=str(e))
 
     if is_event_sent:
-        logging.info(f"Sentinel event sent: {payload}")
+        logger.info("sentinel_event_sent", payload=payload)
     else:
-        logging.error(f"Sentinel event failed: {payload}")
+        logger.error("sentinel_event_error", payload=payload)

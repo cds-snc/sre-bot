@@ -1,6 +1,4 @@
-import os
-
-from integrations import sentinel
+from integrations.sentinel import client as sentinel
 
 from unittest.mock import patch
 
@@ -9,21 +7,13 @@ log_type = "log_type"
 shared_key = "dGVzdCBrZXk="
 
 
-@patch.dict(
-    os.environ, {"SENTINEL_LOG_TYPE": "foo", "SENTINEL_SHARED_KEY": "foo"}, clear=True
-)
+@patch.object(sentinel, "SENTINEL_CUSTOMER_ID", None)
 def test_send_event_customer_id_not_provided():
     event = {}
     assert sentinel.send_event(event) is False
 
 
-@patch.dict(
-    os.environ,
-    {
-        "SENTINEL_CUSTOMER_ID": "foo",
-    },
-    clear=True,
-)
+@patch.object(sentinel, "SENTINEL_SHARED_KEY", None)
 def test_send_event_shared_key_not_provided():
     event = {}
     assert sentinel.send_event(event) is False
@@ -81,18 +71,22 @@ def test_post_data_failure(mock_requests):
     assert sentinel.post_data(customer_id, shared_key, body, log_type) is False
 
 
+@patch("integrations.sentinel.client.logger")
 @patch("integrations.sentinel.client.send_event")
-def test_log_to_sentinel(send_event_mock):
+def test_log_to_sentinel(send_event_mock, logging_mock):
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
+    logging_mock.info.assert_called_with(
+        "sentinel_event_sent", payload={"event": "foo", "message": {"bar": "baz"}}
+    )
 
 
 @patch("integrations.sentinel.client.send_event")
-@patch("integrations.sentinel.client.logging")
+@patch("integrations.sentinel.client.logger")
 def test_log_to_sentinel_logs_error(logging_mock, send_event_mock):
     send_event_mock.return_value = False
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
     logging_mock.error.assert_called_with(
-        "Sentinel event failed: {'event': 'foo', 'message': {'bar': 'baz'}}"
+        "sentinel_event_error", payload={"event": "foo", "message": {"bar": "baz"}}
     )
