@@ -116,6 +116,19 @@ class OpsGenieSettings(BaseSettings):
     )
 
 
+class SentinelSettings(BaseSettings):
+    """Sentinel configuration settings."""
+
+    SENTINEL_CUSTOMER_ID: str | None = Field(default=None, alias="SENTINEL_CUSTOMER_ID")
+    SENTINEL_LOG_TYPE: str = Field(default="DevSREBot", alias="SENTINEL_LOG_TYPE")
+    SENTINEL_SHARED_KEY: str | None = Field(default=None, alias="SENTINEL_SHARED_KEY")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -129,6 +142,7 @@ class Settings(BaseSettings):
     maxmind: MaxMindSettings
     notify: NotifySettings
     opsgenie: OpsGenieSettings
+    sentinel: SentinelSettings
 
     @property
     def is_production(self) -> bool:
@@ -148,6 +162,8 @@ class Settings(BaseSettings):
             kwargs["notify"] = NotifySettings()
         if "opsgenie" not in kwargs:
             kwargs["opsgenie"] = OpsGenieSettings()
+        if "sentinel" not in kwargs:
+            kwargs["sentinel"] = SentinelSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
