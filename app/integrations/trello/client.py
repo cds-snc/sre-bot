@@ -1,6 +1,6 @@
 """Trello client module."""
 
-from trello import TrelloApi
+from trello import TrelloApi  # type: ignore
 from core.config import settings
 
 TRELLO_ATIP_BOARD = settings.trello.TRELLO_ATIP_BOARD
