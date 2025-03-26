@@ -5,11 +5,11 @@ This module contains the user related functionality for the Slack integration.
 
 import re
 from slack_sdk import WebClient
-from logging import getLogger
+from core.logging import get_module_logger
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
-logger = getLogger(__name__)
+logger = get_module_logger()
 
 
 def get_all_users(client: WebClient, deleted=False, is_bot=False):
@@ -36,10 +36,10 @@ def get_all_users(client: WebClient, deleted=False, is_bot=False):
                 if not cursor:
                     break
             else:
-                logger.error(f"Failed to get users list: {response['error']}")
+                logger.error("get_all_users_failed", extra={"response": response})
                 break
     except Exception as e:
-        logger.error(f"Failed to get users list: {e}")
+        logger.error("get_all_users_failed", extra={"error": str(e)})
 
     # filters
     if not deleted:
