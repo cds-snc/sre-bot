@@ -80,11 +80,13 @@ def test_get_google_service_raises_exception_if_credentials_json_not_set():
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     new="invalid",
 )
+@patch("integrations.google_workspace.google_service.logger")
 @patch("integrations.google_workspace.google_service.service_account")
 @patch("integrations.google_workspace.google_service.build")
 def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
-    mocked_service_account,
     _build_mock,
+    mocked_service_account,
+    mocked_logger,
 ):
     """
     Test case to verify that the function raises an exception if:
@@ -96,6 +98,9 @@ def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
     with pytest.raises(JSONDecodeError) as e:
         google_service.get_google_service("drive", "v3")
     assert "Invalid credentials JSON" in str(e.value)
+    mocked_logger.error.assert_called_once_with(
+        "invalid_credentials_json", error="Expecting value: line 1 column 1 (char 0)"
+    )
 
 
 @patch("integrations.google_workspace.google_service.logger")

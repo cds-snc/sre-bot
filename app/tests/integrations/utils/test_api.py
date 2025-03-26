@@ -260,16 +260,16 @@ def test_retry_request_success():
     mock_func.assert_called_once()
 
 
-@patch("logging.warning")
-def test_retry_request_success_after_retries(mock_logging_warning):
+@patch("integrations.utils.api.logger")
+def test_retry_request_success_after_retries(mock_logger):
     mock_func = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "success"])
     result = retry_request(mock_func, max_attempts=3, delay=1)
     assert result == "success"
     assert mock_func.call_count == 3
-    assert mock_logging_warning.call_count == 2
-    assert mock_logging_warning.call_args_list == [
-        call("Error on attempt 1: fail"),
-        call("Error on attempt 2: fail"),
+    assert mock_logger.warning.call_count == 2
+    assert mock_logger.warning.call_args_list == [
+        call("retry_request_attempt", extra={"error": "fail"}, attempt=1),
+        call("retry_request_attempt", extra={"error": "fail"}, attempt=2),
     ]
 
 
@@ -289,18 +289,18 @@ def test_retry_request_delay(mock_sleep):
     mock_sleep.assert_called_once_with(2)
 
 
-@patch("logging.warning")
-def test_retry_request_logging(mock_logging_warning: MagicMock):
+@patch("integrations.utils.api.logger")
+def test_retry_request_logging(mock_logger: MagicMock):
     mock_func = MagicMock(side_effect=Exception("fail"))
     with pytest.raises(Exception, match="fail"):
         retry_request(mock_func, max_attempts=3, delay=1)
     assert mock_func.call_count == 3
-    assert mock_logging_warning.call_count == 3
-    mock_logging_warning.assert_has_calls(
+    assert mock_logger.warning.call_count == 3
+    mock_logger.warning.assert_has_calls(
         [
-            call("Error on attempt 1: fail"),
-            call("Error on attempt 2: fail"),
-            call("Error after 3 attempts: fail"),
+            call("retry_request_attempt", extra={"error": "fail"}, attempt=1),
+            call("retry_request_attempt", extra={"error": "fail"}, attempt=2),
+            call("retry_request_failed", extra={"error": "fail"}),
         ]
     )
 

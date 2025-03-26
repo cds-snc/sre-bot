@@ -96,12 +96,14 @@ def test_get_all_users_with_bot():
     ]
 
 
-def test_get_all_users_with_error():
+@patch("integrations.slack.users.logger")
+def test_get_all_users_with_error(mock_logger):
     client = MagicMock()
-    with patch("integrations.slack.users.logger") as mock_logger:
-        client.users_list.return_value = {"ok": False, "error": "error"}
-        assert users.get_all_users(client) == []
-        mock_logger.error.assert_called_once_with("Failed to get users list: error")
+    client.users_list.return_value = {"ok": False, "error": "error"}
+    assert users.get_all_users(client) == []
+    mock_logger.error.assert_called_once_with(
+        "get_all_users_failed", extra={"response": {"ok": False, "error": "error"}}
+    )
 
 
 def test_get_user_id_from_request_with_user_id():
