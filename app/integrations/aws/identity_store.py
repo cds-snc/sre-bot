@@ -20,7 +20,7 @@ def resolve_identity_store_id(kwargs):
         kwargs.pop("identity_store_id", None)
     if kwargs["IdentityStoreId"] is None:
         error_message = "IdentityStoreId must be provided either as a keyword argument or as the AWS_SSO_INSTANCE_ID environment variable"
-        logger.error(error_message)
+        logger.error("resolve_identity_store_error", error=error_message)
         raise ValueError(error_message)
     return kwargs
 
@@ -35,9 +35,12 @@ def healthcheck():
     try:
         response = list_users()
         healthy = True if response else False
-        logger.info(f"AWS IdentityStore healthcheck result: {response}")
+        logger.info(
+            "identity_store_healthcheck_success",
+            status="healthy" if healthy else "unhealthy",
+        )
     except Exception as error:
-        logger.error(f"AWS IdentityStore healthcheck failed: {error}")
+        logger.exception("identity_store_healthcheck_failed", error=str(error))
     return healthy
 
 
@@ -304,15 +307,28 @@ def list_groups_with_memberships(
     Returns:
         list: A list of group objects with their members. Any group without members will not be included.
     """
+    logger.info(
+        "aws_identity_store_operation_started",
+        operation="list_groups_with_memberships",
+        filter_count=len(groups_filters) if groups_filters else 0,
+        tolerate_errors=tolerate_errors,
+    )
     groups = list_groups()
+    logger.info("aws_identity_store_groups_fetched", count=len(groups))
 
     if not groups:
+        logger.info("aws_identity_store_operation_complete", status="empty", count=0)
         return []
 
     if groups_filters is not None:
+        original_count = len(groups)
         for groups_filter in groups_filters:
             groups = filters.filter_by_condition(groups, groups_filter)
-    logger.info(f"Found {len(groups)} groups in AWS Identity Store.")
+        logger.info(
+            "aws_identity_store_groups_filtered",
+            original_count=original_count,
+            filtered_count=len(groups),
+        )
 
     filtered_groups = [
         {
@@ -324,17 +340,29 @@ def list_groups_with_memberships(
     ]
 
     users = list_users()
-    logger.info(f"Found {len(users)} users in AWS Identity Store.")
-
+    logger.info("aws_identity_store_users_fetched", count=len(users))
     groups_with_memberships = []
+
+    logger.info("aws_identity_store_processing_groups", count=len(filtered_groups))
+
     for group in filtered_groups:
         error_occurred = False
-        logger.info(f"Getting members for group: {group['DisplayName']}")
+        group_id = group.get("GroupId")
+        group_name = group.get("DisplayName", "unknown")
+
+        logger.debug(
+            "aws_identity_store_processing_group",
+            group_id=group_id,
+            group_name=group_name,
+        )
         try:
-            memberships = list_group_memberships(group["GroupId"])
+            memberships = list_group_memberships(group_id)
         except Exception as error:
-            logger.warning(
-                f"Error getting members for group {group['GroupId']}: {error}"
+            logger.exception(
+                "aws_identity_store_group_memberships_error",
+                group_id=group_id,
+                group_name=group_name,
+                error=str(error),
             )
             continue
         for membership in memberships:
@@ -347,7 +375,11 @@ def list_groups_with_memberships(
                 )
             except Exception as error:
                 logger.warning(
-                    f"Error getting details for member {membership['MemberId']['UserId']}: {error}"
+                    "aws_identity_store_member_error",
+                    group_id=group_id,
+                    group_name=group_name,
+                    member_id=membership["MemberId"]["UserId"],
+                    error=str(error),
                 )
                 error_occurred = True
                 if not tolerate_errors:
@@ -357,6 +389,11 @@ def list_groups_with_memberships(
         if memberships and (not error_occurred or tolerate_errors):
             group["GroupMemberships"] = memberships
             groups_with_memberships.append(group)
+    logger.info(
+        "aws_identity_store_operation_complete",
+        status="complete",
+        count=len(groups_with_memberships),
+    )
     return groups_with_memberships
 
 
