@@ -4,7 +4,9 @@ import re
 import string
 import random
 import time
-import logging
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def convert_string_to_camel_case(snake_str):
@@ -113,9 +115,11 @@ def retry_request(
             return func(*args, **kwargs)
         except Exception as e:
             if i == max_attempts - 1:
-                logging.warning(f"Error after {max_attempts} attempts: {e}")
+                logger.warning("retry_request_failed", extra={"error": str(e)})
                 raise e
             else:
-                logging.warning(f"Error on attempt {i + 1}: {e}")
+                logger.warning(
+                    "retry_request_attempt", extra={"error": str(e)}, attempt=i + 1
+                )
             time.sleep(delay)
             continue
