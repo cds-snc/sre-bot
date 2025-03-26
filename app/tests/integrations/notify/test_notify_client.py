@@ -55,7 +55,7 @@ def test_token_contains_correct_iat():
 
 # Test that an assertion error is raised if the NOTIFY_SRE_USER_NAME is missing
 @patch.dict(os.environ, {"NOTIFY_SRE_USER_NAME": "", "NOTIFY_SRE_CLIENT_SECRET": "foo"})
-@patch("integrations.notify.create_jwt_token")
+@patch("integrations.notify.client.create_jwt_token")
 def test_authorization_header_missing_client_id(jwt_token_mock):
     with pytest.raises(AssertionError) as err:
         notify.create_authorization_header()
@@ -64,7 +64,7 @@ def test_authorization_header_missing_client_id(jwt_token_mock):
 
 # Test that an assertion error is raised if the NOTIFY_SRE_CLIENT_SECRET is missing
 @patch.dict(os.environ, {"NOTIFY_SRE_USER_NAME": "foo", "NOTIFY_SRE_CLIENT_SECRET": ""})
-@patch("integrations.notify.create_jwt_token")
+@patch("integrations.notify.client.create_jwt_token")
 def test_authorization_header_missing_secret(jwt_token_mock):
     with pytest.raises(AssertionError) as err:
         notify.create_authorization_header()
@@ -72,7 +72,7 @@ def test_authorization_header_missing_secret(jwt_token_mock):
 
 
 # Test that the authorization header is created correctly and the correct header is generated
-@patch("integrations.notify.create_jwt_token")
+@patch("integrations.notify.client.create_jwt_token")
 def test_successful_creation_of_header(mock_jwt_token):
     mock_jwt_token.return_value = "mocked_jwt_token"
     header_key, header_value = notify.create_authorization_header()
