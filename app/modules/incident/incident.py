@@ -26,7 +26,7 @@ i18n.set("fallback", "en-US")
 INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
 SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID", "")
 PREFIX = os.environ.get("PREFIX", "")
-INCIDENT_HANDBOOK_URL = os.environ.get("INCIDENT_HANDBOOK_URL")
+INCIDENT_HANDBOOK_URL = os.environ.get("INCIDENT_HANDBOOK_URL", "")
 
 
 def register(bot):
@@ -284,6 +284,7 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
 
 
 def generate_incident_modal_view(command, options=[], locale="en-US"):
+    handbook_string = f"For more details on what constitutes a security incident, visit our <{INCIDENT_HANDBOOK_URL}|Incident Management Handbook>"
     return {
         "type": "modal",
         "callback_id": "incident_view",
@@ -408,9 +409,7 @@ def generate_incident_modal_view(command, options=[], locale="en-US"):
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": "For more details on what constitutes a security incident, visit our <"
-                        + INCIDENT_HANDBOOK_URL
-                        + "|Incident Management Handbook>.",
+                        "text": handbook_string,
                     }
                 ],
             },
