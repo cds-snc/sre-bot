@@ -75,6 +75,19 @@ class GoogleWorkspaceSettings(BaseSettings):
     )
 
 
+class MaxMindSettings(BaseSettings):
+    """MaxMind configuration settings."""
+
+    MAXMIND_DB_PATH: str = Field(
+        default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH"
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -85,6 +98,7 @@ class Settings(BaseSettings):
     slack: SlackSettings
     aws: AwsSettings
     google_workspace: GoogleWorkspaceSettings
+    maxmind: MaxMindSettings
 
     @property
     def is_production(self) -> bool:
@@ -98,6 +112,8 @@ class Settings(BaseSettings):
             kwargs["aws"] = AwsSettings()
         if "google_workspace" not in kwargs:
             kwargs["google_workspace"] = GoogleWorkspaceSettings()
+        if "maxmind" not in kwargs:
+            kwargs["maxmind"] = MaxMindSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
