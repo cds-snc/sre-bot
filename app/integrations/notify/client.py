@@ -1,10 +1,18 @@
-import os
-import jwt
-import time
+"""GC Notify client."""
+
 import calendar
-import logging
-import requests
 import json
+import time
+
+import jwt
+import requests
+from core.config import settings
+from core.logging import get_module_logger
+
+logger = get_module_logger()
+NOTIFY_SRE_USER_NAME = settings.notify.NOTIFY_SRE_USER_NAME
+NOTIFY_SRE_CLIENT_SECRET = settings.notify.NOTIFY_SRE_CLIENT_SECRET
+NOTIFY_API_URL = settings.notify.NOTIFY_API_URL
 
 
 # generate the epoch seconds for the jwt token
@@ -32,8 +40,12 @@ def create_jwt_token(secret, client_id):
 
     Returns a JWT token for this request
     """
-    assert secret, "Missing secret key"
-    assert client_id, "Missing client id"
+    if not secret:
+        logger.error("jwt_token_creation_failed", error="Missing secret key")
+        raise ValueError("Missing secret key")
+    if not client_id:
+        logger.error("jwt_token_creation_failed", error="Missing client id")
+        raise ValueError("Missing client id")
 
     headers = {"typ": "JWT", "alg": "HS256"}
 
@@ -45,23 +57,35 @@ def create_jwt_token(secret, client_id):
         return t.decode()
 
 
-# Function to create the authorization header for the Notify API
 def create_authorization_header():
+    """Function to create the authorization header for the Notify API"""
     # get the client_id and secret from the environment variables
-    client_id = os.getenv("NOTIFY_SRE_USER_NAME")
-    secret = os.getenv("NOTIFY_SRE_CLIENT_SECRET")
+    client_id = NOTIFY_SRE_USER_NAME
+    secret = NOTIFY_SRE_CLIENT_SECRET
 
-    # If the client_id or secret is missing, raise an assertion error
-    assert client_id, "NOTIFY_SRE_USER_NAME is missing"
-    assert secret, "NOTIFY_SRE_CLIENT_SECRET is missing"
+    # If the client_id or secret is missing, raise an error
+    if not client_id:
+        error = "NOTIFY_SRE_USER_NAME is missing"
+        logger.error(
+            "authorization_header_creation_failed",
+            error=error,
+        )
+        raise ValueError(error)
+    if not secret:
+        error = "NOTIFY_SRE_CLIENT_SECRET is missing"
+        logger.error(
+            "authorization_header_creation_failed",
+            error=error,
+        )
+        raise ValueError(error)
 
     # Create the jwt token and return the authorization header
     token = create_jwt_token(secret=secret, client_id=client_id)
     return "Authorization", "Bearer {}".format(token)
 
 
-# Function to post an api call to Notify
 def post_event(url, payload):
+    """Function to post an api call to Notify"""
     # Create the authorization headers
     header_key, header_value = create_authorization_header()
     header = {header_key: header_value, "Content-Type": "application/json"}
@@ -71,13 +95,13 @@ def post_event(url, payload):
     return response
 
 
-# Function to revoke an api key by calling Notify's revoke api endpoint
 def revoke_api_key(api_key, api_type, github_repo, source):
+    """Function to revoke an api key by calling Notify's revoke api endpoint"""
     # get the url and jwt_token
-    url = os.getenv("NOTIFY_API_URL")
+    url = NOTIFY_API_URL
 
     if url is None:
-        logging.error("NOTIFY_API_URL is missing")
+        logger.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")
         return False
 
     # append the revoke-endpoint to the url
@@ -95,10 +119,12 @@ def revoke_api_key(api_key, api_type, github_repo, source):
     response = post_event(url, payload)
     # A successful response has a status code of 201
     if response.status_code == 201:
-        logging.info(f"API key {api_key} has been successfully revoked")
+        logger.info("revoke_api_key_success", api_key=api_key)
         return True
     else:
-        logging.error(
-            f"API key {api_key} could not be revoked. Response code: {response.status_code}"
+        logger.error(
+            "revoke_api_key_error",
+            api_key=api_key,
+            response_code=response.status_code,
         )
         return False
