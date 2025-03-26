@@ -88,6 +88,21 @@ class MaxMindSettings(BaseSettings):
     )
 
 
+class NotifySettings(BaseSettings):
+    """GC Notify configuration settings."""
+
+    NOTIFY_SRE_USER_NAME: str | None = Field(default=None, alias="NOTIFY_SRE_USER_NAME")
+    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(
+        default=None, alias="NOTIFY_SRE_CLIENT_SECRET"
+    )
+    NOTIFY_API_URL: str = Field(default="", alias="NOTIFY_API_URL")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -99,6 +114,7 @@ class Settings(BaseSettings):
     aws: AwsSettings
     google_workspace: GoogleWorkspaceSettings
     maxmind: MaxMindSettings
+    notify: NotifySettings
 
     @property
     def is_production(self) -> bool:
@@ -114,6 +130,8 @@ class Settings(BaseSettings):
             kwargs["google_workspace"] = GoogleWorkspaceSettings()
         if "maxmind" not in kwargs:
             kwargs["maxmind"] = MaxMindSettings()
+        if "notify" not in kwargs:
+            kwargs["notify"] = NotifySettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
