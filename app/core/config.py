@@ -103,6 +103,19 @@ class NotifySettings(BaseSettings):
     )
 
 
+class OpsGenieSettings(BaseSettings):
+    """OpsGenie configuration settings."""
+
+    OPSGENIE_INTEGRATIONS_KEY: str | None = Field(
+        default=None, alias="OPSGENIE_INTEGRATIONS_KEY"
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -115,6 +128,7 @@ class Settings(BaseSettings):
     google_workspace: GoogleWorkspaceSettings
     maxmind: MaxMindSettings
     notify: NotifySettings
+    opsgenie: OpsGenieSettings
 
     @property
     def is_production(self) -> bool:
@@ -132,6 +146,8 @@ class Settings(BaseSettings):
             kwargs["maxmind"] = MaxMindSettings()
         if "notify" not in kwargs:
             kwargs["notify"] = NotifySettings()
+        if "opsgenie" not in kwargs:
+            kwargs["opsgenie"] = OpsGenieSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
