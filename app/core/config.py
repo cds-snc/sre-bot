@@ -129,6 +129,19 @@ class SentinelSettings(BaseSettings):
     )
 
 
+class TrelloSettings(BaseSettings):
+    """Trello configuration settings."""
+
+    TRELLO_APP_KEY: str | None = Field(default=None, alias="TRELLO_APP_KEY")
+    TRELLO_TOKEN: str | None = Field(default=None, alias="TRELLO_TOKEN")
+    TRELLO_ATIP_BOARD: str | None = Field(default=None, alias="TRELLO_ATIP_BOARD")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -143,6 +156,7 @@ class Settings(BaseSettings):
     notify: NotifySettings
     opsgenie: OpsGenieSettings
     sentinel: SentinelSettings
+    trello: TrelloSettings
 
     @property
     def is_production(self) -> bool:
@@ -164,6 +178,8 @@ class Settings(BaseSettings):
             kwargs["opsgenie"] = OpsGenieSettings()
         if "sentinel" not in kwargs:
             kwargs["sentinel"] = SentinelSettings()
+        if "trello" not in kwargs:
+            kwargs["trello"] = TrelloSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
