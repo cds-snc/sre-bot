@@ -1,6 +1,8 @@
-import logging
 import geoip2.database
 from geoip2.errors import AddressNotFoundError
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def geolocate(ip):
@@ -25,7 +27,7 @@ def healthcheck():
     try:
         result = geolocate("8.8.8.8")
         healthy = isinstance(result, tuple)
-        logging.info(f"Maxmind healthcheck result: {result}")
+        logger.info(f"Maxmind healthcheck result: {result}")
     except Exception as error:
-        logging.error(f"Maxmind healthcheck failed: {error}")
+        logger.error(f"Maxmind healthcheck failed: {error}")
     return healthy
