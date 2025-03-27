@@ -67,7 +67,11 @@ class GoogleWorkspaceSettings(BaseSettings):
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
         default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
     )
+
+    SRE_DRIVE_ID: str = Field(default="", alias="SRE_DRIVE_ID")
+    SRE_INCIDENT_FOLDER: str = Field(default="", alias="SRE_INCIDENT_FOLDER")
     INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
+    INCIDENT_LIST: str = Field(default="", alias="INCIDENT_LIST")
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
@@ -146,6 +150,7 @@ class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
     PREFIX: str = ""
+    LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
 
     # Nested settings

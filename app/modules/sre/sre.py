@@ -71,7 +71,7 @@ def sre_command(
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "test":
-            dev_core.dev_command(ack, logger, respond, client, body, args)
+            dev_core.dev_command(ack, respond, client, body, args)
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case "reports":

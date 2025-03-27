@@ -1,17 +1,23 @@
-import os
-from . import aws_dev, google, slack, incident
+"""This module contains the core functionality for the dev command to be used in the Slack app for development and testing purposes."""
 
-PREFIX = os.environ.get("PREFIX", "")
+from core.config import settings
+from core.logging import get_module_logger
+
+from modules.dev import aws_dev, google, slack, incident
 
 
-def dev_command(ack, logger, respond, client, body, args):
+PREFIX = settings.PREFIX
+logger = get_module_logger()
+
+
+def dev_command(ack, respond, client, body, args):
     ack()
 
     if PREFIX != "dev-":
         respond("This command is only available in the development environment.")
         return
     action = args.pop(0) if args else ""
-    logger.info("Dev command received: %s", action)
+    logger.info("dev_command_received", action=action)
     match action:
         case "aws":
             aws_dev.aws_dev_command(ack, client, body, respond, logger)
@@ -27,10 +33,18 @@ def dev_command(ack, logger, respond, client, body, args):
             incident.load_incidents(ack, logger, respond, client, body)
         case "add-incident":
             incident.add_incident(ack, logger, respond, client, body)
+        case _:
+            logger.error(
+                "dev_command_invalid_action", action=action if action else None
+            )
+            logger.error(
+                "Invalid action for dev command: %s", action if action else None
+            )
 
 
 def test_stale_channel_notification(ack, logger, respond, client, body):
     ack()
+    logger.info("test_stale_channel_notification_received", body=body)
     text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.\n
         Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
     attachments = [
