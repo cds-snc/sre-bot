@@ -7,8 +7,13 @@ from unittest.mock import call, MagicMock, patch
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
+@patch("jobs.revoke_aws_sso_access.logger")
 def test_revoke_aws_sso_access(
-    aws_access_requests_mock, aws_sso_mock, identity_store_mock, log_ops_message_mock
+    logger_mock,
+    aws_access_requests_mock,
+    aws_sso_mock,
+    identity_store_mock,
+    log_ops_message_mock,
 ):
     client = MagicMock()
     aws_access_requests_mock.get_expired_requests.return_value = [
@@ -45,14 +50,23 @@ def test_revoke_aws_sso_access(
         user="test_user_id",
         text="Revoked access to test_account_name (test_account_id) for <@test_user_id> (test_email) with access type: test_access_type",
     )
+    logger_mock.info.assert_called_once_with(
+        "revoking_aws_sso_access",
+        account_name="test_account_name",
+        account_id="test_account_id",
+        user_id="test_user_id",
+        email="test_email",
+        access_type="test_access_type",
+        created_at="test_created_at",
+    )
 
 
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
-@patch("jobs.revoke_aws_sso_access.logging")
+@patch("jobs.revoke_aws_sso_access.logger")
 def test_revoke_aws_sso_access_with_exception(
-    logging_mock, aws_sso_mock, identity_store_mock, aws_access_requests_mock
+    logger_mock, _aws_sso_mock, identity_store_mock, aws_access_requests_mock
 ):
     client = MagicMock()
     aws_access_requests_mock.get_expired_requests.return_value = [
@@ -67,4 +81,4 @@ def test_revoke_aws_sso_access_with_exception(
     ]
     identity_store_mock.get_user_id.side_effect = Exception("test_exception")
     revoke_aws_sso_access.revoke_aws_sso_access(client)
-    assert logging_mock.error.call_count == 2
+    assert logger_mock.error.call_count == 1

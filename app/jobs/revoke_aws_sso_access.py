@@ -1,9 +1,9 @@
 from modules.aws import aws_access_requests
 from integrations.aws import sso_admin, identity_store
 from server.utils import log_ops_message
-import logging
+from core.logging import get_module_logger
 
-logging.basicConfig(level=logging.INFO)
+logger = get_module_logger()
 
 
 def revoke_aws_sso_access(client):
@@ -15,8 +15,14 @@ def revoke_aws_sso_access(client):
         access_type = request["access_type"]["S"]
         created_at = request["created_at"]["N"]
 
-        logging.info(
-            f"Revoking access to {account_name} ({account_id}) for <@{user_id}> with access type: {access_type}"
+        logger.info(
+            "revoking_aws_sso_access",
+            account_name=account_name,
+            account_id=account_id,
+            user_id=user_id,
+            email=email,
+            access_type=access_type,
+            created_at=created_at,
         )
 
         try:
@@ -34,7 +40,12 @@ def revoke_aws_sso_access(client):
             log_ops_message(client, msg)
 
         except Exception as e:
-            logging.error(
-                f"Failed to revoke access to {account_name} ({account_id}) for <@{user_id}> with access type: {access_type}"
+            logger.error(
+                "failed_to_revoke_aws_sso_access",
+                account_name=account_name,
+                account_id=account_id,
+                user_id=user_id,
+                email=email,
+                access_type=access_type,
+                error=str(e),
             )
-            logging.error(e)

@@ -1,7 +1,6 @@
 import threading
 import time
 import schedule
-import logging
 
 from integrations import maxmind, opsgenie
 from integrations.google_workspace import google_drive
@@ -12,7 +11,9 @@ from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
 
-logging.basicConfig(level=logging.INFO)
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def safe_run(job):
@@ -20,13 +21,23 @@ def safe_run(job):
         try:
             job(*args, **kwargs)
         except Exception as e:
-            logging.error(f"Error running job `{job.__name__}`: {e}")
+            logger.error(
+                "safe_run_error",
+                error=str(e),
+                module=job.__module__,
+                function=job.__name__,
+                arguments=kwargs,
+                job_args=args,
+            )
 
     return wrapper
 
 
 def init(bot):
-    logging.info("Scheduled tasks initialized ...")
+    """Initialize the scheduled tasks."""
+    logger.info(
+        "initializing_scheduled_tasks", module="scheduled_tasks", function="init"
+    )
 
     schedule.every().day.at("16:00").do(
         notify_stale_incident_channels, client=bot.client
@@ -37,16 +48,21 @@ def init(bot):
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
     schedule.every().day.at("00:00").do(
-        safe_run(spending.generate_spending_data), logger=logging
+        safe_run(spending.generate_spending_data), logger=logger
     )
 
 
 def scheduler_heartbeat():
-    logging.info("Scheduler is running at %s", time.ctime())
+    logger.info(
+        "running_scheduler_heartbeat", module="scheduled_tasks", time=time.ctime()
+    )
 
 
 def integration_healthchecks():
-    logging.info("Running integration healthchecks ...")
+    """Run integration healthchecks."""
+    logger.info(
+        "running_integration_healthchecks", module="scheduled_tasks", time=time.ctime()
+    )
     healthchecks = {
         "google_drive": google_drive.healthcheck,
         "maxmind": maxmind.healthcheck,
@@ -55,13 +71,24 @@ def integration_healthchecks():
     }
     for key, healthcheck in healthchecks.items():
         if not healthcheck():
-            logging.error(f"Integration {key} is unhealthy 💀")
+            logger.error(
+                "integration_healthcheck_result",
+                module="scheduled_tasks",
+                integration=key,
+                result="unhealthy",
+            )
         else:
-            logging.info(f"Integration {key} is healthy 🌈")
+            logger.info(
+                "integration_healthcheck_result",
+                module="scheduled_tasks",
+                integration=key,
+                result="healthy",
+            )
 
 
 def provision_aws_identity_center():
-    logging.info("Provisioning AWS Identity Center")
+    """Provision AWS Identity Center"""
+    logger.info("provisioning_aws_identity_center", module="scheduled_tasks")
     identity_center.synchronize(
         enable_user_create=False,
         enable_membership_create=True,

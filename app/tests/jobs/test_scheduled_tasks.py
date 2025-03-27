@@ -69,8 +69,8 @@ def test_init(schedule_mock):
     assert len(logger_params) >= 1
 
 
-@patch("jobs.scheduled_tasks.logging")
-def test_safe_run(mock_logging):
+@patch("jobs.scheduled_tasks.logger")
+def test_safe_run(mock_logger):
     """Test that safe_run properly handles exceptions."""
 
     # Setup
@@ -86,15 +86,19 @@ def test_safe_run(mock_logging):
     wrapper()
 
     # Verify that logging.error was called with the expected message
-    mock_logging.error.assert_called_once()
-    error_message = mock_logging.error.call_args[0][0]
-    assert "Error running job `test_job`" in error_message
-    assert "Test exception" in error_message
+    mock_logger.error.assert_called_once_with(
+        "safe_run_error",
+        error="Test exception",
+        module=test_job.__module__,
+        function="test_job",
+        arguments={},
+        job_args=(),
+    )
 
 
-@patch("jobs.scheduled_tasks.logging")
+@patch("jobs.scheduled_tasks.logger")
 @patch("jobs.scheduled_tasks.time")
-def test_scheduler_heartbeat(mock_time, mock_logging):
+def test_scheduler_heartbeat(mock_time, mock_logger):
     """Test that scheduler_heartbeat logs the current time."""
     # Setup
     mock_time.ctime.return_value = "Thu Mar 17 14:30:00 2025"
@@ -103,8 +107,10 @@ def test_scheduler_heartbeat(mock_time, mock_logging):
     scheduled_tasks.scheduler_heartbeat()
 
     # Verify that logging.info was called with the expected message
-    mock_logging.info.assert_called_once_with(
-        "Scheduler is running at %s", "Thu Mar 17 14:30:00 2025"
+    mock_logger.info.assert_called_once_with(
+        "running_scheduler_heartbeat",
+        module="scheduled_tasks",
+        time=mock_time.ctime.return_value,
     )
     mock_time.ctime.assert_called_once()
 
@@ -124,7 +130,7 @@ def test_run_continuously(time_mock, threading_mock, schedule_mock):
 @patch("jobs.scheduled_tasks.google_drive")
 @patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
-@patch("jobs.scheduled_tasks.logging")
+@patch("jobs.scheduled_tasks.logger")
 def test_integration_healthchecks_healthy(
     mock_logging, mock_opsgenie, mock_maxmind, mock_google_drive, mock_aws_client
 ):
@@ -143,7 +149,7 @@ def test_integration_healthchecks_healthy(
 @patch("jobs.scheduled_tasks.google_drive")
 @patch("jobs.scheduled_tasks.maxmind")
 @patch("jobs.scheduled_tasks.opsgenie")
-@patch("jobs.scheduled_tasks.logging")
+@patch("jobs.scheduled_tasks.logger")
 def test_integration_healthchecks_unhealthy(
     mock_logging, mock_opsgenie, mock_maxmind, mock_google_drive, mock_aws_client
 ):
