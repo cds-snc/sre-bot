@@ -83,11 +83,21 @@ def post_data(customer_id, shared_key, body, log_type):
 
     response = requests.post(uri, data=body, headers=headers, timeout=60)
     if response.status_code >= 200 and response.status_code <= 299:
-        logger.info(f"Response code: {response.status_code}, log type: {log_type}")
+        logger.info(
+            "sentinel_event_sent",
+            customer_id=customer_id,
+            log_type=log_type,
+            content_length=content_length,
+        )
         return True
     else:
         print(response.text)
-        logger.error(f"Response code: {response.status_code}, log type: {log_type}")
+        logger.error(
+            "sentinel_event_error",
+            customer_id=customer_id,
+            log_type=log_type,
+            content_length=content_length,
+        )
         return False
 
 

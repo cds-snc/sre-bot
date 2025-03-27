@@ -14,7 +14,11 @@ def get_queue_url(queue_name):
     Returns:
         str: The URL of the SQS queue.
     """
-    logger.info(f"Getting URL for SQS queue: {queue_name}")
+    logger.info(
+        "getting_queue_url",
+        service="sqs",
+        queue_name=queue_name,
+    )
     if not queue_name:
         raise ValueError("Queue_name must not be empty")
     return execute_aws_api_call("sqs", "get_queue_url", QueueName=queue_name)[
@@ -34,7 +38,13 @@ def send_message(queue_url, message_body, message_group_id):
     Returns:
         dict: The response from the SQS service.
     """
-    logger.info(f"Sending message to SQS queue: {queue_url}. Message: {message_body}")
+    logger.info(
+        "sending_message",
+        service="sqs",
+        queue_url=queue_url,
+        message_body=message_body,
+        message_group_id=message_group_id,
+    )
     return execute_aws_api_call(
         "sqs",
         "send_message",
@@ -57,7 +67,11 @@ def receive_message(queue_url, max_number_of_messages=10, wait_time_seconds=10):
         list: A list of messages.
     """
     logger.info(
-        f"Receiving messages from SQS queue: {queue_url}. Max number of messages: {max_number_of_messages}. Wait time: {wait_time_seconds}"
+        "receiving_message",
+        service="sqs",
+        queue_url=queue_url,
+        max_number_of_messages=max_number_of_messages,
+        wait_time_seconds=wait_time_seconds,
     )
     return execute_aws_api_call(
         "sqs",
@@ -80,8 +94,12 @@ def delete_message(queue_url, receipt_handle):
         dict: The response from the SQS service.
     """
     logger.info(
-        f"Deleting message from SQS queue: {queue_url}. Receipt handle: {receipt_handle}"
+        "deleting_message",
+        service="sqs",
+        queue_url=queue_url,
+        receipt_handle=receipt_handle,
     )
+
     return execute_aws_api_call(
         "sqs", "delete_message", QueueUrl=queue_url, ReceiptHandle=receipt_handle
     )
