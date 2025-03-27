@@ -56,7 +56,11 @@ def get_google_service(
     creds_json = GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 
     if not creds_json:
-        logger.error("credentials_json_missing")
+        logger.error(
+            "credentials_json_missing",
+            service=service,
+            version=version,
+        )
         raise ValueError("Credentials JSON not set")
 
     try:
@@ -67,7 +71,13 @@ def get_google_service(
         if scopes:
             creds = creds.with_scopes(scopes)
     except JSONDecodeError as json_decode_exception:
-        logger.error("invalid_credentials_json", error=str(json_decode_exception))
+        logger.error(
+            "invalid_credentials_json",
+            service=service,
+            version=version,
+            error=str(json_decode_exception),
+            error_type="JSONDecodeError",
+        )
         raise JSONDecodeError(
             msg="Invalid credentials JSON", doc="Credentials JSON", pos=0
         ) from json_decode_exception
@@ -97,6 +107,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 "executing_google_api_call",
                 function=func.__name__,
                 module=func.__module__,
+                service="google_api",
                 arguments=argument_string,
             )
             result = func(*args, **kwargs)
@@ -104,6 +115,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                 "google_api_call_success",
                 function=func.__name__,
                 module=func.__module__,
+                service="google_api",
             )
             return result
         except HttpError as e:
@@ -113,6 +125,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                     "google_api_http_warning",
                     function=func.__name__,
                     module=func.__module__,
+                    service="google_api",
                     arguments=argument_string,
                     error=str(e),
                 )
@@ -121,16 +134,18 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
                     "google_api_http_error",
                     function=func.__name__,
                     module=func.__module__,
+                    service="google_api",
                     error=str(e),
                 )
             raise e
         except Exception as e:  # Catch-all for any other types of exceptions
-            message = str(e)
             logger.error(
                 "google_api_generic_error",
                 function=func.__name__,
                 module=func.__module__,
+                service="google_api",
                 error=str(e),
+                error_type=type(e).__name__,
             )
             raise e
 
@@ -157,7 +172,12 @@ def execute_google_api_call(
         Any: The result of the API call. If p/aginate is True, returns a list of all results.
     """
     if not service:
-        logger.error("service_missing")
+        logger.error(
+            "service_missing",
+            resource_path=resource_path,
+            method=method,
+            service="google_api",
+        )
         raise ValueError("Service not provided")
 
     for resource in resource_path.split("."):
@@ -167,7 +187,11 @@ def execute_google_api_call(
             logger.error(
                 "resource_access_error",
                 resource=resource,
+                resource_path=resource_path,
+                method=method,
+                service="google_api",
                 error=str(e),
+                error_type=type(e).__name__,
             )
             raise AttributeError(
                 f"Error accessing {resource} on resource object. Exception: {e}"
@@ -179,7 +203,10 @@ def execute_google_api_call(
         logger.error(
             "api_method_error",
             method=method,
+            resource_path=resource_path,
+            service="google_api",
             error=str(e),
+            error_type=type(e).__name__,
         )
         raise AttributeError(
             f"Error executing API method {method}. Exception: {e}"
@@ -212,6 +239,7 @@ def get_google_api_command_parameters(service, method):
     logger.debug(
         "getting_api_command_parameters",
         method=method,
+        service="google_api",
     )
     api_method = getattr(service, method)
     # Add known parameters not documented in the docstring
@@ -231,6 +259,7 @@ def get_google_api_command_parameters(service, method):
     logger.debug(
         "api_command_parameters_obtained",
         method=method,
+        service="google_api",
         parameters=parameter_names,
     )
     return parameter_names

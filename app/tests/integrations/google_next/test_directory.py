@@ -344,17 +344,32 @@ class TestGoogleDirectory:
 
         mock_logger.info.assert_has_calls(
             [
-                call("listing_groups_with_members", query=None, groups_filters=None),
-                call("groups_found", count=2, query=None),
-                call("getting_members_for_group", group_email="group_email1"),
-                call("getting_members_for_group", group_email="group_email2"),
-                call("groups_with_members_listed", count=1),
+                call(
+                    "listing_groups_with_members",
+                    service="google_directory",
+                    query=None,
+                    groups_filters=None,
+                ),
+                call("groups_found", service="google_directory", count=2, query=None),
+                call(
+                    "getting_members_for_group",
+                    service="google_directory",
+                    group_email="group_email1",
+                ),
+                call(
+                    "getting_members_for_group",
+                    service="google_directory",
+                    group_email="group_email2",
+                ),
+                call("groups_with_members_listed", service="google_directory", count=1),
             ]
         )
         mock_logger.warning.assert_called_once_with(
             "error_getting_group_members",
+            service="google_directory",
             group_email="group_email1",
             error="Retry Exception",
+            error_type="Exception",
         )
         mock_logger.error.assert_not_called()
 
@@ -464,11 +479,24 @@ class TestGoogleDirectory:
 
         mock_logger.info.assert_has_calls(
             [
-                call("listing_groups_with_members", query=None, groups_filters=None),
-                call("groups_found", count=2, query=None),
-                call("getting_members_for_group", group_email="group_email1"),
-                call("getting_members_for_group", group_email="group_email2"),
-                call("groups_with_members_listed", count=2),
+                call(
+                    "listing_groups_with_members",
+                    service="google_directory",
+                    query=None,
+                    groups_filters=None,
+                ),
+                call("groups_found", service="google_directory", count=2, query=None),
+                call(
+                    "getting_members_for_group",
+                    service="google_directory",
+                    group_email="group_email1",
+                ),
+                call(
+                    "getting_members_for_group",
+                    service="google_directory",
+                    group_email="group_email2",
+                ),
+                call("groups_with_members_listed", service="google_directory", count=2),
             ]
         )
         mock_logger.warning.assert_not_called()
@@ -542,11 +570,23 @@ class TestGoogleDirectory:
         )
         mock_logger.debug.assert_has_calls(
             [
-                call("getting_user_details_for_member", member_email="email1"),
-                call("getting_user_details_for_member", member_email="email2"),
-                call("user_details_found", member_email="email2"),
+                call(
+                    "getting_user_details_for_member",
+                    service="google_directory",
+                    member_email="email1",
+                ),
+                call(
+                    "getting_user_details_for_member",
+                    service="google_directory",
+                    member_email="email2",
+                ),
+                call(
+                    "user_details_found",
+                    service="google_directory",
+                    member_email="email2",
+                ),
             ]
         )
         mock_logger.warning.assert_called_once_with(
-            "user_details_not_found", member_email="email1"
+            "user_details_not_found", service="google_directory", member_email="email1"
         )

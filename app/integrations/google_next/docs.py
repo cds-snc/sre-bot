@@ -6,6 +6,9 @@ from integrations.google_next.service import (
     get_google_service,
     GOOGLE_DELEGATED_ADMIN_EMAIL,
 )
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 class GoogleDocs:
@@ -36,9 +39,21 @@ class GoogleDocs:
         self.scopes = scopes
         self.delegated_email = delegated_email
         self.service = service if service else self._get_docs_service()
+        logger.debug(
+            "google_docs_initialized",
+            service_type="docs",
+            scopes=scopes,
+            delegated_email=delegated_email,
+        )
 
     def _get_docs_service(self) -> Resource:
         """Get authenticated directory service for Google Workspace."""
+        logger.debug(
+            "getting_docs_service",
+            service_type="docs",
+            scopes=self.scopes,
+            delegated_email=self.delegated_email,
+        )
         return get_google_service("docs", "v1", self.scopes, self.delegated_email)
 
     @handle_google_api_errors
@@ -53,6 +68,12 @@ class GoogleDocs:
         Reference:
             https://developers.google.com/docs/api/reference/rest/v1/documents/create
         """
+        logger.info(
+            "creating_google_doc",
+            service="google_docs",
+            title=title,
+            kwargs=kwargs if kwargs else None,
+        )
         body = {
             "title": title,
         }
@@ -81,6 +102,13 @@ class GoogleDocs:
         Reference:
             https://developers.google.com/docs/api/reference/rest/v1/documents/batchUpdate
         """
+        logger.info(
+            "updating_google_doc",
+            service="google_docs",
+            document_id=document_id,
+            requests=requests,
+            kwargs=kwargs if kwargs else None,
+        )
         return execute_google_api_call(
             self.service,
             "documents",
@@ -103,6 +131,12 @@ class GoogleDocs:
         Reference:
             https://developers.google.com/docs/api/reference/rest/v1/documents/get
         """
+        logger.info(
+            "getting_google_doc",
+            service="google_docs",
+            document_id=document_id,
+            kwargs=kwargs if kwargs else None,
+        )
         return execute_google_api_call(
             self.service,
             "documents",
@@ -122,6 +156,10 @@ def extract_google_doc_id(url):
     Returns:
         str: The Google Docs ID extracted from the URL.
     """
+    logger.debug(
+        "extracting_google_doc_id",
+        url=url,
+    )
     if not url:
         return None
 
