@@ -43,6 +43,7 @@ class GoogleDirectory:
         self.service = service if service else self._get_directory_service()
         logger.debug(
             "google_directory_initialized",
+            service_type="directory",
             scopes=scopes,
             delegated_email=delegated_email,
         )
@@ -51,6 +52,7 @@ class GoogleDirectory:
         """Get authenticated directory service for Google Workspace."""
         logger.debug(
             "getting_directory_service",
+            service_type="directory",
             scopes=self.scopes,
             delegated_email=self.delegated_email,
         )
@@ -202,14 +204,19 @@ class GoogleDirectory:
             list: A list of group objects with members and their details.
         """
         logger.info(
-            "listing_groups_with_members", query=query, groups_filters=groups_filters
+            "listing_groups_with_members",
+            service="google_directory",
+            query=query,
+            groups_filters=groups_filters,
         )
 
         groups: list[dict] = self.list_groups(
             query=query,
             fields="groups(email, name, directMembersCount, description)",
         )
-        logger.info("groups_found", count=len(groups), query=query)
+        logger.info(
+            "groups_found", service="google_directory", count=len(groups), query=query
+        )
 
         if len(groups) == 0:
             return []
@@ -220,14 +227,21 @@ class GoogleDirectory:
             for groups_filter in groups_filters:
                 groups = filters.filter_by_condition(groups, groups_filter)
             logger.info(
-                "groups_filtered", count=len(groups), groups_filters=groups_filters
+                "groups_filtered",
+                service="google_directory",
+                count=len(groups),
+                groups_filters=groups_filters,
             )
 
         groups_with_members = []
 
         for group in groups:
             group_email = group.get("email", "unknown")
-            logger.info("getting_members_for_group", group_email=group_email)
+            logger.info(
+                "getting_members_for_group",
+                service="google_directory",
+                group_email=group_email,
+            )
 
             try:
                 members = retry_request(
@@ -242,8 +256,10 @@ class GoogleDirectory:
                 group["error"] = f"Error getting members: {error_message}"
                 logger.warning(
                     "error_getting_group_members",
+                    service="google_directory",
                     group_email=group_email,
                     error=error_message,
+                    error_type=type(e).__name__,
                 )
                 continue
             members = self.get_members_details(members, users)
@@ -254,7 +270,11 @@ class GoogleDirectory:
                 ):
                     group["error"] = "Error getting members details."
                 groups_with_members.append(group)
-        logger.info("groups_with_members_listed", count=len(groups_with_members))
+        logger.info(
+            "groups_with_members_listed",
+            service="google_directory",
+            count=len(groups_with_members),
+        )
         return groups_with_members
 
     def get_members_details(self, members: list[dict], users: list[dict]):
@@ -270,17 +290,29 @@ class GoogleDirectory:
 
         for member in members:
             member_email = member.get("email", "unknown")
-            logger.debug("getting_user_details_for_member", member_email=member_email)
+            logger.debug(
+                "getting_user_details_for_member",
+                service="google_directory",
+                member_email=member_email,
+            )
             user_details = next(
                 (user for user in users if user["primaryEmail"] == member["email"]),
                 None,
             )
             if user_details:
                 member.update(user_details)
-                logger.debug("user_details_found", member_email=member_email)
+                logger.debug(
+                    "user_details_found",
+                    service="google_directory",
+                    member_email=member_email,
+                )
 
             else:
                 member["error"] = "User details not found"
-                logger.warning("user_details_not_found", member_email=member_email)
+                logger.warning(
+                    "user_details_not_found",
+                    service="google_directory",
+                    member_email=member_email,
+                )
 
         return members

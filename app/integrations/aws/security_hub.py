@@ -1,6 +1,8 @@
 from core.config import settings
+from core.logging import get_module_logger
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
+logger = get_module_logger()
 LOGGING_ROLE_ARN = settings.aws.LOGGING_ROLE_ARN
 
 
@@ -14,6 +16,7 @@ def get_findings(filters):
     Returns:
         list: A list of finding objects.
     """
+    logger.debug("security_hub_get_findings_started", filter_keys=list(filters.keys()))
     response = execute_aws_api_call(
         "securityhub",
         "get_findings",
@@ -21,4 +24,6 @@ def get_findings(filters):
         role_arn=LOGGING_ROLE_ARN,
         Filters=filters,
     )
+    finding_count = len(response) if response else 0
+    logger.debug("security_hub_get_findings_completed", finding_count=finding_count)
     return response

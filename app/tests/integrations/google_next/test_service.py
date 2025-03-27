@@ -113,6 +113,7 @@ def test_handle_google_api_errors_catches_http_error(mocked_logger: MagicMock):
         "google_api_http_error",
         function="mock_func",
         module="mock_module",
+        service="google_api",
         error='<HttpError 400 "Bad Request">',
     )
 
@@ -140,6 +141,7 @@ def test_handle_google_api_errors_catches_http_warning(
         "google_api_http_warning",
         function="mock_func",
         module="mock_module",
+        service="google_api",
         arguments="(arg=value)",
         error='<HttpError 404 "Resource Not Found: userKey">',
     )
@@ -161,7 +163,9 @@ def test_handle_google_api_errors_catches_error(mocked_logging: MagicMock):
         "google_api_generic_error",
         function="mock_func",
         module="mock_module",
+        service="google_api",
         error="Error message",
+        error_type="Error",
     )
 
 
@@ -181,7 +185,9 @@ def test_handle_google_api_errors_catches_exception(mocked_logging: MagicMock):
         "google_api_generic_error",
         function="mock_func",
         module="mock_module",
+        service="google_api",
         error="Exception message",
+        error_type="Exception",
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
@@ -198,7 +204,9 @@ def test_handle_google_api_errors_catches_exception(mocked_logging: MagicMock):
         "google_api_generic_error",
         function="list_groups",
         module="mock_module",
+        service="google_api",
         error="timed out",
+        error_type="Exception",
     )
 
     mock_func = MagicMock(side_effect=Exception("timed out"))
@@ -215,7 +223,9 @@ def test_handle_google_api_errors_catches_exception(mocked_logging: MagicMock):
         "google_api_generic_error",
         function="get_user",
         module="mock_module",
+        service="google_api",
         error="timed out",
+        error_type="Exception",
     )
 
 
