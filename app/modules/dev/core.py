@@ -26,9 +26,7 @@ def dev_command(ack, respond, client, body, args):
         case "slack":
             slack.slack_command(ack, client, body, respond, logger, args)
         case "stale":
-            test_stale_channel_notification(
-                ack, logger, respond, client, body
-            )
+            test_stale_channel_notification(ack, logger, respond, client, body)
         case "incident":
             incident.list_incidents(ack, logger, respond, client, body)
         case "load-incidents":
