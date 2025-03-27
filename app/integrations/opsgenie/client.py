@@ -1,10 +1,11 @@
 import json
-import os
-import logging
 from urllib.request import Request, urlopen
+from core.config import settings
+from core.logging import get_module_logger
 
 # Use the integrations API Key as the Opsgenie API Key
-OPSGENIE_KEY = os.getenv("OPSGENIE_INTEGRATIONS_KEY", None)
+OPSGENIE_KEY = settings.opsgenie.OPSGENIE_INTEGRATIONS_KEY
+logger = get_module_logger()
 
 
 def get_on_call_users(schedule):
@@ -16,8 +17,10 @@ def get_on_call_users(schedule):
         data = json.loads(content)
         return list(map(lambda x: x["name"], data["data"]["onCallParticipants"]))
     except Exception as e:
-        logging.error(
-            f"Could not get on call users for schedule {schedule}. Details of error: {e}"
+        logger.exception(
+            "get_on_call_users_error",
+            schedule=schedule,
+            error=str(e),
         )
         return []
 
@@ -34,10 +37,18 @@ def create_alert(description):
     )
     try:
         data = json.loads(content)
-        logging.info(f"Created opsgenie alert with result: {data['result']}")
+        logger.info(
+            "create_alert",
+            description=description,
+            result=data["result"],
+        )
         return data["result"]
     except Exception as e:
-        logging.error(f"Could not create opsgenie alert. Error: {e}")
+        logger.exception(
+            "create_alert_error",
+            description=description,
+            error=str(e),
+        )
         return "Could not issue alert to Opsgenie!"
 
 
@@ -51,9 +62,16 @@ def healthcheck():
         )
         result = json.loads(content)
         healthy = "data" in result
-        logging.info(f"OpsGenie healthcheck result: {result}")
+        logger.info(
+            "opsgenie_healthcheck_success",
+            status="healthy" if healthy else "unhealthy",
+            result=result,
+        )
     except Exception as error:
-        logging.error(f"OpsGenie healthcheck failed: {error}")
+        logger.exception(
+            "opsgenie_healthcheck_error",
+            error=str(error),
+        )
     return healthy
 
 

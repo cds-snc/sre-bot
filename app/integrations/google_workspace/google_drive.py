@@ -5,7 +5,9 @@ This module provides functionalities to interact with Google Drive. It includes 
 """
 
 from integrations.google_workspace import google_service
+from core.logging import get_module_logger
 
+logger = get_module_logger()
 INCIDENT_TEMPLATE = google_service.INCIDENT_TEMPLATE
 
 handle_google_api_errors = google_service.handle_google_api_errors
@@ -376,8 +378,15 @@ def healthcheck():
         bool: True if the API is healthy, False otherwise.
     """
     healthy = False
-    metadata = list_metadata(INCIDENT_TEMPLATE)
-    if metadata is not None:
-        healthy = "id" in metadata
+    try:
+        metadata = list_metadata(INCIDENT_TEMPLATE)
+        if metadata is not None:
+            healthy = "id" in metadata
+        logger.info(
+            "google_drive_healthcheck_success",
+            status="healthy" if healthy else "unhealthy",
+        )
+    except Exception as error:
+        logger.exception("google_drive_healthcheck_failed", error=str(error))
 
     return healthy

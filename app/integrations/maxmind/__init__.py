@@ -1,4 +1,4 @@
-"""MaxMind integrations package."""
+"""MaxMind integration package."""
 
 from .client import geolocate, healthcheck
 

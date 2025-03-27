@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 from integrations import trello
 
 
-@patch("integrations.trello.get_trello_client")
-@patch("integrations.trello.get_atip_inbox_list_id_in_board")
+@patch("integrations.trello.client.get_trello_client")
+@patch("integrations.trello.client.get_atip_inbox_list_id_in_board")
 def test_add_atip_card_to_trello(
     atip_inbox_list_id_in_board_mock, get_trello_client_mock
 ):
@@ -18,7 +18,7 @@ def test_add_atip_card_to_trello(
     )
 
 
-@patch("integrations.trello.get_trello_client")
+@patch("integrations.trello.client.get_trello_client")
 def test_get_atip_inbox_list_id_in_board(get_trello_client_mock):
     trello_mock = MagicMock()
     trello_mock.boards.get_field.return_value = [
@@ -29,7 +29,7 @@ def test_get_atip_inbox_list_id_in_board(get_trello_client_mock):
     assert trello.get_atip_inbox_list_id_in_board() == "inbox_list_id"
 
 
-@patch("integrations.trello.TrelloApi")
+@patch("integrations.trello.client.TrelloApi")
 def test_get_trello_client(trello_api_mock):
     trello_api_mock.return_value = MagicMock()
     assert trello.get_trello_client() == trello_api_mock()

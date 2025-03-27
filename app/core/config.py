@@ -88,6 +88,60 @@ class MaxMindSettings(BaseSettings):
     )
 
 
+class NotifySettings(BaseSettings):
+    """GC Notify configuration settings."""
+
+    NOTIFY_SRE_USER_NAME: str | None = Field(default=None, alias="NOTIFY_SRE_USER_NAME")
+    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(
+        default=None, alias="NOTIFY_SRE_CLIENT_SECRET"
+    )
+    NOTIFY_API_URL: str = Field(default="", alias="NOTIFY_API_URL")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
+class OpsGenieSettings(BaseSettings):
+    """OpsGenie configuration settings."""
+
+    OPSGENIE_INTEGRATIONS_KEY: str | None = Field(
+        default=None, alias="OPSGENIE_INTEGRATIONS_KEY"
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
+class SentinelSettings(BaseSettings):
+    """Sentinel configuration settings."""
+
+    SENTINEL_CUSTOMER_ID: str | None = Field(default=None, alias="SENTINEL_CUSTOMER_ID")
+    SENTINEL_LOG_TYPE: str = Field(default="DevSREBot", alias="SENTINEL_LOG_TYPE")
+    SENTINEL_SHARED_KEY: str | None = Field(default=None, alias="SENTINEL_SHARED_KEY")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
+class TrelloSettings(BaseSettings):
+    """Trello configuration settings."""
+
+    TRELLO_APP_KEY: str | None = Field(default=None, alias="TRELLO_APP_KEY")
+    TRELLO_TOKEN: str | None = Field(default=None, alias="TRELLO_TOKEN")
+    TRELLO_ATIP_BOARD: str | None = Field(default=None, alias="TRELLO_ATIP_BOARD")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -99,6 +153,10 @@ class Settings(BaseSettings):
     aws: AwsSettings
     google_workspace: GoogleWorkspaceSettings
     maxmind: MaxMindSettings
+    notify: NotifySettings
+    opsgenie: OpsGenieSettings
+    sentinel: SentinelSettings
+    trello: TrelloSettings
 
     @property
     def is_production(self) -> bool:
@@ -114,6 +172,14 @@ class Settings(BaseSettings):
             kwargs["google_workspace"] = GoogleWorkspaceSettings()
         if "maxmind" not in kwargs:
             kwargs["maxmind"] = MaxMindSettings()
+        if "notify" not in kwargs:
+            kwargs["notify"] = NotifySettings()
+        if "opsgenie" not in kwargs:
+            kwargs["opsgenie"] = OpsGenieSettings()
+        if "sentinel" not in kwargs:
+            kwargs["sentinel"] = SentinelSettings()
+        if "trello" not in kwargs:
+            kwargs["trello"] = TrelloSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
