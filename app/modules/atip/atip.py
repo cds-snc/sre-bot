@@ -3,21 +3,26 @@
 This module contains the ATIP commands and events for the Slack Bot.
 """
 
-import os
 from datetime import datetime
 
 import i18n  # type: ignore
 
+from core.config import settings
+from core.logging import get_module_logger
+
 from integrations.slack import users as slack_users, commands as slack_commands
 from integrations import trello
 
+
+logger = get_module_logger()
 
 i18n.load_path.append("./locales/")
 
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
-PREFIX = os.environ.get("PREFIX", "")
+PREFIX = settings.PREFIX
+ATIP_ANNOUNCE_CHANNEL = settings.atip.ATIP_ANNOUNCE_CHANNEL
 
 
 def register(bot):
@@ -39,11 +44,19 @@ def register(bot):
     bot.action("atip_change_locale")(update_modal_locale)
 
 
-def atip_command(ack, command, logger, respond, client, body):
+def atip_command(ack, command, respond, client, body):
     ack()
     user_id = body["user_id"]
     i18n.set("locale", slack_users.get_user_locale(client, user_id))
-    logger.info("Atip command received: %s", command["text"])
+    logger.info(
+        "atip_command_called",
+        command=command["text"],
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
+    )
+
     if command["text"] == "":
         respond(i18n.t("atip.help_text", command=command["command"]))
         return
@@ -364,7 +377,7 @@ def atip_width_action(ack):
     ack()
 
 
-def atip_view_handler(ack, body, say, logger, client):
+def atip_view_handler(ack, body, say, client):
     ack()
 
     ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
@@ -415,7 +428,9 @@ def atip_view_handler(ack, body, say, logger, client):
     response = client.conversations_create(name=f"{slug}")
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
-    logger.info(f"Created conversation: {channel_name}")
+    logger.info(
+        "atip_channel_created", channel_id=channel_id, channel_name=channel_name
+    )
 
     channel_id = response["channel"]["id"]
 
@@ -502,7 +517,7 @@ Il est important que vous ne supprimiez aucune documentation relative à la dema
 Merci de votre compréhension! L’accès à l’information renforce notre démocratie. 💪
 """
     )
-    say(text=post_content, channel=os.environ.get("ATIP_ANNOUNCE_CHANNEL"))
+    say(text=post_content, channel=ATIP_ANNOUNCE_CHANNEL)
     say(text=post_content, channel=channel_id)
 
     # Add trello card
