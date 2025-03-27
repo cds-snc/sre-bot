@@ -146,6 +146,7 @@ class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
     PREFIX: str = ""
+    LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
 
     # Nested settings
