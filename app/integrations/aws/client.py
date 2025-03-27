@@ -153,6 +153,10 @@ def execute_aws_api_call(
     if client_config is None:
         client_config = {"region_name": AWS_REGION}
 
+    logger.debug(
+        "aws_api_call_started", service=service_name, method=method, paginated=paginated
+    )
+
     client = get_aws_service_client(
         service_name,
         role_arn,
@@ -170,7 +174,7 @@ def execute_aws_api_call(
         and results["ResponseMetadata"]["HTTPStatusCode"] != 200
     ):
         logger.error(
-            "api_call_failed",
+            "aws_api_call_failed",
             service=service_name,
             method=method,
             status_code=results["ResponseMetadata"]["HTTPStatusCode"],
@@ -178,6 +182,13 @@ def execute_aws_api_call(
         raise RuntimeError(
             f"API call to {service_name}.{method} failed with status code {results['ResponseMetadata']['HTTPStatusCode']}"
         )
+
+    logger.debug(
+        "aws_api_call_completed",
+        service=service_name,
+        method=method,
+    )
+
     return results
 
 
