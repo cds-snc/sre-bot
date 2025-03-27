@@ -1,18 +1,14 @@
 """Testing new google service (will be removed)"""
 
-import os
-
+from core.config import settings
 from integrations.google_workspace import (
     google_directory,
 )
 
-from dotenv import load_dotenv
 
-load_dotenv()
-
-SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
-SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
-INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
+SRE_DRIVE_ID = settings.google_workspace.SRE_DRIVE_ID
+SRE_INCIDENT_FOLDER = settings.google_workspace.SRE_INCIDENT_FOLDER
+INCIDENT_TEMPLATE = settings.google_workspace.INCIDENT_TEMPLATE
 
 
 def get_members(group):

@@ -1,11 +1,12 @@
 import json
-import os
 
 from slack_sdk import WebClient
 from boto3.dynamodb.types import TypeDeserializer
 from modules.incident import incident_folder, incident_conversation, db_operations
 
-INCIDENT_LIST = os.getenv("INCIDENT_LIST")
+from core.config import settings
+
+INCIDENT_LIST = settings.google_workspace.INCIDENT_LIST
 
 
 def list_incidents(ack, logger, respond, client: WebClient, body):
