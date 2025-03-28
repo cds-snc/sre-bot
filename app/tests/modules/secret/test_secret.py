@@ -11,7 +11,14 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
 
     mock_get_user_locale.return_value = "en-US"
 
-    command = "secret"
+    command = {
+        "text": "",
+        "command": "/secret",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
 
     body = {
         "trigger_id": "trigger_id",
