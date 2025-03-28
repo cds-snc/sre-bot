@@ -845,7 +845,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
     }
     client.usergroups_users_list.return_value = {
         "ok": True,
-        "users": ["creator_user_id"],
+        "users": ["creator_user_id", "security_user_id"],
     }
 
     mock_incident_document.create_incident_document.return_value = "id"
@@ -858,7 +858,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
     incident.submit(ack, view, say, body, client, logger)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
-    client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
+    client.usergroups_users_list.assert_not_called()
     client.conversations_invite.assert_has_calls(
         [
             call(channel="channel_id", users="creator_user_id"),
