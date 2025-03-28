@@ -30,7 +30,11 @@ def secret_command(client, ack, command, body):
     ack()
     logger.info(
         "secret_command_received",
-        command=command,
+        command=command["text"],
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
     )
     if "user" in body:
         user_id = body["user"]["id"]
