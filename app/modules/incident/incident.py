@@ -255,11 +255,11 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
         # and add them to the list of users to invite
         response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
 
-    # if we are testing, ie PREFIX is "dev" then don't add the security group users since we don't want to spam them
-    if response.get("ok") and PREFIX == "":
-        for security_user in response["users"]:
-            if security_user != user_id:
-                users_to_invite.append(security_user)
+        # if we are testing, ie PREFIX is "dev" then don't add the security group users since we don't want to spam them
+        if response.get("ok") and PREFIX == "":
+            for security_user in response["users"]:
+                if security_user != user_id:
+                    users_to_invite.append(security_user)
 
     # Invite all collected users to the channel in a single API call
     if users_to_invite:
