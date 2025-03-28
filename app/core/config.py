@@ -159,6 +159,34 @@ class AtipSettings(BaseSettings):
     )
 
 
+class TalentRoleSettings(BaseSettings):
+    """Talent Role configuration settings."""
+
+    INTERNAL_TALENT_FOLDER: str = Field(default="", alias="INTERNAL_TALENT_FOLDER")
+    SCORING_GUIDE_TEMPLATE: str = Field(default="", alias="SCORING_GUIDE_TEMPLATE")
+    TEMPLATES_FOLDER: str = Field(default="", alias="TEMPLATES_FOLDER")
+    CORE_VALUES_INTERVIEW_NOTES_TEMPLATE: str = Field(
+        default="", alias="CORE_VALUES_INTERVIEW_NOTES_TEMPLATE"
+    )
+    TECHNICAL_INTERVIEW_NOTES_TEMPLATE: str = Field(
+        default="", alias="TECHNICAL_INTERVIEW_NOTES_TEMPLATE"
+    )
+    INTAKE_FORM_TEMPLATE: str = Field(default="", alias="INTAKE_FORM_TEMPLATE")
+    PHONE_SCREEN_TEMPLATE: str = Field(default="", alias="PHONE_SCREEN_TEMPLATE")
+    RECRUITMENT_FEEDBACK_TEMPLATE: str = Field(
+        default="", alias="RECRUITMENT_FEEDBACK_TEMPLATE"
+    )
+    PANELIST_GUIDEBOOK_TEMPLATE: str = Field(
+        default="", alias="PANELIST_GUIDEBOOK_TEMPLATE"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -178,6 +206,7 @@ class Settings(BaseSettings):
 
     # Functionality settings
     atip: AtipSettings
+    talent_role: TalentRoleSettings
 
     @property
     def is_production(self) -> bool:
@@ -203,6 +232,8 @@ class Settings(BaseSettings):
             kwargs["trello"] = TrelloSettings()
         if "atip" not in kwargs:
             kwargs["atip"] = AtipSettings()
+        if "talent_role" not in kwargs:
+            kwargs["talent_role"] = TalentRoleSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
