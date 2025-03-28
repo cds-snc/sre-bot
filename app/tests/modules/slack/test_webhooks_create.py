@@ -20,7 +20,6 @@ def test_create_webhook_with_illegal_name():
         MagicMock(),
         MagicMock(),
         MagicMock(),
-        MagicMock(),
     )
     ack.assert_any_call(
         response_action="errors",
@@ -37,7 +36,6 @@ def test_create_webhook_with_long_name():
         MagicMock(),
         MagicMock(),
         MagicMock(),
-        MagicMock(),
     )
     ack.assert_any_call(
         response_action="errors",
@@ -45,20 +43,19 @@ def test_create_webhook_with_long_name():
     )
 
 
+@patch("modules.slack.webhooks_create.logger")
 @patch("modules.slack.webhooks_create.webhooks.create_webhook")
-def test_create_webhook_with_existing_webhook(create_webhook_mock):
+def test_create_webhook_with_existing_webhook(create_webhook_mock, logger_mock):
     create_webhook_mock.return_value = "id"
     ack = MagicMock()
     view = helper_generate_view("foo")
     body = {"user": {"id": "user"}}
-    logger = MagicMock()
     client = MagicMock()
     say = MagicMock()
     webhooks_create.handle_create_webhook_action(
         ack,
         view,
         body,
-        logger,
         client,
         say,
     )
@@ -68,8 +65,14 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock):
         "foo",
         "alert",
     )
-    logger.info.assert_called_with(
-        "Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/id"
+    logger_mock.info.assert_called_with(
+        "webhook_creation_success",
+        webhook_id="id",
+        webhook_url="https://sre-bot.cdssandbox.xyz/hook/id",
+        webhook_type="alert",
+        channel="channel",
+        user="user",
+        name="foo",
     )
 
     say.assert_called_with(
@@ -84,20 +87,19 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock):
     )
 
 
+@patch("modules.slack.webhooks_create.logger")
 @patch("modules.slack.webhooks_create.webhooks.create_webhook")
-def test_create_webhook_with_creation_error(create_webhook_mock):
+def test_create_webhook_with_creation_error(create_webhook_mock, logger_mock):
     create_webhook_mock.return_value = None
     ack = MagicMock()
     view = helper_generate_view("foo")
     body = {"user": {"id": "user"}}
-    logger = MagicMock()
     client = MagicMock()
     say = MagicMock()
     webhooks_create.handle_create_webhook_action(
         ack,
         view,
         body,
-        logger,
         client,
         say,
     )
@@ -107,7 +109,9 @@ def test_create_webhook_with_creation_error(create_webhook_mock):
         "foo",
         "alert",
     )
-    logger.error.assert_called_with("Error creating webhook: channel, user, foo")
+    logger_mock.error.assert_called_with(
+        "webhook_creation_failure", channel="channel", user="user", name="foo"
+    )
 
     client.chat_postEphemeral.assert_called_with(
         channel="channel",

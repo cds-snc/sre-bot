@@ -349,5 +349,5 @@ def test_validate_string_payload_type_unknown_payload_type(caplog):
             None,
             None,
         )
-    warning_message = 'Unknown type for payload: {"type": "unknown"}'
+    warning_message = "Unknown payload type"
     assert warning_message in caplog.text

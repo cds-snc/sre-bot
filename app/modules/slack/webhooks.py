@@ -1,6 +1,5 @@
-from decimal import Decimal
 import json
-import logging
+from decimal import Decimal
 from typing import List, Type
 
 import uuid
@@ -11,6 +10,9 @@ from boto3.dynamodb.types import TypeDeserializer
 from models import model_utils
 from models.webhooks import WebhookPayload, AwsSnsPayload, AccessRequest, UpptimePayload
 from integrations.aws import dynamodb
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 table = "webhooks"
 
@@ -144,7 +146,7 @@ def validate_string_payload_type(payload: str) -> tuple:
     try:
         payload_dict = json.loads(payload)
     except json.JSONDecodeError:
-        logging.warning("Invalid JSON payload")
+        logger.warning("string_payload_validation_error", error="Invalid JSON payload")
         return None, None
 
     known_models: List[Type[BaseModel]] = [
@@ -165,5 +167,9 @@ def validate_string_payload_type(payload: str) -> tuple:
     if payload_type:
         return payload_type, payload_dict
     else:
-        logging.warning("Unknown type for payload: %s", json.dumps(payload_dict))
+        logger.warning(
+            "string_payload_validation_error",
+            error="Unknown payload type",
+            payload=payload,
+        )
         return None, None

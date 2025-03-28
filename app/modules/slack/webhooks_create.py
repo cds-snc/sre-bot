@@ -1,11 +1,16 @@
-import os
+"""Slack utilities for creating webhooks."""
+
 import re
 from modules.slack import webhooks
+from core.config import settings
+from core.logging import get_module_logger
 
-PREFIX = os.environ.get("PREFIX", "")
+PREFIX = settings.PREFIX
+
+logger = get_module_logger()
 
 
-def handle_create_webhook_action(ack, view, body, logger, client, say):
+def handle_create_webhook_action(ack, view, body, client, say):
     ack()
 
     errors = {}
@@ -30,12 +35,30 @@ def handle_create_webhook_action(ack, view, body, logger, client, say):
     id = webhooks.create_webhook(channel, user, name, hook_type)
     client.conversations_join(channel=channel)
     if id:
+        webhook_url = f"https://sre-bot.cdssandbox.xyz/hook/{id}"
         message = f"Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/{id}"
-        logger.info(message)
+        logger.info(
+            "webhook_creation_success",
+            webhook_id=id,
+            webhook_url=webhook_url,
+            webhook_type=hook_type,
+            channel=channel,
+            user=user,
+            name=name,
+        )
         say(channel=channel, text=f"<@{user}> created a new SRE-Bot webhook: {name}")
     else:
         message = "Something went wrong creating the webhook"
-        logger.error(f"Error creating webhook: {channel}, {user}, {name}")
+        logger.error(
+            "webhook_creation_failure",
+            channel=channel,
+            user=user,
+            name=name,
+        )
+        say(
+            channel=channel,
+            text=f"Something went wrong creating the webhook: {name}",
+        )
 
     client.chat_postEphemeral(
         channel=channel,
