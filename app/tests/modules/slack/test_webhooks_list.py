@@ -339,8 +339,9 @@ def test_list_all_webhooks_update():
     client.views_update.assert_called_with(view_id="id", view=ANY)
 
 
+@patch("modules.slack.webhooks_list.logger")
 @patch("modules.slack.webhooks_list.webhooks.get_webhook")
-def test_reveal_webhook(get_webhook_mock):
+def test_reveal_webhook(get_webhook_mock, mock_logger):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
     client = MagicMock()
@@ -350,15 +351,17 @@ def test_reveal_webhook(get_webhook_mock):
         "view": {"id": "id"},
         "trigger_id": "trigger_id",
     }
-    logger = MagicMock()
-    webhooks_list.reveal_webhook(ack, body, logger, client)
+    webhooks_list.reveal_webhook(ack, body, client)
     ack.assert_called()
-    logger.info.assert_called_with(
-        "username has requested to see the webhook with ID: id"
+    mock_logger.info.assert_called_with(
+        "reveal_webhook_called",
+        user_name="username",
+        webhook_id="id",
     )
     client.views_push.assert_called()
 
 
+@patch("modules.slack.webhooks_list.logger")
 @patch("modules.slack.webhooks_list.list_all_webhooks")
 @patch("modules.slack.webhooks_list.webhooks.list_all_webhooks")
 @patch("modules.slack.webhooks_list.webhooks.lookup_webhooks")
@@ -370,6 +373,7 @@ def test_toggle_webhook(
     lookup_webhooks_mock,
     list_all_webhooks_mock,
     list_all_webhooks_view_mock,
+    logger_mock,
 ):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
@@ -382,11 +386,15 @@ def test_toggle_webhook(
     }
     all_hooks = ["hook1", "hook2"]
     list_all_webhooks_mock.return_value = all_hooks
-    logger = MagicMock()
-    webhooks_list.toggle_webhook(ack, body, logger, client)
+    webhooks_list.toggle_webhook(ack, body, client)
     ack.assert_called()
     toggle_webhook_mock.assert_called_with("id")
-    logger.info.assert_called_with("Webhook name has been disabled by <@username>")
+    logger_mock.info.assert_called_with(
+        "toggle_webhook_called",
+        user_name="username",
+        webhook_id="id",
+        channel="channel",
+    )
     client.chat_postMessage.assert_called_with(
         channel="channel",
         user="user_id",
@@ -406,6 +414,7 @@ def test_toggle_webhook(
     )
 
 
+@patch("modules.slack.webhooks_list.logger")
 @patch("modules.slack.webhooks_list.list_all_webhooks")
 @patch("modules.slack.webhooks_list.webhooks.list_all_webhooks")
 @patch("modules.slack.webhooks_list.webhooks.lookup_webhooks")
@@ -417,6 +426,7 @@ def test_toggle_webhook_with_channel(
     lookup_webhooks_mock,
     list_all_webhooks_mock,
     list_all_webhooks_view_mock,
+    logger_mock,
 ):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
@@ -429,11 +439,15 @@ def test_toggle_webhook_with_channel(
     }
     all_hooks = ["hook1", "hook2"]
     lookup_webhooks_mock.return_value = all_hooks
-    logger = MagicMock()
-    webhooks_list.toggle_webhook(ack, body, logger, client)
+    webhooks_list.toggle_webhook(ack, body, client)
     ack.assert_called()
     toggle_webhook_mock.assert_called_with("id")
-    logger.info.assert_called_with("Webhook name has been disabled by <@username>")
+    logger_mock.info.assert_called_with(
+        "toggle_webhook_called",
+        user_name="username",
+        webhook_id="id",
+        channel="channel",
+    )
     client.chat_postMessage.assert_called_with(
         channel="channel",
         user="user_id",

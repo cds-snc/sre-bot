@@ -2,6 +2,10 @@ import json
 from slack_sdk.web import WebClient
 from modules.slack import webhooks
 
+from core.logging import get_module_logger
+
+logger = get_module_logger()
+
 MAX_BLOCK_SIZE = 16
 
 
@@ -192,7 +196,7 @@ def list_all_webhooks(
         client.views_open(trigger_id=body["trigger_id"], view=blocks)
 
 
-def reveal_webhook(ack, body, logger, client: WebClient):
+def reveal_webhook(ack, body, client: WebClient):
     ack()
 
     username = body["user"]["username"]
@@ -201,8 +205,7 @@ def reveal_webhook(ack, body, logger, client: WebClient):
     name = hook["name"]["S"]
     channel = hook["channel"]["S"]
 
-    message = f"{username} has requested to see the webhook with ID: {id}"
-    logger.info(message)
+    logger.info("reveal_webhook_called", user_name=username, webhook_id=id)
 
     blocks = {
         "type": "modal",
@@ -233,7 +236,7 @@ def reveal_webhook(ack, body, logger, client: WebClient):
     )
 
 
-def toggle_webhook(ack, body, logger, client):
+def toggle_webhook(ack, body, client):
     ack()
 
     username = body["user"]["username"]
@@ -246,7 +249,12 @@ def toggle_webhook(ack, body, logger, client):
 
     webhooks.toggle_webhook(id)
     message = f"Webhook {name} has been {'disabled' if hook['active']['BOOL'] else 'enabled'} by <@{username}>"
-    logger.info(message)
+    logger.info(
+        "toggle_webhook_called",
+        user_name=username,
+        webhook_id=id,
+        channel=channel,
+    )
     client.chat_postMessage(
         channel=channel,
         user=user_id,
