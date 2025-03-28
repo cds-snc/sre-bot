@@ -11,11 +11,17 @@ def test_atip_command_handles_empty_command_EN_client():
     respond = MagicMock()
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
-
+    command = {
+        "text": "",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -29,11 +35,17 @@ def test_atip_command_handles_empty_command_FR_client():
     respond = MagicMock()
     client = MagicMock()
     client.users_info.return_value = helper_client_locale("fr")
-
+    command = {
+        "text": "",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -48,10 +60,17 @@ def test_atip_command_handles_help_EN_command_EN_client():
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
 
+    command = {
+        "text": "help",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "help", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -66,10 +85,17 @@ def test_atip_command_handles_help_EN_command_FR_client():
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
 
+    command = {
+        "text": "help",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "help", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -83,11 +109,17 @@ def test_atip_command_handles_help_FR_command_EN_client():
     respond = MagicMock()
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
-
+    command = {
+        "text": "aide",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "aide", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -101,10 +133,17 @@ def test_atip_command_handles_unknown_command_EN_client():
     respond = MagicMock()
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
+    command = {
+        "text": "foo",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "foo", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -120,10 +159,17 @@ def test_atip_command_handles_unknown_command_FR_client():
     respond = MagicMock()
     client = MagicMock()
     client.users_info.return_value = helper_client_locale("fr")
+    command = {
+        "text": "foo",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
     atip.atip_command(
         ack,
-        {"text": "foo", "command": "/atip"},
-        MagicMock(),
+        command,
         respond,
         client,
         MagicMock(),
@@ -141,8 +187,15 @@ def test_atip_command_handles_access_EN_command(request_start_modal):
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
     body = MagicMock()
-
-    atip.atip_command(ack, {"text": "start"}, MagicMock(), respond, client, body)
+    command = {
+        "text": "start",
+        "command": "/atip",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
+    atip.atip_command(ack, command, respond, client, body)
     ack.assert_called
     request_start_modal.assert_called_with(client, body, "en-US")
 
@@ -155,7 +208,15 @@ def test_atip_command_handles_access_FR_command(request_start_modal):
     client.users_info.return_value = helper_client_locale()
     body = MagicMock()
 
-    atip.atip_command(ack, {"text": "lancer"}, MagicMock(), respond, client, body)
+    command = {
+        "text": "lancer",
+        "command": "/aiprp",
+        "user_id": "user_id",
+        "user_name": "user_name",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+    }
+    atip.atip_command(ack, command, respond, client, body)
     ack.assert_called
     request_start_modal.assert_called_with(client, body, "fr-FR")
 
@@ -189,7 +250,7 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set_EN_client():
         "selected_options"
     ] = []
 
-    atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
+    atip.atip_view_handler(ack, body, MagicMock(), MagicMock())
     ack.assert_called_with(
         response_action="errors",
         errors={"ati_search_width": "Please select at least one search width"},
@@ -203,7 +264,7 @@ def test_atip_view_handler_returns_error_if_no_search_width_is_set_FR_client():
         "selected_options"
     ] = []
 
-    atip.atip_view_handler(ack, body, MagicMock(), MagicMock(), MagicMock())
+    atip.atip_view_handler(ack, body, MagicMock(), MagicMock())
     ack.assert_called_with(
         response_action="errors",
         errors={
@@ -217,10 +278,9 @@ def test_atip_view_handler_success(add_atip_card_to_trello_mock):
     ack = MagicMock()
     body = helper_generate_payload("en-US")
     say = MagicMock()
-    logger = MagicMock()
     client = MagicMock()
 
-    atip.atip_view_handler(ack, body, say, logger, client)
+    atip.atip_view_handler(ack, body, say, client)
     ack.assert_called
 
     client.conversations_create.assert_called_with(name="tmp-atip-number")

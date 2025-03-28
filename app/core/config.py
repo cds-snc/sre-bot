@@ -146,6 +146,19 @@ class TrelloSettings(BaseSettings):
     )
 
 
+class AtipSettings(BaseSettings):
+    """ATIP configuration settings."""
+
+    ATIP_ANNOUNCE_CHANNEL: str | None = Field(
+        default=None, alias="ATIP_ANNOUNCE_CHANNEL"
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -153,7 +166,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
 
-    # Nested settings
+    # Integration settings
     slack: SlackSettings
     aws: AwsSettings
     google_workspace: GoogleWorkspaceSettings
@@ -162,6 +175,9 @@ class Settings(BaseSettings):
     opsgenie: OpsGenieSettings
     sentinel: SentinelSettings
     trello: TrelloSettings
+
+    # Functionality settings
+    atip: AtipSettings
 
     @property
     def is_production(self) -> bool:
@@ -185,6 +201,8 @@ class Settings(BaseSettings):
             kwargs["sentinel"] = SentinelSettings()
         if "trello" not in kwargs:
             kwargs["trello"] = TrelloSettings()
+        if "atip" not in kwargs:
+            kwargs["atip"] = AtipSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
@@ -197,14 +215,23 @@ class Settings(BaseSettings):
 # Create the settings instance
 settings = Settings()
 
-logger.info("config_initialized", prefix=settings.PREFIX, git_sha=settings.GIT_SHA)
-logger.info(
-    "aws_config_loaded",
-    config_keys=list(settings.aws.model_dump().keys()),
-    region=settings.aws.AWS_REGION,
-)
-logger.info("slack_config_loaded", config_keys=list(settings.slack.model_dump().keys()))
-logger.info(
-    "google_workspace_config_loaded",
-    config_keys=list(settings.google_workspace.model_dump().keys()),
-)
+
+def list_configs():
+    """List all configuration settings keys"""
+    config_settings = {"settings": []}
+
+    for key, value in settings.model_dump().items():
+        if isinstance(value, dict):
+            config_settings[key] = list(value.keys())
+        else:
+            config_settings["settings"].append({key: value})
+
+    logger.info(
+        "configuration_initialized", config_settings=config_settings["settings"]
+    )
+    for key, value in config_settings.items():
+        if key != "settings":
+            logger.info("configuration_loaded", config_setting=key, keys=value)
+
+
+list_configs()
