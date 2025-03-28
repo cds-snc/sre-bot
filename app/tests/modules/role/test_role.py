@@ -330,6 +330,34 @@ def test_create_new_folder(mock_create_new_folder, mock_copy_file_to_folder):
     )
 
 
+@patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
+@patch("modules.role.role.BOT_EMAIL", "bot_email")
+@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
+@patch("modules.role.role.logger")
+@patch("modules.role.role.google_drive.copy_file_to_folder")
+@patch("modules.role.role.google_drive.create_folder")
+def test_create_new_folder_failed(
+    mock_create_new_folder, mock_copy_file_to_folder, mock_logger
+):
+    ack = MagicMock()
+    say = MagicMock()
+    body = helper_body_payload("en-US")
+    client = MagicMock()
+    mock_create_new_folder.return_value = ""
+    role.role_view_handler(ack, body, say, client)
+    mock_create_new_folder.assert_called_once_with(
+        "foo",
+        "internal_talent_folder",
+        "id",
+        scopes=["https://www.googleapis.com/auth/drive"],
+        delegated_user_email="bot_email",
+    )
+    mock_logger.error.assert_called_once_with(
+        "talent_role_folder_creation_failed", folder_name="foo"
+    )
+    mock_copy_file_to_folder.assert_not_called()
+
+
 @patch.multiple(role, **ROLE_CONSTANTS)  # type: ignore
 @patch("modules.role.role.BOT_EMAIL", "bot_email")
 @patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])

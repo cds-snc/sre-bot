@@ -229,7 +229,6 @@ def role_view_handler(ack, body, say, client):
         logger.error(
             "talent_role_folder_creation_failed",
             folder_name=role_name,
-            error=folder,
         )
         return
 
