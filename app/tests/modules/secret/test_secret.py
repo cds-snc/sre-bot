@@ -1,6 +1,6 @@
-from modules import secret
-
 from unittest.mock import MagicMock, patch
+
+from modules import secret
 
 
 @patch("modules.secret.secret.generate_secret_command_modal_view")
@@ -31,12 +31,15 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
     )
 
 
+@patch("modules.secret.secret.logger")
 @patch("modules.secret.secret.requests")
 @patch("modules.secret.secret.time")
-def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
+def test_secret_view_handler_with_succesfull_request(
+    mock_time, mock_requests, mock_logger
+):
     ack = MagicMock()
     client = MagicMock()
-    logger = MagicMock()
+
     view = {
         "blocks": [
             {
@@ -70,9 +73,11 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
 
     mock_requests.post.return_value.json.return_value = {"id": "id"}
 
-    secret.secret_view_handler(ack, client, view, logger)
+    secret.secret_view_handler(ack, client, view)
 
     ack.assert_called_once_with()
+
+    mock_logger.exception.assert_not_called()
 
     mock_time.time.assert_called_once_with()
     mock_requests.post.assert_called_once_with(
@@ -89,12 +94,13 @@ def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests):
     )
 
 
+@patch("modules.secret.secret.logger")
 @patch("modules.secret.secret.requests")
 @patch("modules.secret.secret.time")
-def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
+def test_secret_view_handler_with_failed_request(mock_time, mock_requests, mock_logger):
     ack = MagicMock()
     client = MagicMock()
-    logger = MagicMock()
+
     view = {
         "blocks": [
             {
@@ -128,7 +134,7 @@ def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
 
     mock_requests.post.return_value.json.return_value = {}
 
-    secret.secret_view_handler(ack, client, view, logger)
+    secret.secret_view_handler(ack, client, view)
 
     ack.assert_called_once_with()
 
@@ -139,6 +145,7 @@ def test_secret_view_handler_with_failed_request(mock_time, mock_requests):
         timeout=10,
         headers={"Content-Type": "application/json"},
     )
+    mock_logger.exception.assert_called_once()
 
     client.chat_postEphemeral.assert_called_once_with(
         channel="private_metadata",
