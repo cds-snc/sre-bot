@@ -3,18 +3,21 @@
 This module allows users to send encrypted messages to other users.
 """
 
-import os
-import i18n
-import requests
 import time
+
+import i18n  # type: ignore
+import requests  # type: ignore
+from core.config import settings
+from core.logging import get_module_logger
 from integrations.slack import users as slack_users
 
-i18n.load_path.append("./locales/")
+PREFIX = settings.PREFIX
 
+i18n.load_path.append("./locales/")
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
-PREFIX = os.environ.get("PREFIX", "")
+logger = get_module_logger()
 
 
 def register(bot):
@@ -25,6 +28,14 @@ def register(bot):
 
 def secret_command(client, ack, command, body):
     ack()
+    logger.info(
+        "secret_command_received",
+        command=command["text"],
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
+    )
     if "user" in body:
         user_id = body["user"]["id"]
     else:
@@ -35,7 +46,7 @@ def secret_command(client, ack, command, body):
     client.views_open(trigger_id=body["trigger_id"], view=view)
 
 
-def secret_view_handler(ack, client, view, logger):
+def secret_view_handler(ack, client, view):
     ack()
     locale = view["blocks"][0]["elements"][0]["value"]
     i18n.set("locale", locale)
@@ -58,7 +69,11 @@ def secret_view_handler(ack, client, view, logger):
             text=f"{i18n.t('secret.link_available')} {url}",
         )
     except Exception as e:
-        logger.error(e)
+        logger.exception(
+            "secret_view_handler_error",
+            exception=str(e),
+            endpoint=endpoint,
+        )
         client.chat_postEphemeral(
             channel=view["private_metadata"],
             user=view["private_metadata"],
