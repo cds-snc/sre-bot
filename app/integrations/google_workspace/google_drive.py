@@ -95,13 +95,15 @@ def create_folder(
     fields: str | None = None,
     scopes: list[str] | None = None,
     delegated_user_email: str | None = None,
-):
+) -> dict:
     """Create a new folder in Google Drive.
 
     Args:
         name (str): The name of the new folder.
         parent_folder (str): The id of the parent folder.
         fields (str, optional): The fields to include in the response.
+        scopes (list[str], optional): The scopes to use for the API call.
+        delegated_user_email (str, optional): The email address of the user to impersonate.
 
     Returns:
         dict: A File resource representing the new folder.
