@@ -187,6 +187,18 @@ class TalentRoleSettings(BaseSettings):
     )
 
 
+class ReportsSettings(BaseSettings):
+    FOLDER_REPORTS_GOOGLE_GROUPS: str = Field(
+        default="", alias="FOLDER_REPORTS_GOOGLE_GROUPS"
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -207,6 +219,7 @@ class Settings(BaseSettings):
     # Functionality settings
     atip: AtipSettings
     talent_role: TalentRoleSettings
+    reports: ReportsSettings
 
     @property
     def is_production(self) -> bool:
@@ -234,6 +247,8 @@ class Settings(BaseSettings):
             kwargs["atip"] = AtipSettings()
         if "talent_role" not in kwargs:
             kwargs["talent_role"] = TalentRoleSettings()
+        if "reports" not in kwargs:
+            kwargs["reports"] = ReportsSettings()
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
