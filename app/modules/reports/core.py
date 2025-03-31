@@ -1,8 +1,10 @@
 from slack_bolt import Ack, Respond
 from slack_sdk import WebClient
-from logging import Logger
 
-from . import google_groups  #
+from core.logging import get_module_logger
+from modules.reports import google_groups
+
+logger = get_module_logger()
 
 
 help_text = """
@@ -17,9 +19,7 @@ help_text = """
 \n      - générer un rapport sur les membres des groupes Google"""
 
 
-def reports_command(
-    args, ack: Ack, command, logger: Logger, respond: Respond, client: WebClient, body
-):
+def reports_command(args, ack: Ack, command, respond: Respond, client: WebClient, body):
     ack()
     if len(args) == 0:
         respond(help_text)
@@ -27,15 +27,14 @@ def reports_command(
     logger.info("SRE reports command received: %s", command["text"])
 
     action, *args = args
-    logger.info("SRE reports action: %s", action)
-    logger.info("SRE reports args: %s", args)
+    logger.info("reports_action_received", action=action, args=args)
     match action:
         case "help" | "aide":
             respond(help_text)
         case "google-groups":
             google_groups.generate_report(args, respond)
         case "google-groups-members":
-            google_groups.generate_group_members_report(args, respond, logger)
+            google_groups.generate_group_members_report(args, respond)
         case _:
             respond(
                 "Unknown command. Type `/sre reports help` for a list of commands.\nCommande inconnue. Tapez `/sre reports aide` pour voir une liste de commandes."
