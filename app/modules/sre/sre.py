@@ -75,7 +75,7 @@ def sre_command(
         case "version":
             respond(f"SRE Bot version: {os.environ.get('GIT_SHA', 'unknown')}")
         case "reports":
-            reports.reports_command(args, ack, command, logger, respond, client, body)
+            reports.reports_command(args, ack, command, respond, client, body)
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
