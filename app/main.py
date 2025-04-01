@@ -31,6 +31,7 @@ def main(bot):
     logger.info(
         "application_startup",
     )
+    list_configs()
     logger.info("environment_checked", config_keys=list(os.environ.keys()))
 
     APP_TOKEN = settings.slack.APP_TOKEN
@@ -74,6 +75,22 @@ def get_bot():
     if not bool(SLACK_TOKEN):
         return False
     return App(token=SLACK_TOKEN)
+
+
+def list_configs():
+    """List all configuration settings keys"""
+    config_settings = {"settings": []}
+
+    for key, value in settings.model_dump().items():
+        if isinstance(value, dict):
+            config_settings[key] = list(value.keys())
+        else:
+            config_settings["settings"].append({key: value})
+
+    logger.info("configuration_initialized", base_settings=config_settings["settings"])
+    for key, value in config_settings.items():
+        if key != "settings":
+            logger.info("configuration_loaded", config_setting=key, keys=value)
 
 
 bot = get_bot()
