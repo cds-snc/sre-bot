@@ -229,20 +229,18 @@ def sync_groups(
 
     groups_memberships_created = []
     groups_memberships_deleted = []
-    for i in range(len(source_groups_to_sync)):
-        if (
-            source_groups_to_sync[i]["DisplayName"]
-            == target_groups_to_sync[i]["DisplayName"]
-        ):
+    for i, source_group in enumerate(source_groups_to_sync):
+        target_group = target_groups_to_sync[i]
+        if source_group["DisplayName"] == target_group["DisplayName"]:
             logger.info(
                 "groups_memberships_sync_processing",
-                source_group_name=source_groups_to_sync[i]["DisplayName"],
-                target_group_name=target_groups_to_sync[i]["DisplayName"],
+                source_group_name=source_group["DisplayName"],
+                target_group_name=target_group["DisplayName"],
             )
             users_to_add, users_to_remove = filters.compare_lists(
-                {"values": source_groups_to_sync[i]["members"], "key": "primaryEmail"},
+                {"values": source_group["members"], "key": "primaryEmail"},
                 {
-                    "values": target_groups_to_sync[i]["GroupMemberships"],
+                    "values": target_group["GroupMemberships"],
                     "key": "MemberId.UserName",
                 },
                 mode="sync",
@@ -252,9 +250,9 @@ def sync_groups(
                 {
                     **user,
                     "user_id": target_user["UserId"],
-                    "group_id": target_groups_to_sync[i]["GroupId"],
+                    "group_id": target_group["GroupId"],
                     "log_user_name": user["primaryEmail"],
-                    "log_group_name": target_groups_to_sync[i]["DisplayName"],
+                    "log_group_name": target_group["DisplayName"],
                 }
                 for user in users_to_add
                 for target_user in target_users
@@ -277,7 +275,7 @@ def sync_groups(
                     **user,
                     "membership_id": user["MembershipId"],
                     "log_user_name": user["MemberId"]["UserName"],
-                    "log_group_name": target_groups_to_sync[i]["DisplayName"],
+                    "log_group_name": target_group["DisplayName"],
                 }
                 for user in users_to_remove
                 if user.get("MembershipId")
