@@ -1,9 +1,9 @@
-import logging
 from utils import filters
 from integrations.sentinel import log_to_sentinel
+from core.logging import get_module_logger
 
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger()
 
 
 def provision_entities(
@@ -34,12 +34,21 @@ def provision_entities(
     provisioned_entities = []
     if not entities:
         logger.info(
-            f"{integration_name}:{entity_name}:{operation_name}: No entities to process"
+            "provision_entities_no_entities_to_process",
+            integration=integration_name,
+            entity=entity_name,
+            operation=operation_name,
         )
         return provisioned_entities
+
     logger.info(
-        f"{integration_name}:{entity_name}:{operation_name}: Started processing {len(entities)} entities"
+        "provision_entities_started",
+        integration=integration_name,
+        entity=entity_name,
+        operation=operation_name,
+        entities_count=len(entities),
     )
+
     for entity in entities:
         event = {
             "name": "provision_entities",
@@ -55,7 +64,11 @@ def provision_entities(
             response = function(**entity, **kwargs)
             if response:
                 logger.info(
-                    f"{integration_name}:{entity_name}:{operation_name}:Successful: {entity_string}"
+                    "provision_entity_successful",
+                    integration=integration_name,
+                    entity=entity_name,
+                    operation=operation_name,
+                    entity_value=entity_string,
                 )
                 event["status"] = "successful"
                 log_to_sentinel(
@@ -66,7 +79,11 @@ def provision_entities(
             else:
                 event["status"] = "failed"
                 logger.error(
-                    f"{integration_name}:{entity_name}:{operation_name}:Failed: {entity_string}"
+                    "provision_entity_failed",
+                    integration=integration_name,
+                    entity=entity_name,
+                    operation=operation_name,
+                    entity_value=entity_string,
                 )
                 log_to_sentinel(
                     event,
@@ -74,14 +91,24 @@ def provision_entities(
                 )
         else:
             logger.info(
-                f"{integration_name}:{entity_name}:{operation_name}:Successful:DRY_RUN: {entity_string}"
+                "provision_entity_dry_run",
+                integration=integration_name,
+                entity=entity_name,
+                operation=operation_name,
+                entity_value=entity_string,
             )
             log_to_sentinel(
                 event,
                 {"entity": entity},
             )
             provisioned_entities.append({"entity": entity, "response": None})
+
     logger.info(
-        f"{integration_name}:{entity_name}:{operation_name}: Completed processing {len(provisioned_entities)} entities"
+        "provision_entities_completed",
+        integration=integration_name,
+        entity=entity_name,
+        operation=operation_name,
+        provisioned_entities_count=len(provisioned_entities),
     )
+
     return provisioned_entities
