@@ -200,12 +200,11 @@ def test_incident_submit_calls_ack(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     ack.assert_called()
 
 
@@ -224,12 +223,11 @@ def test_incident_submit_calls_views_open(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     ack.assert_called_once()
     client.views_open.assert_called_once()
 
@@ -239,12 +237,11 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
     _mock_google_meet,
 ):
     ack = MagicMock()
-    logger = MagicMock()
     view = helper_generate_view("!@#$%%^&*()_+-=[]{};':,./<>?\\|`~")
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     ack.assert_any_call(
         response_action="errors",
         errors={
@@ -258,12 +255,12 @@ def test_incident_submit_returns_error_if_description_is_too_long(
     _mock_google_meet,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view("a" * 61)
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     ack.assert_any_call(
         response_action="errors",
         errors={
@@ -285,7 +282,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -293,7 +290,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
     client.conversations_setTopic.assert_called_once_with(
         channel="channel_id", topic="Incident: name / product"
@@ -317,7 +314,7 @@ def test_incident_submit_creates_channel_sets_description(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -325,7 +322,7 @@ def test_incident_submit_creates_channel_sets_description(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
     client.conversations_setPurpose.assert_called_once_with(
         channel="channel_id", purpose="name"
@@ -345,7 +342,7 @@ def test_incident_submit_adds_creator_to_channel(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "view": view, "trigger_id": "trigger_id"}
@@ -358,7 +355,7 @@ def test_incident_submit_adds_creator_to_channel(
         "ok": False,
     }
     client.users_lookupByEmail.return_value = {"ok": False, "error": "users_not_found"}
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     client.conversations_invite.assert_has_calls(
         [
             call(channel="channel_id", users="creator_user_id"),
@@ -379,7 +376,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -394,7 +391,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
         "meetingCode": "aaa-bbbb-ccc",
         "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
 
     client.bookmarks_add.assert_any_call(
         channel_id="channel_id",
@@ -422,7 +419,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -441,7 +438,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
         "meetingCode": "aaa-bbbb-ccc",
         "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
 
     client.conversations_canvases_create.assert_called_once_with(
         channel_id="channel_id", document_content=canvas_data
@@ -463,7 +460,7 @@ def test_incident_canvas_create_returns_successful_response(
     mock_incident_folder.create_item.return_value = "incident_id"
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -480,7 +477,7 @@ def test_incident_canvas_create_returns_successful_response(
         "meetingCode": "aaa-bbbb-ccc",
         "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
 
     assert client.conversations_canvases_create.return_value == expected_response
     ack.assert_called_once()
@@ -502,7 +499,7 @@ def test_incident_canvas_create_unsuccessful_called(
 
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -519,7 +516,7 @@ def test_incident_canvas_create_unsuccessful_called(
         "meetingCode": "aaa-bbbb-ccc",
         "config": {"accessType": "TRUSTED", "entryPointAccess": "ALL"},
     }
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
 
     assert client.conversations_canvases_create.return_value == expected_response
 
@@ -535,7 +532,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
 
@@ -556,7 +553,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
 
     mock_incident_folder.get_folder_metadata.return_value = {"appProperties": {}}
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_incident_document.create_incident_document.assert_called_once_with(
         f"{DATE}-name", "folder"
     )
@@ -586,7 +583,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -616,7 +613,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
         "appProperties": {"genie_schedule": "oncall"}
     }
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
@@ -646,7 +643,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -676,7 +673,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
         "appProperties": {"genie_schedule": "oncall"}
     }
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
@@ -705,7 +702,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
@@ -735,7 +732,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
         "appProperties": {"genie_schedule": "oncall"}
     }
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
@@ -765,7 +762,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
 
     say = MagicMock()
@@ -795,7 +792,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
         "appProperties": {"genie_schedule": "oncall"}
     }
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
@@ -822,7 +819,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
     _mock_db_operations,
 ):
     ack = MagicMock()
-    logger = MagicMock()
+
     view = helper_generate_view()
 
     # override the security incident selection to "no"
@@ -855,7 +852,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
         "appProperties": {"genie_schedule": "oncall"}
     }
 
-    incident.submit(ack, view, say, body, client, logger)
+    incident.submit(ack, view, say, body, client)
     mock_get_on_call_users.assert_called_once_with("oncall")
     client.users_lookupByEmail.assert_any_call(email="email")
     client.usergroups_users_list.assert_not_called()

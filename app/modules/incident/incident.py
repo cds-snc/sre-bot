@@ -1,9 +1,8 @@
-import os
 import re
 import datetime
 import i18n  # type: ignore
-from dotenv import load_dotenv
 from slack_sdk import WebClient
+from slack_bolt import Ack
 
 from integrations import opsgenie
 from integrations.slack import users as slack_users
@@ -15,18 +14,21 @@ from modules.incident import (
     incident_document,
     db_operations,
 )
+from core.logging import get_module_logger
+from core.config import settings
 
-load_dotenv()
+
+PREFIX = settings.PREFIX
+INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
+SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
+INCIDENT_HANDBOOK_URL = settings.feat_incident.INCIDENT_HANDBOOK_URL
+
+logger = get_module_logger()
 
 i18n.load_path.append("./locales/")
 
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
-
-INCIDENT_CHANNEL = os.environ.get("INCIDENT_CHANNEL")
-SLACK_SECURITY_USER_GROUP_ID = os.environ.get("SLACK_SECURITY_USER_GROUP_ID", "")
-PREFIX = os.environ.get("PREFIX", "")
-INCIDENT_HANDBOOK_URL = os.environ.get("INCIDENT_HANDBOOK_URL", "")
 
 
 def register(bot):
@@ -37,6 +39,11 @@ def register(bot):
 
 def open_create_incident_modal(client, ack, command, body):
     ack()
+    logger.info(
+        "incident_command_called",
+        command=command,
+        body=body,
+    )
     if "user" in body:
         user_id = body["user"]["id"]
     else:
@@ -93,12 +100,9 @@ def handle_change_locale_button(ack, client, body):
     client.views_update(view_id=body["view"]["id"], view=view)
 
 
-def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
+def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     # Complexity of function is too high for flake8 but currently we are ignoring this until we refactor this function.
     ack()
-
-    gmeet_scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
-    gmeet = GoogleMeet(scopes=gmeet_scopes)
     errors = {}
 
     name = view["state"]["values"]["name"]["name"]["value"]
@@ -114,7 +118,7 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
         errors["name"] = (
             "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
         )
-    if len(name) > 60:
+    if len(name) > 59:
         errors["name"] = (
             "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
         )
@@ -122,6 +126,17 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
         ack(response_action="errors", errors=errors)
         return
 
+    logger.info(
+        "incident_modal_submitted",
+        name=name,
+        name_length=len(name),
+        folder=folder,
+        product=product,
+        security_incident=security_incident,
+        body=body,
+    )
+    gmeet_scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
+    gmeet = GoogleMeet(scopes=gmeet_scopes)
     log_to_sentinel("incident_called", body)
 
     # Get folder metadata
@@ -143,14 +158,32 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
     # Create channel
     # if we are testing ie PREFIX is "dev" then create the channel with name incident-dev-{slug}. Otherwise create the channel with name incident-{slug}
     environment = "prod"
+    channel_to_create = f"incident-{slug}"
     if PREFIX == "dev-":
-        response = client.conversations_create(name=f"incident-dev-{slug}")
         environment = "dev"
-    else:
-        response = client.conversations_create(name=f"incident-{slug}")
+        channel_to_create = f"incident-dev-{slug}"
+    try:
+        if len(channel_to_create) > 80:
+            channel_to_create = channel_to_create[:80]
+        response = client.conversations_create(name=channel_to_create)
+    except Exception as e:
+        logger.error(
+            "incident_channel_creation_failed",
+            error=str(e),
+            channel_name=channel_to_create,
+        )
+        say(
+            text=":warning: Channel creation failed. Please contact the SRE team.",
+            channel=body["user"]["id"],
+        )
+        return
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
-    logger.info(f"Created conversation: {channel_name}")
+    logger.info(
+        "incident_channel_created",
+        channel_id=channel_id,
+        channel_name=channel_name,
+    )
 
     view = generate_success_modal(body, channel_id, channel_name)
     client.views_open(trigger_id=body["trigger_id"], view=view)
@@ -201,7 +234,7 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
 
     # Create incident document
     document_id = incident_document.create_incident_document(slug, folder)
-    logger.info(f"Created document: {slug} in folder: {folder} / {document_id}")
+    logger.info("incident_document_created", document_id=document_id)
 
     document_link = f"https://docs.google.com/document/d/{document_id}/edit"
 
@@ -227,8 +260,8 @@ def submit(ack, view, say, body, client: WebClient, logger):  # noqa: C901
         "meet_url": meet_link["meetingUri"],
         "environment": environment,
     }
-    db_operations.create_incident(incident_data)
-    logger.info(f"Created incident in dynamodb: {slug}")
+    incident_id = db_operations.create_incident(incident_data)
+    logger.info("incident_record_created", incident_id=incident_id)
 
     # Bookmark incident document
     client.bookmarks_add(

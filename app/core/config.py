@@ -211,6 +211,26 @@ class AWSFeatureSettings(BaseSettings):
     )
 
 
+class IncidentFeatureSettings(BaseSettings):
+    """Incident Feature configuration settings."""
+
+    INCIDENT_CHANNEL: str | None = Field(default=None, alias="INCIDENT_CHANNEL")
+    SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
+        default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
+    )
+    INCIDENT_HANDBOOK_URL: str = Field(default="", alias="INCIDENT_HANDBOOK_URL")
+    INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
+    INCIDENT_LIST: str = Field(default="", alias="INCIDENT_LIST")
+    SRE_DRIVE_ID: str = Field(default="", alias="SRE_DRIVE_ID")
+    SRE_INCIDENT_FOLDER: str = Field(default="", alias="SRE_INCIDENT_FOLDER")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -233,6 +253,7 @@ class Settings(BaseSettings):
     talent_role: TalentRoleSettings
     reports: ReportsSettings
     aws_feature: AWSFeatureSettings
+    feat_incident: IncidentFeatureSettings
 
     @property
     def is_production(self) -> bool:
@@ -253,6 +274,7 @@ class Settings(BaseSettings):
             "talent_role": TalentRoleSettings,
             "reports": ReportsSettings,
             "aws_feature": AWSFeatureSettings,
+            "feat_incident": IncidentFeatureSettings,
         }
 
         for setting_name, setting_class in settings_map.items():
