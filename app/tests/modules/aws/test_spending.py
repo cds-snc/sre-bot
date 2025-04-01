@@ -53,7 +53,7 @@ def test_generate_spending_data(
     assert mock_list_accounts.called
     mock_get_details.assert_called_once_with(["123", "456"], mock_logger)
     assert mock_get_spending.called
-    mock_spending_to_df.assert_called_once_with(["spending_data"])
+    mock_spending_to_df.assert_called_once_with(["spending_data"], mock_logger)
 
     # Check for Converted Cost calculation
     assert "Converted Cost" in result.columns
@@ -148,6 +148,7 @@ def test_format_account_details():
 
 
 def test_spending_to_df_with_data():
+    mock_logger = MagicMock()
     """Test the spending_to_df function with valid data."""
     spending_data = [
         {
@@ -160,7 +161,7 @@ def test_spending_to_df_with_data():
             ],
         }
     ]
-    result = spending.spending_to_df(spending_data)
+    result = spending.spending_to_df(spending_data, mock_logger)
 
     assert isinstance(result, pd.DataFrame)
     assert len(result) == 1
@@ -172,12 +173,14 @@ def test_spending_to_df_with_data():
 def test_spending_to_df_empty_data():
     """Test the spending_to_df function with empty data."""
     # Test with empty list
-    result = spending.spending_to_df([])
+    mock_logger = MagicMock()
+    result = spending.spending_to_df([], mock_logger)
     assert result.empty
 
     # Test with data but no groups
     result = spending.spending_to_df(
-        [{"TimePeriod": {"Start": "2025-03-01"}, "Groups": []}]
+        [{"TimePeriod": {"Start": "2025-03-01"}, "Groups": []}],
+        mock_logger,
     )
     assert result.empty
 
@@ -202,7 +205,7 @@ def test_update_spending_data(mock_batch_update):
     mock_batch_update.assert_called_once()
     args, kwargs = mock_batch_update.call_args
     assert kwargs["spreadsheetId"] == "test_spreadsheet_id"
-    assert kwargs["range"] == "Sheet1"
+    assert kwargs["cell_range"] == "Sheet1"
     assert kwargs["valueInputOption"] == "USER_ENTERED"
 
     # Check values format
@@ -216,7 +219,9 @@ def test_update_spending_data(mock_batch_update):
     assert values[1][1] == 100  # First row, second column
     assert values[2][0] == "456"  # Second row, first column
     assert values[2][1] == 200  # Second row, second column
-    mock_logger.info.assert_called_once_with("Spending data updated successfully")
+    mock_logger.info.assert_called_once_with(
+        "update_spending_data", spreadsheet_id="test_spreadsheet_id"
+    )
 
 
 @patch("modules.aws.spending.sheets.batch_update_values")
@@ -254,7 +259,7 @@ def test_update_spending_data_with_fallback(mock_batch_update):
     spending.update_spending_data(mock_df, mock_logger, mock_spreadsheet_id)
 
     mock_logger.warning.assert_called_once_with(
-        "Warning: DataFrame values conversion issue. Type: <class 'str'>"
+        "data_values_is_not_list", actual_type="<class 'str'>"
     )
 
     # Verify batch_update_values was called with correct values
@@ -276,9 +281,12 @@ def test_update_spending_data_no_sheet_id():
 
     spending.update_spending_data(mock_df, mock_logger, spreadsheet_id=None)
 
-    mock_logger.error.assert_called_once_with("Error: SPENDING_SHEET_ID is not set")
+    mock_logger.error.assert_called_once_with(
+        "update_spending_data", error="SPENDING_SHEET_ID is not set"
+    )
 
 
+@patch.object(spending, "SPENDING_SHEET_ID", "test_spreadsheet_id")
 @patch("modules.aws.spending.update_spending_data")
 @patch("modules.aws.spending.generate_spending_data")
 def test_schedule_spending_data_update(mock_generate, mock_update):
@@ -291,8 +299,14 @@ def test_schedule_spending_data_update(mock_generate, mock_update):
 
     spending.execute_spending_data_update_job(mock_logger)
 
-    mock_logger.info.assert_any_call("Starting spending data update job")
-    mock_logger.info.assert_any_call("Spending data update job completed")
+    mock_logger.info.assert_any_call(
+        "execute_spending_data_update_job", status="started"
+    )
+    mock_logger.info.assert_any_call(
+        "execute_spending_data_update_job",
+        status="success",
+        spreadsheet_id="test_spreadsheet_id",
+    )
     mock_generate.assert_called_once_with(mock_logger)
     mock_update.assert_called_once_with(dummy_data, mock_logger)
 
@@ -309,7 +323,13 @@ def test_schedule_spending_data_update_empty(mock_generate, mock_update):
 
     spending.execute_spending_data_update_job(mock_logger)
 
-    mock_logger.info.assert_any_call("Starting spending data update job")
-    mock_logger.error.assert_any_call("No spending data to update")
+    mock_logger.info.assert_any_call(
+        "execute_spending_data_update_job", status="started"
+    )
+    mock_logger.error.assert_any_call(
+        "execute_spending_data_update_job",
+        status="failed",
+        error="No spending data generated",
+    )
     mock_generate.assert_called_once_with(mock_logger)
     mock_update.assert_not_called()

@@ -8,10 +8,8 @@ This module provides the following features:
 
 """
 
-import os
 from slack_bolt import App, Ack, Respond
 from slack_sdk.web import WebClient
-from logging import Logger
 
 from integrations.aws.organizations import get_account_id_by_name
 from integrations.aws import identity_store
@@ -24,9 +22,13 @@ from modules.aws import (
     lambdas,
     spending,
 )
+from core.config import settings
+from core.logging import get_module_logger
 
-PREFIX = os.environ.get("PREFIX", "")
-AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
+PREFIX = settings.PREFIX
+AWS_ADMIN_GROUPS = settings.aws_feature.AWS_ADMIN_GROUPS
+
+logger = get_module_logger()
 
 help_text = """
 \n `/aws users <operation> <user1> <user2> ...`
@@ -64,9 +66,7 @@ def register(bot: App) -> None:
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
 
-def aws_command(
-    ack: Ack, command, logger: Logger, respond: Respond, client: WebClient, body
-) -> None:
+def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) -> None:
     """AWS command handler.
 
     This function handles the `/aws` command by parsing the command text and executing the appropriate action.
@@ -81,7 +81,14 @@ def aws_command(
     """
 
     ack()
-    logger.info("AWS command received: %s", command["text"])
+    logger.info(
+        "aws_command_received",
+        command=command["text"],
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
+    )
 
     if command["text"] == "":
         respond(

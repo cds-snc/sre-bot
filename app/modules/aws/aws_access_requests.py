@@ -1,18 +1,18 @@
 import boto3  # type: ignore
 import datetime
-import os
 import uuid
 
 from slack_sdk import WebClient
 from server.utils import log_ops_message
+from core.config import settings
 from integrations.aws import identity_store, organizations, sso_admin
 
 
+PREFIX = settings.PREFIX
+
 dynamodb_client = boto3.client(
     "dynamodb",
-    endpoint_url=(
-        "http://dynamodb-local:8000" if os.environ.get("PREFIX", None) else None
-    ),
+    endpoint_url=("http://dynamodb-local:8000" if PREFIX != "" else None),
     region_name="ca-central-1",
 )
 
@@ -191,7 +191,15 @@ def access_view_handler(ack, body, logger, client: WebClient):
 
     msg = f"<@{user_id}> ({email}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
 
-    logger.info(msg)
+    logger.info(
+        "aws_account_access_request",
+        user_id=user_id,
+        email=email,
+        account_id=account,
+        account_name=account_name,
+        access_type=access_type,
+        rationale=rationale,
+    )
     log_ops_message(client, msg)
     aws_user_id = identity_store.get_user_id(email)
 

@@ -228,11 +228,36 @@ def test_synchronize_sync_users_and_groups_with_defaults(
 
     assert mock_identity_store.list_users.call_count == 2
     logger_calls = [
-        call("synchronize:Found 1 Groups and 3 Users from Source"),
-        call("synchronize:Found 1 Groups and 3 Users from Target"),
-        call("synchronize:Sync Completed"),
+        call(
+            "synchronize_task_requested",
+            enable_users_sync=True,
+            enable_groups_sync=True,
+            enable_user_create=True,
+            enable_user_delete=False,
+            enable_membership_create=True,
+            enable_membership_delete=False,
+            query="email:aws-*",
+            pre_processing_filters=[],
+        ),
+        call(
+            "source_groups_users_fetched",
+            groups_count=1,
+            users_count=3,
+            source="google_groups",
+        ),
+        call(
+            "target_groups_users_fetched",
+            groups_count=1,
+            users_count=3,
+            source="aws_identity_center",
+        ),
+        call(
+            "synchronize_task_completed",
+            users_sync_status=(["users_created"], ["users_deleted"]),
+            groups_sync_status=(["memberships_created"], ["memberships_deleted"]),
+        ),
     ]
-    assert mock_logger.info.call_args_list == logger_calls
+    mock_logger.info.assert_has_calls(logger_calls)
 
     assert mock_sync_users.call_count == 1
     assert mock_sync_users.call_args_list == [
@@ -310,11 +335,38 @@ def test_synchronize_sync_skip_users_if_false(
         in mock_sync_identity_center_groups.call_args_list
     )
 
-    assert mock_logger.info.call_count == 3
-    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
-    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
-    logger_calls.append(call("synchronize:Sync Completed"))
-    assert mock_logger.info.call_args_list == logger_calls
+    assert mock_logger.info.call_count == 4
+    logger_calls = [
+        call(
+            "synchronize_task_requested",
+            enable_users_sync=False,
+            enable_groups_sync=True,
+            enable_user_create=True,
+            enable_user_delete=False,
+            enable_membership_create=True,
+            enable_membership_delete=False,
+            query="email:aws-*",
+            pre_processing_filters=[],
+        ),
+        call(
+            "source_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="google_groups",
+        ),
+        call(
+            "target_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="aws_identity_center",
+        ),
+        call(
+            "synchronize_task_completed",
+            users_sync_status=None,
+            groups_sync_status=("memberships_created", "memberships_deleted"),
+        ),
+    ]
+    mock_logger.info.assert_has_calls(logger_calls)
 
 
 @patch("modules.aws.identity_center.logger")
@@ -380,11 +432,38 @@ def test_synchronize_sync_skip_groups_false_if_false(
         in mock_sync_identity_center_users.call_args_list
     )
 
-    assert mock_logger.info.call_count == 3
-    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
-    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
-    logger_calls.append(call("synchronize:Sync Completed"))
-    assert mock_logger.info.call_args_list == logger_calls
+    assert mock_logger.info.call_count == 4
+    logger_calls = [
+        call(
+            "synchronize_task_requested",
+            enable_users_sync=True,
+            enable_groups_sync=False,
+            enable_user_create=True,
+            enable_user_delete=False,
+            enable_membership_create=True,
+            enable_membership_delete=False,
+            query="email:aws-*",
+            pre_processing_filters=[],
+        ),
+        call(
+            "source_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="google_groups",
+        ),
+        call(
+            "target_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="aws_identity_center",
+        ),
+        call(
+            "synchronize_task_completed",
+            users_sync_status=("users_created", "users_deleted"),
+            groups_sync_status=None,
+        ),
+    ]
+    mock_logger.info.assert_has_calls(logger_calls)
 
 
 @patch("modules.aws.identity_center.logger")
@@ -446,11 +525,39 @@ def test_synchronize_sync_skip_users_and_groups_if_false(
 
     assert mock_sync_identity_center_users.call_count == 0
     assert mock_sync_identity_center_groups.call_count == 0
-    assert mock_logger.info.call_count == 3
-    logger_calls = [call("synchronize:Found 3 Groups and 6 Users from Source")]
-    logger_calls.append(call("synchronize:Found 3 Groups and 6 Users from Target"))
-    logger_calls.append(call("synchronize:Sync Completed"))
-    assert mock_logger.info.call_args_list == logger_calls
+    assert mock_logger.info.call_count == 4
+    logger_calls = [
+        call(
+            "synchronize_task_requested",
+            enable_users_sync=False,
+            enable_groups_sync=False,
+            enable_user_create=True,
+            enable_user_delete=False,
+            enable_membership_create=True,
+            enable_membership_delete=False,
+            query="email:aws-*",
+            pre_processing_filters=[],
+        ),
+        call(
+            "source_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="google_groups",
+        ),
+        call(
+            "target_groups_users_fetched",
+            groups_count=3,
+            users_count=6,
+            source="aws_identity_center",
+        ),
+        call(
+            "synchronize_task_completed",
+            users_sync_status=None,
+            groups_sync_status=None,
+        ),
+    ]
+
+    mock_logger.info.assert_has_calls(logger_calls)
 
 
 @patch("modules.aws.identity_center.logger")
@@ -514,10 +621,28 @@ def test_sync_users_default(
             display_key="UserName",
         )
     ) in mock_entities.provision_entities.call_args_list
-    assert mock_logger.info.call_count == 1
-    assert (
-        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 3
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_users_task_requested",
+                enable_user_create=True,
+                enable_user_delete=False,
+                delete_target_all=False,
+                source_users_count=3,
+                target_users_count=3,
+            ),
+            call(
+                "synchronize_users_task_processing",
+                users_to_create_count=3,
+                users_to_delete_count=3,
+            ),
+            call(
+                "synchronize_users_task_completed",
+                created_users_count=3,
+                deleted_users_count=0,
+            ),
+        ]
     )
 
 
@@ -583,10 +708,28 @@ def test_sync_users_enable_delete_true(
         )
         in mock_entities.provision_entities.call_args_list
     )
-    assert mock_logger.info.call_count == 1
-    assert (
-        call("synchronize:users:Found 3 Users to Create and 3 Users to Delete")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 3
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_users_task_requested",
+                enable_user_create=True,
+                enable_user_delete=True,
+                delete_target_all=False,
+                source_users_count=3,
+                target_users_count=3,
+            ),
+            call(
+                "synchronize_users_task_processing",
+                users_to_create_count=3,
+                users_to_delete_count=3,
+            ),
+            call(
+                "synchronize_users_task_completed",
+                created_users_count=3,
+                deleted_users_count=3,
+            ),
+        ]
     )
 
 
@@ -646,10 +789,28 @@ def test_sync_users_delete_target_all_disable_delete(
         in mock_entities.provision_entities.call_args_list
     )
 
-    assert mock_logger.info.call_count == 1
-    assert (
-        call("synchronize:users:Found 0 Users to Create and 6 Users to Delete")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 3
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_users_task_requested",
+                enable_user_create=True,
+                enable_user_delete=False,
+                delete_target_all=True,
+                source_users_count=3,
+                target_users_count=6,
+            ),
+            call(
+                "synchronize_users_task_processing",
+                users_to_create_count=0,
+                users_to_delete_count=6,
+            ),
+            call(
+                "synchronize_users_task_completed",
+                created_users_count=0,
+                deleted_users_count=0,
+            ),
+        ]
     )
 
 
@@ -714,10 +875,28 @@ def test_sync_users_delete_target_all_enable_delete(
         in mock_entities.provision_entities.call_args_list
     )
 
-    assert mock_logger.info.call_count == 1
-    assert (
-        call("synchronize:users:Found 0 Users to Create and 6 Users to Delete")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 3
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_users_task_requested",
+                enable_user_create=True,
+                enable_user_delete=True,
+                delete_target_all=True,
+                source_users_count=3,
+                target_users_count=6,
+            ),
+            call(
+                "synchronize_users_task_processing",
+                users_to_create_count=0,
+                users_to_delete_count=6,
+            ),
+            call(
+                "synchronize_users_task_completed",
+                created_users_count=0,
+                deleted_users_count=6,
+            ),
+        ]
     )
 
 
@@ -899,10 +1078,28 @@ def test_sync_groups_empty_source_groups(
     assert mock_filters.compare_lists.call_count == 1
     assert mock_identity_store.create_group_membership.call_count == 0
     assert mock_identity_store.delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 4
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_groups_task_requested",
+                enable_membership_create=True,
+                enable_membership_delete=True,
+                source_groups_count=0,
+                target_groups_count=3,
+            ),
+            call("synchronize_groups_comparison_started"),
+            call(
+                "synchronize_groups_comparison_completed",
+                source_groups_to_sync_count=0,
+                target_groups_to_sync_count=0,
+            ),
+            call(
+                "synchronize_groups_task_completed",
+                groups_memberships_created_count=0,
+                groups_memberships_deleted_count=0,
+            ),
+        ]
     )
 
 
@@ -948,10 +1145,28 @@ def test_sync_groups_empty_target_groups(
     assert mock_filters.compare_lists.call_count == 1
     assert mock_identity_store.create_group_membership.call_count == 0
     assert mock_identity_store.delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 4
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_groups_task_requested",
+                enable_membership_create=True,
+                enable_membership_delete=True,
+                source_groups_count=3,
+                target_groups_count=0,
+            ),
+            call("synchronize_groups_comparison_started"),
+            call(
+                "synchronize_groups_comparison_completed",
+                source_groups_to_sync_count=0,
+                target_groups_to_sync_count=0,
+            ),
+            call(
+                "synchronize_groups_task_completed",
+                groups_memberships_created_count=0,
+                groups_memberships_deleted_count=0,
+            ),
+        ]
     )
 
 
@@ -998,10 +1213,23 @@ def test_sync_groups_without_matching_groups_to_sync(
     assert mock_filters.compare_lists.call_count == 1
     assert mock_identity_store.create_group_membership.call_count == 0
     assert mock_identity_store.delete_group_membership.call_count == 0
-    assert mock_logger.info.call_count == 2
-    assert (
-        call("synchronize:groups:Found 0 Source Groups and 0 Target Groups")
-        in mock_logger.info.call_args_list
+    assert mock_logger.info.call_count == 4
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "synchronize_groups_task_requested",
+                enable_membership_create=True,
+                enable_membership_delete=True,
+                source_groups_count=3,
+                target_groups_count=3,
+            ),
+            call("synchronize_groups_comparison_started"),
+            call(
+                "synchronize_groups_comparison_completed",
+                source_groups_to_sync_count=0,
+                target_groups_to_sync_count=0,
+            ),
+        ]
     )
 
 
@@ -1028,7 +1256,7 @@ def test_provision_aws_user_create(
     ]
     identity_center.provision_aws_users("create", users_emails)
     mock_users.get_users_from_integration.assert_called_once_with("google_directory")
-    mock_filters.preformat_items.call_count == 4
+    assert mock_filters.preformat_items.call_count == 4
     mock_entities.provision_entities.assert_called_once_with(
         mock_identity_store.create_user,
         [source_users[0]],

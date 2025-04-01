@@ -205,8 +205,8 @@ def test_health_view_handler(get_account_health_mock):
     }
     client = MagicMock()
 
-    aws_account_health.health_view_handler(ack, body, MagicMock(), client)
-    ack.assert_called
+    aws_account_health.health_view_handler(ack, body, client)
+    ack.assert_called()
     client.views_open.assert_called_with(
         trigger_id="trigger_id",
         view=ANY,

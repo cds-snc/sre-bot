@@ -1,15 +1,15 @@
 """Module to get AWS spending data."""
 
 from datetime import datetime
-import os
 
 import pandas as pd
 from pandas.core.frame import DataFrame
 
 from integrations.aws import organizations, cost_explorer
 from integrations.google_workspace import sheets
+from core.config import settings
 
-SPENDING_SHEET_ID = os.environ.get("SPENDING_SHEET_ID")
+SPENDING_SHEET_ID = settings.aws_feature.SPENDING_SHEET_ID
 
 rates = {
     "2025-03-01": {"rate": 1.4591369, "confirmed": False},
@@ -31,18 +31,17 @@ rates = {
 def generate_spending_data(logger):
     """Generates the spending data for all accounts and returns a DataFrame"""
     year, month = datetime.now().strftime("%Y"), datetime.now().strftime("%m")
-    logger.info(f"Generating spending data for {year}-{month}")
+    logger.info("generating_aws_spending_data", year=year, month=month)
     account_ids = list(
         map(lambda account: account["Id"], organizations.list_organization_accounts())
     )
-    logger.info(f"Found {len(account_ids)} accounts\nGetting account details...")
+    logger.info("aws_accounts_listed", count=len(account_ids))
     accounts = get_accounts_details(account_ids, logger)
     accounts_df = pd.DataFrame(accounts)
-    logger.info("Getting spending data")
+    logger.info("aws_spending_data_request", year=year, month=month)
     spending = get_accounts_spending(year, month)
-    spending_df = spending_to_df(spending)
+    spending_df = spending_to_df(spending, logger)
     merged_df = pd.merge(accounts_df, spending_df, on="Linked account", how="inner")
-    print(merged_df.head())
     merged_df["Converted Cost"] = merged_df.apply(
         lambda row: row["Cost Amount"] * get_rate_for_period(row["Period"]),
         axis=1,
@@ -54,7 +53,7 @@ def get_accounts_details(ids, logger):
     """Returns the details for the specified account IDs"""
     accounts = []
     for id in ids:
-        logger.info(f"Getting details for account {id}")
+        logger.info("aws_account_details_request", account_id=id)
         details = organizations.get_account_details(id)
         account_tags = organizations.get_account_tags(id)
         details["Tags"] = account_tags
@@ -111,10 +110,10 @@ def format_account_details(account):
     }
 
 
-def spending_to_df(spending: list):
+def spending_to_df(spending: list, logger):
     """Converts the spending data to a pandas DataFrame with flattened structure"""
     if not spending:
-        print("No spending to convert")
+        logger.warning("spending_to_df", error="No spending data provided")
         return pd.DataFrame()
 
     flattened_data = []
@@ -133,7 +132,10 @@ def spending_to_df(spending: list):
             )
 
     if not flattened_data:
-        print("No data to convert")
+        logger.warning(
+            "spending_to_df",
+            error="No spending data available after flattening",
+        )
         return pd.DataFrame()
 
     return pd.DataFrame(flattened_data)
@@ -149,7 +151,7 @@ def update_spending_data(
         spending_data_df: pandas DataFrame containing the data to upload
     """
     if not spreadsheet_id:
-        logger.error("Error: SPENDING_SHEET_ID is not set")
+        logger.error("update_spending_data", error="SPENDING_SHEET_ID is not set")
         return
 
     # Convert DataFrame to list of lists for Google Sheets API
@@ -165,7 +167,8 @@ def update_spending_data(
     else:
         # Handle the case where values.tolist() might not return a list
         logger.warning(
-            f"Warning: DataFrame values conversion issue. Type: {type(data_values)}"
+            "data_values_is_not_list",
+            actual_type=str(type(data_values)),
         )
         # Alternative approach if needed:
         for _, row in spending_data_df.iterrows():
@@ -174,19 +177,27 @@ def update_spending_data(
     # Update the entire sheet with new values
     sheets.batch_update_values(
         spreadsheetId=spreadsheet_id,
-        range="Sheet1",
+        cell_range="Sheet1",
         values=values,
         valueInputOption="USER_ENTERED",
     )
-    logger.info("Spending data updated successfully")
+    logger.info("update_spending_data", spreadsheet_id=spreadsheet_id)
 
 
 def execute_spending_data_update_job(logger):
     """Executes the spending data update job"""
-    logger.info("Starting spending data update job")
+    logger.info("execute_spending_data_update_job", status="started")
     spending_data = generate_spending_data(logger)
     if spending_data.empty:
-        logger.error("No spending data to update")
+        logger.error(
+            "execute_spending_data_update_job",
+            status="failed",
+            error="No spending data generated",
+        )
         return
     update_spending_data(spending_data, logger)
-    logger.info("Spending data update job completed")
+    logger.info(
+        "execute_spending_data_update_job",
+        status="success",
+        spreadsheet_id=SPENDING_SHEET_ID,
+    )

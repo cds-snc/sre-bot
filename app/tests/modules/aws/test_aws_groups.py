@@ -90,7 +90,15 @@ def test_request_groups_sync_synchronizes_groups(
     mock_permissions.is_user_member_of_groups.assert_called_once_with(
         "admin.user@test.com", groups.AWS_ADMIN_GROUPS
     )
-    logger.info.assert_called_once_with("Synchronizing AWS Identity Center Groups.")
+    logger.info.assert_has_calls(
+        [
+            call(
+                "aws_groups_sync_request_received",
+                requestor_email="admin.user@test.com",
+            ),
+        ]
+    )
+
     mock_identity_center.synchronize.assert_called_once_with(
         enable_users_sync=False,
         enable_user_create=False,
@@ -136,7 +144,14 @@ def test_request_groups_sync_synchronizes_groups_with_args(
     mock_permissions.is_user_member_of_groups.assert_called_once_with(
         "admin.user@test.com", groups.AWS_ADMIN_GROUPS
     )
-    logger.info.assert_called_once_with("Synchronizing AWS Identity Center Groups.")
+    logger.info.assert_has_calls(
+        [
+            call(
+                "aws_groups_sync_request_received",
+                requestor_email="admin.user@test.com",
+            ),
+        ]
+    )
     mock_identity_center.synchronize.assert_called_once_with(
         enable_users_sync=False,
         enable_user_create=False,
@@ -154,6 +169,7 @@ def test_request_groups_sync_synchronizes_groups_with_args(
     )
 
 
+@patch.object(groups, "AWS_ADMIN_GROUPS", ["admin@test.com"])
 @patch("modules.aws.groups.slack_users")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.identity_center")
@@ -175,8 +191,11 @@ def test_request_groups_sync_handles_user_without_permission(
     mock_permissions.is_user_member_of_groups.assert_called_once_with(
         "not.admin@test.com", groups.AWS_ADMIN_GROUPS
     )
-    logger.error.assert_called_once_with(
-        "User not.admin@test.com does not have permission to sync groups."
+    logger.warning.assert_called_once_with(
+        "aws_groups_sync_request_denied",
+        requestor_email="not.admin@test.com",
+        aws_admin_groups=["admin@test.com"],
+        error="User does not have permission to sync groups.",
     )
     respond.assert_called_once_with("You do not have permission to sync groups.")
 
@@ -217,7 +236,8 @@ def test_request_groups_list_handles_user_with_permission(
         call("Groups found:\n • Group 1 (1 members)\n • Group 2 (0 members)\n"),
     ]
     respond.assert_has_calls(respond_calls)
-    logger.info.assert_called_once_with("Listing AWS Identity Center Groups.")
+    logger.info.assert_called()
+    logger.warning.assert_not_called()
     mock_provisioning_groups.get_groups_from_integration.assert_called_once_with(
         "aws_identity_center"
     )
@@ -247,4 +267,5 @@ def test_request_groups_list_handles_user_without_permission(
     )
     respond.assert_called_once_with("You do not have permission to list groups.")
 
-    logger.info.assert_not_called()
+    logger.info.assert_called_once()
+    logger.warning.assert_called_once()

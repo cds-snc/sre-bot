@@ -199,6 +199,18 @@ class ReportsSettings(BaseSettings):
     )
 
 
+class AWSFeatureSettings(BaseSettings):
+    AWS_ADMIN_GROUPS: list[str] = Field(
+        default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
+    )
+    SPENDING_SHEET_ID: str = Field(default="", alias="SPENDING_SHEET_ID")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -220,6 +232,7 @@ class Settings(BaseSettings):
     atip: AtipSettings
     talent_role: TalentRoleSettings
     reports: ReportsSettings
+    aws_feature: AWSFeatureSettings
 
     @property
     def is_production(self) -> bool:
@@ -227,28 +240,25 @@ class Settings(BaseSettings):
         return not bool(self.PREFIX)
 
     def __init__(self, **kwargs):
-        if "slack" not in kwargs:
-            kwargs["slack"] = SlackSettings()
-        if "aws" not in kwargs:
-            kwargs["aws"] = AwsSettings()
-        if "google_workspace" not in kwargs:
-            kwargs["google_workspace"] = GoogleWorkspaceSettings()
-        if "maxmind" not in kwargs:
-            kwargs["maxmind"] = MaxMindSettings()
-        if "notify" not in kwargs:
-            kwargs["notify"] = NotifySettings()
-        if "opsgenie" not in kwargs:
-            kwargs["opsgenie"] = OpsGenieSettings()
-        if "sentinel" not in kwargs:
-            kwargs["sentinel"] = SentinelSettings()
-        if "trello" not in kwargs:
-            kwargs["trello"] = TrelloSettings()
-        if "atip" not in kwargs:
-            kwargs["atip"] = AtipSettings()
-        if "talent_role" not in kwargs:
-            kwargs["talent_role"] = TalentRoleSettings()
-        if "reports" not in kwargs:
-            kwargs["reports"] = ReportsSettings()
+        settings_map = {
+            "slack": SlackSettings,
+            "aws": AwsSettings,
+            "google_workspace": GoogleWorkspaceSettings,
+            "maxmind": MaxMindSettings,
+            "notify": NotifySettings,
+            "opsgenie": OpsGenieSettings,
+            "sentinel": SentinelSettings,
+            "trello": TrelloSettings,
+            "atip": AtipSettings,
+            "talent_role": TalentRoleSettings,
+            "reports": ReportsSettings,
+            "aws_feature": AWSFeatureSettings,
+        }
+
+        for setting_name, setting_class in settings_map.items():
+            if setting_name not in kwargs:
+                kwargs[setting_name] = setting_class()
+
         super().__init__(**kwargs)
 
     model_config = SettingsConfigDict(
@@ -260,24 +270,3 @@ class Settings(BaseSettings):
 
 # Create the settings instance
 settings = Settings()
-
-
-def list_configs():
-    """List all configuration settings keys"""
-    config_settings = {"settings": []}
-
-    for key, value in settings.model_dump().items():
-        if isinstance(value, dict):
-            config_settings[key] = list(value.keys())
-        else:
-            config_settings["settings"].append({key: value})
-
-    logger.info(
-        "configuration_initialized", config_settings=config_settings["settings"]
-    )
-    for key, value in config_settings.items():
-        if key != "settings":
-            logger.info("configuration_loaded", config_setting=key, keys=value)
-
-
-list_configs()

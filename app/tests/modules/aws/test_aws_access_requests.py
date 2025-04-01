@@ -328,7 +328,13 @@ def test_access_view_handler_with_unknown_sso_user(
     ack.assert_called()
     client.users_info.assert_called_with(user="user_id")
     logger.info.assert_called_with(
-        "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale"
+        "aws_account_access_request",
+        user_id="user_id",
+        email="email",
+        account_id="account_id",
+        account_name="account",
+        access_type="access_type",
+        rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
         client,
@@ -363,7 +369,13 @@ def test_access_view_handler_with_existing_access(
     ack.assert_called()
     client.users_info.assert_called_with(user="user_id")
     logger.info.assert_called_with(
-        "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale"
+        "aws_account_access_request",
+        user_id="user_id",
+        email="email",
+        account_id="account_id",
+        account_name="account",
+        access_type="access_type",
+        rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
         client,
@@ -406,7 +418,13 @@ def test_access_view_handler_successful_access_request(
     ack.assert_called()
     client.users_info.assert_called_with(user="user_id")
     logger.info.assert_called_with(
-        "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale"
+        "aws_account_access_request",
+        user_id="user_id",
+        email="email",
+        account_id="account_id",
+        account_name="account",
+        access_type="access_type",
+        rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
         client,
@@ -449,7 +467,13 @@ def test_access_view_handler_failed_access_request(
     ack.assert_called()
     client.users_info.assert_called_with(user="user_id")
     logger.info.assert_called_with(
-        "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale"
+        "aws_account_access_request",
+        user_id="user_id",
+        email="email",
+        account_id="account_id",
+        account_name="account",
+        access_type="access_type",
+        rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
         client,

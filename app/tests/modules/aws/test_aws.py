@@ -3,24 +3,40 @@ from modules import aws
 from unittest.mock import MagicMock, patch, call
 
 
-def test_aws_command_handles_empty_command():
+@patch("modules.aws.aws.logger")
+def test_aws_command_handles_empty_command(mock_logger):
     ack = MagicMock()
     respond = MagicMock()
-
-    aws.aws_command(ack, {"text": ""}, MagicMock(), respond, MagicMock(), MagicMock())
+    command = command_helper("")
+    aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
     ack.assert_called()
     respond.assert_called()
+    mock_logger.info.assert_called_with(
+        "aws_command_received",
+        command="",
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
+    )
 
 
-def test_aws_command_handles_help_command():
+@patch("modules.aws.aws.logger")
+def test_aws_command_handles_help_command(mock_logger):
     ack = MagicMock()
     respond = MagicMock()
-
-    aws.aws_command(
-        ack, {"text": "help"}, MagicMock(), respond, MagicMock(), MagicMock()
-    )
+    command = command_helper("help")
+    aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
     ack.assert_called()
     respond.assert_called_with(aws.help_text)
+    mock_logger.info.assert_called_with(
+        "aws_command_received",
+        command="help",
+        user_id=command["user_id"],
+        user_name=command["user_name"],
+        channel_id=command["channel_id"],
+        channel_name=command["channel_name"],
+    )
 
 
 @patch("modules.aws.aws.aws_access_requests.request_access_modal")
@@ -29,25 +45,73 @@ def test_aws_command_handles_access_command(request_access_modal):
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    aws.aws_command(ack, {"text": "access"}, MagicMock(), respond, client, body)
+    command = command_helper("access")
+    aws.aws_command(ack, command, respond, client, body)
     ack.assert_called()
     request_access_modal.assert_called_with(client, body)
 
 
+@patch("modules.aws.aws.logger")
 @patch("modules.aws.aws.slack_commands.parse_command")
-@patch("modules.aws.groups.command_handler")
-def test_aws_command_handles_groups_command(
-    command_handler: MagicMock, mock_parse_command: MagicMock
+@patch("modules.aws.users.command_handler")
+def test_aws_command_handles_users_command(
+    users_command_handler: MagicMock,
+    mock_parse_command: MagicMock,
+    mock_logger: MagicMock,
 ):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    logger = MagicMock()
-    mock_parse_command.return_value = ["groups", "sync"]
-    aws.aws_command(ack, {"text": "groups sync"}, logger, respond, client, body)
+    command = command_helper("users sync")
+    mock_parse_command.return_value = ["users", "sync"]
+    aws.aws_command(ack, command, respond, client, body)
     ack.assert_called()
-    command_handler.assert_called_with(client, body, respond, ["sync"], logger)
+    users_command_handler.assert_called_with(
+        client, body, respond, ["sync"], mock_logger
+    )
+
+
+@patch("modules.aws.aws.logger")
+@patch("modules.aws.aws.slack_commands.parse_command")
+@patch("modules.aws.groups.command_handler")
+def test_aws_command_handles_groups_command(
+    groups_command_handler: MagicMock,
+    mock_parse_command: MagicMock,
+    mock_logger: MagicMock,
+):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    command = command_helper("groups sync")
+    mock_parse_command.return_value = ["groups", "sync"]
+    aws.aws_command(ack, command, respond, client, body)
+    ack.assert_called()
+    groups_command_handler.assert_called_with(
+        client, body, respond, ["sync"], mock_logger
+    )
+
+
+@patch("modules.aws.aws.logger")
+@patch("modules.aws.aws.slack_commands.parse_command")
+@patch("modules.aws.lambdas.command_handler")
+def test_aws_command_handles_lambdas_command(
+    lambdas_command_handler: MagicMock,
+    mock_parse_command: MagicMock,
+    mock_logger: MagicMock,
+):
+    ack = MagicMock()
+    respond = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    command = command_helper("lambdas sync")
+    mock_parse_command.return_value = ["lambdas", "sync"]
+    aws.aws_command(ack, command, respond, client, body)
+    ack.assert_called()
+    lambdas_command_handler.assert_called_with(
+        client, body, respond, ["sync"], mock_logger
+    )
 
 
 @patch("modules.aws.aws.slack_commands.parse_command")
@@ -59,25 +123,27 @@ def test_aws_command_handles_health_command(
     respond = MagicMock()
     client = MagicMock()
     body = MagicMock()
+    command = command_helper("health")
     mock_parse_command.return_value = ["health"]
-    aws.aws_command(ack, {"text": "health"}, MagicMock(), respond, client, body)
+    aws.aws_command(ack, command, respond, client, body)
     ack.assert_called()
     request_health_modal.assert_called_with(client, body)
 
 
+@patch("modules.aws.aws.logger")
 @patch("modules.aws.aws.spending")
 @patch("modules.aws.aws.slack_commands.parse_command")
 def test_aws_command_handles_spending_command(
-    mock_parse_command: MagicMock, mock_spending: MagicMock
+    mock_parse_command: MagicMock, mock_spending: MagicMock, mock_logger: MagicMock
 ):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
-    logger = MagicMock()
     body = MagicMock()
+    command = command_helper("spending")
     mock_parse_command.return_value = ["spending"]
     mock_spending.generate_spending_data.return_value = "spending_data"
-    aws.aws_command(ack, {"text": "spending"}, logger, respond, client, body)
+    aws.aws_command(ack, command, respond, client, body)
     ack.assert_called()
     respond.assert_has_calls(
         [
@@ -87,23 +153,24 @@ def test_aws_command_handles_spending_command(
             ),
         ]
     )
-    mock_spending.generate_spending_data.assert_called_with(logger)
-    mock_spending.update_spending_data.assert_called_with("spending_data", logger)
+    mock_spending.generate_spending_data.assert_called_with(mock_logger)
+    mock_spending.update_spending_data.assert_called_with("spending_data", mock_logger)
 
 
+@patch("modules.aws.aws.logger")
 @patch("modules.aws.aws.spending")
 @patch("modules.aws.aws.slack_commands.parse_command")
 def test_aws_command_handles_spending_command_without_data(
-    mock_parse_command: MagicMock, mock_spending: MagicMock
+    mock_parse_command: MagicMock, mock_spending: MagicMock, mock_logger: MagicMock
 ):
     ack = MagicMock()
     respond = MagicMock()
     client = MagicMock()
-    logger = MagicMock()
     body = MagicMock()
+    command = command_helper("spending")
     mock_parse_command.return_value = ["spending"]
     mock_spending.generate_spending_data.return_value = None
-    aws.aws_command(ack, {"text": "spending"}, logger, respond, client, body)
+    aws.aws_command(ack, command, respond, client, body)
     ack.assert_called()
     respond.assert_has_calls(
         [
@@ -113,18 +180,18 @@ def test_aws_command_handles_spending_command_without_data(
             ),
         ]
     )
-    mock_spending.generate_spending_data.assert_called_with(logger)
+    mock_spending.generate_spending_data.assert_called_with(mock_logger)
     mock_spending.update_spending_data.assert_not_called()
 
 
+@patch("modules.aws.aws.spending")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_aws_command_handles_unknown_command(mock_parse_command):
+def test_aws_command_handles_unknown_command(mock_parse_command, _mock_spending):
     ack = MagicMock()
     respond = MagicMock()
     mock_parse_command.return_value = ["unknown"]
-    aws.aws_command(
-        ack, {"text": "unknown"}, MagicMock(), respond, MagicMock(), MagicMock()
-    )
+    command = command_helper("unknown")
+    aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
     ack.assert_called()
     respond.assert_called_with(
         "Unknown command: `unknown`. Type `/aws help` to see a list of commands.\nCommande inconnue: `unknown`. Tapez `/aws help` pour voir une liste des commandes."
@@ -242,3 +309,16 @@ def test_request_aws_account_access_failure(
         access_type,
         rationale,
     )
+
+
+def command_helper(text: str):
+    """
+    Helper function to create a command dictionary.
+    """
+    return {
+        "text": text,
+        "user_id": "U123456",
+        "user_name": "test_user",
+        "channel_id": "C123456",
+        "channel_name": "test_channel",
+    }
