@@ -68,7 +68,7 @@ def delete_metadata(file_id, key, delegated_user_email=None):
 
 
 @handle_google_api_errors
-def list_metadata(file_id: str):
+def list_metadata(file_id: str) -> dict:
     """List metadata of a file in Google Drive.
 
     Args:
