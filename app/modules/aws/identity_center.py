@@ -5,7 +5,6 @@ from modules.provisioning import groups, entities, users
 from utils import filters
 from core.logging import get_module_logger
 
-DRY_RUN = True
 logger = get_module_logger()
 
 

@@ -1,10 +1,10 @@
-from logging import getLogger
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store
 from utils import filters
+from core.logging import get_module_logger
 
 
-logger = getLogger(__name__)
+logger = get_module_logger()
 
 
 def get_groups_from_integration(
@@ -34,9 +34,15 @@ def get_groups_from_integration(
     members = None
     members_display_key = None
     integration_name = integration_source
+    groups_dataframe = None
     match integration_source:
         case "google_groups":
-            logger.info("Getting Google Groups with members.")
+            logger.info(
+                "get_groups_from_integration_started",
+                integration_source=integration_source,
+                service="Google Groups",
+                query=query,
+            )
             groups = google_directory.list_groups_with_members(
                 groups_filters=pre_processing_filters,
                 query=query,
@@ -50,7 +56,11 @@ def get_groups_from_integration(
             members = "members"
             members_display_key = "primaryEmail"
         case "aws_identity_center":
-            logger.info("Getting AWS Identity Center Groups with members.")
+            logger.info(
+                "get_groups_from_integration_started",
+                integration_source=integration_source,
+                service="AWS Identity Center",
+            )
             groups = identity_store.list_groups_with_memberships(
                 groups_filters=pre_processing_filters,
             )
@@ -75,7 +85,7 @@ def get_groups_from_integration(
         members_display_key=members_display_key,
         integration_name=integration_name,
     )
-    return groups_dataframe if return_dataframe else groups
+    return groups_dataframe if groups_dataframe is not None else groups
 
 
 def log_groups(
@@ -92,20 +102,40 @@ def log_groups(
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
     if not group_display_key:
-        logger.warning(f"{integration_name}:No group display key provided.")
+        logger.warning(
+            "log_groups_missing_display_key",
+            integration_name=integration_name,
+            missing_key="group_display_key",
+        )
     if not members:
-        logger.warning(f"{integration_name}:No members key provided.")
+        logger.warning(
+            "log_groups_missing_members_key",
+            integration_name=integration_name,
+            missing_key="members",
+        )
     if not members_display_key:
-        logger.warning(f"{integration_name}:No members display key provided.")
+        logger.warning(
+            "log_groups_missing_display_key",
+            integration_name=integration_name,
+            missing_key="members_display_key",
+        )
 
-    logger.info(f"{integration_name}Found {len(groups)} groups")
+    logger.info(
+        "log_groups_summary",
+        integration_name=integration_name,
+        groups_count=len(groups),
+    )
+
     for group in groups:
         group_display_name = filters.get_nested_value(group, group_display_key)
         if not group_display_name:
             group_display_name = "<Group Name not found>"
         if group.get(members):
             logger.info(
-                f"{integration_name}Group: {group_display_name} has {len(group[members])} members"
+                "log_group_members",
+                integration_name=integration_name,
+                group_name=group_display_name,
+                members_count=len(group[members]),
             )
             for member in group[members]:
                 members_display_name = filters.get_nested_value(
@@ -113,8 +143,15 @@ def log_groups(
                 )
                 if not members_display_name:
                     members_display_name = "<User Name not found>"
-                logger.info(f"{integration_name}Group:Member: {members_display_name}")
+                logger.info(
+                    "log_group_member",
+                    integration_name=integration_name,
+                    group_name=group_display_name,
+                    member_name=members_display_name,
+                )
         else:
             logger.info(
-                f"{integration_name}Group: {group_display_name} has no members."
+                "log_group_no_members",
+                integration_name=integration_name,
+                group_name=group_display_name,
             )

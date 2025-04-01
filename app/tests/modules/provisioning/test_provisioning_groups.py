@@ -1,5 +1,4 @@
-import logging
-from unittest.mock import patch
+from unittest.mock import patch, call
 from modules.provisioning import groups
 
 
@@ -186,10 +185,11 @@ def test_get_groups_from_integration_filters_returns_subset(
     assert not mock_google_list_groups_with_members.called
 
 
+@patch("modules.provisioning.groups.logger")
 @patch("modules.provisioning.groups.filters")
 def test_log_groups(
     mock_filters,
-    caplog,
+    mock_logger,
     aws_groups_w_users,
 ):
     groups_w_members = aws_groups_w_users(3, 3)
@@ -207,61 +207,117 @@ def test_log_groups(
         "user-email2@test.com",
         "user-email3@test.com",
     ]
-    with caplog.at_level(logging.INFO):
-        groups.log_groups(
-            groups_w_members,
-            group_display_key="DisplayName",
-            members="GroupMemberships",
-            members_display_key="MemberId.UserName",
-            integration_name="AWS:",
-        )
-        expected_info_messages = [
-            "AWS:Found 3 groups",
-            "AWS:Group: group-name1 has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-            "AWS:Group: group-name2 has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-            "AWS:Group: group-name3 has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-        ]
-        for record in caplog.records:
-            if record.levelname == "INFO":
-                assert record.message in expected_info_messages
+    groups.log_groups(
+        groups_w_members,
+        group_display_key="DisplayName",
+        members="GroupMemberships",
+        members_display_key="MemberId.UserName",
+        integration_name="AWS",
+    )
+    expected_info_messages = [
+        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name1",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="user-email3@test.com",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name2",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="user-email3@test.com",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name3",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="user-email3@test.com",
+        ),
+    ]
+    mock_logger.info.assert_has_calls(expected_info_messages)
 
 
+@patch("modules.provisioning.groups.logger")
 @patch("modules.provisioning.groups.filters")
 def test_log_groups_no_groups(
     mock_filters,
-    caplog,
+    mock_logger,
     aws_groups_w_users,
 ):
     groups_w_members = []
-    with caplog.at_level(logging.INFO):
-        groups.log_groups(
-            groups_w_members,
-            group_display_key="DisplayName",
-            members="GroupMemberships",
-            members_display_key="MemberId.UserName",
-            integration_name="AWS:",
-        )
-        expected_info_messages = [
-            "AWS:Found 0 groups",
-        ]
-        for record in caplog.records:
-            if record.levelname == "INFO":
-                assert record.message in expected_info_messages
+    groups.log_groups(
+        groups_w_members,
+        group_display_key="DisplayName",
+        members="GroupMemberships",
+        members_display_key="MemberId.UserName",
+        integration_name="AWS",
+    )
+    expected_info_messages = [
+        call("log_groups_summary", integration_name="AWS", groups_count=0)
+    ]
+    mock_logger.info.assert_has_calls(expected_info_messages)
 
 
+@patch("modules.provisioning.groups.logger")
 @patch("modules.provisioning.groups.filters")
 def test_log_groups_missing_members_key(
     mock_filters,
-    caplog,
+    mock_logger,
     aws_groups_w_users,
 ):
     groups_w_members = aws_groups_w_users(3, 3)
@@ -270,32 +326,36 @@ def test_log_groups_missing_members_key(
         "group-name2",
         "group-name3",
     ]
-    with caplog.at_level(logging.INFO):
-        groups.log_groups(
-            groups_w_members,
-            group_display_key="DisplayName",
-            members=None,
-            members_display_key="MemberId.UserName",
-            integration_name="AWS:",
+
+    groups.log_groups(
+        groups_w_members,
+        group_display_key="DisplayName",
+        members=None,
+        members_display_key="MemberId.UserName",
+        integration_name="AWS",
+    )
+    expected_info_messages = [
+        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call("log_group_no_members", integration_name="AWS", group_name="group-name1"),
+        call("log_group_no_members", integration_name="AWS", group_name="group-name2"),
+        call("log_group_no_members", integration_name="AWS", group_name="group-name3"),
+    ]
+    expected_warn_messages = [
+        call(
+            "log_groups_missing_members_key",
+            integration_name="AWS",
+            missing_key="members",
         )
-        expected_info_messages = [
-            "AWS:Found 3 groups",
-            "AWS:Group: group-name1 has no members.",
-            "AWS:Group: group-name2 has no members.",
-            "AWS:Group: group-name3 has no members.",
-        ]
-        expected_warn_messages = ["AWS:No members key provided."]
-        for record in caplog.records:
-            if record.levelname == "INFO":
-                assert record.message in expected_info_messages
-            elif record.levelname == "WARN":
-                assert record.message in expected_warn_messages
+    ]
+    mock_logger.info.assert_has_calls(expected_info_messages)
+    mock_logger.warning.assert_has_calls(expected_warn_messages)
 
 
+@patch("modules.provisioning.groups.logger")
 @patch("modules.provisioning.groups.filters")
 def test_log_groups_missing_group_display_key(
     mock_filters,
-    caplog,
+    mock_logger,
     aws_groups_w_users,
 ):
     groups_w_members = aws_groups_w_users(3, 3)
@@ -313,43 +373,106 @@ def test_log_groups_missing_group_display_key(
         "user-email2@test.com",
         "user-email3@test.com",
     ]
-    with caplog.at_level(logging.INFO):
-        groups.log_groups(
-            groups_w_members,
-            group_display_key=None,
-            members="GroupMemberships",
-            members_display_key="MemberId.UserName",
-            integration_name="AWS:",
+    groups.log_groups(
+        groups_w_members,
+        group_display_key=None,
+        members="GroupMemberships",
+        members_display_key="MemberId.UserName",
+        integration_name="AWS",
+    )
+    expected_info_messages = [
+        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email3@test.com",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email3@test.com",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email1@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email2@test.com",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="<Group Name not found>",
+            member_name="user-email3@test.com",
+        ),
+    ]
+
+    expected_warn_messages = [
+        call(
+            "log_groups_missing_display_key",
+            integration_name="AWS",
+            missing_key="group_display_key",
         )
-        expected_info_messages = [
-            "AWS:Found 3 groups",
-            "AWS:Group: <Group Name not found> has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-            "AWS:Group: <Group Name not found> has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-            "AWS:Group: <Group Name not found> has 3 members",
-            "AWS:Group:Member: user-email1@test.com",
-            "AWS:Group:Member: user-email2@test.com",
-            "AWS:Group:Member: user-email3@test.com",
-        ]
+    ]
 
-        expected_warn_messages = ["AWS:No group display key provided."]
-
-        for record in caplog.records:
-            if record.levelname == "INFO":
-                assert record.message in expected_info_messages
-            elif record.levelname == "WARN":
-                assert record.message in expected_warn_messages
+    mock_logger.info.assert_has_calls(expected_info_messages)
+    mock_logger.warning.assert_has_calls(expected_warn_messages)
 
 
+@patch("modules.provisioning.groups.logger")
 @patch("modules.provisioning.groups.filters")
 def test_log_groups_no_group_members_display_keys(
     mock_filters,
-    caplog,
+    mock_logger,
     aws_groups_w_users,
 ):
     groups_w_members = aws_groups_w_users(3, 3)
@@ -367,34 +490,96 @@ def test_log_groups_no_group_members_display_keys(
         None,
         None,
     ]
-    with caplog.at_level(logging.INFO):
-        groups.log_groups(
-            groups_w_members,
-            group_display_key="DisplayName",
-            members="GroupMemberships",
-            members_display_key=None,
-            integration_name="AWS:",
+    groups.log_groups(
+        groups_w_members,
+        group_display_key="DisplayName",
+        members="GroupMemberships",
+        members_display_key=None,
+        integration_name="AWS",
+    )
+    expected_info_messages = [
+        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name1",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name1",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name2",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name2",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_members",
+            integration_name="AWS",
+            group_name="group-name3",
+            members_count=3,
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="<User Name not found>",
+        ),
+        call(
+            "log_group_member",
+            integration_name="AWS",
+            group_name="group-name3",
+            member_name="<User Name not found>",
+        ),
+    ]
+
+    expected_warn_messages = [
+        call(
+            "log_groups_missing_display_key",
+            integration_name="AWS",
+            missing_key="members_display_key",
         )
-        expected_info_messages = [
-            "AWS:Found 3 groups",
-            "AWS:Group: group-name1 has 3 members",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group: group-name2 has 3 members",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group: group-name3 has 3 members",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-            "AWS:Group:Member: <User Name not found>",
-        ]
+    ]
 
-        expected_warn_messages = ["AWS:No members display key provided."]
-
-        for record in caplog.records:
-            if record.levelname == "INFO":
-                assert record.message in expected_info_messages
-            elif record.levelname == "WARN":
-                assert record.message in expected_warn_messages
+    mock_logger.info.assert_has_calls(expected_info_messages)
+    mock_logger.warning.assert_has_calls(expected_warn_messages)

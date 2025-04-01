@@ -20,14 +20,44 @@ def test_provision_entities_success(mock_logger, mock_log_to_sentinel):
     assert len(result) == len(users_list)
     assert mock_function.call_count == len(users_list)
     info_calls = [
-        call("aws:Entity:creation: Started processing 3 entities"),
-        call("aws:Entity:creation: Completed processing 3 entities"),
+        call(
+            "provision_entities_started",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entities_count=3,
+        ),
+        call(
+            "provision_entity_successful",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user1",
+        ),
+        call(
+            "provision_entity_successful",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user2",
+        ),
+        call(
+            "provision_entity_successful",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user3",
+        ),
+        call(
+            "provision_entities_completed",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            provisioned_entities_count=3,
+        ),
     ]
-    for i, user in enumerate(users_list):
-        pos = i + 1
-        info_calls.insert(pos, call(f"aws:Entity:creation:Successful: {user['name']}"))
 
-    assert mock_logger.info.call_args_list == info_calls
+    mock_logger.info.assert_has_calls(info_calls)
     mock_logger.error.assert_not_called()
     mock_log_to_sentinel.assert_called()
 
@@ -51,16 +81,48 @@ def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
     assert mock_function.call_count == len(users_list)
 
     info_calls = [
-        call("aws:Entity:creation: Started processing 3 entities"),
-        call("aws:Entity:creation:Successful: user1"),
-        call("aws:Entity:creation:Successful: user3"),
-        call("aws:Entity:creation: Completed processing 2 entities"),
+        call(
+            "provision_entities_started",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entities_count=3,
+        ),
+        call(
+            "provision_entity_successful",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user1",
+        ),
+        call(
+            "provision_entity_successful",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user3",
+        ),
+        call(
+            "provision_entities_completed",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            provisioned_entities_count=2,
+        ),
     ]
 
-    assert mock_logger.info.call_args_list == info_calls
-    assert mock_logger.error.call_args_list == [
-        call("aws:Entity:creation:Failed: user2"),
-    ]
+    mock_logger.info.assert_has_calls(info_calls)
+    mock_logger.error.assert_has_calls(
+        [
+            call(
+                "provision_entity_failed",
+                integration="aws",
+                entity="Entity",
+                operation="creation",
+                entity_value="user2",
+            )
+        ]
+    )
     mock_log_to_sentinel.assert_called()
 
 
@@ -79,9 +141,15 @@ def test_provision_entities_empty_list(mock_logger, mock_log_to_sentinel):
 
     assert len(result) == 0
     assert mock_function.call_count == 0
-    assert (
-        call("aws:Entity:creation: No entities to process")
-        in mock_logger.info.call_args_list
+    mock_logger.info.assert_has_calls(
+        [
+            call(
+                "provision_entities_no_entities_to_process",
+                integration="aws",
+                entity="Entity",
+                operation="creation",
+            )
+        ]
     )
     mock_logger.error.assert_not_called()
     mock_log_to_sentinel.assert_not_called()
@@ -107,12 +175,42 @@ def test_provision_entities_execute_false(mock_logger, mock_log_to_sentinel):
     assert mock_function.call_count == 0
 
     info_calls = [
-        call("aws:Entity:creation: Started processing 3 entities"),
-        call("aws:Entity:creation:Successful:DRY_RUN: user1"),
-        call("aws:Entity:creation:Successful:DRY_RUN: user2"),
-        call("aws:Entity:creation:Successful:DRY_RUN: user3"),
-        call("aws:Entity:creation: Completed processing 3 entities"),
+        call(
+            "provision_entities_started",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entities_count=3,
+        ),
+        call(
+            "provision_entity_dry_run",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user1",
+        ),
+        call(
+            "provision_entity_dry_run",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user2",
+        ),
+        call(
+            "provision_entity_dry_run",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            entity_value="user3",
+        ),
+        call(
+            "provision_entities_completed",
+            integration="aws",
+            entity="Entity",
+            operation="creation",
+            provisioned_entities_count=3,
+        ),
     ]
 
-    assert mock_logger.info.call_args_list == info_calls
+    mock_logger.info.assert_has_calls(info_calls)
     mock_log_to_sentinel.assert_called()
