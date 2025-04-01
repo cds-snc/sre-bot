@@ -44,7 +44,9 @@ def test_aws_lambdas_command_handles_functions_command(mock_list_functions):
 
     respond.assert_any_call("Fetching Lambda functions...")
     respond.assert_any_call("Lambda functions found:\n\n • test-function")
-    logger.info.assert_called_once_with([{"FunctionName": "test-function"}])
+    logger.info.assert_called_once_with(
+        "lambda_functions_found", count=1, response=[{"FunctionName": "test-function"}]
+    )
 
 
 @patch("integrations.aws.lambdas.list_layers")
@@ -69,12 +71,14 @@ def test_aws_lambdas_command_handles_layers_command(mock_list_layers):
         "Lambda layers found:\n\n • aws-sentinel-connector-layer <latest version: 163>"
     )
     logger.info.assert_called_once_with(
-        [
+        "lambda_layers_found",
+        count=1,
+        response=[
             {
                 "LayerName": "aws-sentinel-connector-layer",
                 "LatestMatchingVersion": {"Version": 163},
             }
-        ]
+        ],
     )
 
 
@@ -106,7 +110,9 @@ def test_request_list_functions_handles_non_empty_response(mock_list_functions):
 
     respond.assert_any_call("Fetching Lambda functions...")
     respond.assert_any_call("Lambda functions found:\n\n • test-function")
-    logger.info.assert_called_once_with([{"FunctionName": "test-function"}])
+    logger.info.assert_called_once_with(
+        "lambda_functions_found", count=1, response=[{"FunctionName": "test-function"}]
+    )
 
 
 @patch("integrations.aws.lambdas.list_layers")
@@ -146,10 +152,12 @@ def test_request_list_layers_handles_non_empty_response(mock_list_layers):
         "Lambda layers found:\n\n • aws-sentinel-connector-layer <latest version: 163>"
     )
     logger.info.assert_called_once_with(
-        [
+        "lambda_layers_found",
+        count=1,
+        response=[
             {
                 "LayerName": "aws-sentinel-connector-layer",
                 "LatestMatchingVersion": {"Version": 163},
             }
-        ]
+        ],
     )

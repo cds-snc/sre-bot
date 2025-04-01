@@ -1,11 +1,11 @@
-import os
 import json
 from slack_sdk.web import WebClient
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from integrations.slack import users as slack_users
+from core.config import settings
 
-AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
+AWS_ADMIN_GROUPS = settings.aws_feature.AWS_ADMIN_GROUPS
 
 help_text = """
 \n *AWS Users*:
@@ -14,7 +14,7 @@ help_text = """
 """
 
 
-def command_handler(client: WebClient, body, respond, args, logger):
+def command_handler(client: WebClient, body, respond, args: str, logger):
     """Handle the command.
 
     Args:
@@ -49,6 +49,9 @@ def request_user_provisioning(client: WebClient, body, respond, args, logger):
         logger (Logger): The logger instance.
     """
     requestor_email = slack_users.get_user_email_from_body(client, body)
+    logger.info(
+        "aws_users_provisioning_request_received", requestor_email=requestor_email
+    )
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         operation = args[0]
         users_emails = args[1:]
@@ -67,4 +70,6 @@ def request_user_provisioning(client: WebClient, body, respond, args, logger):
             "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."
         )
 
-    logger.info("Completed user provisioning request")
+    logger.info(
+        "aws_users_provisioning_request_completed", requestor_email=requestor_email
+    )

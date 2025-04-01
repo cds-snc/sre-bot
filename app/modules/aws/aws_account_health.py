@@ -1,8 +1,8 @@
 import arrow
 from slack_bolt import Ack
 from slack_sdk import WebClient
-from logging import Logger
 
+from core.logging import get_module_logger
 from integrations.aws import (
     organizations,
     security_hub,
@@ -11,7 +11,7 @@ from integrations.aws import (
     cost_explorer,
 )
 
-logger = Logger(__name__)
+logger = get_module_logger()
 
 
 def get_account_health(account_id):
@@ -140,9 +140,11 @@ def get_ignored_security_hub_issues():
     return list(map(lambda t: {"Value": t, "Comparison": "NOT_EQUALS"}, ignored_issues))
 
 
-def health_view_handler(ack: Ack, body, logger: Logger, client: WebClient):
+def health_view_handler(ack: Ack, body, client: WebClient):
     ack()
-
+    logger.info(
+        "aws_health_request_received",
+    )
     account_id = body["view"]["state"]["values"]["account"]["account"][
         "selected_option"
     ]["value"]

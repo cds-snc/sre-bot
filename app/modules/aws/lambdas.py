@@ -45,7 +45,7 @@ def request_list_functions(client: WebClient, body, respond: Respond, logger):
     respond("Fetching Lambda functions...")
     response = aws_lambdas.list_functions()
     if response:
-        logger.info(response)
+        logger.info("lambda_functions_found", count=len(response), response=response)
         function_string = ""
         for function in response:
             function_string += f"\n • {function['FunctionName']}"
@@ -65,7 +65,7 @@ def request_list_layers(client: WebClient, body, respond: Respond, logger):
     response = aws_lambdas.list_layers()
     respond("Fetching Lambda layers...")
     if response:
-        logger.info(response)
+        logger.info("lambda_layers_found", count=len(response), response=response)
         response_string = ""
         for layer in response:
             response_string += f"\n • {layer['LayerName']} <latest version: {layer['LatestMatchingVersion']['Version']}>"

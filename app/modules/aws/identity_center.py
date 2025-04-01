@@ -1,13 +1,12 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 
-from logging import getLogger
 from integrations.aws import identity_store
 from modules.provisioning import groups, entities, users
 from utils import filters
+from core.logging import get_module_logger
 
-
-logger = getLogger(__name__)
 DRY_RUN = True
+logger = get_module_logger()
 
 
 def synchronize(
@@ -35,6 +34,17 @@ def synchronize(
         tuple: A tuple containing the users sync status and groups sync status.
     """
 
+    logger.info(
+        "synchronize_task_requested",
+        enable_users_sync=enable_users_sync,
+        enable_groups_sync=enable_groups_sync,
+        enable_user_create=enable_user_create,
+        enable_user_delete=enable_user_delete,
+        enable_membership_create=enable_membership_create,
+        enable_membership_delete=enable_membership_delete,
+        query=query,
+        pre_processing_filters=pre_processing_filters,
+    )
     users_sync_status = None
     groups_sync_status = None
 
@@ -47,18 +57,21 @@ def synchronize(
     )
     source_users = filters.get_unique_nested_dicts(source_groups, "members")
     logger.info(
-        f"synchronize:Found {len(source_groups)} Groups and {len(source_users)} Users from Source"
+        "source_groups_users_fetched",
+        groups_count=len(source_groups),
+        users_count=len(source_users),
+        source="google_groups",
     )
-
     target_groups = groups.get_groups_from_integration(
         "aws_identity_center", pre_processing_filters=pre_processing_filters
     )
     target_users = identity_store.list_users()
-
     logger.info(
-        f"synchronize:Found {len(target_groups)} Groups and {len(target_users)} Users from Target"
+        "target_groups_users_fetched",
+        groups_count=len(target_groups),
+        users_count=len(target_users),
+        source="aws_identity_center",
     )
-
     if enable_users_sync:
         users_sync_status = sync_users(
             source_users, target_users, enable_user_create, enable_user_delete
@@ -73,7 +86,11 @@ def synchronize(
             enable_membership_create,
             enable_membership_delete,
         )
-    logger.info("synchronize:Sync Completed")
+    logger.info(
+        "synchronize_task_completed",
+        users_sync_status=users_sync_status,
+        groups_sync_status=groups_sync_status,
+    )
 
     return {
         "users": users_sync_status,
@@ -101,6 +118,14 @@ def sync_users(
     Returns:
         tuple: A tuple containing the users created and deleted.
     """
+    logger.info(
+        "synchronize_users_task_requested",
+        enable_user_create=enable_user_create,
+        enable_user_delete=enable_user_delete,
+        delete_target_all=delete_target_all,
+        source_users_count=len(source_users),
+        target_users_count=len(target_users),
+    )
 
     if delete_target_all:
         users_to_delete = target_users
@@ -111,8 +136,11 @@ def sync_users(
             {"values": target_users, "key": "UserName"},
             mode="sync",
         )
+
     logger.info(
-        f"synchronize:users:Found {len(users_to_create)} Users to Create and {len(users_to_delete)} Users to Delete"
+        "synchronize_users_task_processing",
+        users_to_create_count=len(users_to_create),
+        users_to_delete_count=len(users_to_delete),
     )
     preformatting_keys = [
         ("primaryEmail", "email"),
@@ -149,6 +177,11 @@ def sync_users(
         display_key="UserName",
     )
 
+    logger.info(
+        "synchronize_users_task_completed",
+        created_users_count=len(created_users),
+        deleted_users_count=len(deleted_users),
+    )
     return created_users, deleted_users
 
 
@@ -170,7 +203,16 @@ def sync_groups(
     Returns:
         tuple: A tuple containing the groups memberships created and deleted.
     """
-    logger.info("synchronize:groups:Formatting Source Groups")
+    logger.info(
+        "synchronize_groups_task_requested",
+        enable_membership_create=enable_membership_create,
+        enable_membership_delete=enable_membership_delete,
+        source_groups_count=len(source_groups),
+        target_groups_count=len(target_groups),
+    )
+    logger.info(
+        "synchronize_groups_comparison_started",
+    )
     source_groups = filters.preformat_items(
         source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
     )
@@ -180,7 +222,9 @@ def sync_groups(
         mode="match",
     )
     logger.info(
-        f"synchronize:groups:Found {len(source_groups_to_sync)} Source Groups and {len(target_groups_to_sync)} Target Groups"
+        "synchronize_groups_comparison_completed",
+        source_groups_to_sync_count=len(source_groups_to_sync),
+        target_groups_to_sync_count=len(target_groups_to_sync),
     )
 
     groups_memberships_created = []
@@ -191,7 +235,9 @@ def sync_groups(
             == target_groups_to_sync[i]["DisplayName"]
         ):
             logger.info(
-                f"synchronize:groups:Syncing group {source_groups_to_sync[i]['name']} with {target_groups_to_sync[i]['DisplayName']}"
+                "groups_memberships_sync_processing",
+                source_group_name=source_groups_to_sync[i]["DisplayName"],
+                target_group_name=target_groups_to_sync[i]["DisplayName"],
             )
             users_to_add, users_to_remove = filters.compare_lists(
                 {"values": source_groups_to_sync[i]["members"], "key": "primaryEmail"},
@@ -247,6 +293,11 @@ def sync_groups(
             )
             groups_memberships_deleted.extend(memberships_deleted)
 
+    logger.info(
+        "synchronize_groups_task_completed",
+        groups_memberships_created_count=len(groups_memberships_created),
+        groups_memberships_deleted_count=len(groups_memberships_deleted),
+    )
     return groups_memberships_created, groups_memberships_deleted
 
 

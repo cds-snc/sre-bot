@@ -66,7 +66,10 @@ def test_request_user_provisioning(
         "user.name@email.com", ["admin-group@email.com"]
     )
     respond.assert_called_with("Request completed:\ntrue")
-    logger.info.assert_called_with("Completed user provisioning request")
+    logger.info.assert_called_with(
+        "aws_users_provisioning_request_completed",
+        requestor_email="user.name@email.com",
+    )
 
 
 @patch("modules.aws.users.AWS_ADMIN_GROUPS", ["admin-group@email.com"])

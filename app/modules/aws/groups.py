@@ -1,11 +1,11 @@
 from datetime import datetime
-import os
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from modules.provisioning import groups as provisioning_groups
 from integrations.slack import users as slack_users
+from core.config import settings
 
-AWS_ADMIN_GROUPS = os.environ.get("AWS_ADMIN_GROUPS", "sre-ifs@cds-snc.ca").split(",")
+AWS_ADMIN_GROUPS = settings.aws_feature.AWS_ADMIN_GROUPS
 
 help_text = """
 \n *AWS Groups*:
@@ -50,6 +50,7 @@ def request_groups_sync(client, body, respond, args, logger):
         logger (Logger): The logger.
     """
     requestor_email = slack_users.get_user_email_from_body(client, body)
+    logger.info("aws_groups_sync_request_received", requestor_email=requestor_email)
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         pre_processing_filters = (
             [
@@ -61,7 +62,11 @@ def request_groups_sync(client, body, respond, args, logger):
             if args
             else []
         )
-        logger.info("Synchronizing AWS Identity Center Groups.")
+        logger.info(
+            "aws_groups_sync_request_processing",
+            requestor_email=requestor_email,
+            pre_processing_filters=pre_processing_filters,
+        )
         respond("AWS Groups Memberships Synchronization Initiated.")
         start_time = datetime.now()
         identity_center.synchronize(
@@ -77,7 +82,12 @@ def request_groups_sync(client, body, respond, args, logger):
             f"AWS Groups Memberships Synchronization Completed in {time.total_seconds():.6f} seconds."
         )
     else:
-        logger.error(f"User {requestor_email} does not have permission to sync groups.")
+        logger.warning(
+            "aws_groups_sync_request_denied",
+            requestor_email=requestor_email,
+            aws_admin_groups=AWS_ADMIN_GROUPS,
+            error="User does not have permission to sync groups.",
+        )
         respond("You do not have permission to sync groups.")
         return
 
@@ -85,9 +95,16 @@ def request_groups_sync(client, body, respond, args, logger):
 def request_groups_list(client, body, respond, args, logger):
     """List all groups from AWS Identity Center."""
     requestor_email = slack_users.get_user_email_from_body(client, body)
+    logger.info(
+        "aws_groups_list_request_received",
+        requestor_email=requestor_email,
+    )
     if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
         respond("AWS Groups List request received.")
-        logger.info("Listing AWS Identity Center Groups.")
+        logger.info(
+            "aws_groups_list_request_processing",
+            requestor_email=requestor_email,
+        )
         response = provisioning_groups.get_groups_from_integration(
             "aws_identity_center"
         )
@@ -100,5 +117,11 @@ def request_groups_list(client, body, respond, args, logger):
             formatted_string += f" • {group['DisplayName']} ({members_count} members)\n"
         respond(formatted_string)
     else:
+        logger.warning(
+            "aws_groups_list_request_denied",
+            requestor_email=requestor_email,
+            aws_admin_groups=AWS_ADMIN_GROUPS,
+            error="User does not have permission to list groups.",
+        )
         respond("You do not have permission to list groups.")
         return
