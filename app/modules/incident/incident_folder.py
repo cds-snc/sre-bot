@@ -70,7 +70,8 @@ def save_metadata(client: WebClient, body, ack, view):
     view_folder_metadata(client, body, ack)
 
 
-def get_folder_metadata(folder_id):
+def get_folder_metadata(folder_id) -> dict:
+    """Get metadata for a folder."""
     return google_drive.list_metadata(folder_id)
 
 
@@ -243,7 +244,7 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
     Returns:
         bool: True if the incident was added successfully, False otherwise.
     """
-    list = [
+    incident_data = [
         [
             datetime.datetime.now().strftime("%Y-%m-%d"),
             f'=HYPERLINK("{document_link}", "{name}")',
@@ -252,12 +253,12 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
             f'=HYPERLINK("{channel_url}", "#{slug}")',
         ]
     ]
-    range = "Sheet1!A:A"
+    cell_range = "Sheet1!A:A"
     body = {
         "majorDimension": "ROWS",
-        "values": list,
+        "values": incident_data,
     }
-    updated_sheet = sheets.append_values(INCIDENT_LIST, range, body)
+    updated_sheet = sheets.append_values(INCIDENT_LIST, cell_range, body)
     return updated_sheet
 
 
