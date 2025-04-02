@@ -1,8 +1,7 @@
 import json
 import os
 import uuid
-import logging
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch, call
 import pytest
 
 from modules import incident_helper
@@ -402,8 +401,7 @@ def test_close_incident_when_client_not_in_channel(
 @patch("modules.incident.incident_helper.slack_users")
 def test_close_incident_when_client_not_in_channel_throws_error(
     mock_slack_users,
-    mock_db_operations,
-    caplog,
+    _mock_db_operations,
 ):
     # the client is not in the channel so it needs to be added
     mock_client = MagicMock()
@@ -423,28 +421,21 @@ def test_close_incident_when_client_not_in_channel_throws_error(
     mock_client.conversations_join.side_effect = Exception(exception_message)
 
     # Call close_incident
-    with caplog.at_level(logging.ERROR):
-        incident_helper.close_incident(
-            mock_client,
-            mock_logger,
-            {
-                "channel_id": "C12345",
-                "user_id": "U12345",
-                "channel_name": "incident-channel",
-            },
-            mock_ack,
-            mock_respond,
-        )
+    incident_helper.close_incident(
+        mock_client,
+        mock_logger,
+        {
+            "channel_id": "C12345",
+            "user_id": "U12345",
+            "channel_name": "incident-channel",
+        },
+        mock_ack,
+        mock_respond,
+    )
 
-        assert caplog.records
-
-        # Find the specific log message we're interested in
-        log_messages = [record.message for record in caplog.records]
-
-        expected_message = "Failed to join the channel C12345: is_archived"
-        assert (
-            expected_message in log_messages
-        ), "Expected error message not found in log records"
+    mock_logger.exception.assert_called_once_with(
+        "client_conversations_error", channel_id="C12345", error="is_archived"
+    )
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.
@@ -452,7 +443,9 @@ def test_close_incident_when_client_not_in_channel_throws_error(
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
 def test_close_incident_cant_send_private_message(
-    mock_incident_status, mock_slack_users, mock_db_operations, caplog
+    mock_incident_status,
+    mock_slack_users,
+    _mock_db_operations,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -478,29 +471,25 @@ def test_close_incident_cant_send_private_message(
     # Prepare the request body
     body = {"channel_id": channel_id, "user_id": user_id, "channel_name": channel_name}
 
-    # Use the caplog fixture to capture logging
-    with caplog.at_level(logging.ERROR):
-        # Call the function being tested
-        incident_helper.close_incident(
-            mock_client, mock_logger, body, mock_ack, mock_respond
-        )
-        mock_client.chat_postEphemeral.assert_called_once_with(
-            text="Channel general is not an incident channel. Please use this command in an incident channel.",
-            channel="C12345",
-            user="U12345",
-        )
-        # Check that the expected error message was logged
-        assert caplog.records  # Ensure there is at least one log record
+    # Call the function being tested
+    incident_helper.close_incident(
+        mock_client, mock_logger, body, mock_ack, mock_respond
+    )
+    mock_client.chat_postEphemeral.assert_called_once_with(
+        text="Channel general is not an incident channel. Please use this command in an incident channel.",
+        channel="C12345",
+        user="U12345",
+    )
 
-        # Find the specific log message we're interested in
-        log_messages = [record.message for record in caplog.records]
-
-        expected_message = (
-            f"Could not post ephemeral message to user {user_id} due to not_in_channel."
-        )
-        assert (
-            expected_message in log_messages
-        ), "Expected error message not found in log records"
+    expected_message = (
+        f"Could not post ephemeral message to user {user_id} due to not_in_channel."
+    )
+    mock_logger.exception.assert_called_once_with(
+        "client_post_ephemeral_error",
+        channel_id=channel_id,
+        user_id=user_id,
+        error=exception_message,
+    )
 
     mock_incident_status.update_status.assert_not_called()
 
@@ -535,24 +524,28 @@ def test_close_incident_handles_conversations_archive_failure(
     }
     mock_client.conversations_archive.side_effect = Exception("not_in_channel")
 
-    with caplog.at_level(logging.ERROR, logger="commands.helpers.incident_helper"):
-        # Call close_incident
-        incident_helper.close_incident(
-            mock_client,
-            mock_logger,
-            {
-                "channel_id": "C12345",
-                "channel_name": "incident-2024-01-12-test",
-                "user_id": "U12345",
-            },
-            mock_ack,
-            mock_respond,
-        )
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        mock_logger,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
+        mock_ack,
+        mock_respond,
+    )
 
     # Ensure that the client's conversations_archive method was called
     mock_client.conversations_archive.assert_called_once_with(channel="C12345")
+    mock_logger.exception.assert_called_once_with(
+        "client_conversations_archive_error",
+        channel_id="C12345",
+        user_id="U12345",
+        error="not_in_channel",
+    )
     error_message = "Could not archive the channel incident-2024-01-12-test due to error: not_in_channel"
-    assert error_message in caplog.text
     mock_respond.assert_called_once_with(error_message)
 
 
@@ -560,7 +553,9 @@ def test_close_incident_handles_conversations_archive_failure(
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
 def test_close_incident_handles_post_message_failure(
-    mock_incident_status, mock_slack_users, mock_db_operations, caplog
+    mock_incident_status,
+    mock_slack_users,
+    mock_db_operations,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
@@ -589,25 +584,28 @@ def test_close_incident_handles_post_message_failure(
     }
     mock_client.chat_postMessage.side_effect = Exception("auth_error")
 
-    with caplog.at_level(logging.ERROR, logger="commands.helpers.incident_helper"):
-        # Call close_incident
-        incident_helper.close_incident(
-            mock_client,
-            mock_logger,
-            {
-                "channel_id": "C12345",
-                "channel_name": "incident-2024-01-12-test",
-                "user_id": "U12345",
-            },
-            mock_ack,
-            mock_respond,
-        )
+    # Call close_incident
+    incident_helper.close_incident(
+        mock_client,
+        mock_logger,
+        {
+            "channel_id": "C12345",
+            "channel_name": "incident-2024-01-12-test",
+            "user_id": "U12345",
+        },
+        mock_ack,
+        mock_respond,
+    )
 
     mock_client.chat_postMessage.assert_called_once_with(
         channel="C12345", text="<@U12345> has archived this channel 👋"
     )
-    error_message = "Could not post message to channel incident-2024-01-12-test due to error: auth_error"
-    assert error_message in caplog.text
+    mock_logger.exception.assert_called_once_with(
+        "client_post_message_error",
+        channel_id="C12345",
+        user_id="U12345",
+        error="auth_error",
+    )
 
 
 @patch("modules.incident.incident_helper.slack_users")

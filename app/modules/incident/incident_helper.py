@@ -1,7 +1,5 @@
 from datetime import datetime
 import json
-import logging
-import os
 import re
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
@@ -19,12 +17,11 @@ from modules.incident import (
     information_display,
     information_update,
 )
+from core.config import settings
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
-SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
-SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
-START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
-END_HEADING = "Trigger"
+SRE_DRIVE_ID = settings.feat_incident.SRE_DRIVE_ID
+SRE_INCIDENT_FOLDER = settings.feat_incident.SRE_INCIDENT_FOLDER
 VALID_STATUS = [
     "In Progress",
     "Open",
@@ -106,7 +103,10 @@ def handle_incident_command(
     args, client: WebClient, body, respond: Respond, ack: Ack, logger
 ):
     """Handle the /sre incident command."""
-
+    logger.info(
+        "sre_incident_command_received",
+        args=args,
+    )
     # If no arguments are provided, open the update status view
     if len(args) == 0:
         information_display.open_incident_info_view(client, body, respond)
@@ -162,7 +162,9 @@ def close_incident(client: WebClient, logger, body, ack, respond):
         if channel_info is None or not channel_info.get("is_member", False):
             client.conversations_join(channel=channel_id)
     except Exception as e:
-        logging.error("Failed to join the channel %s: %s", channel_id, e)
+        logger.exception(
+            "client_conversations_error", channel_id=channel_id, error=str(e)
+        )
         return
 
     if not channel_name.startswith("incident-"):
@@ -173,8 +175,11 @@ def close_incident(client: WebClient, logger, body, ack, respond):
                 user=user_id,
             )
         except Exception as e:
-            logging.error(
-                "Could not post ephemeral message to user %s due to %s.", user_id, e
+            logger.exception(
+                "client_post_ephemeral_error",
+                channel_id=channel_id,
+                user_id=user_id,
+                error=str(e),
             )
         return
 
@@ -196,22 +201,33 @@ def close_incident(client: WebClient, logger, body, ack, respond):
             text=f"<@{user_id}> has archived this channel 👋",
         )
     except Exception as e:
-        logging.error(
-            "Could not post message to channel %s due to error: %s.", channel_name, e
+        logger.exception(
+            "client_post_message_error",
+            channel_id=channel_id,
+            user_id=user_id,
+            error=str(e),
         )
 
     # archive the channel
     try:
         client.conversations_archive(channel=channel_id)
-        logging.info(
-            "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
+        logger.info(
+            "incident_channel_archived",
+            channel_id=channel_id,
+            channel_name=channel_name,
+            user_id=user_id,
         )
         log_to_sentinel("incident_channel_archived", body)
     except Exception as e:
+        logger.exception(
+            "client_conversations_archive_error",
+            channel_id=channel_id,
+            user_id=user_id,
+            error=str(e),
+        )
         error_message = (
             f"Could not archive the channel {channel_name} due to error: {e}"
         )
-        logging.error(error_message)
         respond(error_message)
 
 
