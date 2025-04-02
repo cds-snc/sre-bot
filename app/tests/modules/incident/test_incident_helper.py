@@ -1,13 +1,9 @@
 import json
-import os
 import uuid
-from unittest.mock import ANY, MagicMock, patch, call
+from unittest.mock import ANY, MagicMock, patch
 import pytest
 
 from modules import incident_helper
-
-SLACK_SECURITY_USER_GROUP_ID = os.getenv("SLACK_SECURITY_USER_GROUP_ID")
-INCIDENT_HANDBOOK_URL = os.getenv("INCIDENT_HANDBOOK_URL")
 
 
 @patch("modules.incident.incident_helper.incident_conversation")
@@ -481,9 +477,6 @@ def test_close_incident_cant_send_private_message(
         user="U12345",
     )
 
-    expected_message = (
-        f"Could not post ephemeral message to user {user_id} due to not_in_channel."
-    )
     mock_logger.exception.assert_called_once_with(
         "client_post_ephemeral_error",
         channel_id=channel_id,
