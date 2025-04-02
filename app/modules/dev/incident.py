@@ -48,7 +48,7 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
     logger.info(
         "complete_incidents_details_completed", payload=incidents, count=len(incidents)
     )
-    count = incident_folder.create_missing_incidents(logger, incidents)
+    count = incident_folder.create_missing_incidents(incidents)
     respond(f"Created {count} new incidents")
     logger.info("create_missing_incidents_completed", count=count)
     logger.info("load_incidents_completed")
@@ -80,7 +80,7 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         "teams": ["Development"],
         "created_at": channel["created"],
     }
-    incident = incident_folder.get_incident_details(client, logger, incident)
+    incident = incident_folder.get_incident_details(client, incident)
     if not incident.get("report_url"):
         logger.info("getting_report_url")
         incident["report_url"] = incident_conversation.get_incident_document_id(
