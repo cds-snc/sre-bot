@@ -302,7 +302,7 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         )
         return False
     sheet_name = "Sheet1"
-    sheet = dict(sheets.get_values(INCIDENT_LIST, range=sheet_name))
+    sheet = dict(sheets.get_values(INCIDENT_LIST, cell_range=sheet_name))
     values = sheet.get("values", [])
     if len(values) == 0:
         logger.warning(

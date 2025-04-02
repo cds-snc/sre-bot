@@ -105,7 +105,7 @@ def handle_incident_command(
     """Handle the /sre incident command."""
     logger.info(
         "sre_incident_command_received",
-        args=args,
+        # args=args,
     )
     # If no arguments are provided, open the update status view
     if len(args) == 0:
