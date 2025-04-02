@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from modules.incident import incident_conversation
 import pytest
 
@@ -910,7 +910,6 @@ def test_handle_reaction_removed_successful_message_removal(
 @patch("modules.incident.incident_conversation.logger")
 def test_handle_reaction_removed_successful_message_removal_user_id(mock_logger):
     # Mock the client and logger
-    mock_ack = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.users_profile_get.return_value = {

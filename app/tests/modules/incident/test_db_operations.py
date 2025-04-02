@@ -259,7 +259,6 @@ def test_list_incidents_empty(
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.dynamodb")
 def test_update_incident_field(mock_dynamodb, mock_log_activity):
-    mock_logger = MagicMock()
     mock_dynamodb.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
     }

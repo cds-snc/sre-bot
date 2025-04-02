@@ -149,7 +149,6 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
 ):
     mock_ack = MagicMock()
     mock_client = MagicMock()
-    mock_logger = MagicMock()
     mock_incident_conversation.is_incident_channel.return_value = [False, False]
 
     # The test channel and user IDs
@@ -185,7 +184,6 @@ def test_open_incident_retro_modal(
 ):
     mock_ack = MagicMock()
     mock_client = MagicMock()
-    mock_logger = MagicMock()
     mock_incident_conversation.is_incident_channel.return_value = [True, False]
     mock_incident_conversation.get_incident_document_id.return_value = (
         "dummy_document_id"
