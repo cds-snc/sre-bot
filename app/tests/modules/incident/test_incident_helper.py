@@ -285,7 +285,6 @@ def test_close_incident(mock_incident_status, mock_slack_users, mock_db_operatio
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
-        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",
@@ -384,7 +383,6 @@ def test_close_incident_when_client_not_in_channel(
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
-        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",
@@ -635,7 +633,6 @@ def test_handle_update_status_command(
     mock_incident_status.update_status.assert_called_once_with(
         mock_client,
         mock_respond,
-        mock_logger,
         "Closed",
         "C12345",
         "incident-2024-01-12-test",

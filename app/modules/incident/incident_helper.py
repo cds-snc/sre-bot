@@ -116,8 +116,11 @@ def handle_incident_command(
         case "create-folder":
             name = " ".join(args)
             folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
-            if folder:
-                respond(f"Folder `{folder['name']}` created.")
+            folder_name = None
+            if isinstance(folder, dict):
+                folder_name = folder.get("name", None)
+            if folder_name:
+                respond(f"Folder `{folder_name}` created.")
             else:
                 respond(f"Failed to create folder `{name}`.")
         case "help":
@@ -186,7 +189,6 @@ def close_incident(client: WebClient, logger, body, ack, respond):
     incident_status.update_status(
         client,
         respond,
-        logger,
         "Closed",
         channel_id,
         channel_name,
@@ -332,7 +334,6 @@ def handle_update_status_command(
         incident_status.update_status(
             client,
             respond,
-            logger,
             status,
             body["channel_id"],
             body["channel_name"],
