@@ -1,5 +1,4 @@
-import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 from modules.incident import db_operations
 import pytest
 
@@ -119,7 +118,8 @@ def test_create_incident_with_optional_args(
     )
 
 
-def test_create_incident_with_invalid_data(caplog):
+@patch("modules.incident.db_operations.logger")
+def test_create_incident_with_invalid_data(mock_logger):
     incident_data = {
         "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
         "channel_id": "channel_id",
@@ -127,11 +127,14 @@ def test_create_incident_with_invalid_data(caplog):
         "report_url": "report_url",
         "meet_url": "meet_url",
     }
-    with caplog.at_level(logging.ERROR):
-        with pytest.raises(ValueError, match="Invalid incident data"):
-            db_operations.create_incident(incident_data)
 
-    assert "Invalid incident data" in caplog.text
+    with pytest.raises(ValueError, match="Invalid incident data"):
+        db_operations.create_incident(incident_data)
+
+    mock_logger.error.assert_called_once_with(
+        "incident_creation_failed",
+        error=ANY,
+    )
 
 
 @patch("modules.incident.db_operations.log_activity")
@@ -260,9 +263,7 @@ def test_update_incident_field(mock_dynamodb, mock_log_activity):
     mock_dynamodb.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
     }
-    assert db_operations.update_incident_field(
-        mock_logger, "foo", "bar", "baz", "user_id"
-    )
+    assert db_operations.update_incident_field("foo", "bar", "baz", "user_id")
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
         Key={"id": {"S": "foo"}},
@@ -278,13 +279,11 @@ def test_update_incident_field(mock_dynamodb, mock_log_activity):
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.dynamodb")
 def test_update_incident_field_with_type(mock_dynamodb, mock_log_activity):
-    mock_logger = MagicMock()
+
     mock_dynamodb.update_item.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200}
     }
-    assert db_operations.update_incident_field(
-        mock_logger, "foo", "bar", "baz", "user_id", "M"
-    )
+    assert db_operations.update_incident_field("foo", "bar", "baz", "user_id", "M")
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
         Key={"id": {"S": "foo"}},
