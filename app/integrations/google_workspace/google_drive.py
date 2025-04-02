@@ -134,7 +134,7 @@ def create_file_from_template(
     fields: str | None = None,
     scopes: list[str] | None = None,
     delegated_user_email: str | None = None,
-):
+) -> dict:
     """Create a new file in Google Drive from a template
      (Docs, Sheets, Slides, Forms, or Sites.)
 
