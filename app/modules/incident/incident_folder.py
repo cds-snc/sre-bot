@@ -4,9 +4,8 @@ Includes functions to manage the folders, the metadata, and the list of incident
 """
 
 import datetime
-import os
 import pytz
-import logging
+
 import re
 import time
 from slack_sdk.web import WebClient
@@ -15,9 +14,13 @@ from slack_bolt import Ack
 from integrations.google_workspace import google_drive, sheets
 from integrations.aws import dynamodb
 from modules.incident import db_operations
+from core.config import settings
+from core.logging import get_module_logger
 
-SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
-INCIDENT_LIST = os.environ.get("INCIDENT_LIST")
+SRE_INCIDENT_FOLDER = settings.feat_incident.SRE_INCIDENT_FOLDER
+INCIDENT_LIST = settings.feat_incident.INCIDENT_LIST
+
+logger = get_module_logger()
 
 
 def list_incident_folders():
@@ -52,9 +55,17 @@ def delete_folder_metadata(client: WebClient, body, ack):
     key = body["actions"][0]["value"]
     response = google_drive.delete_metadata(folder_id, key)
     if not response:
-        logging.info(f"Failed to delete metadata `{key}` for folder `{folder_id}`")
+        logger.warning(
+            "metadata_delete_failed",
+            key=key,
+            folder_id=folder_id,
+        )
     else:
-        logging.info(f"Deleted metadata for key `{key}`")
+        logger.info(
+            "metadata_delete_success",
+            key=key,
+            folder_id=folder_id,
+        )
     body["actions"] = [{"value": folder_id}]
     view_folder_metadata(client, body, ack)
 
@@ -78,7 +89,10 @@ def get_folder_metadata(folder_id) -> dict:
 def view_folder_metadata(client, body, ack):
     ack()
     folder_id = body["actions"][0]["value"]
-    logging.info(f"Viewing metadata for folder {folder_id}")
+    logger.info(
+        "view_folder_metadata",
+        folder_id=folder_id,
+    )
     folder = google_drive.list_metadata(folder_id)
     blocks = {
         "type": "modal",
@@ -280,13 +294,23 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         "Closed",
     ]
     if status not in valid_statuses:
-        logging.warning("Invalid status %s", status)
+        logger.warning(
+            "update_incident_spreadsheet_error",
+            channel=channel_name,
+            status=status,
+            error="Invalid status",
+        )
         return False
     sheet_name = "Sheet1"
-    sheet = sheets.get_values(INCIDENT_LIST, range=sheet_name)
+    sheet = dict(sheets.get_values(INCIDENT_LIST, range=sheet_name))
     values = sheet.get("values", [])
     if len(values) == 0:
-        logging.warning("No incident found for channel %s", channel_name)
+        logger.warning(
+            "update_incident_spreadsheet_error",
+            channel=channel_name,
+            status=status,
+            error="No values found in the sheet",
+        )
         return False
     # Find the row with the search value
     for i, row in enumerate(values):
@@ -360,18 +384,20 @@ def get_incidents_from_sheet(days=0) -> list:
     return []
 
 
-def complete_incidents_details(client: WebClient, logger, incidents: list[dict]):
+def complete_incidents_details(client: WebClient, incidents: list[dict]):
     """Complete incidents details with channel info"""
     for incident in incidents:
         logger.info(
-            f"Getting info for incident {incident['channel_id']} - {incident['name']}"
+            "get_incident_details",
+            channel_id=incident["channel_id"],
+            channel_name=incident["channel_name"],
         )
         incident.update(get_incident_details(client, logger, incident))
         time.sleep(0.2)
     return incidents
 
 
-def get_incident_details(client: WebClient, logger, incident):
+def get_incident_details(client: WebClient, incident):
     """Get incident details from Slack"""
     max_retries = 5
     retry_attempts = 0
@@ -414,16 +440,24 @@ def get_incident_details(client: WebClient, logger, incident):
 
         except SlackApiError as e:
             if retry_attempts < max_retries:
-                logger.error(f"Error getting incident details: {e}")
-                logger.info("Retrying in 10 seconds...")
-                time.sleep(10)
                 retry_attempts += 1
+                logger.warning(
+                    "get_incident_details_error",
+                    channel_id=incident["channel_id"],
+                    error=str(e),
+                    retry_attempts=retry_attempts,
+                )
+                time.sleep(10)
             else:
-                logger.error(f"Error getting incident details: {e}")
+                logger.error(
+                    "get_incident_details_max_retries",
+                    channel_id=incident["channel_id"],
+                    error=str(e),
+                )
     return incident
 
 
-def create_missing_incidents(logger, incidents):
+def create_missing_incidents(incidents):
     """Create missing incidents"""
     count = 0
     for incident in incidents:
@@ -447,11 +481,18 @@ def create_missing_incidents(logger, incidents):
             if incident_id:
                 message = "Automated import of the incident from the Google Sheet via the SRE Bot"
                 db_operations.log_activity(incident_id, message)
-            logger.info(f"created incident: {incident['name']}: {incident_id}")
+            logger.info(
+                "incident_created",
+                incident_id=incident_id,
+                incident_name=incident["name"],
+            )
             count += 1
         else:
             logger.info(
-                f"incident {incident['name']} already exists: {incident_exists[0]['id']['S']}"
+                "incident_not_created",
+                reason="Incident already exists",
+                incident_id=incident_exists[0]["id"]["S"],
+                incident_name=incident["name"],
             )
     return count
 

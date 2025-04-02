@@ -46,11 +46,11 @@ def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
     client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
 
 
-@patch("modules.incident.incident_folder.logging")
+@patch("modules.incident.incident_folder.logger")
 @patch("modules.incident.incident_folder.google_drive.delete_metadata")
 @patch("modules.incident.incident_folder.view_folder_metadata")
 def test_delete_folder_metadata(
-    view_folder_metadata_mock, delete_metadata_mock, logging_mock
+    view_folder_metadata_mock, delete_metadata_mock, logger_mock
 ):
     client = MagicMock()
     body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
@@ -68,14 +68,16 @@ def test_delete_folder_metadata(
         {"actions": [{"value": "bar"}], "view": {"private_metadata": "bar"}},
         ack,
     )
-    logging_mock.info.assert_called_once_with("Deleted metadata for key `foo`")
+    logger_mock.info.assert_called_once_with(
+        "metadata_delete_success", key="foo", folder_id="bar"
+    )
 
 
-@patch("modules.incident.incident_folder.logging")
+@patch("modules.incident.incident_folder.logger")
 @patch("modules.incident.incident_folder.google_drive.delete_metadata")
 @patch("modules.incident.incident_folder.view_folder_metadata")
 def test_delete_folder_metadata_failed(
-    view_folder_metadata_mock, delete_metadata_mock, logging_mock
+    view_folder_metadata_mock, delete_metadata_mock, logger_mock
 ):
     client = MagicMock()
     body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
@@ -90,8 +92,8 @@ def test_delete_folder_metadata_failed(
         {"actions": [{"value": "bar"}], "view": {"private_metadata": "bar"}},
         ack,
     )
-    logging_mock.info.assert_called_once_with(
-        "Failed to delete metadata `foo` for folder `bar`"
+    logger_mock.warning.assert_called_once_with(
+        "metadata_delete_failed", key="foo", folder_id="bar"
     )
 
 
@@ -284,21 +286,29 @@ def test_add_new_incident_to_list(sheets_mock, datetime_mock):
 
 
 @patch("modules.incident.incident_folder.sheets")
-@patch("modules.incident.incident_folder.logging")
-def test_update_spreadsheet_incident_status_invalid_status(logging_mock, sheets_mock):
+@patch("modules.incident.incident_folder.logger")
+def test_update_spreadsheet_incident_status_invalid_status(logger_mock, sheets_mock):
     assert not incident_folder.update_spreadsheet_incident_status(
         "foo", "InvalidStatus"
     )
-    logging_mock.warning.assert_called_once_with("Invalid status %s", "InvalidStatus")
+    logger_mock.warning.assert_called_once_with(
+        "update_incident_spreadsheet_error",
+        channel="foo",
+        status="InvalidStatus",
+        error="Invalid status",
+    )
 
 
 @patch("modules.incident.incident_folder.sheets")
-@patch("modules.incident.incident_folder.logging")
-def test_update_spreadsheet_incident_status_empty_values(logging_mock, sheets_mock):
+@patch("modules.incident.incident_folder.logger")
+def test_update_spreadsheet_incident_status_empty_values(logger_mock, sheets_mock):
     sheets_mock.get_values.return_value = {"values": []}
     assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
-    logging_mock.warning.assert_called_once_with(
-        "No incident found for channel %s", "foo"
+    logger_mock.warning.assert_called_once_with(
+        "update_incident_spreadsheet_error",
+        channel="foo",
+        status="Closed",
+        error="No values found in the sheet",
     )
 
 
