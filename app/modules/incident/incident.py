@@ -252,7 +252,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
 
     incident_data = {
         "channel_id": channel_id,
-        "channel_name": slug,
+        "channel_name": channel_name,
         "name": name,
         "user_id": user_id,
         "teams": [team_name],
