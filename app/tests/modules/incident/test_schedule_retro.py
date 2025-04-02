@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytest
 import pytz  # type: ignore
 
-# from integrations.google_workspace import google_calendar
 from modules.incident import schedule_retro
 
 
@@ -96,7 +95,7 @@ def test_schedule_event_successful(
 
 
 # Test out the schedule_event function when no available slots are found
-@patch("modules.incident.schedule_retro.logging")
+@patch("modules.incident.schedule_retro.logger")
 @patch("modules.incident.schedule_retro.identify_unavailable_users")
 @patch("modules.incident.schedule_retro.get_freebusy")
 @patch("modules.incident.schedule_retro.find_first_available_slot")
@@ -104,7 +103,7 @@ def test_schedule_event_no_available_slots(
     find_first_available_slot_mock,
     get_freebusy_mock,
     identifiy_unavailable_users_mock,
-    logging_mock,
+    logger_mock,
 ):
     # Set up the mock return values
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
@@ -136,7 +135,7 @@ def test_schedule_event_no_available_slots(
     find_first_available_slot_mock.assert_called_once_with(
         {"result": "Mocked FreeBusy Query Result"}, mock_days
     )
-    logging_mock.warning.assert_called_once()
+    logger_mock.warning.assert_called_once()
     assert result["first_available_start"] is None
     assert result["first_available_end"] is None
     assert result["unavailable_users"] == mock_emails
@@ -604,16 +603,16 @@ def test_save_retro_event(
     }
 
 
-@patch("modules.incident.schedule_retro.logging")
-def test_confirm_click(mock_logging):
+@patch("modules.incident.schedule_retro.logger")
+def test_confirm_click(mock_logger):
     ack = MagicMock()
     body = {
         "user": {"id": "user_id", "username": "username"},
     }
     schedule_retro.confirm_click(ack, body, client=MagicMock())
     ack.assert_called_once()
-    mock_logging.info.assert_called_once_with(
-        "User username viewed the calendar event."
+    mock_logger.info.assert_called_once_with(
+        "user_viewed_calendar_event", username="username"
     )
 
 
