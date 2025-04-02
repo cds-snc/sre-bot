@@ -1233,7 +1233,7 @@ def test_archive_channel_action_archive(
     assert ack.call_count == 1
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
     mock_incident_helper.close_incident.assert_called_once_with(
-        client, mock_logger, channel_info, ack, respond
+        client, channel_info, ack, respond
     )
 
 
@@ -1262,6 +1262,6 @@ def test_archive_channel_action_schedule_incident(
     incident_conversation.archive_channel_action(client, body, ack, MagicMock())
     assert ack.call_count == 1
     mock_schedule.open_incident_retro_modal.assert_called_once_with(
-        client, channel_info, ack, mock_logger
+        client, channel_info, ack
     )
     mock_log_to_sentinel.assert_called_once_with("incident_retro_scheduled", body)

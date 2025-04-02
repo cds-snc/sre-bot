@@ -423,11 +423,11 @@ def archive_channel_action(client: WebClient, body, ack, respond):
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        incident_helper.close_incident(client, logger, channel_info, ack, respond)
+        incident_helper.close_incident(client, channel_info, ack, respond)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
         channel_info["trigger_id"] = body["trigger_id"]
-        schedule_retro.open_incident_retro_modal(client, channel_info, ack, logger)
+        schedule_retro.open_incident_retro_modal(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)

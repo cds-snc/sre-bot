@@ -141,7 +141,6 @@ def handle_incident_command(
             stale_incidents(client, body, ack)
         case "schedule":
             schedule_retro.open_incident_retro_modal(client, body, ack)
-            # retro.schedule_incident_retro(client, body, ack, logger)
         case "status":
             handle_update_status_command(client, body, respond, ack, args)
         case "add_summary":

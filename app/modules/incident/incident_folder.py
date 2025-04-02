@@ -392,7 +392,7 @@ def complete_incidents_details(client: WebClient, incidents: list[dict]):
             channel_id=incident["channel_id"],
             channel_name=incident["channel_name"],
         )
-        incident.update(get_incident_details(client, logger, incident))
+        incident.update(get_incident_details(client, incident))
         time.sleep(0.2)
     return incidents
 
