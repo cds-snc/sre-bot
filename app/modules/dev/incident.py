@@ -44,7 +44,7 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
     logger.info(
         "get_incidents_from_sheet_completed", payload=incidents, count=len(incidents)
     )
-    incidents = incident_folder.complete_incidents_details(client, logger, incidents)
+    incidents = incident_folder.complete_incidents_details(client, incidents)
     logger.info(
         "complete_incidents_details_completed", payload=incidents, count=len(incidents)
     )
