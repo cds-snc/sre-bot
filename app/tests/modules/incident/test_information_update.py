@@ -403,7 +403,6 @@ def test_handle_update_field_submission_date_type(
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "detection_time",
         updated_value,
@@ -456,7 +455,6 @@ def test_handle_update_field_submission_text_type(
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "retrospective_url",
         "new_value",
@@ -514,7 +512,6 @@ def test_handle_update_field_submission_dropdown_type(
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "status",
         "Closed",

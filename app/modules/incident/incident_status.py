@@ -59,9 +59,7 @@ def update_status(
             incident_folder.return_channel_name(channel_name), status
         )
         if incident_id:
-            db_operations.update_incident_field(
-                logger, incident_id, "status", status, user_id
-            )
+            db_operations.update_incident_field(incident_id, "status", status, user_id)
     except Exception as e:
         logger.warning(
             "incident_folder_status_update_failed",

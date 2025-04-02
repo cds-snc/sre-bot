@@ -108,7 +108,7 @@ def test_update_status_success_with_incident_id(
         mock_incident_folder.return_channel_name.return_value, status
     )
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger, incident_id, "status", status, user_id
+        incident_id, "status", status, user_id
     )
     client.chat_postMessage.assert_called_once_with(
         channel=channel_id,

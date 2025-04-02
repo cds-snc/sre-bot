@@ -315,7 +315,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
 
         db_operations.update_incident_field(
-            logger, incident_id, action, value, user_id, type=value_type
+            incident_id, action, value, user_id, type=value_type
         )
         client.chat_postMessage(
             channel=channel_id,
