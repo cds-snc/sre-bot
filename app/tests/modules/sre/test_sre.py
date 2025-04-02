@@ -1,5 +1,3 @@
-import os
-
 from modules import sre
 
 from unittest.mock import MagicMock, patch
