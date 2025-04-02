@@ -54,7 +54,7 @@ def is_incident_channel(
             raise SlackApiError("Error getting the channel info", channel_info)
     except SlackApiError as e:
         logger.error(
-            "validate_incident_channel_error",
+            "incident_channel_info_error",
             channel=channel_id,
             error=str(e),
         )

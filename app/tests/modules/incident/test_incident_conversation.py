@@ -91,7 +91,7 @@ def test_is_incident_channel_raises_slack_api_error(mock_logger):
     client.conversations_info.assert_called_once_with(channel=channel_id)
     client.conversations_join.assert_not_called()
     mock_logger.error.assert_called_once_with(
-        "validate_incident_channel_error",
+        "incident_channel_info_error",
         channel=channel_id,
         error=str(channel_info_error),
     )
@@ -110,7 +110,7 @@ def test_is_incident_channel_raises_slack_api_error(mock_logger):
     client.conversations_info.assert_called_once_with(channel=channel_id)
     client.conversations_join.assert_not_called()
     mock_logger.error.assert_called_once_with(
-        "validate_incident_channel_error",
+        "incident_channel_info_error",
         channel=channel_id,
         error=str(SlackApiError("Error getting the channel info", {"ok": False})),
     )
@@ -137,7 +137,7 @@ def test_is_incident_channel_raises_slack_api_error(mock_logger):
     client.conversations_info.assert_called_once_with(channel=channel_id)
     client.conversations_join.assert_called_once_with(channel=channel_id)
     mock_logger.error.assert_called_once_with(
-        "validate_incident_channel_error",
+        "incident_channel_info_error",
         channel=channel_id,
         error=str(join_channel_error),
     )
