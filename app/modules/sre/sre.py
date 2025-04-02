@@ -65,9 +65,7 @@ def sre_command(
                 return
             geolocate_helper.geolocate(args, respond)
         case "incident":
-            incident_helper.handle_incident_command(
-                args, client, body, respond, ack, logger
-            )
+            incident_helper.handle_incident_command(args, client, body, respond, ack)
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "test":

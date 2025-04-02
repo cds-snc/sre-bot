@@ -18,6 +18,7 @@ from modules.incident import (
     information_update,
 )
 from core.config import settings
+from core.logging import get_module_logger
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_DRIVE_ID = settings.feat_incident.SRE_DRIVE_ID
@@ -30,6 +31,7 @@ VALID_STATUS = [
     "Closed",
 ]
 
+logger = get_module_logger()
 
 help_text = """
 \n `/sre incident`
@@ -100,12 +102,16 @@ def register(bot: App):
 
 
 def handle_incident_command(
-    args, client: WebClient, body, respond: Respond, ack: Ack, logger
+    args,
+    client: WebClient,
+    body,
+    respond: Respond,
+    ack: Ack,
 ):
     """Handle the /sre incident command."""
     logger.info(
         "sre_incident_command_received",
-        # args=args,
+        args=args,
     )
     # If no arguments are provided, open the update status view
     if len(args) == 0:
@@ -130,14 +136,14 @@ def handle_incident_command(
         case "roles":
             incident_roles.manage_roles(client, body, ack, respond)
         case "close":
-            close_incident(client, logger, body, ack, respond)
+            close_incident(client, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case "schedule":
-            schedule_retro.open_incident_retro_modal(client, body, ack, logger)
+            schedule_retro.open_incident_retro_modal(client, body, ack)
             # retro.schedule_incident_retro(client, body, ack, logger)
         case "status":
-            handle_update_status_command(client, logger, body, respond, ack, args)
+            handle_update_status_command(client, body, respond, ack, args)
         case "add_summary":
             open_updates_dialog(client, body, ack)
         case "summary":
@@ -148,7 +154,7 @@ def handle_incident_command(
             )
 
 
-def close_incident(client: WebClient, logger, body, ack, respond):
+def close_incident(client: WebClient, body, ack, respond):
     ack()
     # get the current chanel id and name
     channel_id = body["channel_id"]
@@ -303,7 +309,7 @@ def channel_item(channel):
 
 
 def handle_update_status_command(
-    client: WebClient, logger, body, respond: Respond, ack: Ack, args
+    client: WebClient, body, respond: Respond, ack: Ack, args
 ):
     ack()
     status = str.join(" ", args)

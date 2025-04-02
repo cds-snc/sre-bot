@@ -166,7 +166,7 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
     }
 
     # Call the function being tested
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # Ensure the ack method was called
     mock_ack.assert_called_once()
@@ -234,13 +234,12 @@ def test_open_incident_retro_modal(
         }
     )
     # Call the function being tested
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
     mock_incident_conversation.get_incident_document_id.assert_called_once_with(
         mock_client,
         channel_id,
-        mock_logger,
     )
     mock_slack_channels.fetch_user_details.assert_called_once_with(
         mock_client, channel_id
