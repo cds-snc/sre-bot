@@ -1,6 +1,5 @@
 from datetime import datetime
 import json
-import logging
 from slack_bolt import Ack
 from slack_sdk import WebClient
 from models.incidents import Incident
@@ -12,6 +11,7 @@ from modules.incident import (
     utils,
 )
 from integrations.google_workspace import google_docs
+from core.logging import get_module_logger
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -30,6 +30,8 @@ FIELD_SCHEMA = {
     },
 }
 
+logger = get_module_logger()
+
 
 def open_update_field_view(client: WebClient, body, ack: Ack):
     """Open the view to update the incident field"""
@@ -46,7 +48,7 @@ def update_field_view(client, body, action, incident_data):
     """Update the incident field view based on the action clicked by the user.
     Will return the default view if the action is not recognized,
     or the view associated with the field type."""
-    logging.info("Loading Update Field View for action: %s", action)
+    logger.info("updating_field_view", field=action, incident_data=incident_data)
     if action not in FIELD_SCHEMA:
         return generate_default_field_update_view(action)
     field_info = FIELD_SCHEMA[action]
@@ -257,7 +259,7 @@ def generate_drop_down_field_update_view(action, incident_data, options):
     }
 
 
-def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logger):
+def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
     ack()
     user_id = body["user"]["id"]
     tz = client.users_info(user=user_id)["user"]["tz"]
@@ -271,7 +273,9 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
     report_url = incident_data["report_url"]
 
     if action not in FIELD_SCHEMA or not FIELD_SCHEMA[action]["type"]:
-        logger.error("Unsupported action: %s", action)
+        logger.error(
+            "update_field_submission", action=action, message="Unsupported action type"
+        )
         return
 
     field_info = FIELD_SCHEMA.get(action, None)
@@ -298,7 +302,11 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
             value_type = "S"
             message += value if value else "Unknown"
         case _:
-            logger.error("Unknown field type: %s", field_info["type"])
+            logger.error(
+                "update_field_submission",
+                action=action,
+                message="Unsupported action type",
+            )
             return
     if value and value_type:
         if action == "status" and isinstance(value, str):
@@ -307,7 +315,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view, logg
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
 
         db_operations.update_incident_field(
-            logger, incident_id, action, value, user_id, type=value_type
+            incident_id, action, value, user_id, type=value_type
         )
         client.chat_postMessage(
             channel=channel_id,

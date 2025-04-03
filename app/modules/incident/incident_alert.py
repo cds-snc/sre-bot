@@ -1,9 +1,12 @@
 from integrations.sentinel import log_to_sentinel
 from modules.incident import incident
 from modules.slack import webhooks
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
-def handle_incident_action_buttons(client, ack, body, logger):
+def handle_incident_action_buttons(client, ack, body):
     delete_block = False
     name = body["actions"][0]["name"]
     value = body["actions"][0]["value"]
@@ -41,6 +44,10 @@ def handle_incident_action_buttons(client, ack, body, logger):
         if delete_block:
             body["original_message"]["blocks"] = []
 
-        logger.info(f"Updating chat: {body['original_message']}")
+        logger.info(
+            "incident_alert_update_chat",
+            channel=body["channel"]["id"],
+            message=body["original_message"],
+        )
         client.api_call("chat.update", json=body["original_message"])
         log_to_sentinel("ignore_incident_button_pressed", body)

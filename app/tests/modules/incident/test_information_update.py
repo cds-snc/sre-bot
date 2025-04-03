@@ -33,9 +33,9 @@ def test_open_update_field_view(mock_update_field_view):
 
 
 @patch("modules.incident.information_update.generate_default_field_update_view")
-@patch("modules.incident.information_update.logging")
+@patch("modules.incident.information_update.logger")
 def test_update_field_view_default(
-    mock_logging, mock_generate_default_field_update_view
+    mock_logger, mock_generate_default_field_update_view
 ):
     mock_client = MagicMock()
     body = {
@@ -44,8 +44,10 @@ def test_update_field_view_default(
     information_update.update_field_view(
         mock_client, body, "some_action", {"some_action": "data"}
     )
-    mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "some_action"
+    mock_logger.info.assert_called_once_with(
+        "updating_field_view",
+        field="some_action",
+        incident_data={"some_action": "data"},
     )
     mock_generate_default_field_update_view.assert_called_once_with("some_action")
 
@@ -72,9 +74,9 @@ def test_generate_default_field_update_view():
 @patch("modules.incident.information_update.generate_date_field_update_view")
 @patch("modules.incident.information_update.datetime")
 @patch("modules.incident.information_update.utils")
-@patch("modules.incident.information_update.logging")
+@patch("modules.incident.information_update.logger")
 def test_update_field_view_date_field(
-    mock_logging, mock_utils, mock_datetime, mock_generate_date_field_update_view
+    mock_logger, mock_utils, mock_datetime, mock_generate_date_field_update_view
 ):
     mock_client = MagicMock()
     body = {
@@ -95,8 +97,10 @@ def test_update_field_view_date_field(
     information_update.update_field_view(
         mock_client, body, "detection_time", incident_data
     )
-    mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "detection_time"
+    mock_logger.info.assert_called_once_with(
+        "updating_field_view",
+        field="detection_time",
+        incident_data={"status": "data", "detection_time": "1234567890"},
     )
     mock_generate_date_field_update_view.assert_called_once_with(
         mock_client, body, "detection_time", incident_data
@@ -194,9 +198,9 @@ def test_generate_date_field_update_view(mock_datetime, mock_utils):
 
 
 @patch("modules.incident.information_update.generate_text_field_update_view")
-@patch("modules.incident.information_update.logging")
+@patch("modules.incident.information_update.logger")
 def test_update_field_view_text_field(
-    mock_logging, mock_generate_text_field_update_view
+    mock_logger, mock_generate_text_field_update_view
 ):
     mock_client = MagicMock()
     body = {
@@ -206,8 +210,10 @@ def test_update_field_view_text_field(
     information_update.update_field_view(
         mock_client, body, "retrospective_url", incident_data
     )
-    mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "retrospective_url"
+    mock_logger.info.assert_called_once_with(
+        "updating_field_view",
+        field="retrospective_url",
+        incident_data={"status": "data", "retrospective_url": "unknown"},
     )
     mock_generate_text_field_update_view.assert_called_once_with(
         "retrospective_url", incident_data
@@ -264,9 +270,9 @@ def test_generate_text_field_update_view():
     new={"status": {"type": "dropdown", "options": ["Open", "Closed"]}},
 )
 @patch("modules.incident.information_update.generate_drop_down_field_update_view")
-@patch("modules.incident.information_update.logging")
+@patch("modules.incident.information_update.logger")
 def test_update_field_view_dropdown_field(
-    mock_logging, mock_generate_drop_down_field_update_view
+    mock_logger, mock_generate_drop_down_field_update_view
 ):
     mock_client = MagicMock()
     body = {
@@ -274,8 +280,8 @@ def test_update_field_view_dropdown_field(
     }
     incident_data = {"status": "Open", "retrospective_url": "unknown"}
     information_update.update_field_view(mock_client, body, "status", incident_data)
-    mock_logging.info.assert_called_once_with(
-        "Loading Update Field View for action: %s", "status"
+    mock_logger.info.assert_called_once_with(
+        "updating_field_view", field="status", incident_data=incident_data
     )
     mock_generate_drop_down_field_update_view.assert_called_once_with(
         "status", incident_data, ["Open", "Closed"]
@@ -347,6 +353,7 @@ def test_generate_drop_down_field_update_view():
     }
 
 
+@patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.datetime")
 @patch("modules.incident.information_update.utils")
 @patch("modules.incident.information_update.incident_document")
@@ -360,10 +367,10 @@ def test_handle_update_field_submission_date_type(
     mock_incident_document,
     mock_utils,
     mock_datetime,
+    mock_logger,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    mock_logger = MagicMock()
     # update value as a string based on date and time input 2024-01-12 12:00
     updated_value = "1705060800.0"
     incident_data = generate_incident_data()
@@ -394,11 +401,8 @@ def test_handle_update_field_submission_date_type(
         "view": [{"block": "block_id"}]
     }
 
-    information_update.handle_update_field_submission(
-        mock_client, body, mock_ack, view, mock_logger
-    )
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "detection_time",
         updated_value,
@@ -413,6 +417,7 @@ def test_handle_update_field_submission_date_type(
     mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
+@patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -422,10 +427,10 @@ def test_handle_update_field_submission_text_type(
     mock_information_display,
     mock_incident_folder,
     mock_incident_document,
+    mock_logger,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    mock_logger = MagicMock()
     incident_data = generate_incident_data()
     view = {
         "state": {
@@ -448,11 +453,8 @@ def test_handle_update_field_submission_text_type(
         "view": [{"block": "block_id"}]
     }
 
-    information_update.handle_update_field_submission(
-        mock_client, body, mock_ack, view, mock_logger
-    )
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "retrospective_url",
         "new_value",
@@ -467,6 +469,7 @@ def test_handle_update_field_submission_text_type(
     mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
 
 
+@patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.google_docs")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
@@ -478,10 +481,10 @@ def test_handle_update_field_submission_dropdown_type(
     mock_incident_folder,
     mock_incident_document,
     mock_google_docs,
+    mock_logger,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    mock_logger = MagicMock()
     incident_data = generate_incident_data()
     view = {
         "state": {
@@ -507,11 +510,8 @@ def test_handle_update_field_submission_dropdown_type(
         "view": [{"block": "block_id"}]
     }
 
-    information_update.handle_update_field_submission(
-        mock_client, body, mock_ack, view, mock_logger
-    )
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
-        mock_logger,
         incident_data["id"],
         "status",
         "Closed",
@@ -531,6 +531,7 @@ def test_handle_update_field_submission_dropdown_type(
     )
 
 
+@patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -540,10 +541,10 @@ def test_handle_update_field_submission_not_supported(
     mock_information_display,
     mock_incident_folder,
     mock_incident_document,
+    mock_logger,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    mock_logger = MagicMock()
     incident_data = generate_incident_data()
     view = {
         "state": {
@@ -567,15 +568,15 @@ def test_handle_update_field_submission_not_supported(
         "view": [{"block": "block_id"}]
     }
 
-    information_update.handle_update_field_submission(
-        mock_client, body, mock_ack, view, mock_logger
-    )
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_not_called()
     mock_client.chat_postMessage.assert_not_called()
     mock_information_display.incident_information_view.assert_not_called()
     mock_client.views_update.assert_not_called()
     mock_logger.error.assert_called_once_with(
-        "Unsupported action: %s", "unsupported_field"
+        "update_field_submission",
+        action="unsupported_field",
+        message="Unsupported action type",
     )
     mock_incident_document.update_incident_document_status.assert_not_called()
     mock_incident_folder.update_spreadsheet_incident_status.assert_not_called()
@@ -585,6 +586,7 @@ def test_handle_update_field_submission_not_supported(
     "modules.incident.information_update.FIELD_SCHEMA",
     new={"status": {"type": "some_type"}},
 )
+@patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -594,10 +596,10 @@ def test_handle_update_field_submission_with_unknown_type(
     mock_incident_information_display,
     mock_incident_folder,
     mock_incident_document,
+    mock_logger,
 ):
     mock_client = MagicMock()
     mock_ack = MagicMock()
-    mock_logger = MagicMock()
     incident_data = generate_incident_data()
     view = {
         "state": {
@@ -620,10 +622,10 @@ def test_handle_update_field_submission_with_unknown_type(
         "view": [{"block": "block_id"}]
     }
 
-    information_update.handle_update_field_submission(
-        mock_client, body, mock_ack, view, mock_logger
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
+    mock_logger.error.assert_called_once_with(
+        "update_field_submission", action="status", message="Unsupported action type"
     )
-    mock_logger.error.assert_called_once_with("Unknown field type: %s", "some_type")
     mock_db_operations.update_incident_field.assert_not_called()
     mock_client.chat_postMessage.assert_not_called()
     mock_incident_information_display.incident_information_view.assert_not_called()

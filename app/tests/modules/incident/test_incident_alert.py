@@ -9,7 +9,6 @@ def test_handle_incident_action_buttons_call_incident(
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -20,22 +19,26 @@ def test_handle_incident_action_buttons_call_incident(
         ],
         "user": {"id": "user_id"},
     }
-    incident_alert.handle_incident_action_buttons(client, ack, body, logger)
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
     incident_mock.open_create_incident_modal.assert_called_with(
         client, ack, {"text": "incident_id"}, body
     )
     log_to_sentinel_mock.assert_called_with("call_incident_button_pressed", body)
 
 
+@patch("modules.incident.incident_alert.logger")
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.webhooks.increment_acknowledged_count")
 @patch("modules.incident.incident_alert.incident")
 def test_handle_incident_action_buttons_ignore(
-    incident_mock, increment_acknowledged_count_mock, log_to_sentinel_mock
+    incident_mock, increment_acknowledged_count_mock, log_to_sentinel_mock, logger_mock
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -56,7 +59,11 @@ def test_handle_incident_action_buttons_ignore(
             ],
         },
     }
-    incident_alert.handle_incident_action_buttons(client, ack, body, logger)
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
     increment_acknowledged_count_mock.assert_called_with("incident_id")
     client.api_call.assert_called_with(
         "chat.update",
@@ -71,6 +78,11 @@ def test_handle_incident_action_buttons_ignore(
             ],
         },
     )
+    logger_mock.info.assert_called_with(
+        "incident_alert_update_chat",
+        channel="channel_id",
+        message=body["original_message"],
+    )
 
 
 @patch("modules.incident.incident_alert.log_to_sentinel")
@@ -83,7 +95,6 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -116,7 +127,11 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
             ],
         },
     }
-    incident_alert.handle_incident_action_buttons(client, ack, body, logger)
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
     increment_acknowledged_count_mock.assert_called_with("incident_id")
     client.api_call.assert_called_with(
         "chat.update",
@@ -134,6 +149,7 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block(
     )
 
 
+@patch("modules.incident.incident_alert.logger")
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.webhooks.increment_acknowledged_count")
 @patch("modules.incident.incident_alert.incident")
@@ -141,10 +157,10 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
     incident_mock,
     increment_acknowledged_count_mock,
     log_to_sentinel_mock,
+    logger_mock,
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -177,7 +193,11 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
             ],
         },
     }
-    incident_alert.handle_incident_action_buttons(client, ack, body, logger)
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
     increment_acknowledged_count_mock.assert_called_with("incident_id")
     client.api_call.assert_called_with(
         "chat.update",
@@ -217,7 +237,6 @@ def test_handle_incident_action_buttons_link_preview(
 ):
     client = MagicMock()
     ack = MagicMock()
-    logger = MagicMock()
     body = {
         "actions": [
             {
@@ -245,7 +264,11 @@ def test_handle_incident_action_buttons_link_preview(
             ],
         },
     }
-    incident_alert.handle_incident_action_buttons(client, ack, body, logger)
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
     increment_acknowledged_count_mock.assert_called_with("incident_id")
     client.api_call.assert_called_with(
         "chat.update",

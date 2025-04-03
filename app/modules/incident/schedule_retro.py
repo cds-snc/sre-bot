@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime, timedelta
 
 import json
@@ -12,6 +11,9 @@ from integrations.google_workspace.google_calendar import (
     identify_unavailable_users,
 )
 from modules.incident import incident_conversation
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def schedule_event(client: WebClient, days, users, days_lookup=60):
@@ -41,10 +43,9 @@ def schedule_event(client: WebClient, days, users, days_lookup=60):
         freebusy_result, time_min, time_max
     )
     if set(unavailable_users_emails) == set(user_emails):
-        logging.warning(
-            "All users are unavailable for the next %s days starting from %s. Please check the user emails or the calendar settings.",
-            days_lookup,
-            time_min,
+        logger.warning(
+            "schedule_event_could_not_schedule",
+            message="All users are unavailable for the selected time range.",
         )
     # # return the first available slot to book the event
     first_available_start, first_available_end = find_first_available_slot(
@@ -60,23 +61,21 @@ def schedule_event(client: WebClient, days, users, days_lookup=60):
 # Function to be triggered when the /sre incident schedule command is called. This function brings up a modal window
 # that explains how the event is scheduled and allows the user to schedule a retro meeting for the incident after the
 # submit button is clicked.
-def open_incident_retro_modal(client: WebClient, body, ack, logger):
+def open_incident_retro_modal(client: WebClient, body, ack):
     """Open the modal for scheduling a retro meeting."""
     ack()
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
 
     is_incident, _is_dev_incident = incident_conversation.is_incident_channel(
-        client, logger, channel_id
+        client, channel_id
     )
     if not is_incident:
         return
 
     # get the incident document
     # get and update the incident document
-    document_id = incident_conversation.get_incident_document_id(
-        client, channel_id, logger
-    )
+    document_id = incident_conversation.get_incident_document_id(client, channel_id)
 
     # convert the data to string so that we can send it as private metadata
     private_metadata = json.dumps(
@@ -265,8 +264,12 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
     first_available_end = scheduled_event_details["first_available_end"]
     if first_available_start is None:
         saving_view = generate_retro_saving_view(status=2)
-        logging.info(
-            "The event could not be scheduled since no free time was found for the next 60 days"
+        logger.error(
+            "retro_scheduling_failed",
+            message="Failed to schedule retro event - no available time slots found",
+            incident_name=incident_name,
+            days_offset=days,
+            unavailable_users=scheduled_event_details["unavailable_users"],
         )
         client.views_update(
             view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view
@@ -283,8 +286,12 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
     # if we could not schedule the event, display a message to the user that the event could not be scheduled
     if result is None:
         saving_view = generate_retro_saving_view(status=2)
-        logging.info(
-            "The event could not be scheduled since schedule_event returned None"
+        logger.error(
+            "retro_scheduling_failed",
+            message="The save_retro_event did not return a link",
+            incident_name=incident_name,
+            days_offset=days,
+            unavailable_users=scheduled_event_details["unavailable_users"],
         )
 
     # if the event was scheduled successfully, display a message to the user that the event was scheduled and provide a link to the event
@@ -293,7 +300,15 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
         event_link = result["event_link"]
         event_info = result["event_info"]
         saving_view = generate_retro_saving_view(status=1, link=event_link)
-        logging.info("Event has been scheduled successfully. Link: %s", event_link)
+        logger.info(
+            "retro_scheduling_success",
+            message="Successfully scheduled retro event",
+            incident_name=incident_name,
+            days_offset=days,
+            unavailable_users=scheduled_event_details["unavailable_users"],
+            event_link=event_link,
+            event_info=event_info,
+        )
 
         # post the message in the channel
         client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
@@ -310,7 +325,8 @@ def save_retro_event(
     user_emails,
     incident_name,
     incident_document,
-):
+) -> dict:
+    """Save the retro event to the calendar and return the event link."""
     event_config = {
         "description": "This is a retro meeting to discuss incident: " + incident_name,
         "conferenceData": {
@@ -342,7 +358,10 @@ def save_retro_event(
 def confirm_click(ack, body, client):
     ack()
     username = body["user"]["username"]
-    logging.info(f"User {username} viewed the calendar event.")
+    logger.info(
+        "user_viewed_calendar_event",
+        username=username,
+    )
 
 
 def get_users_emails_from_selected_options(client: WebClient, selected_options):

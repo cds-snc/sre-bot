@@ -1,14 +1,16 @@
 """Module to manage the incident document used to track the details."""
 
 import datetime
-import logging
-import os
 import re
 from integrations.google_workspace import google_docs, google_drive
+from core.config import settings
+from core.logging import get_module_logger
 
-INCIDENT_TEMPLATE = os.environ.get("INCIDENT_TEMPLATE")
+INCIDENT_TEMPLATE = settings.feat_incident.INCIDENT_TEMPLATE
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+
+logger = get_module_logger()
 
 
 def create_incident_document(title, folder):
@@ -20,9 +22,12 @@ def create_incident_document(title, folder):
     Returns:
         str: The ID of the new document.
     """
-    return google_drive.create_file_from_template(title, folder, INCIDENT_TEMPLATE)[
-        "id"
-    ]
+    document_id = ""
+    response = google_drive.create_file_from_template(title, folder, INCIDENT_TEMPLATE)
+    if isinstance(response, dict):
+        document_id = response.get("id")
+
+    return document_id
 
 
 def update_boilerplate_text(document_id, name, product, slack_channel, on_call_names):
@@ -101,7 +106,8 @@ def update_incident_document_status(document_id, new_status="Closed"):
         for status in possible_statuses
         if status != new_status
     ]
-    replies = google_docs.batch_update(document_id, changes)["replies"]
+    result = google_docs.batch_update(document_id, changes)
+    replies = result.get("replies", []) if isinstance(result, dict) else []
     return any(
         reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0
         for reply in replies
@@ -286,4 +292,8 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                 )
         google_docs.batch_update(doc_id, requests)
     else:
-        logging.warning("Headings not found")
+        logger.warning(
+            "replace_text_between_headings_failed",
+            document_id=doc_id,
+            error="Headings not found",
+        )

@@ -1,9 +1,11 @@
 import datetime
-import logging
 from boto3.dynamodb.types import TypeSerializer
 
 from models.incidents import Incident
 from integrations.aws import dynamodb
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def create_incident(incident_data: dict) -> str | None:
@@ -19,8 +21,11 @@ def create_incident(incident_data: dict) -> str | None:
     try:
         incident = Incident(**incident_data)
     except ValueError as e:
+        logger.error(
+            "incident_creation_failed",
+            error=str(e),
+        )
         message = f"Invalid incident data: {e}"
-        logging.error(message)
         raise ValueError(message) from e
 
     existing_incident = get_incident_by_channel_id(incident.channel_id)
@@ -40,13 +45,22 @@ def create_incident(incident_data: dict) -> str | None:
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
         message = f"User `{incident.user_id}` created incident `{incident.name}` in channel `{incident.channel_id}`"
         log_activity(incident.id, message)
-        logging.info("Created incident %s", incident.id)
+        logger.info(
+            "incident_creation_success",
+            channel=incident.channel_id,
+            incident_id=incident.id,
+            user=incident.user_id,
+        )
         return incident.id
     else:
         message = (
             f"Failed to create incident in database for channel `{incident.channel_id}`"
         )
-        logging.error(message)
+        logger.error(
+            "incident_creation_failed",
+            channel=incident.channel_id,
+        )
+
         return None
 
 
@@ -55,7 +69,7 @@ def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
     return dynamodb.scan(TableName="incidents", Select=select, **kwargs)
 
 
-def update_incident_field(logger, id, field, value, user_id, type="S"):
+def update_incident_field(id, field, value, user_id, type="S"):
     """Update an attribute in an incident item.
 
     Default type is string, but it can be changed to other types like N for numbers, SS for string sets, etc.
@@ -64,7 +78,12 @@ def update_incident_field(logger, id, field, value, user_id, type="S"):
     """
     protected_fields = ["id", "created_at", "channel_id", "logs"]
     if field in protected_fields:
-        logger.warn("Field `%s` is protected and cannot be updated", field)
+        logger.warning(
+            "incident_update_protected_field",
+            field=field,
+            incident_id=id,
+            user_id=user_id,
+        )
         return None
     expression_attribute_names = {f"#{field}": field}
     expression_attribute_values = {f":{field}": {type: value}}

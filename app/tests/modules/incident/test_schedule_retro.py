@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pytest
 import pytz  # type: ignore
 
-# from integrations.google_workspace import google_calendar
 from modules.incident import schedule_retro
 
 
@@ -96,7 +95,7 @@ def test_schedule_event_successful(
 
 
 # Test out the schedule_event function when no available slots are found
-@patch("modules.incident.schedule_retro.logging")
+@patch("modules.incident.schedule_retro.logger")
 @patch("modules.incident.schedule_retro.identify_unavailable_users")
 @patch("modules.incident.schedule_retro.get_freebusy")
 @patch("modules.incident.schedule_retro.find_first_available_slot")
@@ -104,7 +103,7 @@ def test_schedule_event_no_available_slots(
     find_first_available_slot_mock,
     get_freebusy_mock,
     identifiy_unavailable_users_mock,
-    logging_mock,
+    logger_mock,
 ):
     # Set up the mock return values
     get_freebusy_mock.return_value = {"result": "Mocked FreeBusy Query Result"}
@@ -136,7 +135,7 @@ def test_schedule_event_no_available_slots(
     find_first_available_slot_mock.assert_called_once_with(
         {"result": "Mocked FreeBusy Query Result"}, mock_days
     )
-    logging_mock.warning.assert_called_once()
+    logger_mock.warning.assert_called_once()
     assert result["first_available_start"] is None
     assert result["first_available_end"] is None
     assert result["unavailable_users"] == mock_emails
@@ -150,7 +149,6 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
 ):
     mock_ack = MagicMock()
     mock_client = MagicMock()
-    mock_logger = MagicMock()
     mock_incident_conversation.is_incident_channel.return_value = [False, False]
 
     # The test channel and user IDs
@@ -167,7 +165,7 @@ def test_open_incident_retro_modal_not_incident_channel_exception(
     }
 
     # Call the function being tested
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     # Ensure the ack method was called
     mock_ack.assert_called_once()
@@ -186,7 +184,6 @@ def test_open_incident_retro_modal(
 ):
     mock_ack = MagicMock()
     mock_client = MagicMock()
-    mock_logger = MagicMock()
     mock_incident_conversation.is_incident_channel.return_value = [True, False]
     mock_incident_conversation.get_incident_document_id.return_value = (
         "dummy_document_id"
@@ -235,13 +232,12 @@ def test_open_incident_retro_modal(
         }
     )
     # Call the function being tested
-    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack, mock_logger)
+    schedule_retro.open_incident_retro_modal(mock_client, body, mock_ack)
 
     mock_ack.assert_called_once()
     mock_incident_conversation.get_incident_document_id.assert_called_once_with(
         mock_client,
         channel_id,
-        mock_logger,
     )
     mock_slack_channels.fetch_user_details.assert_called_once_with(
         mock_client, channel_id
@@ -604,16 +600,16 @@ def test_save_retro_event(
     }
 
 
-@patch("modules.incident.schedule_retro.logging")
-def test_confirm_click(mock_logging):
+@patch("modules.incident.schedule_retro.logger")
+def test_confirm_click(mock_logger):
     ack = MagicMock()
     body = {
         "user": {"id": "user_id", "username": "username"},
     }
     schedule_retro.confirm_click(ack, body, client=MagicMock())
     ack.assert_called_once()
-    mock_logging.info.assert_called_once_with(
-        "User username viewed the calendar event."
+    mock_logger.info.assert_called_once_with(
+        "user_viewed_calendar_event", username="username"
     )
 
 

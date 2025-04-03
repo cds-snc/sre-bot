@@ -1,7 +1,5 @@
 from datetime import datetime
 import json
-import logging
-import os
 import re
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
@@ -19,12 +17,12 @@ from modules.incident import (
     information_display,
     information_update,
 )
+from core.config import settings
+from core.logging import get_module_logger
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
-SRE_DRIVE_ID = os.environ.get("SRE_DRIVE_ID")
-SRE_INCIDENT_FOLDER = os.environ.get("SRE_INCIDENT_FOLDER")
-START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
-END_HEADING = "Trigger"
+SRE_DRIVE_ID = settings.feat_incident.SRE_DRIVE_ID
+SRE_INCIDENT_FOLDER = settings.feat_incident.SRE_INCIDENT_FOLDER
 VALID_STATUS = [
     "In Progress",
     "Open",
@@ -33,6 +31,7 @@ VALID_STATUS = [
     "Closed",
 ]
 
+logger = get_module_logger()
 
 help_text = """
 \n `/sre incident`
@@ -103,10 +102,17 @@ def register(bot: App):
 
 
 def handle_incident_command(
-    args, client: WebClient, body, respond: Respond, ack: Ack, logger
+    args,
+    client: WebClient,
+    body,
+    respond: Respond,
+    ack: Ack,
 ):
     """Handle the /sre incident command."""
-
+    logger.info(
+        "sre_incident_command_received",
+        args=args,
+    )
     # If no arguments are provided, open the update status view
     if len(args) == 0:
         information_display.open_incident_info_view(client, body, respond)
@@ -116,8 +122,11 @@ def handle_incident_command(
         case "create-folder":
             name = " ".join(args)
             folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
-            if folder:
-                respond(f"Folder `{folder['name']}` created.")
+            folder_name = None
+            if isinstance(folder, dict):
+                folder_name = folder.get("name", None)
+            if folder_name:
+                respond(f"Folder `{folder_name}` created.")
             else:
                 respond(f"Failed to create folder `{name}`.")
         case "help":
@@ -127,14 +136,13 @@ def handle_incident_command(
         case "roles":
             incident_roles.manage_roles(client, body, ack, respond)
         case "close":
-            close_incident(client, logger, body, ack, respond)
+            close_incident(client, body, ack, respond)
         case "stale":
             stale_incidents(client, body, ack)
         case "schedule":
-            schedule_retro.open_incident_retro_modal(client, body, ack, logger)
-            # retro.schedule_incident_retro(client, body, ack, logger)
+            schedule_retro.open_incident_retro_modal(client, body, ack)
         case "status":
-            handle_update_status_command(client, logger, body, respond, ack, args)
+            handle_update_status_command(client, body, respond, ack, args)
         case "add_summary":
             open_updates_dialog(client, body, ack)
         case "summary":
@@ -145,7 +153,7 @@ def handle_incident_command(
             )
 
 
-def close_incident(client: WebClient, logger, body, ack, respond):
+def close_incident(client: WebClient, body, ack, respond):
     ack()
     # get the current chanel id and name
     channel_id = body["channel_id"]
@@ -162,7 +170,9 @@ def close_incident(client: WebClient, logger, body, ack, respond):
         if channel_info is None or not channel_info.get("is_member", False):
             client.conversations_join(channel=channel_id)
     except Exception as e:
-        logging.error("Failed to join the channel %s: %s", channel_id, e)
+        logger.exception(
+            "client_conversations_error", channel_id=channel_id, error=str(e)
+        )
         return
 
     if not channel_name.startswith("incident-"):
@@ -173,15 +183,17 @@ def close_incident(client: WebClient, logger, body, ack, respond):
                 user=user_id,
             )
         except Exception as e:
-            logging.error(
-                "Could not post ephemeral message to user %s due to %s.", user_id, e
+            logger.exception(
+                "client_post_ephemeral_error",
+                channel_id=channel_id,
+                user_id=user_id,
+                error=str(e),
             )
         return
 
     incident_status.update_status(
         client,
         respond,
-        logger,
         "Closed",
         channel_id,
         channel_name,
@@ -196,22 +208,33 @@ def close_incident(client: WebClient, logger, body, ack, respond):
             text=f"<@{user_id}> has archived this channel 👋",
         )
     except Exception as e:
-        logging.error(
-            "Could not post message to channel %s due to error: %s.", channel_name, e
+        logger.exception(
+            "client_post_message_error",
+            channel_id=channel_id,
+            user_id=user_id,
+            error=str(e),
         )
 
     # archive the channel
     try:
         client.conversations_archive(channel=channel_id)
-        logging.info(
-            "Channel %s has been archived by %s", channel_name, f"<@{user_id}>"
+        logger.info(
+            "incident_channel_archived",
+            channel_id=channel_id,
+            channel_name=channel_name,
+            user_id=user_id,
         )
         log_to_sentinel("incident_channel_archived", body)
     except Exception as e:
+        logger.exception(
+            "client_conversations_archive_error",
+            channel_id=channel_id,
+            user_id=user_id,
+            error=str(e),
+        )
         error_message = (
             f"Could not archive the channel {channel_name} due to error: {e}"
         )
-        logging.error(error_message)
         respond(error_message)
 
 
@@ -285,7 +308,7 @@ def channel_item(channel):
 
 
 def handle_update_status_command(
-    client: WebClient, logger, body, respond: Respond, ack: Ack, args
+    client: WebClient, body, respond: Respond, ack: Ack, args
 ):
     ack()
     status = str.join(" ", args)
@@ -316,7 +339,6 @@ def handle_update_status_command(
         incident_status.update_status(
             client,
             respond,
-            logger,
             status,
             body["channel_id"],
             body["channel_name"],

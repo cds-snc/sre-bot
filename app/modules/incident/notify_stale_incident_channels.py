@@ -1,13 +1,16 @@
-import logging
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import channels as slack_channels
 from modules.incident.incident_helper import INCIDENT_CHANNELS_PATTERN
 
-logging.basicConfig(level=logging.INFO)
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def notify_stale_incident_channels(client):
-    logging.info("Checking for stale incident channels")
+    logger.info(
+        "notify_stale_incident_channels_started",
+    )
     channels = slack_channels.get_stale_channels(
         client, pattern=INCIDENT_CHANNELS_PATTERN
     )

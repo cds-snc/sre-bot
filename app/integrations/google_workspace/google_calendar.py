@@ -47,7 +47,7 @@ def get_freebusy(time_min, time_max, items, **kwargs):
 
 
 @handle_google_api_errors
-def insert_event(start, end, emails, title, incident_document, **kwargs):
+def insert_event(start, end, emails, title, incident_document, **kwargs) -> dict:
     """Creates a new event in the specified calendars.
 
     Args:
@@ -60,7 +60,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs):
         https://developers.google.com/calendar/v3/reference/events/insert
 
     Returns:
-        str: The link to the created event.
+        dict: A dictionary containing the event link and a message indicating when the event has been scheduled.
     """
     time_zone = kwargs.get("time_zone", "America/New_York")
     body = {

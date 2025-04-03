@@ -88,9 +88,7 @@ def test_sre_command_with_incident_argument(command_runner, logger_mock):
         clientMock,
         body,
     )
-    command_runner.assert_called_once_with(
-        [], clientMock, body, respond, ack, logger_mock
-    )
+    command_runner.assert_called_once_with([], clientMock, body, respond, ack)
 
 
 @patch("modules.sre.webhook_helper.handle_webhook_command")

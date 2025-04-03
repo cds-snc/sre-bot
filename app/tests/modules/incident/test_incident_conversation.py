@@ -24,14 +24,13 @@ def test_is_floppy_disk_false():
 def test_is_incident_channel_false():
     # Test case where the channel name does not contain 'incident'
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
     client.conversations_info.return_value = {
         "ok": True,
         "channel": {"name": "general", "is_archived": False, "is_member": False},
     }
     client.conversations_join.return_value = {"ok": True}
-    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+    assert incident_conversation.is_incident_channel(client, channel_id) == (
         False,
         False,
     )
@@ -42,14 +41,13 @@ def test_is_incident_channel_false():
 def test_is_incident_channel_true_archived_not_member():
     # Test case where the channel name contains 'incident'
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
     client.conversations_info.return_value = {
         "ok": True,
         "channel": {"name": "incident-123", "is_archived": True, "is_member": False},
     }
 
-    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+    assert incident_conversation.is_incident_channel(client, channel_id) == (
         True,
         False,
     )
@@ -60,14 +58,13 @@ def test_is_incident_channel_true_archived_not_member():
 def test_is_incident_channel_true_not_archived_member():
     # Test case where the channel name contains 'incident'
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
     client.conversations_info.return_value = {
         "ok": True,
         "channel": {"name": "incident-123", "is_archived": False, "is_member": True},
     }
 
-    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+    assert incident_conversation.is_incident_channel(client, channel_id) == (
         True,
         False,
     )
@@ -75,30 +72,80 @@ def test_is_incident_channel_true_not_archived_member():
     client.conversations_join.assert_not_called()
 
 
-def test_is_incident_channel_raises_slack_api_error():
+@patch("modules.incident.incident_conversation.logger")
+def test_is_incident_channel_raises_slack_api_error(mock_logger):
     # Test case where the Slack API call raises an exception
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
-    client.conversations_info.side_effect = SlackApiError(
-        message="error", response={"ok": False, "error": "error"}
+
+    # Test 1: Error when getting channel info
+    channel_info_error = SlackApiError(
+        message="channel_info_error",
+        response={"ok": False, "error": "channel_info_error"},
     )
+    client.conversations_info.side_effect = channel_info_error
 
     with pytest.raises(SlackApiError):
-        assert incident_conversation.is_incident_channel(
-            client, logger, channel_id
-        ) == (
-            False,
-            False,
-        )
+        incident_conversation.is_incident_channel(client, channel_id)
+
     client.conversations_info.assert_called_once_with(channel=channel_id)
     client.conversations_join.assert_not_called()
+    mock_logger.error.assert_called_once_with(
+        "incident_channel_info_error",
+        channel=channel_id,
+        error=str(channel_info_error),
+    )
+
+    # Reset mocks for next test
+    mock_logger.reset_mock()
+    client.reset_mock()
+
+    # Test 2: Error when channel info returns not OK
+    client.conversations_info.side_effect = None
+    client.conversations_info.return_value = {"ok": False}
+
+    with pytest.raises(SlackApiError):
+        incident_conversation.is_incident_channel(client, channel_id)
+
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_not_called()
+    mock_logger.error.assert_called_once_with(
+        "incident_channel_info_error",
+        channel=channel_id,
+        error=str(SlackApiError("Error getting the channel info", {"ok": False})),
+    )
+
+    # Reset mocks for next test
+    mock_logger.reset_mock()
+    client.reset_mock()
+
+    # Test 3: Error when joining channel
+    client.conversations_info.return_value = {
+        "ok": True,
+        "channel": {"name": "incident-123", "is_archived": False, "is_member": False},
+    }
+    join_channel_error = SlackApiError(
+        message="join_channel_error",
+        response={"ok": False, "error": "join_channel_error"},
+    )
+    client.conversations_join.return_value = {"ok": False}
+    client.conversations_join.side_effect = join_channel_error
+
+    with pytest.raises(SlackApiError):
+        incident_conversation.is_incident_channel(client, channel_id)
+
+    client.conversations_info.assert_called_once_with(channel=channel_id)
+    client.conversations_join.assert_called_once_with(channel=channel_id)
+    mock_logger.error.assert_called_once_with(
+        "incident_channel_info_error",
+        channel=channel_id,
+        error=str(join_channel_error),
+    )
 
 
 def test_is_incident_channel_true_not_archived_not_member():
     # Test case where the channel name contains 'incident'
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
     client.conversations_info.return_value = {
         "ok": True,
@@ -106,7 +153,7 @@ def test_is_incident_channel_true_not_archived_not_member():
     }
 
     client.conversations_join.return_value = {"ok": True}
-    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+    assert incident_conversation.is_incident_channel(client, channel_id) == (
         True,
         False,
     )
@@ -117,7 +164,6 @@ def test_is_incident_channel_true_not_archived_not_member():
 def test_is_incident_dev_channel_true():
     # Test case where the channel name contains 'incident-dev'
     client = MagicMock()
-    logger = MagicMock()
     channel_id = "C123456"
     client.conversations_info.return_value = {
         "ok": True,
@@ -125,7 +171,7 @@ def test_is_incident_dev_channel_true():
     }
     client.conversations_join.return_value = {"ok": True}
 
-    assert incident_conversation.is_incident_channel(client, logger, channel_id) == (
+    assert incident_conversation.is_incident_channel(client, channel_id) == (
         True,
         True,
     )
@@ -354,9 +400,9 @@ def test_handle_images_in_message_empty_text():
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
-def test_get_incident_document_id_found(mock_extract):
+@patch("modules.incident.incident_conversation.logger")
+def test_get_incident_document_id_found(mock_logger, mock_extract):
     client = MagicMock()
-    logger = MagicMock()
     client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -366,20 +412,18 @@ def test_get_incident_document_id_found(mock_extract):
             }
         ],
     }
-    document_id = incident_conversation.get_incident_document_id(
-        client, "channel_id", logger
-    )
+    document_id = incident_conversation.get_incident_document_id(client, "channel_id")
     assert document_id == "dummy_document_id"
-    logger.error.assert_not_called()
+    mock_logger.error.assert_not_called()
 
 
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="",
 )
-def test_get_incident_document_id_not_found(mock_extract):
+@patch("modules.incident.incident_conversation.logger")
+def test_get_incident_document_id_not_found(mock_logger, mock_extract):
     client = MagicMock()
-    logger = MagicMock()
     client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -390,21 +434,19 @@ def test_get_incident_document_id_not_found(mock_extract):
         ],
     }
 
-    document_id = incident_conversation.get_incident_document_id(
-        client, "channel_id", logger
-    )
+    document_id = incident_conversation.get_incident_document_id(client, "channel_id")
     assert document_id == ""
     mock_extract.assert_not_called()
-    logger.error.assert_not_called()
+    mock_logger.error.assert_not_called()
 
 
 @patch(
     "integrations.google_workspace.google_docs.extract_google_doc_id",
     return_value="",
 )
-def test_get_incident_document_id_extraction_fails(mock_extract):
+@patch("modules.incident.incident_conversation.logger")
+def test_get_incident_document_id_extraction_fails(mock_logger, mock_extract):
     client = MagicMock()
-    logger = MagicMock()
     client.bookmarks_list.return_value = {
         "ok": True,
         "bookmarks": [
@@ -415,28 +457,33 @@ def test_get_incident_document_id_extraction_fails(mock_extract):
         ],
     }
 
-    document_id = incident_conversation.get_incident_document_id(
-        client, "channel_id", logger
-    )
+    document_id = incident_conversation.get_incident_document_id(client, "channel_id")
     assert document_id == ""
     mock_extract.assert_called_once_with("https://docs.google.com/document/d/12345")
-    logger.error.assert_called_once_with("No incident document found for this channel.")
+    mock_logger.error.assert_called_once_with(
+        "incident_document_bookmark_not_found",
+        channel="channel_id",
+        error="No bookmark link for the incident document found",
+    )
 
 
-def test_get_incident_document_id_api_fails():
+@patch("modules.incident.incident_conversation.logger")
+def test_get_incident_document_id_api_fails(mock_logger):
     client = MagicMock()
-    logger = MagicMock()
     client.bookmarks_list.return_value = {"ok": False}
 
     document_id = incident_conversation.get_incident_document_id(
-        client, "channel_id", logger
+        client,
+        "channel_id",
     )
     assert document_id == ""
-    logger.error.assert_not_called()
+    mock_logger.error.assert_not_called()
 
 
-def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(
+    mock_logger,
+):
     mock_client = MagicMock()
 
     # Set up mock client and body to simulate the scenario
@@ -467,15 +514,16 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Assert the correct API calls were made
     mock_client.conversations_info.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
 
 
-def test_handle_reaction_added_non_incident_channel():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_non_incident_channel(mock_logger):
+
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "general"}}
 
@@ -486,14 +534,16 @@ def test_handle_reaction_added_non_incident_channel():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Assert that certain actions are not performed for a non-incident channel
     mock_client.conversations_history.assert_not_called()
 
 
-def test_handle_reaction_added_empty_message_list():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_empty_message_list(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {"messages": []}
@@ -505,14 +555,16 @@ def test_handle_reaction_added_empty_message_list():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Assert that the function tries to fetch replies when the message list is empty
     mock_client.conversations_replies.assert_not_called()
 
 
-def test_handle_reaction_added_message_in_thread():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_message_in_thread(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_history.return_value = {
         "ok": True,
@@ -538,14 +590,17 @@ def test_handle_reaction_added_message_in_thread():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Assert that the function doe
     mock_client.conversations_replies.assert_called_once()
 
 
-def test_handle_reaction_added_message_in_thread_return_top_message():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_message_in_thread_return_top_message(
+    mock_logger,
+):
+
     mock_client = MagicMock()
     mock_client.conversations_history.return_value = {
         "ok": True,
@@ -577,14 +632,16 @@ def test_handle_reaction_added_message_in_thread_return_top_message():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Assert that the function doe
     mock_client.conversations_replies.assert_called_once()
 
 
-def test_handle_reaction_added_incident_report_document_not_found():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_incident_report_document_not_found(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     # Simulate no incident report document found
@@ -597,11 +654,12 @@ def test_handle_reaction_added_incident_report_document_not_found():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     mock_client.users_profile_get.assert_not_called()
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.replace_text_between_headings")
 @patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
@@ -621,8 +679,8 @@ def test_handle_reaction_added_processes_messages(
     mock_slack_users,
     mock_rearrange_by_datetime_ascending,
     mock_replace_text_between_headings,
+    mock_logger,
 ):
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_return_messages.return_value = {
@@ -642,7 +700,7 @@ def test_handle_reaction_added_processes_messages(
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
     mock_return_messages.assert_called_once()
     mock_get_incident_document_id.assert_called_once()
     mock_handle_forwarded_messages.assert_called_once()
@@ -654,8 +712,10 @@ def test_handle_reaction_added_processes_messages(
     mock_replace_text_between_headings.assert_called_once()
 
 
-def test_handle_reaction_added_adding_new_message_to_timeline():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_adding_new_message_to_timeline(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
@@ -677,7 +737,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
     mock_client.conversations_history.assert_called_once()
@@ -685,8 +745,10 @@ def test_handle_reaction_added_adding_new_message_to_timeline():
     mock_client.users_profile_get.assert_called_once()
 
 
-def test_handle_reaction_added_adding_new_message_to_timeline_user_handle():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_adding_new_message_to_timeline_user_handle(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
@@ -708,7 +770,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline_user_handle():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
     mock_client.conversations_history.assert_called_once()
@@ -716,8 +778,10 @@ def test_handle_reaction_added_adding_new_message_to_timeline_user_handle():
     mock_client.users_profile_get.assert_called_once()
 
 
-def test_handle_reaction_added_returns_link():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_returns_link(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
@@ -756,7 +820,7 @@ def test_handle_reaction_added_returns_link():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
     mock_client.conversations_info.assert_called_once()
@@ -766,8 +830,10 @@ def test_handle_reaction_added_returns_link():
     mock_client.chat_getPermalink.assert_called_once()
 
 
-def test_handle_reaction_added_forwarded_message():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_added_forwarded_message(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
@@ -791,7 +857,7 @@ def test_handle_reaction_added_forwarded_message():
         }
     }
 
-    incident_conversation.handle_reaction_added(mock_client, lambda: None, body, logger)
+    incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
     mock_client.conversations_history.assert_called_once()
@@ -799,9 +865,11 @@ def test_handle_reaction_added_forwarded_message():
     mock_client.users_profile_get.assert_called_once()
 
 
-def test_handle_reaction_removed_successful_message_removal():
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_removed_successful_message_removal(
+    mock_logger,
+):
     # Mock the client and logger
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.users_profile_get.return_value = {
@@ -833,17 +901,15 @@ def test_handle_reaction_removed_successful_message_removal():
         ],
     }
 
-    incident_conversation.handle_reaction_removed(
-        mock_client, lambda: None, body, logger
-    )
+    incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
     mock_client.conversations_history.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
 
 
-def test_handle_reaction_removed_successful_message_removal_user_id():
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_removed_successful_message_removal_user_id(mock_logger):
     # Mock the client and logger
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.users_profile_get.return_value = {
@@ -875,16 +941,16 @@ def test_handle_reaction_removed_successful_message_removal_user_id():
         ],
     }
 
-    incident_conversation.handle_reaction_removed(
-        mock_client, lambda: None, body, logger
-    )
+    incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
     mock_client.conversations_history.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
 
 
-def test_handle_reaction_removed_message_not_in_timeline():
-    logger = MagicMock()
+@patch("modules.incident.incident_conversation.logger")
+def test_handle_reaction_removed_message_not_in_timeline(
+    mock_logger,
+):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_history.return_value = {
@@ -906,13 +972,12 @@ def test_handle_reaction_removed_message_not_in_timeline():
     }
 
     assert (
-        incident_conversation.handle_reaction_removed(
-            mock_client, lambda: None, body, logger
-        )
+        incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
         is None
     )
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.replace_text_between_headings")
 @patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
@@ -932,8 +997,8 @@ def test_handle_reaction_removed_processes_messages(
     mock_slack_users,
     mock_rearrange_by_datetime_ascending,
     mock_replace_text_between_headings,
+    mock_logger,
 ):
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
 
@@ -971,9 +1036,7 @@ def test_handle_reaction_removed_processes_messages(
     mock_slack_users.replace_user_id_with_handle.return_value = "Original message text"
 
     assert (
-        incident_conversation.handle_reaction_removed(
-            mock_client, lambda: None, body, logger
-        )
+        incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
         is None
     )
     mock_return_messages.assert_called_once()
@@ -987,9 +1050,9 @@ def test_handle_reaction_removed_processes_messages(
     mock_replace_text_between_headings.assert_called_once()
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.return_messages")
-def test_handle_reaction_removed_no_messages(mock_return_messages):
-    logger = MagicMock()
+def test_handle_reaction_removed_no_messages(mock_return_messages, mock_logger):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
 
@@ -1004,15 +1067,18 @@ def test_handle_reaction_removed_no_messages(mock_return_messages):
     }
 
     assert (
-        incident_conversation.handle_reaction_removed(
-            mock_client, lambda: None, body, logger
-        )
+        incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
         is None
     )
     mock_return_messages.assert_called_once()
-    logger.warning.assert_called_once_with("No messages found")
+    mock_logger.warning.assert_called_once_with(
+        "handle_reaction_removed_no_messages",
+        channel="incident-123",
+        error="No messages found",
+    )
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.return_messages")
 @patch("modules.incident.incident_conversation.get_timeline_section")
 @patch("modules.incident.incident_conversation.get_incident_document_id")
@@ -1028,8 +1094,8 @@ def test_handle_reaction_removed_message_not_found(
     mock_get_incident_document_id,
     mock_get_timeline_section,
     mock_return_messages,
+    mock_logger,
 ):
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
@@ -1055,12 +1121,14 @@ def test_handle_reaction_removed_message_not_found(
         }
     }
 
-    incident_conversation.handle_reaction_removed(
-        mock_client, lambda: None, body, logger
-    )
+    incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
 
     mock_return_messages.assert_called_once()
-    logger.warning.assert_called_once_with("Message not found in the timeline")
+    mock_logger.warning.assert_called_once_with(
+        "handle_reaction_removed_message_not_found",
+        channel="incident-123",
+        error="Message not found in the timeline",
+    )
 
 
 def test_handle_reaction_removed_non_incident_channel_reaction_removal():
@@ -1074,7 +1142,6 @@ def test_handle_reaction_removed_non_incident_channel_reaction_removal():
 
 
 def test_handle_reaction_removed_empty_message_list_handling():
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_history.return_value = {"messages": []}
     body = {
@@ -1084,15 +1151,12 @@ def test_handle_reaction_removed_empty_message_list_handling():
         }
     }
     assert (
-        incident_conversation.handle_reaction_removed(
-            mock_client, lambda: None, body, logger
-        )
+        incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
         is None
     )
 
 
 def test_handle_reaction_removed_forwarded_message():
-    logger = MagicMock()
     mock_client = MagicMock()
     mock_client.conversations_history.return_value = {
         "attachments": [{"fallback": "This is a forwarded message"}],
@@ -1108,16 +1172,17 @@ def test_handle_reaction_removed_forwarded_message():
         }
     }
     assert (
-        incident_conversation.handle_reaction_removed(
-            mock_client, lambda: None, body, logger
-        )
+        incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
         is None
     )
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.incident_helper")
 @patch("modules.incident.incident_conversation.log_to_sentinel")
-def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helper):
+def test_archive_channel_action_ignore(
+    mock_log_to_sentinel, mock_incident_helper, mock_logger
+):
     client = MagicMock()
     body = {
         "actions": [{"value": "ignore"}],
@@ -1127,8 +1192,7 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helpe
     }
     ack = MagicMock()
     respond = MagicMock()
-    logger = MagicMock()
-    incident_conversation.archive_channel_action(client, logger, body, ack, respond)
+    incident_conversation.archive_channel_action(client, body, ack, respond)
     ack.assert_called_once()
     client.chat_update.assert_called_once_with(
         channel="channel_id",
@@ -1141,14 +1205,16 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helpe
     )
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.incident_helper")
 @patch("modules.incident.incident_conversation.log_to_sentinel")
 def test_archive_channel_action_archive(
     mock_log_to_sentinel,
     mock_incident_helper,
+    mock_logger,
 ):
     client = MagicMock()
-    logger = MagicMock()
+
     body = {
         "actions": [{"value": "archive"}],
         "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
@@ -1162,19 +1228,22 @@ def test_archive_channel_action_archive(
     }
     ack = MagicMock()
     respond = MagicMock()
-    incident_conversation.archive_channel_action(client, logger, body, ack, respond)
+    incident_conversation.archive_channel_action(client, body, ack, respond)
     assert ack.call_count == 1
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
     mock_incident_helper.close_incident.assert_called_once_with(
-        client, logger, channel_info, ack, respond
+        client, channel_info, ack, respond
     )
 
 
+@patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.schedule_retro")
 @patch("modules.incident.incident_conversation.log_to_sentinel")
-def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_schedule):
+def test_archive_channel_action_schedule_incident(
+    mock_log_to_sentinel, mock_schedule, mock_logger
+):
     client = MagicMock()
-    logger = MagicMock()
+
     body = {
         "actions": [{"value": "schedule_retro"}],
         "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
@@ -1189,9 +1258,9 @@ def test_archive_channel_action_schedule_incident(mock_log_to_sentinel, mock_sch
         "trigger_id": "trigger_id",
     }
     ack = MagicMock()
-    incident_conversation.archive_channel_action(client, logger, body, ack, MagicMock())
+    incident_conversation.archive_channel_action(client, body, ack, MagicMock())
     assert ack.call_count == 1
     mock_schedule.open_incident_retro_modal.assert_called_once_with(
-        client, channel_info, ack, logger
+        client, channel_info, ack
     )
     mock_log_to_sentinel.assert_called_once_with("incident_retro_scheduled", body)

@@ -12,9 +12,13 @@ from modules.incident.incident_document import (
     replace_text_between_headings,
 )
 from modules.incident import incident_helper, schedule_retro
+from core.logging import get_module_logger
+
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+
+logger = get_module_logger()
 
 
 # Make sure that we are listening only on floppy disk reaction
@@ -28,7 +32,7 @@ def just_ack_the_rest_of_reaction_events():
 
 
 def is_incident_channel(
-    client: WebClient, logger, channel_id: str, notify: bool = True
+    client: WebClient, channel_id: str, notify: bool = True
 ) -> tuple[bool, bool]:
     """Check if the channel is an incident channel."""
     is_incident = False
@@ -49,7 +53,11 @@ def is_incident_channel(
         else:
             raise SlackApiError("Error getting the channel info", channel_info)
     except SlackApiError as e:
-        logger.error(f"Error with client request: {e}")
+        logger.error(
+            "incident_channel_info_error",
+            channel=channel_id,
+            error=str(e),
+        )
         raise e
     if notify and not is_incident:
         client.chat_postMessage(
@@ -172,7 +180,7 @@ def handle_images_in_message(message):
     return message
 
 
-def get_incident_document_id(client, channel_id, logger):
+def get_incident_document_id(client, channel_id):
     """
     Retrieve the incident report document ID from the incident channel.
 
@@ -183,7 +191,6 @@ def get_incident_document_id(client, channel_id, logger):
     Parameters:
     - client: The client instance used to interact with the API.
     - channel_id: The ID of the channel to fetch bookmarks from.
-    - logger: The logger instance used for logging error messages.
 
     Returns:
     - document_id: The ID of the Google Docs incident report document, or an
@@ -198,11 +205,15 @@ def get_incident_document_id(client, channel_id, logger):
                     response["bookmarks"][item]["link"]
                 )
                 if document_id == "":
-                    logger.error("No incident document found for this channel.")
+                    logger.error(
+                        "incident_document_bookmark_not_found",
+                        channel=channel_id,
+                        error="No bookmark link for the incident document found",
+                    )
     return document_id
 
 
-def handle_reaction_added(client, ack, body, logger):
+def handle_reaction_added(client, ack, body):
     ack()
     # get the channel in which the reaction was used
     channel_id = body["event"]["item"]["channel"]
@@ -217,7 +228,7 @@ def handle_reaction_added(client, ack, body, logger):
             messages = return_messages(client, body, channel_id)
 
             # get the incident report document id from the incident channel
-            document_id = get_incident_document_id(client, channel_id, logger)
+            document_id = get_incident_document_id(client, channel_id)
 
             for message in messages:
                 # get the forwarded message and get the attachments appending the forwarded message to the original message
@@ -265,11 +276,15 @@ def handle_reaction_added(client, ack, body, logger):
                         document_id, sorted_content, START_HEADING, END_HEADING
                     )
         except Exception as e:
-            logger.error(e)
+            logger.error(
+                "incident_document_update_failed",
+                channel=channel_name,
+                error=str(e),
+            )
 
 
 # Execute this function when a reaction was removed
-def handle_reaction_removed(client, ack, body, logger):
+def handle_reaction_removed(client, ack, body):
     ack()
     # get the channel id
     channel_id = body["event"]["item"]["channel"]
@@ -283,7 +298,11 @@ def handle_reaction_removed(client, ack, body, logger):
             messages = return_messages(client, body, channel_id)
 
             if not messages:
-                logger.warning("No messages found")
+                logger.warning(
+                    "handle_reaction_removed_no_messages",
+                    channel=channel_name,
+                    error="No messages found",
+                )
                 return
             # get the message we want to delete
             message = messages[0]
@@ -303,7 +322,7 @@ def handle_reaction_removed(client, ack, body, logger):
             user_full_name = user["profile"]["real_name"]
 
             # get the incident report document id from the incident channel
-            document_id = get_incident_document_id(client, channel_id, logger)
+            document_id = get_incident_document_id(client, channel_id)
 
             # get the current content from the document
             content = get_timeline_section(document_id)
@@ -329,17 +348,25 @@ def handle_reaction_removed(client, ack, body, logger):
                 content = content.replace(message_to_remove, "\n")
 
                 # Update the timeline content
-                result = replace_text_between_headings(
+                replace_text_between_headings(
                     document_id,
                     content,
                     START_HEADING,
                     END_HEADING,
                 )
             else:
-                logger.warning("Message not found in the timeline")
+                logger.warning(
+                    "handle_reaction_removed_message_not_found",
+                    channel=channel_name,
+                    error="Message not found in the timeline",
+                )
                 return
         except Exception as e:
-            logger.error(e)
+            logger.error(
+                "incident_document_update_failed",
+                channel=channel_name,
+                error=str(e),
+            )
 
 
 # Function to return the messages from the conversation
@@ -372,7 +399,7 @@ def return_messages(client, body, channel_id):
     return messages
 
 
-def archive_channel_action(client: WebClient, logger, body, ack, respond):
+def archive_channel_action(client: WebClient, body, ack, respond):
     ack()
     channel_id = body["channel"]["id"]
     action = body["actions"][0]["value"]
@@ -396,11 +423,11 @@ def archive_channel_action(client: WebClient, logger, body, ack, respond):
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        incident_helper.close_incident(client, logger, channel_info, ack, respond)
+        incident_helper.close_incident(client, channel_info, ack, respond)
         # log the event to sentinel
         log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
         channel_info["trigger_id"] = body["trigger_id"]
-        schedule_retro.open_incident_retro_modal(client, channel_info, ack, logger)
+        schedule_retro.open_incident_retro_modal(client, channel_info, ack)
         # log the event to sentinel
         log_to_sentinel("incident_retro_scheduled", body)
