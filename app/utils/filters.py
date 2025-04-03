@@ -1,13 +1,14 @@
 """This module contains utility functions for filtering lists and dictionaries."""
 
-from functools import reduce
-import logging
 import re
+from functools import reduce
 
-logger = logging.getLogger(__name__)
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
-def filter_by_condition(list, condition):
+def filter_by_condition(item_list, condition):
     """Filter a list by a condition, keeping only the items that satisfy the condition.
         Examples:
 
@@ -21,7 +22,7 @@ def filter_by_condition(list, condition):
     Returns:
         list: A list containing the items that satisfy the condition.
     """
-    return [item for item in list if condition(item)]
+    return [item for item in item_list if condition(item)]
 
 
 def get_nested_value(dictionary, key):
@@ -39,7 +40,7 @@ def get_nested_value(dictionary, key):
     try:
         return reduce(dict.get, key.split("."), dictionary)
     except TypeError:
-        logger.error(f"Error getting nested value for key: {key}")
+        logger.exception("error_getting_nested_value", key=key, dictionary=dictionary)
         return None
 
 
@@ -123,7 +124,7 @@ def get_unique_nested_dicts(source_items, nested_key):
     """
     unique_dicts = {}
     if isinstance(source_items, list):
-        logger.info(f"Getting unique dictionaries from {len(source_items)} items.")
+        logger.info("getting_unique_dictionaries_from_list", source_items=source_items)
         for item in source_items:
             for nested_dict in get_nested_value(item, nested_key):
                 if nested_dict:
@@ -133,7 +134,9 @@ def get_unique_nested_dicts(source_items, nested_key):
         for nested_dict in get_nested_value(source_items, nested_key):
             if nested_dict:
                 unique_dicts[str(nested_dict)] = nested_dict
-    logger.info(f"Found {len(unique_dicts)} unique dictionaries.")
+    logger.info(
+        "unique_dictionaries_found", count=len(unique_dicts), source_items=source_items
+    )
     return list(unique_dicts.values())
 
 
