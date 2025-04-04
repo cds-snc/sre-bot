@@ -1,10 +1,12 @@
 from unittest.mock import Mock, patch
 import pytest
-from fastapi import Request
+import httpx
+from fastapi import Request, FastAPI
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from api.dependencies import rate_limits
+from api.routes.system import router as system_router
 
 
 def test_header_exists_and_not_empty():
@@ -69,3 +71,24 @@ async def test_rate_limit_handler():
 
     # Assert the content of the response
     assert response.body.decode("utf-8") == '{"message":"Rate limit exceeded"}'
+
+
+@pytest.mark.asyncio
+async def test_system_endpoint_rate_limiting():
+    """Integration Test to ensure the rate limiting is enforced on the system endpoint, using the /version route as an example."""
+    app = FastAPI()
+    rate_limits.setup_rate_limiter(app)
+    app.include_router(system_router)
+
+    transport = httpx.ASGITransport(app=app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # Make requests up to the limit
+        for _ in range(50):
+            response = await client.get("/version")
+            assert response.status_code == 200
+
+        # Verify rate limit is enforced
+        response = await client.get("/version")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
