@@ -1,4 +1,3 @@
-import os
 from functools import partial
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_bolt import App
@@ -32,7 +31,6 @@ def main(bot):
         "application_startup",
     )
     list_configs()
-    logger.info("environment_checked", config_keys=list(os.environ.keys()))
 
     APP_TOKEN = settings.slack.APP_TOKEN
     PREFIX = settings.PREFIX
