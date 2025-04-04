@@ -25,81 +25,82 @@ def test_validate_sns_payload_validates_model(
     assert response == payload
 
 
+@patch("server.event_handlers.aws.logger")
 @patch("server.event_handlers.aws.log_ops_message")
 def test_validate_sns_payload_invalid_message_type(
     log_ops_message_mock,
-    caplog,
+    logger_mock,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
     payload.Type = "InvalidType"
 
-    with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as e:
-            aws.validate_sns_payload(payload, client)
-        assert e.value.status_code == 500
+    with pytest.raises(HTTPException) as e:
+        aws.validate_sns_payload(payload, client)
+    assert e.value.status_code == 500
 
-        assert (
-            caplog.records[0].message
-            == "Failed to parse AWS event message due to InvalidMessageTypeException: InvalidType is not a valid message type."
-        )
-        assert log_ops_message_mock.call_count == 1
-        assert (
-            log_ops_message_mock.call_args[0][1]
-            == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
-        )
-        caplog.clear()
+    logger_mock.exception.assert_called_once_with(
+        "aws_sns_payload_validation_error",
+        error="InvalidType is not a valid message type.",
+    )
+    assert log_ops_message_mock.call_count == 1
+    assert (
+        log_ops_message_mock.call_args[0][1]
+        == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
+    )
 
 
+@patch("server.event_handlers.aws.logger")
 @patch("server.event_handlers.aws.log_ops_message")
-def test_validate_sns_payload_invalid_signature_version(log_ops_message_mock, caplog):
+def test_validate_sns_payload_invalid_signature_version(
+    log_ops_message_mock, logger_mock
+):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
     payload.Type = "Notification"
     payload.SignatureVersion = "InvalidVersion"
 
-    with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as e:
-            aws.validate_sns_payload(payload, client)
-        assert e.value.status_code == 500
+    with pytest.raises(HTTPException) as e:
+        aws.validate_sns_payload(payload, client)
+    assert e.value.status_code == 500
 
-        assert (
-            caplog.records[0].message
-            == "Failed to parse AWS event message due to InvalidSignatureVersionException: Invalid signature version. Unable to verify signature."
-        )
-        log_ops_message_mock.assert_called_once_with(
-            client,
-            f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
-        )
-        caplog.clear()
+    logger_mock.exception.assert_called_once_with(
+        "aws_sns_payload_validation_error",
+        error="Invalid signature version. Unable to verify signature.",
+    )
+    log_ops_message_mock.assert_called_once_with(
+        client,
+        f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
+    )
 
 
+@patch("server.event_handlers.aws.logger")
 @patch("server.event_handlers.aws.log_ops_message")
-def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, caplog):
+def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, logger_mock):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
     payload.Type = "Notification"
     payload.SignatureVersion = "1"
     payload.SigningCertURL = "https://invalid.url"
-    with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as e:
-            aws.validate_sns_payload(payload, client)
-        assert e.value.status_code == 500
 
-        assert (
-            caplog.records[0].message
-            == "Failed to parse AWS event message due to InvalidCertURLException: Invalid certificate URL."
-        )
-        log_ops_message_mock.assert_called_once_with(
-            client,
-            f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
-        )
+    with pytest.raises(HTTPException) as e:
+        aws.validate_sns_payload(payload, client)
+    assert e.value.status_code == 500
+    logger_mock.exception.assert_called_once_with(
+        "aws_sns_payload_validation_error",
+        error="Invalid certificate URL.",
+    )
+    log_ops_message_mock.assert_called_once_with(
+        client,
+        f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
+    )
 
 
+@patch("server.event_handlers.aws.logger")
 @patch("server.event_handlers.aws.sns_message_validator._verify_signature")
 @patch("server.event_handlers.aws.log_ops_message")
 def test_validate_sns_payload_signature_verification_failure(
-    log_ops_message_mock, verify_signature_mock, caplog
+    log_ops_message_mock, verify_signature_mock, logger_mock
 ):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
@@ -113,30 +114,25 @@ def test_validate_sns_payload_signature_verification_failure(
         "Invalid signature."
     )
 
-    with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as e:
-            aws.validate_sns_payload(payload, client)
-        assert e.value.status_code == 500
+    with pytest.raises(HTTPException) as e:
+        aws.validate_sns_payload(payload, client)
+    assert e.value.status_code == 500
 
-        # Print the actual log messages captured
-        print("Captured log messages:")
-        for record in caplog.records:
-            print(record.message)
-
-        assert (
-            caplog.records[0].message
-            == "Failed to parse AWS event message due to SignatureVerificationFailureException: Invalid signature."
-        )
-        log_ops_message_mock.assert_called_once_with(
-            client,
-            f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
-        )
+    logger_mock.exception.assert_called_once_with(
+        "aws_sns_payload_validation_error",
+        error="Invalid signature.",
+    )
+    log_ops_message_mock.assert_called_once_with(
+        client,
+        f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
+    )
 
 
+@patch("server.event_handlers.aws.logger")
 @patch("server.event_handlers.aws.log_ops_message")
 @patch("server.event_handlers.aws.sns_message_validator.validate_message")
 def test_validate_sns_payload_unexpected_exception(
-    validate_message_mock, log_ops_message_mock, caplog
+    validate_message_mock, log_ops_message_mock, logger_mock
 ):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
@@ -144,24 +140,17 @@ def test_validate_sns_payload_unexpected_exception(
     # Mock the validate_message method to raise a generic exception
     validate_message_mock.side_effect = Exception("Unexpected error")
 
-    with caplog.at_level("ERROR"):
-        with pytest.raises(HTTPException) as e:
-            aws.validate_sns_payload(payload, client)
-        assert e.value.status_code == 500
+    with pytest.raises(HTTPException) as e:
+        aws.validate_sns_payload(payload, client)
+    assert e.value.status_code == 500
 
-        # Print the actual log messages captured
-        print("Captured log messages:")
-        for record in caplog.records:
-            print(record.message)
-
-        assert (
-            caplog.records[0].message
-            == "Failed to parse AWS event message due to Exception: Unexpected error"
-        )
-        log_ops_message_mock.assert_called_once_with(
-            client,
-            f"Error parsing AWS event due to Exception: ```{payload}```",
-        )
+    logger_mock.exception.assert_called_once_with(
+        "aws_sns_payload_validation_error", error="Unexpected error"
+    )
+    log_ops_message_mock.assert_called_once_with(
+        client,
+        f"Error parsing AWS event due to Exception: ```{payload}```",
+    )
 
 
 @patch("server.event_handlers.aws.log_ops_message")
@@ -448,7 +437,7 @@ def test_format_api_key_detected_failure_extracts_the_api_revoke_message_and_ins
     )
 
 
-@patch.dict(os.environ, {"NOTIFY_OPS_CHANNEL_ID": "test_channel_id"})
+@patch.object(aws, "NOTIFY_OPS_CHANNEL_ID", "test_channel_id")
 def test_successful_message_post_notify_channel_for_notify():
     # Mock the chat_postMessage method
     client = MagicMock()
@@ -463,7 +452,7 @@ def test_successful_message_post_notify_channel_for_notify():
     )
 
 
-@patch.dict(os.environ, {"NOTIFY_OPS_CHANNEL_ID": ""})
+@patch.object(aws, "NOTIFY_OPS_CHANNEL_ID", None)
 def test_exception_for_missing_env_variable_notify_channel_for_notify():
     # Test that an exception is reaised if the NOTIFY_POS_CHANNEL_ID is not set
     with pytest.raises(AssertionError) as err:

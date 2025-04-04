@@ -1,7 +1,5 @@
 import json
-import logging
 import re
-import os
 import urllib.parse
 
 from fastapi import HTTPException
@@ -16,7 +14,12 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
+from core.logging import get_module_logger
+from core.config import settings
 
+NOTIFY_OPS_CHANNEL_ID = settings.server.NOTIFY_OPS_CHANNEL_ID
+
+logger = get_module_logger()
 sns_message_validator = SNSMessageValidator()
 
 
@@ -30,9 +33,8 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
         SignatureVerificationFailureException,
         InvalidCertURLException,
     ) as e:
-        logging.error(
-            f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}"
-        )
+        logger.exception("aws_sns_payload_validation_error", error=str(e))
+        log_message = f"Failed to validate AWS event message due to {e.__class__.__qualname__}: {e}"
         if isinstance(e, InvalidMessageTypeException):
             log_message = f"Invalid message type ```{awsSnsPayload.Type}``` in message: ```{awsSnsPayload}```"
         elif isinstance(e, InvalidSignatureVersionException):
@@ -45,10 +47,11 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-        )
+        ) from e
     except Exception as e:
-        logging.error(
-            f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}"
+        logger.exception(
+            "aws_sns_payload_validation_error",
+            error=str(e),
         )
         log_ops_message(
             client,
@@ -57,11 +60,12 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
-        )
+        ) from e
     return valid_payload
 
 
 def parse(payload: AwsSnsPayload, client):
+    """Parse the payload and return the blocks to be sent to Slack."""
     try:
         message = payload.Message
         if message is None:
@@ -85,7 +89,10 @@ def parse(payload: AwsSnsPayload, client):
         isinstance(msg, dict)
         and {"previousBudgetLimit", "currentBudgetLimit"} <= msg.keys()
     ):
-        logging.info(f"Budget auto-adjustment event received: {payload.Message}")
+        logger.info(
+            "budget_auto_adjustment_event",
+            message=payload.Message,
+        )
         blocks = []
     else:
         blocks = []
@@ -276,7 +283,6 @@ def format_cloudwatch_alarm(msg):
 
 # Function to send the message to the Notify ops channel fo alerting. Right now it is set to #notification-ops channel
 def send_message_to_notify_chanel(client, blocks):
-    NOTIFY_OPS_CHANNEL_ID = os.environ.get("NOTIFY_OPS_CHANNEL_ID")
 
     # Raise an exception if the NOTIFY_OPS_CHANNEL_ID is not set
     assert NOTIFY_OPS_CHANNEL_ID, "NOTIFY_OPS_CHANNEL_ID is not set in the environment"
@@ -301,6 +307,8 @@ def format_api_key_detected(payload, client):
     match = pattern.search(api_key)
     if match:
         service_id = match.group("service_id")
+    else:
+        service_id = "Unknown"
 
     # We don't want to send the actual api-key through Slack, but we do want the name to be given,
     # so therefore extract the api key name by following the format of a Notify api key
