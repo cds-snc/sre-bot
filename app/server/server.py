@@ -25,13 +25,13 @@ from server.utils import (
     get_user_email_from_request,
     log_ops_message,
 )
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sns_message_validator import SNSMessageValidator  # type: ignore
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse, RedirectResponse
+
+from api.router import api_router
+from api.dependencies.rate_limits import setup_rate_limiter, get_limiter
 
 GOOGLE_CLIENT_ID = settings.server.GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET = settings.server.GOOGLE_CLIENT_SECRET
@@ -43,14 +43,9 @@ logger = get_module_logger()
 sns_message_validator = SNSMessageValidator()
 
 
-# initialize the limiter
-limiter = Limiter(key_func=get_remote_address)
-
 handler = FastAPI()
-
-# add the limiter to the handler
-handler.state.limiter = limiter
-handler.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+setup_rate_limiter(handler)
+limiter = get_limiter()
 
 
 # Set up the templates directory and static folder for the frontend with the build folder for production
@@ -113,18 +108,7 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-
-def sentinel_key_func(request: Request):
-    # Check if the 'X-Sentinel-Source' exists and is not empty
-    if request.headers.get("X-Sentinel-Source"):
-        return None  # Skip rate limiting if the header exists and is not empty
-    return get_remote_address(request)
-
-
-# Rate limit handler for RateLimitExceeded exceptions
-@handler.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return JSONResponse(status_code=429, content={"message": "Rate limit exceeded"})
+handler.include_router(api_router)
 
 
 # Logout route. If you log out of the application, you will be redirected to the homepage
@@ -464,14 +448,6 @@ def handle_string_payload(
                 detail="Invalid payload type. Must be a WebhookPayload object or a recognized string payload type.",
             )
     return WebhookPayload(**webhook_payload.model_dump(exclude_none=True))
-
-
-# Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
-# As a result, we are giving a generous rate limit of so that we don't run into any issues with the healthchecks
-@handler.get("/version")
-@limiter.limit("50/minute")
-def get_version(request: Request):
-    return {"version": GIT_SHA}
 
 
 def append_incident_buttons(payload: WebhookPayload, webhook_id):
