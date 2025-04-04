@@ -1,41 +1,45 @@
 import json
-import logging
 import os
-import requests  # type: ignore
+from datetime import datetime, timedelta, timezone
 
-from starlette.config import Config
+import requests  # type: ignore
 from authlib.integrations.starlette_client import OAuth, OAuthError  # type: ignore
-from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import RedirectResponse, HTMLResponse
-from fastapi.responses import JSONResponse
+from core.config import settings
+from core.logging import get_module_logger
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+from fastapi.templating import Jinja2Templates
+from integrations import maxmind
+from integrations.aws.organizations import get_active_account_names
+from integrations.sentinel import log_to_sentinel
+from models.webhooks import AccessRequest, AwsSnsPayload, WebhookPayload
+from modules.aws.aws import request_aws_account_access
+from modules.aws.aws_access_requests import get_active_requests, get_past_requests
 from modules.slack import webhooks
-from models.webhooks import WebhookPayload, AccessRequest, AwsSnsPayload
+from server.event_handlers import aws
 from server.utils import (
-    log_ops_message,
     create_access_token,
     get_current_user,
     get_user_email_from_request,
+    log_ops_message,
 )
-from integrations.sentinel import log_to_sentinel
-from integrations import maxmind
-from server.event_handlers import aws
-from sns_message_validator import (  # type: ignore
-    SNSMessageValidator,
-)
-from fastapi import Depends
-from datetime import datetime, timezone, timedelta
-from integrations.aws.organizations import get_active_account_names
-from modules.aws.aws import request_aws_account_access
-from modules.aws.aws_access_requests import get_active_requests, get_past_requests
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sns_message_validator import SNSMessageValidator  # type: ignore
+from starlette.config import Config
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse, RedirectResponse
 
-logging.basicConfig(level=logging.INFO)
+GOOGLE_CLIENT_ID = settings.server.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = settings.server.GOOGLE_CLIENT_SECRET
+SECRET_KEY = settings.server.SECRET_KEY
+GIT_SHA = settings.GIT_SHA
+ENVIRONMENT = "PROD" if settings.is_production else "DEVELOPMENT"
+
+logger = get_module_logger()
 sns_message_validator = SNSMessageValidator()
 
 
@@ -63,15 +67,26 @@ else:
     handler.mount("/static", StaticFiles(directory="../frontend/public"), "static")
 
 
-# OAuth settings
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or None
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET") or None
-if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
-    raise Exception("Missing env variables")
+class ConfigurationError(Exception):
+    """Custom exception for configuration errors."""
 
-SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
-if SECRET_KEY is None:
-    raise Exception("Missing env variables")
+
+# OAuth settings
+if settings.is_production:
+    if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
+        raise ConfigurationError("Missing OAuth credentials in production")
+    if SECRET_KEY is None:
+        raise ConfigurationError("Missing SECRET_KEY in production")
+else:
+    if GOOGLE_CLIENT_ID is None:
+        logger.warning(
+            "oauth_credentials_missing", mode="development", using="dummy_values"
+        )
+        GOOGLE_CLIENT_ID = "dev-client-id"
+    if GOOGLE_CLIENT_SECRET is None:
+        GOOGLE_CLIENT_SECRET = "dev-client-secret"
+    if SECRET_KEY is None:
+        SECRET_KEY = "dev-secret-key"
 
 # add a session middleware to the app
 handler.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -127,13 +142,12 @@ async def logout(request: Request):
 @limiter.limit("5/minute")
 async def login(request: Request):
     # get the current environment (ie dev or prod)
-    environment = os.environ.get("ENVIRONMENT")
     # this is the route that will be called after the user logs in
     redirect_uri = request.url_for(
         "auth",
     )
     # if the environment is production, then make sure to replace the http to https, else don't do anything (ie if you are in dev)
-    if environment == "prod":
+    if settings.is_production:
         redirect_uri = redirect_uri.__str__().replace("http", "https")
 
     return await oauth.google.authorize_redirect(request, redirect_uri)
@@ -324,7 +338,11 @@ def handle_webhook(
                 if isinstance(processed_payload, dict):
                     return processed_payload
                 else:
-                    logging.info(f"Processed payload: {processed_payload}")
+                    logger.info(
+                        "payload_processed",
+                        payload=processed_payload,
+                        webhook_id=id,
+                    )
                     webhook_payload = processed_payload
             else:
                 webhook_payload = payload
@@ -342,14 +360,26 @@ def handle_webhook(
                 )
                 return {"ok": True}
             except Exception as e:
-                logging.error(e)
+                logger.exception(
+                    "webhook_posting_error",
+                    webhook_id=id,
+                    webhook_payload=webhook_payload,
+                    error=str(e),
+                )
                 body = webhook_payload.model_dump(exclude_none=True)
                 log_ops_message(
                     request.state.bot.client, f"Error posting message: ```{body}```"
                 )
-                raise HTTPException(status_code=500, detail="Failed to send message")
+                raise HTTPException(
+                    status_code=500, detail="Failed to send message"
+                ) from e
         else:
-            logging.info(f"Webhook id {id} is not active")
+            logger.info(
+                "webhook_not_active",
+                webhook_id=id,
+                webhook_payload=webhook_payload,
+                error="Webhook is not active",
+            )
             raise HTTPException(status_code=404, detail="Webhook not active")
     else:
         raise HTTPException(status_code=404, detail="Webhook not found")
@@ -363,7 +393,12 @@ def handle_string_payload(
     string_payload_type, validated_payload = webhooks.validate_string_payload_type(
         payload
     )
-    logging.info(f"String payload type: {string_payload_type}")
+    logger.info(
+        "string_payload_type",
+        payload=payload,
+        string_payload_type=string_payload_type,
+        validated_payload=validated_payload,
+    )
     match string_payload_type:
         case "WebhookPayload":
             webhook_payload = WebhookPayload(**validated_payload)
@@ -374,8 +409,10 @@ def handle_string_payload(
             )
             if awsSnsPayload.Type == "SubscriptionConfirmation":
                 requests.get(awsSnsPayload.SubscribeURL, timeout=60)
-                logging.info(
-                    f"Subscribed webhook {id} to topic {awsSnsPayload.TopicArn}"
+                logger.info(
+                    "subscribed_webhook_to_topic",
+                    webhook_id=awsSnsPayload.TopicArn,
+                    subscribed_topic=awsSnsPayload.TopicArn,
                 )
                 log_ops_message(
                     request.state.bot.client,
@@ -393,7 +430,9 @@ def handle_string_payload(
                 # if we have an empty message, log that we have an empty
                 # message and return without posting to slack
                 if not blocks:
-                    logging.info("No blocks to post, returning")
+                    logger.info(
+                        "payload_empty_message",
+                    )
                     return {"ok": True}
                 webhook_payload = WebhookPayload(blocks=blocks)
         case "AccessRequest":
@@ -432,7 +471,7 @@ def handle_string_payload(
 @handler.get("/version")
 @limiter.limit("50/minute")
 def get_version(request: Request):
-    return {"version": os.environ.get("GIT_SHA", "unknown")}
+    return {"version": GIT_SHA}
 
 
 def append_incident_buttons(payload: WebhookPayload, webhook_id):

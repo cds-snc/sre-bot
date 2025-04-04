@@ -1,25 +1,23 @@
-import logging
-from dotenv import load_dotenv
-import os
 from datetime import datetime, timedelta
 from typing import Optional
+
+from fastapi import HTTPException, Request, status
 from jose import JWTError, jwt
-from fastapi import HTTPException, status, Request
 
-logging.basicConfig(level=logging.INFO)
+from core.config import settings
+from core.logging import get_module_logger
 
-load_dotenv()
 
-SECRET_KEY = os.environ.get("SESSION_SECRET_KEY") or None
-if SECRET_KEY is None:
-    raise Exception("Missing env variables")
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
+SECRET_KEY = settings.server.SECRET_KEY
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+
+logger = get_module_logger()
 
 
 def log_ops_message(client, message):
     channel_id = "C0388M21LKZ"
-    logging.info(f"Ops msg: {message}")
+    logger.info("ops_message_logged", message=message)
     client.conversations_join(channel=channel_id)
     client.chat_postMessage(channel=channel_id, text=message, as_user=True)
 
@@ -70,10 +68,10 @@ async def get_current_user(request: Request):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        ) from e
     return user
 
 

@@ -1,20 +1,20 @@
-from unittest import mock
-from unittest.mock import call, MagicMock, patch, PropertyMock, Mock, AsyncMock
+import datetime
+import os
+import urllib.parse
+from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, call, patch
+
+import httpx
+import pytest
+from fastapi import HTTPException, Request, status
+from fastapi.testclient import TestClient
+from models.webhooks import AwsSnsPayload, WebhookPayload
 from server import bot_middleware, server
 from server.server import AccessRequest
-import urllib.parse
 from slowapi.errors import RateLimitExceeded
+from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import JSONResponse
 from starlette.types import Scope
-from starlette.datastructures import Headers, MutableHeaders
-import os
-import pytest
-import datetime
-from fastapi.testclient import TestClient
-from fastapi import Request, HTTPException, status
-import httpx
 
-from models.webhooks import AwsSnsPayload, WebhookPayload
 
 app = server.handler
 app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
@@ -360,10 +360,10 @@ def test_handle_string_payload_with_valid_json_payload():
 def test_get_version_unkown():
     response = client.get("/version")
     assert response.status_code == 200
-    assert response.json() == {"version": "unknown"}
+    assert response.json() == {"version": "Unknown"}
 
 
-@patch.dict(os.environ, {"GIT_SHA": "foo"}, clear=True)
+@patch.object(server, "GIT_SHA", "foo")
 def test_get_version_known():
     response = client.get("/version")
     assert response.status_code == 200
@@ -510,35 +510,40 @@ def test_login_endpoint():
 
 
 # Test the login endpoint converts the redirect_uri to https
-@mock.patch.dict(os.environ, {"ENVIRONMENT": "prod"})
-def test_login_endpoint_redirect_uri_prod():
+@patch("server.server.settings")
+def test_login_endpoint_redirect_uri_prod(mock_settings):
     # Make a test request to the login endpoint
+    mock_settings.is_production = True
     response = client.get("/login")
 
     # assert the call is successful
     assert response.status_code == 200
 
-    if os.environ.get("ENVIRONMENT") == "prod":
-        redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
-        redirect_uri = redirect_uri.__str__().replace("http", "https")
+    # Set up the expected redirect_uri
+    redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+    # Convert to https for production
+    redirect_uri = redirect_uri.__str__().replace("http", "https")
 
     # assert that the response url we get from the login endpoint contains the redirect_uri replaced with https
     assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
 
 
 # Test the login endpoing that does not convert the redirect uri
-@mock.patch.dict(os.environ, {"ENVIRONMENT": "dev"})
-def test_login_endpoint_redirect_uri_dev():
+@patch("server.server.settings")
+def test_login_endpoint_redirect_uri_dev(mock_settings):
+    # Setup the mock to simulate dev environment
+    mock_settings.is_production = False
+
     # Make a test request to the login endpoint
     response = client.get("/login")
 
     # assert the call is successful
     assert response.status_code == 200
 
-    if os.environ.get("ENVIRONMENT") == "dev":
-        redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+    # Set up the expected redirect_uri (without https conversion for dev)
+    redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
 
-    # assert that the response url we get from the login endpoint contains the redirect_uri is not replaced with https (we need to keep the http)
+    # assert that the response url we get from the login endpoint contains the redirect_uri is not replaced with https
     assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
 
 

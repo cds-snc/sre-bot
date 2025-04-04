@@ -231,12 +231,30 @@ class IncidentFeatureSettings(BaseSettings):
     )
 
 
+class ServerSettings(BaseSettings):
+    """Server configuration settings."""
+
+    NOTIFY_OPS_CHANNEL_ID: str = Field(default="", alias="NOTIFY_OPS_CHANNEL_ID")
+    GOOGLE_CLIENT_ID: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
     PREFIX: str = ""
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
+
+    # Server settings
+    server: ServerSettings
 
     # Integration settings
     slack: SlackSettings
@@ -262,6 +280,7 @@ class Settings(BaseSettings):
 
     def __init__(self, **kwargs):
         settings_map = {
+            "server": ServerSettings,
             "slack": SlackSettings,
             "aws": AwsSettings,
             "google_workspace": GoogleWorkspaceSettings,

@@ -1,7 +1,5 @@
 import datetime
 
-import os
-
 from modules import incident
 
 from unittest.mock import call, MagicMock, patch, ANY
@@ -744,6 +742,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     )
 
 
+@patch.object(incident, "PREFIX", "dev")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.GoogleMeet")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
@@ -751,7 +750,6 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
-@patch.dict(os.environ, {"PREFIX": "dev"})
 def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     _log_to_sentinel_mock,
     mock_incident_folder,
