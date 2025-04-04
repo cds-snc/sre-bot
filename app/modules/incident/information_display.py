@@ -37,7 +37,7 @@ def incident_information_view(incident: Incident):
     if incident.end_impact_time != "Unknown":
         impact_end_timestamp = f"<!date^{int(float(incident.end_impact_time))}^{{date}} at {{time}}|Unknown>"
 
-    report_string = f"<https://docs.google.com/document/d/{incident.report_url}|:memo: Incident Report>"
+    report_string = f"<{incident.report_url}|:memo: Incident Report>"
     meet_string = f"<{incident.meet_url}|:headphones: Google Meet>"
     incident_data = incident.model_dump()
     incident_data.pop("logs")
