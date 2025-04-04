@@ -139,7 +139,7 @@ def test_incident_information_view(mock_convert_timestamp):
                 "type": "section",
                 "fields": [
                     {
-                        "text": "<https://docs.google.com/document/d/report_url|:memo: Incident Report>",
+                        "text": "<report_url|:memo: Incident Report>",
                         "type": "mrkdwn",
                     },
                     {
