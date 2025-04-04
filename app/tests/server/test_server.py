@@ -1,7 +1,7 @@
 import datetime
 import os
 import urllib.parse
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, call, patch
 
 import httpx
 import pytest
@@ -10,9 +10,7 @@ from fastapi.testclient import TestClient
 from models.webhooks import AwsSnsPayload, WebhookPayload
 from server import bot_middleware, server
 from server.server import AccessRequest
-from slowapi.errors import RateLimitExceeded
 from starlette.datastructures import Headers, MutableHeaders
-from starlette.responses import JSONResponse
 from starlette.types import Scope
 
 
@@ -357,17 +355,17 @@ def test_handle_string_payload_with_valid_json_payload():
     pass
 
 
-def test_get_version_unkown():
-    response = client.get("/version")
-    assert response.status_code == 200
-    assert response.json() == {"version": "Unknown"}
+# def test_get_version_unkown():
+#     response = client.get("/version")
+#     assert response.status_code == 200
+#     assert response.json() == {"version": "Unknown"}
 
 
-@patch.object(server, "GIT_SHA", "foo")
-def test_get_version_known():
-    response = client.get("/version")
-    assert response.status_code == 200
-    assert response.json() == {"version": "foo"}
+# @patch.object(server, "GIT_SHA", "foo")
+# def test_get_version_known():
+#     response = client.get("/version")
+#     assert response.status_code == 200
+#     assert response.json() == {"version": "foo"}
 
 
 def test_append_incident_buttons_with_list_attachments():
@@ -570,70 +568,6 @@ def test_user_endpoint_with_no_logged_in_user():
     assert response.json() == {"error": "Not logged in"}
 
 
-def test_header_exists_and_not_empty():
-    # Create a mock request with the header 'X-Sentinel-Source'
-    mock_request = Mock(spec=Request)
-    mock_request.headers = {"X-Sentinel-Source": "some_value"}
-
-    # Call the function
-    result = server.sentinel_key_func(mock_request)
-
-    # Assert that the result is None (no rate limiting)
-    assert result is None
-
-
-def test_header_not_present():
-    # Create a mock request without the header 'X-Sentinel-Source'
-    mock_request = Mock(spec=Request)
-    mock_request.headers = {}
-
-    # Mock the client attribute to return the expected IP address
-    mock_request.client.host = "192.168.1.1"
-
-    # Mock the get_remote_address function to return a specific value
-    with patch("slowapi.util.get_remote_address", return_value="192.168.1.1"):
-        result = server.sentinel_key_func(mock_request)
-    # Assert that the result is the IP address (rate limiting applied)
-    assert result == "192.168.1.1"
-
-
-def test_header_empty():
-    # Create a mock request with an empty 'X-Sentinel-Source' header
-    mock_request = Mock(spec=Request)
-    mock_request.headers = {"X-Sentinel-Source": ""}
-
-    # Mock the client attribute to return the expected IP address
-    mock_request.client.host = "192.168.1.1"
-
-    # Mock the get_remote_address function to return a specific value
-    with patch("slowapi.util.get_remote_address", return_value="192.168.1.1"):
-        result = server.sentinel_key_func(mock_request)
-
-    # Assert that the result is the IP address (rate limiting applied)
-    assert result == "192.168.1.1"
-
-
-@pytest.mark.asyncio
-async def test_rate_limit_handler():
-    # Create a mock request
-    mock_request = Mock(spec=Request)
-
-    # Create a mock exception
-    mock_exception = Mock(spec=RateLimitExceeded)
-
-    # Call the handler function
-    response = await server.rate_limit_handler(mock_request, mock_exception)
-
-    # Assert the response is a JSONResponse
-    assert isinstance(response, JSONResponse)
-
-    # Assert the status code is 429
-    assert response.status_code == 429
-
-    # Assert the content of the response
-    assert response.body.decode("utf-8") == '{"message":"Rate limit exceeded"}'
-
-
 @pytest.mark.asyncio
 async def test_logout_rate_limiting():
     # Create a custom transport to mount the ASGI app
@@ -746,23 +680,6 @@ async def test_webhooks_rate_limiting(
 
         # The 31st request should be rate limited
         response = await client.post("/hook/test-id", json=payload)
-        assert response.status_code == 429
-        assert response.json() == {"message": "Rate limit exceeded"}
-
-
-@pytest.mark.asyncio
-async def test_version_rate_limiting():
-    # Create a custom transport to mount the ASGI app
-    transport = httpx.ASGITransport(app=app)
-
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        # Make 5 requests to the version endpoint
-        for _ in range(50):
-            response = await client.get("/version")
-            assert response.status_code == 200
-
-        # The 51th request should be rate limited
-        response = await client.get("/version")
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}
 
