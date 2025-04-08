@@ -103,7 +103,7 @@ async def auth(request: Request):
 
 
 # User information route
-@router.get("/user")
+@router.get("/me")
 @limiter.limit("10/minute")
 async def user(request: Request):
     """Return information about the currently logged in user."""
