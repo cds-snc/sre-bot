@@ -8,9 +8,12 @@ export default function LoginPage() {
 
   // Google login function to handling logging in.
     const googleLogin = () => {
-        var login_url = "/login"
-        console.log("login_url", login_url)
-        window.location.href = login_url
+      const isDevelopment = process.env.NODE_ENV === "development";
+      const loginUrl = isDevelopment
+        ? "http://localhost:8000/login"
+        : "/login";
+        console.log("Redirecting to:", loginUrl);
+        window.location.href = loginUrl;
       }
     return (
       <div className="hero min-h-screen bg-base-200">
