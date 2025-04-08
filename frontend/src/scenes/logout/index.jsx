@@ -1,32 +1,31 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from "react";
 
 const Logout = () => {
-    const navigate = useNavigate();
-  
-    useEffect(() => {
-      const handleLogout = async () => {
-        try {
-          const response = await fetch(`${window.origin}/logout`, {
-            method: 'GET',
-            credentials: 'include', // Include credentials to manage session
-          });
-  
-          if (response.ok) {
-            // Clear the authentication state and redirect to the landing page
-            window.location.reload(); // Refresh the session
-          } else {
-            console.error('Failed to log out');
-          }
-        } catch (error) {
-          console.error('An error occurred during logout:', error);
+  useEffect(() => {
+    const handleLogout = async () => {
+      const logoutUrl = "/logout"; // Use relative URL to leverage the proxy
+
+      try {
+        const response = await fetch(logoutUrl, {
+          method: "GET",
+          credentials: "include", // Include cookies in the request
+        });
+
+        if (response.ok) {
+          // Redirect the user to the root of the app
+          window.location.href = "/";
+        } else {
+          console.error("Failed to log out");
         }
-      };
-  
-      handleLogout();
-    }, [navigate]);
-  
-    return null; // This component doesn't render anything
-  };
-  
-  export default Logout;
+      } catch (error) {
+        console.error("An error occurred during logout:", error);
+      }
+    };
+
+    handleLogout();
+  }, []);
+
+  return null; // This component doesn't render anything
+};
+
+export default Logout;

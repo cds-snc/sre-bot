@@ -25,10 +25,20 @@ export default function HomePage() {
   const googleLogout = () => {
     const isDevelopment = process.env.NODE_ENV === "development";
     const logoutUrl = isDevelopment
-      ? "http://localhost:8000/logout"
+      ? "http://127.0.0.1:8000/logout"
       : "/logout";
 
-    window.location.href = logoutUrl;
+    fetch(logoutUrl, {
+      method: "GET",
+      // credentials: "include", // Include cookies in the request
+    })
+      .then(() => {
+        // Redirect the user to the root of the app
+        window.location.href = "/";
+      })
+      .catch((error) => {
+        console.error("Error during logout:", error);
+      });
   };
 
   return (

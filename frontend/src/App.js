@@ -37,7 +37,7 @@ function App() {
 
     useEffect(() => {
       const isDevelopment = process.env.NODE_ENV === "development";
-      const userUrl = isDevelopment ? "http://localhost:8000/user" : "/user";
+      const userUrl = isDevelopment ? "http://127.0.0.1:8000/user" : "/user";
       // Make a GET request to the "/user" endpoint
       fetch(userUrl, {
         credentials: "include", // Include cookies in the request
@@ -47,6 +47,8 @@ function App() {
           if (!response.ok) {
             throw new Error("Network response was not ok");
           }
+          console.log("Response status code:", response.status);
+          console.log("Response:", JSON.stringify(response));
           // Parse the JSON response
           return response.json();
         })
@@ -217,23 +219,7 @@ function App() {
                 </ColorModeContext.Provider>
               }
             />
-            <Route
-              path="/logout"
-              element={
-                <ColorModeContext.Provider value={colorMode}>
-                  <ThemeProvider theme={theme}>
-                    <CssBaseline />
-                    <div className="app">
-                      <Sidemenu isSidemenu={isSidemenu} />
-                      <main className="content">
-                        <Topmenu setIsSidemenu={setIsSidemenu} />
-                        <Logout />
-                      </main>
-                    </div>
-                  </ThemeProvider>
-                </ColorModeContext.Provider>
-              }
-            />
+            <Route path="/logout" element={<Logout />} />
           </>
         ) : (
           <Route path="/" element={<LandingPage />} />
