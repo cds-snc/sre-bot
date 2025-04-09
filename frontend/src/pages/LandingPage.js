@@ -8,7 +8,7 @@ export default function LoginPage() {
   // Google login function to handling logging in.
   const googleLogin = () => {
     const isDevelopment = process.env.NODE_ENV === "development";
-    const loginUrl = isDevelopment ? "http://127.0.0.1:8000/login" : "/login";
+    const loginUrl = isDevelopment ? "http://127.0.0.1:8000/auth/login" : "/auth/login";
     console.log("Redirecting to:", loginUrl);
     window.location.href = loginUrl;
   };

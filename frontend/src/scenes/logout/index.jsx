@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 const Logout = () => {
   useEffect(() => {
     const handleLogout = async () => {
-      const logoutUrl = "/logout"; // Use relative URL to leverage the proxy
+      const logoutUrl = "/auth/logout"; // Use relative URL to leverage the proxy
 
       try {
         const response = await fetch(logoutUrl, {

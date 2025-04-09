@@ -37,7 +37,7 @@ function App() {
 
     useEffect(() => {
       const isDevelopment = process.env.NODE_ENV === "development";
-      const userUrl = isDevelopment ? "http://127.0.0.1:8000/me" : "/me";
+      const userUrl = isDevelopment ? "http://127.0.0.1:8000/auth/me" : "/auth/me";
       // Make a GET request to the "/user" endpoint
       fetch(userUrl, {
         credentials: "include", // Include cookies in the request
