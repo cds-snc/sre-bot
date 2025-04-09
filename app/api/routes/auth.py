@@ -16,8 +16,6 @@ limiter = get_limiter()
 GOOGLE_CLIENT_ID = settings.server.GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET = settings.server.GOOGLE_CLIENT_SECRET
 FRONTEND_URL = settings.frontend.FRONTEND_URL
-if FRONTEND_URL is None:
-    raise ValueError("FRONTEND_URL must be set in the configuration")
 
 
 class ConfigurationError(Exception):
