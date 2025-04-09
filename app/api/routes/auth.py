@@ -70,8 +70,8 @@ async def login(request: Request):
     redirect_uri = request.url_for("auth")
     # If in production, ensure HTTPS is used
     if settings.is_production:
-        if str(redirect_uri).startswith('http:'):
-            redirect_uri = URL(str(redirect_uri).replace('http:', 'https:', 1))
+        if str(redirect_uri).startswith("http:"):
+            redirect_uri = URL(str(redirect_uri).replace("http:", "https:", 1))
 
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
