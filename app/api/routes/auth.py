@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from starlette.config import Config
+from starlette.datastructures import URL
 from authlib.integrations.starlette_client import OAuth, OAuthError  # type: ignore
 from core.config import settings
 from core.logging import get_module_logger
@@ -8,7 +9,7 @@ from api.dependencies.rate_limits import get_limiter
 from server.utils import create_access_token
 
 logger = get_module_logger()
-router = APIRouter(tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 limiter = get_limiter()
 
 # Set up Google OAuth
@@ -67,10 +68,10 @@ async def login(request: Request):
     """Redirect user to Google OAuth login page."""
     # Get the callback URI for after authentication
     redirect_uri = request.url_for("auth")
-
     # If in production, ensure HTTPS is used
     if settings.is_production:
-        redirect_uri = redirect_uri.__str__().replace("http", "https")
+        if str(redirect_uri).startswith('http:'):
+            redirect_uri = URL(str(redirect_uri).replace('http:', 'https:', 1))
 
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
