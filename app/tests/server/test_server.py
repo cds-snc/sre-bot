@@ -1,6 +1,4 @@
 import datetime
-import os
-import urllib.parse
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, call, patch
 
 import httpx
