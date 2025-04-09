@@ -1,14 +1,11 @@
 import urllib.parse
 from unittest.mock import patch, MagicMock
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
 from fastapi.testclient import TestClient
 from server import bot_middleware, server
 from api.routes.auth import router as auth_router
 
 test_app = server.handler
 test_app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
-
 
 test_app.include_router(auth_router)
 client = TestClient(test_app)
@@ -44,7 +41,7 @@ def test_login_endpoint_redirect_uri_prod(mock_settings):
     assert response.status_code == 200
 
     # Set up the expected redirect_uri
-    redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+    redirect_uri = urllib.parse.quote_plus("http://testserver/callback")
     # Convert to https for production
     redirect_uri = redirect_uri.__str__().replace("http", "https")
 
@@ -65,7 +62,7 @@ def test_login_endpoint_redirect_uri_dev(mock_settings):
     assert response.status_code == 200
 
     # Set up the expected redirect_uri (without https conversion for dev)
-    redirect_uri = urllib.parse.quote_plus("http://testserver/auth")
+    redirect_uri = urllib.parse.quote_plus("http://testserver/callback")
 
     # assert that the response url we get from the login endpoint contains the redirect_uri is not replaced with https
     assert response.url.__str__().__contains__("redirect_uri=" + redirect_uri)
@@ -73,9 +70,9 @@ def test_login_endpoint_redirect_uri_dev(mock_settings):
 
 # Test the auth endpoint
 def test_callback_endpoint():
-    response = client.get("/auth")
+    response = client.get("/callback")
     assert response.status_code == 200
-    assert "http://testserver/auth" in str(response.url)
+    assert "http://testserver/callback" in str(response.url)
 
 
 # Test the user endpoint, logged in
@@ -83,12 +80,12 @@ def test_user_route_logged_in():
     # Simulate a logged-in session by creating a mock request with session data
     session_data = {"user": {"given_name": "FirstName"}}
     headers = {"Cookie": f"session={session_data}"}
-    response = client.get("/user", headers=headers)
+    response = client.get("/me", headers=headers)
     assert response.status_code == 200
 
 
 # Test the user endpoing, not logged in
 def test_user_endpoint_with_no_logged_in_user():
-    response = client.get("/user")
+    response = client.get("/me")
     assert response.status_code == 200
     assert response.json() == {"error": "Not logged in"}

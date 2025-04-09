@@ -76,7 +76,7 @@ async def login(request: Request):
 
 
 # Authentication callback route
-@router.get("/auth")
+@router.get("/callback")
 @limiter.limit("5/minute")
 async def auth(request: Request):
     """Process OAuth callback and create user session."""
