@@ -3,12 +3,10 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import requests  # type: ignore
-from authlib.integrations.starlette_client import OAuth, OAuthError  # type: ignore
 from core.config import settings
 from core.logging import get_module_logger
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from integrations import maxmind
@@ -20,21 +18,16 @@ from modules.aws.aws_access_requests import get_active_requests, get_past_reques
 from modules.slack import webhooks
 from server.event_handlers import aws
 from server.utils import (
-    create_access_token,
     get_current_user,
     get_user_email_from_request,
     log_ops_message,
 )
 from sns_message_validator import SNSMessageValidator  # type: ignore
-from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import HTMLResponse, RedirectResponse
 
 from api.router import api_router
 from api.dependencies.rate_limits import setup_rate_limiter, get_limiter
 
-GOOGLE_CLIENT_ID = settings.server.GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET = settings.server.GOOGLE_CLIENT_SECRET
 SECRET_KEY = settings.server.SECRET_KEY
 GIT_SHA = settings.GIT_SHA
 ENVIRONMENT = "PROD" if settings.is_production else "DEVELOPMENT"
@@ -66,105 +59,36 @@ class ConfigurationError(Exception):
     """Custom exception for configuration errors."""
 
 
-# OAuth settings
 if settings.is_production:
-    if GOOGLE_CLIENT_ID is None or GOOGLE_CLIENT_SECRET is None:
-        raise ConfigurationError("Missing OAuth credentials in production")
     if SECRET_KEY is None:
         raise ConfigurationError("Missing SECRET_KEY in production")
 else:
-    if GOOGLE_CLIENT_ID is None:
-        logger.warning(
-            "oauth_credentials_missing", mode="development", using="dummy_values"
-        )
-        GOOGLE_CLIENT_ID = "dev-client-id"
-    if GOOGLE_CLIENT_SECRET is None:
-        GOOGLE_CLIENT_SECRET = "dev-client-secret"
     if SECRET_KEY is None:
         SECRET_KEY = "dev-secret-key"
 
 # add a session middleware to the app
 handler.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
+allow_origins = (
+    ["*"]
+    if settings.is_production
+    else [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:3000",
+    ]
+)
 handler.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Set up Google OAuth
-config_data = {
-    "GOOGLE_CLIENT_ID": GOOGLE_CLIENT_ID,
-    "GOOGLE_CLIENT_SECRET": GOOGLE_CLIENT_SECRET,
-}
-starlette_config = Config(environ=config_data)
-oauth = OAuth(starlette_config)
-oauth.register(
-    name="google",
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
-
 handler.include_router(api_router)
-
-
-# Logout route. If you log out of the application, you will be redirected to the homepage
-@handler.route("/logout")
-@limiter.limit("5/minute")
-async def logout(request: Request):
-    request.session.pop("user", None)
-    response = RedirectResponse(url="/")
-    response.delete_cookie("access_token")
-    return response
-
-
-# Login route. You will be redirected to the google login page
-@handler.get("/login")
-@limiter.limit("5/minute")
-async def login(request: Request):
-    # get the current environment (ie dev or prod)
-    # this is the route that will be called after the user logs in
-    redirect_uri = request.url_for(
-        "auth",
-    )
-    # if the environment is production, then make sure to replace the http to https, else don't do anything (ie if you are in dev)
-    if settings.is_production:
-        redirect_uri = redirect_uri.__str__().replace("http", "https")
-
-    return await oauth.google.authorize_redirect(request, redirect_uri)
-
-
-# Authenticate route. This is the route that will be called after the user logs in and you are redirected to the /home page
-@handler.route("/auth")
-@limiter.limit("5/minute")
-async def auth(request: Request):
-    try:
-        access_token = await oauth.google.authorize_access_token(request)
-    except OAuthError as error:
-        return HTMLResponse(f"<h1>OAuth Error</h1><pre>{error.error}</pre>")
-    user_data = access_token.get("userinfo")
-    if user_data:
-        request.session["user"] = dict(user_data)
-        jwt_token = create_access_token(data={"sub": user_data["email"]})
-        response = RedirectResponse(url="/")
-        response.set_cookie(
-            "access_token", jwt_token, httponly=True, secure=True, samesite="Strict"
-        )
-    return response
-
-
-# User route. Returns the user's first name that is currently logged into the application
-@handler.route("/user")
-@limiter.limit("10/minute")
-async def user(request: Request):
-    user = request.session.get("user")
-    if user:
-        return JSONResponse({"name": user.get("given_name")})
-    else:
-        return JSONResponse({"error": "Not logged in"})
 
 
 @handler.post("/request_access")
