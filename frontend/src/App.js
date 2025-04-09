@@ -47,8 +47,6 @@ function App() {
           if (!response.ok) {
             throw new Error("Network response was not ok");
           }
-          console.log("Response status code:", response.status);
-          console.log("Response:", JSON.stringify(response));
           // Parse the JSON response
           return response.json();
         })
