@@ -1,4 +1,6 @@
-from unittest.mock import PropertyMock, patch, MagicMock, ANY
+from unittest.mock import AsyncMock, PropertyMock, patch, MagicMock, ANY
+import pytest
+import httpx
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.testclient import TestClient
@@ -6,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.datastructures import URL
 from server import bot_middleware
 from api.routes import auth
+from api.dependencies.rate_limits import setup_rate_limiter
 
 auth_router = auth.router
 
@@ -14,6 +17,7 @@ def create_test_app():
     app = FastAPI()
     app.add_middleware(SessionMiddleware, secret_key="test-secret-key")
     app.add_middleware(bot_middleware.BotMiddleware, bot=MagicMock())
+    setup_rate_limiter(app)
     app.include_router(auth_router)
 
     @app.get("/auth/callback", name="auth")
@@ -110,30 +114,6 @@ def test_login_endpoint_redirect_uri_dev(
     )
     assert response.status_code in (302, 307)
 
-# # Test the login endpoing that does not convert the redirect uri
-# @patch("api.routes.auth.settings")
-# @patch("authlib.integrations.starlette_client.StarletteOAuth2App.authorize_redirect")
-# @patch("api.routes.auth.Request")
-# def test_login_endpoint_redirect_uri_dev(
-#     mock_request, mock_authorize_redirect, mock_settings
-# ):
-#     # Setup the mock to simulate dev environment
-#     mock_request.url_for.return_value = URL("https://testserver/auth/callback")
-#     mock_settings.is_production = True
-#     redirect_url = "https://accounts.google.com/o/oauth2/v2/auth"
-#     mock_authorize_redirect.return_value = RedirectResponse(url=redirect_url)
-
-#     # Make a test request to the login endpoint
-#     response = client.get("/auth/login", follow_redirects=False)
-
-#     # assert the call is successful
-#     assert response.status_code in (302, 307)
-
-#     # Check that the redirect_uri is not converted to https
-#     mock_authorize_redirect.assert_called_once_with(
-#         ANY, "http://testserver/auth/callback"
-#     )
-
 
 # Test the auth endpoint
 def test_callback_endpoint():
@@ -159,3 +139,73 @@ def test_user_endpoint_with_no_logged_in_user():
     response = client.get("/auth/me")
     assert response.status_code == 200
     assert response.json() == {"error": "Not logged in"}
+
+
+@patch("api.routes.auth.settings")
+@pytest.mark.asyncio
+async def test_login_rate_limiting(mock_settings):
+    # Create a custom transport to mount the ASGI app
+    mock_settings.is_production = False
+    transport = httpx.ASGITransport(app=test_app)
+
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as rate_limit_client:
+        # Set the environment variable for the test
+
+        # Make 5 requests to the login endpoint
+        for _ in range(5):
+            response = await rate_limit_client.get("/auth/login")
+            assert response.status_code == 302
+
+        # The 6th request should be rate limited
+        response = await rate_limit_client.get("/auth/login")
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def test_auth_rate_limiting():
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=test_app)
+
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as rate_limit_client:
+        # Mock the OAuth process
+        with patch(
+            "api.routes.auth.oauth.google.authorize_access_token", new_callable=AsyncMock
+        ) as mock_auth:
+            mock_auth.return_value = {
+                "userinfo": {"name": "Test User", "email": "test@test.com"}
+            }
+
+            # Make 5 requests to the auth endpoint
+            for _ in range(5):
+                response = await rate_limit_client.get("/auth/callback")
+                assert response.status_code == 307
+
+            # The 6th request should be rate limited
+            response = await rate_limit_client.get("/auth/callback")
+            assert response.status_code == 429
+            assert response.json() == {"message": "Rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def test_user_rate_limiting():
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=test_app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as rate_limit_client:
+        # Simulate a logged in session
+        session_data = {"user": {"given_name": "FirstName", "email": "test@test.com"}}
+        headers = {"Cookie": f"session={session_data}"}
+        # Make 10 requests to the user endpoint
+        for _ in range(10):
+            response = await rate_limit_client.get("/auth/me", headers=headers)
+            assert response.status_code == 200
+
+        # The 11th request should be rate limited
+        response = await rate_limit_client.get("/auth/me", headers=headers)
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
