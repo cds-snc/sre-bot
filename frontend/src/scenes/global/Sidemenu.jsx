@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ProSidebar, Menu, MenuItem } from "react-pro-sidebar";
 import "react-pro-sidebar/dist/css/styles.css";
 import { Box, IconButton, useTheme, Typography } from "@mui/material";
 import { Link } from "react-router-dom";
 import { tokens } from "../../theme";
+import { useUser } from "../../context/UserProvider";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import AccessAlarmsIcon from '@mui/icons-material/AccessAlarms';
@@ -41,35 +42,8 @@ const Sidemenu = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selected, setSelected] = useState("Dashboard");
 
-  // Get the user data to see who is the logged in user
-  const useUserData = () => {
-    const [userData, setUserData] = useState(null);
-
-    useEffect(() => {
-      // Make a GET request to the "/user" endpoint
-      fetch('/auth/me')
-        .then(response => {
-          // Check if the response status code is OK (200)
-          if (!response.ok) {
-            throw new Error('Network response was not ok');
-          }
-          // Parse the JSON response
-          return response.json();
-        })
-        .then(data => {
-          // Handle the JSON data from the response
-          setUserData(data);
-        })
-        .catch(error => {
-          console.error('There was a problem with the fetch operation:', error);
-        });
-    }, []);
-
-    return userData;
-  };
-
-  // call the useUserData function to get the user data
-  const userData = useUserData();
+  // Use the global user data from the UserProvider
+  const { userData } = useUser();
 
   return (
     // setup the links behaviour and colors
