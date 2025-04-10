@@ -5,7 +5,7 @@ export default function HomePage() {
 
   useEffect(() => {
     // Make a GET request to the "/user" endpoint
-    fetch("/me")
+    fetch("/auth/me")
       .then((response) => {
         // Check if the response status code is OK (200)
         if (!response.ok) {
