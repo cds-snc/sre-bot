@@ -6,7 +6,7 @@ import LandingPage from "./pages/LandingPage.js";
 import Topmenu from "./scenes/global/Topmenu";
 import Dashboard from "./scenes/dashboard";
 import Version from "./scenes/version";
-import AWS_Access from "./scenes/access";
+import AwsAccessManager from "./scenes/access";
 import Sidemenu from "./scenes/global/Sidemenu";
 import Webhooks from "./scenes/webhooks";
 import Incident from "./scenes/incident";
@@ -125,7 +125,7 @@ function App() {
                       <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
                         <Topmenu setIsSidemenu={setIsSidemenu} />
-                        <AWS_Access />
+                        <AwsAccessManager />
                       </main>
                     </div>
                   </ThemeProvider>
