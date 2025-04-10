@@ -156,7 +156,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           not_statement {
             statement {
               byte_match_statement {
-                search_string = "/login"
+                search_string = "/auth/login"
                 field_to_match {
                   uri_path {}
                 }
@@ -174,7 +174,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           not_statement {
             statement {
               byte_match_statement {
-                search_string = "/logout"
+                search_string = "/auth/logout"
                 field_to_match {
                   uri_path {}
                 }
@@ -192,7 +192,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           not_statement {
             statement {
               byte_match_statement {
-                search_string = "/auth"
+                search_string = "/auth/callback"
                 field_to_match {
                   uri_path {}
                 }
@@ -247,7 +247,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
           not_statement {
             statement {
               byte_match_statement {
-                search_string = "/user"
+                search_string = "/auth/me"
                 field_to_match {
                   uri_path {}
                 }
