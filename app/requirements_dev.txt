@@ -5,7 +5,7 @@ flake8==6.1.0
 freezegun==1.5.1
 setuptools==70.3.0
 pytest==8.3.5
-pytest-asyncio==0.25.3
+pytest-asyncio==0.26.0
 pytest-env==0.8.2
 requests-mock==1.12.1
-boto3_stubs==1.36.21
+boto3_stubs==1.37.28
