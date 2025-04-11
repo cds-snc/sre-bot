@@ -1,9 +1,10 @@
 from unittest.mock import patch, MagicMock, PropertyMock, call
 import pytest
+import httpx
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from api.v1.routes import webhooks
-from models.webhooks import AwsSnsPayload
+from models.webhooks import AwsSnsPayload, WebhookPayload
 from utils.tests import create_test_app
 from server import bot_middleware
 
@@ -437,3 +438,35 @@ def test_append_incident_buttons_with_str_attachments():
             ],
         },
     ]
+
+
+@patch(
+    "api.v1.routes.webhooks.webhooks.get_webhook",
+    return_value={"channel": {"S": "test-channel"}},
+)
+@patch("api.v1.routes.webhooks.webhooks.is_active", return_value=True)
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.handle_string_payload", return_value=WebhookPayload())
+@pytest.mark.asyncio
+async def test_webhooks_rate_limiting(
+    get_webhook_mock,
+    is_active_mock,
+    increment_invocation_count_mock,
+    handle_string_payload_mock,
+):
+    # Create a custom transport to mount the ASGI app
+    transport = httpx.ASGITransport(app=test_app)
+
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        get_webhook_mock.return_value = {"channel": {"S": "test-channel"}}
+        payload = '{"Type": "Notification"}'
+        handle_string_payload_mock.return_value = {"ok": True}
+        # Make 30 requests to the handle_webhook endpoint
+        for _ in range(30):
+            response = await client.post("/hook/test-id", json=payload)
+            assert response.status_code == 200
+
+        # The 31st request should be rate limited
+        response = await client.post("/hook/test-id", json=payload)
+        assert response.status_code == 429
+        assert response.json() == {"message": "Rate limit exceeded"}
