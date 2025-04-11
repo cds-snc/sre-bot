@@ -2,6 +2,7 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI
+from api.dependencies.rate_limits import setup_rate_limiter
 
 
 def create_test_app(routers, middlewares=None) -> FastAPI:
@@ -20,9 +21,6 @@ def create_test_app(routers, middlewares=None) -> FastAPI:
     """
     # Create a fresh app
     app = FastAPI()
-
-    # Setup rate limiting
-    from api.dependencies.rate_limits import setup_rate_limiter
 
     setup_rate_limiter(app)
 
