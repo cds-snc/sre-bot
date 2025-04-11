@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
-from jose import JWTError, jwt
+from jose import JWTError, jwt  # type: ignore
 
 from core.config import settings
 from core.logging import get_module_logger

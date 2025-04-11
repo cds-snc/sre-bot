@@ -1,12 +1,13 @@
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ColorModeContext, useMode } from "./theme";
-import { React, useState, useEffect } from "react";
+import { React, useState } from "react";
+import { useUser } from "./context/UserProvider";
 import LandingPage from "./pages/LandingPage.js";
 import Topmenu from "./scenes/global/Topmenu";
 import Dashboard from "./scenes/dashboard";
 import Version from "./scenes/version";
-import AWS_Access from "./scenes/access";
+import AwsAccessManager from "./scenes/access";
 import Sidemenu from "./scenes/global/Sidemenu";
 import Webhooks from "./scenes/webhooks";
 import Incident from "./scenes/incident";
@@ -25,49 +26,7 @@ function App() {
   // Set the initial state of the Sidemenu
   const [isSidemenu, setIsSidemenu] = useState(true);
 
-  // Set the state of whether a user is authenticated or not. Initially, this is set to null.
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
-
-  /**
-   * Custom hook to get user data from the server.
-   * @returns {boolean} Whether the user is authenticated or not.
-   */
-  const useUserData = () => {
-    const [userData, setUserData] = useState(null);
-
-    useEffect(() => {
-      const isDevelopment = process.env.NODE_ENV === "development";
-      const userUrl = isDevelopment ? "http://127.0.0.1:8000/auth/me" : "/auth/me";
-      // Make a GET request to the "/user" endpoint
-      fetch(userUrl, {
-        credentials: "include", // Include cookies in the request
-      })
-        .then((response) => {
-          // Check if the response status code is OK (200)
-          if (!response.ok) {
-            throw new Error("Network response was not ok");
-          }
-          // Parse the JSON response
-          return response.json();
-        })
-        .then((data) => {
-          // Handle the JSON data from the response
-          setUserData(data);
-          // If the user is not logged in, set the state of isAuthenticated to false. Otherwise, set it to true.
-          if (data.error === "Not logged in") {
-            setIsAuthenticated(false);
-          } else {
-            setIsAuthenticated(true);
-          }
-        })
-        .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
-        });
-    }, []);
-  };
-
-  // Call the custom hook to get user data
-  useUserData();
+  const { isAuthenticated } = useUser();
 
   // if we are initially loading the page and isAuthenticated is null, return null. This fixes a flashing issue.
   if (isAuthenticated === null) {
@@ -125,7 +84,7 @@ function App() {
                       <Sidemenu isSidemenu={isSidemenu} />
                       <main className="content">
                         <Topmenu setIsSidemenu={setIsSidemenu} />
-                        <AWS_Access />
+                        <AwsAccessManager />
                       </main>
                     </div>
                   </ThemeProvider>

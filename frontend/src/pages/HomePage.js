@@ -1,27 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { useUser } from "../context/UserProvider";
 
 export default function HomePage() {
-  const [userData, setUserData] = useState(null);
+  const { userData, isAuthenticated } = useUser();
 
-  useEffect(() => {
-    // Make a GET request to the "/user" endpoint
-    fetch("/auth/me")
-      .then((response) => {
-        // Check if the response status code is OK (200)
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-        // Parse the JSON response
-        return response.json();
-      })
-      .then((data) => {
-        // Handle the JSON data from the response
-        setUserData(data);
-      })
-      .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
-      });
-  }, []);
   const googleLogout = () => {
     const isDevelopment = process.env.NODE_ENV === "development";
     const logoutUrl = isDevelopment
@@ -43,7 +25,7 @@ export default function HomePage() {
 
   return (
     <div>
-      {userData ? (
+      {isAuthenticated ? (
         <div>
           <h1 className="text-5xl font-bold">Welcome {userData.name}!</h1>
           <br></br>
