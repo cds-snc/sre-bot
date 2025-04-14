@@ -53,7 +53,7 @@
 			"terragrunt": "0.31.1"
 		},
 		"ghcr.io/devcontainers/features/node:1": {
-			"version": "16.20.0"
+			"version": "16.20.2"
 		}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
