@@ -240,6 +240,7 @@ class ServerSettings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
