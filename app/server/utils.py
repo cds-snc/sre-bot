@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, status, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt  # type: ignore
 
 from core.config import settings
@@ -9,10 +10,12 @@ from core.logging import get_module_logger
 
 
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
+ACCESS_TOKEN_MAX_AGE_MINUTES = settings.server.ACCESS_TOKEN_MAX_AGE_MINUTES
 SECRET_KEY = settings.server.SECRET_KEY
 ALGORITHM = "HS256"
 
 logger = get_module_logger()
+oauth2_scheme = HTTPBearer(auto_error=False)
 
 
 def log_ops_message(client, message):
@@ -28,22 +31,50 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
     Args:
         data (dict): The data to include in the token payload.
-        expires_delta (Optional[timedelta], optional): The time duration for which the token is valid. Defaults to None.
+        expires_delta (Optional[timedelta], optional): The expiration time for the token.
+            If not provided, the token will expire after a default duration.
+            Defaults to None.
 
     Returns:
         str: The encoded JWT token as a string.
+
+    Raises:
+        ValueError: If the expires_delta is negative or exceeds the maximum allowed duration.
+        HTTPException: If there is an error during JWT encoding.
     """
+    if expires_delta and expires_delta.total_seconds() < 0:
+        raise ValueError("expires_delta cannot be negative")
+
+    if (
+        expires_delta
+        and expires_delta.total_seconds() > ACCESS_TOKEN_MAX_AGE_MINUTES * 60
+    ):
+        raise ValueError("expires_delta exceeds maximum allowed duration")
+
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    try:
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    except JWTError as e:
+        logger.error("jwt_encoding_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to encode JWT",
+        ) from e
+    logger.info("jwt_token_created")
     return encoded_jwt
 
 
-async def get_current_user(request: Request):
+async def get_current_user(
+    request: Request,
+    token: Optional[HTTPAuthorizationCredentials] = Depends(oauth2_scheme),
+):
     """
     Extracts and verifies the JWT token from the request cookies to authenticate the user.
 
@@ -56,8 +87,9 @@ async def get_current_user(request: Request):
     Raises:
     HTTPException: If the JWT token is not found, is invalid, or does not contain a valid user identifier.
     """
-    jwt_token = request.cookies.get("access_token")
+    jwt_token = token.credentials if token else request.cookies.get("access_token")
     if not jwt_token:
+        logger.error("jwt_token_missing", request_cookies=request.cookies)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
@@ -65,10 +97,12 @@ async def get_current_user(request: Request):
         payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=[ALGORITHM])
         user = payload.get("sub")
         if user is None:
+            logger.error("jwt_token_invalid", payload=payload)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
             )
     except JWTError as e:
+        logger.error("jwt_token_decoding_failed", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from e
