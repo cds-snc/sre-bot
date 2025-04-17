@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from integrations.slack import users as slack_users
-from jose import JWTError, jwt  # type: ignore
+from jose import JWTError  # type: ignore
 from server import utils
 from server.utils import create_access_token, get_user_email_from_request
 
