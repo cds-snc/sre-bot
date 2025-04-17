@@ -8,7 +8,7 @@ on:
     paths-ignore:
       - ".devcontainer/**"
       - ".github/**"
-      - ".terraform/**"
+      - "terraform/**"
 
 env:
   GITHUB_SHA: ${{ github.sha }}
