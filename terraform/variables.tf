@@ -50,6 +50,7 @@ variable "authorized_endpoints_with_constraints" {
     positional_constraint = string
   }))
   default = [
+    { path = "/", positional_constraint = "EXACTLY" },
     { path = "/auth/login", positional_constraint = "EXACTLY" },
     { path = "/auth/logout", positional_constraint = "EXACTLY" },
     { path = "/auth/callback", positional_constraint = "EXACTLY" },
