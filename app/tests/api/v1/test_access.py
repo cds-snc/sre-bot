@@ -306,7 +306,7 @@ async def test_get_aws_active_requests_unauthenticated():
 
             # Call the dependency function directly to see if it raises an exception
             with pytest.raises(HTTPException):
-                await access.get_current_user(request)
+                await access.get_current_user(request, None)
 
             # If you need to test the actual endpoint, use the TestClient
             response = client.get(

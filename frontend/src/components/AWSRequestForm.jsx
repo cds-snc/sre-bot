@@ -51,13 +51,13 @@ const AWSRequestForm = ({ onSend }) => {
   };
 
   const handleSend = async () => {
-   const requestData = {
+    const requestData = {
       account,
       reason,
       startDate: startDate.utc().toISOString(),
       endDate: endDate.utc().toISOString(),
     };
-    console.log("Request Data")
+    console.log("Request Data");
     console.log(requestData);
 
     try {
@@ -94,81 +94,76 @@ const AWSRequestForm = ({ onSend }) => {
   // display the fields. If the post request is successful, hide the form and display a success message
   return (
     <div>
-    {errorMessage && (
+      {errorMessage && (
         <>
-          <Alert severity="error">{errorMessage}</Alert> 
+          <Alert severity="error">{errorMessage}</Alert>
           <br />
         </>
-        )}      
-      {successMessage && <Alert severity="success">{successMessage}</Alert>} 
+      )}
+      {successMessage && <Alert severity="success">{successMessage}</Alert>}
       {!successMessage && (
         <>
-      <Typography variant="body1" gutterBottom>
-        Fill out the fields below to request access to the desired AWS account. 
-      </Typography>
-      <br />
-      <FormControl variant="standard" sx={{ m: 1, minWidth: 120 }}>
-        <InputLabel id="aws-account-select-label" htmlFor="aws-account-select">AWS Account</InputLabel>
-        <Select
-            labelId="aws-account-select-label"
-            id="aws-account-select"
-            value={account}
-            onChange={handleChangeAccount}
-            label="AWS Account"
-        >
-          {accounts.map((acc) => (
-            <MenuItem key={acc} value={acc}>
-              {acc}
-            </MenuItem>
-          ))}
-        </Select>
-        <TextField 
-          id="standard-basic" 
-          label="Reason for access" 
-          variant="standard" 
-          sx={{ mt: 2 }} 
-          value={reason} 
-          onChange={handleChangeReason} 
-        />
-        <br />
-        <br />
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <Box mb={2}> 
-            <DateTimePicker 
-              label="Start date and time" 
-              value={startDate} 
-              onChange={(newValue) => setStartDate(newValue)} 
-            />
+          <Typography variant="body1" gutterBottom>
+            Fill out the fields below to request access to the desired AWS account.
+          </Typography>
           <br />
-          </Box>
-        </LocalizationProvider>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <Box>
-            <DateTimePicker 
-              label="End date and time" 
-              value={endDate} 
-              onChange={(newValue) => setEndDate(newValue)} 
+          <FormControl variant="standard" sx={{ m: 1, minWidth: 120 }}>
+            <InputLabel id="aws-account-select-label" htmlFor="aws-account-select">AWS Account</InputLabel>
+            <Select
+              labelId="aws-account-select-label"
+              id="aws-account-select"
+              value={account}
+              onChange={handleChangeAccount}
+              label="AWS Account"
+            >
+              {Array.isArray(accounts) && accounts.map((acc) => (
+                <MenuItem key={acc} value={acc}>
+                  {acc}
+                </MenuItem>
+              ))}
+            </Select>
+            <TextField
+              id="standard-basic"
+              label="Reason for access"
+              variant="standard"
+              sx={{ mt: 2 }}
+              value={reason}
+              onChange={handleChangeReason}
             />
-          </Box>
-        </LocalizationProvider>
-        <br />
-        <Button color="success" variant="contained" endIcon={<SendIcon />} onClick={handleSend} sx={{ mt: 2 }}>
-          Send request
-        </Button>
-      </FormControl> 
-      </>
+            <br />
+            <br />
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Box mb={2}>
+                <DateTimePicker
+                  label="Start date and time"
+                  value={startDate}
+                  onChange={(newValue) => setStartDate(newValue)}
+                />
+                <br />
+              </Box>
+            </LocalizationProvider>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+              <Box>
+                <DateTimePicker
+                  label="End date and time"
+                  value={endDate}
+                  onChange={(newValue) => setEndDate(newValue)}
+                />
+              </Box>
+            </LocalizationProvider>
+            <br />
+            <Button color="success" variant="contained" endIcon={<SendIcon />} onClick={handleSend} sx={{ mt: 2 }}>
+              Send request
+            </Button>
+          </FormControl>
+        </>
       )}
     </div>
   );
 };
 
 AWSRequestForm.propTypes = {
-  accounts: PropTypes.arrayOf(PropTypes.number).isRequired,
   onSend: PropTypes.func,
-};
-
-AWSRequestForm.defaultProps = {
-  onSend: null,
 };
 
 export default AWSRequestForm;
