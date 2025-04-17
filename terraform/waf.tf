@@ -151,218 +151,23 @@ resource "aws_wafv2_web_acl" "sre-bot" {
     }
 
     statement {
-      and_statement {
+      not_statement {
         statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/auth/login"
-                field_to_match {
-                  uri_path {}
+          or_statement {
+            dynamic "statement" {
+              for_each = var.authorized_endpoints_with_constraints
+              content {
+                byte_match_statement {
+                  search_string = statement.value.path
+                  field_to_match {
+                    uri_path {}
+                  }
+                  text_transformation {
+                    priority = 0
+                    type     = "NONE"
+                  }
+                  positional_constraint = statement.value.positional_constraint
                 }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/auth/logout"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/auth/callback"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/static"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "STARTS_WITH"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/auth/me"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/request_access"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/active_requests"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/past_requests"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/geolocate"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "STARTS_WITH"
-              }
-            }
-          }
-        }
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/hook"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "STARTS_WITH"
-              }
-            }
-          }
-        }
-
-        statement {
-          not_statement {
-            statement {
-              byte_match_statement {
-                search_string = "/version"
-                field_to_match {
-                  uri_path {}
-                }
-                text_transformation {
-                  priority = 0
-                  type     = "NONE"
-                }
-                positional_constraint = "EXACTLY"
               }
             }
           }
