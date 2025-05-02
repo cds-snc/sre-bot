@@ -259,6 +259,7 @@ class ServerSettings(BaseSettings):
         Returns:
             The validated value of the ISSUER_CONFIG field.
         """
+        logger.info("validate_issuer_config", v=v)
         if v is None or not isinstance(v, dict):
             return {}
         return v
