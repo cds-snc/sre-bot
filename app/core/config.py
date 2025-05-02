@@ -1,6 +1,7 @@
 """SRE Bot configuration settings."""
 
-from pydantic import Field
+from typing import Any, Dict, Optional
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import structlog
 
@@ -241,6 +242,27 @@ class ServerSettings(BaseSettings):
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
+    ISSUER_CONFIG: Optional[Dict[str, Dict[str, Any]]] = Field(
+        default=None,
+        alias="ISSUER_CONFIG",
+    )
+
+    @field_validator("ISSUER_CONFIG", mode="before")
+    @classmethod
+    def validate_issuer_config(cls, v: Optional[Dict[str, Dict[str, Any]]]) -> Any:
+        """Validate the ISSUER_CONFIG field.
+
+        Args:
+            cls: The class itself.
+            v: The value of the ISSUER_CONFIG field.
+
+        Returns:
+            The validated value of the ISSUER_CONFIG field.
+        """
+        if v is None or not isinstance(v, dict):
+            return {}
+        return v
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
