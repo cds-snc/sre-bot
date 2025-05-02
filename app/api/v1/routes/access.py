@@ -10,6 +10,7 @@ from server.utils import (
 )
 
 from core.logging import get_module_logger
+from core.security import validate_jwt_token
 from api.dependencies.rate_limits import get_limiter
 
 
@@ -89,7 +90,9 @@ async def create_access_request(
 
 @router.get("/accounts")
 @limiter.limit("5/minute")
-async def get_accounts(request: Request, user: dict = Depends(get_current_user)):
+async def get_accounts(
+    request: Request, token_data: dict = Depends(validate_jwt_token)
+):
     """
     Endpoint to retrieve active AWS account names.
 
@@ -103,6 +106,13 @@ async def get_accounts(request: Request, user: dict = Depends(get_current_user))
     Returns:
         list: A list of active AWS account names.
     """
+    logger.info(
+        "get_accounts",
+        user=token_data["sub"],
+        email=token_data["email"],
+        issuer=token_data["iss"],
+        token_data=token_data,
+    )
     return get_active_account_names()
 
 
