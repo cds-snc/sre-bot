@@ -12,6 +12,8 @@ ISSUER_CONFIG = settings.server.ISSUER_CONFIG
 logger = get_module_logger()
 security = HTTPBearer()
 
+logger.info("issuer_config_loaded", issuer_config=ISSUER_CONFIG)
+
 
 class JWKSManager:
     """
@@ -34,11 +36,15 @@ class JWKSManager:
         Returns:
             Optional[PyJWKClient]: The JWKS client for the specified issuer, or None if not found.
         """
+        logger.info(
+            "get_jwks_client_called", issuer=issuer, issuer_config=self.issuer_config
+        )
         if not self.issuer_config or issuer not in self.issuer_config:
             return None
         if issuer not in self.jwks_clients:
             try:
                 cfg = self.issuer_config[issuer]
+                logger.info("creating_jwks_client", jwks_uri=cfg.get("jwks_uri"))
                 self.jwks_clients[issuer] = PyJWKClient(
                     cfg["jwks_uri"], cache_jwk_set=True, lifespan=3600, timeout=10
                 )
@@ -65,6 +71,10 @@ def get_issuer_from_token(token: str) -> Optional[str]:
     logger.info("get_issuer_from_token", token=token)
     try:
         unverified_payload = decode(token, options={"verify_signature": False})
+        logger.info(
+            "unverified_payload",
+            unverified_payload=unverified_payload,
+        )
         return unverified_payload.get("iss")
     except Exception:
         return None
@@ -91,6 +101,7 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
         # sub is always present
         if "sub" in payload:
             user_id = payload["sub"].split("/")[-1]
+        logger.info("user_info_extracted", user_id=user_id, user_email=user_email)
 
         return user_id, user_email
     except Exception as e:
@@ -125,15 +136,20 @@ async def validate_jwt_token(
     ):
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     token = credentials.credentials
+    logger.info("token_received", token=token)
     issuer = get_issuer_from_token(token)
+    logger.info("issuer_extracted", issuer=issuer)
     if not issuer:
         raise HTTPException(status_code=401, detail="Issuer not found in token")
     jwks_client = jwks_manager.get_jwks_client(issuer)
+    logger.info("jwks_client_result", jwks_client=bool(jwks_client))
     if not jwks_client or not jwks_manager.issuer_config:
         raise HTTPException(status_code=401, detail="Untrusted or missing token issuer")
     cfg = jwks_manager.issuer_config[issuer]
+    logger.info("jwks_config_used", cfg=cfg)
     try:
         signing_key = jwks_client.get_signing_key_from_jwt(token)
+        logger.info("signing_key_obtained", signing_key=str(signing_key))
         payload = decode(
             token,
             signing_key.key,
@@ -141,6 +157,7 @@ async def validate_jwt_token(
             audience=cfg["audience"],
             options={"verify_exp": True},
         )
+        logger.info("jwt_token_validated", payload=payload)
         return payload
     except (PyJWKClientError, PyJWTError) as e:
         logger.warning("jwt_validation_failed", error=str(e), issuer=issuer)
