@@ -61,6 +61,8 @@ def get_issuer_from_token(token: str) -> Optional[str]:
     Returns:
         str | None: The issuer (iss) claim from the token if present, otherwise None.
     """
+
+    logger.info("get_issuer_from_token", token=token)
     try:
         unverified_payload = decode(token, options={"verify_signature": False})
         return unverified_payload.get("iss")
@@ -112,6 +114,10 @@ async def validate_jwt_token(
     Raises:
         HTTPException: If the token is invalid, untrusted, or if any other error occurs during validation.
     """
+    logger.info(
+        "validate_jwt_token",
+        credentials=credentials,
+    )
     if (
         credentials is None
         or not credentials.scheme == "Bearer"
