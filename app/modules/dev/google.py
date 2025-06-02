@@ -74,7 +74,6 @@ def google_service_command(ack, client, body, respond, logger):
     if not groups:
         respond("No groups found.")
         return
-    # log_object_info(groups)
     group = groups[1]
     logger.info("logging_group_details", details=group)
     logger.info("group_email", email=group["email"])
@@ -87,14 +86,11 @@ def google_service_command(ack, client, body, respond, logger):
     respond(f"Found {len(members)} members in group: {email}")
     for member in members:
         logger.info("member_details", details=member)
-        # Uncomment the next line to respond with each member's email
-        # respond(f"Member: {member['email']}")
-    # respond(f"Group: {group['email']}")
 
     event_start = "2025-05-15T15:30:00-04:00"
     event_end = "2025-05-15T16:00:00-04:00"
     event_title = "Test Calendar Event w/o SRE Bot Account"
-    attendees = [SRE_BOT_EMAIL]  # No attendees specified
+    attendees = [SRE_BOT_EMAIL]
 
     logger.info("calendar_event", event_start=event_start, event_end=event_end)
     calendar_event = google_calendar.insert_event(
