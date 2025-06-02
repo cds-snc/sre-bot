@@ -10,6 +10,7 @@ from core.logging import get_module_logger
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 GOOGLE_SRE_CALENDAR_ID = settings.google_workspace.GOOGLE_SRE_CALENDAR_ID
+SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 SRE_DRIVE_ID = settings.google_workspace.SRE_DRIVE_ID
 SRE_INCIDENT_FOLDER = settings.google_workspace.SRE_INCIDENT_FOLDER
 INCIDENT_TEMPLATE = settings.google_workspace.INCIDENT_TEMPLATE
@@ -93,11 +94,7 @@ def google_service_command(ack, client, body, respond, logger):
     event_start = "2025-05-15T15:30:00-04:00"
     event_end = "2025-05-15T16:00:00-04:00"
     event_title = "Test Calendar Event w/o SRE Bot Account"
-    delegated_user_email = "guillaume.charest@cds-snc.ca"
-    attendees = [
-        "sylvia.mclaughlin@cds-snc.ca",
-        "guillaume.charest@cds-snc.ca",
-    ]  # No attendees specified
+    attendees = [SRE_BOT_EMAIL]  # No attendees specified
 
     logger.info("calendar_event", event_start=event_start, event_end=event_end)
     calendar_event = google_calendar.insert_event(
@@ -107,7 +104,6 @@ def google_service_command(ack, client, body, respond, logger):
         title=event_title,
         calendar_id=GOOGLE_SRE_CALENDAR_ID,
         incident_document=None,
-        delegated_user_email=delegated_user_email,
     )
     logger.info("calendar_event_response", response=calendar_event)
 
