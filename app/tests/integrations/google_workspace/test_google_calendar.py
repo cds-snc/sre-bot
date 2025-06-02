@@ -192,7 +192,9 @@ def test_insert_event_no_kwargs_no_delegated_email(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = "test_document_id"
-    result = google_calendar.insert_event(start, end, emails, title, document_id)
+    result = google_calendar.insert_event(
+        start, end, emails, title, incident_document=document_id
+    )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
@@ -284,7 +286,7 @@ def test_insert_event_with_kwargs(
         },
     }
     result = google_calendar.insert_event(
-        start, end, emails, title, document_id, **kwargs
+        start, end, emails, title, incident_document=document_id, **kwargs
     )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
@@ -359,7 +361,7 @@ def test_insert_event_with_no_document(
         },
     }
     result = google_calendar.insert_event(
-        start, end, emails, title, document_id, **kwargs
+        start, end, emails, title, incident_document=document_id, **kwargs
     )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
@@ -418,7 +420,10 @@ def test_insert_event_google_hangout_link_created(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = "test_document_id"
-    result = google_calendar.insert_event(start, end, emails, title, document_id)
+
+    result = google_calendar.insert_event(
+        start, end, emails, title, incident_document=document_id
+    )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",

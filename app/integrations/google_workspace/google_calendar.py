@@ -47,7 +47,9 @@ def get_freebusy(time_min, time_max, items, **kwargs):
 
 
 @handle_google_api_errors
-def insert_event(start, end, emails, title, incident_document, **kwargs) -> dict:
+def insert_event(
+    start, end, emails, title, calendar_id="primary", incident_document=None, **kwargs
+) -> dict:
     """Creates a new event in the specified calendars.
 
     Args:
@@ -106,7 +108,7 @@ def insert_event(start, end, emails, title, incident_document, **kwargs) -> dict
         scopes=["https://www.googleapis.com/auth/calendar.events"],
         delegated_user_email=delegated_user_email,
         body=body,
-        calendarId="primary",
+        calendarId=calendar_id,
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
