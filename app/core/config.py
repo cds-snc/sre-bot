@@ -64,6 +64,9 @@ class GoogleWorkspaceSettings(BaseSettings):
     GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
         default="", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
     )
+    GOOGLE_SRE_CALENDAR_ID: str = Field(
+        default="", alias="GOOGLE_SRE_CALENDAR_ID"
+    )
 
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
         default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
