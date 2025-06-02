@@ -349,7 +349,7 @@ def save_retro_event(
         first_available_end.isoformat(),
         user_emails,
         "Retro " + incident_name,
-        incident_document,
+        incident_document=incident_document,
         **event_config,
     )
 
