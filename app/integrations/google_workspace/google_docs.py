@@ -4,34 +4,36 @@ This module provides functions to create and manipulate Google Docs.
 """
 
 import re
-from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
-    execute_google_api_call,
-)
+
+from integrations.google_workspace import google_service
 from core.logging import get_module_logger
 
+SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+]
+
 logger = get_module_logger()
+handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
-def create(title: str) -> str:
+def create(title: str):
     """Creates a new document in Google Docs.
 
     Args:
         title (str): The title of the new document.
 
     Returns:
-        str: The id of the new document.
+        dict: The response from the Google Docs API containing the document ID.
     """
-    result = execute_google_api_call(
+    return google_service.execute_google_api_call(
         "docs",
         "v1",
         "documents",
         "create",
-        scopes=["https://www.googleapis.com/auth/documents"],
+        scopes=SCOPES,
         body={"title": title},
     )
-    return result["documentId"]
 
 
 @handle_google_api_errors
@@ -45,12 +47,12 @@ def batch_update(document_id: str, requests: list) -> dict:
     Returns:
         dict: The response from the Google Docs API.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "docs",
         "v1",
         "documents",
         "batchUpdate",
-        scopes=["https://www.googleapis.com/auth/documents"],
+        scopes=SCOPES,
         documentId=document_id,
         body={"requests": requests},
     )
@@ -66,12 +68,12 @@ def get_document(document_id: str) -> dict:
     Returns:
         dict: The document resource.
     """
-    return execute_google_api_call(
+    return google_service.execute_google_api_call(
         "docs",
         "v1",
         "documents",
         "get",
-        scopes=["https://www.googleapis.com/auth/documents.readonly"],
+        scopes=SCOPES,
         documentId=document_id,
     )
 
