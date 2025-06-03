@@ -9,7 +9,6 @@ from integrations.google_workspace import (
     google_drive,
 )
 
-DELEGATED_USER_EMAIL = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
 FOLDER_REPORTS_GOOGLE_GROUPS = settings.reports.FOLDER_REPORTS_GOOGLE_GROUPS
 
 logger = get_module_logger()
