@@ -17,11 +17,12 @@ handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
-def create(title: str):
+def create(title: str, **kwargs) -> dict:
     """Creates a new document in Google Docs.
 
     Args:
         title (str): The title of the new document.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The response from the Google Docs API containing the document ID.
@@ -33,16 +34,18 @@ def create(title: str):
         "create",
         scopes=SCOPES,
         body={"title": title},
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def batch_update(document_id: str, requests: list) -> dict:
+def batch_update(document_id: str, requests: list, **kwargs) -> dict:
     """Applies a list of updates to a document in Google Docs.
 
     Args:
         document_id (str): The id of the document to update.
         requests (list): A list of update requests.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The response from the Google Docs API.
@@ -55,15 +58,17 @@ def batch_update(document_id: str, requests: list) -> dict:
         scopes=SCOPES,
         documentId=document_id,
         body={"requests": requests},
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def get_document(document_id: str) -> dict:
+def get_document(document_id: str, **kwargs) -> dict:
     """Gets a document from Google Docs.
 
     Args:
         document_id (str): The id of the document to get.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The document resource.
@@ -75,6 +80,7 @@ def get_document(document_id: str) -> dict:
         "get",
         scopes=SCOPES,
         documentId=document_id,
+        **kwargs,
     )
 
 

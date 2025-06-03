@@ -92,7 +92,7 @@ def test_get_returns_document_resource(execute_google_api_call_mock):
         "v1",
         "documents",
         "get",
-        scopes=["https://www.googleapis.com/auth/documents.readonly"],
+        scopes=["tests", "scopes"],
         documentId="test_document_id",
     )
 
