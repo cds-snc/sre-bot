@@ -5,15 +5,12 @@ import pytz
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
-# Get the email for the SRE bot and the email for the delegated admin
-SRE_BOT_EMAIL = google_service.SRE_BOT_EMAIL
-GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
-
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
-def get_freebusy(time_min, time_max, items, **kwargs):
+def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
     """Returns free/busy information for a set of calendars.
 
     Args:
@@ -33,22 +30,32 @@ def get_freebusy(time_min, time_max, items, **kwargs):
         "timeMax": time_max,
         "items": items,
     }
-    body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
+    if body_kwargs is not None and isinstance(body_kwargs, dict):
+        body.update(
+            {convert_string_to_camel_case(k): v for k, v in body_kwargs.items()}
+        )
 
     return google_service.execute_google_api_call(
         "calendar",
         "v3",
         "freebusy",
         "query",
-        delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL,
-        scopes=["https://www.googleapis.com/auth/calendar"],
+        scopes=SCOPES,
         body=body,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
 def insert_event(
-    start, end, emails, title, calendar_id="primary", incident_document=None, **kwargs
+    start,
+    end,
+    emails,
+    title,
+    calendar_id="primary",
+    incident_document=None,
+    body_kwargs=None,
+    **kwargs,
 ) -> dict:
     """Creates a new event in the specified calendars.
 
@@ -57,14 +64,22 @@ def insert_event(
         end (datetime): The end time of the event.
         emails (list): The list of email addresses of the attendees.
         title (str): The title of the event.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
-        Any additional kwargs will be added to the event body. For a full list of possible kwargs, refer to the Google Calendar API documentation:
-        https://developers.google.com/calendar/v3/reference/events/insert
+        calendar_id (str, optional): The ID of the calendar to insert the event into. Defaults to 'primary'.
+        incident_document (str, optional): The ID of the Google Document to attach to the event.
+        **body_kwargs: Additional keyword arguments to pass to the event body. E.g., `time_zone`, etc. https://developers.google.com/calendar/v3/reference/events/insert
+        **kwargs: Additional keyword arguments to pass to the API call. E.g., `delegated_user_email`.
 
     Returns:
         dict: A dictionary containing the event link and a message indicating when the event has been scheduled.
     """
-    time_zone = kwargs.get("time_zone", "America/New_York")
+    if body_kwargs is None:
+        time_zone = "America/New_York"
+    elif isinstance(body_kwargs, dict):
+        time_zone = body_kwargs.get("time_zone", "America/New_York")
+    else:
+        raise ValueError(
+            "body_kwargs must be a dictionary or None. If you want to pass a time zone, use body_kwargs={'time_zone': 'America/New_York'}"
+        )
     body = {
         "start": {"dateTime": start, "timeZone": time_zone},
         "end": {"dateTime": end, "timeZone": time_zone},
@@ -94,24 +109,23 @@ def insert_event(
             "attachments", None
         )  # This removes 'attachments' if it exists, does nothing if it doesn't
 
-    body.update({convert_string_to_camel_case(k): v for k, v in kwargs.items()})
-    if "delegated_user_email" in kwargs and kwargs["delegated_user_email"] is not None:
-        delegated_user_email = kwargs["delegated_user_email"]
-    else:
-        delegated_user_email = SRE_BOT_EMAIL
+    if body_kwargs is not None and isinstance(body_kwargs, dict):
+        body.update(
+            {convert_string_to_camel_case(k): v for k, v in body_kwargs.items()}
+        )
 
     result = google_service.execute_google_api_call(
         "calendar",
         "v3",
         "events",
         "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         body=body,
         calendarId=calendar_id,
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
+        **kwargs,
     )
     # Handle the instance differently if the result is a dictionary or a tuple and get the calendar link and start time
     if isinstance(result, dict):
