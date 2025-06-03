@@ -33,6 +33,7 @@ def test_create_draft(
         scopes=["tests", "scopes"],
         userId="me",
         body=message,
+        delegated_user_email="delegated_user_email",
     )
 
     assert message_id == "message_id"

@@ -44,16 +44,11 @@ def create_draft(message, user_id="me", **kwargs):
     Args:
         message (EmailMessage): The message to create the draft with.
         user_id (str, optional): The user's email address. Default is 'me'.
+        **kwargs: Additional keyword arguments to pass to the API call, such as `delegated_user_email`.
 
     Returns:
         dict: The draft object.
     """
-    logger.debug(
-        "creating_draft",
-        user_id=user_id,
-        message=message,
-    )
-
     return google_service.execute_google_api_call(
         service_name="gmail",
         version="v1",
@@ -62,4 +57,5 @@ def create_draft(message, user_id="me", **kwargs):
         scopes=SCOPES,
         userId=user_id,
         body=message,
+        **kwargs,
     )
