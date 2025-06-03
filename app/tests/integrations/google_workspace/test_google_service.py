@@ -251,16 +251,18 @@ def test_handle_google_api_errors_processes_unsupported_params(
     )
 
 
+@patch("integrations.google_workspace.google_service.SRE_BOT_EMAIL", "sre_bot_email")
 @patch("integrations.google_workspace.google_service.get_google_service")
 def test_execute_google_api_call_calls_get_google_service(mock_get_google_service):
     google_service.execute_google_api_call(
         "service_name", "version", "resource", "method"
     )
     mock_get_google_service.assert_called_once_with(
-        "service_name", "version", None, None
+        "service_name", "version", None, "sre_bot_email"
     )
 
 
+@patch("integrations.google_workspace.google_service.SRE_BOT_EMAIL", "sre_bot_email")
 @patch("integrations.google_workspace.google_service.get_google_service")
 def test_execute_google_api_call_calls_get_google_service_with_delegated_user_email(
     mock_get_google_service,

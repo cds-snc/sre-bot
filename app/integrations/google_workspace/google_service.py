@@ -192,6 +192,8 @@ def execute_google_api_call(
     Returns:
         Any: The result of the API call. If paginate is True, returns a list of all results.
     """
+    if delegated_user_email is None:
+        delegated_user_email = SRE_BOT_EMAIL
     service = get_google_service(
         service_name,
         version,
