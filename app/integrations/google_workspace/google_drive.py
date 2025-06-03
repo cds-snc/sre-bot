@@ -7,23 +7,22 @@ This module provides functionalities to interact with Google Drive. It includes 
 from integrations.google_workspace import google_service
 from core.logging import get_module_logger
 
-logger = get_module_logger()
 INCIDENT_TEMPLATE = google_service.INCIDENT_TEMPLATE
-
+DELEGATED_USER_EMAIL = google_service.SRE_BOT_EMAIL
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
-def add_metadata(
-    file_id: str, key: str, value: str, delegated_user_email: str | None = None
-):
+def add_metadata(file_id: str, key: str, value: str, **kwargs):
     """Add metadata to a file in Google Drive.
 
     Args:
         file_id (str): The file id of the file to add metadata to.
         key (str): The key of the metadata to add.
         value (str): The value of the metadata to add.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The updated file metadata.
@@ -33,23 +32,23 @@ def add_metadata(
         "v3",
         "files",
         "update",
-        scopes=["https://www.googleapis.com/auth/drive"],
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         fileId=file_id,
         body={"appProperties": {key: value}},
         fields="name, appProperties",
         supportsAllDrives=True,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def delete_metadata(file_id, key, delegated_user_email=None):
+def delete_metadata(file_id, key, **kwargs):
     """Delete metadata from a file in Google Drive.
 
     Args:
         file_id (str): The file id of the file to delete metadata from.
         key (str): The key of the metadata to delete.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The updated file metadata.
@@ -59,20 +58,22 @@ def delete_metadata(file_id, key, delegated_user_email=None):
         "v3",
         "files",
         "update",
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         fileId=file_id,
         body={"appProperties": {key: None}},
         fields="name, appProperties",
         supportsAllDrives=True,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def list_metadata(file_id: str) -> dict:
+def list_metadata(file_id: str, **kwargs) -> dict:
     """List metadata of a file in Google Drive.
 
     Args:
         file_id (str): The file id of the file to list metadata from.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The file metadata.
@@ -82,9 +83,11 @@ def list_metadata(file_id: str) -> dict:
         "v3",
         "files",
         "get",
+        scopes=SCOPES,
         fileId=file_id,
         fields="id, name, appProperties",
         supportsAllDrives=True,
+        **kwargs,
     )
 
 
@@ -93,8 +96,7 @@ def create_folder(
     name: str,
     parent_folder: str,
     fields: str | None = None,
-    scopes: list[str] | None = None,
-    delegated_user_email: str | None = None,
+    **kwargs,
 ) -> dict:
     """Create a new folder in Google Drive.
 
@@ -102,8 +104,7 @@ def create_folder(
         name (str): The name of the new folder.
         parent_folder (str): The id of the parent folder.
         fields (str, optional): The fields to include in the response.
-        scopes (list[str], optional): The scopes to use for the API call.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: A File resource representing the new folder.
@@ -114,8 +115,7 @@ def create_folder(
         "v3",
         "files",
         "create",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         body={
             "name": name,
             "parents": [parent_folder],
@@ -123,6 +123,7 @@ def create_folder(
         },
         supportsAllDrives=True,
         fields=fields,
+        **kwargs,
     )
 
 
@@ -132,16 +133,16 @@ def create_file_from_template(
     folder: str,
     template: str,
     fields: str | None = None,
-    scopes: list[str] | None = None,
-    delegated_user_email: str | None = None,
+    **kwargs,
 ) -> dict:
-    """Create a new file in Google Drive from a template
-     (Docs, Sheets, Slides, Forms, or Sites.)
+    """Create a new file in Google Drive from a template (Docs, Sheets, Slides, Forms, or Sites.)
 
     Args:
         name (str): The name of the new file.
         folder (str): The id of the folder to create the file in.
         template (str): The id of the template to use.
+        fields (str, optional): The fields to include in the response.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: A File resource representing the new file with a mask of 'id'.
@@ -151,30 +152,24 @@ def create_file_from_template(
         "v3",
         "files",
         "copy",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         fileId=template,
         body={"name": name, "parents": [folder]},
         supportsAllDrives=True,
         fields=fields,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def create_file(name, folder, file_type):
-    """Create a new file in Google Drive.
-        Options for 'file_type' are:
-
-            - "document": Google Docs
-            - "spreadsheet": Google Sheets
-            - "presentation": Google Slides
-            - "form": Google Forms
-            - "site": Google Sites
+def create_file(name, folder, file_type, **kwargs):
+    """Create a new file in Google Drive. Options for 'file_type' are: "document": Google Docs, "spreadsheet": Google Sheets, "presentation": Google Slides, "form": Google Forms, "site": Google Sites
 
     Args:
         name (str): The name of the new file.
         folder (str): The id of the folder to create the file in.
         file_type (str): The type of the new file.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         str: The id of the new file.
@@ -198,20 +193,23 @@ def create_file(name, folder, file_type):
         "v3",
         "files",
         "create",
+        scopes=SCOPES,
         body={"name": name, "parents": [folder], "mimeType": mime_type_value},
         supportsAllDrives=True,
         fields="id, name",
+        **kwargs,
     )
 
     return result
 
 
 @handle_google_api_errors
-def get_file_by_id(fileId: str) -> dict:
+def get_file_by_id(fileId: str, **kwargs) -> dict:
     """Get a file by id in Google Drive.
 
     Args:
         fileId (str): The id of the file to get.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The file metadata.
@@ -221,13 +219,15 @@ def get_file_by_id(fileId: str) -> dict:
         "v3",
         "files",
         "get",
+        scopes=SCOPES,
         fileId=fileId,
         supportsAllDrives=True,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def find_files_by_name(name, folder_id=None):
+def find_files_by_name(name, folder_id=None, **kwargs):
     """Get a file by name in a specific Google Drive folder.
 
     This function requires the caller to have the necessary permissions to access the file in Google Workspace.
@@ -235,6 +235,7 @@ def find_files_by_name(name, folder_id=None):
     Args:
         name (str): The name of the file to get.
         folder_id (str, optional): The id of the folder to search in. If None, search in all folders.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         list: A list of files that match the name within the folder.
@@ -247,7 +248,7 @@ def find_files_by_name(name, folder_id=None):
         "v3",
         "files",
         "list",
-        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        scopes=SCOPES,
         paginate=True,
         pageSize=1,
         supportsAllDrives=True,
@@ -255,16 +256,18 @@ def find_files_by_name(name, folder_id=None):
         corpora="user",
         q=q,
         fields="files(appProperties, id, name)",
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def list_folders_in_folder(folder, query=None):
+def list_folders_in_folder(folder, query=None, **kwargs):
     """List all folders in a folder in Google Drive.
 
     Args:
         folder (str): The id of the folder to list.
         query (str, optional): A query to filter the folders.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         list: A list of folders in the folder.
@@ -278,6 +281,7 @@ def list_folders_in_folder(folder, query=None):
         "v3",
         "files",
         "list",
+        scopes=SCOPES,
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
@@ -285,19 +289,20 @@ def list_folders_in_folder(folder, query=None):
         corpora="user",
         q=base_query,
         fields="files(id, name)",
+        **kwargs,
     )
 
 
 @handle_google_api_errors
 def list_files_in_folder(
     folder: str,
-    scopes: list[str] | None = None,
-    delegated_user_email: str | None = None,
+    **kwargs,
 ):
     """List all files in a folder in Google Drive.
 
     Args:
         folder (str): The id of the folder to list.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         list: A list of files in the folder.
@@ -307,8 +312,7 @@ def list_files_in_folder(
         "v3",
         "files",
         "list",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
@@ -316,6 +320,7 @@ def list_files_in_folder(
         corpora="user",
         q=f"parents in '{folder}' and mimeType != 'application/vnd.google-apps.folder' and trashed=false",
         fields="files(id, name)",
+        **kwargs,
     )
 
 
@@ -325,8 +330,7 @@ def copy_file_to_folder(
     name: str,
     parent_folder_id: str,
     destination_folder_id: str,
-    scopes: list[str] | None = None,
-    delegated_user_email: str | None = None,
+    **kwargs,
 ) -> str:
     """Copy a file to a new folder in Google Drive.
 
@@ -344,12 +348,12 @@ def copy_file_to_folder(
         "v3",
         "files",
         "copy",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         fileId=file_id,
         body={"name": name, "parents": [parent_folder_id]},
         supportsAllDrives=True,
         fields="id",
+        **kwargs,
     )[0]["id"]
     print(f"Copied file: {copied_file}")
 
@@ -359,13 +363,13 @@ def copy_file_to_folder(
         "v3",
         "files",
         "update",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=SCOPES,
         fileId=copied_file,
         addParents=destination_folder_id,
         removeParents=parent_folder_id,
         supportsAllDrives=True,
         fields="id",
+        **kwargs,
     )[0]["id"]
     print(f"Updated file: {updated_file}")
 

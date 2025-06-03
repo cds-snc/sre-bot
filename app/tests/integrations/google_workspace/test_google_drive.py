@@ -5,6 +5,7 @@ import pytest
 from integrations.google_workspace import google_drive
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -19,8 +20,7 @@ def test_add_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "update",
-        scopes=["https://www.googleapis.com/auth/drive"],
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         fileId="file_id",
         body={"appProperties": {"key": "value"}},
         fields="name, appProperties",
@@ -29,6 +29,7 @@ def test_add_metadata_returns_result(execute_google_api_call_mock):
     assert result == {"name": "test_folder", "appProperties": {"key": "value"}}
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -43,7 +44,7 @@ def test_delete_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "update",
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         fileId="file_id",
         body={"appProperties": {"key": None}},
         fields="name, appProperties",
@@ -52,6 +53,7 @@ def test_delete_metadata_returns_result(execute_google_api_call_mock):
     assert result == {"name": "test_folder", "appProperties": {}}
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -66,6 +68,7 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
         "v3",
         "files",
         "get",
+        scopes=["test", "scopes"],
         fileId="file_id",
         fields="id, name, appProperties",
         supportsAllDrives=True,
@@ -76,6 +79,7 @@ def test_list_metadata_returns_result(execute_google_api_call_mock):
     }
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -95,8 +99,7 @@ def test_create_folder_returns_folder(execute_google_api_call_mock):
         "v3",
         "files",
         "create",
-        scopes=None,
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         body={
             "name": "test_folder",
             "mimeType": "application/vnd.google-apps.folder",
@@ -107,6 +110,7 @@ def test_create_folder_returns_folder(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -122,8 +126,7 @@ def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
         "v3",
         "files",
         "create",
-        scopes=None,
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         body={
             "name": "test_folder",
             "mimeType": "application/vnd.google-apps.folder",
@@ -134,6 +137,7 @@ def test_create_folder_calls_api_with_fields(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -146,6 +150,7 @@ def test_create_file_with_valid_type_returns_file_id(execute_google_api_call_moc
         "v3",
         "files",
         "create",
+        scopes=["test", "scopes"],
         body={
             "name": "test_document",
             "mimeType": "application/vnd.google-apps.document",
@@ -168,6 +173,7 @@ def test_create_file_with_invalid_type_raises_value_error(execute_google_api_cal
         assert result is None
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -182,8 +188,7 @@ def test_create_file_from_template_returns_file(execute_google_api_call_mock):
         "v3",
         "files",
         "copy",
-        scopes=None,
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         fileId="template_id",
         body={"name": "test_document", "parents": ["folder_id"]},
         supportsAllDrives=True,
@@ -191,6 +196,7 @@ def test_create_file_from_template_returns_file(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -211,11 +217,13 @@ def test_get_file_by_id(execute_google_api_call_mock):
         "v3",
         "files",
         "get",
+        scopes=["test", "scopes"],
         fileId="test_document_id",
         supportsAllDrives=True,
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -240,7 +248,7 @@ def test_find_files_by_name_with_folder_id_returns_object(execute_google_api_cal
         "v3",
         "files",
         "list",
-        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=1,
         supportsAllDrives=True,
@@ -251,6 +259,7 @@ def test_find_files_by_name_with_folder_id_returns_object(execute_google_api_cal
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -277,7 +286,7 @@ def test_find_files_by_name_without_folder_id_returns_object(
         "v3",
         "files",
         "list",
-        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=1,
         supportsAllDrives=True,
@@ -288,6 +297,7 @@ def test_find_files_by_name_without_folder_id_returns_object(
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -314,7 +324,7 @@ def test_find_files_by_name_with_empty_folder_id_returns_object(
         "v3",
         "files",
         "list",
-        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=1,
         supportsAllDrives=True,
@@ -325,6 +335,7 @@ def test_find_files_by_name_with_empty_folder_id_returns_object(
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -339,7 +350,7 @@ def test_find_files_by_name_no_file_found_returns_empty_list(
         "v3",
         "files",
         "list",
-        scopes=["https://www.googleapis.com/auth/drive.readonly"],
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=1,
         supportsAllDrives=True,
@@ -350,6 +361,7 @@ def test_find_files_by_name_no_file_found_returns_empty_list(
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -371,8 +383,7 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
                 "v3",
                 "files",
                 "copy",
-                scopes=None,
-                delegated_user_email=None,
+                scopes=["test", "scopes"],
                 fileId="file_id",
                 body={"name": "name", "parents": ["parent_folder"]},
                 supportsAllDrives=True,
@@ -383,8 +394,7 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
                 "v3",
                 "files",
                 "update",
-                scopes=None,
-                delegated_user_email=None,
+                scopes=["test", "scopes"],
                 fileId="file_id",
                 addParents="destination_folder",
                 removeParents="parent_folder",
@@ -395,6 +405,7 @@ def test_copy_file_to_folder_returns_file_id(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -415,6 +426,7 @@ def test_list_folders_in_folder_returns_folders(execute_google_api_call_mock):
         "v3",
         "files",
         "list",
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
@@ -425,6 +437,7 @@ def test_list_folders_in_folder_returns_folders(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -446,6 +459,7 @@ def test_list_folders_in_folder_with_query(execute_google_api_call_mock):
         "v3",
         "files",
         "list",
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,
@@ -456,6 +470,7 @@ def test_list_folders_in_folder_with_query(execute_google_api_call_mock):
     )
 
 
+@patch("integrations.google_workspace.google_drive.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_drive.google_service.execute_google_api_call"
 )
@@ -476,8 +491,7 @@ def test_list_files_in_folder_returns_files(execute_google_api_call_mock):
         "v3",
         "files",
         "list",
-        scopes=None,
-        delegated_user_email=None,
+        scopes=["test", "scopes"],
         paginate=True,
         pageSize=25,
         supportsAllDrives=True,

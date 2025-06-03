@@ -2,6 +2,7 @@ from unittest.mock import patch
 from integrations.google_workspace import sheets
 
 
+@patch("integrations.google_workspace.sheets.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.sheets.execute_google_api_call")
 def test_get_values(mock_execute_google_api_call):
 
@@ -16,12 +17,14 @@ def test_get_values(mock_execute_google_api_call):
         "v4",
         "spreadsheets.values",
         "get",
+        scopes=["test", "scopes"],
         spreadsheetId=spreadsheet_id,
         range=range,
         fields=fields,
     )
 
 
+@patch("integrations.google_workspace.sheets.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.sheets.execute_google_api_call")
 def test_get_values_with_defaults(mock_execute_google_api_call):
 
@@ -34,12 +37,14 @@ def test_get_values_with_defaults(mock_execute_google_api_call):
         "v4",
         "spreadsheets.values",
         "get",
+        scopes=["test", "scopes"],
         spreadsheetId=spreadsheet_id,
         range=None,
         fields=None,
     )
 
 
+@patch("integrations.google_workspace.sheets.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.sheets.execute_google_api_call")
 def test_batch_update_values(mock_execute_google_api_call):
 
@@ -55,6 +60,7 @@ def test_batch_update_values(mock_execute_google_api_call):
         "v4",
         "spreadsheets.values",
         "batchUpdate",
+        scopes=["test", "scopes"],
         spreadsheetId=spreadsheet_id,
         body={
             "valueInputOption": value_input_option,
@@ -63,6 +69,7 @@ def test_batch_update_values(mock_execute_google_api_call):
     )
 
 
+@patch("integrations.google_workspace.sheets.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.sheets.execute_google_api_call")
 def test_batch_update_values_with_defaults(mock_execute_google_api_call):
 
@@ -77,6 +84,7 @@ def test_batch_update_values_with_defaults(mock_execute_google_api_call):
         "v4",
         "spreadsheets.values",
         "batchUpdate",
+        scopes=["test", "scopes"],
         spreadsheetId=spreadsheet_id,
         body={
             "valueInputOption": "USER_ENTERED",
@@ -85,6 +93,7 @@ def test_batch_update_values_with_defaults(mock_execute_google_api_call):
     )
 
 
+@patch("integrations.google_workspace.sheets.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.sheets.execute_google_api_call")
 def test_append_values(mock_execute_google_api_call):
 
@@ -99,6 +108,7 @@ def test_append_values(mock_execute_google_api_call):
         "v4",
         "spreadsheets.values",
         "append",
+        scopes=["test", "scopes"],
         spreadsheetId=spreadsheet_id,
         range=range,
         body=body,
