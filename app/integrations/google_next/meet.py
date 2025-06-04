@@ -9,8 +9,7 @@ from integrations.google_next.service import (
 from core.logging import get_module_logger
 
 DEFAULT_SCOPES = [
-    "https://www.googleapis.com/auth/meet",
-    "https://www.googleapis.com/auth/meet.space",
+    "https://www.googleapis.com/auth/meet.space.created",
 ]
 
 logger = get_module_logger()
