@@ -8,20 +8,28 @@ from googleapiclient.errors import Error, HttpError  # type: ignore
 from integrations.google_next import service
 
 
+@patch("integrations.google_next.service.SRE_BOT_EMAIL", new="default@email.com")
 @patch("integrations.google_next.service.build")
 @patch("integrations.google_next.service.service_account")
 def test_get_google_service_returns_build_object(mock_service_account, build_mock):
     """
     Test case to verify that the function returns a build object.
     """
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
+    creds_mock = MagicMock()
+    creds_with_subject_mock = MagicMock()
+    creds_with_scopes_mock = MagicMock()
+
+    mock_service_account.Credentials.from_service_account_info.return_value = creds_mock
+    creds_mock.with_subject.return_value = creds_with_subject_mock
+    creds_with_subject_mock.with_scopes.return_value = creds_with_scopes_mock
+
     service.get_google_service("drive", "v3")
+    creds_mock.with_subject.assert_called_once_with("default@email.com")
+    creds_mock.with_scopes.assert_not_called()
     build_mock.assert_called_once_with(
         "drive",
         "v3",
-        credentials=mock_service_account.Credentials.from_service_account_info.return_value,
+        credentials=creds_with_subject_mock,
         cache_discovery=False,
     )
 
@@ -32,29 +40,47 @@ def test_get_google_service_with_delegated_user_email(mock_service_account, buil
     """
     Test case to verify that the function works correctly with a delegated user email.
     """
-    # credentials_mock.return_value = MagicMock()
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
+    creds_mock = MagicMock()
+    creds_with_subject_mock = MagicMock()
+    creds_with_scopes_mock = MagicMock()
+
+    mock_service_account.Credentials.from_service_account_info.return_value = creds_mock
+    creds_mock.with_subject.return_value = creds_with_subject_mock
+    creds_with_subject_mock.with_scopes.return_value = creds_with_scopes_mock
 
     service.get_google_service("drive", "v3", delegated_user_email="test@test.com")
-    mock_service_account.Credentials.from_service_account_info.return_value.with_subject.assert_called_once_with(
-        "test@test.com"
+    creds_mock.with_subject.assert_called_once_with("test@test.com")
+    creds_mock.with_scopes.assert_not_called()
+    build_mock.assert_called_once_with(
+        "drive",
+        "v3",
+        credentials=creds_with_subject_mock,
+        cache_discovery=False,
     )
 
 
+@patch("integrations.google_next.service.SRE_BOT_EMAIL", new="default@email.com")
 @patch("integrations.google_next.service.build")
 @patch("integrations.google_next.service.service_account")
 def test_get_google_service_with_scopes(mock_service_account, build_mock):
     """
     Test case to verify that the function works correctly with scopes.
     """
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
+    creds_mock = MagicMock()
+    creds_with_subject_mock = MagicMock()
+    creds_with_scopes_mock = MagicMock()
+
+    mock_service_account.Credentials.from_service_account_info.return_value = creds_mock
+    creds_mock.with_subject.return_value = creds_with_subject_mock
+    creds_with_subject_mock.with_scopes.return_value = creds_with_scopes_mock
     service.get_google_service("drive", "v3", scopes=["scope1", "scope2"])
-    mock_service_account.Credentials.from_service_account_info.return_value.with_scopes.assert_called_once_with(
-        ["scope1", "scope2"]
+    creds_mock.with_subject.assert_called_once_with("default@email.com")
+    creds_with_subject_mock.with_scopes.assert_called_once_with(["scope1", "scope2"])
+    build_mock.assert_called_once_with(
+        "drive",
+        "v3",
+        credentials=creds_with_scopes_mock,
+        cache_discovery=False,
     )
 
 

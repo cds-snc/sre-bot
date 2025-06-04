@@ -26,7 +26,7 @@ from core.logging import get_module_logger
 
 
 # Define the default arguments
-GOOGLE_DELEGATED_ADMIN_EMAIL = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
+SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
 GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
     settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
@@ -54,6 +54,8 @@ def get_google_service(
     """
 
     creds_json = GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+    if not delegated_user_email:
+        delegated_user_email = SRE_BOT_EMAIL
 
     if not creds_json:
         logger.error(
@@ -66,8 +68,7 @@ def get_google_service(
     try:
         creds_info = json.loads(creds_json)
         creds = service_account.Credentials.from_service_account_info(creds_info)
-        if delegated_user_email:
-            creds = creds.with_subject(delegated_user_email)
+        creds = creds.with_subject(delegated_user_email)
         if scopes:
             creds = creds.with_scopes(scopes)
     except JSONDecodeError as json_decode_exception:
