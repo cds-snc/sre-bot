@@ -5,11 +5,6 @@ from email.message import EmailMessage
 from integrations.google_workspace import google_service
 from core.logging import get_module_logger
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.compose",
-    "https://www.googleapis.com/auth/gmail.modify",
-]
-
 logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
@@ -54,7 +49,10 @@ def create_draft(message, user_id="me", **kwargs):
         version="v1",
         resource_path="users.drafts",
         method="create",
-        scopes=SCOPES,
+        scopes=[
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.modify",
+        ],
         userId=user_id,
         body=message,
         **kwargs,

@@ -85,7 +85,6 @@ def time_range():
     }
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -101,7 +100,7 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
         "v3",
         "freebusy",
         "query",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
             "timeMax": time_max,
@@ -110,7 +109,6 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     )
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -134,7 +132,7 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
         "v3",
         "freebusy",
         "query",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
             "timeMax": time_max,
@@ -160,7 +158,6 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -200,7 +197,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
         "v3",
         "events",
         "insert",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -230,7 +227,6 @@ def test_insert_event_no_kwargs_no_delegated_email(
     assert not mock_convert_string_to_camel_case.called
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -298,7 +294,7 @@ def test_insert_event_with_kwargs(
         "v3",
         "events",
         "insert",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         delegated_user_email=delegated_user_email,
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
@@ -318,7 +314,6 @@ def test_insert_event_with_kwargs(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -379,7 +374,7 @@ def test_insert_event_with_no_document(
         "v3",
         "events",
         "insert",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         delegated_user_email=delegated_user_email,
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
@@ -399,7 +394,6 @@ def test_insert_event_with_no_document(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -440,7 +434,7 @@ def test_insert_event_google_hangout_link_created(
         "v3",
         "events",
         "insert",
-        scopes=["test", "scopes"],
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -472,7 +466,6 @@ def test_insert_event_google_hangout_link_created(
     assert mock_execute_google_api_call.contains(mock_unique_id.return_value)
 
 
-@patch("integrations.google_workspace.google_calendar.SCOPES", ["test", "scopes"])
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"

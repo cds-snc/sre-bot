@@ -5,7 +5,6 @@ import pytz
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
@@ -38,7 +37,7 @@ def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
         "v3",
         "freebusy",
         "query",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body=body,
         **kwargs,
     )
@@ -117,7 +116,7 @@ def insert_event(
         "v3",
         "events",
         "insert",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body=body,
         calendarId=calendar_id,
         supportsAttachments=True,

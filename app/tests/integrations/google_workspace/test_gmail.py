@@ -11,7 +11,6 @@ def test_create_email_message():
     assert message["message"]["raw"] is not None
 
 
-@patch("integrations.google_workspace.gmail.SCOPES", ["tests", "scopes"])
 @patch("integrations.google_workspace.gmail.google_service.execute_google_api_call")
 def test_create_draft(
     mock_execute_google_api_call,
@@ -30,7 +29,10 @@ def test_create_draft(
         version="v1",
         resource_path="users.drafts",
         method="create",
-        scopes=["tests", "scopes"],
+        scopes=[
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.modify",
+        ],
         userId="me",
         body=message,
         delegated_user_email="delegated_user_email",
