@@ -17,10 +17,8 @@ def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
         time_min (str): The start of the interval for the query.
         time_max (str): The end of the interval for the query.
         items (list): The list of calendars and/or groups to query.
-        time_zone (str, optional): The time zone for the query. Default is 'UTC'.
-        calendar_expansion_max (int, optional): The maximum number of calendar identifiers to be provided for a single group. Maximum value is 50.
-        group_expansion_max (int, optional): The maximum number of group members to return for a single group. Maximum value is 100.
-
+        body_kwargs (dict, optional): Additional parameters to include in the request body. e.g. `time_zone`, `groupExpansionMax`, etc.
+        **kwargs: Additional keyword arguments to pass to the API call, such as `delegated_user_email`.
     Returns:
         dict: The free/busy response for the calendars and/or groups provided.
     """

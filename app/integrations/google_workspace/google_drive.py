@@ -204,7 +204,7 @@ def create_file(name, folder, file_type, **kwargs):
 
 
 @handle_google_api_errors
-def get_file_by_id(fileId: str, **kwargs) -> dict:
+def get_file_by_id(file_id: str, **kwargs) -> dict:
     """Get a file by id in Google Drive.
 
     Args:
@@ -220,7 +220,7 @@ def get_file_by_id(fileId: str, **kwargs) -> dict:
         "files",
         "get",
         scopes=SCOPES,
-        fileId=fileId,
+        fileId=file_id,
         supportsAllDrives=True,
         **kwargs,
     )
@@ -339,6 +339,7 @@ def copy_file_to_folder(
         name (str): The name of the new file.
         parent_folder_id (str): The id of the parent folder.
         destination_folder_id (str): The id of the destination folder.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         str: The id of the new file.
