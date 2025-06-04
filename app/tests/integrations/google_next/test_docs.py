@@ -4,42 +4,61 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from integrations.google_next.docs import GoogleDocs
+
+# from integrations.google_next.docs import docs.GoogleDocs
 from integrations.google_next import docs
 
 
-@pytest.fixture(scope="class")
-@patch("integrations.google_next.docs.get_google_service")
-def google_docs(mock_get_google_service) -> GoogleDocs:
+@pytest.fixture
+def mock_service():
+    with patch(
+        "integrations.google_next.docs.get_google_service"
+    ) as mock_get_google_service:
+        mock_get_google_service.return_value = MagicMock()
+        yield mock_get_google_service
+
+
+@pytest.fixture
+def google_docs(mock_service):
+    # Default usage: no arguments
+    return docs.GoogleDocs()
+
+
+@pytest.fixture
+def google_docs_with_email(mock_service):
     scopes = ["https://www.googleapis.com/auth/documents"]
     delegated_email = "email@test.com"
-    mock_get_google_service.return_value = MagicMock()
-    return GoogleDocs(scopes, delegated_email)
+    return docs.GoogleDocs(scopes, delegated_email)
+
+
+@pytest.fixture
+def google_docs_with_scopes(mock_service):
+    scopes = ["https://www.googleapis.com/auth/documents.readonly"]
+    return docs.GoogleDocs(scopes)
 
 
 class TestGoogleDocs:
     @pytest.fixture(autouse=True)
-    def setup(self, google_docs: GoogleDocs):
+    def setup(self, google_docs: docs.GoogleDocs):
         self.google_docs = google_docs
 
-    def test_init_without_scopes_and_service(self):
+    def test_init_uses_defaults(self):
         """Test initialization without scopes and service raises ValueError."""
-        with pytest.raises(
-            ValueError, match="Either scopes or a service must be provided."
-        ):
-            GoogleDocs(delegated_email="email@test.com")
+        assert self.google_docs.scopes == docs.DEFAULT_SCOPES
+        assert self.google_docs.delegated_email is None
 
-    @patch(
-        "integrations.google_next.docs.GOOGLE_DELEGATED_ADMIN_EMAIL",
-        new="default@test.com",
-    )
     @patch("integrations.google_next.docs.get_google_service")
-    def test_init_without_delegated_email_and_service(self, mock_get_google_service):
-        """Test initialization without delegated email and service uses default email."""
+    def test_init_with_delegated_email_scopes_and_service(self, mock_get_google_service):
+        """Test initialization with delegated email and service."""
         mock_get_google_service.return_value = MagicMock()
-        google_docs = GoogleDocs(scopes=["https://www.googleapis.com/auth/documents"])
+        google_docs = docs.GoogleDocs(
+            scopes=["https://www.googleapis.com/auth/documents"],
+            delegated_email="email@test.com",
+            service=mock_get_google_service.return_value,
+        )
         assert google_docs.scopes == ["https://www.googleapis.com/auth/documents"]
-        assert google_docs.delegated_email == "default@test.com"
+        assert google_docs.delegated_email == "email@test.com"
+        assert google_docs.service == mock_get_google_service.return_value
 
     @patch("integrations.google_next.docs.get_google_service")
     def test_get_docs_service(self, mock_get_google_service):

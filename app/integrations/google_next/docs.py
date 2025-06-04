@@ -4,10 +4,12 @@ from integrations.google_next.service import (
     execute_google_api_call,
     handle_google_api_errors,
     get_google_service,
-    GOOGLE_DELEGATED_ADMIN_EMAIL,
 )
 from core.logging import get_module_logger
 
+DEFAULT_SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+]
 logger = get_module_logger()
 
 
@@ -16,27 +18,23 @@ class GoogleDocs:
     A class to simplify the use of various Google Docs API operations across modules.
 
     This class provides methods to interact with the Google Workspace Docs API, including
-      It handles authentication and API calls,
-    and includes error handling for Google API errors.
+    authentication, API calls, and error handling for Google API errors.
 
-    While this class aims to simplify the usage of the Google Directory API, it is always possible
-    to use the Google API Python client directly as per the official documentation:
-    (https://googleapis.github.io/google-api-python-client/docs/)
+    Intended usage is to instantiate the class without any arguments, which will use default
+    OAuth scopes and the service account for authentication. However, flexibility is provided
+    to specify custom scopes, a delegated user email (to perform actions on behalf of a user),
+    or a pre-authenticated service resource if needed for advanced or edge cases.
 
     Attributes:
-        scopes (list): The list of scopes to request.
-        delegated_email (str): The email address of the user to impersonate.
-        service (Resource): Optional - An authenticated Google service resource. If provided, the service will be used instead of creating a new one.
+        scopes (list): The list of OAuth scopes to request. Defaults to DEFAULT_SCOPES if not provided.
+        delegated_email (str or None): The email address of the user to impersonate, if any.
+        service (Resource): An authenticated Google Docs service resource. If not provided, it will be created using the default scopes and delegated email.
     """
 
     def __init__(
         self, scopes=None, delegated_email=None, service: Resource | None = None
     ):
-        if not scopes and not service:
-            raise ValueError("Either scopes or a service must be provided.")
-        if not delegated_email and not service:
-            delegated_email = GOOGLE_DELEGATED_ADMIN_EMAIL
-        self.scopes = scopes
+        self.scopes = scopes if scopes else DEFAULT_SCOPES
         self.delegated_email = delegated_email
         self.service = service if service else self._get_docs_service()
         logger.debug(
