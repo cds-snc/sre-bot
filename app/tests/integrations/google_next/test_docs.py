@@ -48,7 +48,9 @@ class TestGoogleDocs:
         assert self.google_docs.delegated_email is None
 
     @patch("integrations.google_next.docs.get_google_service")
-    def test_init_with_delegated_email_scopes_and_service(self, mock_get_google_service):
+    def test_init_with_delegated_email_scopes_and_service(
+        self, mock_get_google_service
+    ):
         """Test initialization with delegated email and service."""
         mock_get_google_service.return_value = MagicMock()
         google_docs = docs.GoogleDocs(

@@ -94,7 +94,7 @@ def batch_update_values(
     cell_range: str,
     values: list,
     valueInputOption: str = "USER_ENTERED",
-    **kwargs
+    **kwargs,
 ) -> dict:
     """Updates values in a Google Sheet.
 
@@ -129,7 +129,7 @@ def append_values(
     body: dict,
     valueInputOption: str = "USER_ENTERED",
     insertDataOption: str = "INSERT_ROWS",
-    **kwargs
+    **kwargs,
 ) -> dict:
     """Appends values to a Google Sheet.
 
