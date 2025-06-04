@@ -1,11 +1,17 @@
+"""Google Meet API integration module."""
+
 from googleapiclient.discovery import Resource  # type: ignore
 from integrations.google_next.service import (
     execute_google_api_call,
     handle_google_api_errors,
     get_google_service,
-    GOOGLE_DELEGATED_ADMIN_EMAIL,
 )
 from core.logging import get_module_logger
+
+DEFAULT_SCOPES = [
+    "https://www.googleapis.com/auth/meet",
+    "https://www.googleapis.com/auth/meet.space",
+]
 
 logger = get_module_logger()
 
@@ -29,11 +35,7 @@ class GoogleMeet:
     def __init__(
         self, scopes=None, delegated_email=None, service: Resource | None = None
     ):
-        if not scopes and not service:
-            raise ValueError("Either scopes or a service must be provided.")
-        if not delegated_email and not service:
-            delegated_email = GOOGLE_DELEGATED_ADMIN_EMAIL
-        self.scopes = scopes
+        self.scopes = scopes if scopes else DEFAULT_SCOPES
         self.delegated_email = delegated_email
         self.service = service if service else self._get_google_service()
         logger.debug(

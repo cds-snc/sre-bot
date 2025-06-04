@@ -6,42 +6,52 @@ import pytest
 from integrations.google_next.meet import GoogleMeet
 
 
-@pytest.fixture(scope="class")
-@patch("integrations.google_next.meet.get_google_service")
-def google_meet(mock_get_google_service) -> GoogleMeet:
-    scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
-    delegated_email = "email@test.com"
-    mock_get_google_service.return_value = MagicMock()
-    return GoogleMeet(scopes, delegated_email)
+@pytest.fixture
+def mock_service():
+    with patch(
+        "integrations.google_next.meet.get_google_service"
+    ) as mock_get_google_service:
+        mock_get_google_service.return_value = MagicMock()
+        yield mock_get_google_service
+
+
+@pytest.fixture
+def mock_execute_google_api_call():
+    with patch("integrations.google_next.meet.execute_google_api_call") as mock_execute:
+        mock_execute.return_value = MagicMock()
+        yield mock_execute
+
+
+@pytest.fixture
+@patch("integrations.google_next.meet.DEFAULT_SCOPES", ["tests", "scopes"])
+def google_meet(mock_service):
+    return GoogleMeet()
 
 
 class TestGoogleMeet:
+    """Unit tests for the Google Meet API integration."""
+
     @pytest.fixture(autouse=True)
+    # pylint: disable=redefined-outer-name
     def setup(self, google_meet: GoogleMeet):
+        # pylint: disable=attribute-defined-outside-init
         self.google_meet = google_meet
 
-    def test_init_without_scopes_and_service(self):
-        """Test initialization without scopes and service raises ValueError."""
-        with pytest.raises(
-            ValueError, match="Either scopes or a service must be provided."
-        ):
-            GoogleMeet(delegated_email="email@test.com")
+    def test_init_uses_defaults(self):
+        """Test initialization with default scopes and no delegated email."""
+        assert self.google_meet.scopes == ["tests", "scopes"]
+        assert self.google_meet.delegated_email is None
 
-    @patch(
-        "integrations.google_next.meet.GOOGLE_DELEGATED_ADMIN_EMAIL",
-        new="default@test.com",
-    )
-    @patch("integrations.google_next.meet.get_google_service")
-    def test_init_without_delegated_email_and_service(self, mock_get_google_service):
+    def test_init_without_delegated_email_and_service(self, mock_service):
         """Test initialization without delegated email and service uses default email."""
-        mock_get_google_service.return_value = MagicMock()
         google_meet = GoogleMeet(
-            scopes=["https://www.googleapis.com/auth/meetings.space.created"]
+            scopes=["new", "scopes"],
+            delegated_email="user@test.com",
+            service=mock_service.return_value,
         )
-        assert google_meet.scopes == [
-            "https://www.googleapis.com/auth/meetings.space.created"
-        ]
-        assert google_meet.delegated_email == "default@test.com"
+        assert google_meet.scopes == ["new", "scopes"]
+        assert google_meet.delegated_email == "user@test.com"
+        assert google_meet.service is not None
 
     @patch("integrations.google_next.meet.get_google_service")
     def test_get_google_service(self, mock_get_google_service):
@@ -56,7 +66,6 @@ class TestGoogleMeet:
             self.google_meet.delegated_email,
         )
 
-    @patch("integrations.google_next.meet.execute_google_api_call")
     def test_create_space(self, mock_execute_google_api_call):
         """Test create_space returns a response."""
         mock_execute_google_api_call.return_value = {
