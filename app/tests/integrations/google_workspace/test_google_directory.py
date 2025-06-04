@@ -6,7 +6,6 @@ import pandas as pd
 from integrations.google_workspace import google_directory
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -28,13 +27,12 @@ def test_get_user_returns_user(execute_google_api_call_mock):
         "directory_v1",
         "users",
         "get",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         userKey="test_user_id",
         fields=None,
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
@@ -58,7 +56,7 @@ def test_list_users_returns_users(execute_google_api_call_mock):
         "directory_v1",
         "users",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=500,
@@ -66,7 +64,6 @@ def test_list_users_returns_users(execute_google_api_call_mock):
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -97,7 +94,7 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
         "directory_v1",
         "users",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         delegated_user_email=custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
@@ -106,7 +103,6 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
@@ -123,7 +119,7 @@ def test_list_groups_calls_execute_google_api_call(
         "directory_v1",
         "groups",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=200,
@@ -131,7 +127,6 @@ def test_list_groups_calls_execute_google_api_call(
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
@@ -150,7 +145,7 @@ def test_list_groups_calls_execute_google_api_call_with_kwargs(
         "directory_v1",
         "groups",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=200,
@@ -160,7 +155,6 @@ def test_list_groups_calls_execute_google_api_call_with_kwargs(
     assert mock_convert_string_to_camel_case.called_once
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -191,7 +185,7 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
         "directory_v1",
         "groups",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         delegatedUserEmail=custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
@@ -200,7 +194,6 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -214,7 +207,7 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
         "directory_v1",
         "members",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         groupKey=group_key,
         maxResults=200,
@@ -222,7 +215,6 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -252,7 +244,7 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         "directory_v1",
         "members",
         "list",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         delegated_user_email=custom_delegated_user_email,
         paginate=True,
         groupKey=group_key,
@@ -261,7 +253,6 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     )
 
 
-@patch("integrations.google_workspace.google_directory.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -275,7 +266,7 @@ def test_get_group_calls_execute_google_api_call_with_correct_args(
         "directory_v1",
         "groups",
         "get",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         groupKey=group_key,
         fields=None,
     )

@@ -6,12 +6,6 @@ from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
 from core.logging import get_module_logger
 
-SCOPES = [
-    "https://www.googleapis.com/auth/admin.directory.user.readonly",
-    "https://www.googleapis.com/auth/admin.directory.orgunits.readonly",
-    "https://www.googleapis.com/auth/admin.directory.group.readonly",
-    "https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly",
-]
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
 logger = get_module_logger()
@@ -38,7 +32,7 @@ def get_user(user_key, fields=None, **kwargs):
         "directory_v1",
         "users",
         "get",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         userKey=user_key,
         fields=fields,
         **kwargs,
@@ -63,7 +57,7 @@ def list_users(
         "directory_v1",
         "users",
         "list",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         paginate=True,
         customer=customer,
         maxResults=500,
@@ -96,7 +90,7 @@ def list_groups(
         "directory_v1",
         "groups",
         "list",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer=customer,
         maxResults=200,
@@ -125,7 +119,7 @@ def list_group_members(group_key, fields=None, **kwargs):
         "directory_v1",
         "members",
         "list",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         groupKey=group_key,
         maxResults=200,
@@ -150,7 +144,7 @@ def get_group(group_key, fields=None, **kwargs):
         "directory_v1",
         "groups",
         "get",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         groupKey=group_key,
         fields=fields,
         **kwargs,
