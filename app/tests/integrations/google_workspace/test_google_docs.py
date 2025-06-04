@@ -2,7 +2,6 @@ from unittest.mock import patch
 from integrations.google_workspace import google_docs
 
 
-@patch("integrations.google_workspace.google_docs.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
 )
@@ -26,7 +25,7 @@ def test_create_returns_result(execute_google_api_call_mock):
         "v1",
         "documents",
         "create",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/documents"],
         body={"title": "test_document"},
     )
 
@@ -38,7 +37,6 @@ def test_create_returns_result(execute_google_api_call_mock):
     }
 
 
-@patch("integrations.google_workspace.google_docs.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
 )
@@ -57,13 +55,12 @@ def test_batch_update_with_valid_requests_succeeds(execute_google_api_call_mock)
         "v1",
         "documents",
         "batchUpdate",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId="test_document_id",
         body={"requests": requests},
     )
 
 
-@patch("integrations.google_workspace.google_docs.SCOPES", ["tests", "scopes"])
 @patch(
     "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
 )
@@ -92,7 +89,7 @@ def test_get_returns_document_resource(execute_google_api_call_mock):
         "v1",
         "documents",
         "get",
-        scopes=["tests", "scopes"],
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId="test_document_id",
     )
 

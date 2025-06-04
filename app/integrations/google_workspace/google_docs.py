@@ -8,10 +8,6 @@ import re
 from integrations.google_workspace import google_service
 from core.logging import get_module_logger
 
-SCOPES = [
-    "https://www.googleapis.com/auth/documents",
-]
-
 logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
@@ -32,7 +28,7 @@ def create(title: str, **kwargs) -> dict:
         "v1",
         "documents",
         "create",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/documents"],
         body={"title": title},
         **kwargs,
     )
@@ -55,7 +51,7 @@ def batch_update(document_id: str, requests: list, **kwargs) -> dict:
         "v1",
         "documents",
         "batchUpdate",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId=document_id,
         body={"requests": requests},
         **kwargs,
@@ -78,7 +74,7 @@ def get_document(document_id: str, **kwargs) -> dict:
         "v1",
         "documents",
         "get",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId=document_id,
         **kwargs,
     )

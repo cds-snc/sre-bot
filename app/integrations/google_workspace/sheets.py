@@ -5,8 +5,6 @@ from integrations.google_workspace.google_service import (
     execute_google_api_call,
 )
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
 
 @handle_google_api_errors
 def get_values(
@@ -29,7 +27,7 @@ def get_values(
         "v4",
         "spreadsheets.values",
         "get",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
         spreadsheetId=spreadsheetId,
         range=cell_range,
         fields=fields,
@@ -57,7 +55,7 @@ def get_sheet(
         "v4",
         "spreadsheets",
         "get",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
         spreadsheetId=spreadsheetId,
         ranges=ranges,
         includeGridData=includeGridData,
@@ -81,7 +79,7 @@ def batch_update(spreadsheetId: str, body: dict, **kwargs) -> dict:
         "v4",
         "spreadsheets",
         "batchUpdate",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
         spreadsheetId=spreadsheetId,
         body=body,
         **kwargs,
@@ -113,7 +111,7 @@ def batch_update_values(
         "v4",
         "spreadsheets.values",
         "batchUpdate",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
         spreadsheetId=spreadsheetId,
         body={
             "valueInputOption": valueInputOption,
@@ -146,7 +144,7 @@ def append_values(
         "v4",
         "spreadsheets.values",
         "append",
-        scopes=SCOPES,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
         spreadsheetId=spreadsheetId,
         range=cell_range,
         body=body,
