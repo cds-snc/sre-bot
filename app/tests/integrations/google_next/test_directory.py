@@ -6,44 +6,61 @@ import pytest
 from integrations.google_next.directory import GoogleDirectory
 
 
-@pytest.fixture(scope="class")
-@patch("integrations.google_next.directory.google_service.get_google_service")
-def google_directory_instance(mock_get_google_service) -> GoogleDirectory:
-    scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
-    delegated_email = "email@test.com"
-    mock_get_google_service.return_value = MagicMock()
-    return GoogleDirectory(scopes, delegated_email)
+@pytest.fixture
+def mock_service():
+    with patch(
+        "integrations.google_next.directory.get_google_service"
+    ) as mock_get_google_service:
+        mock_get_google_service.return_value = MagicMock()
+        yield mock_get_google_service
+
+
+@pytest.fixture
+def mock_execute_api_call():
+    with patch(
+        "integrations.google_next.directory.execute_google_api_call"
+    ) as mock_call:
+        mock_call.return_value = MagicMock()
+        yield mock_call
+
+
+@pytest.fixture
+@patch(
+    "integrations.google_next.directory.GOOGLE_WORKSPACE_CUSTOMER_ID", new="default_id"
+)
+@patch("integrations.google_next.directory.DEFAULT_SCOPES", new=["test", "scopes"])
+def google_directory(mock_service):
+    return GoogleDirectory()
 
 
 @pytest.mark.usefixtures(
     "google_groups", "google_group_members", "google_users", "google_groups_w_users"
 )
 class TestGoogleDirectory:
+    """Unit tests for the GoogleDirectory class."""
+
     @pytest.fixture(autouse=True)
-    def setup(self, google_directory_instance: GoogleDirectory):
-        self.google_directory = google_directory_instance
+    # pylint: disable=redefined-outer-name
+    def setup(self, google_directory: GoogleDirectory):
+        # pylint: disable=attribute-defined-outside-init
+        self.google_directory = google_directory
 
-    def test_init_without_scopes_and_service(self):
-        """Test initialization without scopes and service raises ValueError."""
-        with pytest.raises(
-            ValueError, match="Either scopes or a service must be provided."
-        ):
-            GoogleDirectory(delegated_email="email@test.com")
+    def test_init_uses_defaults(self):
+        """Test initialization with default scopes and no delegated email."""
+        assert self.google_directory.scopes == ["test", "scopes"]
+        assert self.google_directory.delegated_email is None
 
-    @patch(
-        "integrations.google_next.directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-        new="default@test.com",
-    )
-    @patch("integrations.google_next.directory.google_service.get_google_service")
-    def test_init_without_delegated_email_and_service(self, mock_get_google_service):
-        """Test initialization without delegated email and service uses default email."""
-        mock_get_google_service.return_value = MagicMock()
+    def test_init_with_delegated_email_scopes_and_service(self, mock_service):
+        """Test initialization with delegated email, custom scopes, and service."""
         google_directory = GoogleDirectory(
-            scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"]
+            scopes=["new", "scopes"],
+            delegated_email="user@test.com",
+            service=mock_service.return_value,
         )
-        assert google_directory.delegated_email == "default@test.com"
+        assert google_directory.delegated_email == "user@test.com"
+        assert google_directory.scopes == ["new", "scopes"]
 
-    @patch("integrations.google_next.directory.google_service.get_google_service")
+    @patch("integrations.google_next.directory.get_google_service")
     def test_get_directory_service(self, mock_get_google_service):
         """Test get_directory_service returns a service."""
         mock_get_google_service.return_value = MagicMock()
@@ -56,10 +73,9 @@ class TestGoogleDirectory:
             self.google_directory.delegated_email,
         )
 
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_get_user(self, mock_execute_google_api_call: MagicMock):
+    def test_get_user(self, mock_execute_api_call):
         """Test get_user returns a user."""
-        mock_execute_google_api_call.return_value = {
+        mock_execute_api_call.return_value = {
             "id": "test_user_id",
             "name": "test_user",
             "email": "user.name@domain.com",
@@ -71,14 +87,13 @@ class TestGoogleDirectory:
             "email": "user.name@domain.com",
         }
         assert result == expected_result
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service, "users", "get", userKey="test_user_id"
         )
 
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_list_users_handles_customer_param(self, mock_execute_google_api_call):
+    def test_list_users_handles_customer_param(self, mock_execute_api_call):
         """Test list_users returns users with customer param."""
-        mock_execute_google_api_call.return_value = [
+        mock_execute_api_call.return_value = [
             {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
             {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
         ]
@@ -88,7 +103,7 @@ class TestGoogleDirectory:
             {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
         ]
         assert result == expected_result
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service,
             "users",
             "list",
@@ -100,10 +115,9 @@ class TestGoogleDirectory:
         "integrations.google_next.directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
         new="default_id",
     )
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_list_users(self, mock_execute_google_api_call):
+    def test_list_users(self, mock_execute_api_call):
         """Test list_users returns users."""
-        mock_execute_google_api_call.return_value = [
+        mock_execute_api_call.return_value = [
             {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
             {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
         ]
@@ -113,7 +127,7 @@ class TestGoogleDirectory:
             {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
         ]
         assert result == expected_result
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service,
             "users",
             "list",
@@ -121,10 +135,9 @@ class TestGoogleDirectory:
             customer="default_id",
         )
 
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_get_group(self, mock_execute_google_api_call):
+    def test_get_group(self, mock_execute_api_call):
         """Test get_group returns a group."""
-        mock_execute_google_api_call.return_value = {
+        mock_execute_api_call.return_value = {
             "id": "test_group_id",
             "name": "test_group",
             "email": "test_email@domain.com",
@@ -136,12 +149,11 @@ class TestGoogleDirectory:
         }
         result = self.google_directory.get_group("test_group_id")
         assert result == expected_result
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service, "groups", "get", groupKey="test_group_id"
         )
 
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_list_groups_handles_customer_param(self, mock_execute_google_api_call):
+    def test_list_groups_handles_customer_param(self, mock_execute_api_call):
         """Test list_groups returns groups with customer param."""
         results = [
             {"id": "test_group_id", "name": "test_group", "email": "email@domain.com"},
@@ -151,10 +163,10 @@ class TestGoogleDirectory:
                 "email": "email2@domain.com",
             },
         ]
-        mock_execute_google_api_call.return_value = results
+        mock_execute_api_call.return_value = results
         result = self.google_directory.list_groups(customer="test_customer_id")
         assert result == results
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service,
             "groups",
             "list",
@@ -166,8 +178,7 @@ class TestGoogleDirectory:
         "integrations.google_next.directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
         new="default_id",
     )
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_list_groups(self, mock_execute_google_api_call):
+    def test_list_groups(self, mock_execute_api_call):
         """Test list_groups returns groups."""
         results = [
             {"id": "test_group_id", "name": "test_group", "email": "email@domain.com"},
@@ -177,10 +188,10 @@ class TestGoogleDirectory:
                 "email": "email2@domain.com",
             },
         ]
-        mock_execute_google_api_call.return_value = results
+        mock_execute_api_call.return_value = results
         result = self.google_directory.list_groups()
         assert result == results
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service,
             "groups",
             "list",
@@ -188,17 +199,16 @@ class TestGoogleDirectory:
             customer="default_id",
         )
 
-    @patch("integrations.google_next.directory.google_service.execute_google_api_call")
-    def test_list_group_members(self, mock_execute_google_api_call):
+    def test_list_group_members(self, mock_execute_api_call):
         """Test list_group_members returns group members."""
         results = [
             {"id": "test_member_id", "email": "member@domain.com"},
             {"id": "test_member_id2", "email": "member2@domain.com"},
         ]
-        mock_execute_google_api_call.return_value = results
+        mock_execute_api_call.return_value = results
         result = self.google_directory.list_group_members("test_group_id")
         assert result == results
-        mock_execute_google_api_call.assert_called_once_with(
+        mock_execute_api_call.assert_called_once_with(
             self.google_directory.service,
             "members",
             "list",

@@ -2,15 +2,23 @@
 
 from googleapiclient.discovery import Resource  # type: ignore
 
-from integrations.google_next import service as google_service
+from integrations.google_next.service import (
+    GOOGLE_WORKSPACE_CUSTOMER_ID,
+    get_google_service,
+    handle_google_api_errors,
+    execute_google_api_call,
+)
 from integrations.utils.api import retry_request
 from utils import filters
 from core.logging import get_module_logger
 
-GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
-GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
+DEFAULT_SCOPES = [
+    "https://www.googleapis.com/auth/admin.directory.group.readonly",
+    "https://www.googleapis.com/auth/admin.directory.user.readonly",
+    "https://www.googleapis.com/auth/admin.directory.group.member.readonly",
+]
+
 logger = get_module_logger()
-handle_google_api_errors = google_service.handle_google_api_errors
 
 
 class GoogleDirectory:
@@ -18,35 +26,25 @@ class GoogleDirectory:
     A class to simplify the use of various Google Directory API operations across modules.
 
     This class provides methods to interact with the Google Workspace Directory API, including
-    operations for users, groups, and group members. It handles authentication and API calls,
-    and includes error handling for Google API errors.
+    authentication, API calls, and error handling for Google API errors.
 
-    While this class aims to simplify the usage of the Google Directory API, it is always possible
-    to use the Google API Python client directly as per the official documentation:
-    (https://googleapis.github.io/google-api-python-client/docs/)
+    Intended usage is to instantiate the class without any arguments, which will use default
+    OAuth scopes and the service account for authentication. Flexibility is provided to specify
+    custom scopes, a delegated user email (to perform actions on behalf of a user), or a
+    pre-authenticated service resource for advanced use cases.
 
     Attributes:
-        scopes (list): The list of scopes to request.
-        delegated_email (str): The email address of the user to impersonate.
-        service (Resource): Optional - An authenticated Google service resource. If provided, the service will be used instead of creating a new one.
+        scopes (list): The list of OAuth scopes to request. Defaults to DEFAULT_SCOPES if not provided.
+        delegated_email (str or None): The email address of the user to impersonate, if any.
+        service (Resource): An authenticated Google Directory service resource. If not provided, it will be created using the default scopes and delegated email.
     """
 
     def __init__(
         self, scopes=None, delegated_email=None, service: Resource | None = None
     ):
-        if not scopes and not service:
-            raise ValueError("Either scopes or a service must be provided.")
-        if not delegated_email and not service:
-            delegated_email = GOOGLE_DELEGATED_ADMIN_EMAIL
-        self.scopes = scopes
+        self.scopes = scopes if scopes else DEFAULT_SCOPES
         self.delegated_email = delegated_email
         self.service = service if service else self._get_directory_service()
-        logger.debug(
-            "google_directory_initialized",
-            service_type="directory",
-            scopes=scopes,
-            delegated_email=delegated_email,
-        )
 
     def _get_directory_service(self) -> Resource:
         """Get authenticated directory service for Google Workspace."""
@@ -56,7 +54,7 @@ class GoogleDirectory:
             scopes=self.scopes,
             delegated_email=self.delegated_email,
         )
-        return google_service.get_google_service(
+        return get_google_service(
             "admin", "directory_v1", self.scopes, self.delegated_email
         )
 
@@ -75,7 +73,7 @@ class GoogleDirectory:
         Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/get
         """
         logger.debug("getting_user", user_key=user_key, kwargs=kwargs)
-        return google_service.execute_google_api_call(
+        return execute_google_api_call(
             self.service, "users", "get", userKey=user_key, **kwargs
         )
 
@@ -102,7 +100,7 @@ class GoogleDirectory:
         if not customer:
             customer = GOOGLE_WORKSPACE_CUSTOMER_ID
 
-        return google_service.execute_google_api_call(
+        return execute_google_api_call(
             self.service,
             "users",
             "list",
@@ -128,7 +126,7 @@ class GoogleDirectory:
         """
         logger.debug("getting_group", group_key=group_key, kwargs=kwargs)
 
-        return google_service.execute_google_api_call(
+        return execute_google_api_call(
             self.service, "groups", "get", groupKey=group_key, **kwargs
         )
 
@@ -153,7 +151,7 @@ class GoogleDirectory:
 
         if not customer:
             customer = GOOGLE_WORKSPACE_CUSTOMER_ID
-        return google_service.execute_google_api_call(
+        return execute_google_api_call(
             self.service,
             "groups",
             "list",
@@ -179,7 +177,7 @@ class GoogleDirectory:
         """
         logger.debug("listing_group_members", group_key=group_key, kwargs=kwargs)
 
-        return google_service.execute_google_api_call(
+        return execute_google_api_call(
             self.service,
             "members",
             "list",
