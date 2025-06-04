@@ -18,6 +18,13 @@ def mock_service():
 
 
 @pytest.fixture
+def mock_execute_google_api_call():
+    with patch("integrations.google_next.docs.execute_google_api_call") as mock_execute:
+        mock_execute.return_value = MagicMock()
+        yield mock_execute
+
+
+@pytest.fixture
 def google_docs(mock_service):
     with patch("integrations.google_next.docs.DEFAULT_SCOPES", ["tests", "scopes"]):
         return GoogleDocs()
@@ -38,25 +45,20 @@ class TestGoogleDocs:
         assert self.google_docs.scopes == ["tests", "scopes"]
         assert self.google_docs.delegated_email is None
 
-    @patch("integrations.google_next.docs.get_google_service")
-    def test_init_with_delegated_email_scopes_and_service(
-        self, mock_get_google_service
-    ):
+    def test_init_with_delegated_email_scopes_and_service(self, mock_service):
         """Test initialization with delegated email and service."""
-        mock_get_google_service.return_value = MagicMock()
         google_docs = GoogleDocs(
             scopes=["https://www.googleapis.com/auth/documents"],
             delegated_email="email@test.com",
-            service=mock_get_google_service.return_value,
+            service=mock_service.return_value,
         )
         assert google_docs.scopes == ["https://www.googleapis.com/auth/documents"]
         assert google_docs.delegated_email == "email@test.com"
-        assert google_docs.service == mock_get_google_service.return_value
+        assert google_docs.service == mock_service.return_value
 
     @patch("integrations.google_next.docs.get_google_service")
     def test_get_docs_service(self, mock_get_google_service):
         """Test get_docs_service returns a service."""
-        mock_get_google_service.return_value = MagicMock()
         service = self.google_docs._get_docs_service()
         assert service is not None
         mock_get_google_service.assert_called_once_with(
@@ -66,7 +68,6 @@ class TestGoogleDocs:
             self.google_docs.delegated_email,
         )
 
-    @patch("integrations.google_next.docs.execute_google_api_call")
     def test_create(self, mock_execute_google_api_call):
         """Test create calls execute_google_api_call with correct arguments."""
         title = "test_document"
@@ -79,7 +80,6 @@ class TestGoogleDocs:
             body=body,
         )
 
-    @patch("integrations.google_next.docs.execute_google_api_call")
     def test_create_handles_kwargs(self, mock_execute_google_api_call):
         """Test create handles additional parameters."""
         title = "test_document"
@@ -93,7 +93,6 @@ class TestGoogleDocs:
             something="else",
         )
 
-    @patch("integrations.google_next.docs.execute_google_api_call")
     def test_batch_update(
         self,
         mock_execute_google_api_call,
@@ -115,7 +114,6 @@ class TestGoogleDocs:
             something="else",
         )
 
-    @patch("integrations.google_next.docs.execute_google_api_call")
     def test_get_document(
         self,
         mock_execute_google_api_call,
