@@ -81,12 +81,20 @@ def get_document(document_id: str, **kwargs) -> dict:
 
 
 def extract_google_doc_id(url):
-    # if the url is empty or None, then log an error
+    """
+    Extracts the Google Docs ID from a Google Docs URL.
+
+    Args:
+        url (str): The URL of the Google Docs document.
+
+    Returns:
+        str: The Google Docs ID extracted from the URL.
+    """
+    logger.debug(
+        "extracting_google_doc_id",
+        url=url,
+    )
     if not url:
-        logger.error(
-            "google_doc_id_extraction_failed",
-            error="URL is empty or None",
-        )
         return None
 
     # Regular expression pattern to match Google Docs ID
