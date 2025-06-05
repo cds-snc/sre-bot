@@ -5,7 +5,6 @@ from email.message import EmailMessage
 from integrations.google_workspace import google_service
 from core.logging import get_module_logger
 
-GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
 logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
@@ -34,37 +33,27 @@ def create_email_message(subject: str, message: str, sender: str, recipient: str
 
 
 @handle_google_api_errors
-def create_draft(
-    message, user_id="me", delegated_user_email=GOOGLE_DELEGATED_ADMIN_EMAIL
-):
+def create_draft(message, user_id="me", **kwargs):
     """Creates a new draft with the specified message.
 
     Args:
         message (EmailMessage): The message to create the draft with.
         user_id (str, optional): The user's email address. Default is 'me'.
-        delegated_user_email (str, optional): The email address of the user to impersonate. Default is the default delegated admin email.
+        **kwargs: Additional keyword arguments to pass to the API call, such as `delegated_user_email`.
 
     Returns:
         dict: The draft object.
     """
-    logger.debug(
-        "creating_draft",
-        user_id=user_id,
-        delegated_user_email=delegated_user_email,
-        message=message,
-    )
-    scopes = [
-        "https://www.googleapis.com/auth/gmail.compose",
-        "https://www.googleapis.com/auth/gmail.modify",
-    ]
-
     return google_service.execute_google_api_call(
         service_name="gmail",
         version="v1",
         resource_path="users.drafts",
         method="create",
-        scopes=scopes,
-        delegated_user_email=delegated_user_email,
+        scopes=[
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.modify",
+        ],
         userId=user_id,
         body=message,
+        **kwargs,
     )

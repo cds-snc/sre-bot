@@ -85,7 +85,6 @@ def time_range():
     }
 
 
-@patch.object(google_calendar, "GOOGLE_DELEGATED_ADMIN_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -101,7 +100,6 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
         "v3",
         "freebusy",
         "query",
-        delegated_user_email="test_email",
         scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
@@ -111,7 +109,6 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     )
 
 
-@patch.object(google_calendar, "GOOGLE_DELEGATED_ADMIN_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -122,22 +119,19 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     time_zone = "America/Los_Angeles"
     calendar_expansion_max = 20
     group_expansion_max = 30
+    body_kwargs = {
+        "timeZone": time_zone,
+        "calendarExpansionMax": calendar_expansion_max,
+        "groupExpansionMax": group_expansion_max,
+    }
 
-    google_calendar.get_freebusy(
-        time_min,
-        time_max,
-        items,
-        time_zone=time_zone,
-        calendar_expansion_max=calendar_expansion_max,
-        group_expansion_max=group_expansion_max,
-    )
+    google_calendar.get_freebusy(time_min, time_max, items, body_kwargs=body_kwargs)
 
     mock_execute_google_api_call.assert_called_once_with(
         "calendar",
         "v3",
         "freebusy",
         "query",
-        delegated_user_email="test_email",
         scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "timeMin": time_min,
@@ -164,7 +158,6 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
-@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -204,8 +197,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
         "v3",
         "events",
         "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email="test_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -235,7 +227,6 @@ def test_insert_event_no_kwargs_no_delegated_email(
     assert not mock_convert_string_to_camel_case.called
 
 
-@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -266,10 +257,10 @@ def test_insert_event_with_kwargs(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = "test_document_id"
-    kwargs = {
+    delegated_user_email = "test_custom_email"
+    body_kwargs = {
         "location": "Test Location",
         "description": "Test Description",
-        "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
         "attachments": [
             {
@@ -286,7 +277,13 @@ def test_insert_event_with_kwargs(
         },
     }
     result = google_calendar.insert_event(
-        start, end, emails, title, incident_document=document_id, **kwargs
+        start,
+        end,
+        emails,
+        title,
+        incident_document=document_id,
+        body_kwargs=body_kwargs,
+        delegated_user_email=delegated_user_email,
     )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
@@ -297,8 +294,8 @@ def test_insert_event_with_kwargs(
         "v3",
         "events",
         "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email="test_custom_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
+        delegated_user_email=delegated_user_email,
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
@@ -306,18 +303,17 @@ def test_insert_event_with_kwargs(
             "summary": title,
             "guestsCanModify": True,
             "guestsCanInviteOthers": True,
-            **kwargs,
+            **body_kwargs,
         },
         calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
     )
-    for key in kwargs:
+    for key in body_kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -348,10 +344,10 @@ def test_insert_event_with_no_document(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = ""
-    kwargs = {
+    delegated_user_email = "test_custom_email"
+    body_kwargs = {
         "location": "Test Location",
         "description": "Test Description",
-        "delegated_user_email": "test_custom_email",
         "time_zone": "Magic/Time_Zone",
         "conferenceData": {
             "createRequest": {
@@ -361,7 +357,13 @@ def test_insert_event_with_no_document(
         },
     }
     result = google_calendar.insert_event(
-        start, end, emails, title, incident_document=document_id, **kwargs
+        start,
+        end,
+        emails,
+        title,
+        incident_document=document_id,
+        body_kwargs=body_kwargs,
+        delegated_user_email=delegated_user_email,
     )
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
@@ -372,8 +374,8 @@ def test_insert_event_with_no_document(
         "v3",
         "events",
         "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email="test_custom_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
+        delegated_user_email=delegated_user_email,
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
@@ -381,18 +383,17 @@ def test_insert_event_with_no_document(
             "summary": title,
             "guestsCanModify": True,
             "guestsCanInviteOthers": True,
-            **kwargs,
+            **body_kwargs,
         },
         calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
     )
-    for key in kwargs:
+    for key in body_kwargs:
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
 )
@@ -433,8 +434,7 @@ def test_insert_event_google_hangout_link_created(
         "v3",
         "events",
         "insert",
-        scopes=["https://www.googleapis.com/auth/calendar.events"],
-        delegated_user_email="test_email",
+        scopes=["https://www.googleapis.com/auth/calendar"],
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -466,7 +466,6 @@ def test_insert_event_google_hangout_link_created(
     assert mock_execute_google_api_call.contains(mock_unique_id.return_value)
 
 
-@patch.object(google_calendar, "SRE_BOT_EMAIL", "test_email")
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
 @patch(
     "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"

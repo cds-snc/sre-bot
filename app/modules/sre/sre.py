@@ -34,7 +34,10 @@ help_text = """
 \n      - lister les commandes de liens de rappel HTTP
 \n `/sre version`
 \n      - show the version of the SRE Bot
-\n      - montre la version du bot SRE"""
+\n      - montre la version du bot SRE
+\n `/sre reports`
+\n      - lists reports commands
+\n      - lister les commandes de rapports"""
 
 
 def register(bot: App):

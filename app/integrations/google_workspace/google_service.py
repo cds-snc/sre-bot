@@ -25,7 +25,6 @@ from core.config import settings
 from core.logging import get_module_logger
 
 # Define the default arguments
-GOOGLE_DELEGATED_ADMIN_EMAIL = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
 GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
 GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
     settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
@@ -192,6 +191,8 @@ def execute_google_api_call(
     Returns:
         Any: The result of the API call. If paginate is True, returns a list of all results.
     """
+    if delegated_user_email is None:
+        delegated_user_email = SRE_BOT_EMAIL
     service = get_google_service(
         service_name,
         version,

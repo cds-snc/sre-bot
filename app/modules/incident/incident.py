@@ -7,7 +7,7 @@ from slack_bolt import Ack
 from integrations import opsgenie
 from integrations.slack import users as slack_users
 from integrations.sentinel import log_to_sentinel
-from integrations.google_next.meet import GoogleMeet
+from integrations.google_workspace import meet
 
 from modules.incident import (
     incident_folder,
@@ -135,8 +135,6 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         security_incident=security_incident,
         body=body,
     )
-    gmeet_scopes = ["https://www.googleapis.com/auth/meetings.space.created"]
-    gmeet = GoogleMeet(scopes=gmeet_scopes)
     log_to_sentinel("incident_called", body)
 
     # Get folder metadata
@@ -212,7 +210,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     client.conversations_invite(channel=channel_id, users=user_id)
 
     # Add meeting link
-    meet_link = gmeet.create_space()
+    meet_link = meet.create_space()
     client.bookmarks_add(
         channel_id=channel_id,
         title="Meet link",
@@ -313,6 +311,10 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         product,
         channel_url,
         ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
+    )
+    logger.info(
+        "incident_successfully_created",
+        incident_id=incident_id,
     )
 
 

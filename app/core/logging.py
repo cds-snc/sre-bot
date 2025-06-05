@@ -31,7 +31,7 @@ def configure_logging():
     # Configure standard logging
     logging.basicConfig(
         format="%(message)s",
-        level=logging.INFO,
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     )
 
     return structlog.stdlib.get_logger()

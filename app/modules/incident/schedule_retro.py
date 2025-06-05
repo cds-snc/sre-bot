@@ -12,6 +12,9 @@ from integrations.google_workspace.google_calendar import (
 )
 from modules.incident import incident_conversation
 from core.logging import get_module_logger
+from core.config import settings
+
+CALENDAR_ID = settings.google_workspace.GOOGLE_SRE_CALENDAR_ID
 
 logger = get_module_logger()
 
@@ -349,6 +352,7 @@ def save_retro_event(
         first_available_end.isoformat(),
         user_emails,
         "Retro " + incident_name,
+        calendar_id=CALENDAR_ID,
         incident_document=incident_document,
         **event_config,
     )

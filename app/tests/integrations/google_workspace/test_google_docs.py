@@ -2,8 +2,10 @@ from unittest.mock import patch
 from integrations.google_workspace import google_docs
 
 
-@patch("integrations.google_workspace.google_docs.execute_google_api_call")
-def test_create_returns_document_id(execute_google_api_call_mock):
+@patch(
+    "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
+)
+def test_create_returns_result(execute_google_api_call_mock):
     # Mock the return value of execute_google_api_call
     execute_google_api_call_mock.return_value = {
         "documentId": "test_document_id",
@@ -13,10 +15,9 @@ def test_create_returns_document_id(execute_google_api_call_mock):
     }
 
     # Call the create function
-    document_id = google_docs.create("test_document")
+    result = google_docs.create("test_document")
 
     # Check that the create function returns the correct document id
-    assert document_id == "test_document_id"
 
     # Check that execute_google_api_call was called with the correct arguments
     execute_google_api_call_mock.assert_called_once_with(
@@ -28,8 +29,17 @@ def test_create_returns_document_id(execute_google_api_call_mock):
         body={"title": "test_document"},
     )
 
+    assert result == {
+        "documentId": "test_document_id",
+        "title": "test_document",
+        "body": {"content": [{}]},
+        "headers": {},
+    }
 
-@patch("integrations.google_workspace.google_docs.execute_google_api_call")
+
+@patch(
+    "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
+)
 def test_batch_update_with_valid_requests_succeeds(execute_google_api_call_mock):
     requests = [
         {"createHeader": {"type": "DEFAULT", "sectionBreakLocation": {"index": 1}}},
@@ -51,7 +61,9 @@ def test_batch_update_with_valid_requests_succeeds(execute_google_api_call_mock)
     )
 
 
-@patch("integrations.google_workspace.google_docs.execute_google_api_call")
+@patch(
+    "integrations.google_workspace.google_docs.google_service.execute_google_api_call"
+)
 def test_get_returns_document_resource(execute_google_api_call_mock):
     # Mock the return value of execute_google_api_call
     execute_google_api_call_mock.return_value = {
@@ -77,7 +89,7 @@ def test_get_returns_document_resource(execute_google_api_call_mock):
         "v1",
         "documents",
         "get",
-        scopes=["https://www.googleapis.com/auth/documents.readonly"],
+        scopes=["https://www.googleapis.com/auth/documents"],
         documentId="test_document_id",
     )
 

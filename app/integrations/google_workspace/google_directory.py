@@ -6,19 +6,20 @@ from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
 from core.logging import get_module_logger
 
-GOOGLE_DELEGATED_ADMIN_EMAIL = google_service.GOOGLE_DELEGATED_ADMIN_EMAIL
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
+
 logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
 @handle_google_api_errors
-def get_user(user_key, delegated_user_email=None, fields=None):
+def get_user(user_key, fields=None, **kwargs):
     """Get a user by user key in the Google Workspace domain.
 
     Args:
         user_key (str): The user's primary email address, alias email address, or unique user ID.
-        delegated_user_email (str): The email address of the user to impersonate. (default: must be defined in .env)
+        fields (list, optional): A list of fields to include in the response.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: A user object.
@@ -26,24 +27,20 @@ def get_user(user_key, delegated_user_email=None, fields=None):
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/get
     """
 
-    if not delegated_user_email:
-        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
-    scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
     return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
         "get",
-        scopes,
-        delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         userKey=user_key,
         fields=fields,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
 def list_users(
-    delegated_user_email=None,
     customer=None,
     **kwargs,
 ):
@@ -52,52 +49,48 @@ def list_users(
     Returns:
         list: A list of user objects.
     """
-    if not delegated_user_email:
-        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
+
     if not customer:
         customer = GOOGLE_WORKSPACE_CUSTOMER_ID
-    scopes = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
     return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
         "list",
-        scopes,
-        delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         paginate=True,
         customer=customer,
         maxResults=500,
         orderBy="email",
+        **kwargs,
     )
 
 
 @handle_google_api_errors
 def list_groups(
-    delegated_user_email=None,
     customer=None,
     **kwargs,
 ):
     """List all groups in the Google Workspace domain. A query can be provided to filter the results (e.g. query="email:prefix-*" will filter for all groups where the email starts with 'prefix-').
 
+    Args:
+        customer (str): The unique ID for the Google Workspace customer. If not provided, it will use the default customer ID from the environment variable.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `query`, `fields`.
     Returns:
         list: A list of group objects.
 
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/list
     """
-    if not delegated_user_email:
-        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
     if not customer:
         customer = GOOGLE_WORKSPACE_CUSTOMER_ID
 
     kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
-    scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
     return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
         "list",
-        scopes,
-        delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer=customer,
         maxResults=200,
@@ -107,12 +100,13 @@ def list_groups(
 
 
 @handle_google_api_errors
-def list_group_members(group_key, delegated_user_email=None, fields=None):
+def list_group_members(group_key, fields=None, **kwargs):
     """List all group members in the Google Workspace domain.
 
     Args:
         group_key (str): The group's email address or unique group ID.
-        delegated_user_email (str): The email address of the user to impersonate. (default: must be defined in .env)
+        fields (list, optional): A list of fields to include in the response.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         list: A list of group member objects.
@@ -120,35 +114,40 @@ def list_group_members(group_key, delegated_user_email=None, fields=None):
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/list
     """
 
-    if not delegated_user_email:
-        delegated_user_email = GOOGLE_DELEGATED_ADMIN_EMAIL
-    scopes = ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"]
     return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "members",
         "list",
-        scopes,
-        delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         groupKey=group_key,
         maxResults=200,
         fields=fields,
+        **kwargs,
     )
 
 
 @handle_google_api_errors
-def get_group(group_key, fields=None):
-    scopes = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
+def get_group(group_key, fields=None, **kwargs):
+    """Get a group by group key in the Google Workspace domain.
+    Args:
+        group_key (str): The group's email address or unique group ID.
+        fields (list, optional): A list of fields to include in the response.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
+    Returns:
+        dict: A group object.
+    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/get
+    """
     return google_service.execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
         "get",
-        scopes,
-        GOOGLE_DELEGATED_ADMIN_EMAIL,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         groupKey=group_key,
         fields=fields,
+        **kwargs,
     )
 
 

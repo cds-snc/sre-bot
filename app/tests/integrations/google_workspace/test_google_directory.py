@@ -7,10 +7,6 @@ from integrations.google_workspace import google_directory
 
 
 @patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    new="default_delegated_admin_email",
-)
-@patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
 def test_get_user_returns_user(execute_google_api_call_mock):
@@ -31,39 +27,7 @@ def test_get_user_returns_user(execute_google_api_call_mock):
         "directory_v1",
         "users",
         "get",
-        ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        "default_delegated_admin_email",
-        userKey="test_user_id",
-        fields=None,
-    )
-
-
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
-def test_get_user_uses_custom_delegated_user_email_if_provided(
-    execute_google_api_call_mock,
-):
-    execute_google_api_call_mock.return_value = {
-        "id": "test_user_id",
-        "name": "test_user",
-        "email": "user.name@domain.com",
-    }
-
-    custom_delegated_user_email = "custom.email@domain.com"
-    assert google_directory.get_user("test_user_id", custom_delegated_user_email) == {
-        "id": "test_user_id",
-        "name": "test_user",
-        "email": "user.name@domain.com",
-    }
-
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "users",
-        "get",
-        ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        "custom.email@domain.com",
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         userKey="test_user_id",
         fields=None,
     )
@@ -72,10 +36,6 @@ def test_get_user_uses_custom_delegated_user_email_if_provided(
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
-)
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    new="default_delegated_admin_email",
 )
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
@@ -96,8 +56,7 @@ def test_list_users_returns_users(execute_google_api_call_mock):
         "directory_v1",
         "users",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        "default_delegated_admin_email",
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=500,
@@ -123,7 +82,10 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
     custom_customer_id = "custom_customer_id"
 
     assert (
-        google_directory.list_users(custom_delegated_user_email, custom_customer_id)
+        google_directory.list_users(
+            delegated_user_email=custom_delegated_user_email,
+            customer=custom_customer_id,
+        )
         == results
     )
 
@@ -132,8 +94,8 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
         "directory_v1",
         "users",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        custom_delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
+        delegated_user_email=custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
         maxResults=500,
@@ -144,10 +106,6 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
-)
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    new="default_delegated_admin_email",
 )
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
@@ -161,8 +119,7 @@ def test_list_groups_calls_execute_google_api_call(
         "directory_v1",
         "groups",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        "default_delegated_admin_email",
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=200,
@@ -173,10 +130,6 @@ def test_list_groups_calls_execute_google_api_call(
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
-)
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    new="default_delegated_admin_email",
 )
 @patch("integrations.google_workspace.google_directory.convert_string_to_camel_case")
 @patch(
@@ -192,8 +145,7 @@ def test_list_groups_calls_execute_google_api_call_with_kwargs(
         "directory_v1",
         "groups",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        "default_delegated_admin_email",
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         customer="default_google_workspace_customer_id",
         maxResults=200,
@@ -221,7 +173,10 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
     custom_customer_id = "custom_customer_id"
 
     assert (
-        google_directory.list_groups(custom_delegated_user_email, custom_customer_id)
+        google_directory.list_groups(
+            delegated_user_email=custom_delegated_user_email,
+            customer=custom_customer_id,
+        )
         == results
     )
 
@@ -230,8 +185,8 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
         "directory_v1",
         "groups",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        custom_delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
+        delegatedUserEmail=custom_delegated_user_email,
         paginate=True,
         customer=custom_customer_id,
         maxResults=200,
@@ -239,10 +194,6 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    new="default_delegated_admin_email",
-)
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -256,8 +207,7 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
         "directory_v1",
         "members",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
-        "default_delegated_admin_email",
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         paginate=True,
         groupKey=group_key,
         maxResults=200,
@@ -283,7 +233,9 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     custom_delegated_user_email = "custom.email@domain.com"
 
     assert (
-        google_directory.list_group_members(group_key, custom_delegated_user_email)
+        google_directory.list_group_members(
+            group_key, delegated_user_email=custom_delegated_user_email
+        )
         == results
     )
 
@@ -292,8 +244,8 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
         "directory_v1",
         "members",
         "list",
-        ["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
-        custom_delegated_user_email,
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
+        delegated_user_email=custom_delegated_user_email,
         paginate=True,
         groupKey=group_key,
         maxResults=200,
@@ -301,10 +253,6 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    "default_delegated_admin_email",
-)
 @patch(
     "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
 )
@@ -318,8 +266,7 @@ def test_get_group_calls_execute_google_api_call_with_correct_args(
         "directory_v1",
         "groups",
         "get",
-        ["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        "default_delegated_admin_email",
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
         groupKey=group_key,
         fields=None,
     )

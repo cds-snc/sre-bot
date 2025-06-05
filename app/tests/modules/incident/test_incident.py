@@ -186,7 +186,7 @@ def test_incident_local_button_calls_views_update(mock_list_incident_folders):
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -207,7 +207,7 @@ def test_incident_submit_calls_ack(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.generate_success_modal")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
@@ -230,7 +230,7 @@ def test_incident_submit_calls_views_open(
     client.views_open.assert_called_once()
 
 
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
     _mock_google_meet,
 ):
@@ -248,7 +248,7 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
     )
 
 
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 def test_incident_submit_returns_error_if_description_is_too_long(
     _mock_google_meet,
 ):
@@ -268,7 +268,7 @@ def test_incident_submit_returns_error_if_description_is_too_long(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -300,7 +300,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -328,7 +328,7 @@ def test_incident_submit_creates_channel_sets_description(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -362,7 +362,7 @@ def test_incident_submit_adds_creator_to_channel(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -382,8 +382,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    mock_google_meet_instance = mock_google_meet.return_value
-    mock_google_meet_instance.create_space.return_value = {
+    mock_google_meet.create_space.return_value = {
         "name": "spaces/asdfasdf",
         "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
         "meetingCode": "aaa-bbbb-ccc",
@@ -404,7 +403,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -429,8 +428,8 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    mock_google_meet_instance = mock_google_meet.return_value
-    mock_google_meet_instance.create_space.return_value = {
+
+    mock_google_meet.create_space.return_value = {
         "name": "spaces/asdfasdf",
         "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
         "meetingCode": "aaa-bbbb-ccc",
@@ -444,7 +443,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -468,8 +467,8 @@ def test_incident_canvas_create_returns_successful_response(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    mock_google_meet_instance = mock_google_meet.return_value
-    mock_google_meet_instance.create_space.return_value = {
+
+    mock_google_meet.create_space.return_value = {
         "name": "spaces/asdfasdf",
         "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
         "meetingCode": "aaa-bbbb-ccc",
@@ -482,7 +481,7 @@ def test_incident_canvas_create_returns_successful_response(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
@@ -507,8 +506,8 @@ def test_incident_canvas_create_unsuccessful_called(
     client.conversations_create.return_value = {
         "channel": {"id": "channel_id", "name": "channel_name"}
     }
-    mock_google_meet_instance = mock_google_meet.return_value
-    mock_google_meet_instance.create_space.return_value = {
+
+    mock_google_meet.create_space.return_value = {
         "name": "spaces/asdfasdf",
         "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
         "meetingCode": "aaa-bbbb-ccc",
@@ -521,7 +520,7 @@ def test_incident_canvas_create_unsuccessful_called(
 
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.incident_document")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_folder")
 def test_incident_submit_creates_a_document_and_announces_it(
     mock_incident_folder,
@@ -567,7 +566,7 @@ def test_incident_submit_creates_a_document_and_announces_it(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
@@ -627,7 +626,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
@@ -686,7 +685,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
@@ -744,7 +743,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 
 @patch.object(incident, "PREFIX", "dev")
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
@@ -803,7 +802,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
 
 
 @patch("modules.incident.incident.db_operations")
-@patch("modules.incident.incident.GoogleMeet")
+@patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")

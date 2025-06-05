@@ -11,10 +11,6 @@ def test_create_email_message():
     assert message["message"]["raw"] is not None
 
 
-@patch(
-    "integrations.google_workspace.gmail.google_service.GOOGLE_DELEGATED_ADMIN_EMAIL",
-    "delegated_user_email",
-)
 @patch("integrations.google_workspace.gmail.google_service.execute_google_api_call")
 def test_create_draft(
     mock_execute_google_api_call,
@@ -28,20 +24,18 @@ def test_create_draft(
         delegated_user_email="delegated_user_email",
     )
 
-    scopes = [
-        "https://www.googleapis.com/auth/gmail.compose",
-        "https://www.googleapis.com/auth/gmail.modify",
-    ]
-
     mock_execute_google_api_call.assert_called_once_with(
         service_name="gmail",
         version="v1",
         resource_path="users.drafts",
         method="create",
-        scopes=scopes,
-        delegated_user_email="delegated_user_email",
+        scopes=[
+            "https://www.googleapis.com/auth/gmail.compose",
+            "https://www.googleapis.com/auth/gmail.modify",
+        ],
         userId="me",
         body=message,
+        delegated_user_email="delegated_user_email",
     )
 
     assert message_id == "message_id"
