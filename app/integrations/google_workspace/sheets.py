@@ -43,7 +43,9 @@ def get_sheet(
 
     Args:
         spreadsheetId (str): The id of the Google Sheet.
-        sheetId (int): The id of the sheet.
+        ranges (str | None, optional): The ranges to retrieve.
+        includeGridData (bool, optional): Whether to include grid data.
+        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
 
     Returns:
         dict: The response from the Google Sheets API.
