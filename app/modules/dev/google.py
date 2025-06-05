@@ -1,10 +1,7 @@
 """Testing new google service (will be removed)"""
 
 from core.config import settings
-from integrations.google_workspace import (
-    google_service,
-    google_calendar,
-)
+from integrations.google_workspace import google_service, google_directory, meet
 from core.logging import get_module_logger
 
 
@@ -70,38 +67,27 @@ def log_object_info(obj):
 
 def google_service_command(ack, client, body, respond, logger):
     ack()
-    groups = get_groups()
-    if not groups:
-        respond("No groups found.")
-        return
-    group = groups[1]
-    logger.info("logging_group_details", details=group)
-    logger.info("group_email", email=group["email"])
-    email = group["email"]
-    members = get_members(email)
-    if not members:
-        respond(f"No members found in group: {email}")
-        return
-    log_object_info(members)
-    respond(f"Found {len(members)} members in group: {email}")
-    for member in members:
-        logger.info("member_details", details=member)
+    logger.info("google_service_command", body=body)
+    space = meet.create_space()
+    logger.info("google_meet_event_created", space=space)
+    if space:
+        respond(
+            f"Created a new Google Meet space: {space['name']} with meeting code: {space['meetingCode']}"
+        )
+    else:
+        respond("Failed to create a Google Meet space.")
 
-    event_start = "2025-05-15T15:30:00-04:00"
-    event_end = "2025-05-15T16:00:00-04:00"
-    event_title = "Test Calendar Event w/o SRE Bot Account"
-    attendees = [SRE_BOT_EMAIL]
+    groups = google_directory.list_groups()
+    if groups:
+        logger.info("google_groups_listed", groups=groups)
+        respond(f"Listed {len(groups)} Google Groups.")
 
-    logger.info("calendar_event", event_start=event_start, event_end=event_end)
-    calendar_event = google_calendar.insert_event(
-        start=event_start,
-        end=event_end,
-        emails=attendees,
-        title=event_title,
-        calendar_id=GOOGLE_SRE_CALENDAR_ID,
-        incident_document=None,
-    )
-    logger.info("calendar_event_response", response=calendar_event)
+    # groups = get_groups()
+    # if groups:
+    #     logger.info("google_groups_listed", groups=groups)
+    #     respond(f"Listed {len(groups)} Google Groups.")
+    else:
+        respond("No Google Groups found.")
 
 
 def test_content():
