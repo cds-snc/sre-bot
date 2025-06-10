@@ -310,7 +310,6 @@ def test_update_modal_locale_to_FR():
 
 @patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
 @patch("modules.role.role.BOT_EMAIL", "bot_email")
-@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 @patch("modules.role.role.google_drive.create_folder")
 def test_create_new_folder(mock_create_new_folder, mock_copy_file_to_folder):
@@ -325,14 +324,12 @@ def test_create_new_folder(mock_create_new_folder, mock_copy_file_to_folder):
         "foo",
         "internal_talent_folder",
         "id",
-        scopes=["https://www.googleapis.com/auth/drive"],
         delegated_user_email="bot_email",
     )
 
 
 @patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
 @patch("modules.role.role.BOT_EMAIL", "bot_email")
-@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
 @patch("modules.role.role.logger")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 @patch("modules.role.role.google_drive.create_folder")
@@ -349,7 +346,6 @@ def test_create_new_folder_failed(
         "foo",
         "internal_talent_folder",
         "id",
-        scopes=["https://www.googleapis.com/auth/drive"],
         delegated_user_email="bot_email",
     )
     mock_logger.error.assert_called_once_with(
@@ -360,7 +356,6 @@ def test_create_new_folder_failed(
 
 @patch.multiple(role, **ROLE_CONSTANTS)  # type: ignore
 @patch("modules.role.role.BOT_EMAIL", "bot_email")
-@patch("modules.role.role.ROLE_SCOPES", ["https://www.googleapis.com/auth/drive"])
 @patch("modules.role.role.logger")
 @patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
@@ -382,7 +377,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Template 2022/06 - foo Interview Panel Scoring Document - <year/month> ",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -390,7 +384,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Template EN+FR 2022/09- foo - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -398,7 +391,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Template EN+FR 2022/09 - foo - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -406,7 +398,6 @@ def test_copy_files_to_internal_talent_folder(
                 "TEMPLATE Month YYYY - foo - Kick-off form",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -414,7 +405,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Phone Screen - Template",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -422,7 +412,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Recruitment Feedback - foo",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
             call(
@@ -430,7 +419,6 @@ def test_copy_files_to_internal_talent_folder(
                 "Panelist Guidebook - Interview Best Practices - foo",
                 "mock_templates_folder",
                 "folder_id",
-                scopes=["https://www.googleapis.com/auth/drive"],
                 delegated_user_email="bot_email",
             ),
         ]

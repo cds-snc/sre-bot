@@ -219,7 +219,6 @@ def role_view_handler(ack, body, say, client):
         role_name,
         INTERNAL_TALENT_FOLDER,
         "id",
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     folder_id = None
@@ -246,7 +245,6 @@ def role_view_handler(ack, body, say, client):
         f"Template 2022/06 - {role_name} Interview Panel Scoring Document - <year/month> ",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Scoring Guide", scoring_guide_id)
@@ -256,7 +254,6 @@ def role_view_handler(ack, body, say, client):
         f"Template EN+FR 2022/09- {role_name} - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Core Values Interview Notes", core_values_interview_notes_id)
@@ -266,7 +263,6 @@ def role_view_handler(ack, body, say, client):
         f"Template EN+FR 2022/09 - {role_name} - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Technical Interview Notes", technical_interview_notes_id)
@@ -276,7 +272,6 @@ def role_view_handler(ack, body, say, client):
         f"TEMPLATE Month YYYY - {role_name} - Kick-off form",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Intake Form", intake_form_id)
@@ -286,7 +281,6 @@ def role_view_handler(ack, body, say, client):
         "Phone Screen - Template",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Phone Screen Template", phone_screen_template_id)
@@ -296,7 +290,6 @@ def role_view_handler(ack, body, say, client):
         f"Recruitment Feedback - {role_name}",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created(
@@ -308,7 +301,6 @@ def role_view_handler(ack, body, say, client):
         f"Panelist Guidebook - Interview Best Practices - {role_name}",
         TEMPLATES_FOLDER,
         folder_id,
-        scopes=ROLE_SCOPES,
         delegated_user_email=BOT_EMAIL,
     )
     log_document_created("Panelist Guidebook Template", panelist_guidebook_template_id)
