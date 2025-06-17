@@ -15,6 +15,7 @@ class SlackSettings(BaseSettings):
     SLACK_SECURITY_USER_GROUP_ID: str = ""
     APP_TOKEN: str = ""
     SLACK_TOKEN: str = ""
+    USER_TOKEN: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
