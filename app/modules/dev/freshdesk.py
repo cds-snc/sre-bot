@@ -14,7 +14,7 @@ logger = get_module_logger()
 
 
 def freshdesk_command(
-    ack: Ack, client: WebClient, body, respond: Respond, logger, args
+    ack: Ack, client: WebClient, body, respond: Respond, args
 ):
     ack()
     respond(
@@ -314,7 +314,7 @@ def extract_ticket_number(msg):
                     return result
 
             # Then check all other dictionary values
-            for key, value in obj.items():
+            for _key, value in obj.items():
                 result = search_in_object(value)
                 if result:
                     return result
@@ -378,6 +378,7 @@ class ReportBuilder:
             for ticket_id in self.tickets_ids
             if ticket_id not in matched_ticket_ids
         ]
+        self.tickets_without_matches.sort()
         logger.info(
             "identified_tickets_without_matches",
             total_without_matches=len(self.tickets_without_matches),
@@ -390,7 +391,7 @@ class ReportBuilder:
             "tickets_loaded_count": self.tickets_loaded_count,
             "tickets_with_one_match": 0,
             "tickets_with_multiple_matches": 0,
-            "tickets_with_no_matches": 0,
+            "tickets_with_no_matches": len(self.tickets_without_matches),
             "skipped_messages_by_reason": {},
             "skipped_messages_total": 0,
         }
