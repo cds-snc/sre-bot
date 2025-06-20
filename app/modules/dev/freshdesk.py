@@ -5,7 +5,8 @@ import time
 from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
-from slack import WebClient
+from slack_sdk import WebClient
+from slack_sdk.web import SlackResponse
 from slack_bolt import Ack, Respond
 from core.logging import get_module_logger
 from core.config import settings
@@ -15,27 +16,33 @@ logger = get_module_logger()
 
 class ReportBuilder:
     def __init__(self):
-        self.tickets_loaded_count = 0
-        self.tickets_ids = set()
-        self.tickets_without_matches: List[str] = []
         self.search_results_count = 0
-        self.search_results: List[Dict[str, Any]] = []
+        self.tickets_ids_loaded = set()
+        self.tickets_without_matches: List[str] = []
+        self.tickets_search_results: List[Dict[str, Any]] = []
         self.skipped_messages: Dict[str, List[Dict[str, Any]]] = {}
 
-    def set_tickets_loaded(self, tickets: pd.DataFrame):
-        self.tickets_loaded_count = len(tickets)
-        self.tickets_ids = set(tickets["ID"].astype(str).tolist())
+    def set_tickets_ids_loaded(self, tickets: pd.DataFrame):
+        self.tickets_ids_loaded = set(tickets["ID"].astype(str).tolist())
+
+    def get_tickets_ids_loaded_count(self) -> int:
+        """
+        Get the count of tickets that were loaded.
+        This is used to report the total number of tickets processed.
+        """
+        return len(self.tickets_ids_loaded)
 
     def set_messages_searched_count(self, count: int):
+        """Set the count of messages that were searched during the process using the basic query."""
         self.search_results_count = count
 
-    def add_search_result(
+    def add_ticket_search_result(
         self,
         ticket_id: str,
         query: str,
         matches: List[Dict[str, Any]],
     ):
-        self.search_results.append(
+        self.tickets_search_results.append(
             {
                 "ticket_id": ticket_id,
                 "query": query,
@@ -55,10 +62,12 @@ class ReportBuilder:
         Identify tickets that had no matches in the search results.
         This will populate self.tickets_without_matches with ticket IDs that had no matches.
         """
-        matched_ticket_ids = {result["ticket_id"] for result in self.search_results}
+        matched_ticket_ids = {
+            result["ticket_id"] for result in self.tickets_search_results
+        }
         self.tickets_without_matches = [
             ticket_id
-            for ticket_id in self.tickets_ids
+            for ticket_id in self.tickets_ids_loaded
             if ticket_id not in matched_ticket_ids
         ]
         self.tickets_without_matches.sort()
@@ -67,14 +76,13 @@ class ReportBuilder:
             total_without_matches=len(self.tickets_without_matches),
         )
 
-    def load_from_search_report(self, report_data, skipped_messages):
+    def load_from_file(self, report_data, skipped_messages):
         """
         Load the report from a JSON file.
         This will populate the report with data from the file.
         """
-        self.tickets_loaded_count = report_data["summary"]["tickets_loaded_count"]
         self.search_results_count = report_data["summary"]["messages_searched_count"]
-        self.search_results = report_data["details"]["search_results"]
+        self.tickets_search_results = report_data["details"]["tickets_search_results"]
         self.tickets_without_matches = report_data["details"]["skipped_tickets"]
         self.skipped_messages = skipped_messages
 
@@ -82,14 +90,14 @@ class ReportBuilder:
         self.identify_tickets_without_matches()
         summary = {
             "messages_searched_count": self.search_results_count,
-            "tickets_loaded_count": self.tickets_loaded_count,
+            "tickets_loaded_count": self.get_tickets_ids_loaded_count(),
             "tickets_with_one_match": 0,
             "tickets_with_multiple_matches": 0,
             "tickets_with_no_matches": len(self.tickets_without_matches),
             "skipped_messages_by_reason": {},
             "skipped_messages_total": 0,
         }
-        for result in self.search_results:
+        for result in self.tickets_search_results:
             if result["match_count"] == 1:
                 summary["tickets_with_one_match"] += 1
             elif result["match_count"] > 1:
@@ -107,7 +115,7 @@ class ReportBuilder:
         report = {
             "summary": self.build_summary(),
             "details": {
-                "search_results": self.search_results,
+                "tickets_search_results": self.tickets_search_results,
                 "skipped_tickets": self.tickets_without_matches,
             },
         }
@@ -148,7 +156,7 @@ def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args)
         execute_search = False
 
     report = ReportBuilder()
-    report.set_tickets_loaded(data)
+    report.set_tickets_ids_loaded(data)
 
     if execute_search:
         response_text = search_and_process(
@@ -173,8 +181,20 @@ def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args)
         )
         respond(response_text)
 
+    time_sleep_value = 1
+    search_complete_message = (
+        f"Tickets matches completed. Starting to fetch thread messages for parent messages.\n"
+        f"With {len(report.tickets_search_results)} matching tickets found, it should take approximately {len(report.tickets_search_results) * time_sleep_value/60} minutes. (API rate limit of 50 calls per minute, so approximately 2 seconds per call to support pagination)."
+    )
+    post_ephemeral_message(
+        client=client,
+        channel_id=channel_id,
+        user_id=user_id,
+        text=search_complete_message,
+    )
     # for each search result, lookup the thread messages for the is_parent_message matches
-    for result in report.search_results[:5]:  # Limit to first 5 results for tests
+    total_results = len(report.tickets_search_results)
+    for idx, result in enumerate(report.tickets_search_results, start=1):
         ticket_id = result["ticket_id"]
         matches = result["matches"]
         if not matches:
@@ -196,21 +216,26 @@ def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args)
         thread_messages = find_thread_messages(
             client=client, channel_id=parent_message_channel_id, thread_ts=thread_ts
         )
+        # API rate limit of 50 calls per minute
+        time.sleep(time_sleep_value)
+
         # Add thread messages to the report
         result["thread_messages"] = thread_messages
-
-        post_ephemeral_message(
-            client=client,
-            channel_id=channel_id,
-            user_id=user_id,
-            text=f"Found {len(thread_messages)} messages in thread for ticket {ticket_id}.",
+        result["thread_messages_count"] = len(thread_messages)
+        progress = f"{idx}/{total_results} ({(idx / total_results) * 100:.2f}%)"
+        logger.info(
+            "thread_messages_found",
+            progress=progress,
+            ticket_id=ticket_id,
+            thread_ts=thread_ts,
+            message_count=len(thread_messages),
         )
     report.save()
 
 
 def post_ephemeral_message(
     client: WebClient, channel_id: str, user_id: str, text: str
-) -> Dict[str, Any] | None:
+) -> Any | None:
     """
     Post an ephemeral message to a Slack channel.
     """
@@ -220,7 +245,7 @@ def post_ephemeral_message(
             user=user_id,
             text=text,
         )
-        if response["ok"]:
+        if response.get("ok", None):
             return response
     except Exception as e:
         logger.error(f"Failed to post ephemeral message: {str(e)}")
@@ -250,13 +275,13 @@ def load_from_files(
     with open(skipped_messages_path, "r") as f:
         skipped_messages = json.load(f)
 
-    report.load_from_search_report(report_data, skipped_messages)
+    report.load_from_file(report_data, skipped_messages)
 
     # Build summary for response
     summary = report.build_summary()
     response_text = (
         f"Search completed.\n"
-        f"Total tickets provided: {report.tickets_loaded_count}\n"
+        f"Total tickets provided: {report.get_tickets_ids_loaded_count()}\n"
         f"Messages found for basic query: {summary['messages_searched_count']}\n"
         f"Found:\nExact matches for {summary['tickets_with_one_match']} tickets.\n"
         f"Multiple matches for {summary['tickets_with_multiple_matches']} tickets.\n"
@@ -285,7 +310,7 @@ def search_and_process(
     )
     # Make one larger query for all Freshdesk ticket messages
     base_query = "from:freshdesk2 created a ticket"
-    max_pages = 3
+    max_pages = 0  # 0 means no limit, will fetch all pages
 
     all_matches = search_messages(
         base_query=base_query,
@@ -306,13 +331,13 @@ def search_and_process(
     # Process the messages to find matches for each ticket ID provided
     tickets_processed, skipped_messages = process_messages(
         all_matches=all_matches,
-        ticket_ids=report.tickets_ids,
+        ticket_ids=report.tickets_ids_loaded,
         expected_user=expected_user,
         expected_channels=expected_channels,
     )
     # Add results to our report
     for ticket_id, matches in tickets_processed.items():
-        report.add_search_result(
+        report.add_ticket_search_result(
             ticket_id=ticket_id,
             query=f"{base_query} {ticket_id}",
             matches=matches,
@@ -327,7 +352,7 @@ def search_and_process(
     summary = report.build_summary()
     response_text = (
         f"Search completed.\n"
-        f"Total tickets provided: {report.tickets_loaded_count}\n"
+        f"Total tickets provided: {report.get_tickets_ids_loaded_count()}\n"
         f"Messages found for basic query: {summary['messages_searched_count']}\n"
         f"Found:\nExact matches for {summary['tickets_with_one_match']} tickets.\n"
         f"Multiple matches for {summary['tickets_with_multiple_matches']} tickets.\n"
@@ -350,9 +375,12 @@ def search_messages(
     Search messages in Slack using the provided base query.
     Returns a list of all matches found.
     """
-    all_matches = []
+    all_matches: List[Dict[str, Any]] = []
     current_page = 1
     per_page = 100  # Slack API max per page
+
+    if not user_auth_client:
+        raise ValueError("user_auth_client must be provided for searching messages.")
 
     while True:
         logger.info(
@@ -362,16 +390,20 @@ def search_messages(
             per_page=per_page,
         )
         try:
-            search_response = user_auth_client.search_messages(
+            search_response: SlackResponse = user_auth_client.search_messages(
                 query=base_query, count=per_page, page=current_page
             )
-            matches = search_response.get("messages", {}).get("matches", [])
-            pagination = search_response.get("messages", {}).get("pagination", {})
+            messages: dict[str, Any] = search_response.get("messages", {})
+            matches = messages.get("matches") or []
+            pagination = messages.get("pagination", {})
             all_matches.extend(matches)
 
             if current_page == 1:
                 if client and channel_id and user_id:
-                    response_message = f"Found {pagination.get('total_count', 0)} messages matching '{base_query}'.\nWith {per_page} messages per page and {pagination.get('page_count', 0)} total pages, this request will take {3 * pagination.get('page_count', 0)} seconds to complete. (assuming 3 seconds per page for rate limits)."
+                    response_message = (
+                        f"Found {pagination.get('total_count', 0)} messages matching '{base_query}'.\n"
+                        f"With {per_page} messages per page and {pagination.get('page_count', 0)} total pages, this request will take {3 * pagination.get('page_count', 0) / 60} minutes to complete. (assuming 3 seconds per page for rate limits)."
+                    )
                     post_ephemeral_message(
                         client=client,
                         channel_id=channel_id,
@@ -459,6 +491,10 @@ def process_messages(
         else:
             msg["is_parent_message"] = False
 
+        keys_to_remove = ["attachments", "blocks"]
+        for key in keys_to_remove:
+            if key in msg:
+                del msg[key]
         # This message passed all filters
         if ticket_id not in tickets_processed:
             tickets_processed[ticket_id] = []
@@ -469,6 +505,10 @@ def process_messages(
         total_skipped_messages=len(skipped_messages),
     )
     return tickets_processed, skipped_messages
+
+
+def process_messages_threads():
+    pass
 
 
 def is_conversation_member(
@@ -496,13 +536,12 @@ def find_thread_messages(
     client: WebClient,
     channel_id: str,
     thread_ts: str,
-    max_results: int = 100,
 ) -> List[Dict[str, Any]]:
     """
     Find all messages in a thread given the channel ID and thread timestamp.
     Returns a list of messages in the thread.
     """
-    all_messages = []
+    all_messages: List[Dict[str, Any]] = []
     is_member = is_conversation_member(
         client=client,
         channel_id=channel_id,
@@ -517,15 +556,24 @@ def find_thread_messages(
         response = client.conversations_replies(
             channel=channel_id,
             ts=thread_ts,
-            limit=max_results,
         )
-        all_messages.extend(response.get("messages", []))
-        logger.info(
-            "thread_messages_found",
-            channel_id=channel_id,
-            thread_ts=thread_ts,
-            message_count=len(all_messages),
-        )
+        messages: list[dict[str, Any]] = response.get("messages", [])
+        if messages:
+            # keep the following keys of the message
+            keys_to_keep = [
+                "ts",
+                "user",
+                "text",
+                "type",
+                "thread_ts",
+                "reply_count",
+                "reply_users_count",
+                "reply_users",
+            ]
+            for msg in messages:
+                filtered_msg = {k: msg[k] for k in keys_to_keep if k in msg}
+                all_messages.append(filtered_msg)
+
     except Exception as e:
         logger.error(
             "error_fetching_thread_messages",
@@ -533,7 +581,7 @@ def find_thread_messages(
             thread_ts=thread_ts,
             error=str(e),
         )
-        return all_messages
+
     return all_messages
 
 
