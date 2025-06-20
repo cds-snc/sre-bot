@@ -97,6 +97,7 @@ class ReportBuilder:
             "tickets_with_one_match": 0,
             "tickets_with_multiple_matches": 0,
             "tickets_with_no_matches": len(self.tickets_without_matches),
+            "thread_messages_count": 0,
             "skipped_messages_by_reason": {},
             "skipped_messages_total": 0,
         }
@@ -105,6 +106,11 @@ class ReportBuilder:
                 summary["tickets_with_one_match"] += 1
             elif result["match_count"] > 1:
                 summary["tickets_with_multiple_matches"] += 1
+
+            if "thread_messages_count" in result:
+                summary["thread_messages_count"] += result.get(
+                    "thread_messages_count", 0
+                )
         for reason, group in self.skipped_messages.items():
             count = sum(len(msgs) for msgs in group.values())
             summary["skipped_messages_by_reason"][reason] = count
@@ -129,10 +135,19 @@ class ReportBuilder:
             json.dump(self.skipped_messages, f, indent=2, default=default_converter)
 
 
-def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args):
+def freshdesk_command(
+    ack: Ack, client: WebClient, body, respond: Respond, args: List[str]
+):
     ack()
     respond(f"Starting search process at {time.strftime('%Y-%m-%d %H:%M:%S')}.")
     logger.info("freshdesk_command_received", body=json.dumps(body), args=args)
+    # if thread string is in args, then run_process_threads = True
+    run_process_threads = "thread" in args
+    if not run_process_threads:
+        logger.info("freshdesk_command_no_threads", args=args)
+        respond(
+            "Running without threads. If you want to run with threads, use `thread` argument."
+        )
     user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
     expected_user = "U01DBUUHJEP"
     expected_channels = ["C04U4PCDZ24", "C03FA4DJCCU", "C03T4FAE9FV", "CNWA63606"]
@@ -181,56 +196,9 @@ def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args)
         )
         respond(response_text)
 
-    time_sleep_value = 1
-    search_complete_message = (
-        f"Tickets matches completed. Starting to fetch thread messages for parent messages.\n"
-        f"With {len(report.tickets_search_results)} matching tickets found, it should take approximately {len(report.tickets_search_results) * time_sleep_value/60} minutes. (API rate limit of 50 calls per minute, so approximately 2 seconds per call to support pagination)."
-    )
-    post_ephemeral_message(
-        client=client,
-        channel_id=channel_id,
-        user_id=user_id,
-        text=search_complete_message,
-    )
-    # for each search result, lookup the thread messages for the is_parent_message matches
-    total_results = len(report.tickets_search_results)
-    for idx, result in enumerate(report.tickets_search_results, start=1):
-        ticket_id = result["ticket_id"]
-        matches = result["matches"]
-        if not matches:
-            continue
-        # Find the first match that is a parent message
-        parent_message = next(
-            (msg for msg in matches if msg.get("is_parent_message")), None
-        )
-        if not parent_message:
-            continue
-        thread_ts = parent_message.get("ts")
-        if not thread_ts:
-            continue
-        parent_message_channel_id = parent_message.get("channel", {}).get("id")
-        if not parent_message_channel_id:
-            continue
-
-        # Fetch all messages in the thread
-        thread_messages = find_thread_messages(
-            client=client, channel_id=parent_message_channel_id, thread_ts=thread_ts
-        )
-        # API rate limit of 50 calls per minute
-        time.sleep(time_sleep_value)
-
-        # Add thread messages to the report
-        result["thread_messages"] = thread_messages
-        result["thread_messages_count"] = len(thread_messages)
-        progress = f"{idx}/{total_results} ({(idx / total_results) * 100:.2f}%)"
-        logger.info(
-            "thread_messages_found",
-            progress=progress,
-            ticket_id=ticket_id,
-            thread_ts=thread_ts,
-            message_count=len(thread_messages),
-        )
-    report.save()
+    if run_process_threads:
+        process_threads(client, channel_id, user_id, report)
+        report.save()
 
 
 def post_ephemeral_message(
@@ -280,13 +248,13 @@ def load_from_files(
     # Build summary for response
     summary = report.build_summary()
     response_text = (
-        f"Search completed.\n"
+        f"*Search completed.*\n"
         f"Total tickets provided: {report.get_tickets_ids_loaded_count()}\n"
         f"Messages found for basic query: {summary['messages_searched_count']}\n"
-        f"Found:\nExact matches for {summary['tickets_with_one_match']} tickets.\n"
+        f"\n*Found:*\nExact matches for {summary['tickets_with_one_match']} tickets.\n"
         f"Multiple matches for {summary['tickets_with_multiple_matches']} tickets.\n"
         f"No matches for {summary['tickets_with_no_matches']} tickets.\n"
-        f"Total tickets loaded: {summary['tickets_loaded_count']}\n"
+        f"Thread messages found: {summary['thread_messages_count']}\n"
         f"Report loaded from search_report.json."
     )
     return response_text
@@ -553,6 +521,60 @@ def is_conversation_member(
             error=str(e),
         )
         return False
+
+
+def process_threads(
+    client: WebClient, channel_id: str, user_id: str, report: ReportBuilder
+):
+    time_sleep_value = 1
+    search_complete_message = (
+        f"Tickets matches completed. Starting to fetch thread messages for parent messages.\n"
+        f"With {len(report.tickets_search_results)} matching tickets found, it should take approximately {len(report.tickets_search_results) * time_sleep_value/60} minutes. (API rate limit of 50 calls per minute, so approximately 2 seconds per call to support pagination)."
+    )
+    post_ephemeral_message(
+        client=client,
+        channel_id=channel_id,
+        user_id=user_id,
+        text=search_complete_message,
+    )
+    # for each search result, lookup the thread messages for the is_parent_message matches
+    total_results = len(report.tickets_search_results)
+    for idx, result in enumerate(report.tickets_search_results, start=1):
+        ticket_id = result["ticket_id"]
+        matches = result["matches"]
+        if not matches:
+            continue
+        # Find the first match that is a parent message
+        parent_message = next(
+            (msg for msg in matches if msg.get("is_parent_message")), None
+        )
+        if not parent_message:
+            continue
+        thread_ts = parent_message.get("ts")
+        if not thread_ts:
+            continue
+        parent_message_channel_id = parent_message.get("channel", {}).get("id")
+        if not parent_message_channel_id:
+            continue
+
+        # Fetch all messages in the thread
+        thread_messages = find_thread_messages(
+            client=client, channel_id=parent_message_channel_id, thread_ts=thread_ts
+        )
+        # API rate limit of 50 calls per minute
+        time.sleep(time_sleep_value)
+
+        # Add thread messages to the report
+        result["thread_messages"] = thread_messages
+        result["thread_messages_count"] = len(thread_messages)
+        progress = f"{idx}/{total_results} ({(idx / total_results) * 100:.2f}%)"
+        logger.info(
+            "thread_messages_found",
+            progress=progress,
+            ticket_id=ticket_id,
+            thread_ts=thread_ts,
+            message_count=len(thread_messages),
+        )
 
 
 def find_thread_messages(
