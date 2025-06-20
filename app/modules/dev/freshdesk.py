@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import re
@@ -88,7 +89,9 @@ class ReportBuilder:
 
     def build_summary(self):
         self.identify_tickets_without_matches()
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         summary = {
+            "report_generated_at": now,
             "messages_searched_count": self.search_results_count,
             "tickets_loaded_count": self.get_tickets_ids_loaded_count(),
             "tickets_with_one_match": 0,
@@ -122,11 +125,8 @@ class ReportBuilder:
         with open(report_path, "w") as f:
             json.dump(report, f, indent=2, default=default_converter)
 
-        debug_file = {
-            "skipped_messages": self.skipped_messages,
-        }
         with open(skipped_messages_path, "w") as f:
-            json.dump(debug_file, f, indent=2, default=default_converter)
+            json.dump(self.skipped_messages, f, indent=2, default=default_converter)
 
 
 def freshdesk_command(ack: Ack, client: WebClient, body, respond: Respond, args):
@@ -434,6 +434,29 @@ def search_messages(
     return all_matches
 
 
+def log_skipped(
+    skipped_messages: Dict[str, Dict[str, Any]],
+    reason: str,
+    msg: Dict[str, Any],
+    ticket_id: str | None = None,
+):
+    """
+    Log a skipped message with a reason and add it to the skipped_messages dictionary.
+    """
+    if reason not in skipped_messages:
+        skipped_messages[reason] = {}
+    group_id = ticket_id if ticket_id is not None else "no_ticket_id"
+    if group_id not in skipped_messages[reason]:
+        skipped_messages[reason][group_id] = []
+    skipped_messages[reason][group_id].append(msg)
+    logger.warning(
+        "skipping_message",
+        reason=reason,
+        ticket_id=ticket_id,
+        message=msg,
+    )
+
+
 def process_messages(
     all_matches: List[Dict[str, Any]],
     ticket_ids: set,
@@ -583,29 +606,6 @@ def find_thread_messages(
         )
 
     return all_messages
-
-
-def log_skipped(
-    skipped_messages: Dict[str, Dict[str, Any]],
-    reason: str,
-    msg: Dict[str, Any],
-    ticket_id: str | None = None,
-):
-    """
-    Log a skipped message with a reason and add it to the skipped_messages dictionary.
-    """
-    if reason not in skipped_messages:
-        skipped_messages[reason] = {}
-    group_id = ticket_id if ticket_id is not None else "no_ticket_id"
-    if group_id not in skipped_messages[reason]:
-        skipped_messages[reason][group_id] = []
-    skipped_messages[reason][group_id].append(msg)
-    logger.warning(
-        "skipping_message",
-        reason=reason,
-        ticket_id=ticket_id,
-        message=msg,
-    )
 
 
 def default_converter(o):
