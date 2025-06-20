@@ -3,7 +3,7 @@
 from core.config import settings
 from core.logging import get_module_logger
 
-from modules.dev import aws_dev, google, slack, incident
+from modules.dev import aws_dev, google, slack, incident, freshdesk
 
 
 PREFIX = settings.PREFIX
@@ -25,6 +25,8 @@ def dev_command(ack, respond, client, body, args):
             google.google_service_command(ack, client, body, respond, logger)
         case "slack":
             slack.slack_command(ack, client, body, respond, logger, args)
+        case "fresh":
+            freshdesk.freshdesk_command(ack, client, body, respond, args)
         case "stale":
             test_stale_channel_notification(ack, logger, respond, client, body)
         case "incident":
