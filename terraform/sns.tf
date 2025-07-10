@@ -37,7 +37,7 @@ data "aws_iam_policy_document" "sns_cloudwatch" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::${var.account_id}:root"]
+      identifiers = ["arn:aws:iam::283582579564:root"]
     }
   }
 
