@@ -1,11 +1,11 @@
 black==24.10.0
-checkov==3.2.447
+checkov==3.2.457
 coverage==6.5.0
 flake8==6.1.0
-freezegun==1.5.2
+freezegun==1.5.3
 setuptools==78.1.1
 pytest==8.4.1
 pytest-asyncio==0.26.0
 pytest-env==0.8.2
 requests-mock==1.12.1
-boto3_stubs==1.39.3
+boto3_stubs==1.39.15
