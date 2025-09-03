@@ -41,7 +41,9 @@ def test_incident_open_modal_calls_ack(
         kwargs["view"]["blocks"][0]["text"]["text"]
         == ":beach-ball: Launching incident process..."
     )
-    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "en-US")
+    mock_generate_incident_modal_view.assert_called_once_with(
+        command, ANY, None, "en-US"
+    )
     client.views_update.assert_called_once_with(view_id=ANY, view=loaded_view)
 
 
@@ -104,7 +106,9 @@ def test_incident_open_modal_calls_get_user_locale(
     incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_get_user_locale.assert_called_once_with(client, "user_id")
-    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, "fr-FR")
+    mock_generate_incident_modal_view.assert_called_once_with(
+        command, ANY, None, "fr-FR"
+    )
 
 
 @patch("modules.incident.incident.i18n")
@@ -163,8 +167,10 @@ def test_incident_locale_button_updates_view_modal_locale_value(
     }
     incident.handle_change_locale_button(ack, client, body)
 
-    ack.assert_called
-    mock_generate_incident_modal_view.assert_called_with(command, options, "en-US")
+    ack.assert_called()
+    mock_generate_incident_modal_view.assert_called_with(
+        command, options, None, "en-US"
+    )
 
 
 @patch("modules.incident.incident.incident_folder.list_incident_folders")
@@ -212,7 +218,9 @@ def test_incident_submit_calls_ack(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_calls_views_open(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     _mock_incident_folder,
     _mock_incident_document,
@@ -225,6 +233,11 @@ def test_incident_submit_calls_views_open(
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
     incident.submit(ack, view, say, body, client)
     ack.assert_called_once()
     client.views_open.assert_called_once()
@@ -272,7 +285,9 @@ def test_incident_submit_returns_error_if_description_is_too_long(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     _mock_incident_folder,
     _mock_incident_document,
@@ -281,15 +296,17 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 ):
     ack = MagicMock()
 
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
-    }
     incident.submit(ack, view, say, body, client)
-    client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
+    client.conversations_create.assert_not_called()
     client.conversations_setTopic.assert_called_once_with(
         channel="channel_id", topic="Incident: name / product"
     )
@@ -304,7 +321,9 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_creates_channel_sets_description(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     _mock_incident_folder,
     _mock_incident_document,
@@ -312,16 +331,16 @@ def test_incident_submit_creates_channel_sets_description(
     _mock_db_operations,
 ):
     ack = MagicMock()
-
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
-    }
     incident.submit(ack, view, say, body, client)
-    client.conversations_create.assert_called_once_with(name=f"incident-{DATE}-name")
     client.conversations_setPurpose.assert_called_once_with(
         channel="channel_id", purpose="name"
     )
@@ -332,7 +351,9 @@ def test_incident_submit_creates_channel_sets_description(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_adds_creator_to_channel(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     _mock_incident_folder,
     _mock_incident_document,
@@ -340,15 +361,16 @@ def test_incident_submit_adds_creator_to_channel(
     _mock_db_operations,
 ):
     ack = MagicMock()
-
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
     view = helper_generate_view()
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "view": view, "trigger_id": "trigger_id"}
     client = MagicMock()
     client.views_open.return_value = {"view": view}
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
-    }
     client.usergroups_users_list.return_value = {
         "ok": False,
     }
@@ -366,7 +388,9 @@ def test_incident_submit_adds_creator_to_channel(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     _mock_incident_folder,
     _mock_incident_document,
@@ -379,8 +403,10 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     mock_google_meet.create_space.return_value = {
         "name": "spaces/asdfasdf",
@@ -407,7 +433,9 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_canvas_create_successful_called_with_correct_params(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_incident_folder,
     mock_incident_document,
@@ -425,8 +453,10 @@ def test_incident_canvas_create_successful_called_with_correct_params(
         "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want. All you need to do is to start typing below!️",
     }
 
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
 
     mock_google_meet.create_space.return_value = {
@@ -447,7 +477,9 @@ def test_incident_canvas_create_successful_called_with_correct_params(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_canvas_create_returns_successful_response(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_incident_folder,
     mock_incident_document,
@@ -464,8 +496,10 @@ def test_incident_canvas_create_returns_successful_response(
     expected_response = {"ok": True, "canvas_id": "canvas_id"}
     client.conversations_canvases_create.return_value = expected_response
 
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
 
     mock_google_meet.create_space.return_value = {
@@ -485,7 +519,9 @@ def test_incident_canvas_create_returns_successful_response(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_canvas_create_unsuccessful_called(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_incident_folder,
     mock_incident_document,
@@ -503,8 +539,10 @@ def test_incident_canvas_create_unsuccessful_called(
     expected_response = {"ok": False, "error": "invalid_type"}
     client.conversations_canvases_create.return_value = expected_response
 
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
 
     mock_google_meet.create_space.return_value = {
@@ -522,7 +560,9 @@ def test_incident_canvas_create_unsuccessful_called(
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_creates_a_document_and_announces_it(
+    mock_create_incident_conversation,
     mock_incident_folder,
     mock_google_meet,
     mock_incident_document,
@@ -540,8 +580,10 @@ def test_incident_submit_creates_a_document_and_announces_it(
         "view": view,
     }
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
 
     mock_incident_folder.create_item.return_value = "incident_id"
@@ -552,13 +594,13 @@ def test_incident_submit_creates_a_document_and_announces_it(
 
     incident.submit(ack, view, say, body, client)
     mock_incident_document.create_incident_document.assert_called_once_with(
-        f"{DATE}-name", "folder"
+        "slug", "folder"
     )
 
     mock_incident_folder.add_new_incident_to_list.assert_called_once_with(
         "https://docs.google.com/document/d/id/edit",
         "name",
-        f"{DATE}-name",
+        "slug",
         "product",
         "https://gcdigital.slack.com/archives/channel_id",
     )
@@ -571,7 +613,9 @@ def test_incident_submit_creates_a_document_and_announces_it(
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_pulls_oncall_people_into_the_channel(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_get_on_call_users,
     mock_incident_folder,
@@ -585,8 +629,10 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
@@ -631,7 +677,9 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_get_on_call_users,
     mock_incident_folder,
@@ -645,8 +693,10 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
@@ -690,7 +740,9 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_security_group_members_already_in_channel(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_get_on_call_users,
     mock_incident_folder,
@@ -704,8 +756,10 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
@@ -749,7 +803,9 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_incident_folder,
     mock_get_on_call_users,
@@ -765,8 +821,10 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,
@@ -807,7 +865,9 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.opsgenie.get_on_call_users")
 @patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
+    mock_create_incident_conversation,
     _log_to_sentinel_mock,
     mock_get_on_call_users,
     mock_incident_folder,
@@ -827,8 +887,10 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
     say = MagicMock()
     body = {"user": {"id": "creator_user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
+    mock_create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
     }
     client.users_lookupByEmail.return_value = {
         "ok": True,

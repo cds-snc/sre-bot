@@ -1,15 +1,14 @@
 import re
-import datetime
 import i18n  # type: ignore
 from slack_sdk import WebClient
-from slack_bolt import Ack
+from slack_bolt import Ack, App
 
 from integrations import opsgenie
 from integrations.slack import users as slack_users
-from integrations.sentinel import log_to_sentinel
 from integrations.google_workspace import meet
 
 from modules.incident import (
+    incident_conversation,
     incident_folder,
     incident_document,
     db_operations,
@@ -31,14 +30,20 @@ i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
 
-def register(bot):
+def register(bot: App):
     bot.command(f"/{PREFIX}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)
 
 
-def open_create_incident_modal(client, ack, command, body):
+def open_create_incident_modal(client: WebClient, ack, command, body):
     ack()
+    # private_metadata = json.dumps(
+    #     {
+    #         "channel_id": body["channel"]["id"],
+    #         "message_ts": body["message_ts"],
+    #     }
+    # )
     logger.info(
         "incident_command_called",
         command=command,
@@ -73,7 +78,7 @@ def open_create_incident_modal(client, ack, command, body):
         }
         for i in folders
     ]
-    loaded_view = generate_incident_modal_view(command, options, locale)
+    loaded_view = generate_incident_modal_view(command, options, None, locale)
     client.views_update(view_id=view["id"], view=loaded_view)
 
 
@@ -96,7 +101,7 @@ def handle_change_locale_button(ack, client, body):
     command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
     if command["text"] is None:
         command["text"] = ""
-    view = generate_incident_modal_view(command, options, locale)
+    view = generate_incident_modal_view(command, options, None, locale)
     client.views_update(view_id=body["view"]["id"], view=view)
 
 
@@ -126,6 +131,53 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         ack(response_action="errors", errors=errors)
         return
 
+    channel_id = None
+    channel_name = None
+    slug = None
+
+    # private_metadata = json.loads(body["view"].get("private_metadata"))
+    # source_channel_id = private_metadata.get("channel_id")
+    # source_message_ts = private_metadata.get("message_ts")
+    try:
+        channel_created = incident_conversation.create_incident_conversation(
+            client, name
+        )
+        channel_id = channel_created["channel_id"]
+        channel_name = channel_created["channel_name"]
+        slug = channel_created["slug"]
+
+    except Exception as e:
+        logger.error(
+            "incident_channel_creation_failed",
+            error=str(e),
+            incident_name=name,
+        )
+        say(
+            text=":warning: Channel creation failed. Please contact the SRE team.",
+            channel=body["user"]["id"],
+        )
+        return
+
+    # if private_metadata:
+    #     # private_metadata = json.loads(private_metadata)
+    #     logger.info("private_metadata_found", private_metadata=private_metadata)
+    #     incident_alert.update_alert_with_channel_link(
+    #         client,
+    #         source_channel_id,
+    #         source_message_ts,
+    #         incident_details={"channel_id": channel_id, "channel_name": channel_name},
+    #     )
+
+    logger.info(
+        "incident_channel_created",
+        channel_id=channel_id,
+        channel_name=channel_name,
+        slug=slug,
+    )
+
+    view = generate_success_modal(body, channel_id, channel_name)
+    client.views_open(trigger_id=body["trigger_id"], view=view)
+
     logger.info(
         "incident_modal_submitted",
         name=name,
@@ -135,7 +187,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         security_incident=security_incident,
         body=body,
     )
-    log_to_sentinel("incident_called", body)
+    # log_to_sentinel("incident_called", body)
 
     # Get folder metadata
     folder_metadata = incident_folder.get_folder_metadata(folder).get(
@@ -150,41 +202,15 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
             if r.get("ok"):
                 oncall.append(r["user"])
 
-    date = datetime.datetime.now().strftime("%Y-%m-%d")
-    slug = f"{date} {name}".replace(" ", "-").lower()
-
     # Create channel
-    # if we are testing ie PREFIX is "dev" then create the channel with name incident-dev-{slug}. Otherwise create the channel with name incident-{slug}
     environment = "prod"
-    channel_to_create = f"incident-{slug}"
     if PREFIX == "dev-":
         environment = "dev"
-        channel_to_create = f"incident-dev-{slug}"
-    try:
-        if len(channel_to_create) > 80:
-            channel_to_create = channel_to_create[:80]
-        response = client.conversations_create(name=channel_to_create)
-    except Exception as e:
-        logger.error(
-            "incident_channel_creation_failed",
-            error=str(e),
-            channel_name=channel_to_create,
-        )
-        say(
-            text=":warning: Channel creation failed. Please contact the SRE team.",
-            channel=body["user"]["id"],
-        )
-        return
-    channel_id = response["channel"]["id"]
-    channel_name = response["channel"]["name"]
     logger.info(
         "incident_channel_created",
         channel_id=channel_id,
         channel_name=channel_name,
     )
-
-    view = generate_success_modal(body, channel_id, channel_name)
-    client.views_open(trigger_id=body["trigger_id"], view=view)
 
     channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
 
@@ -318,13 +344,19 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     )
 
 
-def generate_incident_modal_view(command, options=[], locale="en-US"):
+def generate_incident_modal_view(
+    command, options=None, private_metadata=None, locale="en-US"
+):
+    """Generate the incident creation modal view."""
+    if options is None:
+        options = []
     handbook_string = f"For more details on what constitutes a security incident, visit our <{INCIDENT_HANDBOOK_URL}|Incident Management Handbook>"
     return {
         "type": "modal",
         "callback_id": "incident_view",
         "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
         "submit": {"type": "plain_text", "text": i18n.t("incident.submit")},
+        "private_metadata": private_metadata,
         "blocks": [
             {
                 "type": "actions",
