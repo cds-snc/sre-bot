@@ -271,6 +271,17 @@ class ServerSettings(BaseSettings):
     )
 
 
+class DevSettings(BaseSettings):
+    """Development environment configuration settings."""
+
+    SLACK_DEV_MSG_CHANNEL: str = Field(default="", alias="SLACK_DEV_MSG_CHANNEL")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class FrontEndSettings(BaseSettings):
     FRONTEND_URL: str = Field(default="http://127.0.0.1:3000", alias="FRONTEND_URL")
     model_config = SettingsConfigDict(
@@ -308,6 +319,9 @@ class Settings(BaseSettings):
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
 
+    # Development settings
+    dev: DevSettings
+
     @property
     def is_production(self) -> bool:
         """Check if the application is running in production."""
@@ -330,6 +344,7 @@ class Settings(BaseSettings):
             "reports": ReportsSettings,
             "aws_feature": AWSFeatureSettings,
             "feat_incident": IncidentFeatureSettings,
+            "dev": DevSettings,
         }
 
         for setting_name, setting_class in settings_map.items():
