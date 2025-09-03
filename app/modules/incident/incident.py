@@ -6,6 +6,7 @@ from slack_bolt import Ack, App
 from integrations import opsgenie
 from integrations.slack import users as slack_users
 from integrations.google_workspace import meet
+from integrations.sentinel import log_to_sentinel
 
 from modules.incident import (
     incident_conversation,
@@ -187,7 +188,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         security_incident=security_incident,
         body=body,
     )
-    # log_to_sentinel("incident_called", body)
+    log_to_sentinel("incident_called", body)
 
     # Get folder metadata
     folder_metadata = incident_folder.get_folder_metadata(folder).get(
