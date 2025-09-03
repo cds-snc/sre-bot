@@ -18,6 +18,7 @@ fr-FR:
     security_yes: "Oui"
     security_no: "Non"
     success: "Incident créé avec succès"
+    success_creating: "*Veuillez patienter pendant que nous créons le canal de l'incident*"
     user_added: "Vous avez ajouté à la discussion de cet incident:\n"
     next_steps: "Attendez! Que faire ensuite?"
     next_steps_instructions: "Posez-vous ces questions:"

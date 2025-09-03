@@ -18,6 +18,7 @@ en-US:
     security_yes: "Yes"
     security_no: "No"
     success: "Incident successfully created"
+    success_creating: "*Please wait while we are creating the incident channel*"
     user_added: "You have been added to the incident's conversation:\n"
     next_steps: "Wait! What's next?"
     next_steps_instructions: "Ask yourself these questions:"

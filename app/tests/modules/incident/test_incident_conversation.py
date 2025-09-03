@@ -5,6 +5,66 @@ import pytest
 from slack_sdk.errors import SlackApiError
 
 
+def test_create_incident_conversation_success():
+    client = MagicMock()
+    response = {"ok": True, "channel": {"id": "C999999"}}
+    client.conversations_create.return_value = response
+    result = incident_conversation.create_incident_conversation(client, "Test Incident")
+    assert result["channel_id"] == "C999999"
+    assert result["channel_name"].startswith("incident-")
+    assert "test-incident" in result["channel_name"]
+    assert result["slug"].endswith("test-incident")
+
+
+def test_create_incident_conversation_name_taken():
+    client = MagicMock()
+    responses = [
+        {"ok": False, "error": "name_taken"},
+        {"ok": True, "channel": {"id": "C888888"}},
+    ]
+    client.conversations_create.side_effect = responses
+    result = incident_conversation.create_incident_conversation(client, "Test Incident")
+    assert result["channel_id"] == "C888888"
+    assert result["channel_name"].endswith("-1")
+
+
+def test_create_incident_conversation_truncates_to_80_chars():
+    client = MagicMock()
+    long_name = "A" * 100
+    response = {"ok": True, "channel": {"id": "C777777"}}
+    client.conversations_create.return_value = response
+    result = incident_conversation.create_incident_conversation(client, long_name)
+    assert len(result["channel_name"]) <= 80
+
+
+def test_create_incident_conversation_suffix_truncation():
+    client = MagicMock()
+    responses = [{"ok": False, "error": "name_taken"} for _ in range(12)]
+    responses.append({"ok": True, "channel": {"id": "C666666"}})
+    client.conversations_create.side_effect = responses
+    long_name = "B" * 100
+    result = incident_conversation.create_incident_conversation(client, long_name)
+    assert result["channel_id"] == "C666666"
+    assert result["channel_name"].endswith("-12")
+    assert len(result["channel_name"]) <= 80
+
+
+def test_create_incident_conversation_raises_on_other_error():
+    client = MagicMock()
+    response = {"ok": False, "error": "other_error"}
+    client.conversations_create.return_value = response
+    with pytest.raises(SlackApiError):
+        incident_conversation.create_incident_conversation(client, "Test Incident")
+
+
+def test_create_incident_conversation_raises_on_channel_data_not_dict():
+    client = MagicMock()
+    response = {"ok": True, "channel": None}
+    client.conversations_create.return_value = response
+    with pytest.raises(SlackApiError):
+        incident_conversation.create_incident_conversation(client, "Test Incident")
+
+
 def test_is_floppy_disk_true():
     # Test case where the reaction is 'floppy_disk'
     event = {"reaction": "floppy_disk"}
