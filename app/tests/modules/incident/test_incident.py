@@ -1,5 +1,7 @@
 import datetime
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch, call
+from slack_sdk.errors import SlackApiError
+from models.incidents import IncidentPayload
 from modules import incident
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -209,33 +211,44 @@ def test_incident_submit_calls_succeeds(
         "channel_name": "channel_name",
         "slug": "slug",
     }
+    incident_payload = IncidentPayload(
+        name="name",
+        folder="folder",
+        product="product",
+        security_incident="yes",
+        user_id="user_id",
+        channel_id="channel_id",
+        channel_name="channel_name",
+        slug="slug",
+    )
     incident.submit(ack, view, say, body, client)
     ack.assert_called()
-
-
-@patch("modules.incident.incident.core")
-@patch("modules.incident.incident.log_to_sentinel")
-@patch("modules.incident.incident.logger")
-@patch("modules.incident.incident.incident_conversation")
-def test_incident_submit_calls_views_open(
-    mock_create_incident_conversation,
-    mock_logger,
-    mock_log_to_sentinel,
-    mock_core,
-):
-    ack = MagicMock()
-    view = helper_generate_view()
-    say = MagicMock()
-    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
-    client = MagicMock()
-    mock_create_incident_conversation.create_incident_conversation.return_value = {
-        "channel_id": "channel_id",
-        "channel_name": "channel_name",
-        "slug": "slug",
-    }
-    incident.submit(ack, view, say, body, client)
-    ack.assert_called_once()
     client.views_open.assert_called_once()
+    info_calls = [
+        call(
+            "incident_channel_created",
+            channel_id="channel_id",
+            channel_name="channel_name",
+            slug="slug",
+        ),
+        call(
+            "incident_modal_submitted",
+            name="name",
+            name_length=len("name"),
+            folder="folder",
+            product="product",
+            security_incident="yes",
+            body=body,
+        ),
+    ]
+    mock_logger.info.assert_has_calls(info_calls)
+    mock_log_to_sentinel.assert_called_once_with("incident_called", body)
+
+    mock_core.initiate_resources_creation.assert_called_once_with(
+        client=client,
+        say=say,
+        incident_payload=incident_payload,
+    )
 
 
 @patch("modules.incident.incident.core")
@@ -244,9 +257,9 @@ def test_incident_submit_calls_views_open(
 @patch("modules.incident.incident.incident_conversation")
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
     mock_create_incident_conversation,
-    mock_logger,
-    mock_log_to_sentinel,
-    mock_core,
+    _mock_logger,
+    _mock_log_to_sentinel,
+    _mock_core,
 ):
     ack = MagicMock()
     view = helper_generate_view("!@#$%%^&*()_+-=[]{};':,./<>?\\|`~")
@@ -273,9 +286,9 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
 @patch("modules.incident.incident.incident_conversation")
 def test_incident_submit_returns_error_if_description_is_too_long(
     mock_create_incident_conversation,
-    mock_logger,
-    mock_log_to_sentinel,
-    mock_core,
+    _mock_logger,
+    _mock_log_to_sentinel,
+    _mock_core,
 ):
     ack = MagicMock()
 
@@ -294,6 +307,70 @@ def test_incident_submit_returns_error_if_description_is_too_long(
         errors={
             "name": "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
         },
+    )
+
+
+@patch("modules.incident.incident.core")
+@patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident.logger")
+@patch("modules.incident.incident.incident_conversation")
+def test_submit_conversation_creation_error(
+    mock_create_incident_conversation,
+    mock_logger,
+    _mock_log_to_sentinel,
+    _mock_core,
+):
+    ack = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    mock_create_incident_conversation.create_incident_conversation.side_effect = (
+        SlackApiError(message="error", response=MagicMock())
+    )
+    incident.submit(ack, view, say, body, client)
+    ack.assert_called()
+    say.assert_called_with(
+        text=":warning: Channel creation failed. Please contact the SRE team.",
+        channel="user_id",
+    )
+    mock_logger.error.assert_called_once_with(
+        "incident_channel_creation_failed", error=ANY, incident_name="name"
+    )
+
+
+@patch("modules.incident.incident.core")
+@patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident.logger")
+@patch("modules.incident.incident.incident_conversation")
+def test_submit_initiate_resources_creation_error(
+    mock_create_incident_conversation,
+    mock_logger,
+    _mock_log_to_sentinel,
+    mock_core,
+):
+    ack = MagicMock()
+    view = helper_generate_view()
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    mock_create_incident_conversation.create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
+    mock_core.initiate_resources_creation.side_effect = Exception("error")
+    incident.submit(ack, view, say, body, client)
+    ack.assert_called()
+    say.assert_called_with(
+        text=":warning: There was an error initiating the incident resources. Please contact the SRE team.",
+        channel="channel_id",
+    )
+    mock_logger.error.assert_called_once_with(
+        "incident_resources_creation_failed",
+        error=ANY,
+        incident_name="name",
+        channel_id="channel_id",
     )
 
 

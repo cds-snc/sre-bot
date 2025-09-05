@@ -213,7 +213,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
             channel_id=channel_id,
         )
         say(
-            text=":warning: Incident setup failed. Please contact the SRE team.",
+            text=":warning: There was an error initiating the incident resources. Please contact the SRE team.",
             channel=channel_id,
         )
         return
