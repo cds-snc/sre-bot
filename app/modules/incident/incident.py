@@ -4,15 +4,13 @@ from slack_sdk import WebClient
 from slack_bolt import Ack, App
 
 from integrations.slack import users as slack_users
-from integrations.google_workspace import meet
 from integrations.sentinel import log_to_sentinel
+from models.incidents import IncidentPayload
 
 from modules.incident import (
     incident_conversation,
     incident_folder,
-    incident_document,
-    db_operations,
-    on_call,
+    core,
 )
 from core.logging import get_module_logger
 from core.config import settings
@@ -135,6 +133,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     channel_id = None
     channel_name = None
     slug = None
+    user_id = body["user"]["id"]
 
     # private_metadata = json.loads(body["view"].get("private_metadata"))
     # source_channel_id = private_metadata.get("channel_id")
@@ -190,148 +189,34 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     )
     log_to_sentinel("incident_called", body)
 
-    oncall = on_call.get_on_call_users_from_folder(client, folder)
-
-    # Create channel
-    environment = "prod"
-    if PREFIX == "dev-":
-        environment = "dev"
-    logger.info(
-        "incident_channel_created",
+    incident_payload = IncidentPayload(
+        name=name,
+        folder=folder,
+        product=product,
+        security_incident=security_incident,
+        user_id=user_id,
         channel_id=channel_id,
         channel_name=channel_name,
+        slug=slug,
     )
-
-    channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
-
-    # Set topic
-    client.conversations_setTopic(
-        channel=channel_id, topic=f"Incident: {name} / {product}"
-    )
-
-    # Set the description
-    client.conversations_setPurpose(channel=channel_id, purpose=f"{name}")
-
-    # Announce incident
-    user_id = body["user"]["id"]
-    text = (
-        f"<@{user_id}> has kicked off a new incident: {name} for {product}"
-        f" in <#{channel_id}>\n"
-        f"<@{user_id}> a initié un nouvel incident: {name} pour {product}"
-        f" dans <#{channel_id}>"
-    )
-    say(text=text, channel=INCIDENT_CHANNEL)
-
-    # Add incident creator to channel
-    client.conversations_invite(channel=channel_id, users=user_id)
-
-    # Add meeting link
-    meet_link = meet.create_space()
-    client.bookmarks_add(
-        channel_id=channel_id,
-        title="Meet link",
-        type="link",
-        link=meet_link["meetingUri"],
-    )
-
-    # Create a canvas for the channel
-    client.conversations_canvases_create(
-        channel_id=channel_id,
-        document_content={
-            "type": "markdown",
-            "markdown": "# Incident Canvas 📋\n\nUse this area to write/store anything you want. All you need to do is to start typing below!️",
-        },
-    )
-
-    text = f"A hangout has been created at: {meet_link['meetingUri']}"
-    say(text=text, channel=channel_id)
-
-    # Create incident document
-    document_id = incident_document.create_incident_document(slug, folder)
-    logger.info("incident_document_created", document_id=document_id)
-
-    document_link = f"https://docs.google.com/document/d/{document_id}/edit"
-
-    # Update incident list
-    incident_folder.add_new_incident_to_list(
-        document_link, name, slug, product, channel_url
-    )
-
-    folders = incident_folder.list_incident_folders()
-    team_name = "Unknown"
-    for f in folders:
-        if f["id"] == folder:
-            team_name = f["name"]
-            break
-
-    incident_data = {
-        "channel_id": channel_id,
-        "channel_name": channel_name,
-        "name": name,
-        "user_id": user_id,
-        "teams": [team_name],
-        "report_url": document_link,
-        "meet_url": meet_link["meetingUri"],
-        "environment": environment,
-    }
-    incident_id = db_operations.create_incident(incident_data)
-    logger.info("incident_record_created", incident_id=incident_id)
-
-    # Bookmark incident document
-    client.bookmarks_add(
-        channel_id=channel_id,
-        title="Incident report",
-        type="link",
-        link=document_link,
-    )
-
-    text = f":lapage: An incident report has been created at: {document_link}"
-    say(text=text, channel=channel_id)
-
-    # Gather all user IDs in a list to ensure uniqueness
-    users_to_invite = []
-
-    # Add oncall users, excluding the user_id
-    for user in oncall:
-        if user["id"] != user_id:
-            users_to_invite.append(user["id"])
-
-    # Get users from the @security group
-    if security_incident == "yes":
-        # If this is a security incident, get users from the security user group
-        # and add them to the list of users to invite
-        response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
-
-        # if we are testing, ie PREFIX is "dev" then don't add the security group users since we don't want to spam them
-        if response.get("ok") and PREFIX == "":
-            for security_user in response["users"]:
-                if security_user != user_id:
-                    users_to_invite.append(security_user)
-
-    # Invite all collected users to the channel in a single API call
-    if users_to_invite:
-        client.conversations_invite(channel=channel_id, users=users_to_invite)
-
-    text = "Run `/sre incident roles` to assign roles to the incident"
-    say(text=text, channel=channel_id)
-
-    text = "Run `/sre incident close` to update the status of the incident document and incident spreadsheet to closed and to archive the channel"
-    say(text=text, channel=channel_id)
-
-    text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
-    say(text=text, channel=channel_id)
-
-    incident_document.update_boilerplate_text(
-        document_id,
-        name,
-        product,
-        channel_url,
-        ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
-    )
-    logger.info(
-        "incident_successfully_created",
-        incident_id=incident_id,
-    )
+    try:
+        core.initiate_resources_creation(
+            client=client,
+            say=say,
+            incident_payload=incident_payload,
+        )
+    except Exception as e:
+        logger.error(
+            "incident_resources_creation_failed",
+            error=str(e),
+            incident_name=name,
+            channel_id=channel_id,
+        )
+        say(
+            text=":warning: Incident setup failed. Please contact the SRE team.",
+            channel=channel_id,
+        )
+        return
 
 
 def generate_incident_modal_view(
@@ -340,6 +225,8 @@ def generate_incident_modal_view(
     """Generate the incident creation modal view."""
     if options is None:
         options = []
+    if not private_metadata:
+        private_metadata = ""
     handbook_string = f"For more details on what constitutes a security incident, visit our <{INCIDENT_HANDBOOK_URL}|Incident Management Handbook>"
     return {
         "type": "modal",
