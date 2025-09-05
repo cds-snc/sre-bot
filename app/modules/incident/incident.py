@@ -351,6 +351,8 @@ def generate_incident_modal_view(
     """Generate the incident creation modal view."""
     if options is None:
         options = []
+    if not private_metadata:
+        private_metadata = ""
     handbook_string = f"For more details on what constitutes a security incident, visit our <{INCIDENT_HANDBOOK_URL}|Incident Management Handbook>"
     return {
         "type": "modal",
