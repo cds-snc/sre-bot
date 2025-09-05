@@ -3,7 +3,6 @@ import i18n  # type: ignore
 from slack_sdk import WebClient
 from slack_bolt import Ack, App
 
-from integrations import opsgenie
 from integrations.slack import users as slack_users
 from integrations.google_workspace import meet
 from integrations.sentinel import log_to_sentinel
@@ -13,6 +12,7 @@ from modules.incident import (
     incident_folder,
     incident_document,
     db_operations,
+    on_call,
 )
 from core.logging import get_module_logger
 from core.config import settings
@@ -190,18 +190,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     )
     log_to_sentinel("incident_called", body)
 
-    # Get folder metadata
-    folder_metadata = incident_folder.get_folder_metadata(folder).get(
-        "appProperties", {}
-    )
-    oncall = []
-
-    # Get OpsGenie data
-    if "genie_schedule" in folder_metadata:
-        for email in opsgenie.get_on_call_users(folder_metadata["genie_schedule"]):
-            r = client.users_lookupByEmail(email=email)
-            if r.get("ok"):
-                oncall.append(r["user"])
+    oncall = on_call.get_on_call_users_from_folder(client, folder)
 
     # Create channel
     environment = "prod"

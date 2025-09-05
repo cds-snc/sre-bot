@@ -1,8 +1,7 @@
 import datetime
+from unittest.mock import ANY, MagicMock, call, patch
 
 from modules import incident
-
-from unittest.mock import call, MagicMock, patch, ANY
 
 DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
@@ -191,18 +190,21 @@ def test_incident_local_button_calls_views_update(mock_list_incident_folders):
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "en-US"
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.log_to_sentinel")
 def test_incident_submit_calls_ack(
+    mock_get_on_call_users_from_folder,
     _log_to_sentinel_mock,
     _mock_incident_document,
     _mock_incident_folder,
     _mock_google_meet,
     _mock_db_operations,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
@@ -212,6 +214,7 @@ def test_incident_submit_calls_ack(
     ack.assert_called()
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.generate_success_modal")
@@ -227,7 +230,9 @@ def test_incident_submit_calls_views_open(
     _mock_generate_success_modal,
     _mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
     view = helper_generate_view()
     say = MagicMock()
@@ -243,10 +248,13 @@ def test_incident_submit_calls_views_open(
     client.views_open.assert_called_once()
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.meet")
 def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
+    mock_get_on_call_users_from_folder,
     _mock_google_meet,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
     view = helper_generate_view("!@#$%%^&*()_+-=[]{};':,./<>?\\|`~")
     say = MagicMock()
@@ -261,10 +269,13 @@ def test_incident_submit_returns_error_if_description_is_not_alphanumeric(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.meet")
 def test_incident_submit_returns_error_if_description_is_too_long(
+    mock_get_on_call_users_from_folder,
     _mock_google_meet,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
 
     view = helper_generate_view("a" * 61)
@@ -280,6 +291,7 @@ def test_incident_submit_returns_error_if_description_is_too_long(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -293,7 +305,9 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     _mock_incident_document,
     _mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
 
     mock_create_incident_conversation.return_value = {
@@ -316,6 +330,7 @@ def test_incident_submit_creates_channel_sets_topic_and_announces_channel(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -329,7 +344,9 @@ def test_incident_submit_creates_channel_sets_description(
     _mock_incident_document,
     _mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
     mock_create_incident_conversation.return_value = {
         "channel_id": "channel_id",
@@ -346,6 +363,7 @@ def test_incident_submit_creates_channel_sets_description(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -359,7 +377,9 @@ def test_incident_submit_adds_creator_to_channel(
     _mock_incident_document,
     _mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
     mock_create_incident_conversation.return_value = {
         "channel_id": "channel_id",
@@ -383,6 +403,7 @@ def test_incident_submit_adds_creator_to_channel(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -396,7 +417,9 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     _mock_incident_document,
     mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
 
     view = helper_generate_view()
@@ -428,6 +451,7 @@ def test_incident_submit_adds_bookmarks_for_a_meet_and_announces_it(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -441,7 +465,9 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     mock_incident_document,
     mock_google_meet,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     client = MagicMock()
     ack = MagicMock()
 
@@ -472,6 +498,7 @@ def test_incident_canvas_create_successful_called_with_correct_params(
     )
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -485,7 +512,9 @@ def test_incident_canvas_create_returns_successful_response(
     mock_incident_document,
     mock_google_meet,
     mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     mock_incident_folder.create_item.return_value = "incident_id"
     client = MagicMock()
     ack = MagicMock()
@@ -514,6 +543,7 @@ def test_incident_canvas_create_returns_successful_response(
     ack.assert_called_once()
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
@@ -527,7 +557,9 @@ def test_incident_canvas_create_unsuccessful_called(
     mock_incident_document,
     mock_google_meet,
     mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     mock_incident_folder.create_item.return_value = "incident_id"
 
     client = MagicMock()
@@ -556,6 +588,7 @@ def test_incident_canvas_create_unsuccessful_called(
     assert client.conversations_canvases_create.return_value == expected_response
 
 
+@patch("modules.incident.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.meet")
@@ -567,7 +600,9 @@ def test_incident_submit_creates_a_document_and_announces_it(
     mock_google_meet,
     mock_incident_document,
     _mock_db_operations,
+    mock_get_on_call_users_from_folder,
 ):
+    mock_get_on_call_users_from_folder.return_value = []
     ack = MagicMock()
 
     view = helper_generate_view()
@@ -590,8 +625,6 @@ def test_incident_submit_creates_a_document_and_announces_it(
 
     mock_incident_document.create_incident_document.return_value = "id"
 
-    mock_incident_folder.get_folder_metadata.return_value = {"appProperties": {}}
-
     incident.submit(ack, view, say, body, client)
     mock_incident_document.create_incident_document.assert_called_once_with(
         "slug", "folder"
@@ -604,14 +637,13 @@ def test_incident_submit_creates_a_document_and_announces_it(
         "product",
         "https://gcdigital.slack.com/archives/channel_id",
     )
-    mock_incident_folder.get_folder_metadata.assert_called_once_with("folder")
 
 
 @patch("modules.incident.incident.db_operations")
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
-@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_pulls_oncall_people_into_the_channel(
@@ -634,13 +666,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
         "channel_name": "channel_name",
         "slug": "slug",
     }
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {
-            "id": "on_call_user_id",
-            "profile": {"display_name_normalized": "name"},
-        },
-    }
+
     client.usergroups_users_list.return_value = {
         "ok": True,
         "users": [
@@ -651,14 +677,25 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
 
     mock_incident_document.create_incident_document.return_value = "id"
 
-    mock_get_on_call_users.return_value = ["email"]
+    mock_get_on_call_users.return_value = [
+        {
+            "id": "on_call_user_id",
+            "name": "testuser",
+            "real_name": "Test User",
+            "profile": {
+                "email": "email",
+                "real_name": "Test User",
+                "display_name": "testuser",
+                "display_name_normalized": "name",
+            },
+        },
+    ]
     mock_incident_folder.get_folder_metadata.return_value = {
         "appProperties": {"genie_schedule": "oncall"}
     }
 
     incident.submit(ack, view, say, body, client)
-    mock_get_on_call_users.assert_called_once_with("oncall")
-    client.users_lookupByEmail.assert_any_call(email="email")
+    mock_get_on_call_users.assert_called_once_with(client, "folder")
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
     client.conversations_invite.assert_has_calls(
         [
@@ -675,7 +712,7 @@ def test_incident_submit_pulls_oncall_people_into_the_channel(
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
-@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
@@ -698,13 +735,6 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
         "channel_name": "channel_name",
         "slug": "slug",
     }
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {
-            "id": "creator_user_id",
-            "profile": {"display_name_normalized": "name"},
-        },
-    }
     client.usergroups_users_list.return_value = {
         "ok": True,
         "users": [
@@ -715,14 +745,26 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
 
     mock_incident_document.create_incident_document.return_value = "id"
 
-    mock_get_on_call_users.return_value = ["email"]
+    mock_get_on_call_users.return_value = [
+        {
+            "id": "creator_user_id",
+            "name": "testuser",
+            "real_name": "Test User",
+            "profile": {
+                "email": "email",
+                "real_name": "Test User",
+                "display_name": "testuser",
+                "display_name_normalized": "name",
+            },
+        },
+    ]
     mock_incident_folder.get_folder_metadata.return_value = {
         "appProperties": {"genie_schedule": "oncall"}
     }
 
     incident.submit(ack, view, say, body, client)
-    mock_get_on_call_users.assert_called_once_with("oncall")
-    client.users_lookupByEmail.assert_any_call(email="email")
+    mock_get_on_call_users.assert_called_once_with(client, "folder")
+
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
     client.conversations_invite.assert_has_calls(
         [
@@ -738,7 +780,7 @@ def test_incident_submit_does_not_invite_on_call_if_already_in_channel(
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
-@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_security_group_members_already_in_channel(
@@ -761,13 +803,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
         "channel_name": "channel_name",
         "slug": "slug",
     }
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {
-            "id": "on_call_user_id",
-            "profile": {"display_name_normalized": "name"},
-        },
-    }
+
     client.usergroups_users_list.return_value = {
         "ok": True,
         "users": [
@@ -778,14 +814,26 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 
     mock_incident_document.create_incident_document.return_value = "id"
 
-    mock_get_on_call_users.return_value = ["email"]
+    mock_get_on_call_users.return_value = [
+        {
+            "id": "on_call_user_id",
+            "name": "testuser",
+            "real_name": "Test User",
+            "profile": {
+                "email": "email",
+                "real_name": "Test User",
+                "display_name": "testuser",
+                "display_name_normalized": "name",
+            },
+        },
+    ]
     mock_incident_folder.get_folder_metadata.return_value = {
         "appProperties": {"genie_schedule": "oncall"}
     }
 
     incident.submit(ack, view, say, body, client)
-    mock_get_on_call_users.assert_called_once_with("oncall")
-    client.users_lookupByEmail.assert_any_call(email="email")
+    mock_get_on_call_users.assert_called_once_with(client, "folder")
+
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
     client.conversations_invite.assert_has_calls(
         [
@@ -800,7 +848,7 @@ def test_incident_submit_does_not_invite_security_group_members_already_in_chann
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document.update_boilerplate_text")
 @patch("modules.incident.incident.incident_document.create_incident_document")
-@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.incident_folder")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch("modules.incident.incident_conversation.create_incident_conversation")
@@ -826,13 +874,6 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
         "channel_name": "channel_name",
         "slug": "slug",
     }
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {
-            "id": "on_call_user_id",
-            "profile": {"display_name_normalized": "name"},
-        },
-    }
     client.usergroups_users_list.return_value = {
         "ok": True,
         "users": [
@@ -842,14 +883,26 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
 
     mock_create_new_incident.return_value = "id"
 
-    mock_get_on_call_users.return_value = ["email"]
+    mock_get_on_call_users.return_value = [
+        {
+            "id": "on_call_user_id",
+            "name": "testuser",
+            "real_name": "Test User",
+            "profile": {
+                "email": "email",
+                "real_name": "Test User",
+                "display_name": "testuser",
+                "display_name_normalized": "name",
+            },
+        },
+    ]
     mock_incident_folder.get_folder_metadata.return_value = {
         "appProperties": {"genie_schedule": "oncall"}
     }
 
     incident.submit(ack, view, say, body, client)
-    mock_get_on_call_users.assert_called_once_with("oncall")
-    client.users_lookupByEmail.assert_any_call(email="email")
+    mock_get_on_call_users.assert_called_once_with(client, "folder")
+
     client.usergroups_users_list(usergroup="SLACK_SECURITY_USER_GROUP_ID")
     client.conversations_invite.assert_has_calls(
         [
@@ -863,7 +916,7 @@ def test_incident_submit_does_not_invite_security_group_members_if_prefix_dev(
 @patch("modules.incident.incident.meet")
 @patch("modules.incident.incident.incident_document")
 @patch("modules.incident.incident.incident_folder")
-@patch("modules.incident.incident.opsgenie.get_on_call_users")
+@patch("modules.incident.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.incident.log_to_sentinel")
 @patch("modules.incident.incident_conversation.create_incident_conversation")
 def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
@@ -892,13 +945,6 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
         "channel_name": "channel_name",
         "slug": "slug",
     }
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {
-            "id": "on_call_user_id",
-            "profile": {"display_name_normalized": "name"},
-        },
-    }
     client.usergroups_users_list.return_value = {
         "ok": True,
         "users": ["creator_user_id", "security_user_id"],
@@ -906,14 +952,26 @@ def test_incident_submit_does_not_invite_security_group_members_if_not_selected(
 
     mock_incident_document.create_incident_document.return_value = "id"
 
-    mock_get_on_call_users.return_value = ["email"]
+    mock_get_on_call_users.return_value = [
+        {
+            "id": "on_call_user_id",
+            "name": "testuser",
+            "real_name": "Test User",
+            "profile": {
+                "email": "email",
+                "real_name": "Test User",
+                "display_name": "testuser",
+                "display_name_normalized": "name",
+            },
+        },
+    ]
     mock_incident_folder.get_folder_metadata.return_value = {
         "appProperties": {"genie_schedule": "oncall"}
     }
 
     incident.submit(ack, view, say, body, client)
-    mock_get_on_call_users.assert_called_once_with("oncall")
-    client.users_lookupByEmail.assert_any_call(email="email")
+    mock_get_on_call_users.assert_called_once_with(client, "folder")
+
     client.usergroups_users_list.assert_not_called()
     client.conversations_invite.assert_has_calls(
         [
