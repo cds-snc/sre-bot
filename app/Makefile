@@ -22,7 +22,7 @@ lint:
 	flake8 .
 
 test:
-	python3 -m coverage run -m pytest -s -vv tests &&\
+	python3 -m coverage run -m pytest -s -vv $(if $(SUBTEST),tests/$(SUBTEST),tests) &&\
 	python3 -m coverage report -m
 
 lint-ci:
