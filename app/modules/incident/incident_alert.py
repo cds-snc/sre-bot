@@ -1,3 +1,6 @@
+import json
+from slack_sdk import WebClient
+from slack_sdk.web import SlackResponse
 from integrations.sentinel import log_to_sentinel
 from modules.incident import incident
 from modules.slack import webhooks
@@ -6,7 +9,7 @@ from core.logging import get_module_logger
 logger = get_module_logger()
 
 
-def handle_incident_action_buttons(client, ack, body):
+def handle_incident_action_buttons(client: WebClient, ack, body):
     delete_block = False
     name = body["actions"][0]["name"]
     value = body["actions"][0]["value"]
@@ -51,3 +54,44 @@ def handle_incident_action_buttons(client, ack, body):
         )
         client.api_call("chat.update", json=body["original_message"])
         log_to_sentinel("ignore_incident_button_pressed", body)
+
+
+def update_alert_with_channel_link(
+    client: WebClient,
+    channel_id: str,
+    message_ts: str,
+    incident_details: dict,
+):
+    """Update the incident alert message with the new incident channel link"""
+    response: SlackResponse = client.conversations_history(
+        channel=channel_id,
+        latest=message_ts,
+        oldest=message_ts,
+        inclusive=True,
+        limit=1,
+    )
+    logger.warn("response_data", response_data=response.data)
+    response_data = response.data
+    if isinstance(response_data, bytes):
+        response_data = json.loads(response_data.decode("utf-8"))
+    message = None
+    if (
+        isinstance(response_data, dict)
+        and response_data.get("ok")
+        and "messages" in response_data
+        and response_data["messages"]
+    ):
+        message = response_data["messages"][0]
+        new_attachments = [
+            {
+                "color": "good",
+                "fallback": f"Incident created: <#{incident_details['channel_id']}|{incident_details['channel_name']}>",
+                "text": f":rotating_light: Incident created: <#{incident_details['channel_id']}|{incident_details['channel_name']}>",
+            }
+        ]
+        client.chat_update(
+            channel=channel_id,
+            ts=message_ts,
+            attachments=new_attachments,
+            text=message.get("text", ""),
+        )
