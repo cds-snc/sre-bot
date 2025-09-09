@@ -139,6 +139,24 @@ def freshdesk_command(
     ack: Ack, client: WebClient, body, respond: Respond, args: List[str]
 ):
     ack()
+    action = args.pop(0) if args else ""
+    helper_text = (
+        "Available actions for /dev fresh:\n"
+        "`search` - Search for Freshdesk ticket messages in Slack based on ticket IDs from an Excel file.\n"
+        "`load` - Load the search report from the last search operation.\n"
+    )
+    match action:
+        case "search":
+            initiate_search_report(client, respond, body, args)
+        case "load":
+            response = load_search_report()
+            respond(response)
+        case _:
+            respond(f"Invalid action for /dev fresh command.\n{helper_text}")
+
+
+def initiate_search_report(client, respond, body, args):
+    """Initiate the search process for Freshdesk ticket messages in Slack."""
     respond(f"Starting search process at {time.strftime('%Y-%m-%d %H:%M:%S')}.")
     logger.info("freshdesk_command_received", body=json.dumps(body), args=args)
     # if thread string is in args, then run_process_threads = True
@@ -199,6 +217,38 @@ def freshdesk_command(
     if run_process_threads:
         process_threads(client, channel_id, user_id, report)
         report.save()
+
+
+def load_search_report():
+    """Loads the search results from the last search operation and displays them to the user."""
+    directory = os.path.dirname(__file__)
+    report_path = os.path.join(directory, "search_report.json")
+    if not os.path.exists(report_path):
+        logger.error("no_search_report_found")
+        return "No search report found. Please run the search command first."
+
+    with open(report_path, "r", encoding="utf-8") as f:
+        report_data = json.load(f)
+
+    summary = report_data["summary"]
+    response_text = (
+        f"*Search report loaded from last operation at {summary['report_generated_at']}*\n"
+        f"Total tickets loaded: {summary['tickets_loaded_count']}\n"
+        f"Messages searched: {summary['messages_searched_count']}\n"
+        f"Tickets with exactly one match: {summary['tickets_with_one_match']}\n"
+        f"Tickets with multiple matches: {summary['tickets_with_multiple_matches']}\n"
+        f"Tickets with no matches: {summary['tickets_with_no_matches']}\n"
+        f"Thread messages found: {summary['thread_messages_count']}\n"
+        f"Skipped messages by reason:\n"
+        + "\n".join(
+            f"  - {reason}: {count}"
+            for reason, count in summary.get("skipped_messages_by_reason", {}).items()
+        )
+        + f"\nTotal skipped messages: {summary['skipped_messages_total']}\n"
+        f"Report loaded from search_report.json."
+    )
+    logger.info("search_report_loaded", summary=summary)
+    return response_text
 
 
 def post_ephemeral_message(
