@@ -1,10 +1,14 @@
+import requests
 from slack_sdk import WebClient
 from boto3.dynamodb.types import TypeDeserializer
 from modules.incident import incident_folder, incident_conversation, db_operations
+from api.v1.routes.webhooks import append_incident_buttons
+from models.webhooks import WebhookPayload
 
 from core.config import settings
 
 INCIDENT_LIST = settings.google_workspace.INCIDENT_LIST
+SLACK_DEV_MSG_CHANNEL = settings.dev.SLACK_DEV_MSG_CHANNEL
 
 
 def list_incidents(ack, logger, respond, client: WebClient, body):
@@ -102,3 +106,67 @@ def add_incident(ack, logger, respond, client: WebClient, body):
 
     logger.info("incident_data_created", payload=incident_data)
     db_operations.create_incident(incident_data)
+
+
+def emit_test_incident_alert(ack, logger, respond, client: WebClient, body):
+    """Emit a test incident alert by sending a payload to the Slack Test Channel Webhook."""
+    webhook_url = SLACK_DEV_MSG_CHANNEL
+    payload = WebhookPayload(text="This is a test incident alert", attachments=None)
+    payload = append_incident_buttons(payload, "test-incident-id")
+
+    response = requests.post(
+        webhook_url, json=payload.model_dump(exclude_none=True), timeout=10
+    )
+    print(response.status_code)
+    print(response.text)
+
+
+def post_dev_test_message(ack, logger, respond, client: WebClient, body):
+    """Post a test message as the bot and log channel/ts for update testing."""
+    ack()
+    channel_id = body.get("channel_id") or body.get("channel", {}).get("id")
+    if not channel_id:
+        respond("No channel_id found in body.")
+        return
+    result = client.chat_postMessage(
+        channel=channel_id,
+        text=":robot_face: Dev test message for update testing.",
+        attachments=[{"color": "#439FE0", "text": "This is a test attachment."}],
+    )
+    ts = result["ts"]
+    logger.info("dev_test_message_posted", channel=channel_id, ts=ts)
+    respond(
+        f"Test message posted. Channel: `{channel_id}` TS: `{ts}` `{channel_id},{ts}`"
+    )
+
+
+def update_dev_test_message(ack, logger, respond, client: WebClient, body, args: list):
+    """Update a message given channel and ts (provide as body['text'] = 'channel_id,ts')."""
+    ack()
+    channel_id = None
+    ts = None
+    # Expecting body['text'] = 'channel_id,ts'
+    try:
+        channel_id, ts = [x.strip() for x in args[0].split(",")]
+    except Exception:
+        respond("Please provide input as 'channel_id,ts'")
+        return
+    logger.info("update_dev_test_invoked", channel_id=channel_id, ts=ts)
+    try:
+        result = client.chat_update(
+            channel=channel_id,
+            ts=ts,
+            text=":robot_face: Updated by dev command!",
+            attachments=[
+                {"color": "good", "text": "This message was updated successfully!"}
+            ],
+        )
+        logger.info(
+            "dev_test_message_updated", channel=channel_id, ts=ts, result=result
+        )
+        respond(f"Message updated! Channel: `{channel_id}` TS: `{ts}`")
+    except Exception as e:
+        logger.error(
+            "dev_test_message_update_failed", channel=channel_id, ts=ts, error=str(e)
+        )
+        respond(f"Failed to update message: {e}")

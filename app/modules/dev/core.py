@@ -17,7 +17,7 @@ def dev_command(ack, respond, client, body, args):
         respond("This command is only available in the development environment.")
         return
     action = args.pop(0) if args else ""
-    logger.info("dev_command_received", action=action)
+    logger.info("dev_command_received", action=action, args=args)
     match action:
         case "aws":
             aws_dev.aws_dev_command(ack, client, body, respond, logger)
@@ -33,6 +33,12 @@ def dev_command(ack, respond, client, body, args):
             incident.load_incidents(ack, logger, respond, client, body)
         case "add-incident":
             incident.add_incident(ack, logger, respond, client, body)
+        case "alert":
+            incident.emit_test_incident_alert(ack, logger, respond, client, body)
+        case "post":
+            incident.post_dev_test_message(ack, logger, respond, client, body)
+        case "update":
+            incident.update_dev_test_message(ack, logger, respond, client, body, args)
         case _:
             logger.error(
                 "dev_command_invalid_action", action=action if action else None
