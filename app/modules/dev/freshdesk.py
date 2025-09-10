@@ -287,6 +287,13 @@ def parse_tickets_from_search_report(report_data):
     return result
 
 
+def filter_tickets(tickets_search_results: dict, ticket_list: list[str] | None) -> dict:
+    """Filter tickets based on the provided ticket list."""
+    if ticket_list:
+        return {k: v for k, v in tickets_search_results.items() if k in ticket_list}
+    return tickets_search_results
+
+
 def delete_messages(ticket_list: list[str] | None) -> str:
     """Loads all messages identified in the last search report and deletes them.
 
@@ -307,40 +314,32 @@ def delete_messages(ticket_list: list[str] | None) -> str:
         report_data = json.load(f)
 
     tickets_search_results = parse_tickets_from_search_report(report_data)
+    tickets_search_results = filter_tickets(tickets_search_results, ticket_list)
 
-    if ticket_list is not None and len(ticket_list) > 0:
-        filtered_tickets = {
-            k: v for k, v in tickets_search_results.items() if k in ticket_list
-        }
-        tickets_search_results = filtered_tickets
-        if tickets_search_results:
-            selected_ticket_samples = list(tickets_search_results.items())
-            for ticket in selected_ticket_samples:
-                ticket_id, ticket_data = ticket
-                channel_id = ticket_data.get("channel_id")
-                messages_ts = [
-                    msg.get("ts") for msg in ticket_data.get("thread_messages", [])
-                ]
-                logger.info(
-                    "ticket_to_delete",
-                    ticket_id=ticket_id,
-                    channel_id=channel_id,
-                    thread_messages_ts=messages_ts,
-                )
-                # if messages_ts:
-                #     try:
-                #         user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
-                #         for ts in messages_ts:
-                #             user_auth_client.chat_delete(
-                #                 channel=channel_id, ts=ts
-                #             )
-                #     except Exception as e:
-                #         logger.error(f"Failed to delete messages for ticket {ticket_id}: {str(e)}")
-                #         return f"Failed to delete messages for ticket {ticket_id}: {str(e)}"
-            return f"Messages for tickets {list(tickets_search_results.keys())} deleted successfully."
-        else:
-            return "No matching tickets found for the provided ticket IDs."
-    return f"Message with tickets {ticket_list} deleted successfully."
+    if not tickets_search_results:
+        return "No matching tickets found for the provided ticket IDs."
+
+    for ticket_id, ticket_data in tickets_search_results.items():
+        channel_id = ticket_data.get("channel_id")
+        messages_ts = [msg.get("ts") for msg in ticket_data.get("thread_messages", [])]
+        logger.info(
+            "ticket_to_delete",
+            ticket_id=ticket_id,
+            channel_id=channel_id,
+            thread_messages_ts=messages_ts,
+        )
+        # if messages_ts:
+        #     try:
+        #         user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
+        #         for ts in messages_ts:
+        #             user_auth_client.chat_delete(
+        #                 channel=channel_id, ts=ts
+        #             )
+        #     except Exception as e:
+        #         logger.error(f"Failed to delete messages for ticket {ticket_id}: {str(e)}")
+        #         return f"Failed to delete messages for ticket {ticket_id}: {str(e)}"
+
+    return f"Messages for tickets {list(tickets_search_results.keys())} deleted successfully."
 
 
 def post_ephemeral_message(
@@ -511,7 +510,7 @@ def search_messages(
                 query=base_query, count=per_page, page=current_page
             )
             messages: dict[str, Any] = search_response.get("messages", {})
-            matches = messages.get("matches") or []
+            matches = messages.get("pagination", {}).get("next_cursor") or []
             pagination = messages.get("pagination", {})
             all_matches.extend(matches)
 
