@@ -144,12 +144,16 @@ def freshdesk_command(
         "Available actions for /dev fresh:\n"
         "`search` - Search for Freshdesk ticket messages in Slack based on ticket IDs from an Excel file.\n"
         "`load` - Load the search report from the last search operation.\n"
+        "`delete <message_ts>` - Delete messages identified in the last search report based on the provided message timestamp.\n"
     )
     match action:
         case "search":
             initiate_search_report(client, respond, body, args)
         case "load":
             response = load_search_report()
+            respond(response)
+        case "delete":
+            response = delete_messages(args)
             respond(response)
         case _:
             respond(f"Invalid action for /dev fresh command.\n{helper_text}")
@@ -251,6 +255,94 @@ def load_search_report():
     return response_text
 
 
+def parse_tickets_from_search_report(report_data):
+    """Parse the tickets_search_results from the report data and returns a cleaned list.
+
+    Returns:
+        A dictionary where the key is the ticket_id and the value is the cleaned ticket data.
+    """
+    details = report_data.get("details", {})
+    tickets_search_results = details.get("tickets_search_results", [])
+    result = {}
+    for ticket in tickets_search_results:
+        ticket_id = ticket.get("ticket_id")
+        # Get channel_id from first match, if available
+        channel_id = None
+        matches = ticket.get("matches", [])
+        if matches:
+            channel_id = matches[0].get("channel_id") or matches[0].get(
+                "channel", {}
+            ).get("id")
+        # Build thread_messages list
+        thread_messages = []
+        for thread_msg in ticket.get("thread_messages", []):
+            ts = thread_msg.get("ts")
+            if ts:
+                thread_messages.append({"ts": ts})
+        if ticket_id:
+            result[ticket_id] = {
+                "channel_id": channel_id,
+                "thread_messages": thread_messages,
+            }
+    return result
+
+
+def delete_messages(ticket_list: list[str] | None) -> str:
+    """Loads all messages identified in the last search report and deletes them.
+
+    Args:
+        message_ts_list (list[str] | None): List of message timestamps to delete. If None or empty, will delete all messages from the last search report.
+
+    Returns:
+        str: Result message indicating success or failure.
+    """
+    directory = os.path.dirname(__file__)
+    report_path = os.path.join(directory, "search_report.json")
+
+    if not os.path.exists(report_path):
+        logger.error("no_search_report_found")
+        return "No search report found. Please run the search command first."
+
+    with open(report_path, "r", encoding="utf-8") as f:
+        report_data = json.load(f)
+
+    tickets_search_results = parse_tickets_from_search_report(report_data)
+
+    if ticket_list is not None and len(ticket_list) > 0:
+        filtered_tickets = {
+            k: v for k, v in tickets_search_results.items() if k in ticket_list
+        }
+        tickets_search_results = filtered_tickets
+        if tickets_search_results:
+            selected_ticket_samples = list(tickets_search_results.items())
+            for ticket in selected_ticket_samples:
+                ticket_id, ticket_data = ticket
+                channel_id = ticket_data.get("channel_id")
+                messages_ts = [
+                    msg.get("ts") for msg in ticket_data.get("thread_messages", [])
+                ]
+                logger.info(
+                    "ticket_to_delete",
+                    ticket_id=ticket_id,
+                    channel_id=channel_id,
+                    thread_messages_ts=messages_ts,
+                )
+                # if messages_ts:
+                #     try:
+                #         user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
+                #         for ts in messages_ts:
+                #             user_auth_client.chat_delete(
+                #                 channel=channel_id, ts=ts
+                #             )
+                #     except Exception as e:
+                #         logger.error(f"Failed to delete messages for ticket {ticket_id}: {str(e)}")
+                #         return f"Failed to delete messages for ticket {ticket_id}: {str(e)}"
+            return f"Messages for tickets {list(tickets_search_results.keys())} deleted successfully."
+        else:
+            return "No matching tickets found for the provided ticket IDs."
+    return f"Message with tickets {ticket_list} deleted successfully."
+
+
 def post_ephemeral_message(
     client: WebClient, channel_id: str, user_id: str, text: str
 ) -> Any | None:
@@ -308,6 +400,13 @@ def load_from_files(
         f"Report loaded from search_report.json."
     )
     return response_text
+
+
+def extract_message_ts_list(message: Dict[str, Any]) -> str | None:
+    """
+    Extract the timestamp from a Slack message.
+    """
+    return message.get("ts")
 
 
 def search_and_process(
