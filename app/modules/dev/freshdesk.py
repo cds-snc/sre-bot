@@ -323,6 +323,7 @@ def delete_messages(
     if not tickets_search_results:
         return "No matching tickets found for the provided ticket IDs."
 
+    tickets_messages_failed_to_delete = []
     for ticket_id, ticket_data in tickets_search_results.items():
         channel_id = ticket_data.get("channel_id")
         messages_ts = [msg.get("ts") for msg in ticket_data.get("thread_messages", [])]
@@ -340,18 +341,51 @@ def delete_messages(
             user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
             for ts in messages_ts:
                 try:
-                    user_auth_client.chat_delete(
-                        channel=channel_id, ts=ts
-                    )
+                    user_auth_client.chat_delete(channel=channel_id, ts=ts)
                 except SlackApiError as e:
                     if e.response.get("error") == "message_not_found":
-                        logger.info(f"Message already deleted or not found for ticket {ticket_id}, ts: {ts}")
+                        logger.info(
+                            f"Message already deleted or not found for ticket {ticket_id}, ts: {ts}"
+                        )
                     else:
-                        logger.error(f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}")
+                        logger.error(
+                            f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}"
+                        )
+                        tickets_messages_failed_to_delete.append(
+                            {
+                                "ticket_id": ticket_id,
+                                "channel_id": channel_id,
+                                "ts": ts,
+                                "error": str(e),
+                            }
+                        )
                 except Exception as e:
-                    logger.error(f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}")
+                    logger.error(
+                        f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}"
+                    )
+                    tickets_messages_failed_to_delete.append(
+                        {
+                            "ticket_id": ticket_id,
+                            "channel_id": channel_id,
+                            "ts": ts,
+                            "error": str(e),
+                        }
+                    )
+
                 logger.info(f"Message ts `{ts}` for ticket {ticket_id} deleted.")
-                time.sleep(1.2)  # 50 calls per minute = 1.2 seconds between calls
+                time.sleep(1.5)  # 50 calls per minute = min 1.5 seconds between calls
+        client.chat_postMessage(
+            channel=invoked_channel_id,
+            text=f"Messages for ticket {ticket_id} deleted.",
+        )
+    if tickets_messages_failed_to_delete:
+        file_path = os.path.join(directory, "failed_to_delete_messages.json")
+        with open(
+            file_path,
+            "w",
+            encoding="utf-8",
+        ) as f:
+            json.dump(tickets_messages_failed_to_delete, f, indent=2)
     return f"Messages for tickets {list(tickets_search_results.keys())} deleted successfully."
 
 
