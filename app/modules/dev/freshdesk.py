@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from slack_sdk import WebClient
 from slack_sdk.web import SlackResponse
+from slack_sdk.errors import SlackApiError
 from slack_bolt import Ack, Respond
 from core.logging import get_module_logger
 from core.config import settings
@@ -153,7 +154,7 @@ def freshdesk_command(
             response = load_search_report()
             respond(response)
         case "delete":
-            response = delete_messages(args)
+            response = delete_messages(client, body.get("channel_id"), args)
             respond(response)
         case _:
             respond(f"Invalid action for /dev fresh command.\n{helper_text}")
@@ -294,10 +295,13 @@ def filter_tickets(tickets_search_results: dict, ticket_list: list[str] | None) 
     return tickets_search_results
 
 
-def delete_messages(ticket_list: list[str] | None) -> str:
+def delete_messages(
+    client: WebClient, invoked_channel_id, ticket_list: list[str] | None
+) -> str:
     """Loads all messages identified in the last search report and deletes them.
 
     Args:
+        client (WebClient): Slack WebClient instance to perform API calls.
         message_ts_list (list[str] | None): List of message timestamps to delete. If None or empty, will delete all messages from the last search report.
 
     Returns:
@@ -328,17 +332,26 @@ def delete_messages(ticket_list: list[str] | None) -> str:
             channel_id=channel_id,
             thread_messages_ts=messages_ts,
         )
-        # if messages_ts:
-        #     try:
-        #         user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
-        #         for ts in messages_ts:
-        #             user_auth_client.chat_delete(
-        #                 channel=channel_id, ts=ts
-        #             )
-        #     except Exception as e:
-        #         logger.error(f"Failed to delete messages for ticket {ticket_id}: {str(e)}")
-        #         return f"Failed to delete messages for ticket {ticket_id}: {str(e)}"
-
+        client.chat_postMessage(
+            channel=invoked_channel_id,
+            text=f"Deleting messages for ticket {ticket_id}: {messages_ts}",
+        )
+        if messages_ts:
+            user_auth_client = WebClient(token=settings.slack.USER_TOKEN)
+            for ts in messages_ts:
+                try:
+                    user_auth_client.chat_delete(
+                        channel=channel_id, ts=ts
+                    )
+                except SlackApiError as e:
+                    if e.response.get("error") == "message_not_found":
+                        logger.info(f"Message already deleted or not found for ticket {ticket_id}, ts: {ts}")
+                    else:
+                        logger.error(f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Failed to delete message for ticket {ticket_id}, ts: {ts}: {str(e)}")
+                logger.info(f"Message ts `{ts}` for ticket {ticket_id} deleted.")
+                time.sleep(1.2)  # 50 calls per minute = 1.2 seconds between calls
     return f"Messages for tickets {list(tickets_search_results.keys())} deleted successfully."
 
 
