@@ -19,3 +19,17 @@ def test_parse_command_two_args():
 
 def test_parse_command_with_quotes():
     assert slack_commands.parse_command('sre "foo bar baz"') == ["sre", "foo bar baz"]
+
+
+def test_parse_flags_no_flags():
+    args, flags = slack_commands.parse_flags(["sre", "foo", "bar"])
+    assert args == ["sre", "foo", "bar"]
+    assert flags == {}
+
+
+def test_parse_flags_with_flags():
+    args, flags = slack_commands.parse_flags(
+        ["sre", "foo", "--flag", "--key", "value", "-f"]
+    )
+    assert args == ["sre", "foo"]
+    assert flags == {"flag": True, "key": "value", "f": True}
