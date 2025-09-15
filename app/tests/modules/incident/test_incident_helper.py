@@ -118,7 +118,7 @@ def test_legacy_handle_incident_command_with_add_summary(mock_open_updates_dialo
 
 
 @patch("modules.incident.incident_helper.display_current_updates")
-def test_handle_incident_legacy_summary_command(mock_display_current_updates):
+def test_legacy_handle_incident_summary_command(mock_display_current_updates):
     client = MagicMock()
     body = {
         "channel_id": "channel_id",
@@ -136,7 +136,7 @@ def test_handle_incident_legacy_summary_command(mock_display_current_updates):
 
 
 @patch("modules.incident.incident_helper.display_current_updates")
-def test_handle_incident_legacy_summary_command_calls_new_handler(
+def test_legacy_handle_incident_summary_command_calls_new_handler(
     mock_display_current_updates,
 ):
     client = MagicMock()
@@ -153,7 +153,7 @@ def test_handle_incident_legacy_summary_command_calls_new_handler(
 
 
 @patch("modules.incident.incident_helper.stale_incidents")
-def test_handle_incident_legacy_stale_command(mock_stale_incidents):
+def test_legacy_handle_incident_stale_command(mock_stale_incidents):
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
@@ -164,7 +164,7 @@ def test_handle_incident_legacy_stale_command(mock_stale_incidents):
 
 
 @patch("modules.incident.incident_helper.handle_legacy_stale")
-def test_handle_incident_legacy_stale_command_calls_new_handler(
+def test_legacy_handle_incident_stale_command_calls_new_handler(
     mock_handle_legacy_stale,
 ):
     client = MagicMock()
@@ -235,7 +235,7 @@ def test_handle_incident_command_dispatches_to_correct_handler():
 
 
 @patch("modules.incident.incident_helper.close_incident")
-def test_handle_incident_command_with_close(close_incident_mock):
+def test_handle_close(mock_close_incident):
     client = MagicMock()
     body = {
         "channel_id": "channel_id",
@@ -245,8 +245,8 @@ def test_handle_incident_command_with_close(close_incident_mock):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(["close"], client, body, respond, ack)
-    close_incident_mock.assert_called_once_with(client, body, ack, respond)
+    incident_helper.handle_close(client, body, respond, ack, [], {})
+    mock_close_incident.assert_called_once_with(client, body, ack, respond)
 
 
 # Test for resource handlers

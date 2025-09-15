@@ -236,6 +236,10 @@ def handle_details(client, body, respond, _ack, _args, _flags):
     information_display.open_incident_info_view(client, body, respond)
 
 
+def handle_close(client, body, respond, ack, _args, _flags):
+    close_incident(client, body, ack, respond)
+
+
 def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
     """Handle create command."""
     create_help_text = (
@@ -266,10 +270,6 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
                 respond(f"Failed to create folder `{name}`.")
         case _:
             respond(create_help_text)
-
-
-def handle_close(client, body, respond, ack, args, flags):
-    close_incident(client, body, ack, respond)
 
 
 def handle_list(client, body, respond, ack, _args, flags):
