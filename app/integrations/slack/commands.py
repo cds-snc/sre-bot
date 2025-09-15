@@ -21,7 +21,8 @@ def parse_command(command):
             else:
                 in_quote = True
         elif char == " " and not in_quote:
-            args.append(arg)
+            if arg:
+                args.append(arg)
             arg = ""
         else:
             arg += char

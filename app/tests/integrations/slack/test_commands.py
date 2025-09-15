@@ -33,3 +33,19 @@ def test_parse_flags_with_flags():
     )
     assert args == ["sre", "foo"]
     assert flags == {"flag": True, "key": "value", "f": True}
+
+    args, flags = slack_commands.parse_flags(
+        ["-f", "--key", "value", "sre", "foo", "--flag"]
+    )
+    assert args == ["sre", "foo"]
+    assert flags == {"flag": True, "key": "value", "f": True}
+
+
+def test_parse_command_with_flags():
+    command = 'sre foo --flag --key "value with spaces" -f'
+    args = slack_commands.parse_command(command)
+    assert args == ["sre", "foo", "--flag", "--key", "value with spaces", "-f"]
+
+    positional, flags = slack_commands.parse_flags(args)
+    assert positional == ["sre", "foo"]
+    assert flags == {"flag": True, "key": "value with spaces", "f": True}
