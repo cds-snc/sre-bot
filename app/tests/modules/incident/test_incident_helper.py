@@ -1,42 +1,36 @@
 import json
 import uuid
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch, call
 import pytest
 
 from modules import incident_helper
 
-
-@patch("modules.incident.incident_helper.incident_conversation")
-@patch("modules.incident.incident_helper.information_display.open_incident_info_view")
-def test_handle_incident_command_with_empty_args(
-    mock_open_incident_info_view, mock_incident_conversation
-):
-    client = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    body = {
-        "channel_id": "channel_id",
-    }
-    mock_incident_conversation.is_incident_channel.return_value = (True, False)
-    incident_helper.handle_incident_command([], client, body, respond, ack)
-    mock_open_incident_info_view.assert_called_once_with(client, body, respond)
+# Legacy command tests to be removed once transition period is over
 
 
 @patch("modules.incident.incident_helper.google_drive.create_folder")
-def test_handle_incident_command_with_create_command(create_folder_mock):
-    create_folder_mock.return_value = {"id": "test_id", "name": "foo bar"}
+def test_legacy_handle_incident_command_with_create_command(mock_create_folder):
+    mock_create_folder.return_value = {"id": "test_id", "name": "foo bar"}
     respond = MagicMock()
     ack = MagicMock()
 
     incident_helper.handle_incident_command(
         ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
     )
-    respond.assert_called_once_with("Folder `foo bar` created.")
+    mock_create_folder.assert_called_once_with("foo bar", ANY)
+
+    respond.assert_has_calls(
+        [
+            call(
+                "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create --folder <folder_name>` instead."
+            ),
+            call("Folder `foo bar` created."),
+        ]
+    )
 
 
 @patch("modules.incident.incident_helper.google_drive.create_folder")
-def test_handle_incident_command_with_create_command_error(create_folder_mock):
+def test_legacy_handle_incident_command_with_create_command_error(create_folder_mock):
     create_folder_mock.return_value = None
     respond = MagicMock()
     ack = MagicMock()
@@ -44,7 +38,126 @@ def test_handle_incident_command_with_create_command_error(create_folder_mock):
     incident_helper.handle_incident_command(
         ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
     )
-    respond.assert_called_once_with("Failed to create folder `foo bar`.")
+    respond.assert_has_calls(
+        [
+            call(
+                "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create --folder <folder_name>` instead."
+            ),
+            call("Failed to create folder `foo bar`."),
+        ]
+    )
+
+
+@patch("modules.incident.incident_helper.close_incident")
+def test_legacy_handle_incident_command_with_close(close_incident_mock):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(["close"], client, body, respond, ack)
+    close_incident_mock.assert_called_once_with(client, body, ack, respond)
+
+
+@patch("modules.incident.incident_helper.incident_folder.list_folders_view")
+def test_legacy_handle_incident_command_with_list_folders(list_folders_mock):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["list-folders"], client, body, respond, ack
+    )
+    list_folders_mock.assert_called_once_with(client, body, ack)
+
+
+# @patch("modules.incident.incident_helper.handle_status")
+@patch("modules.incident.incident_helper.handle_update_status_command")
+def test_legacy_handle_incident_command_with_update_status_command(
+    mock_handle_update_status_command,
+    # mock_handle_status,
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    args = ["status", "Ready", "to", "be", "Reviewed"]
+    incident_helper.handle_incident_command(args, client, body, respond, ack)
+    args.pop(0)  # remove status value as it doesn't get parsed after
+    respond.assert_called_once_with(
+        "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
+    )
+    mock_handle_update_status_command.assert_called_once_with(
+        client, body, respond, ack, args
+    )
+
+
+@patch("modules.incident.incident_helper.open_updates_dialog")
+def test_legacy_handle_incident_command_with_add_summary(open_updates_dialog_mock):
+
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(["add_summary"], client, body, respond, ack)
+    respond.assert_called_once_with(
+        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+    )
+    open_updates_dialog_mock.assert_called_once_with(client, body, ack)
+
+
+@patch("modules.incident.incident_helper.display_current_updates")
+def test_legacy_handle_incident_command_with_summary(display_current_updates_mock):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(["summary"], client, body, respond, ack)
+    respond.assert_called_once_with(
+        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+    )
+    display_current_updates_mock.assert_called_once_with(client, body, respond, ack)
+
+
+# New command tests
+
+
+def test_handle_incident_command_with_empty_args():
+    client = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+    body = MagicMock()
+    incident_helper.handle_incident_command([], client, body, respond, ack)
+    respond.assert_called_once_with(
+        "Please provide a valid command. Type `/sre incident help` to see a list of commands."
+    )
+
+
+def test_handle_incident_command_with_unknown_command():
+    respond = MagicMock()
+    ack = MagicMock()
+    incident_helper.handle_incident_command(
+        ["foo"], MagicMock(), MagicMock(), respond, ack
+    )
+    respond.assert_called_once_with(
+        "Unknown command: foo. Type `/sre incident help` to see a list of commands."
+    )
 
 
 def test_handle_incident_command_with_help():
@@ -57,17 +170,29 @@ def test_handle_incident_command_with_help():
     respond.assert_called_once_with(incident_helper.help_text)
 
 
-@patch("modules.incident.incident_helper.incident_folder.list_folders_view")
-def test_handle_incident_command_with_list_folders(list_folders_mock):
+# Test incident actions
+
+def test_handle_incident_command_dispatches_to_correct_handler():
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["list-folders"], client, body, respond, ack
-    )
-    list_folders_mock.assert_called_once_with(client, body, ack)
+    handler_map = {}
+    handler_map.update(incident_helper.get_resource_handlers())
+    handler_map.update(incident_helper.get_incident_actions())
+
+    for first_arg, handler in handler_map.items():
+        handler_name = handler.__name__
+        with patch(f"modules.incident.incident_helper.{handler_name}") as handler_mock:
+            args = [first_arg, "dummy_action"]
+            incident_helper.handle_incident_command(args, client, body, respond, ack)
+            assert (
+                handler_mock.called
+            ), f"{handler_name} should be called for first_arg '{first_arg}'"
+
+
+# Test for resource handlers
 
 
 @patch("modules.incident.incident_helper.incident_roles.manage_roles")
@@ -121,66 +246,6 @@ def test_handle_incident_command_with_retro(schedule_retro_mock):
     incident_helper.handle_incident_command(["schedule"], client, body, respond, ack)
     schedule_retro_mock.open_incident_retro_modal.assert_called_once_with(
         client, body, ack
-    )
-
-
-@patch("modules.incident.incident_helper.handle_update_status_command")
-def test_handle_incident_command_with_update_status_command(
-    mock_handle_update_status_command,
-):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    args = ["status", "Ready", "to", "be", "Reviewed"]
-    incident_helper.handle_incident_command(args, client, body, respond, ack)
-    args.pop(0)
-    mock_handle_update_status_command.assert_called_once_with(
-        client, body, respond, ack, args
-    )
-
-
-@patch("modules.incident.incident_helper.open_updates_dialog")
-def test_handle_incident_command_with_add_summary(open_updates_dialog_mock):
-
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "user_id",
-    }
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_incident_command(["add_summary"], client, body, respond, ack)
-    open_updates_dialog_mock.assert_called_once_with(client, body, ack)
-
-
-@patch("modules.incident.incident_helper.display_current_updates")
-def test_handle_incident_command_with_summary(display_current_updates_mock):
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "user_id",
-    }
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_incident_command(["summary"], client, body, respond, ack)
-    display_current_updates_mock.assert_called_once_with(client, body, respond, ack)
-
-
-def test_handle_incident_command_with_unknown_command():
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_incident_command(
-        ["foo"], MagicMock(), MagicMock(), respond, ack
-    )
-    respond.assert_called_once_with(
-        "Unknown command: foo. Type `/sre incident help` to see a list of commands."
     )
 
 

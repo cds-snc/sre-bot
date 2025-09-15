@@ -1,10 +1,15 @@
 from datetime import datetime
+from typing import Callable
 import json
 import re
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond, App
 from integrations.google_workspace import google_drive
-from integrations.slack import channels as slack_channels, users as slack_users
+from integrations.slack import (
+    channels as slack_channels,
+    users as slack_users,
+    commands as slack_commands,
+)
 from integrations.sentinel import log_to_sentinel
 from modules.incident import (
     incident_status,
@@ -34,43 +39,82 @@ VALID_STATUS = [
 logger = get_module_logger()
 
 help_text = """
-\n `/sre incident`
-\n      - opens a modal to show and update the incident information
-\n      - ouvre une boîte de dialogue pour afficher et mettre à jour les informations sur l'incident
-\n `/sre incident create-folder <folder_name>`
-\n      - create a folder for a team in the incident drive
-\n      - créer un dossier pour une équipe dans le dossier d'incidents
-\n `/sre incident help`
-\n      - show this help text
-\n      - afficher ce texte d'aide
-\n `/sre incident list-folders`
-\n      - list all folders in the incident drive
-\n      - lister tous les dossiers dans le dossier d'incidents
-\n `/sre incident roles`
-\n      - manages roles in an incident channel
-\n      - gérer les rôles dans un canal d'incident
-\n  `/sre incident schedule`
-\n      - schedules a 30 minute meeting a week into the future in everyone's calendars for the incident post mortem process.
-\n      - planifie une réunion de 30 minutes une semaine dans le futur dans les calendriers de tout le monde pour le processus de post-mortem de l'incident.
-\n `/sre incident close`
-\n      - close the incident, archive the channel and update the incident spreadsheet and document
-\n      - clôturer l'incident, archiver le canal et mettre à jour la feuille de calcul et le document de l'incident
-\n `/sre incident stale`
-\n      - lists all incidents older than 14 days with no activity
-\n      - lister tous les incidents plus vieux que 14 jours sans activité
-\n `/sre incident status <status>`
-\n      - update the status of the incident with the provided status. Supported statuses are: Open, In Progress, Ready to be Reviewed, Reviewed, Closed
-\n      - mettre à jour le statut de l'incident avec le statut fourni. Les statuts pris en charge sont : Open, In Progress, Ready to be Reviewed, Reviewed, Closed
-\n `/sre incident add_summary`
-\n      - encourages the IC to give freeform summary on what has been done to resolve the incident so far
-\n      - encourage l'IC à donner un résumé libre sur ce qui a été fait pour résoudre l'incident jusqu'à présent
-\n `/sre incident summary`
-\n      - displays the summary of the incident
-\n      - affiche le résumé de l'incident
+*SRE Incident Management*
+
+Usage:
+`/sre incident [<resource>] <action> [options] [arguments]`
+
+*Resources:*
+• channel      - Manage incident channels
+• product      - Manage incident products (folders)
+• roles        - Manage incident roles
+• updates      - Add or show incident updates
+• status       - Update or show incident status
+
+*Incident-level actions (no resource):*
+• create       - Create a new incident
+• close        - Close the current incident
+• details      - Show details of the current incident
+• list         - List incidents or resources
+• help         - Show this help message
+
+*Examples:*
+- `/sre incident create`
+- `/sre incident close`
+- `/sre incident details`
+- `/sre incident channel list --stale`
+- `/sre incident product create "foo bar"`
+- `/sre incident updates add "new update"`
+- `/sre incident status update Ready to be Reviewed`
+
+*Legacy commands (will be deprecated after 2025-11-01):*
+• summary
+• add_summary
+• create-folder
+• list-folders
+• stale
+
+_For details on each subcommand, use:_  
+`/sre incident <subcommand> help`
+
+---
+
+*Gestion des Incidents IFS:*
+
+Utilisation:
+`/sre incident [<ressource>] <action> [options] [arguments]`
+
+*Ressources:*
+• channel      - Gérer les canaux d'incidents
+• product      - Gérer les produits d'incidents (dossiers)
+• roles        - Gérer les rôles d'incidents
+• updates      - Ajouter ou afficher des mises à jour d'incidents
+• status       - Mettre à jour ou afficher l'état d'un incident
+
+*Actions pour l'incident (sans ressource):*
+• create       - Créer un nouvel incident
+• close        - Clore l'incident en cours
+• details      - Afficher les détails de l'incident en cours
+• list         - Lister les incidents ou ressources
+• help         - Afficher ce message d'aide
+
+*Commandes obsolètes (seront supprimées après le 2025-11-01):*
+• add_summary
+• summary
+• create-folder
+• list-folders
+• stale
+
+_Pour les détails sur chaque sous-commande, utilisez:_
+`/sre incident <sous-commande> help`
 """
 
 
 def register(bot: App):
+    """Incident module registration.
+    Args:
+        bot (SlackBot): The SlackBot instance to which the module will be registered.
+    """
     bot.action("handle_incident_action_buttons")(
         incident_alert.handle_incident_action_buttons
     )
@@ -101,10 +145,38 @@ def register(bot: App):
     bot.view("update_field_modal")(information_update.handle_update_field_submission)
 
 
+def get_incident_actions() -> dict[str, Callable]:
+    """Returns a dictionary mapping incident subcommands to their handler functions."""
+    return {
+        "create": handle_create,
+        "close": handle_close,
+        "details": handle_details,
+        "help": handle_help,
+        "list": handle_list,
+        "schedule": handle_schedule,
+        "create-folder": handle_legacy_create_folder,
+        "list-folders": handle_legacy_list_folders,
+        "stale": handle_legacy_stale,
+        "add_summary": handle_legacy_add_summary,
+        "summary": handle_legacy_summary,
+    }
+
+
+def get_resource_handlers():
+    return {
+        "channel": handle_channel,
+        "product": handle_product,
+        "roles": handle_roles,
+        "updates": handle_updates,
+        "status": handle_status,
+        "schedule": handle_schedule,
+    }
+
+
 def handle_incident_command(
-    args,
+    args: list[str],
     client: WebClient,
-    body,
+    body: dict,
     respond: Respond,
     ack: Ack,
 ):
@@ -113,44 +185,190 @@ def handle_incident_command(
         "sre_incident_command_received",
         args=args,
     )
-    # If no arguments are provided, open the update status view
-    if len(args) == 0:
-        information_display.open_incident_info_view(client, body, respond)
-        return
-    action, *args = args
-    match action:
-        case "create-folder":
-            name = " ".join(args)
-            folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
-            folder_name = None
-            if isinstance(folder, dict):
-                folder_name = folder.get("name", None)
-            if folder_name:
-                respond(f"Folder `{folder_name}` created.")
-            else:
-                respond(f"Failed to create folder `{name}`.")
-        case "help":
-            respond(help_text)
-        case "list-folders":
-            incident_folder.list_folders_view(client, body, ack)
-        case "roles":
-            incident_roles.manage_roles(client, body, ack, respond)
-        case "close":
-            close_incident(client, body, ack, respond)
-        case "stale":
-            stale_incidents(client, body, ack)
-        case "schedule":
-            schedule_retro.open_incident_retro_modal(client, body, ack)
-        case "status":
-            handle_update_status_command(client, body, respond, ack, args)
-        case "add_summary":
-            open_updates_dialog(client, body, ack)
-        case "summary":
-            display_current_updates(client, body, respond, ack)
-        case _:
+    args_list, flags = slack_commands.parse_flags(args)
+    try:
+        first_arg = args_list.pop(0)
+    except IndexError:
+        first_arg = None
+    resource_handlers = get_resource_handlers()
+    incident_actions = get_incident_actions()
+    if first_arg in resource_handlers:
+        # this is to handle if the argument is a resource
+        resource = first_arg
+        if (
+            resource == "status"
+            and len(args_list) > 0
+            and " ".join(args_list) in VALID_STATUS
+        ):
+            args_list.insert(0, "update")  # handle legacy command, to be deprecated
             respond(
-                f"Unknown command: {action}. Type `/sre incident help` to see a list of commands."
+                "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
             )
+        action = args_list.pop(0) if len(args_list) > 1 else "help"
+        resource_handler: Callable = resource_handlers.get(resource, handle_help)
+        resource_handler(client, body, respond, ack, action, args_list, flags)
+    elif first_arg in incident_actions:
+        # this is to handle if the argument is a valid action on the incident itself
+        action = first_arg
+        action_handler: Callable = incident_actions.get(action, handle_help)
+        action_handler(client, body, respond, ack, args_list, flags)
+    else:
+        if first_arg:
+            respond(
+                f"Unknown command: {first_arg}. Type `/sre incident help` to see a list of commands."
+            )
+        else:
+            respond(
+                "Please provide a valid command. Type `/sre incident help` to see a list of commands."
+            )
+
+
+def handle_help(_client, _body, respond, _ack, _args, _flags) -> None:
+    """Handle help command."""
+    respond(help_text)
+
+
+def handle_details(client, body, respond, _ack, _args, _flags):
+    """Handle details command."""
+    information_display.open_incident_info_view(client, body, respond)
+
+
+def handle_create(_client, _body, respond, _ack, _args: list[str], flags: dict):
+    """Handle create command."""
+    create_help_text = (
+        "\n `/sre incident create [resource] [options]`"
+        "\n"
+        "\n*Resources*"
+        "\n --folder <folder_name>      - create a folder for a team in the incident drive"
+        '\n          _Tip: Use quotes for multi-word folder names: `--folder "folder name"`_'
+        "\n --new <incident_name>        - create a new incident (upcoming feature)"
+    )
+    if "folder" in flags:
+        name = flags.get("folder")
+        if not name:
+            respond("Please provide a folder name using --folder <folder_name>")
+            return
+        folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
+        folder_name = None
+        if isinstance(folder, dict):
+            folder_name = folder.get("name", None)
+        if folder_name:
+            respond(f"Folder `{folder_name}` created.")
+        else:
+            respond(f"Failed to create folder `{name}`.")
+    else:
+        respond(create_help_text)
+
+
+def handle_close(client, body, respond, ack, args, flags):
+    close_incident(client, body, ack, respond)
+
+
+def handle_list(client, body, respond, ack, _args, flags):
+    list_help_text = (
+        "\n `/sre incident list --folders`"
+        "\n      - lists all folders in the incident drive"
+        "\n      - lister tous les dossiers dans le dossier d'incidents"
+        "\n `/sre incident list --stale`"
+        "\n      - lists all incidents older than 14 days with no activity"
+        "\n      - lister tous les incidents plus vieux que 14 jours sans activité"
+        "\n Use `/sre incident help` to see a list of commands."
+    )
+    if "folders" in flags:
+        incident_folder.list_folders_view(client, body, ack)
+    if "stale" in flags:
+        stale_incidents(client, body, ack)
+    else:
+        respond(list_help_text)
+
+
+def handle_updates(client, body, respond, ack, args, flags):
+    """Handle the updates command."""
+    if "--add" in flags:
+        open_updates_dialog(client, body, ack)
+    else:
+        display_current_updates(client, body, respond, ack)
+
+
+def handle_channel(client, body, respond, ack, action, args, flags):
+    pass
+
+
+def handle_product(client, body, respond, ack, action, args, flags):
+    pass
+
+
+def handle_schedule(client, body, respond, ack, action, args, flags):
+    if "new" in args:
+        pass
+    schedule_retro.open_incident_retro_modal(client, body, ack)
+
+
+def handle_status(client, body, respond, ack, action, args, _flags):
+    """Handle the status command."""
+    status_help_text = (
+        "\n `/sre incident status [options] [arguments]`"
+        "\n"
+        "\n*Options*"
+        "\n show             - show the current incident status"
+        "\n update <status>   - update the incident status to one of the valid statuses"
+        "\n"
+        "\n*Valid Statuses*"
+        "\n" + ", ".join(VALID_STATUS)
+    )
+    if action == "show":
+        respond("Upcoming feature: show current incident status.")
+    elif action == "update":
+        handle_update_status_command(client, body, respond, ack, args)
+    else:
+        respond(status_help_text)
+
+
+def handle_roles(client, body, respond, ack, action, args, flags):
+    incident_roles.manage_roles(client, body, ack, respond)
+
+
+def handle_legacy_create_folder(client, body, respond, ack, args, flags):
+    """Handle the legacy create-folder command."""
+    respond(
+        "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create --folder <folder_name>` instead."
+    )
+    flags["folder"] = " ".join(args)
+    handle_create(client, body, respond, ack, args, flags)
+
+
+def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
+    """Handle the legacy list-folders command."""
+    respond(
+        "The `/sre incident list-folders` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --folders` instead."
+    )
+    flags["folders"] = True
+    handle_list(client, body, respond, ack, [], flags)
+
+
+def handle_legacy_stale(client, body, respond, ack, _args, _flags):
+    """Handle the legacy stale command."""
+    respond(
+        "The `/sre incident stale` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --stale` instead."
+    )
+    # Optionally, call the new handler logic:
+    stale_incidents(client, body, ack)
+
+
+def handle_legacy_add_summary(client, body, respond, ack, _args, _flags):
+    """Handle the legacy add_summary command."""
+    respond(
+        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+    )
+    open_updates_dialog(client, body, ack)
+
+
+def handle_legacy_summary(client, body, respond, ack, _args, _flags):
+    """Handle the legacy summary command."""
+    respond(
+        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+    )
+    display_current_updates(client, body, respond, ack)
 
 
 def close_incident(client: WebClient, body, ack, respond):
