@@ -249,6 +249,48 @@ def test_handle_close(mock_close_incident):
     mock_close_incident.assert_called_once_with(client, body, ack, respond)
 
 
+def test_handle_create_new():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_create(client, body, respond, ack, ["new"], {})
+    respond.assert_called_once_with("Upcoming feature: create a new incident.")
+
+
+def test_handle_create_no_resource():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    create_help_text = (
+        "\n `/sre incident create [resource] [options]`"
+        "\n"
+        "\n*Resources*"
+        "\n new [<incident_name>]        - create a new incident (upcoming feature)"
+    )
+    incident_helper.handle_create(client, body, respond, ack, [], {})
+    respond.assert_called_once_with(create_help_text)
+
+
+@patch("modules.incident.incident_helper.information_display.open_incident_info_view")
+def test_handle_details(mock_open_incident_info_view):
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_details(client, body, respond, ack, [], {})
+    mock_open_incident_info_view.assert_called_once_with(client, body, respond)
+
+    # "create": handle_create,
+    # "details": handle_details,
+    # "help": handle_help,
+    # "list": handle_list,
+    # "schedule": handle_schedule,
+
+
 # Test for resource handlers
 
 

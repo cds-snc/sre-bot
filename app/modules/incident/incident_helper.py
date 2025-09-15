@@ -246,48 +246,44 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
         "\n `/sre incident create [resource] [options]`"
         "\n"
         "\n*Resources*"
-        "\n folder <folder_name>      - create a folder for a team in the incident drive"
-        '\n          _Tip: Use quotes for multi-word folder names: `--folder "folder name"`_'
         "\n new [<incident_name>]        - create a new incident (upcoming feature)"
     )
-    resource = args.pop(0)
+    try:
+        resource = args.pop(0)
+    except IndexError:
+        resource = None
     match resource:
         case "new":
             respond("Upcoming feature: create a new incident.")
             return
-        case "folder":
-            name = " ".join(args)
-            if not name:
-                respond("Please provide a folder name using --folder <folder_name>")
-                return
-            folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
-            folder_name = None
-            if isinstance(folder, dict):
-                folder_name = folder.get("name", None)
-            if folder_name:
-                respond(f"Folder `{folder_name}` created.")
-            else:
-                respond(f"Failed to create folder `{name}`.")
         case _:
             respond(create_help_text)
 
 
-def handle_list(client, body, respond, ack, _args, flags):
+def handle_list(client, body, respond, ack, args, flags):
     list_help_text = (
-        "\n `/sre incident list --folders`"
-        "\n      - lists all folders in the incident drive"
-        "\n      - lister tous les dossiers dans le dossier d'incidents"
-        "\n `/sre incident list --stale`"
+        "\n `/sre incident list [options]`"
+        "\n      "
+        "\n*Options*"
+        "\n active"
+        "\n      - lists all active incidents (default; not stale or archived)"
+        "\n      - liste tous les incidents actifs (par défaut; ni obsolètes ni archivés)"
+        "\n stale"
         "\n      - lists all incidents older than 14 days with no activity"
-        "\n      - lister tous les incidents plus vieux que 14 jours sans activité"
+        "\n      - liste tous les incidents plus vieux que 14 jours sans activité"
         "\n Use `/sre incident help` to see a list of commands."
     )
-    if "folders" in flags:
-        incident_folder.list_folders_view(client, body, ack)
-    if "stale" in flags:
-        stale_incidents(client, body, ack)
-    else:
-        respond(list_help_text)
+    try:
+        option = args.pop(0)
+    except IndexError:
+        option = None
+    match option:
+        case "active":
+            respond("Upcoming feature: list all active incidents.")
+        case "stale":
+            stale_incidents(client, body, ack)
+        case _:
+            respond(list_help_text)
 
 
 def handle_updates(client, body, respond, ack, args, flags):
@@ -303,7 +299,35 @@ def handle_channel(client, body, respond, ack, action, args, flags):
 
 
 def handle_product(client, body, respond, ack, action, args, flags):
-    pass
+    """Handle the product command."""
+    product_help_text = (
+        "\n `/sre incident product <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n create <product_name>      - create a new product name to be referenced in the incident resources"
+        '\n          _Tip: Use quotes for multi-word product names: `create "product name"`_'
+        "\n list                      - list all products currently available in the incident resources"
+        "\n"
+        "\nUse `/sre incident help` to see a list of commands."
+    )
+    match action:
+        case "create":
+            name = " ".join(args)
+            if not name:
+                respond("Please provide a product name using `create <product_name>`")
+                return
+            folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
+            folder_name = None
+            if isinstance(folder, dict):
+                folder_name = folder.get("name", None)
+            if folder_name:
+                respond(f"Folder `{folder_name}` created.")
+            else:
+                respond(f"Failed to create folder `{name}`.")
+        case "list":
+            incident_folder.list_folders_view(client, body, ack)
+        case _:
+            respond(product_help_text)
 
 
 def handle_schedule(client, body, respond, ack, args, flags):
@@ -352,8 +376,8 @@ def handle_legacy_create_folder(client, body, respond, ack, args, _flags):
     respond(
         "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create folder <folder_name>` instead."
     )
-    args.insert(0, "folder")
-    handle_create(client, body, respond, ack, args, _flags)
+    action = "create"
+    handle_product(client, body, respond, ack, action, args, _flags)
 
 
 def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
@@ -361,8 +385,8 @@ def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
     respond(
         "The `/sre incident list-folders` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --folders` instead."
     )
-    flags["folders"] = True
-    handle_list(client, body, respond, ack, [], flags)
+    action = "list"
+    handle_product(client, body, respond, ack, action, [], flags)
 
 
 def handle_legacy_stale(client, body, respond, ack, _args, _flags):
