@@ -57,15 +57,17 @@ Usage:
 • details      - Show details of the current incident
 • list         - List incidents or resources
 • help         - Show this help message
+• schedule     - Schedule an event for the incident
 
 *Examples:*
 - `/sre incident create`
+- `/sre incident channel list --stale`
 - `/sre incident close`
 - `/sre incident details`
-- `/sre incident channel list --stale`
 - `/sre incident product create "foo bar"`
-- `/sre incident updates add "new update"`
+- `/sre incident schedule retro`
 - `/sre incident status update Ready to be Reviewed`
+- `/sre incident updates add "new update"`
 
 *Legacy commands (will be deprecated after 2025-11-01):*
 • summary
@@ -154,6 +156,7 @@ def get_incident_actions() -> dict[str, Callable]:
         "help": handle_help,
         "list": handle_list,
         "schedule": handle_schedule,
+        # legacy commands
         "create-folder": handle_legacy_create_folder,
         "list-folders": handle_legacy_list_folders,
         "stale": handle_legacy_stale,
@@ -163,13 +166,13 @@ def get_incident_actions() -> dict[str, Callable]:
 
 
 def get_resource_handlers():
+    """Returns a dictionary mapping resources to their handler functions."""
     return {
         "channel": handle_channel,
         "product": handle_product,
         "roles": handle_roles,
         "updates": handle_updates,
         "status": handle_status,
-        "schedule": handle_schedule,
     }
 
 
@@ -233,31 +236,36 @@ def handle_details(client, body, respond, _ack, _args, _flags):
     information_display.open_incident_info_view(client, body, respond)
 
 
-def handle_create(_client, _body, respond, _ack, _args: list[str], flags: dict):
+def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
     """Handle create command."""
     create_help_text = (
         "\n `/sre incident create [resource] [options]`"
         "\n"
         "\n*Resources*"
-        "\n --folder <folder_name>      - create a folder for a team in the incident drive"
+        "\n folder <folder_name>      - create a folder for a team in the incident drive"
         '\n          _Tip: Use quotes for multi-word folder names: `--folder "folder name"`_'
-        "\n --new <incident_name>        - create a new incident (upcoming feature)"
+        "\n new [<incident_name>]        - create a new incident (upcoming feature)"
     )
-    if "folder" in flags:
-        name = flags.get("folder")
-        if not name:
-            respond("Please provide a folder name using --folder <folder_name>")
+    resource = args.pop(0)
+    match resource:
+        case "new":
+            respond("Upcoming feature: create a new incident.")
             return
-        folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
-        folder_name = None
-        if isinstance(folder, dict):
-            folder_name = folder.get("name", None)
-        if folder_name:
-            respond(f"Folder `{folder_name}` created.")
-        else:
-            respond(f"Failed to create folder `{name}`.")
-    else:
-        respond(create_help_text)
+        case "folder":
+            name = " ".join(args)
+            if not name:
+                respond("Please provide a folder name using --folder <folder_name>")
+                return
+            folder = google_drive.create_folder(name, SRE_INCIDENT_FOLDER)
+            folder_name = None
+            if isinstance(folder, dict):
+                folder_name = folder.get("name", None)
+            if folder_name:
+                respond(f"Folder `{folder_name}` created.")
+            else:
+                respond(f"Failed to create folder `{name}`.")
+        case _:
+            respond(create_help_text)
 
 
 def handle_close(client, body, respond, ack, args, flags):
@@ -298,10 +306,17 @@ def handle_product(client, body, respond, ack, action, args, flags):
     pass
 
 
-def handle_schedule(client, body, respond, ack, action, args, flags):
-    if "new" in args:
-        pass
-    schedule_retro.open_incident_retro_modal(client, body, ack)
+def handle_schedule(client, body, respond, ack, args, flags):
+    if not args:
+        args = ["retro"]
+    action = args[0]
+    match action:
+        case "retro":
+            schedule_retro.open_incident_retro_modal(client, body, ack)
+        case _:
+            respond(
+                f"Unknown schedule action: {action}. Currently, only 'retro' is supported."
+            )
 
 
 def handle_status(client, body, respond, ack, action, args, _flags):
@@ -316,25 +331,29 @@ def handle_status(client, body, respond, ack, action, args, _flags):
         "\n*Valid Statuses*"
         "\n" + ", ".join(VALID_STATUS)
     )
-    if action == "show":
-        respond("Upcoming feature: show current incident status.")
-    elif action == "update":
-        handle_update_status_command(client, body, respond, ack, args)
-    else:
-        respond(status_help_text)
+    match action:
+        case "update":
+            if args:
+                handle_update_status_command(client, body, respond, ack, args)
+            else:
+                respond("Please provide a status to update.")
+        case "show":
+            respond("Upcoming feature: show current incident status.")
+        case _:
+            respond(status_help_text)
 
 
-def handle_roles(client, body, respond, ack, action, args, flags):
+def handle_roles(client, body, respond, ack, _action, _args, _flags):
     incident_roles.manage_roles(client, body, ack, respond)
 
 
-def handle_legacy_create_folder(client, body, respond, ack, args, flags):
+def handle_legacy_create_folder(client, body, respond, ack, args, _flags):
     """Handle the legacy create-folder command."""
     respond(
-        "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create --folder <folder_name>` instead."
+        "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create folder <folder_name>` instead."
     )
-    flags["folder"] = " ".join(args)
-    handle_create(client, body, respond, ack, args, flags)
+    args.insert(0, "folder")
+    handle_create(client, body, respond, ack, args, _flags)
 
 
 def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
