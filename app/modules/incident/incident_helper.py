@@ -46,7 +46,7 @@ Usage:
 
 *Resources:*
 • channel      - Manage incident channels
-• product      - Manage incident products (folders)
+• products     - Manage incident products (aka folders)
 • roles        - Manage incident roles
 • updates      - Add or show incident updates
 • status       - Update or show incident status
@@ -54,17 +54,17 @@ Usage:
 *Incident-level actions (no resource):*
 • create       - Create a new incident
 • close        - Close the current incident
-• details      - Show details of the current incident
 • list         - List incidents or resources
 • help         - Show this help message
 • schedule     - Schedule an event for the incident
+• show         - Show details of the current incident
 
 *Examples:*
 - `/sre incident create`
 - `/sre incident channel list --stale`
 - `/sre incident close`
-- `/sre incident details`
-- `/sre incident product create "foo bar"`
+- `/sre incident show`
+- `/sre incident products create "foo bar"`
 - `/sre incident schedule retro`
 - `/sre incident status update Ready to be Reviewed`
 - `/sre incident updates add "new update"`
@@ -96,9 +96,10 @@ Utilisation:
 *Actions pour l'incident (sans ressource):*
 • create       - Créer un nouvel incident
 • close        - Clore l'incident en cours
-• details      - Afficher les détails de l'incident en cours
 • list         - Lister les incidents ou ressources
 • help         - Afficher ce message d'aide
+• schedule     - Planifier un événement pour l'incident
+• show         - Afficher les détails de l'incident en cours
 
 *Commandes obsolètes (seront supprimées après le 2025-11-01):*
 • add_summary
@@ -152,7 +153,7 @@ def get_incident_actions() -> dict[str, Callable]:
     return {
         "create": handle_create,
         "close": handle_close,
-        "details": handle_details,
+        "show": handle_show,
         "help": handle_help,
         "list": handle_list,
         "schedule": handle_schedule,
@@ -169,7 +170,7 @@ def get_resource_handlers():
     """Returns a dictionary mapping resources to their handler functions."""
     return {
         "channel": handle_channel,
-        "product": handle_product,
+        "product": handle_products,
         "roles": handle_roles,
         "updates": handle_updates,
         "status": handle_status,
@@ -255,8 +256,8 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
             respond(create_help_text)
 
 
-def handle_details(client, body, respond, _ack, _args, _flags):
-    """Handle details command."""
+def handle_show(client, body, respond, _ack, _args, _flags):
+    """Handle show command."""
     information_display.open_incident_info_view(client, body, respond)
 
 
@@ -311,22 +312,14 @@ def handle_schedule(client, body, respond, ack, args, flags):
 # resource level actions
 
 
-def handle_updates(client, body, respond, ack, _args, flags):
-    """Handle the updates command."""
-    if "--add" in flags:
-        open_updates_dialog(client, body, ack)
-    else:
-        display_current_updates(client, body, respond, ack)
-
-
 def handle_channel(client, body, respond, ack, action, args, flags):
     pass
 
 
-def handle_product(client, body, respond, ack, action, args, flags):
+def handle_products(client, body, respond, ack, action, args, flags):
     """Handle the product command."""
     product_help_text = (
-        "\n `/sre incident product <action> [options] [arguments]`"
+        "\n `/sre incident products <action> [options] [arguments]`"
         "\n"
         "\n*Actions*"
         "\n create <product_name>      - create a new product name to be referenced in the incident resources"
@@ -346,9 +339,9 @@ def handle_product(client, body, respond, ack, action, args, flags):
             if isinstance(folder, dict):
                 folder_name = folder.get("name", None)
             if folder_name:
-                respond(f"Folder `{folder_name}` created.")
+                respond(f"Product `{folder_name}` created.")
             else:
-                respond(f"Failed to create folder `{name}`.")
+                respond(f"Failed to create product `{name}`.")
         case "list":
             incident_folder.list_folders_view(client, body, ack)
         case _:
@@ -383,13 +376,36 @@ def handle_roles(client, body, respond, ack, _action, _args, _flags):
     incident_roles.manage_roles(client, body, ack, respond)
 
 
+def handle_updates(client, body, respond, ack, args, _flags):
+    """Handle the updates command."""
+    updates_help_text = (
+        "\n `/sre incident updates <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n add             - add updates to the incident"
+        "\n show            - show current incident updates"
+    )
+    try:
+        option = args.pop(0)
+    except IndexError:
+        option = None
+
+    match option:
+        case "add":
+            open_updates_dialog(client, body, ack)
+        case "show":
+            display_current_updates(client, body, respond, ack)
+        case _:
+            respond(updates_help_text)
+
+
 def handle_legacy_create_folder(client, body, respond, ack, args, _flags):
     """Handle the legacy create-folder command."""
     respond(
         "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create folder <folder_name>` instead."
     )
     action = "create"
-    handle_product(client, body, respond, ack, action, args, _flags)
+    handle_products(client, body, respond, ack, action, args, _flags)
 
 
 def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
@@ -398,7 +414,7 @@ def handle_legacy_list_folders(client, body, respond, ack, _args, flags):
         "The `/sre incident list-folders` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --folders` instead."
     )
     action = "list"
-    handle_product(client, body, respond, ack, action, [], flags)
+    handle_products(client, body, respond, ack, action, [], flags)
 
 
 def handle_legacy_stale(client, body, respond, ack, _args, _flags):
@@ -412,17 +428,19 @@ def handle_legacy_stale(client, body, respond, ack, _args, _flags):
 def handle_legacy_add_summary(client, body, respond, ack, _args, _flags):
     """Handle the legacy add_summary command."""
     respond(
-        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates add` instead."
     )
-    open_updates_dialog(client, body, ack)
+    args = ["add"]
+    handle_updates(client, body, respond, ack, args, _flags)
 
 
 def handle_legacy_summary(client, body, respond, ack, _args, _flags):
     """Handle the legacy summary command."""
     respond(
-        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates show` instead."
     )
-    display_current_updates(client, body, respond, ack)
+    args = ["show"]
+    handle_updates(client, body, respond, ack, args, _flags)
 
 
 def close_incident(client: WebClient, body, ack, respond):

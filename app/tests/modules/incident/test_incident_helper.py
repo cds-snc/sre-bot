@@ -5,6 +5,8 @@ import pytest
 
 from modules import incident_helper
 
+VALID_STATUS = incident_helper.VALID_STATUS
+
 # Legacy command tests to be removed once transition period is over
 
 
@@ -24,7 +26,7 @@ def test_legacy_handle_incident_command_with_create_command(mock_create_folder):
             call(
                 "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create folder <folder_name>` instead."
             ),
-            call("Folder `foo bar` created."),
+            call("Product `foo bar` created."),
         ]
     )
 
@@ -43,7 +45,7 @@ def test_legacy_handle_incident_command_with_create_command_error(mock_create_fo
             call(
                 "The `/sre incident create-folder` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident create folder <folder_name>` instead."
             ),
-            call("Failed to create folder `foo bar`."),
+            call("Failed to create product `foo bar`."),
         ]
     )
 
@@ -112,7 +114,7 @@ def test_legacy_handle_incident_command_with_add_summary(mock_open_updates_dialo
 
     incident_helper.handle_incident_command(["add_summary"], client, body, respond, ack)
     respond.assert_called_once_with(
-        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+        "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates add` instead."
     )
     mock_open_updates_dialog.assert_called_once_with(client, body, ack)
 
@@ -130,7 +132,7 @@ def test_legacy_handle_incident_summary_command(mock_display_current_updates):
 
     incident_helper.handle_incident_command(["summary"], client, body, respond, ack)
     respond.assert_called_once_with(
-        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates` instead."
+        "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates show` instead."
     )
     mock_display_current_updates.assert_called_once_with(client, body, respond, ack)
 
@@ -275,13 +277,13 @@ def test_handle_create_without_resource():
 
 
 @patch("modules.incident.incident_helper.information_display.open_incident_info_view")
-def test_handle_details(mock_open_incident_info_view):
+def test_handle_show(mock_open_incident_info_view):
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
 
-    incident_helper.handle_details(client, body, respond, ack, [], {})
+    incident_helper.handle_show(client, body, respond, ack, [], {})
     mock_open_incident_info_view.assert_called_once_with(client, body, respond)
 
 
@@ -328,6 +330,23 @@ def test_handle_list_with_stale(mock_stale_incidents):
     mock_stale_incidents.assert_called_once_with(client, body, ack)
 
 
+@patch("modules.incident.incident_helper.schedule_retro")
+def test_handle_schedule_with_no_option(mock_schedule_retro):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_schedule(client, body, respond, ack, [], {})
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
+        client, body, ack
+    )
+
+
 def test_handle_schedule_with_invalid_option():
     respond = MagicMock()
     ack = MagicMock()
@@ -365,6 +384,84 @@ def test_handle_schedule_with_retro(mock_schedule_retro):
 # resource level actions
 
 
+def test_handle_products_with_no_action():
+    respond = MagicMock()
+    ack = MagicMock()
+    product_help_text = (
+        "\n `/sre incident products <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n create <product_name>      - create a new product name to be referenced in the incident resources"
+        '\n          _Tip: Use quotes for multi-word product names: `create "product name"`_'
+        "\n list                      - list all products currently available in the incident resources"
+        "\n"
+        "\nUse `/sre incident help` to see a list of commands."
+    )
+    incident_helper.handle_products(
+        MagicMock(), MagicMock(), respond, ack, None, [], {}
+    )
+    respond.assert_called_once_with(product_help_text)
+
+
+@patch("modules.incident.incident_helper.google_drive.create_folder")
+def test_handle_products_with_create(mock_create_folder):
+    mock_create_folder.return_value = {"id": "test_id", "name": "foo bar"}
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_products(
+        MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {}
+    )
+    mock_create_folder.assert_called_once_with("foo bar", ANY)
+
+    respond.assert_called_once_with("Product `foo bar` created.")
+
+
+@patch("modules.incident.incident_helper.google_drive.create_folder")
+def test_handle_products_create_without_name(mock_create_folder):
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_products(
+        MagicMock(), MagicMock(), respond, ack, "create", [], {}
+    )
+
+    respond.assert_called_once_with(
+        "Please provide a product name using `create <product_name>`"
+    )
+
+
+@patch("modules.incident.incident_helper.google_drive.create_folder")
+def test_handle_products_with_create_error(mock_create_folder):
+    mock_create_folder.return_value = None
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_products(
+        MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {}
+    )
+    mock_create_folder.assert_called_once_with("foo bar", ANY)
+
+    respond.assert_called_once_with("Failed to create product `foo bar`.")
+
+
+def test_handle_status_with_no_action():
+    respond = MagicMock()
+    ack = MagicMock()
+    status_help_text = (
+        "\n `/sre incident status [options] [arguments]`"
+        "\n"
+        "\n*Options*"
+        "\n show             - show the current incident status"
+        "\n update <status>   - update the incident status to one of the valid statuses"
+        "\n"
+        "\n*Valid Statuses*"
+        "\n" + ", ".join(VALID_STATUS)
+    )
+    incident_helper.handle_status(MagicMock(), MagicMock(), respond, ack, None, [], {})
+    respond.assert_called_once_with(status_help_text)
+
+
 @patch("modules.incident.incident_helper.incident_roles.manage_roles")
 def test_handle_incident_command_with_roles(manage_roles_mock):
     client = MagicMock()
@@ -387,7 +484,9 @@ def test_handle_incident_command_with_schedule(mock_schedule_retro):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(["schedule", "retro"], client, body, respond, ack)
+    incident_helper.handle_incident_command(
+        ["schedule", "retro"], client, body, respond, ack
+    )
     mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
         client, body, ack
     )
