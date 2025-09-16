@@ -211,9 +211,6 @@ def test_handle_incident_command_with_help():
     respond.assert_called_once_with(incident_helper.help_text)
 
 
-# Test incident actions
-
-
 def test_handle_incident_command_dispatches_to_correct_handler():
     client = MagicMock()
     body = MagicMock()
@@ -234,6 +231,9 @@ def test_handle_incident_command_dispatches_to_correct_handler():
             ), f"{handler_name} should be called for first_arg '{first_arg}'"
 
 
+# Incident level actions
+
+
 @patch("modules.incident.incident_helper.close_incident")
 def test_handle_close(mock_close_incident):
     client = MagicMock()
@@ -249,7 +249,7 @@ def test_handle_close(mock_close_incident):
     mock_close_incident.assert_called_once_with(client, body, ack, respond)
 
 
-def test_handle_create_new():
+def test_handle_create_with_new():
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
@@ -259,7 +259,7 @@ def test_handle_create_new():
     respond.assert_called_once_with("Upcoming feature: create a new incident.")
 
 
-def test_handle_create_no_resource():
+def test_handle_create_without_resource():
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
@@ -284,14 +284,85 @@ def test_handle_details(mock_open_incident_info_view):
     incident_helper.handle_details(client, body, respond, ack, [], {})
     mock_open_incident_info_view.assert_called_once_with(client, body, respond)
 
-    # "create": handle_create,
-    # "details": handle_details,
-    # "help": handle_help,
-    # "list": handle_list,
-    # "schedule": handle_schedule,
+
+def test_handle_list_without_resource():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    list_help_text = (
+        "\n `/sre incident list [options]`"
+        "\n      "
+        "\n*Options*"
+        "\n active"
+        "\n      - lists all active incidents (default; not stale or archived)"
+        "\n      - liste tous les incidents actifs (par défaut; ni obsolètes ni archivés)"
+        "\n stale"
+        "\n      - lists all incidents older than 14 days with no activity"
+        "\n      - liste tous les incidents plus vieux que 14 jours sans activité"
+        "\n Use `/sre incident help` to see a list of commands."
+    )
+
+    incident_helper.handle_list(client, body, respond, ack, [], {})
+    respond.assert_called_once_with(list_help_text)
 
 
-# Test for resource handlers
+def test_handle_list_with_active():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_list(client, body, respond, ack, ["active"], {})
+    respond.assert_called_once_with("Upcoming feature: list all active incidents.")
+
+
+@patch("modules.incident.incident_helper.stale_incidents")
+def test_handle_list_with_stale(mock_stale_incidents):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_list(client, body, respond, ack, ["stale"], {})
+    mock_stale_incidents.assert_called_once_with(client, body, ack)
+
+
+def test_handle_schedule_without_action():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    schedule_help_text = (
+        "\n `/sre incident schedule [options]`"
+        "\n"
+        "\n*Options*"
+        "\n retro             - schedule a retrospective for the incident"
+        "\n"
+        "\nUse `/sre incident help` to see a list of commands."
+    )
+    incident_helper.handle_schedule(client, body, respond, ack, [], {})
+    respond.assert_called_once_with(schedule_help_text)
+
+
+@patch("modules.incident.incident_helper.schedule_retro")
+def test_handle_schedule_with_retro(mock_schedule_retro):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_schedule(client, body, respond, ack, ["retro"], {})
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
+        client, body, ack
+    )
+
+
+# resource level actions
 
 
 @patch("modules.incident.incident_helper.incident_roles.manage_roles")
@@ -316,7 +387,7 @@ def test_handle_incident_command_with_schedule(mock_schedule_retro):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(["schedule"], client, body, respond, ack)
+    incident_helper.handle_incident_command(["schedule", "retro"], client, body, respond, ack)
     mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
         client, body, ack
     )

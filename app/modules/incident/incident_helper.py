@@ -231,11 +231,6 @@ def handle_help(_client, _body, respond, _ack, _args, _flags) -> None:
     respond(help_text)
 
 
-def handle_details(client, body, respond, _ack, _args, _flags):
-    """Handle details command."""
-    information_display.open_incident_info_view(client, body, respond)
-
-
 def handle_close(client, body, respond, ack, _args, _flags):
     close_incident(client, body, ack, respond)
 
@@ -260,7 +255,13 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
             respond(create_help_text)
 
 
-def handle_list(client, body, respond, ack, args, flags):
+def handle_details(client, body, respond, _ack, _args, _flags):
+    """Handle details command."""
+    information_display.open_incident_info_view(client, body, respond)
+
+
+def handle_list(client, body, respond, ack, args, _flags):
+    """Handle list command."""
     list_help_text = (
         "\n `/sre incident list [options]`"
         "\n      "
@@ -286,7 +287,31 @@ def handle_list(client, body, respond, ack, args, flags):
             respond(list_help_text)
 
 
-def handle_updates(client, body, respond, ack, args, flags):
+def handle_schedule(client, body, respond, ack, args, flags):
+    """Handle the schedule command"""
+    schedule_help_text = (
+        "\n `/sre incident schedule [options]`"
+        "\n"
+        "\n*Options*"
+        "\n retro             - schedule a retrospective for the incident"
+        "\n"
+        "\nUse `/sre incident help` to see a list of commands."
+    )
+    try:
+        option = args.pop(0)
+    except IndexError:
+        option = None
+    match option:
+        case "retro":
+            schedule_retro.open_incident_retro_modal(client, body, ack)
+        case _:
+            respond(schedule_help_text)
+
+
+# resource level actions
+
+
+def handle_updates(client, body, respond, ack, _args, flags):
     """Handle the updates command."""
     if "--add" in flags:
         open_updates_dialog(client, body, ack)
@@ -328,19 +353,6 @@ def handle_product(client, body, respond, ack, action, args, flags):
             incident_folder.list_folders_view(client, body, ack)
         case _:
             respond(product_help_text)
-
-
-def handle_schedule(client, body, respond, ack, args, flags):
-    if not args:
-        args = ["retro"]
-    action = args[0]
-    match action:
-        case "retro":
-            schedule_retro.open_incident_retro_modal(client, body, ack)
-        case _:
-            respond(
-                f"Unknown schedule action: {action}. Currently, only 'retro' is supported."
-            )
 
 
 def handle_status(client, body, respond, ack, action, args, _flags):
@@ -394,7 +406,6 @@ def handle_legacy_stale(client, body, respond, ack, _args, _flags):
     respond(
         "The `/sre incident stale` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --stale` instead."
     )
-    # Optionally, call the new handler logic:
     stale_incidents(client, body, ack)
 
 
