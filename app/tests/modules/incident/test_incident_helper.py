@@ -278,12 +278,10 @@ def test_handle_create_without_resource():
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    create_help_text = (
-        "\n `/sre incident create [resource] [options]`"
-        "\n"
-        "\n*Resources*"
-        "\n new [<incident_name>]        - create a new incident (upcoming feature)"
-    )
+    create_help_text = """`/sre incident create [resource] [options]`
+
+*Resources:*
+• `new [<incident_name>]` — create a new incident (upcoming feature)"""
     incident_helper.handle_create(client, body, respond, ack, [], {})
     respond.assert_called_once_with(create_help_text)
 
@@ -304,18 +302,13 @@ def test_handle_list_without_resource():
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    list_help_text = (
-        "\n `/sre incident list [options]`"
-        "\n      "
-        "\n*Options*"
-        "\n active"
-        "\n      - lists all active incidents (default; not stale or archived)"
-        "\n      - liste tous les incidents actifs (par défaut; ni obsolètes ni archivés)"
-        "\n stale"
-        "\n      - lists all incidents older than 14 days with no activity"
-        "\n      - liste tous les incidents plus vieux que 14 jours sans activité"
-        "\n Use `/sre incident help` to see a list of commands."
-    )
+    list_help_text = """`/sre incident list [options]`
+
+*Options:*
+• `active` — lists all active incidents (default; not stale or archived)
+• `stale` — lists all incidents older than 14 days with no activity
+
+Use `/sre incident help` to see a list of commands."""
 
     incident_helper.handle_list(client, body, respond, ack, [], {})
     respond.assert_called_once_with(list_help_text)
@@ -364,14 +357,12 @@ def test_handle_schedule_with_invalid_option():
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    schedule_help_text = (
-        "\n `/sre incident schedule [options]`"
-        "\n"
-        "\n*Options*"
-        "\n retro             - schedule a retrospective for the incident"
-        "\n"
-        "\nUse `/sre incident help` to see a list of commands."
-    )
+    schedule_help_text = """`/sre incident schedule [options]`
+
+*Options:*
+• `retro` — schedule a retrospective for the incident
+
+Use `/sre incident help` to see a list of commands."""
     incident_helper.handle_schedule(client, body, respond, ack, ["asdf"], {})
     respond.assert_called_once_with(schedule_help_text)
 
@@ -393,6 +384,25 @@ def test_handle_schedule_with_retro(mock_schedule_retro):
     )
 
 
+@patch("modules.incident.incident_helper.schedule_retro")
+def test_handle_incident_command_with_schedule(mock_schedule_retro):
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["schedule", "retro"], client, body, respond, ack
+    )
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
+        client, body, ack
+    )
+
+
 # resource level actions
 
 
@@ -401,12 +411,10 @@ def test_handle_channels_with_no_action():
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
-    channels_help_text = (
-        "\n `/sre incident channels <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n <Upcoming feature>  - manage incident channels"
-    )
+    channels_help_text = """`/sre incident channels <action> [options] [arguments]`
+
+*Actions:*
+• `<Upcoming feature>` — manage incident channels"""
     incident_helper.handle_channels(client, body, respond, ack, None, [], {})
     respond.assert_called_once_with(channels_help_text)
 
@@ -414,16 +422,14 @@ def test_handle_channels_with_no_action():
 def test_handle_products_with_no_action():
     respond = MagicMock()
     ack = MagicMock()
-    product_help_text = (
-        "\n `/sre incident products <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n create <product_name>      - create a new product name to be referenced in the incident resources"
-        '\n          _Tip: Use quotes for multi-word product names: `create "product name"`_'
-        "\n list                      - list all products currently available in the incident resources"
-        "\n"
-        "\nUse `/sre incident help` to see a list of commands."
-    )
+    product_help_text = """`/sre incident products <action> [options] [arguments]`
+
+*Actions:*
+• `create <product_name>` — create a new product name to be referenced in the incident resources
+  _Tip: Use quotes for multi-word product names: `create "product name"`_
+• `list` — list all products currently available in the incident resources
+
+Use `/sre incident help` to see a list of commands."""
     incident_helper.handle_products(
         MagicMock(), MagicMock(), respond, ack, None, [], {}
     )
@@ -475,15 +481,15 @@ def test_handle_products_with_create_error(mock_create_folder):
 def test_handle_status_with_no_action():
     respond = MagicMock()
     ack = MagicMock()
-    status_help_text = (
-        "\n `/sre incident status [options] [arguments]`"
-        "\n"
-        "\n*Options*"
-        "\n show              - show the current incident status"
-        "\n update <status>   - update the incident status to one of the valid statuses"
-        "\n"
-        "\n*Valid Statuses*"
-        "\n" + ", ".join(VALID_STATUS)
+    status_help_text = """`/sre incident status [options] [arguments]`
+
+*Options:*
+• `show` — show the current incident status
+• `update <status>` — update the incident status to one of the valid statuses
+
+*Valid Statuses:*
+""" + ", ".join(
+        VALID_STATUS
     )
     incident_helper.handle_status(MagicMock(), MagicMock(), respond, ack, None, [], {})
     respond.assert_called_once_with(status_help_text)
@@ -536,9 +542,14 @@ def test_handle_roles_with_no_action(mock_incident_roles):
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
+    roles_help_text = """`/sre incident roles <action> [options] [arguments]`
 
+*Actions:*
+• `manage` — manage incident roles
+• `show` — show current incident roles"""
     incident_helper.handle_roles(client, body, respond, ack, None, [], {})
     mock_incident_roles.assert_not_called()
+    respond.assert_called_once_with(roles_help_text)
 
 
 @patch("modules.incident.incident_helper.incident_roles")
@@ -562,35 +573,14 @@ def test_handle_roles_with_show():
     respond.assert_called_once_with("Upcoming feature: show current incident roles.")
 
 
-@patch("modules.incident.incident_helper.schedule_retro")
-def test_handle_incident_command_with_schedule(mock_schedule_retro):
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "user_id",
-    }
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_incident_command(
-        ["schedule", "retro"], client, body, respond, ack
-    )
-    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
-        client, body, ack
-    )
-
-
 def test_handle_updates_with_no_action():
     respond = MagicMock()
     ack = MagicMock()
-    updates_help_text = (
-        "\n `/sre incident updates <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n add             - add updates to the incident"
-        "\n show            - show current incident updates"
-    )
+    updates_help_text = """`/sre incident updates <action> [options] [arguments]`
+
+*Actions:*
+• `add` — add updates to the incident
+• `show` — show current incident updates"""
     incident_helper.handle_updates(MagicMock(), MagicMock(), respond, ack, None, [], {})
     respond.assert_called_once_with(updates_help_text)
 

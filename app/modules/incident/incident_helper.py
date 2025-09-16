@@ -21,7 +21,6 @@ from modules.incident import (
     db_operations,
     information_display,
     information_update,
-    core as incident_core,
 )
 from core.config import settings
 from core.logging import get_module_logger
@@ -62,7 +61,7 @@ Usage:
 
 *Examples:*
 - `/sre incident create`
-- `/sre incident channel list --stale`
+- `/sre incident list --stale`
 - `/sre incident close`
 - `/sre incident show`
 - `/sre incident products create "foo bar"`
@@ -104,7 +103,7 @@ Utilisation:
 
 *Exemples:*
 - `/sre incident create`
-- `/sre incident channel list --stale`
+- `/sre incident list --stale`
 - `/sre incident close`
 - `/sre incident show`
 - `/sre incident products create "foo bar"`
@@ -247,12 +246,10 @@ def handle_close(client, body, respond, ack, _args, _flags):
 
 def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
     """Handle create command."""
-    create_help_text = (
-        "\n `/sre incident create [resource] [options]`"
-        "\n"
-        "\n*Resources*"
-        "\n new [<incident_name>]        - create a new incident (upcoming feature)"
-    )
+    create_help_text = """`/sre incident create [resource] [options]`
+
+*Resources:*
+• `new [<incident_name>]` — create a new incident (upcoming feature)"""
     try:
         resource = args.pop(0)
     except IndexError:
@@ -277,18 +274,13 @@ def handle_show(client, body, respond, _ack, _args, _flags):
 
 def handle_list(client, body, respond, ack, args, _flags):
     """Handle list command."""
-    list_help_text = (
-        "\n `/sre incident list [options]`"
-        "\n      "
-        "\n*Options*"
-        "\n active"
-        "\n      - lists all active incidents (default; not stale or archived)"
-        "\n      - liste tous les incidents actifs (par défaut; ni obsolètes ni archivés)"
-        "\n stale"
-        "\n      - lists all incidents older than 14 days with no activity"
-        "\n      - liste tous les incidents plus vieux que 14 jours sans activité"
-        "\n Use `/sre incident help` to see a list of commands."
-    )
+    list_help_text = """`/sre incident list [options]`
+
+*Options:*
+• `active` — lists all active incidents (default; not stale or archived)
+• `stale` — lists all incidents older than 14 days with no activity
+
+Use `/sre incident help` to see a list of commands."""
     try:
         option = args.pop(0)
     except IndexError:
@@ -304,14 +296,12 @@ def handle_list(client, body, respond, ack, args, _flags):
 
 def handle_schedule(client, body, respond, ack, args, _flags):
     """Handle the schedule command"""
-    schedule_help_text = (
-        "\n `/sre incident schedule [options]`"
-        "\n"
-        "\n*Options*"
-        "\n retro             - schedule a retrospective for the incident"
-        "\n"
-        "\nUse `/sre incident help` to see a list of commands."
-    )
+    schedule_help_text = """`/sre incident schedule [options]`
+
+*Options:*
+• `retro` — schedule a retrospective for the incident
+
+Use `/sre incident help` to see a list of commands."""
     try:
         option = args.pop(0)
     except IndexError:
@@ -328,12 +318,10 @@ def handle_schedule(client, body, respond, ack, args, _flags):
 
 def handle_channels(_client, _body, respond, _ack, action, _args, _flags):
     """Handle the channels command."""
-    channels_help_text = (
-        "\n `/sre incident channels <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n <Upcoming feature>  - manage incident channels"
-    )
+    channels_help_text = """`/sre incident channels <action> [options] [arguments]`
+
+*Actions:*
+• `<Upcoming feature>` — manage incident channels"""
     match action:
         case _:
             respond(channels_help_text)
@@ -341,16 +329,14 @@ def handle_channels(_client, _body, respond, _ack, action, _args, _flags):
 
 def handle_products(client, body, respond, ack, action, args, flags):
     """Handle the products command."""
-    product_help_text = (
-        "\n `/sre incident products <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n create <product_name>      - create a new product name to be referenced in the incident resources"
-        '\n          _Tip: Use quotes for multi-word product names: `create "product name"`_'
-        "\n list                      - list all products currently available in the incident resources"
-        "\n"
-        "\nUse `/sre incident help` to see a list of commands."
-    )
+    product_help_text = """`/sre incident products <action> [options] [arguments]`
+
+*Actions:*
+• `create <product_name>` — create a new product name to be referenced in the incident resources
+  _Tip: Use quotes for multi-word product names: `create "product name"`_
+• `list` — list all products currently available in the incident resources
+
+Use `/sre incident help` to see a list of commands."""
     match action:
         case "create":
             name = " ".join(args)
@@ -373,15 +359,15 @@ def handle_products(client, body, respond, ack, action, args, flags):
 
 def handle_status(client, body, respond, ack, action, args, _flags):
     """Handle the status command."""
-    status_help_text = (
-        "\n `/sre incident status [options] [arguments]`"
-        "\n"
-        "\n*Options*"
-        "\n show              - show the current incident status"
-        "\n update <status>   - update the incident status to one of the valid statuses"
-        "\n"
-        "\n*Valid Statuses*"
-        "\n" + ", ".join(VALID_STATUS)
+    status_help_text = """`/sre incident status [options] [arguments]`
+
+*Options:*
+• `show` — show the current incident status
+• `update <status>` — update the incident status to one of the valid statuses
+
+*Valid Statuses:*
+""" + ", ".join(
+        VALID_STATUS
     )
     match action:
         case "update":
@@ -397,13 +383,11 @@ def handle_status(client, body, respond, ack, action, args, _flags):
 
 def handle_roles(client, body, respond, ack, action, _args, _flags):
     """Handle the roles command."""
-    roles_help_text = (
-        "\n `/sre incident roles <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n manage          - manage incident roles"
-        "\n show            - show current incident roles"
-    )
+    roles_help_text = """`/sre incident roles <action> [options] [arguments]`
+
+*Actions:*
+• `manage` — manage incident roles
+• `show` — show current incident roles"""
     match action:
         case "manage":
             incident_roles.manage_roles(client, body, ack, respond)
@@ -415,13 +399,11 @@ def handle_roles(client, body, respond, ack, action, _args, _flags):
 
 def handle_updates(client, body, respond, ack, action, _args, _flags):
     """Handle the updates command."""
-    updates_help_text = (
-        "\n `/sre incident updates <action> [options] [arguments]`"
-        "\n"
-        "\n*Actions*"
-        "\n add             - add updates to the incident"
-        "\n show            - show current incident updates"
-    )
+    updates_help_text = """`/sre incident updates <action> [options] [arguments]`
+
+*Actions:*
+• `add` — add updates to the incident
+• `show` — show current incident updates"""
 
     match action:
         case "add":
