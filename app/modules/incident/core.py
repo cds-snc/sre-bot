@@ -155,16 +155,22 @@ def initiate_resources_creation(
         client.conversations_invite(
             channel=incident_payload.channel_id, users=users_to_invite
         )
+    text = """🚨 *Incident Resources Created Successfully!*
+*Next Steps - Available Commands:*
+• `/sre incident roles manage` - Assign roles to the incident
+• `/sre incident schedule retro` - Schedule a retrospective meeting  
+• `/sre incident close` - Close and archive this incident
+• `/sre incident status update <status>` - Update incident status
+• `/sre incident updates add` - Add incident updates
+• `/sre incident show` - View incident details
 
-    text = "Run `/sre incident roles` to assign roles to the incident"
+*Quick Actions:*
+📋 Use the bookmarked incident report above to document findings
+👥 Assign roles to team members for clear responsibilities  
+📅 Schedule a retro meeting when ready
+
+_Type_ `/sre incident help` _for complete command list_"""
     client.chat_postMessage(text=text, channel=incident_payload.channel_id)
-
-    text = "Run `/sre incident close` to update the status of the incident document and incident spreadsheet to closed and to archive the channel"
-    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
-
-    text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
-    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
-
     incident_document.update_boilerplate_text(
         document_id,
         incident_payload.name,
