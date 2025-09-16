@@ -17,6 +17,7 @@ def helper_generate_default_incident_params():
     )
 
 
+@patch("modules.incident.core.INCIDENT_CHANNEL", "incident-channel")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
@@ -48,7 +49,6 @@ def test_initiate_resources_creation_succeeds(
         },
     ]
     client = MagicMock()
-    say = MagicMock()
     mock_create_incident_conversation.return_value = {
         "channel_id": "channel_id",
         "channel_name": "channel_name",
@@ -82,7 +82,22 @@ def test_initiate_resources_creation_succeeds(
             },
         ],
     }
-    core.initiate_resources_creation(client, say, incident_payload)
+    expected_text = """🚨 *Incident Resources Created Successfully!*
+*Next Steps - Available Commands:*
+• `/sre incident roles manage` - Assign roles to the incident
+• `/sre incident schedule retro` - Schedule a retrospective meeting
+• `/sre incident close` - Close and archive this incident
+• `/sre incident status update <status>` - Update incident status
+• `/sre incident updates add` - Add incident updates
+• `/sre incident show` - View incident details
+
+*Quick Actions:*
+📋 Use the bookmarked incident report above to document findings
+👥 Assign roles to team members for clear responsibilities
+📅 Schedule a retro meeting when ready
+
+_Type_ `/sre incident help` _for complete command list_"""
+    core.initiate_resources_creation(client, incident_payload)
 
     # this must be performed before the resources creation is called.
     client.conversations_create.assert_not_called()
@@ -94,9 +109,9 @@ def test_initiate_resources_creation_succeeds(
     client.conversations_setPurpose.assert_called_once_with(
         channel="channel_id", purpose="name"
     )
-    say.assert_any_call(
+    client.chat_postMessage.assert_any_call(
         text="<@user_id> has kicked off a new incident: name for product in <#channel_id>\n<@user_id> a initié un nouvel incident: name pour product dans <#channel_id>",
-        channel=core.INCIDENT_CHANNEL,
+        channel="incident-channel",
     )
     mock_google_meet.create_space.assert_called_once()
     client.bookmarks_add.assert_has_calls(
@@ -123,7 +138,7 @@ def test_initiate_resources_creation_succeeds(
         },
     )
 
-    say.assert_any_call(
+    client.chat_postMessage.assert_any_call(
         text="A hangout has been created at: https://meet.google.com/aaa-bbbb-ccc",
         channel="channel_id",
     )
@@ -165,21 +180,13 @@ def test_initiate_resources_creation_succeeds(
         any_order=True,
     )
 
-    say.assert_any_call(
+    client.chat_postMessage.assert_any_call(
         text=":lapage: An incident report has been created at: https://docs.google.com/document/d/document_id/edit",
         channel="channel_id",
     )
 
-    say.assert_any_call(
-        text="Run `/sre incident roles` to assign roles to the incident",
-        channel="channel_id",
-    )
-    say.assert_any_call(
-        text="Run `/sre incident close` to update the status of the incident document and incident spreadsheet to closed and to archive the channel",
-        channel="channel_id",
-    )
-    say.assert_any_call(
-        text="Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants.",
+    client.chat_postMessage.assert_any_call(
+        text=expected_text,
         channel="channel_id",
     )
 
@@ -214,9 +221,9 @@ def test_initiate_resources_creation_oncall_fails(
     incident_payload = helper_generate_default_incident_params()
     mock_get_on_call_users_from_folder.side_effect = Exception("oncall error")
     client = MagicMock()
-    say = MagicMock()
+
     with pytest.raises(Exception) as excinfo:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     assert str(excinfo.value) == "oncall error"
     mock_create_incident_conversation.assert_not_called()
     mock_google_meet.create_space.assert_not_called()
@@ -246,9 +253,9 @@ def test_initiate_resources_creation_meet_fails(
     mock_get_on_call_users_from_folder.return_value = []
     mock_google_meet.create_space.side_effect = Exception("meet error")
     client = MagicMock()
-    say = MagicMock()
+
     with pytest.raises(Exception) as excinfo:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     assert str(excinfo.value) == "meet error"
     mock_create_incident_conversation.assert_not_called()
     mock_google_meet.create_space.assert_called_once()
@@ -279,9 +286,9 @@ def test_initiate_resources_creation_document_fails(
     mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
     mock_incident_document.create_incident_document.side_effect = Exception("doc error")
     client = MagicMock()
-    say = MagicMock()
+
     with pytest.raises(Exception) as excinfo:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     assert str(excinfo.value) == "doc error"
     mock_create_incident_conversation.assert_not_called()
     mock_google_meet.create_space.assert_called_once()
@@ -315,9 +322,9 @@ def test_initiate_resources_creation_db_fails(
     mock_incident_document.create_incident_document.return_value = "doc_id"
     mock_db_operations.create_incident.side_effect = Exception("db error")
     client = MagicMock()
-    say = MagicMock()
+
     with pytest.raises(Exception) as excinfo:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     assert str(excinfo.value) == "db error"
     mock_create_incident_conversation.assert_not_called()
     mock_google_meet.create_space.assert_called_once()
@@ -351,10 +358,10 @@ def test_initiate_resources_creation_security_group_fails(
     mock_incident_document.create_incident_document.return_value = "doc_id"
     mock_db_operations.create_incident.return_value = "incident_id"
     client = MagicMock()
-    say = MagicMock()
+
     client.usergroups_users_list.side_effect = Exception("security error")
     try:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     except Exception as e:
         assert str(e) == "security error"
     mock_create_incident_conversation.assert_not_called()
@@ -404,9 +411,9 @@ def test_initiate_resources_creation_no_users_to_invite(
     mock_incident_document.create_incident_document.return_value = "doc_id"
     mock_db_operations.create_incident.return_value = "incident_id"
     client = MagicMock()
-    say = MagicMock()
+
     client.usergroups_users_list.return_value = {"ok": True, "users": ["user_id"]}
-    core.initiate_resources_creation(client, say, incident_payload)
+    core.initiate_resources_creation(client, incident_payload)
     client.conversations_invite.assert_called_once_with(
         channel="channel_id", users="user_id"
     )
@@ -437,8 +444,8 @@ def test_initiate_resources_creation_boilerplate_update_fails(
         "boilerplate error"
     )
     client = MagicMock()
-    say = MagicMock()
+
     try:
-        core.initiate_resources_creation(client, say, incident_payload)
+        core.initiate_resources_creation(client, incident_payload)
     except Exception as e:
         assert str(e) == "boilerplate error"

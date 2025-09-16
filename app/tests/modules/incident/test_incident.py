@@ -246,7 +246,6 @@ def test_incident_submit_calls_succeeds(
 
     mock_core.initiate_resources_creation.assert_called_once_with(
         client=client,
-        say=say,
         incident_payload=incident_payload,
     )
 
