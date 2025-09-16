@@ -396,6 +396,23 @@ def test_handle_schedule_with_retro(mock_schedule_retro):
 # resource level actions
 
 
+def test_handle_channels_with_no_action():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+    channels_help_text = (
+        "\n `/sre incident channels <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n <Upcoming feature>  - manage incident channels"
+    )
+    incident_helper.handle_channels(
+        client, body, respond, ack, None, [], {}
+    )
+    respond.assert_called_once_with(channels_help_text)
+
+
 def test_handle_products_with_no_action():
     respond = MagicMock()
     ack = MagicMock()

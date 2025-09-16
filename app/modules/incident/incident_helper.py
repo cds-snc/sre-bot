@@ -46,7 +46,7 @@ Usage:
 `/sre incident [<resource>] <action> [options] [arguments]`
 
 *Resources:*
-• channel      - Manage incident channels
+• channels     - Manage incident channels
 • products     - Manage incident products (aka folders)
 • roles        - Manage incident roles
 • updates      - Add or show incident updates
@@ -88,7 +88,7 @@ Utilisation:
 `/sre incident [<ressource>] <action> [options] [arguments]`
 
 *Ressources:*
-• channel      - Gérer les canaux d'incidents
+• channels     - Gérer les canaux d'incidents
 • products     - Gérer les produits d'incidents (dossiers)
 • roles        - Gérer les rôles d'incidents
 • updates      - Ajouter ou afficher des mises à jour d'incidents
@@ -101,6 +101,16 @@ Utilisation:
 • help         - Afficher ce message d'aide
 • schedule     - Planifier un événement pour l'incident
 • show         - Afficher les détails de l'incident en cours
+
+*Exemples:*
+- `/sre incident create`
+- `/sre incident channel list --stale`
+- `/sre incident close`
+- `/sre incident show`
+- `/sre incident products create "foo bar"`
+- `/sre incident schedule retro`
+- `/sre incident status update Ready to be Reviewed`
+- `/sre incident updates add "new update"`
 
 *Commandes obsolètes (seront supprimées après le 2025-11-01):*
 • add_summary
