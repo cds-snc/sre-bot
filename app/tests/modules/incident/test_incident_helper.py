@@ -462,6 +462,47 @@ def test_handle_status_with_no_action():
     respond.assert_called_once_with(status_help_text)
 
 
+@patch("modules.incident.incident_helper.handle_update_status_command")
+def test_handle_status_with_update(mock_update_status_command):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_status(
+        client, body, respond, ack, "update", ["Ready", "to", "be", "Reviewed"], {}
+    )
+    mock_update_status_command.assert_called_once_with(
+        client, body, respond, ack, ["Ready", "to", "be", "Reviewed"]
+    )
+
+
+@patch("modules.incident.incident_helper.handle_update_status_command")
+def test_handle_status_with_update_no_args(mock_update_status_command):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_status(client, body, respond, ack, "update", [], {})
+    mock_update_status_command.assert_not_called()
+    respond.assert_called_once_with("Please provide a status to update.")
+
+
+def test_handle_status_with_show():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+
+    incident_helper.handle_status(client, body, respond, ack, "show", [], {})
+    respond.assert_called_once_with("Upcoming feature: show current incident status.")
+
+
 @patch("modules.incident.incident_helper.incident_roles.manage_roles")
 def test_handle_incident_command_with_roles(manage_roles_mock):
     client = MagicMock()
