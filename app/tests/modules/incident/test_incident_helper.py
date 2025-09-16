@@ -407,9 +407,7 @@ def test_handle_channels_with_no_action():
         "\n*Actions*"
         "\n <Upcoming feature>  - manage incident channels"
     )
-    incident_helper.handle_channels(
-        client, body, respond, ack, None, [], {}
-    )
+    incident_helper.handle_channels(client, body, respond, ack, None, [], {})
     respond.assert_called_once_with(channels_help_text)
 
 
@@ -481,7 +479,7 @@ def test_handle_status_with_no_action():
         "\n `/sre incident status [options] [arguments]`"
         "\n"
         "\n*Options*"
-        "\n show             - show the current incident status"
+        "\n show              - show the current incident status"
         "\n update <status>   - update the incident status to one of the valid statuses"
         "\n"
         "\n*Valid Statuses*"

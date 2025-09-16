@@ -377,7 +377,7 @@ def handle_status(client, body, respond, ack, action, args, _flags):
         "\n `/sre incident status [options] [arguments]`"
         "\n"
         "\n*Options*"
-        "\n show             - show the current incident status"
+        "\n show              - show the current incident status"
         "\n update <status>   - update the incident status to one of the valid statuses"
         "\n"
         "\n*Valid Statuses*"
