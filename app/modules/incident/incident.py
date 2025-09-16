@@ -202,7 +202,6 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     try:
         core.initiate_resources_creation(
             client=client,
-            say=say,
             incident_payload=incident_payload,
         )
     except Exception as e:
