@@ -216,7 +216,7 @@ def handle_incident_command(
     if first_arg in resource_handlers:
         # this is to handle if the argument is a resource
         resource = first_arg
-        action = args_list.pop(0) if len(args_list) > 1 else "help"
+        action = args_list.pop(0) if args_list else "help"
         resource_handler: Callable = resource_handlers[resource]
         resource_handler(client, body, respond, ack, action, args_list, flags)
     elif first_arg in incident_actions:
