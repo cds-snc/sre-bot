@@ -21,6 +21,7 @@ from modules.incident import (
     db_operations,
     information_display,
     information_update,
+    core as incident_core,
 )
 from core.config import settings
 from core.logging import get_module_logger
@@ -88,7 +89,7 @@ Utilisation:
 
 *Ressources:*
 • channel      - Gérer les canaux d'incidents
-• product      - Gérer les produits d'incidents (dossiers)
+• products     - Gérer les produits d'incidents (dossiers)
 • roles        - Gérer les rôles d'incidents
 • updates      - Ajouter ou afficher des mises à jour d'incidents
 • status       - Mettre à jour ou afficher l'état d'un incident
@@ -169,7 +170,7 @@ def get_incident_actions() -> dict[str, Callable]:
 def get_resource_handlers():
     """Returns a dictionary mapping resources to their handler functions."""
     return {
-        "channel": handle_channel,
+        "channel": handle_channels,
         "product": handle_products,
         "roles": handle_roles,
         "updates": handle_updates,
@@ -196,25 +197,23 @@ def handle_incident_command(
         first_arg = None
     resource_handlers = get_resource_handlers()
     incident_actions = get_incident_actions()
+    # Handle deprecated `/sre incident status <status>` command
+    if first_arg == "status" and args_list and " ".join(args_list) in VALID_STATUS:
+        respond(
+            "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
+        )
+        args_list = ["update"] + args_list
+
     if first_arg in resource_handlers:
         # this is to handle if the argument is a resource
         resource = first_arg
-        if (
-            resource == "status"
-            and len(args_list) > 0
-            and " ".join(args_list) in VALID_STATUS
-        ):
-            args_list.insert(0, "update")  # handle legacy command, to be deprecated
-            respond(
-                "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
-            )
         action = args_list.pop(0) if len(args_list) > 1 else "help"
-        resource_handler: Callable = resource_handlers.get(resource, handle_help)
+        resource_handler: Callable = resource_handlers[resource]
         resource_handler(client, body, respond, ack, action, args_list, flags)
     elif first_arg in incident_actions:
         # this is to handle if the argument is a valid action on the incident itself
         action = first_arg
-        action_handler: Callable = incident_actions.get(action, handle_help)
+        action_handler: Callable = incident_actions[action]
         action_handler(client, body, respond, ack, args_list, flags)
     else:
         if first_arg:
@@ -252,6 +251,11 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
         case "new":
             respond("Upcoming feature: create a new incident.")
             return
+        case "resources":
+            respond(
+                "Upcoming feature: create resources for an incident (e.g., document, meet links, etc.)."
+            )
+            return
         case _:
             respond(create_help_text)
 
@@ -288,7 +292,7 @@ def handle_list(client, body, respond, ack, args, _flags):
             respond(list_help_text)
 
 
-def handle_schedule(client, body, respond, ack, args, flags):
+def handle_schedule(client, body, respond, ack, args, _flags):
     """Handle the schedule command"""
     schedule_help_text = (
         "\n `/sre incident schedule [options]`"
@@ -312,12 +316,21 @@ def handle_schedule(client, body, respond, ack, args, flags):
 # resource level actions
 
 
-def handle_channel(client, body, respond, ack, action, args, flags):
-    pass
+def handle_channels(_client, _body, respond, _ack, action, _args, _flags):
+    """Handle the channels command."""
+    channels_help_text = (
+        "\n `/sre incident channels <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n <Upcoming feature>  - manage incident channels"
+    )
+    match action:
+        case _:
+            respond(channels_help_text)
 
 
 def handle_products(client, body, respond, ack, action, args, flags):
-    """Handle the product command."""
+    """Handle the products command."""
     product_help_text = (
         "\n `/sre incident products <action> [options] [arguments]`"
         "\n"
@@ -372,11 +385,25 @@ def handle_status(client, body, respond, ack, action, args, _flags):
             respond(status_help_text)
 
 
-def handle_roles(client, body, respond, ack, _action, _args, _flags):
-    incident_roles.manage_roles(client, body, ack, respond)
+def handle_roles(client, body, respond, ack, action, _args, _flags):
+    """Handle the roles command."""
+    roles_help_text = (
+        "\n `/sre incident roles <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n manage          - manage incident roles"
+        "\n show            - show current incident roles"
+    )
+    match action:
+        case "manage":
+            incident_roles.manage_roles(client, body, ack, respond)
+        case "show":
+            respond("Upcoming feature: show current incident roles.")
+        case _:
+            respond(roles_help_text)
 
 
-def handle_updates(client, body, respond, ack, args, _flags):
+def handle_updates(client, body, respond, ack, action, _args, _flags):
     """Handle the updates command."""
     updates_help_text = (
         "\n `/sre incident updates <action> [options] [arguments]`"
@@ -385,12 +412,8 @@ def handle_updates(client, body, respond, ack, args, _flags):
         "\n add             - add updates to the incident"
         "\n show            - show current incident updates"
     )
-    try:
-        option = args.pop(0)
-    except IndexError:
-        option = None
 
-    match option:
+    match action:
         case "add":
             open_updates_dialog(client, body, ack)
         case "show":
@@ -430,8 +453,7 @@ def handle_legacy_add_summary(client, body, respond, ack, _args, _flags):
     respond(
         "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates add` instead."
     )
-    args = ["add"]
-    handle_updates(client, body, respond, ack, args, _flags)
+    handle_updates(client, body, respond, ack, "add", _args, _flags)
 
 
 def handle_legacy_summary(client, body, respond, ack, _args, _flags):
@@ -439,8 +461,7 @@ def handle_legacy_summary(client, body, respond, ack, _args, _flags):
     respond(
         "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident updates show` instead."
     )
-    args = ["show"]
-    handle_updates(client, body, respond, ack, args, _flags)
+    handle_updates(client, body, respond, ack, "show", _args, _flags)
 
 
 def close_incident(client: WebClient, body, ack, respond):

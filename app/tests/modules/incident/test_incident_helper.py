@@ -261,6 +261,18 @@ def test_handle_create_with_new():
     respond.assert_called_once_with("Upcoming feature: create a new incident.")
 
 
+def test_handle_create_with_resources():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_create(client, body, respond, ack, ["resources"], {})
+    respond.assert_called_once_with(
+        "Upcoming feature: create resources for an incident (e.g., document, meet links, etc.)."
+    )
+
+
 def test_handle_create_without_resource():
     respond = MagicMock()
     ack = MagicMock()
@@ -503,15 +515,36 @@ def test_handle_status_with_show():
     respond.assert_called_once_with("Upcoming feature: show current incident status.")
 
 
-@patch("modules.incident.incident_helper.incident_roles.manage_roles")
-def test_handle_incident_command_with_roles(manage_roles_mock):
+@patch("modules.incident.incident_helper.incident_roles")
+def test_handle_roles_with_no_action(mock_incident_roles):
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(["roles"], client, body, respond, ack)
-    manage_roles_mock.assert_called_once_with(client, body, ack, respond)
+    incident_helper.handle_roles(client, body, respond, ack, None, [], {})
+    mock_incident_roles.assert_not_called()
+
+
+@patch("modules.incident.incident_helper.incident_roles")
+def test_handle_roles_with_manage(mock_incident_roles):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_roles(client, body, respond, ack, "manage", [], {})
+    mock_incident_roles.manage_roles.assert_called_once_with(client, body, ack, respond)
+
+
+def test_handle_roles_with_show():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_roles(client, body, respond, ack, "show", [], {})
+    respond.assert_called_once_with("Upcoming feature: show current incident roles.")
 
 
 @patch("modules.incident.incident_helper.schedule_retro")
@@ -531,6 +564,52 @@ def test_handle_incident_command_with_schedule(mock_schedule_retro):
     mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
         client, body, ack
     )
+
+
+def test_handle_updates_with_no_action():
+    respond = MagicMock()
+    ack = MagicMock()
+    updates_help_text = (
+        "\n `/sre incident updates <action> [options] [arguments]`"
+        "\n"
+        "\n*Actions*"
+        "\n add             - add updates to the incident"
+        "\n show            - show current incident updates"
+    )
+    incident_helper.handle_updates(MagicMock(), MagicMock(), respond, ack, None, [], {})
+    respond.assert_called_once_with(updates_help_text)
+
+
+@patch("modules.incident.incident_helper.open_updates_dialog")
+def test_handle_updates_with_add(mock_open_updates_dialog):
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    incident_helper.handle_updates(client, body, respond, ack, "add", [], {})
+    mock_open_updates_dialog.assert_called_once_with(
+        client,
+        body,
+        ack,
+    )
+
+
+@patch("modules.incident.incident_helper.display_current_updates")
+def test_handle_updates_with_show(mock_display_current_updates):
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "channel_id": "channel_id",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "user_id",
+    }
+    incident_helper.handle_updates(client, body, respond, ack, "show", [], {})
+    mock_display_current_updates.assert_called_once_with(client, body, respond, ack)
 
 
 @patch("modules.incident.incident_helper.slack_channels.get_stale_channels")
