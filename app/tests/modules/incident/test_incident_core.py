@@ -84,7 +84,7 @@ def test_initiate_resources_creation_succeeds(
     expected_text = """🚨 *Incident Resources Created Successfully!*
 *Next Steps - Available Commands:*
 • `/sre incident roles manage` - Assign roles to the incident
-• `/sre incident schedule retro` - Schedule a retrospective meeting  
+• `/sre incident schedule retro` - Schedule a retrospective meeting
 • `/sre incident close` - Close and archive this incident
 • `/sre incident status update <status>` - Update incident status
 • `/sre incident updates add` - Add incident updates
@@ -92,7 +92,7 @@ def test_initiate_resources_creation_succeeds(
 
 *Quick Actions:*
 📋 Use the bookmarked incident report above to document findings
-👥 Assign roles to team members for clear responsibilities  
+👥 Assign roles to team members for clear responsibilities
 📅 Schedule a retro meeting when ready
 
 _Type_ `/sre incident help` _for complete command list_"""
