@@ -180,7 +180,7 @@ def get_incident_actions() -> dict[str, Callable]:
 def get_resource_handlers():
     """Returns a dictionary mapping resources to their handler functions."""
     return {
-        "channel": handle_channels,
+        "channels": handle_channels,
         "product": handle_products,
         "roles": handle_roles,
         "updates": handle_updates,
