@@ -17,6 +17,7 @@ def helper_generate_default_incident_params():
     )
 
 
+@patch("modules.incident.core.INCIDENT_CHANNEL", "incident-channel")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
@@ -110,7 +111,7 @@ _Type_ `/sre incident help` _for complete command list_"""
     )
     client.chat_postMessage.assert_any_call(
         text="<@user_id> has kicked off a new incident: name for product in <#channel_id>\n<@user_id> a initié un nouvel incident: name pour product dans <#channel_id>",
-        channel=core.INCIDENT_CHANNEL,
+        channel="incident-channel",
     )
     mock_google_meet.create_space.assert_called_once()
     client.bookmarks_add.assert_has_calls(
