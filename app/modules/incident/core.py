@@ -24,7 +24,6 @@ logger = get_module_logger()
 
 def initiate_resources_creation(
     client: WebClient,
-    say: Say,
     incident_payload: IncidentPayload,
 ):
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
@@ -54,7 +53,8 @@ def initiate_resources_creation(
         f"<@{incident_payload.user_id}> a initié un nouvel incident: {incident_payload.name} pour {incident_payload.product}"
         f" dans <#{incident_payload.channel_id}>"
     )
-    say(text=text, channel=INCIDENT_CHANNEL)
+    if INCIDENT_CHANNEL:
+        client.chat_postMessage(text=text, channel=INCIDENT_CHANNEL)
 
     # Add incident creator to channel
     client.conversations_invite(
@@ -80,7 +80,7 @@ def initiate_resources_creation(
     )
 
     text = f"A hangout has been created at: {meet_link['meetingUri']}"
-    say(text=text, channel=incident_payload.channel_id)
+    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     # Create incident document
     document_id = incident_document.create_incident_document(
@@ -128,7 +128,7 @@ def initiate_resources_creation(
     )
 
     text = f":lapage: An incident report has been created at: {document_link}"
-    say(text=text, channel=incident_payload.channel_id)
+    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     # Gather all user IDs in a list to ensure uniqueness
     users_to_invite = []
@@ -157,13 +157,13 @@ def initiate_resources_creation(
         )
 
     text = "Run `/sre incident roles` to assign roles to the incident"
-    say(text=text, channel=incident_payload.channel_id)
+    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     text = "Run `/sre incident close` to update the status of the incident document and incident spreadsheet to closed and to archive the channel"
-    say(text=text, channel=incident_payload.channel_id)
+    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     text = "Run `/sre incident schedule` to let the SRE bot schedule a Retro Google calendar meeting for all participants."
-    say(text=text, channel=incident_payload.channel_id)
+    client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     incident_document.update_boilerplate_text(
         document_id,
