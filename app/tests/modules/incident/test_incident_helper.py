@@ -281,7 +281,8 @@ def test_handle_create_without_resource():
     create_help_text = """`/sre incident create [resource] [options]`
 
 *Resources:*
-• `new [<incident_name>]` — create a new incident (upcoming feature)"""
+• `new [<incident_name>]` — create a new incident (upcoming feature)
+• `resources` — create resources for an existing incident (document, meet links, etc.) (upcoming feature)"""
     incident_helper.handle_create(client, body, respond, ack, [], {})
     respond.assert_called_once_with(create_help_text)
 

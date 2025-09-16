@@ -76,7 +76,7 @@ Usage:
 • list-folders
 • stale
 
-_For details on each subcommand, use:_  
+_For details on each subcommand, use:_
 `/sre incident <subcommand> help`
 
 ---
@@ -249,7 +249,8 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
     create_help_text = """`/sre incident create [resource] [options]`
 
 *Resources:*
-• `new [<incident_name>]` — create a new incident (upcoming feature)"""
+• `new [<incident_name>]` — create a new incident (upcoming feature)
+• `resources` — create resources for an existing incident (document, meet links, etc.) (upcoming feature)"""
     try:
         resource = args.pop(0)
     except IndexError:
