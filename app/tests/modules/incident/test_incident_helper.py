@@ -328,7 +328,7 @@ def test_handle_list_with_stale(mock_stale_incidents):
     mock_stale_incidents.assert_called_once_with(client, body, ack)
 
 
-def test_handle_schedule_without_action():
+def test_handle_schedule_with_invalid_option():
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
@@ -341,7 +341,7 @@ def test_handle_schedule_without_action():
         "\n"
         "\nUse `/sre incident help` to see a list of commands."
     )
-    incident_helper.handle_schedule(client, body, respond, ack, [], {})
+    incident_helper.handle_schedule(client, body, respond, ack, ["asdf"], {})
     respond.assert_called_once_with(schedule_help_text)
 
 

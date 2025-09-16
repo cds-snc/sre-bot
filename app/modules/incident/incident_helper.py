@@ -300,7 +300,7 @@ def handle_schedule(client, body, respond, ack, args, flags):
     try:
         option = args.pop(0)
     except IndexError:
-        option = None
+        option = "retro"  # default to retro if no option is provided
     match option:
         case "retro":
             schedule_retro.open_incident_retro_modal(client, body, ack)
