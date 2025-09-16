@@ -1,7 +1,6 @@
 """Core module to handle Incident creation"""
 
 from slack_sdk import WebClient
-from slack_bolt import Say
 
 from core.config import settings
 from core.logging import get_module_logger
