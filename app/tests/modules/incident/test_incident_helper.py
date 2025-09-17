@@ -203,16 +203,6 @@ def test_handle_incident_command_with_unknown_command():
     )
 
 
-def test_handle_incident_command_with_help():
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_incident_command(
-        ["help"], MagicMock(), MagicMock(), respond, ack
-    )
-    respond.assert_called_once_with(incident_helper.help_text)
-
-
 def test_handle_incident_command_dispatches_to_correct_handler():
     client = MagicMock()
     body = MagicMock()
@@ -285,6 +275,26 @@ def test_handle_create_without_resource():
 • `resources` — create resources for an existing incident (document, meet links, etc.) (upcoming feature)"""
     incident_helper.handle_create(client, body, respond, ack, [], {})
     respond.assert_called_once_with(create_help_text)
+
+
+def test_handle_help():
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_incident_command(
+        ["help"], MagicMock(), MagicMock(), respond, ack
+    )
+    respond.assert_called_once_with(incident_helper.help_text)
+
+
+def test_handle_help_with_french():
+    respond = MagicMock()
+    ack = MagicMock()
+    client = MagicMock()
+    body = MagicMock()
+
+    incident_helper.handle_help(client, body, respond, ack, ["fr"], {})
+    respond.assert_called_once_with(incident_helper.help_text_fr)
 
 
 @patch("modules.incident.incident_helper.information_display.open_incident_info_view")

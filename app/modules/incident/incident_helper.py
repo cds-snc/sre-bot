@@ -76,11 +76,11 @@ Usage:
 • list-folders
 • stale
 
-_For details on each subcommand, use:_
-`/sre incident <subcommand> help`
+_For details on each resource, use:_
+`/sre incident <resource> help`
+"""
 
----
-
+help_text_fr = """
 *Gestion des Incidents IFS:*
 
 Utilisation:
@@ -118,8 +118,8 @@ Utilisation:
 • list-folders
 • stale
 
-_Pour les détails sur chaque sous-commande, utilisez:_
-`/sre incident <sous-commande> help`
+_Pour les détails sur chaque resource, utilisez:_
+`/sre incident <resource> help`
 """
 
 
@@ -165,6 +165,7 @@ def get_incident_actions() -> dict[str, Callable]:
         "close": handle_close,
         "show": handle_show,
         "help": handle_help,
+        "aide": handle_help,
         "list": handle_list,
         "schedule": handle_schedule,
         # legacy commands
@@ -222,6 +223,8 @@ def handle_incident_command(
     elif first_arg in incident_actions:
         # this is to handle if the argument is a valid action on the incident itself
         action = first_arg
+        if action == "aide":
+            args_list = ["fr"] + args_list
         action_handler: Callable = incident_actions[action]
         action_handler(client, body, respond, ack, args_list, flags)
     else:
@@ -235,9 +238,12 @@ def handle_incident_command(
             )
 
 
-def handle_help(_client, _body, respond, _ack, _args, _flags) -> None:
+def handle_help(_client, _body, respond, _ack, args, _flags) -> None:
     """Handle help command."""
-    respond(help_text)
+    if args and args[0].lower() in ["fr", "aide"]:
+        respond(help_text_fr)
+    else:
+        respond(help_text)
 
 
 def handle_close(client, body, respond, ack, _args, _flags):
