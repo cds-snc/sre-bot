@@ -45,7 +45,7 @@ def execute():
 
     if not unassigned_accounts:
         status = {
-            "status": "success",
+            "status": "ok",
             "message": (
                 f"Ops group '{AWS_OPS_GROUP_NAME}' is already assigned to all active accounts."
             ),

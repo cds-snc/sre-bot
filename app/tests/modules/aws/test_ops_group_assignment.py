@@ -94,7 +94,7 @@ def test_execute_all_accounts_already_assigned(
         }
     ]
     result = ops_group_assignment.execute()
-    assert result["status"] == "success"
+    assert result["status"] == "ok"
     assert "already assigned" in result["message"]
 
 
