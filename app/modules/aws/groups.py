@@ -1,5 +1,5 @@
 from datetime import datetime
-from modules.aws import identity_center
+from modules.aws import identity_center, ops_group_assignment
 from modules.permissions import handler as permissions
 from modules.provisioning import groups as provisioning_groups
 from integrations.slack import users as slack_users
@@ -33,6 +33,8 @@ def command_handler(client, body, respond, args, logger):
             request_groups_sync(client, body, respond, args, logger)
         case "list":
             request_groups_list(client, body, respond, args, logger)
+        case "ops":
+            request_groups_ops(client, body, respond, args, logger)
         case _:
             respond("Invalid command. Type `/aws groups help` for more information.")
 
@@ -124,4 +126,40 @@ def request_groups_list(client, body, respond, args, logger):
             error="User does not have permission to list groups.",
         )
         respond("You do not have permission to list groups.")
+        return
+
+
+def request_groups_ops(client, body, respond, args, logger):
+    """Assign Ops group to all AWS accounts."""
+    requestor_email = slack_users.get_user_email_from_body(client, body)
+    logger.info(
+        "aws_ops_group_assignment_received",
+        requestor_email=requestor_email,
+    )
+    if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
+        respond("AWS Ops Group Assignment request received.")
+        logger.info(
+            "aws_ops_group_assignment_processing",
+            requestor_email=requestor_email,
+        )
+        response = ops_group_assignment.execute()
+        if not response:
+            respond("⚠️ AWS Ops Group Assignment feature is disabled.")
+            return
+        if response["status"] == "success":
+            respond(f"✅ *Success*: {response['message']}")
+        elif response["status"] == "failed":
+            respond(f"❌ *Error*: {response['message']}")
+        elif response["status"] == "ok":
+            respond(f"ℹ️ *Info*: {response['message']}")
+        else:
+            respond(f"⚠️ {response['message']}")
+    else:
+        logger.warning(
+            "aws_ops_group_assignment_request_denied",
+            requestor_email=requestor_email,
+            aws_admin_groups=AWS_ADMIN_GROUPS,
+            error="User does not have permission to assign Ops group.",
+        )
+        respond("You do not have permission to assign Ops group.")
         return
