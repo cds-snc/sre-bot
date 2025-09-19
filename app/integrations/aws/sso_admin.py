@@ -29,7 +29,9 @@ def get_predefined_permission_sets(permission_set_name):
 
 
 @handle_aws_api_errors
-def create_account_assignment(user_id, account_id, permission_set):
+def create_account_assignment(
+    user_id, account_id, permission_set, principal_type="USER"
+):
     """Create an account assignment for an AWS SSO user.
 
     Args:
@@ -47,7 +49,7 @@ def create_account_assignment(user_id, account_id, permission_set):
         "TargetId": account_id,
         "TargetType": "AWS_ACCOUNT",
         "PermissionSetArn": permissions_set_arn,
-        "PrincipalType": "USER",
+        "PrincipalType": principal_type,
         "PrincipalId": user_id,
     }
     response = execute_aws_api_call(
@@ -88,6 +90,33 @@ def delete_account_assignment(user_id, account_id, permission_set):
         **params,
     )
     return response["AccountAssignmentDeletionStatus"]["Status"] != "FAILED"
+
+
+def list_account_assignments_for_principal(principal_id, principal_type="USER"):
+    """List the account assignments for a given principal.
+
+    Args:
+        principal_id (str): The ID of the principal (user or group).
+        principal_type (str): The type of the principal ("USER" or "GROUP"). Default is "USER".
+
+    Returns:
+        list: The list of account assignments.
+    """
+    params = {
+        "InstanceArn": INSTANCE_ARN,
+        "PrincipalType": principal_type,
+        "PrincipalId": principal_id,
+    }
+    response = execute_aws_api_call(
+        "sso-admin",
+        "list_account_assignments_for_principal",
+        paginated=True,
+        role_arn=ROLE_ARN,
+        keys=["AccountAssignments"],
+        **params,
+    )
+
+    return response if response else []
 
 
 @handle_aws_api_errors
