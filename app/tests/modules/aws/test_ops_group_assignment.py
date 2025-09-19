@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from modules.aws import ops_group_assignment
 
 
