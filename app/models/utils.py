@@ -1,5 +1,8 @@
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:
@@ -56,3 +59,46 @@ def are_all_parameters_in_model(
     model_params: List[str], payload: Dict[str, Any]
 ) -> bool:
     return all(param in model_params for param in payload.keys())
+
+
+def select_best_model(
+    data: dict,
+    models: List[Type[BaseModel]],
+    priorities: Optional[Dict[Type[BaseModel], int]] = None,
+) -> Optional[BaseModel]:
+    """
+    Select the best matching model for the given data.
+
+    Args:
+        data (dict): The data to validate against the models.
+        models (List[Type[BaseModel]]): The list of known models to validate against.
+        priorities (Optional[Dict[Type[BaseModel], int]]): Optional dictionary of model priorities.
+
+    Returns:
+        Optional[BaseModel]: The best matching model instance, or None if no match is found.
+    """
+    best_match = None
+    best_score = float("-inf")
+
+    for model in models:
+        # Get model fields and calculate overlap
+        model_fields = set(model.__pydantic_fields__.keys())
+        matching_fields = model_fields.intersection(data.keys())
+
+        # Calculate score based on matching fields
+        score = len(matching_fields) / len(model_fields)
+        if priorities and model in priorities:
+            score += priorities[model]
+
+        # Only consider models that match at least one field
+        if len(matching_fields) > 0:
+            # Extract only the matched fields from data
+            filtered_data = {key: data[key] for key in matching_fields}
+
+            # Create model instance without validation
+            instance = model.model_construct(**filtered_data)
+            if score > best_score:
+                best_score = score
+                best_match = instance
+
+    return best_match

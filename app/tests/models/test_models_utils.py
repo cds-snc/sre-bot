@@ -2,6 +2,9 @@ from pydantic import BaseModel
 import models.utils as model_utils
 
 
+# Define mock models for testing
+
+
 class MockModel(BaseModel):
     field1: str
     field2: int
@@ -10,6 +13,21 @@ class MockModel(BaseModel):
 
 class EmptyModel(BaseModel):
     pass
+
+
+class MockModelA(BaseModel):
+    field1: str
+    field2: int
+
+
+class MockModelB(BaseModel):
+    field3: float
+    field4: str
+
+
+class MockModelC(BaseModel):
+    field1: str
+    field5: bool
 
 
 def test_get_parameters_from_model():
@@ -87,3 +105,39 @@ def test_are_all_parameters_in_model():
     assert not model_utils.are_all_parameters_in_model(
         model_params, non_string_keys_payload
     )
+
+
+def test_select_best_model_with_exact_match():
+    data = {"field1": "value", "field2": 123}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert isinstance(result, MockModelA)
+
+
+def test_select_best_model_with_partial_match():
+    data = {"field1": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert isinstance(result, MockModelA)
+
+
+def test_select_best_model_with_priorities():
+    data = {"field1": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+    priorities = {MockModelC: 10}
+    result = model_utils.select_best_model(data, models, priorities)
+    assert isinstance(result, MockModelC)
+
+
+def test_select_best_model_with_no_match():
+    data = {"unknown_field": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert result is None
+
+
+def test_select_best_model_with_empty_data():
+    data = {}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert result is None
