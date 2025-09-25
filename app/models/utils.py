@@ -96,7 +96,7 @@ def select_best_model(
         # skip if not a single matching field
         if not model_fields.intersection(data.keys()):
             continue
-        
+
         # skip if not all required fields are present
         if not required_fields.issubset(data.keys()):
             continue
