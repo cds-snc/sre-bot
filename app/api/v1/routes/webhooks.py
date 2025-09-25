@@ -17,22 +17,22 @@ router = APIRouter(tags=["Access"])
 limiter = get_limiter()
 
 
-@router.post("/hook/{id}")
+@router.post("/hook/{webhook_id}")
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
 def handle_webhook(
-    id: str,
+    webhook_id: str,
     payload: WebhookPayload | str,
     request: Request,
 ):
-    webhook = webhooks.get_webhook(id)
+    webhook = webhooks.get_webhook(webhook_id)
     webhook_payload = WebhookPayload()
     if webhook:
         hook_type: str = webhook.get("hook_type", {"S": "alert"})["S"]
         # if the webhook is active, then send forward the response to the webhook
-        if webhooks.is_active(id):
-            webhooks.increment_invocation_count(id)
+        if webhooks.is_active(webhook_id):
+            webhooks.increment_invocation_count(webhook_id)
             if isinstance(payload, str):
                 processed_payload = handle_string_payload(payload, request)
                 if isinstance(processed_payload, dict):
@@ -41,14 +41,14 @@ def handle_webhook(
                     logger.info(
                         "payload_processed",
                         payload=processed_payload,
-                        webhook_id=id,
+                        webhook_id=webhook_id,
                     )
                     webhook_payload = processed_payload
             else:
                 webhook_payload = payload
             webhook_payload.channel = webhook["channel"]["S"]
             if hook_type == "alert":
-                webhook_payload = append_incident_buttons(webhook_payload, id)
+                webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
             try:
                 webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
                 request.state.bot.client.api_call(
@@ -62,7 +62,7 @@ def handle_webhook(
             except Exception as e:
                 logger.exception(
                     "webhook_posting_error",
-                    webhook_id=id,
+                    webhook_id=webhook_id,
                     webhook_payload=webhook_payload,
                     error=str(e),
                 )
@@ -76,7 +76,7 @@ def handle_webhook(
         else:
             logger.info(
                 "webhook_not_active",
-                webhook_id=id,
+                webhook_id=webhook_id,
                 webhook_payload=webhook_payload,
                 error="Webhook is not active",
             )
