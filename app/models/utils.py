@@ -1,5 +1,5 @@
-from typing import Any, Dict, List, Optional, Type
-from pydantic import BaseModel
+from typing import Any, Dict, List, Optional, Type, Tuple
+from pydantic import BaseModel, ValidationError
 from core.logging import get_module_logger
 
 logger = get_module_logger()
@@ -65,9 +65,9 @@ def select_best_model(
     data: dict,
     models: List[Type[BaseModel]],
     priorities: Optional[Dict[Type[BaseModel], int]] = None,
-) -> Optional[BaseModel]:
+) -> Optional[Tuple[Type[BaseModel], Any]]:
     """
-    Select the best matching model for the given data.
+    Select the best matching model instance for the given data.
 
     Args:
         data (dict): The data to validate against the models.
@@ -75,30 +75,49 @@ def select_best_model(
         priorities (Optional[Dict[Type[BaseModel], int]]): Optional dictionary of model priorities.
 
     Returns:
-        Optional[BaseModel]: The best matching model instance, or None if no match is found.
+        Optional[Tuple[Type[BaseModel], Any]]: A tuple of the best matching model class and instance, or None if no match is found.
     """
     best_match = None
     best_score = float("-inf")
 
     for model in models:
-        # Get model fields and calculate overlap
-        model_fields = set(model.__pydantic_fields__.keys())
-        matching_fields = model_fields.intersection(data.keys())
+        try:
+            instance = model.model_validate(data)
+        except ValidationError:
+            continue
 
-        # Calculate score based on matching fields
-        score = len(matching_fields) / len(model_fields)
+        # Calculate required and optional fields
+        model_fields = set(model.__pydantic_fields__.keys())
+        required_fields = {
+            key
+            for key, field in model.__pydantic_fields__.items()
+            if field.is_required()
+        }
+        optional_fields = model_fields - required_fields
+
+        # Calculate score based on matching fields (arbitrary scoring system)
+        matching_required = required_fields.intersection(data.keys())
+        matching_optional = optional_fields.intersection(data.keys())
+        score = len(matching_required) + 0.5 * len(matching_optional)
+
+        # Apply priority boost if available
         if priorities and model in priorities:
             score += priorities[model]
 
-        # Only consider models that match at least one field
-        if len(matching_fields) > 0:
-            # Extract only the matched fields from data
-            filtered_data = {key: data[key] for key in matching_fields}
+        logger.debug(
+            f"Model: {model.__name__}, Required: {required_fields}, Optional: {optional_fields}, "
+            f"Matching Required: {matching_required}, Matching Optional: {matching_optional}, Score: {score}"
+        )
 
-            # Create model instance without validation
-            instance = model.model_construct(**filtered_data)
-            if score > best_score:
-                best_score = score
-                best_match = instance
+        # Update the best match if the score is higher
+        if score > best_score:
+            best_score = score
+            best_match = (model, instance)
+
+    if best_match is None:
+        logger.warning(
+            "invalid_model_detected",
+            payload=str(data),
+        )
 
     return best_match
