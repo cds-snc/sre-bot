@@ -59,4 +59,4 @@ class AccessRequest(BaseModel):
 
 
 class UpptimePayload(BaseModel):
-    text: str | None = None
+    text: str
