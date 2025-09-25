@@ -93,21 +93,22 @@ def select_best_model(
             for key, field in model.__pydantic_fields__.items()
             if field.is_required()
         }
-        optional_fields = model_fields - required_fields
+        # skip if not a single matching field
+        if not model_fields.intersection(data.keys()):
+            continue
+        
+        # skip if not all required fields are present
+        if not required_fields.issubset(data.keys()):
+            continue
 
         # Calculate score based on matching fields (arbitrary scoring system)
         matching_required = required_fields.intersection(data.keys())
-        matching_optional = optional_fields.intersection(data.keys())
+        matching_optional = model_fields.intersection(data.keys()) - matching_required
         score = len(matching_required) + 0.5 * len(matching_optional)
 
         # Apply priority boost if available
         if priorities and model in priorities:
             score += priorities[model]
-
-        logger.debug(
-            f"Model: {model.__name__}, Required: {required_fields}, Optional: {optional_fields}, "
-            f"Matching Required: {matching_required}, Matching Optional: {matching_optional}, Score: {score}"
-        )
 
         # Update the best match if the score is higher
         if score > best_score:

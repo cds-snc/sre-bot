@@ -30,6 +30,14 @@ class MockModelC(BaseModel):
     field5: Optional[bool] = None
 
 
+class MockModelD(BaseModel):
+    field1: Optional[str] = None
+    field2: Optional[int] = None
+    field3: Optional[float] = None
+    field4: Optional[str] = None
+    field5: Optional[bool] = None
+
+
 def test_get_parameters_from_model():
     expected = ["field1", "field2", "field3"]
     result = model_utils.get_parameters_from_model(MockModel)
@@ -140,7 +148,7 @@ def test_select_best_model_with_priorities():
 
 def test_select_best_model_with_no_match():
     data = {"unknown_field": "value"}
-    models = [MockModelA, MockModelB, MockModelC]
+    models = [MockModelA, MockModelB, MockModelC, MockModelD]
     result = model_utils.select_best_model(data, models)
     assert result is None
 
