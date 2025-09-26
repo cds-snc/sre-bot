@@ -7,7 +7,13 @@ import httpx
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from api.v1.routes import webhooks
-from models.webhooks import AwsSnsPayload, WebhookPayload, AccessRequest, UpptimePayload
+from models.webhooks import (
+    AwsSnsPayload,
+    WebhookPayload,
+    AccessRequest,
+    UpptimePayload,
+    WebhookResult,
+)
 from utils.tests import create_test_app
 from server import bot_middleware
 
@@ -44,7 +50,11 @@ def test_handle_webhook(
         "active": {"BOOL": True},
     }
 
-    mock_handle_webhook_payload.return_value = WebhookPayload(text="some text")
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
 
     mock_append_incident_buttons.return_value = WebhookPayload(
         text="some text",
@@ -128,7 +138,9 @@ def test_handle_webhook_with_none_payload_none(
         "hook_type": {"S": "standard"},
         "active": {"BOOL": True},
     }
-    handle_webhook_payload_mock.return_value = None
+    handle_webhook_payload_mock.return_value = WebhookResult(
+        status="error", action=None, payload=None
+    )
 
     response = test_client.post("/hook/id", json=payload)
 
@@ -166,7 +178,11 @@ def test_handle_webhook_slack_api_failure(
     }
 
     webhook_payload = WebhookPayload(text="test message")
-    handle_webhook_payload_mock.return_value = webhook_payload
+    handle_webhook_payload_mock.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=webhook_payload,
+    )
     append_incident_buttons_mock.return_value = webhook_payload
 
     # Configure the bot mock to raise an exception
@@ -193,13 +209,14 @@ def test_handle_webhook_slack_api_failure(
 
 
 @patch("api.v1.routes.webhooks.validate_payload")
-def test_handle_webhook_payload_none(mock_validate_payload):
+def test_handle_webhook_payload_empty(mock_validate_payload):
     mock_validate_payload.return_value = None
     request = MagicMock()
-    payload = None
-    with pytest.raises(HTTPException) as exc_info:
-        webhooks.handle_webhook_payload(payload, request)
-    assert exc_info.value.status_code == 400
+    payload = {}
+
+    response = webhooks.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.message == "No matching model found for payload"
 
 
 @patch("api.v1.routes.webhooks.validate_payload")
@@ -211,11 +228,13 @@ def test_handle_webhook_payload_webhook_payload(validate_payload_mock):
         WebhookPayload(text="This is a test message"),
     )
     result = webhooks.handle_webhook_payload(payload, request)
-    assert isinstance(result, WebhookPayload)
-    assert result.text == "This is a test message"
-    assert result.channel is None
-    assert result.attachments == []
-    assert result.blocks == []
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.status == "success"
+    assert result.action == "post"
+    assert result.payload.text == "This is a test message"
+    assert result.payload.channel is None
+    assert result.payload.attachments == []
+    assert result.payload.blocks == []
 
 
 @patch("api.v1.routes.webhooks.aws.parse")
@@ -236,9 +255,11 @@ def test_handle_webhook_payload_aws_sns_notification_no_message(
         Type="Notification", Message=""
     )
     parse_mock.return_value = ""
-    with pytest.raises(HTTPException) as exc_info:
-        webhooks.handle_webhook_payload(payload, request)
-    assert exc_info.value.status_code == 400
+
+    response = webhooks.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.action == "none"
+    assert response.message == "Empty AWS SNS Notification message"
 
 
 @patch("api.v1.routes.webhooks.aws.parse")
@@ -258,7 +279,10 @@ def test_handle_webhook_payload_aws_sns_notification(
     )
     parse_mock.return_value = "parsed_blocks"
     result = webhooks.handle_webhook_payload(payload, request)
-    assert result.blocks == "parsed_blocks"
+    assert result.status == "success"
+    assert result.action == "post"
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.payload.blocks == "parsed_blocks"
 
 
 @patch("api.v1.routes.webhooks.log_ops_message")
@@ -283,7 +307,9 @@ def test_handle_webhook_payload_aws_sns_subscription_confirmation(
         Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
     )
     result = webhooks.handle_webhook_payload(payload, request)
-    assert result.text == "Subscription confirmed"
+    assert result.status == "success"
+    assert result.action == "log"
+    assert result.payload is None
     assert log_ops_message_mock.call_count == 1
 
 
@@ -314,7 +340,9 @@ def test_handle_webhook_payload_with_aws_sns_unsubscribe_confirmation(
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
     response = webhooks.handle_webhook_payload(payload, request)
-    assert response.text == "Unsubscription confirmed"
+    assert response.status == "success"
+    assert response.action == "log"
+    assert response.payload is None
     assert log_ops_message_mock.call_count == 1
 
 
@@ -341,8 +369,10 @@ def test_handle_webhook_payload_with_access_request(
         ),
     )
     response = webhooks.handle_webhook_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "post"
     assert (
-        response.text
+        response.payload.text
         == "{'account': 'account1', 'reason': 'reason1', 'startDate': datetime.datetime(2025, 9, 25, 12, 0, tzinfo=TzInfo(UTC)), 'endDate': datetime.datetime(2025, 9, 26, 12, 0, tzinfo=TzInfo(UTC))}"
     )
 
@@ -360,7 +390,9 @@ def test_handle_webhook_payload_upptime(validate_payload_mock):
         ),
     )
     response = webhooks.handle_webhook_payload(payload, request)
-    assert response.blocks == [
+    assert response.status == "success"
+    assert response.action == "post"
+    assert response.payload.blocks == [
         {"text": {"text": " ", "type": "mrkdwn"}, "type": "section"},
         {
             "text": {
@@ -381,24 +413,24 @@ def test_handle_webhook_payload_upptime(validate_payload_mock):
 
 @patch("api.v1.routes.webhooks.validate_payload")
 def test_handle_webhook_payload_with_invalid_payload_type(
-    validate_payload_mock,
+    mock_validate_payload,
 ):
-    class UnknownType(BaseModel):
-        pass
+    class UnknownPayload(BaseModel):
+        invalid_field: str
+
+        class Config:
+            extra = "forbid"
 
     request = MagicMock()
-    validate_payload_mock.return_value = (
-        UnknownType,
-        {},
+    payload = {}
+    mock_validate_payload.return_value = (
+        UnknownPayload,
+        UnknownPayload(invalid_field="invalid_field"),
     )
-    payload = "{}"
-    with pytest.raises(HTTPException) as exc_info:
-        webhooks.handle_webhook_payload(payload, request)
-    assert exc_info.value.status_code == 500
-    assert (
-        exc_info.value.detail
-        == "Invalid payload type. Must be a WebhookPayload object or a recognized string payload type."
-    )
+
+    response = webhooks.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.message == "No matching model found for payload"
 
 
 def test_append_incident_buttons_with_list_attachments():
@@ -540,7 +572,9 @@ async def test_webhooks_rate_limiting(
         payload = '{"Type": "Notification"}'
         # Return a proper WebhookPayload instance
         mock_webhook_payload = WebhookPayload(text="Test message")
-        handle_webhook_payload_mock.return_value = mock_webhook_payload
+        handle_webhook_payload_mock.return_value = WebhookResult(
+            status="success", action="post", payload=mock_webhook_payload
+        )
         # Make 30 requests to the handle_webhook endpoint
         for _ in range(30):
             response = await client.post("/hook/test-id", json=payload)

@@ -6,7 +6,13 @@ from api.dependencies.rate_limits import get_limiter
 from core.logging import get_module_logger
 from fastapi import APIRouter, HTTPException, Request, Body
 from integrations.sentinel import log_to_sentinel
-from models.webhooks import AwsSnsPayload, WebhookPayload, AccessRequest, UpptimePayload
+from models.webhooks import (
+    AwsSnsPayload,
+    WebhookPayload,
+    AccessRequest,
+    UpptimePayload,
+    WebhookResult,
+)
 from modules.slack import webhooks
 from modules.webhooks.base import validate_payload
 from server.event_handlers import aws
@@ -14,7 +20,7 @@ from server.utils import log_ops_message
 
 
 logger = get_module_logger()
-router = APIRouter(tags=["Webhooks"])
+router = APIRouter(tags=["Access"])
 limiter = get_limiter()
 
 
@@ -63,64 +69,71 @@ def handle_webhook(
         raise HTTPException(status_code=404, detail="Webhook not active")
     webhooks.increment_invocation_count(webhook_id)
 
-    webhook_payload = handle_webhook_payload(payload_dict, request)
-    if not isinstance(webhook_payload, WebhookPayload):
+    webhook_result = handle_webhook_payload(payload_dict, request)
+
+    if webhook_result.status == "error":
         raise HTTPException(status_code=400, detail="Invalid payload")
 
-    webhook_payload.channel = webhook["channel"]["S"]
-    hook_type = webhook["hook_type"]["S"]
-    if hook_type == "alert":
-        webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
+    if webhook_result.action == "post" and isinstance(
+        webhook_result.payload, WebhookPayload
+    ):
+        webhook_payload = webhook_result.payload
+        webhook_payload.channel = webhook["channel"]["S"]
+        hook_type = webhook["hook_type"]["S"]
+        if hook_type == "alert":
+            webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
 
-    webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
+        webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
 
-    try:
-        request.state.bot.client.api_call(
-            "chat.postMessage", json=webhook_payload_parsed
-        )
-        log_to_sentinel(
-            "webhook_sent",
-            {"webhook": webhook, "payload": webhook_payload_parsed},
-        )
-        return {"ok": True}
+        try:
+            request.state.bot.client.api_call(
+                "chat.postMessage", json=webhook_payload_parsed
+            )
+            log_to_sentinel(
+                "webhook_sent",
+                {"webhook": webhook, "payload": webhook_payload_parsed},
+            )
 
-    except Exception as e:
-        logger.exception(
-            "webhook_posting_error",
-            webhook_id=webhook_id,
-            error=str(e),
-        )
-        raise HTTPException(status_code=500, detail="Failed to send message") from e
+        except Exception as e:
+            logger.exception(
+                "webhook_posting_error",
+                webhook_id=webhook_id,
+                error=str(e),
+            )
+            raise HTTPException(status_code=500, detail="Failed to send message") from e
+
+    return {"ok": True}
 
 
 def handle_webhook_payload(
     payload_dict: dict,
     request: Request,
-) -> WebhookPayload | None:
-    """Process and validate the webhook payload."""
+) -> WebhookResult:
+    """Process and validate the webhook payload.
+
+    Returns:
+        dict: A dictionary containing:
+            - status (str): The status of the operation (e.g., "success", "error").
+            - action (Literal["post", "log", "none"]): The action to take.
+            - payload (Optional[WebhookPayload]): The payload to post, if applicable.
+    """
     logger.info("processing_webhook_payload", payload=payload_dict)
-    result = validate_payload(payload_dict)
-    if result is not None:
-        payload_type, validated_payload = result
-    else:
-        logger.error(
-            "payload_validation_error",
-            error="No matching model found for payload",
-            payload=payload_dict,
-        )
-        raise HTTPException(status_code=400, detail="Invalid payload")
+    payload_validation_result = validate_payload(payload_dict)
 
-    logger.info(
-        "string_payload_type",
-        payload=payload_dict,
-        string_payload_type=payload_type.__name__,
-        validated_payload=validated_payload,
+    webhook_result = WebhookResult(
+        status="error", message="Failed to process payload for unknown reasons"
     )
+    if payload_validation_result is not None:
+        payload_type, validated_payload = payload_validation_result
+    else:
+        error_message = "No matching model found for payload"
+        return WebhookResult(status="error", message=error_message)
 
-    webhook_payload = None
     match payload_type.__name__:
         case "WebhookPayload":
-            webhook_payload = validated_payload
+            webhook_result = WebhookResult(
+                status="success", action="post", payload=validated_payload
+            )
         case "AwsSnsPayload":
             aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
             aws_sns_payload = aws.validate_sns_payload(
@@ -139,25 +152,45 @@ def handle_webhook_payload(
                     request.state.bot.client,
                     f"Subscribed webhook {id} to topic {aws_sns_payload.TopicArn}",
                 )
-                webhook_payload = WebhookPayload(text="Subscription confirmed")
+                webhook_result = WebhookResult(
+                    status="success", action="log", payload=None
+                )
 
             if aws_sns_payload.Type == "UnsubscribeConfirmation":
                 log_ops_message(
                     request.state.bot.client,
                     f"{aws_sns_payload.TopicArn} unsubscribed from webhook {id}",
                 )
-                webhook_payload = WebhookPayload(text="Unsubscription confirmed")
+                webhook_result = WebhookResult(
+                    status="success", action="log", payload=None
+                )
 
             if aws_sns_payload.Type == "Notification":
                 blocks = aws.parse(aws_sns_payload, request.state.bot.client)
                 if not blocks:
-                    logger.info("payload_empty_message")
-                    raise HTTPException(status_code=400, detail="Empty notification")
-                webhook_payload = WebhookPayload(blocks=blocks)
+                    logger.info(
+                        "payload_empty_message",
+                        payload_type="AwsSnsPayload",
+                        sns_type=aws_sns_payload.Type,
+                    )
+                    return WebhookResult(
+                        status="error",
+                        action="none",
+                        message="Empty AWS SNS Notification message",
+                    )
+                webhook_result = WebhookResult(
+                    status="success",
+                    action="post",
+                    payload=WebhookPayload(blocks=blocks),
+                )
 
         case "AccessRequest":
             message = str(cast(AccessRequest, validated_payload).model_dump())
-            webhook_payload = WebhookPayload(text=message)
+            webhook_result = WebhookResult(
+                status="success",
+                action="post",
+                payload=WebhookPayload(text=message),
+            )
 
         case "UpptimePayload":
             text = cast(UpptimePayload, validated_payload).text
@@ -176,15 +209,19 @@ def handle_webhook_payload(
                     },
                 },
             ]
-            webhook_payload = WebhookPayload(blocks=blocks)
-
-        case _:
-            raise HTTPException(
-                status_code=500,
-                detail="Invalid payload type. Must be a WebhookPayload object or a recognized string payload type.",
+            webhook_result = WebhookResult(
+                status="success",
+                action="post",
+                payload=WebhookPayload(blocks=blocks),
             )
 
-    return webhook_payload
+        case _:
+            webhook_result = WebhookResult(
+                status="error",
+                message="No matching model found for payload",
+            )
+
+    return webhook_result
 
 
 def append_incident_buttons(payload: WebhookPayload, webhook_id) -> WebhookPayload:
