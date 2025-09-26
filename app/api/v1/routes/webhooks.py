@@ -1,12 +1,12 @@
 import json
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, cast
 
 import requests  # type: ignore
 from api.dependencies.rate_limits import get_limiter
 from core.logging import get_module_logger
 from fastapi import APIRouter, HTTPException, Request, Body
 from integrations.sentinel import log_to_sentinel
-from models.webhooks import AwsSnsPayload, WebhookPayload
+from models.webhooks import AwsSnsPayload, WebhookPayload, AccessRequest, UpptimePayload
 from modules.slack import webhooks
 from modules.webhooks.base import validate_payload
 from server.event_handlers import aws
@@ -28,13 +28,13 @@ def handle_webhook(
     payload: Union[Dict[Any, Any], str] = Body(...),
 ):
     """Handle incoming webhook requests and post to Slack channel.
-    
+
     Args:
         webhook_id (str): The ID of the webhook to handle.
         request (Request): The incoming HTTP request.
         payload (Union[Dict[Any, Any], str]): The incoming webhook payload, either as
             a JSON string or a dictionary.
-            
+
     Raises:
         HTTPException: If the webhook is not found, not active, or if there are issues
             with payload validation or posting to Slack.
@@ -122,18 +122,7 @@ def handle_webhook_payload(
         case "WebhookPayload":
             webhook_payload = validated_payload
         case "AwsSnsPayload":
-            if isinstance(validated_payload, dict):
-                aws_sns_payload_instance = AwsSnsPayload(**validated_payload)
-            elif isinstance(validated_payload, AwsSnsPayload):
-                aws_sns_payload_instance = validated_payload
-            else:
-                logger.error(
-                    "payload_type_error",
-                    error=f"validated_payload is not a dict or AwsSnsPayload: {type(validated_payload)}",
-                    payload=validated_payload,
-                )
-                raise HTTPException(status_code=400, detail="Invalid AwsSnsPayload")
-
+            aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
             aws_sns_payload = aws.validate_sns_payload(
                 aws_sns_payload_instance,
                 request.state.bot.client,
@@ -167,11 +156,11 @@ def handle_webhook_payload(
                 webhook_payload = WebhookPayload(blocks=blocks)
 
         case "AccessRequest":
-            message = validated_payload.model_dump()
+            message = str(cast(AccessRequest, validated_payload).model_dump())
             webhook_payload = WebhookPayload(text=message)
 
         case "UpptimePayload":
-            text = validated_payload.text
+            text = cast(UpptimePayload, validated_payload).text
             header_text = "📈 Web Application Status Changed!"
             blocks = [
                 {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
