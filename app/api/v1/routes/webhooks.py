@@ -14,7 +14,7 @@ from server.utils import log_ops_message
 
 
 logger = get_module_logger()
-router = APIRouter(tags=["Access"])
+router = APIRouter(tags=["Webhooks"])
 limiter = get_limiter()
 
 
