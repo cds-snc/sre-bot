@@ -29,4 +29,15 @@ def validate_payload(
         UpptimePayload,
     ]
 
-    return select_best_model(payload_dict, models, priorities)
+    selected_model = select_best_model(payload_dict, models, priorities)
+    if selected_model:
+        model, validated_payload = selected_model
+        logger.info(
+            "payload_validation_success",
+            model=model.__name__,
+            payload=validated_payload.model_dump(),
+        )
+        return model, validated_payload
+    else:
+        logger.error("payload_validation_failure", payload=payload_dict)
+        return None
