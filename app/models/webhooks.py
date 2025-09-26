@@ -59,4 +59,14 @@ class AccessRequest(BaseModel):
 
 
 class UpptimePayload(BaseModel):
-    text: str | None = None
+    text: str
+
+
+class WebhookResult(BaseModel):
+    status: str
+    action: str | None = None
+    payload: WebhookPayload | None = None
+    message: str | None = None
+
+    class Config:
+        extra = "forbid"

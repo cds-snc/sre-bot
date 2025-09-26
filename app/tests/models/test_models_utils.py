@@ -1,5 +1,8 @@
-from pydantic import BaseModel
+from typing import Optional
+from unittest.mock import patch
+
 import models.utils as model_utils
+from pydantic import BaseModel
 
 
 class MockModel(BaseModel):
@@ -10,6 +13,29 @@ class MockModel(BaseModel):
 
 class EmptyModel(BaseModel):
     pass
+
+
+class MockModelA(BaseModel):
+    field1: str
+    field2: Optional[int] = None
+
+
+class MockModelB(BaseModel):
+    field3: float
+    field4: Optional[str] = None
+
+
+class MockModelC(BaseModel):
+    field1: str
+    field5: Optional[bool] = None
+
+
+class MockModelD(BaseModel):
+    field1: Optional[str] = None
+    field2: Optional[int] = None
+    field3: Optional[float] = None
+    field4: Optional[str] = None
+    field5: Optional[bool] = None
 
 
 def test_get_parameters_from_model():
@@ -87,3 +113,75 @@ def test_are_all_parameters_in_model():
     assert not model_utils.are_all_parameters_in_model(
         model_params, non_string_keys_payload
     )
+
+
+def test_select_best_model_with_exact_match():
+    data = {"field1": "value", "field2": 123}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert result is not None
+    model_class, instance = result
+    assert model_class is MockModelA
+    assert isinstance(instance, MockModelA)
+
+
+def test_select_best_model_with_partial_match():
+    data = {"field1": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert result is not None
+    model_class, instance = result
+    assert model_class is MockModelA
+    assert isinstance(instance, MockModelA)
+
+
+def test_select_best_model_with_priorities():
+    data = {"field1": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+    priorities = {MockModelC: 10}
+    result = model_utils.select_best_model(data, models, priorities)
+    assert result is not None
+    model_class, instance = result
+    assert model_class is MockModelC
+    assert isinstance(instance, MockModelC)
+
+
+def test_select_best_model_with_no_match():
+    data = {"unknown_field": "value"}
+    models = [MockModelA, MockModelB, MockModelC, MockModelD]
+    result = model_utils.select_best_model(data, models)
+    assert result is None
+
+
+def test_select_best_model_with_empty_data():
+    data = {}
+    models = [MockModelA, MockModelB, MockModelC]
+    result = model_utils.select_best_model(data, models)
+    assert result is None
+
+
+def test_select_best_model_logs_warning_on_no_match():
+    data = {"unknown_field": "value"}
+    models = [MockModelA, MockModelB, MockModelC]
+
+    with patch("models.utils.logger.warning") as mock_logger:
+        result = model_utils.select_best_model(data, models)
+        assert result is None
+        mock_logger.assert_called_once_with(
+            "invalid_model_detected",
+            payload=str(data),
+        )
+
+
+def test_select_best_model_with_valid_and_invalid_models():
+    class InvalidModel(BaseModel):
+        field1: int
+
+    data = {"field1": "value"}
+    models = [InvalidModel, MockModelC]
+
+    result = model_utils.select_best_model(data, models)
+    assert result is not None
+    model_class, instance = result
+    assert model_class is MockModelC
+    assert isinstance(instance, MockModelC)

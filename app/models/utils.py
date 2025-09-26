@@ -1,5 +1,8 @@
-from typing import Any, Dict, List, Type
-from pydantic import BaseModel
+from typing import Any, Dict, List, Optional, Type, Tuple
+from pydantic import BaseModel, ValidationError
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:
@@ -56,3 +59,75 @@ def are_all_parameters_in_model(
     model_params: List[str], payload: Dict[str, Any]
 ) -> bool:
     return all(param in model_params for param in payload.keys())
+
+
+def select_best_model(
+    data: dict,
+    models: List[Type[BaseModel]],
+    priorities: Optional[Dict[Type[BaseModel], int]] = None,
+) -> Optional[Tuple[Type[BaseModel], Any]]:
+    """
+    Select the best matching model instance for the given data. The selection is based on an
+    arbitrary scoring system that considers the number of matching fields (both required and optional)
+    and any provided priorities. The model with the highest score is selected as the best match.
+    If no models match, None is returned.
+
+    Note:
+        - The scoring system is arbitrary and may be adjusted in the future to better suit specific use cases.
+        - Required fields contribute more to the score than optional fields.
+
+    Args:
+        data (dict): The data to validate against the models.
+        models (List[Type[BaseModel]]): The list of known models to validate against.
+        priorities (Optional[Dict[Type[BaseModel], int]]): Optional dictionary of model priorities,
+            where higher values indicate higher priority.
+
+    Returns:
+        Optional[Tuple[Type[BaseModel], Any]]: A tuple containing the best matching model class and
+        its validated instance, or None if no match is found.
+    """
+    best_match = None
+    best_score = float("-inf")
+
+    for model in models:
+        try:
+            instance = model.model_validate(data)
+        except ValidationError:
+            continue
+
+        # Calculate required and optional fields
+        model_fields = set(model.__pydantic_fields__.keys())
+        required_fields = {
+            key
+            for key, field in model.__pydantic_fields__.items()
+            if field.is_required()
+        }
+        # skip if not a single matching field
+        if not model_fields.intersection(data.keys()):
+            continue
+
+        # skip if not all required fields are present
+        if not required_fields.issubset(data.keys()):
+            continue
+
+        # Calculate score based on matching fields (arbitrary scoring system)
+        matching_required = required_fields.intersection(data.keys())
+        matching_optional = model_fields.intersection(data.keys()) - matching_required
+        score = len(matching_required) + 0.5 * len(matching_optional)
+
+        # Apply priority boost if available
+        if priorities and model in priorities:
+            score += priorities[model]
+
+        # Update the best match if the score is higher
+        if score > best_score:
+            best_score = score
+            best_match = (model, instance)
+
+    if best_match is None:
+        logger.warning(
+            "invalid_model_detected",
+            payload=str(data),
+        )
+
+    return best_match
