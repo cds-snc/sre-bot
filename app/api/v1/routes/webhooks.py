@@ -79,7 +79,9 @@ def handle_webhook(
     ):
         webhook_payload = webhook_result.payload
         webhook_payload.channel = webhook["channel"]["S"]
-        hook_type = webhook["hook_type"]["S"]
+        hook_type = webhook.get("hook_type", {}).get(
+            "S", "alert"
+        )  # Default to "alert" if hook_type is missing
         if hook_type == "alert":
             webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
 
