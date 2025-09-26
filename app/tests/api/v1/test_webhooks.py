@@ -4,7 +4,6 @@ from unittest.mock import patch, MagicMock, PropertyMock, call, ANY
 from pydantic import BaseModel
 import pytest
 import httpx
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from api.v1.routes import webhooks
 from models.webhooks import (
