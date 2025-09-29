@@ -199,7 +199,7 @@ def access_view_handler(ack, body, logger, client: WebClient):
         access_type=access_type,
         rationale=rationale,
     )
-    log_ops_message(client, msg)
+    log_ops_message(msg)
     aws_user_id = identity_store.get_user_id(email)
 
     if aws_user_id is None:

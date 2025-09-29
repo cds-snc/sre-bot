@@ -337,7 +337,6 @@ def test_access_view_handler_with_unknown_sso_user(
         rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
-        client,
         "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale",
     )
     client.chat_postEphemeral.assert_called_with(
@@ -378,7 +377,6 @@ def test_access_view_handler_with_existing_access(
         rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
-        client,
         "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale",
     )
     client.chat_postEphemeral.assert_called_with(
@@ -427,7 +425,6 @@ def test_access_view_handler_successful_access_request(
         rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
-        client,
         "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale",
     )
     client.chat_postEphemeral.assert_called_with(
@@ -476,7 +473,6 @@ def test_access_view_handler_failed_access_request(
         rationale="rationale",
     )
     log_ops_message_mock.assert_called_with(
-        client,
         "<@user_id> (email) requested access to account (account_id) with access_type priviliges.\n\nRationale: rationale",
     )
     client.chat_postEphemeral.assert_called_with(

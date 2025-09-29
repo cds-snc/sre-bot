@@ -45,14 +45,12 @@ def process_aws_sns_payload(payload: AwsSnsPayload, client: WebClient) -> Webhoo
             subscribed_topic=aws_sns_payload.TopicArn,
         )
         log_ops_message(
-            client,
             f"Subscribed webhook {id} to topic {aws_sns_payload.TopicArn}",
         )
         webhook_result = WebhookResult(status="success", action="log", payload=None)
 
     if aws_sns_payload.Type == "UnsubscribeConfirmation":
         log_ops_message(
-            client,
             f"{aws_sns_payload.TopicArn} unsubscribed from webhook {id}",
         )
         webhook_result = WebhookResult(status="success", action="log", payload=None)
@@ -107,7 +105,7 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
             log_message = f"Invalid certificate URL ```{awsSnsPayload.SigningCertURL}``` in message: ```{awsSnsPayload}```"
         elif isinstance(e, SignatureVerificationFailureException):
             log_message = f"Failed to verify signature ```{awsSnsPayload.Signature}``` in message: ```{awsSnsPayload}```"
-        log_ops_message(client, log_message)
+        log_ops_message(log_message)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
@@ -118,7 +116,6 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
             error=str(e),
         )
         log_ops_message(
-            client,
             f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{awsSnsPayload}```",
         )
         raise HTTPException(
@@ -162,13 +159,11 @@ def parse(payload: AwsSnsPayload, client) -> list:  # get_payload_formatter
         blocks = []
         if payload.Message is None:
             log_ops_message(
-                client,
                 f"Payload Message is empty ```{payload}```",
             )
         else:
             log_ops_message(
-                client,
-                f"Unidentified AWS event received ```{payload.Message}```",
+                f"Unidentified AWS event received ```{payload.Message}```"
             )
 
     return blocks

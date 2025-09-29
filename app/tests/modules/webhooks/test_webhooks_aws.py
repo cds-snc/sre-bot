@@ -40,10 +40,8 @@ def test_validate_sns_payload_invalid_message_type(
         "aws_sns_payload_validation_error",
         error="InvalidType is not a valid message type.",
     )
-    assert log_ops_message_mock.call_count == 1
-    assert (
-        log_ops_message_mock.call_args[0][1]
-        == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
+    log_ops_message_mock.assert_called_once_with(
+        f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
     )
 
 
@@ -66,7 +64,6 @@ def test_validate_sns_payload_invalid_signature_version(
         error="Invalid signature version. Unable to verify signature.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
     )
 
@@ -88,7 +85,6 @@ def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, logger
         error="Invalid certificate URL.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
     )
 
@@ -120,7 +116,6 @@ def test_validate_sns_payload_signature_verification_failure(
         error="Invalid signature.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
     )
 
@@ -145,7 +140,6 @@ def test_validate_sns_payload_unexpected_exception(
         "aws_sns_payload_validation_error", error="Unexpected error"
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Error parsing AWS event due to Exception: ```{payload}```",
     )
 
@@ -232,7 +226,7 @@ def test_parse_returns_empty_block_if_empty_message(log_ops_message_mock):
     response = aws.parse(payload, client)
     assert response == []
     log_ops_message_mock.assert_called_once_with(
-        client, f"Payload Message is empty ```{payload}```"
+        f"Payload Message is empty ```{payload}```"
     )
 
 
@@ -243,7 +237,7 @@ def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mo
     response = aws.parse(payload, client)
     assert response == []
     log_ops_message_mock.assert_called_once_with(
-        client, f"Unidentified AWS event received ```{payload.Message}```"
+        f"Unidentified AWS event received ```{payload.Message}```"
     )
 
 

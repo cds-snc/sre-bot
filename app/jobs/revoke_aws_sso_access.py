@@ -37,7 +37,7 @@ def revoke_aws_sso_access(client):
                 user=user_id,
                 text=msg,
             )
-            log_ops_message(client, msg)
+            log_ops_message(msg)
 
         except Exception as e:
             logger.error(
