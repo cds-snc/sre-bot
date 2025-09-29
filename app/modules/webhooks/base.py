@@ -2,7 +2,6 @@ from typing import Any, Dict, List, Optional, Tuple, Type, cast
 
 from fastapi import Request
 from pydantic import BaseModel
-import requests
 from core.logging import get_module_logger
 from models.utils import select_best_model
 from models.webhooks import (
@@ -12,8 +11,7 @@ from models.webhooks import (
     UpptimePayload,
     WebhookResult,
 )
-from modules.webhooks import aws
-from modules.ops.notifications import log_ops_message
+from modules.webhooks.aws import process_aws_sns_payload
 
 logger = get_module_logger()
 
@@ -77,6 +75,13 @@ def handle_webhook_payload(
         error_message = "No matching model found for payload"
         return WebhookResult(status="error", message=error_message)
 
+    # handler_map = {
+    #     "WebhookPayload": "handle_webhook_payload",
+    #     "AwsSnsPayload": "process_aws_sns_payload",
+    #     "AccessRequest": "handle_access_request_payload",
+    #     "UpptimePayload": "handle_upptime_payload",
+    # }
+
     match payload_type.__name__:
         case "WebhookPayload":
             webhook_result = WebhookResult(
@@ -84,53 +89,9 @@ def handle_webhook_payload(
             )
         case "AwsSnsPayload":
             aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
-            aws_sns_payload = aws.validate_sns_payload(
-                aws_sns_payload_instance,
-                request.state.bot.client,
+            webhook_result = process_aws_sns_payload(
+                aws_sns_payload_instance, request.state.bot.client
             )
-
-            if aws_sns_payload.Type == "SubscriptionConfirmation":
-                requests.get(aws_sns_payload.SubscribeURL, timeout=60)
-                logger.info(
-                    "subscribed_webhook_to_topic",
-                    webhook_id=aws_sns_payload.TopicArn,
-                    subscribed_topic=aws_sns_payload.TopicArn,
-                )
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Subscribed webhook {id} to topic {aws_sns_payload.TopicArn}",
-                )
-                webhook_result = WebhookResult(
-                    status="success", action="log", payload=None
-                )
-
-            if aws_sns_payload.Type == "UnsubscribeConfirmation":
-                log_ops_message(
-                    request.state.bot.client,
-                    f"{aws_sns_payload.TopicArn} unsubscribed from webhook {id}",
-                )
-                webhook_result = WebhookResult(
-                    status="success", action="log", payload=None
-                )
-
-            if aws_sns_payload.Type == "Notification":
-                blocks = aws.parse(aws_sns_payload, request.state.bot.client)
-                if not blocks:
-                    logger.info(
-                        "payload_empty_message",
-                        payload_type="AwsSnsPayload",
-                        sns_type=aws_sns_payload.Type,
-                    )
-                    return WebhookResult(
-                        status="error",
-                        action="none",
-                        message="Empty AWS SNS Notification message",
-                    )
-                webhook_result = WebhookResult(
-                    status="success",
-                    action="post",
-                    payload=WebhookPayload(blocks=blocks),
-                )
 
         case "AccessRequest":
             message = str(cast(AccessRequest, validated_payload).model_dump())

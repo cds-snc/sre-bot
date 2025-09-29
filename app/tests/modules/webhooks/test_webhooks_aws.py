@@ -1,14 +1,11 @@
 import json
 import os
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+from models.webhooks import AwsSnsPayload, WebhookPayload
 from modules.webhooks import aws
-from modules.webhooks.aws import (
-    SignatureVerificationFailureException,
-    HTTPException,
-)
-from models.webhooks import AwsSnsPayload
+from modules.webhooks.aws import HTTPException, SignatureVerificationFailureException
 
 
 @patch("modules.webhooks.aws.log_ops_message")
@@ -151,6 +148,81 @@ def test_validate_sns_payload_unexpected_exception(
         client,
         f"Error parsing AWS event due to Exception: ```{payload}```",
     )
+
+
+@patch("modules.webhooks.aws.parse")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_with_notification_no_message(
+    validate_sns_payload_mock,
+    parse_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(Type="Notification", Message="")
+    validate_sns_payload_mock.return_value = payload
+    parse_mock.return_value = []
+
+    response = aws.process_aws_sns_payload(payload, request)
+    assert response.status == "error"
+    assert response.action == "none"
+    assert response.message == "Empty AWS SNS Notification message"
+
+
+@patch("modules.webhooks.aws.parse")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_aws_sns_notification(
+    validate_sns_payload_mock, parse_mock
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(Type="Notification", Message="message")
+    validate_sns_payload_mock.return_value = payload
+    parse_mock.return_value = "parsed_blocks"
+    result = aws.process_aws_sns_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "post"
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.payload.blocks == "parsed_blocks"
+
+
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.requests.get")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_aws_sns_subscription_confirmation(
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(
+        Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
+    )
+    validate_sns_payload_mock.return_value = payload
+    result = aws.process_aws_sns_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "log"
+    assert result.payload is None
+    assert log_ops_message_mock.call_count == 1
+
+
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.requests.get")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_with_aws_sns_unsubscribe_confirmation(
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(
+        Type="UnsubscribeConfirmation",
+        TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+    )
+    validate_sns_payload_mock.return_value = payload
+    response = aws.process_aws_sns_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "log"
+    assert response.payload is None
+    assert log_ops_message_mock.call_count == 1
+    assert get_mock.call_count == 0
 
 
 @patch("modules.webhooks.aws.log_ops_message")

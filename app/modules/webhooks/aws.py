@@ -3,10 +3,12 @@ import re
 import urllib.parse
 
 from fastapi import HTTPException
+import requests
+from slack_sdk import WebClient
 
 from modules.ops.notifications import log_ops_message
 from integrations import notify
-from models.webhooks import AwsSnsPayload
+from models.webhooks import AwsSnsPayload, WebhookResult, WebhookPayload
 from sns_message_validator import (
     SNSMessageValidator,
     InvalidMessageTypeException,
@@ -23,9 +25,57 @@ logger = get_module_logger()
 sns_message_validator = SNSMessageValidator()
 
 
-def handle_aws_sns_payload(payload: dict, client):
-    """Handle the AWS SNS payload and return the blocks to be sent to Slack."""
-    pass
+def process_aws_sns_payload(payload: AwsSnsPayload, client: WebClient) -> WebhookResult:
+    """Process the AWS SNS payload and return the blocks to be sent to Slack."""
+    aws_sns_payload = validate_sns_payload(
+        payload,
+        client,
+    )
+    webhook_result = WebhookResult(
+        status="error",
+        action="none",
+        payload=None,
+        message="Unhandled AWS SNS payload type",
+    )
+    if aws_sns_payload.Type == "SubscriptionConfirmation":
+        requests.get(aws_sns_payload.SubscribeURL, timeout=60)
+        logger.info(
+            "subscribed_webhook_to_topic",
+            webhook_id=aws_sns_payload.TopicArn,
+            subscribed_topic=aws_sns_payload.TopicArn,
+        )
+        log_ops_message(
+            client,
+            f"Subscribed webhook {id} to topic {aws_sns_payload.TopicArn}",
+        )
+        webhook_result = WebhookResult(status="success", action="log", payload=None)
+
+    if aws_sns_payload.Type == "UnsubscribeConfirmation":
+        log_ops_message(
+            client,
+            f"{aws_sns_payload.TopicArn} unsubscribed from webhook {id}",
+        )
+        webhook_result = WebhookResult(status="success", action="log", payload=None)
+
+    if aws_sns_payload.Type == "Notification":
+        blocks = parse(aws_sns_payload, client)
+        if not blocks:
+            logger.info(
+                "payload_empty_message",
+                payload_type="AwsSnsPayload",
+                sns_type=aws_sns_payload.Type,
+            )
+            return WebhookResult(
+                status="error",
+                action="none",
+                message="Empty AWS SNS Notification message",
+            )
+        webhook_result = WebhookResult(
+            status="success",
+            action="post",
+            payload=WebhookPayload(blocks=blocks),
+        )
+    return webhook_result
 
 
 def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
@@ -78,7 +128,7 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     return valid_payload
 
 
-def parse(payload: AwsSnsPayload, client): # get_payload_formatter
+def parse(payload: AwsSnsPayload, client) -> list:  # get_payload_formatter
     """Parse the payload and return the blocks to be sent to Slack."""
     try:
         message = payload.Message
@@ -143,7 +193,7 @@ def format_abuse_notification(payload, msg):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*<https://health.aws.amazon.com/health/home#/account/dashboard/open-issues| 🚨 Abuse Alert | {account}>*",
+                "text": f"*<https://health.amazon.com/health/home#/account/dashboard/open-issues| 🚨 Abuse Alert | {account}>*",
             },
         },
         {
@@ -231,7 +281,7 @@ def format_budget_notification(payload):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*<https://console.aws.amazon.com/billing/home#/budgets| 💸 Budget Alert | {account}>*",
+                "text": f"*<https://console.amazon.com/billing/home#/budgets| 💸 Budget Alert | {account}>*",
             },
         },
         {
@@ -259,7 +309,7 @@ def format_cloudwatch_alarm(msg):
     if msg["AlarmDescription"] is None:
         msg["AlarmDescription"] = " "
 
-    link = f"https://console.aws.amazon.com/cloudwatch/home?region={region}#alarm:alarmFilter=ANY;name={urllib.parse.quote(msg['AlarmName'])}"
+    link = f"https://console.amazon.com/cloudwatch/home?region={region}#alarm:alarmFilter=ANY;name={urllib.parse.quote(msg['AlarmName'])}"
 
     blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
