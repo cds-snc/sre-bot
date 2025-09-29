@@ -116,6 +116,91 @@ def test_handle_webhook_disabled(
     assert append_incident_buttons_mock.call_count == 0
 
 
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_hook_type_info(
+    mock_get_webhook,
+    mock_increment_invocation,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    mock_log_to_sentinel,
+    test_client,
+):
+    payload = {"text": "some text"}
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "hook_type": {"S": "info"},
+        "active": {"BOOL": True},
+    }
+
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+
+    mock_append_incident_buttons.return_value = WebhookPayload(
+        text="some text",
+        channel="test-channel",
+    )
+
+    response = test_client.post("/hook/id", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    mock_get_webhook.assert_called_once()
+    mock_increment_invocation.assert_called_once_with("id")
+    mock_handle_webhook_payload.assert_called_once_with(payload, ANY)
+    mock_append_incident_buttons.assert_not_called()
+    mock_log_to_sentinel.assert_called_once()
+
+
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_hook_type_not_defined(
+    mock_get_webhook,
+    mock_increment_invocation,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    mock_log_to_sentinel,
+    test_client,
+):
+    payload = {"text": "some text"}
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "active": {"BOOL": True},
+    }
+
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+
+    mock_append_incident_buttons.return_value = WebhookPayload(
+        text="some text",
+        channel="test-channel",
+    )
+
+    response = test_client.post("/hook/id", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+
+    mock_get_webhook.assert_called_once()
+    mock_increment_invocation.assert_called_once_with("id")
+    mock_handle_webhook_payload.assert_called_once_with(payload, ANY)
+    mock_append_incident_buttons.assert_called_once()
+    mock_log_to_sentinel.assert_called_once()
+
+
 @patch("api.v1.routes.webhooks.handle_webhook_payload")
 @patch("api.v1.routes.webhooks.append_incident_buttons")
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")
