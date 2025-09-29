@@ -1,18 +1,15 @@
 import json
 import os
-import pytest
 from unittest.mock import MagicMock, patch
 
-from server.event_handlers import aws
-from server.event_handlers.aws import (
-    SignatureVerificationFailureException,
-    HTTPException,
-)
-from models.webhooks import AwsSnsPayload
+import pytest
+from models.webhooks import AwsSnsPayload, WebhookPayload
+from modules.webhooks import aws
+from modules.webhooks.aws import HTTPException, SignatureVerificationFailureException
 
 
-@patch("server.event_handlers.aws.log_ops_message")
-@patch("server.event_handlers.aws.sns_message_validator")
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.sns_message_validator")
 def test_validate_sns_payload_validates_model(
     sns_message_validator_mock, log_ops_message_mock
 ):
@@ -25,8 +22,8 @@ def test_validate_sns_payload_validates_model(
     assert response == payload
 
 
-@patch("server.event_handlers.aws.logger")
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.logger")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_validate_sns_payload_invalid_message_type(
     log_ops_message_mock,
     logger_mock,
@@ -43,15 +40,13 @@ def test_validate_sns_payload_invalid_message_type(
         "aws_sns_payload_validation_error",
         error="InvalidType is not a valid message type.",
     )
-    assert log_ops_message_mock.call_count == 1
-    assert (
-        log_ops_message_mock.call_args[0][1]
-        == f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
+    log_ops_message_mock.assert_called_once_with(
+        f"Invalid message type ```{payload.Type}``` in message: ```{payload}```"
     )
 
 
-@patch("server.event_handlers.aws.logger")
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.logger")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_validate_sns_payload_invalid_signature_version(
     log_ops_message_mock, logger_mock
 ):
@@ -69,13 +64,12 @@ def test_validate_sns_payload_invalid_signature_version(
         error="Invalid signature version. Unable to verify signature.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Unexpected signature version ```{payload.SignatureVersion}``` in message: ```{payload}```",
     )
 
 
-@patch("server.event_handlers.aws.logger")
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.logger")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, logger_mock):
     client = MagicMock()
     payload = AwsSnsPayload(**mock_budget_alert())
@@ -91,14 +85,13 @@ def test_validate_sns_payload_invalid_signature_url(log_ops_message_mock, logger
         error="Invalid certificate URL.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Invalid certificate URL ```{payload.SigningCertURL}``` in message: ```{payload}```",
     )
 
 
-@patch("server.event_handlers.aws.logger")
-@patch("server.event_handlers.aws.sns_message_validator._verify_signature")
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.logger")
+@patch("modules.webhooks.aws.sns_message_validator._verify_signature")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_validate_sns_payload_signature_verification_failure(
     log_ops_message_mock, verify_signature_mock, logger_mock
 ):
@@ -123,14 +116,13 @@ def test_validate_sns_payload_signature_verification_failure(
         error="Invalid signature.",
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Failed to verify signature ```{payload.Signature}``` in message: ```{payload}```",
     )
 
 
-@patch("server.event_handlers.aws.logger")
-@patch("server.event_handlers.aws.log_ops_message")
-@patch("server.event_handlers.aws.sns_message_validator.validate_message")
+@patch("modules.webhooks.aws.logger")
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.sns_message_validator.validate_message")
 def test_validate_sns_payload_unexpected_exception(
     validate_message_mock, log_ops_message_mock, logger_mock
 ):
@@ -148,34 +140,108 @@ def test_validate_sns_payload_unexpected_exception(
         "aws_sns_payload_validation_error", error="Unexpected error"
     )
     log_ops_message_mock.assert_called_once_with(
-        client,
         f"Error parsing AWS event due to Exception: ```{payload}```",
     )
 
 
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.parse")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_with_notification_no_message(
+    validate_sns_payload_mock,
+    parse_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(Type="Notification", Message="")
+    validate_sns_payload_mock.return_value = payload
+    parse_mock.return_value = []
+
+    response = aws.process_aws_sns_payload(payload, request)
+    assert response.status == "error"
+    assert response.action == "none"
+    assert response.message == "Empty AWS SNS Notification message"
+
+
+@patch("modules.webhooks.aws.parse")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_aws_sns_notification(
+    validate_sns_payload_mock, parse_mock
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(Type="Notification", Message="message")
+    validate_sns_payload_mock.return_value = payload
+    parse_mock.return_value = "parsed_blocks"
+    result = aws.process_aws_sns_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "post"
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.payload.blocks == "parsed_blocks"
+
+
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.requests.get")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_aws_sns_subscription_confirmation(
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(
+        Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
+    )
+    validate_sns_payload_mock.return_value = payload
+    result = aws.process_aws_sns_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "log"
+    assert result.payload is None
+    assert log_ops_message_mock.call_count == 1
+
+
+@patch("modules.webhooks.aws.log_ops_message")
+@patch("modules.webhooks.aws.requests.get")
+@patch("modules.webhooks.aws.validate_sns_payload")
+def test_process_aws_sns_payload_with_aws_sns_unsubscribe_confirmation(
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = AwsSnsPayload(
+        Type="UnsubscribeConfirmation",
+        TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+    )
+    validate_sns_payload_mock.return_value = payload
+    response = aws.process_aws_sns_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "log"
+    assert response.payload is None
+    assert log_ops_message_mock.call_count == 1
+    assert get_mock.call_count == 0
+
+
+@patch("modules.webhooks.aws.log_ops_message")
 def test_parse_returns_empty_block_if_empty_message(log_ops_message_mock):
     client = MagicMock()
     payload = MagicMock(Message=None, Type="Notification")
     response = aws.parse(payload, client)
     assert response == []
     log_ops_message_mock.assert_called_once_with(
-        client, f"Payload Message is empty ```{payload}```"
+        f"Payload Message is empty ```{payload}```"
     )
 
 
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_parse_returns_empty_block_if_no_match_and_logs_error(log_ops_message_mock):
     client = MagicMock()
     payload = MagicMock(Message='{"foo": "bar"}')
     response = aws.parse(payload, client)
     assert response == []
     log_ops_message_mock.assert_called_once_with(
-        client, f"Unidentified AWS event received ```{payload.Message}```"
+        f"Unidentified AWS event received ```{payload.Message}```"
     )
 
 
-@patch("server.event_handlers.aws.log_ops_message")
+@patch("modules.webhooks.aws.log_ops_message")
 def test_parse_returns_empty_block_if_budget_auto_adjustment_event(
     log_ops_message_mock,
 ):
@@ -188,7 +254,7 @@ def test_parse_returns_empty_block_if_budget_auto_adjustment_event(
     log_ops_message_mock.assert_not_called()
 
 
-@patch("server.event_handlers.aws.format_cloudwatch_alarm")
+@patch("modules.webhooks.aws.format_cloudwatch_alarm")
 def test_parse_returns_blocks_if_AlarmArn_in_msg(format_cloudwatch_alarm_mock):
     client = MagicMock()
     format_cloudwatch_alarm_mock.return_value = ["foo", "bar"]
@@ -198,7 +264,7 @@ def test_parse_returns_blocks_if_AlarmArn_in_msg(format_cloudwatch_alarm_mock):
     format_cloudwatch_alarm_mock.assert_called_once_with(json.loads(payload.Message))
 
 
-@patch("server.event_handlers.aws.format_budget_notification")
+@patch("modules.webhooks.aws.format_budget_notification")
 def test_parse_returns_blocks_if_budget_notification_in_msg(
     format_budget_notification_mock,
 ):
@@ -210,7 +276,7 @@ def test_parse_returns_blocks_if_budget_notification_in_msg(
     format_budget_notification_mock.assert_called_once_with(payload)
 
 
-@patch("server.event_handlers.aws.format_abuse_notification")
+@patch("modules.webhooks.aws.format_abuse_notification")
 def test_parse_returns_blocks_if_service_is_ABUSE(format_abuse_notification_mock):
     client = MagicMock()
     format_abuse_notification_mock.return_value = ["foo", "bar"]
@@ -222,7 +288,7 @@ def test_parse_returns_blocks_if_service_is_ABUSE(format_abuse_notification_mock
     )
 
 
-@patch("server.event_handlers.aws.format_auto_mitigation")
+@patch("modules.webhooks.aws.format_auto_mitigation")
 def test_parse_returns_blocks_if_auto_mitigated(format_auto_mitigation_mock):
     # Test that the parse function returns the blocks returned by format_auto_mitigation
     client = MagicMock()
@@ -233,7 +299,7 @@ def test_parse_returns_blocks_if_auto_mitigated(format_auto_mitigation_mock):
     format_auto_mitigation_mock.assert_called_once_with(payload)
 
 
-@patch("server.event_handlers.aws.format_new_iam_user")
+@patch("modules.webhooks.aws.format_new_iam_user")
 def test_parse_returns_blocks_if_new_iam_user(format_new_iam_user_mock):
     # Test that the parse function returns the blocks returned by format_new_iam_user
     client = MagicMock()
@@ -351,7 +417,7 @@ def test_format_new_iam_user_extracts_the_user_and_inserts_it_into_blocks():
     assert "test_user@cds-snc.ca" in response[2]["text"]["text"]
 
 
-@patch("server.event_handlers.aws.format_api_key_detected")
+@patch("modules.webhooks.aws.format_api_key_detected")
 def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
     # Test that the parse function returns the blocks returned by format_api_key_detected
     client = MagicMock()
@@ -362,7 +428,7 @@ def test_parse_returns_blocks_if_api_key_detected(format_api_key_detected_mock):
     format_api_key_detected_mock.assert_called_once_with(payload, client)
 
 
-@patch("server.event_handlers.aws.format_api_key_detected")
+@patch("modules.webhooks.aws.format_api_key_detected")
 def test_parse_returns_blocks_if_api_key_compromised(format_api_key_detected_mock):
     # Test that the parse function returns the blocks returned by format_new_iam_user
     client = MagicMock()

@@ -1,7 +1,7 @@
-from modules.aws import aws_access_requests
-from integrations.aws import sso_admin, identity_store
-from server.utils import log_ops_message
 from core.logging import get_module_logger
+from integrations.aws import identity_store, sso_admin
+from modules.aws import aws_access_requests
+from modules.ops.notifications import log_ops_message
 
 logger = get_module_logger()
 
@@ -37,7 +37,7 @@ def revoke_aws_sso_access(client):
                 user=user_id,
                 text=msg,
             )
-            log_ops_message(client, msg)
+            log_ops_message(msg)
 
         except Exception as e:
             logger.error(

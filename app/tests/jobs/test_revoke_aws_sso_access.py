@@ -32,7 +32,6 @@ def test_revoke_aws_sso_access(
     revoke_aws_sso_access.revoke_aws_sso_access(client)
     assert log_ops_message_mock.call_count == 1
     assert log_ops_message_mock.call_args == call(
-        client,
         "Revoked access to test_account_name (test_account_id) for <@test_user_id> (test_email) with access type: test_access_type",
     )
     assert identity_store_mock.get_user_id.call_count == 1
