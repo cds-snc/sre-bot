@@ -82,121 +82,49 @@ def test_handle_webhook_payload_webhook_payload(validate_payload_mock):
     assert result.payload.blocks == []
 
 
-@patch("modules.webhooks.base.aws.parse")
-@patch("modules.webhooks.base.aws.validate_sns_payload")
+@patch("modules.webhooks.base.process_aws_sns_payload")
 @patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_aws_sns_notification_no_message(
+def test_handle_webhook_payload_with_sns_payload(
     validate_payload_mock,
-    validate_sns_payload_mock,
-    parse_mock,
-):
-    request = MagicMock()
-    payload = {"Type": "Notification", "Message": ""}
-    validate_payload_mock.return_value = (
-        AwsSnsPayload,
-        AwsSnsPayload(Type="Notification", Message=""),
-    )
-    validate_sns_payload_mock.return_value = AwsSnsPayload(
-        Type="Notification", Message=""
-    )
-    parse_mock.return_value = ""
-
-    response = base.handle_webhook_payload(payload, request)
-    assert response.status == "error"
-    assert response.action == "none"
-    assert response.message == "Empty AWS SNS Notification message"
-
-
-@patch("modules.webhooks.base.aws.parse")
-@patch("modules.webhooks.base.aws.validate_sns_payload")
-@patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_aws_sns_notification(
-    validate_payload_mock, validate_sns_payload_mock, parse_mock
-):
-    request = MagicMock()
-    payload = {"Type": "Notification", "Message": "message"}
-    validate_payload_mock.return_value = (
-        AwsSnsPayload,
-        AwsSnsPayload(Type="Notification", Message="message"),
-    )
-    validate_sns_payload_mock.return_value = AwsSnsPayload(
-        Type="Notification", Message="message"
-    )
-    parse_mock.return_value = "parsed_blocks"
-    result = base.handle_webhook_payload(payload, request)
-    assert result.status == "success"
-    assert result.action == "post"
-    assert isinstance(result.payload, WebhookPayload)
-    assert result.payload.blocks == "parsed_blocks"
-
-
-@patch("modules.webhooks.base.log_ops_message")
-@patch("modules.webhooks.base.requests.get")
-@patch("modules.webhooks.base.aws.validate_sns_payload")
-@patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_aws_sns_subscription_confirmation(
-    validate_payload_mock,
-    validate_sns_payload_mock,
-    get_mock,
-    log_ops_message_mock,
-):
-    request = MagicMock()
-    payload = {"Type": "SubscriptionConfirmation", "SubscribeURL": "http://example.com"}
-    validate_payload_mock.return_value = (
-        AwsSnsPayload,
-        AwsSnsPayload(
-            Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
-        ),
-    )
-    validate_sns_payload_mock.return_value = AwsSnsPayload(
-        Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
-    )
-    result = base.handle_webhook_payload(payload, request)
-    assert result.status == "success"
-    assert result.action == "log"
-    assert result.payload is None
-    assert log_ops_message_mock.call_count == 1
-
-
-@patch("modules.webhooks.base.log_ops_message")
-@patch("modules.webhooks.base.requests.get")
-@patch("modules.webhooks.base.aws.validate_sns_payload")
-@patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_with_aws_sns_unsubscribe_confirmation(
-    validate_payload_mock,
-    validate_sns_payload_mock,
-    get_mock,
-    log_ops_message_mock,
+    process_aws_sns_payload_mock,
 ):
     request = MagicMock()
     payload = {
-        "Type": "UnsubscribeConfirmation",
+        "Type": "Notification",
+        "MessageId": "12345",
         "TopicArn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
+        "Message": "This is a test message from SNS",
+        "Timestamp": "2023-10-01T12:00:00.000Z",
     }
     validate_payload_mock.return_value = (
         AwsSnsPayload,
         AwsSnsPayload(
-            Type="UnsubscribeConfirmation",
+            Type="Notification",
+            MessageId="12345",
             TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+            Message="This is a test message from SNS",
+            Timestamp="2023-10-01T12:00:00.000Z",
         ),
     )
-    validate_sns_payload_mock.return_value = AwsSnsPayload(
-        Type="UnsubscribeConfirmation",
-        TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+
+    process_aws_sns_payload_mock.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="Processed SNS message"),
     )
     response = base.handle_webhook_payload(payload, request)
+
     assert response.status == "success"
-    assert response.action == "log"
-    assert response.payload is None
-    assert log_ops_message_mock.call_count == 1
+    assert response.action == "post"
+    assert isinstance(response.payload, WebhookPayload)
+    assert response.payload.text == "Processed SNS message"
+    process_aws_sns_payload_mock.assert_called_once_with(
+        ANY, request.state.bot.client
+    )  # Ensure the client is passed
 
 
-@patch("modules.webhooks.base.log_ops_message")
-@patch("modules.webhooks.base.requests.get")
 @patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_with_access_request(
-    validate_payload_mock, get_mock, log_ops_message_mock
-):
+def test_handle_webhook_payload_with_access_request(validate_payload_mock):
     request = MagicMock()
     payload = {
         "account": "account1",
