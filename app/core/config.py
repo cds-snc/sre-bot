@@ -190,6 +190,8 @@ class TalentRoleSettings(BaseSettings):
 
 
 class ReportsSettings(BaseSettings):
+    """Reports configuration settings."""
+
     FOLDER_REPORTS_GOOGLE_GROUPS: str = Field(
         default="", alias="FOLDER_REPORTS_GOOGLE_GROUPS"
     )
@@ -202,6 +204,8 @@ class ReportsSettings(BaseSettings):
 
 
 class AWSFeatureSettings(BaseSettings):
+    """AWS Feature configuration settings."""
+
     AWS_ADMIN_GROUPS: list[str] = Field(
         default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
     )
@@ -227,6 +231,17 @@ class IncidentFeatureSettings(BaseSettings):
     SRE_DRIVE_ID: str = Field(default="", alias="SRE_DRIVE_ID")
     SRE_INCIDENT_FOLDER: str = Field(default="", alias="SRE_INCIDENT_FOLDER")
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
+class SreOpsSettings(BaseSettings):
+    """SRE Ops configuration settings."""
+
+    SRE_OPS_CHANNEL_ID: str = Field(default="", alias="SRE_OPS_CHANNEL_ID")
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
@@ -319,6 +334,7 @@ class Settings(BaseSettings):
     reports: ReportsSettings
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
+    sre_ops: SreOpsSettings
 
     # Development settings
     dev: DevSettings
@@ -345,6 +361,7 @@ class Settings(BaseSettings):
             "reports": ReportsSettings,
             "aws_feature": AWSFeatureSettings,
             "feat_incident": IncidentFeatureSettings,
+            "sre_ops": SreOpsSettings,
             "dev": DevSettings,
         }
 
