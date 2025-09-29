@@ -162,9 +162,7 @@ def parse(payload: AwsSnsPayload, client) -> list:  # get_payload_formatter
                 f"Payload Message is empty ```{payload}```",
             )
         else:
-            log_ops_message(
-                f"Unidentified AWS event received ```{payload.Message}```"
-            )
+            log_ops_message(f"Unidentified AWS event received ```{payload.Message}```")
 
     return blocks
 
