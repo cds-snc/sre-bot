@@ -4,7 +4,7 @@ import urllib.parse
 
 from fastapi import HTTPException
 
-from server.utils import log_ops_message
+from modules.ops.notifications import log_ops_message
 from integrations import notify
 from models.webhooks import AwsSnsPayload
 from sns_message_validator import (

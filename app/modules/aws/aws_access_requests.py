@@ -1,12 +1,11 @@
-import boto3  # type: ignore
 import datetime
 import uuid
 
-from slack_sdk import WebClient
-from server.utils import log_ops_message
+import boto3  # type: ignore
 from core.config import settings
 from integrations.aws import identity_store, organizations, sso_admin
-
+from modules.ops.notifications import log_ops_message
+from slack_sdk import WebClient
 
 PREFIX = settings.PREFIX
 
