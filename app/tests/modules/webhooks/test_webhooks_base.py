@@ -1,6 +1,13 @@
-from unittest.mock import patch, ANY
+from unittest.mock import patch, ANY, MagicMock
 from modules.webhooks import base
 from pydantic import BaseModel
+from models.webhooks import (
+    WebhookPayload,
+    AwsSnsPayload,
+    AccessRequest,
+    UpptimePayload,
+    WebhookResult,
+)
 
 
 @patch("modules.webhooks.base.logger")
@@ -44,3 +51,228 @@ def test_validate_payload_returns_none_if_invalid(mock_select_best_model):
         None,  # priorities argument
     )
     assert validated is None
+
+
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_empty(mock_validate_payload):
+    mock_validate_payload.return_value = None
+    request = MagicMock()
+    payload = {}
+
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.message == "No matching model found for payload"
+
+
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_webhook_payload(validate_payload_mock):
+    request = MagicMock()
+    payload = {"text": "This is a test message"}
+    validate_payload_mock.return_value = (
+        WebhookPayload,
+        WebhookPayload(text="This is a test message"),
+    )
+    result = base.handle_webhook_payload(payload, request)
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.status == "success"
+    assert result.action == "post"
+    assert result.payload.text == "This is a test message"
+    assert result.payload.channel is None
+    assert result.payload.attachments == []
+    assert result.payload.blocks == []
+
+
+@patch("modules.webhooks.base.aws.parse")
+@patch("modules.webhooks.base.aws.validate_sns_payload")
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_aws_sns_notification_no_message(
+    validate_payload_mock,
+    validate_sns_payload_mock,
+    parse_mock,
+):
+    request = MagicMock()
+    payload = {"Type": "Notification", "Message": ""}
+    validate_payload_mock.return_value = (
+        AwsSnsPayload,
+        AwsSnsPayload(Type="Notification", Message=""),
+    )
+    validate_sns_payload_mock.return_value = AwsSnsPayload(
+        Type="Notification", Message=""
+    )
+    parse_mock.return_value = ""
+
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.action == "none"
+    assert response.message == "Empty AWS SNS Notification message"
+
+
+@patch("modules.webhooks.base.aws.parse")
+@patch("modules.webhooks.base.aws.validate_sns_payload")
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_aws_sns_notification(
+    validate_payload_mock, validate_sns_payload_mock, parse_mock
+):
+    request = MagicMock()
+    payload = {"Type": "Notification", "Message": "message"}
+    validate_payload_mock.return_value = (
+        AwsSnsPayload,
+        AwsSnsPayload(Type="Notification", Message="message"),
+    )
+    validate_sns_payload_mock.return_value = AwsSnsPayload(
+        Type="Notification", Message="message"
+    )
+    parse_mock.return_value = "parsed_blocks"
+    result = base.handle_webhook_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "post"
+    assert isinstance(result.payload, WebhookPayload)
+    assert result.payload.blocks == "parsed_blocks"
+
+
+@patch("modules.webhooks.base.log_ops_message")
+@patch("modules.webhooks.base.requests.get")
+@patch("modules.webhooks.base.aws.validate_sns_payload")
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_aws_sns_subscription_confirmation(
+    validate_payload_mock,
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = {"Type": "SubscriptionConfirmation", "SubscribeURL": "http://example.com"}
+    validate_payload_mock.return_value = (
+        AwsSnsPayload,
+        AwsSnsPayload(
+            Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
+        ),
+    )
+    validate_sns_payload_mock.return_value = AwsSnsPayload(
+        Type="SubscriptionConfirmation", SubscribeURL="http://example.com"
+    )
+    result = base.handle_webhook_payload(payload, request)
+    assert result.status == "success"
+    assert result.action == "log"
+    assert result.payload is None
+    assert log_ops_message_mock.call_count == 1
+
+
+@patch("modules.webhooks.base.log_ops_message")
+@patch("modules.webhooks.base.requests.get")
+@patch("modules.webhooks.base.aws.validate_sns_payload")
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_with_aws_sns_unsubscribe_confirmation(
+    validate_payload_mock,
+    validate_sns_payload_mock,
+    get_mock,
+    log_ops_message_mock,
+):
+    request = MagicMock()
+    payload = {
+        "Type": "UnsubscribeConfirmation",
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:MyTopic",
+    }
+    validate_payload_mock.return_value = (
+        AwsSnsPayload,
+        AwsSnsPayload(
+            Type="UnsubscribeConfirmation",
+            TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+        ),
+    )
+    validate_sns_payload_mock.return_value = AwsSnsPayload(
+        Type="UnsubscribeConfirmation",
+        TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
+    )
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "log"
+    assert response.payload is None
+    assert log_ops_message_mock.call_count == 1
+
+
+@patch("modules.webhooks.base.log_ops_message")
+@patch("modules.webhooks.base.requests.get")
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_with_access_request(
+    validate_payload_mock, get_mock, log_ops_message_mock
+):
+    request = MagicMock()
+    payload = {
+        "account": "account1",
+        "reason": "reason1",
+        "startDate": "2025-09-25T12:00:00Z",
+        "endDate": "2025-09-26T12:00:00Z",
+    }
+    validate_payload_mock.return_value = (
+        AccessRequest,
+        AccessRequest(
+            account="account1",
+            reason="reason1",
+            startDate="2025-09-25T12:00:00Z",
+            endDate="2025-09-26T12:00:00Z",
+        ),
+    )
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "post"
+    assert (
+        response.payload.text
+        == "{'account': 'account1', 'reason': 'reason1', 'startDate': datetime.datetime(2025, 9, 25, 12, 0, tzinfo=TzInfo(UTC)), 'endDate': datetime.datetime(2025, 9, 26, 12, 0, tzinfo=TzInfo(UTC))}"
+    )
+
+
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_upptime(validate_payload_mock):
+    request = MagicMock()
+    payload = {
+        "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
+    }
+    validate_payload_mock.return_value = (
+        UpptimePayload,
+        UpptimePayload(
+            text="🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
+        ),
+    )
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "success"
+    assert response.action == "post"
+    assert response.payload.blocks == [
+        {"text": {"text": " ", "type": "mrkdwn"}, "type": "section"},
+        {
+            "text": {
+                "text": "📈 Web Application Status Changed!",
+                "type": "plain_text",
+            },
+            "type": "header",
+        },
+        {
+            "text": {
+                "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222",
+                "type": "mrkdwn",
+            },
+            "type": "section",
+        },
+    ]
+
+
+@patch("modules.webhooks.base.validate_payload")
+def test_handle_webhook_payload_with_invalid_payload_type(
+    mock_validate_payload,
+):
+    class UnknownPayload(BaseModel):
+        invalid_field: str
+
+        class Config:
+            extra = "forbid"
+
+    request = MagicMock()
+    payload = {}
+    mock_validate_payload.return_value = (
+        UnknownPayload,
+        UnknownPayload(invalid_field="invalid_field"),
+    )
+
+    response = base.handle_webhook_payload(payload, request)
+    assert response.status == "error"
+    assert response.message == "No matching model found for payload"
