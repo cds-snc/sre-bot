@@ -1,11 +1,12 @@
-import re
+import os
 import importlib
-from typing import Optional, Dict, List, Callable, Any, Pattern, Literal
-from pydantic.dataclasses import dataclass
-from pydantic import field_validator
+import re
+from typing import Any, Callable, Dict, List, Literal, Optional, Pattern
 
-from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
 from core.logging import get_module_logger
+from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
+from pydantic import field_validator
+from pydantic.dataclasses import dataclass
 
 logger = get_module_logger()
 
@@ -215,11 +216,19 @@ def process_simple_text_payload(payload: SimpleTextPayload) -> WebhookResult:
     )
 
 
-# Register built-in patterns on module import
-try:
-    from modules.webhooks.patterns.simple_text.upptime import UPPTIME_HANDLER
-
-    register_pattern(UPPTIME_HANDLER)
-    logger.info("registered_upptime_pattern")
-except ImportError as e:
-    logger.warning("failed_to_register_upptime_pattern", error=str(e))
+# Auto-discover and register all pattern handlers in the patterns directory
+patterns_dir = os.path.join(os.path.dirname(__file__), "patterns", "simple_text")
+for fname in os.listdir(patterns_dir):
+    if fname.endswith(".py") and not fname.startswith("__"):
+        mod_name = f"modules.webhooks.patterns.simple_text.{fname[:-3]}"
+        try:
+            mod = importlib.import_module(mod_name)
+            # Register any variable ending with _HANDLER
+            for attr in dir(mod):
+                if attr.endswith("_HANDLER"):
+                    register_pattern(getattr(mod, attr))
+                    logger.info(f"registered_pattern: {attr}")
+        except Exception as e:
+            logger.warning(
+                f"failed_to_register_pattern_module: {mod_name}", error=str(e)
+            )
