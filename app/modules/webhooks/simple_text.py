@@ -5,6 +5,9 @@ from pydantic.dataclasses import dataclass
 from pydantic import field_validator
 
 from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
+from core.logging import get_module_logger
+
+logger = get_module_logger()
 
 
 @dataclass
@@ -193,7 +196,6 @@ def process_simple_text_payload(payload: SimpleTextPayload) -> WebhookResult:
         WebhookResult with the formatted payload ready for posting to Slack
     """
     text = payload.text
-
     matched_handler = find_matching_handler(text)
 
     if matched_handler:
@@ -211,3 +213,13 @@ def process_simple_text_payload(payload: SimpleTextPayload) -> WebhookResult:
         action="post",
         payload=formatted_payload,
     )
+
+
+# Register built-in patterns on module import
+try:
+    from modules.webhooks.patterns.simple_text.upptime import UPPTIME_HANDLER
+
+    register_pattern(UPPTIME_HANDLER)
+    logger.info("registered_upptime_pattern")
+except ImportError as e:
+    logger.warning("failed_to_register_upptime_pattern", error=str(e))

@@ -1,5 +1,5 @@
 from models.webhooks import WebhookPayload
-from modules.webhooks.simple_text import SimpleTextPattern, register_pattern
+from modules.webhooks.simple_text import SimpleTextPattern
 
 
 def handle_upptime_payload(text: str) -> WebhookPayload:
@@ -94,8 +94,3 @@ UPPTIME_HANDLER: SimpleTextPattern = SimpleTextPattern(
     priority=10,
     enabled=True,
 )
-
-
-def register_upptime_pattern():
-    """Register the Upptime pattern handler."""
-    register_pattern(UPPTIME_HANDLER)

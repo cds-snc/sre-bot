@@ -3,9 +3,8 @@ from modules.webhooks.patterns.simple_text.upptime import (
     handle_upptime_payload,
     is_upptime_pattern,
     UPPTIME_HANDLER,
-    register_upptime_pattern,
 )
-from modules.webhooks.simple_text import PATTERN_HANDLERS, SimpleTextPattern
+from modules.webhooks.simple_text import SimpleTextPattern
 
 
 def test_handle_upptime_payload_service_down():
@@ -134,20 +133,6 @@ def test_upptime_handler_pattern_configuration():
     )
     assert UPPTIME_HANDLER.priority == 10
     assert UPPTIME_HANDLER.enabled is True
-
-
-def test_register_upptime_pattern():
-    """Test registration of the Upptime pattern."""
-    # Clear existing handlers
-    PATTERN_HANDLERS.clear()
-
-    # Register the pattern
-    register_upptime_pattern()
-
-    # Verify it was registered
-    assert len(PATTERN_HANDLERS) == 1
-    assert PATTERN_HANDLERS[0].name == "upptime_monitoring"
-    assert PATTERN_HANDLERS[0].priority == 10
 
 
 def test_handle_upptime_payload_block_structure():
