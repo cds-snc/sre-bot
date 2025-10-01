@@ -5,7 +5,7 @@ from models.webhooks import (
     WebhookPayload,
     AwsSnsPayload,
     AccessRequest,
-    UpptimePayload,
+    SimpleTextPayload,
     WebhookResult,
 )
 
@@ -157,8 +157,8 @@ def test_handle_webhook_payload_upptime(validate_payload_mock):
         "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
     }
     validate_payload_mock.return_value = (
-        UpptimePayload,
-        UpptimePayload(
+        SimpleTextPayload,
+        SimpleTextPayload(
             text="🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
         ),
     )

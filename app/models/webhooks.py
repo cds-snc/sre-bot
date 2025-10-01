@@ -58,7 +58,7 @@ class AccessRequest(BaseModel):
     endDate: datetime
 
 
-class UpptimePayload(BaseModel):
+class SimpleTextPayload(BaseModel):
     text: str
 
 

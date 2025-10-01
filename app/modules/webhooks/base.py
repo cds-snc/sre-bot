@@ -8,7 +8,7 @@ from models.webhooks import (
     WebhookPayload,
     AwsSnsPayload,
     AccessRequest,
-    UpptimePayload,
+    SimpleTextPayload,
     WebhookResult,
 )
 from modules.webhooks.aws import process_aws_sns_payload
@@ -34,7 +34,7 @@ def validate_payload(
         WebhookPayload,
         AwsSnsPayload,
         AccessRequest,
-        UpptimePayload,
+        SimpleTextPayload,
     ]
 
     selected_model = select_best_model(payload_dict, models, priorities)
@@ -76,10 +76,10 @@ def handle_webhook_payload(
         return WebhookResult(status="error", message=error_message)
 
     # handler_map = {
-    #     "WebhookPayload": "handle_webhook_payload",
+    #     "WebhookPayload": "process_webhook_payload",
     #     "AwsSnsPayload": "process_aws_sns_payload",
-    #     "AccessRequest": "handle_access_request_payload",
-    #     "UpptimePayload": "handle_upptime_payload",
+    #     "AccessRequest": "process_access_request_payload",
+    #     "SimpleTextPayload": "process_simple_text_payload",
     # }
 
     match payload_type.__name__:
@@ -101,8 +101,8 @@ def handle_webhook_payload(
                 payload=WebhookPayload(text=message),
             )
 
-        case "UpptimePayload":
-            text = cast(UpptimePayload, validated_payload).text
+        case "SimpleTextPayload":
+            text = cast(SimpleTextPayload, validated_payload).text
             header_text = "📈 Web Application Status Changed!"
             blocks = [
                 {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
