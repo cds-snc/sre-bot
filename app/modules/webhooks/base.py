@@ -12,6 +12,7 @@ from models.webhooks import (
     WebhookResult,
 )
 from modules.webhooks.aws import process_aws_sns_payload
+from modules.webhooks.simple_text import process_simple_text_payload
 
 logger = get_module_logger()
 
@@ -102,27 +103,8 @@ def handle_webhook_payload(
             )
 
         case "SimpleTextPayload":
-            text = cast(SimpleTextPayload, validated_payload).text
-            header_text = "📈 Web Application Status Changed!"
-            blocks = [
-                {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
-                {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": f"{header_text}"},
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"{text}",
-                    },
-                },
-            ]
-            webhook_result = WebhookResult(
-                status="success",
-                action="post",
-                payload=WebhookPayload(blocks=blocks),
-            )
+            simple_text_payload = cast(SimpleTextPayload, validated_payload)
+            webhook_result = process_simple_text_payload(simple_text_payload)
 
         case _:
             webhook_result = WebhookResult(
