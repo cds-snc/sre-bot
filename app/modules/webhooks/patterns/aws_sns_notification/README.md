@@ -25,6 +25,7 @@ The AWS SNS webhook processing has been refactored from a single `parse()` funct
 ### Pattern Handler Structure
 
 Each pattern handler module contains:
+
 1. **Handler Function**: Processes the specific notification type and returns Slack blocks
 2. **Pattern Matcher**: Function to determine if a payload matches this pattern
 3. **Pattern Registration**: AwsNotificationPattern configuration object
@@ -48,12 +49,14 @@ The following pattern handlers have been implemented:
 The `AwsNotificationPattern` class supports multiple matching strategies:
 
 ### Match Types
+
 - **`regex`**: Regular expression pattern matching
 - **`contains`**: Simple substring matching
 - **`callable`**: Custom function for complex matching logic
 - **`message_structure`**: JSON key existence checking
 
 ### Match Targets
+
 - **`message`**: Match against the raw message content
 - **`subject`**: Match against the SNS subject field
 - **`topic_arn`**: Match against the topic ARN
@@ -126,16 +129,20 @@ blocks = process_aws_notification_payload(payload, client)
 ## Migration Notes
 
 ### Breaking Changes
+
 - Removed `parse()` function from `aws_sns.py`
 - Removed all `format_*()` functions from `aws_sns.py`
 - Removed `NOTIFY_OPS_CHANNEL_ID` from `aws_sns.py`
 - Removed `send_message_to_notify_chanel()` function from `aws_sns.py`
 
 ### Backward Compatibility
+
 The public API for `process_aws_sns_payload()` remains unchanged. Only internal implementation details have changed.
 
 ### Test Updates Required
+
 Existing tests will need to be updated to:
+
 1. Import functions from the new pattern handler modules instead of `aws_sns.py`
 2. Update mocking paths to the new module locations
 3. Test the new pattern coordinator functionality
@@ -143,6 +150,7 @@ Existing tests will need to be updated to:
 ## Files Changed
 
 ### New Files
+
 - `modules/webhooks/aws_sns_notification.py`
 - `modules/webhooks/patterns/aws_sns_notification/__init__.py`
 - `modules/webhooks/patterns/aws_sns_notification/cloudwatch_alarm.py`
@@ -154,6 +162,7 @@ Existing tests will need to be updated to:
 - `modules/webhooks/patterns/aws_sns_notification/budget_auto_adjustment.py`
 
 ### Modified Files
+
 - `modules/webhooks/aws_sns.py` (significantly simplified)
 
 ## Future Enhancements

@@ -46,8 +46,12 @@ def validate_blocks(blocks: List[Dict]) -> bool:
         # Basic validation for common block types
         block_type = block.get("type")
 
-        # Section and header blocks require text
-        if block_type in ["section", "header"] and "text" not in block:
+        # Section blocks require text OR fields
+        if block_type == "section" and "text" not in block and "fields" not in block:
+            return False
+
+        # Header blocks require text
+        if block_type == "header" and "text" not in block:
             return False
 
         # Divider blocks should be minimal
