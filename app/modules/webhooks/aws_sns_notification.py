@@ -7,11 +7,39 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Pattern, Union
 from core.logging import get_module_logger
 from models.webhooks import AwsSnsPayload
 from modules.ops.notifications import log_ops_message
-from pydantic import field_validator
+from pydantic import field_validator, ValidationError
 from pydantic.dataclasses import dataclass
 from slack_sdk import WebClient
 
 logger = get_module_logger()
+
+
+def validate_slack_blocks(blocks: List[Dict]) -> bool:
+    """
+    Validate that the returned blocks are valid Slack block structures.
+
+    Args:
+        blocks: List of Slack block dictionaries
+
+    Returns:
+        bool: True if blocks are valid, False otherwise
+    """
+    if not isinstance(blocks, list):
+        return False
+
+    for block in blocks:
+        if not isinstance(block, dict):
+            return False
+        if "type" not in block:
+            return False
+        # Basic validation for common block types
+        block_type = block.get("type")
+        if block_type in ["section", "header"] and "text" not in block:
+            return False
+        if block_type == "divider" and len(block) > 1:
+            return False
+
+    return True
 
 
 @dataclass
@@ -245,8 +273,16 @@ def find_matching_handler(
                 # For message_structure, pattern should be a key that exists in the parsed message
                 if compiled_pattern in parsed_message:
                     return handler
-        except Exception:  # pylint: disable=broad-except
+        except Exception as exc:  # pylint: disable=broad-except
             # Skip handlers that raise exceptions during matching or compilation
+            logger.warning(
+                "handler_pattern_matching_failed",
+                handler_name=handler.name,
+                match_type=handler.match_type,
+                pattern=handler.pattern[:100],  # Truncate long patterns
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             continue
 
     return None
@@ -277,38 +313,160 @@ def process_aws_notification_payload(
         try:
             handler_function = matched_handler.get_handler_function()
             blocks = handler_function(payload, client)
+
+            # Validate the returned blocks
+            if blocks and not validate_slack_blocks(blocks):
+                logger.warning(
+                    "handler_returned_invalid_blocks",
+                    handler_name=matched_handler.name,
+                    handler_path=matched_handler.handler,
+                    blocks_type=type(blocks).__name__,
+                )
+                return handle_generic_notification(payload, client)
+
+            logger.info(
+                "handler_processed_successfully",
+                handler_name=matched_handler.name,
+                handler_path=matched_handler.handler,
+                blocks_count=len(blocks) if blocks else 0,
+            )
             return blocks if blocks else []
-        except Exception:  # pylint: disable=broad-except
-            # If handler import/execution fails, fall back to generic handling
+
+        except ImportError as exc:
+            logger.error(
+                "handler_import_failed",
+                handler_name=matched_handler.name,
+                handler_path=matched_handler.handler,
+                error=str(exc),
+            )
+            return handle_generic_notification(payload, client)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error(
+                "handler_execution_failed",
+                handler_name=matched_handler.name,
+                handler_path=matched_handler.handler,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             return handle_generic_notification(payload, client)
     else:
+        logger.info(
+            "no_matching_handler_found",
+            payload_type=payload.Type,
+            message_length=len(payload.Message) if payload.Message else 0,
+            subject=payload.Subject,
+            topic_arn=payload.TopicArn,
+        )
         return handle_generic_notification(payload, client)
+
+
+def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
+    """Register handlers from a single module.
+
+    Returns:
+        tuple[int, int]: (registered_count, failed_count)
+    """
+    registered_count = 0
+    failed_count = 0
+
+    for attr in dir(mod):
+        if attr.endswith("_HANDLER"):
+            try:
+                pattern = getattr(mod, attr)
+                register_notification_pattern(pattern)
+                registered_count += 1
+                logger.info(
+                    "registered_notification_pattern",
+                    module=mod_name,
+                    pattern_name=getattr(pattern, "name", attr),
+                    handler_attr=attr,
+                )
+            except Exception as handler_exc:
+                logger.error(
+                    "failed_to_register_pattern_handler",
+                    module=mod_name,
+                    handler_attr=attr,
+                    error=str(handler_exc),
+                    error_type=type(handler_exc).__name__,
+                )
+                failed_count += 1
+
+    if registered_count == 0:
+        logger.info(
+            "no_handlers_found_in_module",
+            module=mod_name,
+        )
+
+    return registered_count, failed_count
+
+
+def _load_pattern_module(mod_name: str, fname: str) -> tuple[int, int]:
+    """Load a single pattern module and register its handlers.
+
+    Returns:
+        tuple[int, int]: (registered_count, failed_count)
+    """
+    try:
+        mod = importlib.import_module(mod_name)
+        return _register_handlers_from_module(mod, mod_name)
+    except ImportError as import_exc:
+        logger.error(
+            "failed_to_import_pattern_module",
+            module=mod_name,
+            filename=fname,
+            error=str(import_exc),
+            error_type="ImportError",
+        )
+        return 0, 1
+    except SyntaxError as syntax_exc:
+        logger.error(
+            "syntax_error_in_pattern_module",
+            module=mod_name,
+            filename=fname,
+            error=str(syntax_exc),
+            error_type="SyntaxError",
+        )
+        return 0, 1
+    except Exception as exc:
+        logger.error(
+            "unexpected_error_loading_pattern_module",
+            module=mod_name,
+            filename=fname,
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        return 0, 1
 
 
 def init_notification_handlers():
     """Initialize and register default notification pattern handlers."""
-    # Auto-discover and register all pattern handlers in the patterns/aws_sns_notification directory
     patterns_dir = os.path.join(
         os.path.dirname(__file__), "patterns", "aws_sns_notification"
     )
-    if patterns_dir and os.path.isdir(patterns_dir):
-        for fname in os.listdir(patterns_dir):
-            if fname.endswith(".py") and not fname.startswith("__"):
-                mod_name = (
-                    f"modules.webhooks.patterns.aws_sns_notification.{fname[:-3]}"
-                )
-                try:
-                    mod = importlib.import_module(mod_name)
-                    # Register any variable ending with _HANDLER
-                    for attr in dir(mod):
-                        if attr.endswith("_HANDLER"):
-                            register_notification_pattern(getattr(mod, attr))
-                            logger.info(f"registered_notification_pattern: {attr}")
-                except Exception as e:
-                    logger.warning(
-                        f"failed_to_register_notification_pattern_module: {mod_name}",
-                        error=str(e),
-                    )
+
+    if not patterns_dir or not os.path.isdir(patterns_dir):
+        logger.warning(
+            "patterns_directory_not_found",
+            patterns_dir=patterns_dir,
+        )
+        return
+
+    total_registered = 0
+    total_failed = 0
+
+    for fname in os.listdir(patterns_dir):
+        if fname.endswith(".py") and not fname.startswith("__"):
+            mod_name = f"modules.webhooks.patterns.aws_sns_notification.{fname[:-3]}"
+            registered, failed = _load_pattern_module(mod_name, fname)
+            total_registered += registered
+            total_failed += failed
+
+    logger.info(
+        "notification_handlers_initialization_complete",
+        registered_count=total_registered,
+        failed_count=total_failed,
+        total_handlers=len(NOTIFICATION_HANDLERS),
+    )
 
 
 # Initialize default patterns on module load

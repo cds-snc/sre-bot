@@ -365,3 +365,236 @@ def test_aws_notification_pattern_get_compiled_pattern_callable(monkeypatch):
     pattern.pattern = "notamodule.notafunc"
     with pytest.raises(ValueError):
         pattern.get_compiled_pattern()
+
+
+def test_validate_slack_blocks():
+    from modules.webhooks.aws_sns_notification import validate_slack_blocks
+
+    # Valid blocks
+    valid_blocks = [
+        {"type": "section", "text": {"type": "mrkdwn", "text": "Hello"}},
+        {"type": "divider"},
+        {"type": "header", "text": {"type": "plain_text", "text": "Header"}},
+    ]
+    assert validate_slack_blocks(valid_blocks) is True
+
+    # Invalid blocks - not a list
+    assert validate_slack_blocks("not a list") is False
+
+    # Invalid blocks - block not a dict
+    assert validate_slack_blocks(["not a dict"]) is False
+
+    # Invalid blocks - missing type
+    assert validate_slack_blocks([{"text": "no type"}]) is False
+
+    # Invalid blocks - section missing text
+    assert validate_slack_blocks([{"type": "section"}]) is False
+
+    # Invalid blocks - header missing text
+    assert validate_slack_blocks([{"type": "header"}]) is False
+
+    # Invalid blocks - divider with extra fields
+    assert validate_slack_blocks([{"type": "divider", "extra": "field"}]) is False
+
+    # Empty list is valid
+    assert validate_slack_blocks([]) is True
+
+
+def test_get_match_text_invalid_target(monkeypatch):
+    # Create a valid pattern first
+    pattern = AwsNotificationPattern(
+        name="test",
+        pattern="foo",
+        handler="x.y.z",
+        match_target="message",
+    )
+    # Then directly set an invalid target to bypass validation
+    monkeypatch.setattr(pattern, "match_target", "invalid_target")
+    payload = AwsSnsPayload(Message="abc")
+    assert pattern.get_match_text(payload, "abc") == ""
+
+
+def test_get_match_text_all_targets():
+    pattern = AwsNotificationPattern(
+        name="test",
+        pattern="foo",
+        handler="x.y.z",
+        match_target="message",
+    )
+    payload = AwsSnsPayload(
+        Message="test message",
+        Subject="test subject",
+        TopicArn="arn:aws:sns:us-east-1:123:test",
+    )
+
+    # Test message target
+    pattern.match_target = "message"
+    assert pattern.get_match_text(payload, "parsed") == "test message"
+
+    # Test subject target
+    pattern.match_target = "subject"
+    assert pattern.get_match_text(payload, "parsed") == "test subject"
+
+    # Test topic_arn target
+    pattern.match_target = "topic_arn"
+    assert pattern.get_match_text(payload, "parsed") == "arn:aws:sns:us-east-1:123:test"
+
+    # Test parsed_message target with dict
+    pattern.match_target = "parsed_message"
+    parsed_dict = {"key": "value"}
+    assert pattern.get_match_text(payload, parsed_dict) == '{"key": "value"}'
+
+    # Test parsed_message target with string
+    assert pattern.get_match_text(payload, "parsed string") == "parsed string"
+
+
+def test_find_matching_handler_exception_handling(monkeypatch):
+    from modules.webhooks.aws_sns_notification import (
+        NOTIFICATION_HANDLERS,
+        find_matching_handler,
+        register_notification_pattern,
+    )
+
+    NOTIFICATION_HANDLERS.clear()
+
+    # Create a pattern that raises an exception during get_compiled_pattern
+    class BadPattern(AwsNotificationPattern):
+        def get_compiled_pattern(self):
+            raise ValueError("Pattern compilation failed")
+
+    bad_pattern = BadPattern(
+        name="bad_pattern",
+        pattern="foo",
+        handler="x.y.z",
+        match_type="regex",
+    )
+    register_notification_pattern(bad_pattern)
+
+    payload = AwsSnsPayload(Message="test")
+    result = find_matching_handler(payload, "test")
+    assert result is None
+
+
+def test_find_matching_handler_message_structure():
+    from modules.webhooks.aws_sns_notification import (
+        NOTIFICATION_HANDLERS,
+        find_matching_handler,
+        register_notification_pattern,
+    )
+
+    NOTIFICATION_HANDLERS.clear()
+
+    # Pattern that matches message structure
+    pattern = AwsNotificationPattern(
+        name="struct_pattern",
+        pattern="AlarmName",
+        handler="x.y.z",
+        match_type="message_structure",
+        match_target="parsed_message",
+    )
+    register_notification_pattern(pattern)
+
+    payload = AwsSnsPayload(Message='{"AlarmName": "TestAlarm"}')
+    parsed_message = {"AlarmName": "TestAlarm", "State": "ALARM"}
+
+    result = find_matching_handler(payload, parsed_message)
+    assert result is not None
+    assert result.name == "struct_pattern"
+
+    # Should not match if key is missing
+    parsed_message_no_match = {"State": "ALARM"}
+    result_no_match = find_matching_handler(payload, parsed_message_no_match)
+    assert result_no_match is None
+
+
+def test_process_aws_notification_payload_handler_exception(monkeypatch):
+    from modules.webhooks.aws_sns_notification import (
+        NOTIFICATION_HANDLERS,
+        process_aws_notification_payload,
+        register_notification_pattern,
+    )
+
+    NOTIFICATION_HANDLERS.clear()
+
+    # Create a handler that raises an exception
+    def bad_handler(payload, client):
+        raise RuntimeError("Handler execution failed")
+
+    dummy_module = types.ModuleType("bad_handler_module")
+    setattr(dummy_module, "bad_handler", bad_handler)
+    monkeypatch.setitem(__import__("sys").modules, "bad_handler_module", dummy_module)
+
+    pattern = AwsNotificationPattern(
+        name="bad_handler_pattern",
+        pattern="test",
+        handler="bad_handler_module.bad_handler",
+        match_type="contains",
+    )
+    register_notification_pattern(pattern)
+
+    payload = AwsSnsPayload(Message="test message")
+    client = MagicMock()
+
+    result = process_aws_notification_payload(payload, client)
+    # Should fall back to generic handler (returns empty list)
+    assert result == []
+
+
+def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
+    from modules.webhooks.aws_sns_notification import (
+        NOTIFICATION_HANDLERS,
+        process_aws_notification_payload,
+        register_notification_pattern,
+    )
+
+    NOTIFICATION_HANDLERS.clear()
+
+    # Create a handler that returns invalid blocks
+    def invalid_blocks_handler(payload, client):
+        return "not a list"  # Invalid return type
+
+    dummy_module = types.ModuleType("invalid_handler_module")
+    setattr(dummy_module, "invalid_blocks_handler", invalid_blocks_handler)
+    monkeypatch.setitem(
+        __import__("sys").modules, "invalid_handler_module", dummy_module
+    )
+
+    pattern = AwsNotificationPattern(
+        name="invalid_blocks_pattern",
+        pattern="test",
+        handler="invalid_handler_module.invalid_blocks_handler",
+        match_type="contains",
+    )
+    register_notification_pattern(pattern)
+
+    payload = AwsSnsPayload(Message="test message")
+    client = MagicMock()
+
+    result = process_aws_notification_payload(payload, client)
+    # Should fall back to generic handler due to invalid blocks
+    assert result == []
+
+
+def test_process_aws_notification_payload_import_error(monkeypatch):
+    from modules.webhooks.aws_sns_notification import (
+        NOTIFICATION_HANDLERS,
+        process_aws_notification_payload,
+        register_notification_pattern,
+    )
+
+    NOTIFICATION_HANDLERS.clear()
+
+    pattern = AwsNotificationPattern(
+        name="import_error_pattern",
+        pattern="test",
+        handler="nonexistent_module.nonexistent_handler",
+        match_type="contains",
+    )
+    register_notification_pattern(pattern)
+
+    payload = AwsSnsPayload(Message="test message")
+    client = MagicMock()
+
+    result = process_aws_notification_payload(payload, client)
+    # Should fall back to generic handler due to import error
+    assert result == []
