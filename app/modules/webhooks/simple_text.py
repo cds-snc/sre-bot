@@ -216,19 +216,26 @@ def process_simple_text_payload(payload: SimpleTextPayload) -> WebhookResult:
     )
 
 
-# Auto-discover and register all pattern handlers in the patterns directory
-patterns_dir = os.path.join(os.path.dirname(__file__), "patterns", "simple_text")
-for fname in os.listdir(patterns_dir):
-    if fname.endswith(".py") and not fname.startswith("__"):
-        mod_name = f"modules.webhooks.patterns.simple_text.{fname[:-3]}"
-        try:
-            mod = importlib.import_module(mod_name)
-            # Register any variable ending with _HANDLER
-            for attr in dir(mod):
-                if attr.endswith("_HANDLER"):
-                    register_pattern(getattr(mod, attr))
-                    logger.info(f"registered_pattern: {attr}")
-        except Exception as e:
-            logger.warning(
-                f"failed_to_register_pattern_module: {mod_name}", error=str(e)
-            )
+def init_pattern_handlers():
+    """Initialize and register default pattern handlers."""
+    # Auto-discover and register all pattern handlers in the patterns directory
+    patterns_dir = os.path.join(os.path.dirname(__file__), "patterns", "simple_text")
+    if patterns_dir and os.path.isdir(patterns_dir):
+        for fname in os.listdir(patterns_dir):
+            if fname.endswith(".py") and not fname.startswith("__"):
+                mod_name = f"modules.webhooks.patterns.simple_text.{fname[:-3]}"
+                try:
+                    mod = importlib.import_module(mod_name)
+                    # Register any variable ending with _HANDLER
+                    for attr in dir(mod):
+                        if attr.endswith("_HANDLER"):
+                            register_pattern(getattr(mod, attr))
+                            logger.info(f"registered_pattern: {attr}")
+                except Exception as e:
+                    logger.warning(
+                        f"failed_to_register_pattern_module: {mod_name}", error=str(e)
+                    )
+
+
+# Initialize default patterns on module load
+init_pattern_handlers()

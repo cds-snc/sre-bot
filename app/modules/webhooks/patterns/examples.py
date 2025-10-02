@@ -2,7 +2,11 @@
 Example patterns showing the different match types and configuration options.
 """
 
+from core.logging import get_module_logger
 from modules.webhooks.simple_text import SimpleTextPattern, register_pattern
+
+
+logger = get_module_logger()
 
 # Example patterns using different match types
 EXAMPLE_PATTERNS = [
@@ -58,9 +62,13 @@ def register_patterns_from_config(config_list):
         try:
             pattern = SimpleTextPattern.from_dict(config)
             register_pattern(pattern)
-            print(f"Registered pattern: {pattern.name}")
+            logger.info("pattern_registration_success", pattern_name=pattern.name)
         except Exception as e:  # pylint: disable=broad-except
-            print(f"Failed to register pattern {config.get('name', 'unknown')}: {e}")
+            logger.error(
+                "pattern_registration_failure",
+                pattern_name=config.get("name", "unknown"),
+                error=str(e),
+            )
 
 
 if __name__ == "__main__":
