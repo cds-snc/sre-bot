@@ -4,7 +4,12 @@ import pytest
 from models.webhooks import AwsSnsPayload, WebhookPayload
 from modules.webhooks import aws_sns
 from fastapi import HTTPException
-from sns_message_validator import SignatureVerificationFailureException
+from sns_message_validator import (
+    InvalidCertURLException,
+    InvalidMessageTypeException,
+    InvalidSignatureVersionException,
+    SignatureVerificationFailureException,
+)
 
 
 @patch("modules.webhooks.aws_sns.log_ops_message")
@@ -43,7 +48,7 @@ def test_validate_sns_payload_invalid_message_type(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = Exception(
+    validate_message_mock.side_effect = InvalidMessageTypeException(
         "InvalidType is not a valid message type."
     )
     with pytest.raises(HTTPException) as e:
@@ -68,7 +73,7 @@ def test_validate_sns_payload_invalid_signature_version(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = Exception(
+    validate_message_mock.side_effect = InvalidSignatureVersionException(
         "Invalid signature version. Unable to verify signature."
     )
     with pytest.raises(HTTPException) as e:
@@ -93,7 +98,9 @@ def test_validate_sns_payload_invalid_signature_url(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = Exception("Invalid certificate URL.")
+    validate_message_mock.side_effect = InvalidCertURLException(
+        "Invalid certificate URL."
+    )
     with pytest.raises(HTTPException) as e:
         aws_sns.validate_sns_payload(payload, client)
     assert e.value.status_code == 500

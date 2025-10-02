@@ -44,6 +44,16 @@ def test_aws_notification_pattern_validate_invalid_name():
     assert "AwsNotificationPattern.name must be a non-empty str" in str(excinfo.value)
 
 
+def test_aws_notification_pattern_validate_name_type_error():
+    with pytest.raises(ValueError) as excinfo:
+        AwsNotificationPattern(
+            name=123,  # not a string
+            pattern="foo",
+            handler="x.y.z",
+        )
+    assert "Input should be a valid string" in str(excinfo.value)
+
+
 def test_aws_notification_pattern_validate_invalid_fields():
     with pytest.raises(ValueError) as excinfo:
         AwsNotificationPattern(
@@ -80,6 +90,17 @@ def test_aws_notification_pattern_validate_invalid_match_type_enabled_priority()
         "Input should be 'regex', 'contains', 'callable' or 'message_structure'"
         in str(excinfo.value)
     )
+
+
+def test_aws_notification_pattern_validate_priority_none():
+    with pytest.raises(ValidationError) as excinfo:
+        AwsNotificationPattern(
+            name="test",
+            pattern="foo",
+            handler="x.y.z",
+            priority=None,
+        )
+    assert "Input should be a valid integer" in str(excinfo.value)
 
 
 def test_aws_notification_pattern_validate_invalid_enabled_priority_extended():
