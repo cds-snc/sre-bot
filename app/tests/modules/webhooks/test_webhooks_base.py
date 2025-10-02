@@ -5,7 +5,7 @@ from models.webhooks import (
     WebhookPayload,
     AwsSnsPayload,
     AccessRequest,
-    UpptimePayload,
+    SimpleTextPayload,
     WebhookResult,
 )
 
@@ -150,18 +150,45 @@ def test_handle_webhook_payload_with_access_request(validate_payload_mock):
     )
 
 
+@patch("modules.webhooks.base.process_simple_text_payload")
 @patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_upptime(validate_payload_mock):
+def test_handle_webhook_payload_upptime(
+    validate_payload_mock, process_simple_text_payload_mock
+):
     request = MagicMock()
     payload = {
         "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
     }
     validate_payload_mock.return_value = (
-        UpptimePayload,
-        UpptimePayload(
+        SimpleTextPayload,
+        SimpleTextPayload(
             text="🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
         ),
     )
+    process_simple_text_payload_mock.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(
+            blocks=[
+                {"text": {"text": " ", "type": "mrkdwn"}, "type": "section"},
+                {
+                    "text": {
+                        "text": "📈 Web Application Status Changed!",
+                        "type": "plain_text",
+                    },
+                    "type": "header",
+                },
+                {
+                    "text": {
+                        "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222",
+                        "type": "mrkdwn",
+                    },
+                    "type": "section",
+                },
+            ],
+        ),
+    )
+
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "success"
     assert response.action == "post"
