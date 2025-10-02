@@ -368,7 +368,7 @@ def test_aws_notification_pattern_get_compiled_pattern_callable(monkeypatch):
 
 
 def test_validate_slack_blocks():
-    from modules.webhooks.aws_sns_notification import validate_slack_blocks
+    from integrations.slack.blocks import validate_blocks as validate_slack_blocks
 
     # Valid blocks
     valid_blocks = [

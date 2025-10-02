@@ -5,41 +5,14 @@ import re
 from typing import Any, Callable, Dict, List, Literal, Optional, Pattern, Union
 
 from core.logging import get_module_logger
+from integrations.slack.blocks import validate_blocks
 from models.webhooks import AwsSnsPayload
 from modules.ops.notifications import log_ops_message
-from pydantic import field_validator, ValidationError
+from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 from slack_sdk import WebClient
 
 logger = get_module_logger()
-
-
-def validate_slack_blocks(blocks: List[Dict]) -> bool:
-    """
-    Validate that the returned blocks are valid Slack block structures.
-
-    Args:
-        blocks: List of Slack block dictionaries
-
-    Returns:
-        bool: True if blocks are valid, False otherwise
-    """
-    if not isinstance(blocks, list):
-        return False
-
-    for block in blocks:
-        if not isinstance(block, dict):
-            return False
-        if "type" not in block:
-            return False
-        # Basic validation for common block types
-        block_type = block.get("type")
-        if block_type in ["section", "header"] and "text" not in block:
-            return False
-        if block_type == "divider" and len(block) > 1:
-            return False
-
-    return True
 
 
 @dataclass
@@ -315,7 +288,7 @@ def process_aws_notification_payload(
             blocks = handler_function(payload, client)
 
             # Validate the returned blocks
-            if blocks and not validate_slack_blocks(blocks):
+            if blocks and not validate_blocks(blocks):
                 logger.warning(
                     "handler_returned_invalid_blocks",
                     handler_name=matched_handler.name,
