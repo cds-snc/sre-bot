@@ -11,7 +11,7 @@ from models.webhooks import (
     SimpleTextPayload,
     WebhookResult,
 )
-from modules.webhooks.aws import process_aws_sns_payload
+from modules.webhooks.aws_sns import process_aws_sns_payload
 from modules.webhooks.simple_text import process_simple_text_payload
 
 logger = get_module_logger()

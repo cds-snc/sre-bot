@@ -1,7 +1,7 @@
 import os
-import main
-
 from unittest.mock import patch
+
+import main
 
 
 @patch("main.SocketModeHandler")
