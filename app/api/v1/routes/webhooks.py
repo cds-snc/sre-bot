@@ -22,7 +22,7 @@ limiter = get_limiter()
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
-async def handle_webhook(
+def handle_webhook(
     webhook_id: str,
     request: Request,
     payload: Union[Dict[Any, Any], str] = Body(...),
