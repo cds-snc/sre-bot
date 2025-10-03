@@ -10,6 +10,7 @@ from models.webhooks import (
 )
 from modules.slack import webhooks
 from modules.webhooks.base import handle_webhook_payload
+from modules.webhooks.slack import map_emails_to_slack_users
 
 
 logger = get_module_logger()
@@ -21,7 +22,7 @@ limiter = get_limiter()
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
-def handle_webhook(
+async def handle_webhook(
     webhook_id: str,
     request: Request,
     payload: Union[Dict[Any, Any], str] = Body(...),
@@ -71,6 +72,7 @@ def handle_webhook(
         webhook_result.payload, WebhookPayload
     ):
         webhook_payload = webhook_result.payload
+        webhook_payload = map_emails_to_slack_users(webhook_payload)
         webhook_payload.channel = webhook["channel"]["S"]
         hook_type = webhook.get("hook_type", {}).get(
             "S", "alert"

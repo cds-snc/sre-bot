@@ -1,6 +1,5 @@
 from unittest.mock import patch, MagicMock, PropertyMock, call, ANY
 
-# from urllib import response
 import pytest
 import httpx
 from fastapi.testclient import TestClient
@@ -25,6 +24,7 @@ def test_client(bot_mock):
     return TestClient(test_app)
 
 
+@patch("api.v1.routes.webhooks.map_emails_to_slack_users")
 @patch("api.v1.routes.webhooks.log_to_sentinel")
 @patch("api.v1.routes.webhooks.append_incident_buttons")
 @patch("api.v1.routes.webhooks.handle_webhook_payload")
@@ -36,6 +36,7 @@ def test_handle_webhook(
     mock_handle_webhook_payload,
     mock_append_incident_buttons,
     mock_log_to_sentinel,
+    mock_map_emails_to_slack_users,
     test_client,
 ):
     payload = {"text": "some text"}
@@ -66,6 +67,7 @@ def test_handle_webhook(
     mock_handle_webhook_payload.assert_called_once_with(payload, ANY)
     mock_append_incident_buttons.assert_called_once()
     mock_log_to_sentinel.assert_called_once()
+    mock_map_emails_to_slack_users.assert_called_once()
 
 
 def test_handle_webhook_malformed_json_string(test_client):
