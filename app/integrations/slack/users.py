@@ -169,7 +169,9 @@ def replace_users_emails_with_mention(text: str) -> str:
         # It's okay to catch all exceptions here since we don't want to fail the entire
         # operation if one email lookup fails.
         except Exception as e:  # pylint: disable=broad-except
-            logger.info("replace_users_emails_with_mention_failed", extra={"error": str(e)})
+            logger.info(
+                "replace_users_emails_with_mention_failed", extra={"error": str(e)}
+            )
             response = None
         if response:
             user: dict = response.get("user", {})
