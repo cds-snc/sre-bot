@@ -164,7 +164,15 @@ def replace_users_emails_with_mention(text: str) -> str:
     email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
     matches = re.findall(email_pattern, text)
     for email in matches:
-        response = client.users_lookupByEmail(email=email)
+        try:
+            response = client.users_lookupByEmail(email=email)
+        # It's okay to catch all exceptions here since we don't want to fail the entire
+        # operation if one email lookup fails.
+        except Exception as e:  # pylint: disable=broad-except
+            logger.info(
+                "replace_users_emails_with_mention_failed", extra={"error": str(e)}
+            )
+            response = None
         if response:
             user: dict = response.get("user", {})
             user_handle = user.get("id")
