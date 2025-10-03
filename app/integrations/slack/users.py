@@ -6,6 +6,7 @@ This module contains the user related functionality for the Slack integration.
 import re
 from slack_sdk import WebClient
 from core.logging import get_module_logger
+from integrations.slack.client import SlackClientManager
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
@@ -146,3 +147,45 @@ def replace_user_id_with_handle(client, message):
     # Use re.sub() with the callback function to replace all matches
     updated_message = re.sub(user_id_pattern, replace_with_handle, message)
     return updated_message
+
+
+def replace_users_emails_with_mention(text: str) -> str:
+    """Replace email addresses in the given text with Slack user mentions when resolvable.
+
+    Args:
+        text (str): The input text potentially containing email addresses.
+    Returns:
+        str: The modified text with email addresses replaced by Slack user mentions.
+    """
+
+    client = SlackClientManager.get_client()
+    if not client:
+        return text
+    email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    matches = re.findall(email_pattern, text)
+    for email in matches:
+        response = client.users_lookupByEmail(email=email)
+        if response:
+            user: dict = response.get("user", {})
+            user_handle = user.get("id")
+            if user_handle:
+                text = text.replace(email, f"<@{user_handle}>")
+    return text
+
+
+def replace_users_emails_in_dict(data):
+    """Recursively replace email addresses in all string values within a nested dictionary or list.
+
+    Args:
+        data (dict or list): The input data structure potentially containing email addresses.
+    Returns:
+        dict or list: The modified data structure with email addresses replaced by Slack user mentions.
+    """
+    if isinstance(data, dict):
+        return {k: replace_users_emails_in_dict(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [replace_users_emails_in_dict(item) for item in data]
+    elif isinstance(data, str):
+        return replace_users_emails_with_mention(data)
+    else:
+        return data
