@@ -38,13 +38,13 @@ def process_aws_sns_payload(payload: AwsSnsPayload, client: WebClient) -> Webhoo
             subscribed_topic=aws_sns_payload.TopicArn,
         )
         log_ops_message(
-            f"Subscribed webhook {id} to topic {aws_sns_payload.TopicArn}",
+            f"Subscribed webhook {id} to topic `{aws_sns_payload.TopicArn}`",
         )
         webhook_result = WebhookResult(status="success", action="log", payload=None)
 
     if aws_sns_payload.Type == "UnsubscribeConfirmation":
         log_ops_message(
-            f"{aws_sns_payload.TopicArn} unsubscribed from webhook {id}",
+            f"`{aws_sns_payload.TopicArn}` unsubscribed from webhook {id}",
         )
         webhook_result = WebhookResult(status="success", action="log", payload=None)
 
