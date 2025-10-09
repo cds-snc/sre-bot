@@ -62,12 +62,18 @@
 
 ---
 
-## Example Workflows
+## Example Slack Workflows
 
-- `/incident create` — Start a new incident and assign roles
-- `/aws access-request` — Request temporary AWS access
-- `/webhook add slack` — Register a new Slack webhook for notifications
-- `/role assign talent` — Assign a "Talent" role to a user
+- `/sre help` — Show all available SRE bot commands
+- `/sre incident` — List incident management commands
+- `/sre geolocate <ip>` — Geolocate an IP address
+- `/sre webhooks` — List webhooks for the current channel
+- `/sre webhooks create` — Create a new webhook
+- `/sre reports` — List available reports
+- `/sre reports google-groups` — Generate a Google Groups statistics report
+- `/aws users create <user>` — Provision AWS user(s) via SCIM bridge (using Google Groups)
+- `/aws groups sync` — Sync AWS groups with Google security groups
+- `/aws health` — Query the health of an AWS account
 
 ---
 
