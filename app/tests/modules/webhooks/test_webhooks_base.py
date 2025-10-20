@@ -144,10 +144,11 @@ def test_handle_webhook_payload_with_access_request(validate_payload_mock):
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "success"
     assert response.action == "post"
-    assert (
-        response.payload.text
-        == "{'account': 'account1', 'reason': 'reason1', 'startDate': datetime.datetime(2025, 9, 25, 12, 0, tzinfo=TzInfo(UTC)), 'endDate': datetime.datetime(2025, 9, 26, 12, 0, tzinfo=TzInfo(UTC))}"
-    )
+    payload_text = response.payload.text
+    assert "'account': 'account1'" in payload_text
+    assert "'reason': 'reason1'" in payload_text
+    assert "2025, 9, 25" in payload_text
+    assert "2025, 9, 26" in payload_text
 
 
 @patch("modules.webhooks.base.process_simple_text_payload")

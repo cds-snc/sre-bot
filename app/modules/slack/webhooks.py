@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from boto3.dynamodb.types import TypeDeserializer
 
-from models import model_utils
+from utils import models as model_utils
 from models.webhooks import (
     WebhookPayload,
     AwsSnsPayload,
