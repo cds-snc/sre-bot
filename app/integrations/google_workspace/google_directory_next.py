@@ -3,16 +3,17 @@ Google Directory module using simplified Google service functions.
 
 """
 
-from typing import Dict, List, Optional, Tuple
+import time
+from typing import Dict, List, Optional
+
 from core.logging import get_module_logger
+from integrations.google_workspace import google_directory
 from integrations.google_workspace import google_service_next as google_service
 from integrations.google_workspace.google_service_next import (
+    execute_batch_request,
     execute_google_api_call,
     get_google_service,
-    execute_batch_request,
 )
-import time
-from integrations.google_workspace import google_directory, google_directory_next
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
@@ -348,8 +349,8 @@ def performance_comparison_example():
 
     # Next-gen
     start_time = time.time()
-    next_result = google_directory_next.list_groups_with_members(
-        groups_kwargs={"query": query, "maxResults": 3, "orderBy": "email"},
+    next_result = list_groups_with_members(
+        groups_kwargs={"query": query, "maxResults": 200, "orderBy": "email"},
         tolerate_errors=True,
     )
     next_time = time.time() - start_time
