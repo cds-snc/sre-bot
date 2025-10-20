@@ -328,4 +328,3 @@ def list_groups_with_members(
             groups_with_members.append(group_obj)
     logger.info("groups_with_members_listed", count=len(groups_with_members))
     return groups_with_members
-
