@@ -1,9 +1,25 @@
+# pylint: disable=missing-function-docstring, protected-access
+import math
 from unittest.mock import MagicMock, patch
 
 import pytest
 from googleapiclient.errors import HttpError
 from integrations.google_workspace import google_service_next as gs
-import math
+
+
+# --- _build_error_info ---
+def test_build_error_info_with_resp():
+    class FakeResp:
+        def get(self, key):
+            return 123 if key == "status" else None
+
+    class FakeError(Exception):
+        def __init__(self):
+            self.resp = FakeResp()
+
+    err = FakeError()
+    info = gs._build_error_info(err, "func")
+    assert info["status_code"] == 123
 
 
 # --- _calculate_retry_delay ---
@@ -50,33 +66,6 @@ def test_handle_final_error_return_none_on_error():
     assert gs._handle_final_error(error, "func", False, True) is None
 
 
-# --- execute_api_call generic retry branch ---
-@patch(
-    "integrations.google_workspace.google_service_next.time.sleep", return_value=None
-)
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_generic_retry(logger_mock, _sleep_mock):
-    gs.ERROR_CONFIG["default_backoff_factor"] = 1.0  # Ensure default value
-
-    calls = []
-
-    def api():
-        calls.append(1)
-        if len(calls) < 2:
-            raise Exception("fail")
-        return "ok"
-
-    result = gs.execute_api_call("func", api)
-    assert result == "ok"
-    assert len(calls) == 2
-    logger_mock.warning.assert_any_call(
-        "google_api_retrying_generic",
-        function="func",
-        attempt=1,
-        delay=1.0,
-        error="fail",
-    )
-
 
 # --- execute_api_call final error after retries ---
 def test_execute_api_call_final_error():
@@ -86,24 +75,6 @@ def test_execute_api_call_final_error():
 
     with pytest.raises(gs.GoogleAPIError):
         gs.execute_api_call("func", api, max_retries=0)
-
-
-# --- get_google_service: SRE_BOT_EMAIL None branch ---
-@patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
-@patch(
-    "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}',
-)
-@patch("integrations.google_workspace.google_service_next.SRE_BOT_EMAIL", None)
-def test_get_google_service_no_delegated_user_email(creds_mock, build_mock):
-
-    build_mock.return_value = "service"
-    creds_mock.return_value = MagicMock()
-    service = gs.get_google_service("admin", "v1")
-    assert service == "service"
 
 
 # --- execute_batch_request exception branch ---
@@ -236,6 +207,23 @@ def test_get_google_service_success(creds_mock, build_mock):
     service = gs.get_google_service("admin", "v1")
     assert service == "service"
     build_mock.assert_called_once()
+
+
+@patch("integrations.google_workspace.google_service_next.build")
+@patch(
+    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
+)
+@patch(
+    "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}',
+)
+@patch("integrations.google_workspace.google_service_next.SRE_BOT_EMAIL", None)
+def test_get_google_service_no_delegated_user_email(creds_mock, build_mock):
+
+    build_mock.return_value = "service"
+    creds_mock.return_value = MagicMock()
+    service = gs.get_google_service("admin", "v1")
+    assert service == "service"
 
 
 @patch(

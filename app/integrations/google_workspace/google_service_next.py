@@ -117,6 +117,34 @@ def _calculate_retry_delay(attempt: int, status_code: int) -> float:
             ) from exc
 
 
+def _get_retry_codes(error_config) -> Optional[set]:
+    """Extract retry codes from error config, handling type errors gracefully."""
+    raw_retry_errors = (
+        error_config.get("retry_errors") if isinstance(error_config, dict) else None
+    )
+    if isinstance(raw_retry_errors, (list, tuple, set)):
+        try:
+            return {int(x) for x in raw_retry_errors}
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _should_retry(
+    auto_retry: bool,
+    retry_codes: Optional[set],
+    error: HttpError,
+    is_last_attempt: bool,
+) -> bool:
+    """Determine if the API call should be retried based on error and config."""
+    return (
+        auto_retry
+        and retry_codes is not None
+        and int(error.resp.status) in retry_codes
+        and not is_last_attempt
+    )
+
+
 def _handle_final_error(
     error: Exception,
     function_name: str,
@@ -212,8 +240,9 @@ def execute_api_call(
         result = execute_api_call("my_api_function", my_api_function)
     """
     max_retry_attempts = max_retries or ERROR_CONFIG["default_max_retries"]
-
     last_exception: Optional[Exception] = None
+
+    retry_codes = _get_retry_codes(ERROR_CONFIG)
 
     for attempt in range(max_retry_attempts + 1):
         try:
@@ -241,25 +270,7 @@ def execute_api_call(
             last_exception = e
             is_last_attempt = attempt == max_retry_attempts
 
-            raw_retry_errors = None
-            if isinstance(ERROR_CONFIG, dict):
-                raw_retry_errors = ERROR_CONFIG.get("retry_errors")
-
-            retry_codes = None
-            if isinstance(raw_retry_errors, (list, tuple, set)):
-                try:
-                    retry_codes = {int(x) for x in raw_retry_errors}
-                except (TypeError, ValueError):
-                    retry_codes = None
-
-            should_retry = (
-                auto_retry
-                and retry_codes is not None
-                and int(e.resp.status) in retry_codes
-                and not is_last_attempt
-            )
-
-            if should_retry:
+            if _should_retry(auto_retry, retry_codes, e, is_last_attempt):
                 delay = _calculate_retry_delay(attempt, e.resp.status)
                 logger.warning(
                     "google_api_retrying",
@@ -272,52 +283,37 @@ def execute_api_call(
                 time.sleep(delay)
                 continue
 
-            # Final error handling after retries
-            error_result = _handle_final_error(
+            return _handle_final_error(
                 e,
                 func_name,
                 non_critical,
                 return_none_on_error,
                 response_metadata=response_metadata,
             )
-            return error_result
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             last_exception = e
             is_last_attempt = attempt == max_retry_attempts
 
-            if auto_retry and not is_last_attempt:
-                delay = ERROR_CONFIG["default_backoff_factor"] * (2**attempt)
-                logger.warning(
-                    "google_api_retrying_generic",
-                    function=func_name,
-                    attempt=attempt + 1,
-                    delay=delay,
-                    error=str(e),
-                )
-                time.sleep(delay)
-                continue
-
-            error_result = _handle_final_error(
+            return _handle_final_error(
                 e,
                 func_name,
                 non_critical,
                 return_none_on_error,
                 response_metadata=response_metadata,
             )
-            return error_result
+
     # If we exit the retry loop without returning, use the last captured exception
     if last_exception is None:
         last_exception = Exception("Unknown error after retries")
 
-    error_result = _handle_final_error(
+    return _handle_final_error(
         last_exception,
         func_name,
         non_critical,
         return_none_on_error,
         response_metadata=response_metadata,
     )
-    return error_result
 
 
 def get_google_service(
