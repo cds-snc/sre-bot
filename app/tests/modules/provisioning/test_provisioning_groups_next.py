@@ -13,8 +13,12 @@ class TestGetGroupsFromIntegrationGoogle:
     """Test cases for get_groups_from_integration with Google Groups using next-gen functions."""
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_get_groups_from_integration_google_basic(
         self,
         mock_google_list_groups_with_members,
@@ -64,8 +68,12 @@ class TestGetGroupsFromIntegrationGoogle:
         assert not mock_aws_list_groups_with_memberships.called
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_get_groups_from_integration_google_with_query(
         self,
         mock_google_list_groups_with_members,
@@ -99,8 +107,12 @@ class TestGetGroupsFromIntegrationGoogle:
         )
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_get_groups_from_integration_google_with_pre_filters(
         self,
         mock_google_list_groups_with_members,
@@ -130,8 +142,12 @@ class TestGetGroupsFromIntegrationGoogle:
         )
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_get_groups_from_integration_google_with_post_filters(
         self,
         mock_google_list_groups_with_members,
@@ -171,8 +187,12 @@ class TestGetGroupsFromIntegrationGoogle:
         )
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_get_groups_from_integration_google_empty_result(
         self,
         mock_google_list_groups_with_members,
@@ -195,8 +215,12 @@ class TestGroupDataStructures:
     """Test specific data structure requirements for Google Groups."""
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_google_group_structure_validation(
         self,
         mock_google_list_groups_with_members,
@@ -294,8 +318,12 @@ class TestGroupDataStructures:
                     )  # Different role contexts
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_google_vs_aws_structure_compatibility(
         self,
         mock_google_list_groups_with_members,
@@ -524,8 +552,12 @@ class TestProvisioningArchitectureValidation:
     """Test current provisioning architecture patterns and validate improvements."""
 
     @patch("modules.provisioning.groups_next.filters")
-    @patch("modules.provisioning.groups_next.identity_store.list_groups_with_memberships")
-    @patch("modules.provisioning.groups_next.google_directory_next.list_groups_with_members")
+    @patch(
+        "modules.provisioning.groups_next.identity_store.list_groups_with_memberships"
+    )
+    @patch(
+        "modules.provisioning.groups_next.google_directory_next.list_groups_with_members"
+    )
     def test_integration_source_pattern_scalability(
         self,
         mock_google_list_groups_with_members,
