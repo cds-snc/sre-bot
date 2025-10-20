@@ -199,43 +199,22 @@ def _handle_final_error(
         return None
 
 
-def _is_list_operation(method: str) -> bool:
+def _can_paginate_method(client: BaseClient, method: str) -> bool:
     """
-    Determine if an AWS API method is a list operation that should be paginated.
+    Determine if an AWS API method can be paginated using the client's can_paginate method.
 
     Args:
+        client (BaseClient): The AWS service client
         method (str): The AWS API method name
 
     Returns:
-        bool: True if the method is a list operation
+        bool: True if the method can be paginated
     """
-    # Common AWS list operation prefixes and patterns
-    list_patterns = [
-        "list_",
-        "describe_",
-        "get_",
-        "scan_",
-        "query_",
-    ]
-
-    # Some specific exceptions that shouldn't be paginated despite the prefix
-    non_paginated_exceptions = [
-        "get_item",
-        "get_object",
-        "get_parameter",
-        "get_secret_value",
-        "describe_table",
-        "describe_stack",
-    ]
-
-    method_lower = method.lower()
-
-    # Check if it's in the exceptions list
-    if method_lower in non_paginated_exceptions:
+    try:
+        return client.can_paginate(method)
+    except (AttributeError, TypeError, ValueError):
+        # Fallback to False if method doesn't exist or can't be checked
         return False
-
-    # Check if it matches list patterns
-    return any(method_lower.startswith(pattern) for pattern in list_patterns)
 
 
 def get_aws_client(
@@ -428,7 +407,7 @@ def execute_aws_api_call(
         api_method = getattr(client, method)
 
         # Auto-paginate list operations unless single_page is explicitly requested
-        should_paginate = _is_list_operation(method) and not single_page
+        should_paginate = _can_paginate_method(client, method) and not single_page
 
         if should_paginate:
             return paginate_all_results(client, method, keys, **kwargs)
