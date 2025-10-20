@@ -3,11 +3,9 @@ Google Directory module using simplified Google service functions.
 
 """
 
-import time
 from typing import Dict, List, Optional
 
 from core.logging import get_module_logger
-from integrations.google_workspace import google_directory
 from integrations.google_workspace import google_service_next as google_service
 from integrations.google_workspace.google_service_next import (
     execute_batch_request,
