@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, cast
 from fastapi import Request
 from pydantic import BaseModel
 from core.logging import get_module_logger
-from models.utils import select_best_model
+from utils.models import select_best_model
 from models.webhooks import (
     WebhookPayload,
     AwsSnsPayload,
