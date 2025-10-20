@@ -22,6 +22,22 @@ def test_build_error_info_with_resp():
     assert info["status_code"] == 123
 
 
+# --- _build_response ---
+def test_build_response():
+    success = True
+    data = {"key": "value"}
+    error_info = None
+    function_name = "func"
+
+    response = gs._build_response(success, data, error_info, function_name)
+    assert response == {
+        "success": success,
+        "data": data,
+        "error": error_info,
+        "function_name": function_name,
+    }
+
+
 # --- _calculate_retry_delay ---
 def test_calculate_retry_delay_rate_limit_numeric():
     gs.ERROR_CONFIG["rate_limit_delay"] = 60
@@ -60,21 +76,185 @@ def test_calculate_retry_delay_invalid_backoff_factor():
         assert False, "Should raise TypeError for invalid default_backoff_factor"
 
 
+# --- _get_retry_codes ---
+def test_get_retry_codes_valid():
+    error_config = {"retry_errors": [429, 500, 502]}
+    codes = gs._get_retry_codes(error_config)
+    assert codes == {429, 500, 502}
+
+
+def test_get_retry_codes_invalid_type():
+    error_config = {"retry_errors": "not-a-list"}
+    codes = gs._get_retry_codes(error_config)
+    assert codes is None
+    error_config = {"retry_errors": [429, "five-hundred", None]}
+    codes = gs._get_retry_codes(error_config)
+    assert codes is None
+
+
 # --- _handle_final_error ---
 def test_handle_final_error_return_none_on_error():
     error = Exception("fail")
     assert gs._handle_final_error(error, "func", False, True) is None
 
 
+def test_handle_final_error_non_critical_with_response_metadata():
+    error = Exception("fail")
+    result = gs._handle_final_error(error, "func", True, False, response_metadata=True)
+    assert isinstance(result, dict)
+    assert result["success"] is False
+    assert result["error"]["message"] == "fail"
 
-# --- execute_api_call final error after retries ---
-def test_execute_api_call_final_error():
 
+def test_handle_final_error_return_none_on_error_with_response_metadata():
+    error = Exception("fail")
+    result = gs._handle_final_error(error, "func", False, True, response_metadata=True)
+    assert isinstance(result, dict)
+    assert result["success"] is False
+    assert result["error"]["message"] == "fail"
+
+
+# --- execute_api_call ---
+def test_execute_api_call_success():
+    def api():
+        return 42
+
+    assert gs.execute_api_call("func", api) == 42
+
+
+@patch(
+    "integrations.google_workspace.google_service_next.ERROR_CONFIG",
+    {
+        "non_critical_errors": {
+            "get_user": ["not found", "timed out"],
+            "get_member": ["not found", "member not found"],
+            "get_group": ["not found", "group not found"],
+            "get_sheet": ["unable to parse range"],
+        },
+        "retry_errors": [429, 500, 502, 503, 504],
+        "rate_limit_delay": 60,
+        "default_max_retries": 3,
+        "default_backoff_factor": 1.0,
+    },
+)
+@patch("integrations.google_workspace.google_service_next.logger")
+@patch(
+    "integrations.google_workspace.google_service_next.time.sleep", return_value=None
+)
+def test_execute_api_call_http_error_retry(_sleep_mock, logger_mock):
+    # Simulate HttpError with retryable status
+    class FakeResp:
+        status = 429
+        reason = "Too Many Requests"
+
+        def get(self, key, default=None):
+            return getattr(self, key, default)
+
+    err = HttpError(resp=FakeResp(), content=b"rate limit")
+    calls = []
+
+    def api():
+        calls.append(1)
+        if len(calls) < 2:
+            raise err
+        return "ok"
+
+    result = gs.execute_api_call("func", api)
+    assert result == "ok"
+    assert len(calls) == 2
+    logger_mock.warning.assert_any_call(
+        "google_api_retrying",
+        function="func",
+        attempt=1,
+        status_code=429,
+        delay=60.0,
+        error=str(err),
+    )
+
+
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_api_call_non_retryable_http_error(logger_mock):
+    class FakeResp:
+        status = 404
+        reason = "Not Found"
+
+        def get(self, key, default=None):
+            return getattr(self, key, default)
+
+    err = HttpError(resp=FakeResp(), content=b"not found")
+
+    def api():
+        raise err
+
+    with pytest.raises(gs.GoogleAPIError):
+        gs.execute_api_call("func", api)
+    logger_mock.error.assert_any_call(
+        "google_api_error_final", function="func", error=str(err), status_code=404
+    )
+
+
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_api_call_non_critical_returns_none(logger_mock):
+    def api():
+        raise Exception("not found")
+
+    result = gs.execute_api_call("get_user", api, non_critical=True)
+    assert result is None
+    logger_mock.warning.assert_any_call(
+        "google_api_non_critical_error",
+        function="get_user",
+        error="not found",
+        status_code=None,
+    )
+
+
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_api_call_non_critical_with_response_metadata(logger_mock):
+    def api():
+        raise Exception("not found")
+
+    result = gs.execute_api_call(
+        "get_user", api, non_critical=True, response_metadata=True
+    )
+    assert isinstance(result, dict)
+    assert result["success"] is False
+    assert result["error"]["message"] == "not found"
+    logger_mock.warning.assert_any_call(
+        "google_api_non_critical_error",
+        function="get_user",
+        error="not found",
+        status_code=None,
+    )
+
+
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_api_call_raises(logger_mock):
     def api():
         raise Exception("fail")
 
     with pytest.raises(gs.GoogleAPIError):
-        gs.execute_api_call("func", api, max_retries=0)
+        gs.execute_api_call("func", api)
+    logger_mock.error.assert_any_call(
+        "google_api_error_final", function="func", error="fail", status_code=None
+    )
+
+
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_api_call_critical_with_return_none_on_error_and_response_metadata(
+    logger_mock,
+):
+    def api():
+        raise Exception("fail")
+
+    result = gs.execute_api_call(
+        "func", api, return_none_on_error=True, response_metadata=True
+    )
+    assert isinstance(result, dict)
+    assert result["success"] is False
+    assert result["error"]["message"] == "fail"
+    logger_mock.error.assert_any_call(
+        "google_api_error_final", function="func", error="fail", status_code=None
+    )
 
 
 # --- execute_batch_request exception branch ---
@@ -242,91 +422,6 @@ def test_get_google_service_missing_creds():
 def test_get_google_service_invalid_json():
     with pytest.raises(Exception):
         gs.get_google_service("admin", "v1")
-
-
-# --- execute_api_call ---
-def test_execute_api_call_success():
-    def api():
-        return 42
-
-    assert gs.execute_api_call("func", api) == 42
-
-
-@patch(
-    "integrations.google_workspace.google_service_next.ERROR_CONFIG",
-    {
-        "non_critical_errors": {
-            "get_user": ["not found", "timed out"],
-            "get_member": ["not found", "member not found"],
-            "get_group": ["not found", "group not found"],
-            "get_sheet": ["unable to parse range"],
-        },
-        "retry_errors": [429, 500, 502, 503, 504],
-        "rate_limit_delay": 60,
-        "default_max_retries": 3,
-        "default_backoff_factor": 1.0,
-    },
-)
-@patch("integrations.google_workspace.google_service_next.logger")
-@patch(
-    "integrations.google_workspace.google_service_next.time.sleep", return_value=None
-)
-def test_execute_api_call_http_error_retry(_sleep_mock, logger_mock):
-    # Simulate HttpError with retryable status
-    class FakeResp:
-        status = 429
-        reason = "Too Many Requests"
-
-        def get(self, key, default=None):
-            return getattr(self, key, default)
-
-    err = HttpError(resp=FakeResp(), content=b"rate limit")
-    calls = []
-
-    def api():
-        calls.append(1)
-        if len(calls) < 2:
-            raise err
-        return "ok"
-
-    result = gs.execute_api_call("func", api)
-    assert result == "ok"
-    assert len(calls) == 2
-    logger_mock.warning.assert_any_call(
-        "google_api_retrying",
-        function="func",
-        attempt=1,
-        status_code=429,
-        delay=60.0,
-        error=str(err),
-    )
-
-
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_non_critical(logger_mock):
-    def api():
-        raise Exception("not found")
-
-    result = gs.execute_api_call("get_user", api, non_critical=True)
-    assert result is None
-    logger_mock.warning.assert_any_call(
-        "google_api_non_critical_error",
-        function="get_user",
-        error="not found",
-        status_code=None,
-    )
-
-
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_raises(logger_mock):
-    def api():
-        raise Exception("fail")
-
-    with pytest.raises(gs.GoogleAPIError):
-        gs.execute_api_call("func", api)
-    logger_mock.error.assert_any_call(
-        "google_api_error_final", function="func", error="fail", status_code=None
-    )
 
 
 # --- execute_batch_request ---
