@@ -1,5 +1,3 @@
-import ast
-
 from unittest.mock import patch, ANY, MagicMock
 from modules.webhooks import base
 from pydantic import BaseModel
