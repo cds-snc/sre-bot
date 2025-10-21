@@ -45,6 +45,11 @@ from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from core.config import settings
 from core.logging import get_module_logger
+from models.integrations import (
+    IntegrationResponse,
+    build_success_response,
+    build_error_response,
+)
 
 logger = get_module_logger()
 
@@ -87,28 +92,7 @@ class AWSAPIError(Exception):
         super().__init__(message)
 
 
-def _build_error_info(error: Exception, function_name: str) -> dict:
-    error_code = (
-        getattr(error, "response", {}).get("Error", {}).get("Code")
-        if hasattr(error, "response")
-        else None
-    )
-    return {
-        "message": str(error),
-        "error_code": error_code,
-        "function_name": function_name,
-    }
-
-
-def _build_response(
-    success: bool, data: Any, error_info: Optional[dict], function_name: str
-) -> dict:
-    return {
-        "success": success,
-        "data": data,
-        "error": error_info,
-        "function_name": function_name,
-    }
+# Helper functions moved to models.integrations for reuse across all integrations
 
 
 def _should_retry(error: Exception, attempt: int, max_attempts: int) -> bool:
@@ -136,7 +120,7 @@ def _calculate_retry_delay(attempt: int) -> float:
 def _handle_final_error(
     error: Exception,
     function_name: str,
-) -> dict:
+) -> IntegrationResponse:
     """Handle the final error after all retries are exhausted. Supports configured non-critical errors which log warnings instead of errors."""
     error_message = str(error).lower()
 
@@ -167,9 +151,7 @@ def _handle_final_error(
             error=str(error),
             error_code=error_code,
         )
-        return _build_response(
-            False, None, _build_error_info(error, function_name), function_name
-        )
+        return build_error_response(error, function_name, "aws")
     else:
         logger.error(
             "aws_api_error_final",
@@ -177,9 +159,7 @@ def _handle_final_error(
             error=str(error),
             error_code=error_code,
         )
-        return _build_response(
-            False, None, _build_error_info(error, function_name), function_name
-        )
+        return build_error_response(error, function_name, "aws")
 
 
 def _can_paginate_method(client: BaseClient, method: str) -> bool:
@@ -260,7 +240,7 @@ def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
     max_retries: Optional[int] = None,
-) -> dict:
+) -> IntegrationResponse:
     """
     Module-level error handling for AWS API calls.
 
@@ -274,7 +254,7 @@ def execute_api_call(
         max_retries (int): Override default max retries
 
     Returns:
-        dict: Standardized response dict
+        IntegrationResponse: Standardized response model for external API integrations.
     """
     default_retries = ERROR_CONFIG.get("default_max_retries", 3)
     max_retry_attempts = (
@@ -300,7 +280,7 @@ def execute_api_call(
                     attempt=attempt + 1,
                 )
 
-            return _build_response(True, result, None, func_name)
+            return build_success_response(result, func_name, "aws")
 
         except (BotoCoreError, ClientError) as e:
             last_exception = e
@@ -350,7 +330,7 @@ def execute_aws_api_call(
     max_retries: Optional[int] = None,
     force_paginate: bool = False,
     **kwargs,
-) -> Any:
+) -> IntegrationResponse:
     """
     Simplified version of execute_aws_api_call using module-level error handling.
 
@@ -368,7 +348,7 @@ def execute_aws_api_call(
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
-        Any: The result of the API call or standardized response dict.
+        IntegrationResponse: Standardized response model for external API integrations.
     """
 
     def api_call():
