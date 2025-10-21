@@ -137,7 +137,6 @@ def _handle_final_error(
     error: Exception,
     function_name: str,
     non_critical: bool = False,
-    return_none_on_error: bool = False,
     response_metadata: bool = False,
 ) -> Any:
     """Handle the final error after all retries are exhausted."""
@@ -153,7 +152,6 @@ def _handle_final_error(
     if isinstance(raw_nc, dict):
         function_errs = raw_nc.get(function_name)
         if isinstance(function_errs, (list, tuple, set)):
-            # Defensive: ensure all elements are strings
             is_non_critical_config = any(
                 isinstance(err, str) and (err in error_message) for err in function_errs
             )
@@ -185,13 +183,6 @@ def _handle_final_error(
             error=str(error),
             error_code=error_code,
         )
-        if return_none_on_error:
-            if response_metadata:
-                return _build_response(
-                    False, None, _build_error_info(error, function_name), function_name
-                )
-            return None
-        # For job safety, never raise exceptions by default
         if response_metadata:
             return _build_response(
                 False, None, _build_error_info(error, function_name), function_name
@@ -267,7 +258,6 @@ def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
     non_critical: bool = False,
-    return_none_on_error: bool = False,
     auto_retry: bool = True,
     max_retries: Optional[int] = None,
     response_metadata: bool = False,
@@ -275,13 +265,12 @@ def execute_api_call(
     """
     Module-level error handling for AWS API calls.
 
-    This provides centralized error handling similar to Google's execute_api_call.
+    This provides centralized error handling.
 
     Args:
         func_name (str): Name of the calling function for logging
         api_call (callable): The API call to execute
         non_critical (bool): Mark this call as non-critical (never raises exceptions)
-        return_none_on_error (bool): Return None instead of raising on errors
         auto_retry (bool): Enable automatic retry for retryable errors
         max_retries (int): Override default max retries
         response_metadata (bool): Return standardized response dict
@@ -336,7 +325,6 @@ def execute_api_call(
                 e,
                 func_name,
                 non_critical,
-                return_none_on_error,
                 response_metadata=response_metadata,
             )
 
@@ -347,7 +335,6 @@ def execute_api_call(
                 e,
                 func_name,
                 non_critical,
-                return_none_on_error,
                 response_metadata=response_metadata,
             )
 
@@ -359,7 +346,6 @@ def execute_api_call(
         last_exception,
         func_name,
         non_critical,
-        return_none_on_error,
         response_metadata=response_metadata,
     )
 
@@ -373,7 +359,6 @@ def execute_aws_api_call(
     client_config: Optional[dict] = None,
     max_retries: Optional[int] = None,
     non_critical: bool = False,
-    return_none_on_error: bool = False,
     response_metadata: bool = False,
     force_paginate: bool = False,
     **kwargs,
@@ -423,7 +408,6 @@ def execute_aws_api_call(
         func_name,
         api_call,
         non_critical=non_critical,
-        return_none_on_error=return_none_on_error,
         auto_retry=True,
         max_retries=max_retries,
         response_metadata=response_metadata,
