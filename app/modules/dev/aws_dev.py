@@ -100,7 +100,11 @@ def performance_comparison_example(
         start_time = time.time()
         legacy_result = legacy_func()
         legacy_time = time.time() - start_time
-        legacy_summary = legacy_formatter(legacy_result) if legacy_formatter else f"Items: {len(legacy_result) if legacy_result else 0}"
+        legacy_summary = (
+            legacy_formatter(legacy_result)
+            if legacy_formatter
+            else f"Items: {len(legacy_result) if legacy_result else 0}"
+        )
     else:
         legacy_result = None
         legacy_time = 0.0
@@ -111,7 +115,11 @@ def performance_comparison_example(
         start_time = time.time()
         next_result = next_func()
         next_time = time.time() - start_time
-        next_summary = next_formatter(next_result) if next_formatter else f"Items: {len(next_result) if next_result else 0}"
+        next_summary = (
+            next_formatter(next_result)
+            if next_formatter
+            else f"Items: {len(next_result) if next_result else 0}"
+        )
     else:
         next_result = None
         next_time = 0.0

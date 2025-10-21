@@ -565,8 +565,7 @@ def _fetch_group_memberships_parallel(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         future_to_gid = {
-            executor.submit(list_group_memberships, gid): gid
-            for gid in group_ids
+            executor.submit(list_group_memberships, gid): gid for gid in group_ids
         }
 
         # Collect results as they complete
