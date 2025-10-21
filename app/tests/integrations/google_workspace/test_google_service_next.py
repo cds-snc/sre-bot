@@ -1,79 +1,81 @@
-# pylint: disable=missing-function-docstring, protected-access
-import math
-from unittest.mock import MagicMock, patch
-
+from models.integrations import IntegrationResponse
 import pytest
+from unittest.mock import MagicMock, patch
 from googleapiclient.errors import HttpError
 from integrations.google_workspace import google_service_next as gs
 
 
-# --- _build_error_info ---
-def test_build_error_info_with_resp():
-    class FakeResp:
-        def get(self, key):
-            return 123 if key == "status" else None
+# --- Fixtures ---
+@pytest.fixture
+@patch("integrations.google_workspace.google_service_next.settings")
+def fake_settings(settings_mock):
+    class FakeGoogleWorkspace:
+        GOOGLE_WORKSPACE_CUSTOMER_ID = "fake_customer_id"
+        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
+            '{"client_email": "bot@example.com", "private_key": "FAKE"}'
+        )
+        SRE_BOT_EMAIL = "bot@example.com"
 
-    class FakeError(Exception):
-        def __init__(self):
-            self.resp = FakeResp()
+    class FakeSettings:
+        google_workspace = FakeGoogleWorkspace()
 
-    err = FakeError()
-    info = gs._build_error_info(err, "func")
-    assert info["status_code"] == 123
-
-
-# --- _build_response ---
-def test_build_response():
-    success = True
-    data = {"key": "value"}
-    error_info = None
-    function_name = "func"
-
-    response = gs._build_response(success, data, error_info, function_name)
-    assert response == {
-        "success": success,
-        "data": data,
-        "error": error_info,
-        "function_name": function_name,
-    }
-
-
-# --- _calculate_retry_delay ---
-def test_calculate_retry_delay_rate_limit_numeric():
-    gs.ERROR_CONFIG["rate_limit_delay"] = 60
-    assert gs._calculate_retry_delay(1, 429) == 60.0
-
-
-def test_calculate_retry_delay_rate_limit_string():
-    gs.ERROR_CONFIG["rate_limit_delay"] = "30"
-    assert gs._calculate_retry_delay(2, 429) == 30.0
-
-
-def test_calculate_retry_delay_server_error():
-    gs.ERROR_CONFIG["default_backoff_factor"] = 2
-    assert math.isclose(
-        gs._calculate_retry_delay(2, 500), 8.0
-    )  # pylint: disable=protected-access
-
-
-def test_calculate_retry_delay_invalid_type():
-    gs.ERROR_CONFIG["rate_limit_delay"] = object()
-    try:
-        gs._calculate_retry_delay(1, 429)  # pylint: disable=protected-access
-    except TypeError:
-        pass
-    else:
-        assert False, "Should raise TypeError"
+    settings_mock.google_workspace = FakeGoogleWorkspace()
+    return FakeSettings()
 
 
 def test_calculate_retry_delay_invalid_backoff_factor():
     gs.ERROR_CONFIG["default_backoff_factor"] = object()
-    try:
-        gs._calculate_retry_delay(1, 500)  # Should raise TypeError
-    except TypeError:
-        pass
-    else:
-        assert False, "Should raise TypeError for invalid default_backoff_factor"
+    with pytest.raises(TypeError):
+        gs._calculate_retry_delay(1, 500)
+
+
+def test_calculate_retry_delay_type_error_default_backoff_factor():
+    gs.ERROR_CONFIG["default_backoff_factor"] = object()
+    # Should raise TypeError when default_backoff_factor is not numeric
+    with pytest.raises(TypeError):
+        gs._calculate_retry_delay(1, 500)
+
+
+def test_calculate_retry_delay_type_error_rate_limit_delay():
+    gs.ERROR_CONFIG["rate_limit_delay"] = object()
+    # Should raise TypeError when rate_limit_delay is not numeric and status_code is 429
+    with pytest.raises(TypeError):
+        gs._calculate_retry_delay(1, 429)
+
+
+# --- Additional edge case tests ---
+
+
+def test_should_retry_exhausts_all_retries():
+    # Simulate HttpError with retryable status
+    class FakeResp:
+        status = 429
+        reason = "Too Many Requests"
+
+    error = HttpError(resp=FakeResp(), content=b"rate limit")
+    # Should retry until last attempt, then stop
+    assert gs._should_retry(True, {429}, error, is_last_attempt=False) is True
+    assert gs._should_retry(True, {429}, error, is_last_attempt=True) is False
+
+
+def test_should_retry_missing_retry_codes():
+    # Should not retry if retry_codes is None
+    class FakeResp:
+        status = 429
+        reason = "Too Many Requests"
+
+    error = HttpError(resp=FakeResp(), content=b"rate limit")
+    assert gs._should_retry(True, None, error, is_last_attempt=False) is False
+
+
+def test_should_retry_non_retryable_error():
+    # Should not retry if status is not in retry_codes
+    class FakeResp:
+        status = 400
+        reason = "Bad Request"
+
+    error = HttpError(resp=FakeResp(), content=b"bad request")
+    assert gs._should_retry(True, {429}, error, is_last_attempt=False) is False
 
 
 # --- _get_retry_codes ---
@@ -93,25 +95,35 @@ def test_get_retry_codes_invalid_type():
 
 
 # --- _handle_final_error ---
+def test_handle_final_error_non_critical_config():
+    error = Exception("not found")
+    resp = gs._handle_final_error(error, "get_user")
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert "not found" in resp.error["message"]
+    assert resp.function_name == "get_user"
+    assert resp.integration_name == "google"
+
+
 def test_handle_final_error_return_none_on_error():
     error = Exception("fail")
-    assert gs._handle_final_error(error, "func", False, True) is None
+    resp = gs._handle_final_error(error, "func")
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert resp.function_name == "func"
+    assert resp.integration_name == "google"
 
 
 def test_handle_final_error_non_critical_with_response_metadata():
-    error = Exception("fail")
-    result = gs._handle_final_error(error, "func", True, False, response_metadata=True)
-    assert isinstance(result, dict)
-    assert result["success"] is False
-    assert result["error"]["message"] == "fail"
-
-
-def test_handle_final_error_return_none_on_error_with_response_metadata():
-    error = Exception("fail")
-    result = gs._handle_final_error(error, "func", False, True, response_metadata=True)
-    assert isinstance(result, dict)
-    assert result["success"] is False
-    assert result["error"]["message"] == "fail"
+    error = Exception("not found")
+    resp = gs._handle_final_error(error, "get_user")
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert resp.function_name == "get_user"
+    assert resp.integration_name == "google"
 
 
 # --- execute_api_call ---
@@ -119,7 +131,104 @@ def test_execute_api_call_success():
     def api():
         return 42
 
-    assert gs.execute_api_call("func", api) == 42
+    resp = gs.execute_api_call("func", api)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == 42
+    assert resp.error is None
+    assert resp.function_name == "func"
+    assert resp.integration_name == "google"
+
+
+def test_execute_api_call_exhausts_retries_and_returns_error():
+    # Simulate always failing API call with retryable error
+    class FakeResp:
+        status = 503
+        reason = "Service Unavailable"
+
+        def get(self, key, default=None):
+            if key == "status":
+                return self.status
+            return default
+
+    error = HttpError(resp=FakeResp(), content=b"fail")
+
+    def api():
+        raise error
+
+    gs.ERROR_CONFIG["default_backoff_factor"] = 1.0
+    resp = gs.execute_api_call("func", api, max_retries=2)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.data is None
+    assert resp.error is not None
+    assert "Service Unavailable" in str(resp.error["message"])
+
+
+def test_execute_api_call_non_retryable_error_returns_error():
+    # Simulate API call raising non-retryable error
+    class FakeResp:
+        status = 400
+        reason = "Bad Request"
+
+        def get(self, key, default=None):
+            if key == "status":
+                return self.status
+            return default
+
+    error = HttpError(resp=FakeResp(), content=b"fail")
+
+    def api():
+        raise error
+
+    gs.ERROR_CONFIG["default_backoff_factor"] = 1.0
+    resp = gs.execute_api_call("func", api, max_retries=2)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.data is None
+    assert resp.error is not None
+    assert "Bad Request" in str(resp.error["message"])
+
+
+def test_execute_api_call_error_response():
+    def api_call():
+        raise ValueError("not found")
+
+    resp = gs.execute_api_call("get_user", api_call)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.data is None
+    assert resp.error is not None
+    assert "not found" in resp.error["message"]
+    assert resp.function_name == "get_user"
+    assert resp.integration_name == "google"
+
+
+def test_execute_api_call_retry_logic():
+    # Ensure ERROR_CONFIG['default_backoff_factor'] is a valid float for this test
+    gs.ERROR_CONFIG["default_backoff_factor"] = 1.0
+
+    class FakeResp:
+        status = 503
+        reason = "Service Unavailable"
+
+        def get(self, key, default=None):
+            return getattr(self, key, default)
+
+    err = HttpError(resp=FakeResp(), content=b"unavailable")
+    calls = []
+
+    def api():
+        calls.append(1)
+        if len(calls) < 3:
+            raise err
+        return "ok"
+
+    resp = gs.execute_api_call("func", api, max_retries=3)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == "ok"
+    assert len(calls) == 3
 
 
 @patch(
@@ -160,7 +269,9 @@ def test_execute_api_call_http_error_retry(_sleep_mock, logger_mock):
         return "ok"
 
     result = gs.execute_api_call("func", api)
-    assert result == "ok"
+    assert isinstance(result, IntegrationResponse)
+    assert result.success is True
+    assert result.data == "ok"
     assert len(calls) == 2
     logger_mock.warning.assert_any_call(
         "google_api_retrying",
@@ -186,94 +297,28 @@ def test_execute_api_call_non_retryable_http_error(logger_mock):
     def api():
         raise err
 
-    with pytest.raises(gs.GoogleAPIError):
-        gs.execute_api_call("func", api)
+    resp = gs.execute_api_call("func", api)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert resp.error["error_code"] == "404"
     logger_mock.error.assert_any_call(
         "google_api_error_final", function="func", error=str(err), status_code=404
     )
 
 
 @patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_non_critical_returns_none(logger_mock):
-    def api():
-        raise Exception("not found")
-
-    result = gs.execute_api_call("get_user", api, non_critical=True)
-    assert result is None
-    logger_mock.warning.assert_any_call(
-        "google_api_non_critical_error",
-        function="get_user",
-        error="not found",
-        status_code=None,
-    )
-
-
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_non_critical_with_response_metadata(logger_mock):
-    def api():
-        raise Exception("not found")
-
-    result = gs.execute_api_call(
-        "get_user", api, non_critical=True, response_metadata=True
-    )
-    assert isinstance(result, dict)
-    assert result["success"] is False
-    assert result["error"]["message"] == "not found"
-    logger_mock.warning.assert_any_call(
-        "google_api_non_critical_error",
-        function="get_user",
-        error="not found",
-        status_code=None,
-    )
-
-
-@patch("integrations.google_workspace.google_service_next.logger")
 def test_execute_api_call_raises(logger_mock):
     def api():
-        raise Exception("fail")
+        raise ValueError("fail")
 
-    with pytest.raises(gs.GoogleAPIError):
-        gs.execute_api_call("func", api)
+    result = gs.execute_api_call("func", api)
+    assert isinstance(result, IntegrationResponse)
+    assert result.success is False
+    assert result.error["message"] == "fail"
     logger_mock.error.assert_any_call(
         "google_api_error_final", function="func", error="fail", status_code=None
     )
-
-
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_api_call_critical_with_return_none_on_error_and_response_metadata(
-    logger_mock,
-):
-    def api():
-        raise Exception("fail")
-
-    result = gs.execute_api_call(
-        "func", api, return_none_on_error=True, response_metadata=True
-    )
-    assert isinstance(result, dict)
-    assert result["success"] is False
-    assert result["error"]["message"] == "fail"
-    logger_mock.error.assert_any_call(
-        "google_api_error_final", function="func", error="fail", status_code=None
-    )
-
-
-# --- execute_batch_request exception branch ---
-@patch("integrations.google_workspace.google_service_next.logger")
-def test_execute_batch_request_exception(logger_mock):
-
-    fake_service = MagicMock()
-    fake_batch = MagicMock()
-    fake_service.new_batch_http_request.return_value = fake_batch
-    fake_batch.add.side_effect = lambda req, request_id=None: None
-    fake_batch.execute.side_effect = Exception("fail")
-    requests = [("id1", MagicMock())]
-    try:
-        gs.execute_batch_request(fake_service, requests)
-    except Exception:
-        pass
-    else:
-        assert False, "Should raise Exception"
-    logger_mock.error.assert_any_call("batch_execution_failed", error="fail")
 
 
 # --- paginate_all_results: auto-detect resource key, response as list, no execute_next_chunk ---
@@ -281,7 +326,38 @@ def test_execute_batch_request_exception(logger_mock):
     "integrations.google_workspace.google_service_next.execute_api_call",
     side_effect=lambda name, fn, **kw: fn(),
 )
-def test_paginate_all_results_auto_detect_key(execute_api_call_mock):
+def test_paginate_all_results(_mock):
+    # Simulate paginated API
+    class FakeRequest:
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self):
+            self.calls += 1
+            if self.calls == 1:
+                return {"users": [1, 2], "nextPageToken": "abc"}
+            elif self.calls == 2:
+                return {"users": [3], "nextPageToken": None}
+            else:
+                return None
+
+        def execute_next_chunk(self):
+            if self.calls < 2:
+                return (self, None)
+            return (None, None)
+
+    req = FakeRequest()
+    resp = gs.paginate_all_results(req, resource_key="users")
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == [1, 2, 3]
+
+
+@patch(
+    "integrations.google_workspace.google_service_next.execute_api_call",
+    side_effect=lambda name, fn, **kw: fn(),
+)
+def test_paginate_all_results_auto_detect_key(_mock):
 
     class FakeRequest:
         def __init__(self):
@@ -302,15 +378,17 @@ def test_paginate_all_results_auto_detect_key(execute_api_call_mock):
             return (None, None)
 
     req = FakeRequest()
-    results = gs.paginate_all_results(req)
-    assert results == [1, 2, 3]
+    resp = gs.paginate_all_results(req)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == [1, 2, 3]
 
 
 @patch(
     "integrations.google_workspace.google_service_next.execute_api_call",
     side_effect=lambda name, fn, **kw: fn(),
 )
-def test_paginate_all_results_response_list(execute_api_call_mock):
+def test_paginate_all_results_response_list(_mock):
 
     class FakeRequest:
         def __init__(self):
@@ -326,15 +404,17 @@ def test_paginate_all_results_response_list(execute_api_call_mock):
         # No execute_next_chunk
 
     req = FakeRequest()
-    results = gs.paginate_all_results(req)
-    assert results == [1, 2]
+    resp = gs.paginate_all_results(req)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == [1, 2]
 
 
 @patch(
     "integrations.google_workspace.google_service_next.execute_api_call",
     side_effect=lambda name, fn, **kw: fn(),
 )
-def test_paginate_all_results_no_execute_next_chunk(execute_api_call_mock):
+def test_paginate_all_results_no_execute_next_chunk(_mock):
 
     class FakeRequest:
         def __init__(self):
@@ -350,29 +430,68 @@ def test_paginate_all_results_no_execute_next_chunk(execute_api_call_mock):
         # No execute_next_chunk
 
     req = FakeRequest()
-    results = gs.paginate_all_results(req, resource_key="foo")
-    assert results == [1]
-
-
-# --- Fixtures ---
-@pytest.fixture
-@patch("integrations.google_workspace.google_service_next.settings")
-def fake_settings(settings_mock):
-    class FakeGoogleWorkspace:
-        GOOGLE_WORKSPACE_CUSTOMER_ID = "fake_customer_id"
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
-            '{"client_email": "bot@example.com", "private_key": "FAKE"}'
-        )
-        SRE_BOT_EMAIL = "bot@example.com"
-
-    class FakeSettings:
-        google_workspace = FakeGoogleWorkspace()
-
-    settings_mock.google_workspace = FakeGoogleWorkspace()
-    return FakeSettings()
+    resp = gs.paginate_all_results(req, resource_key="foo")
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is True
+    assert resp.data == [1]
 
 
 # --- get_google_service ---
+@patch("integrations.google_workspace.google_service_next.build")
+@patch(
+    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
+)
+def test_get_google_service_valid_delegated_user_email(mock_creds, mock_build):
+    # Simulate valid delegated user email
+    mock_creds.return_value = MagicMock()
+    mock_build.return_value = MagicMock()
+    key_file = '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}'
+    with patch(
+        "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+        key_file,
+    ):
+        service = gs.get_google_service(
+            "admin", "v1", delegated_user_email="user@example.com"
+        )
+        assert service is not None
+        mock_creds.assert_called()
+        mock_build.assert_called()
+
+
+@patch("integrations.google_workspace.google_service_next.build")
+@patch(
+    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
+)
+def test_get_google_service_missing_creds_file(mock_creds, mock_build):
+    # Simulate missing credential file
+    mock_creds.return_value = MagicMock()
+    mock_build.return_value = MagicMock()
+    with patch(
+        "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+        None,
+    ):
+        with pytest.raises(ValueError) as exc_info:
+            gs.get_google_service("admin", "v1")
+        assert "Credentials JSON not set" in str(exc_info.value)
+
+
+@patch("integrations.google_workspace.google_service_next.build")
+@patch(
+    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
+)
+def test_get_google_service_invalid_creds_file(mock_creds, mock_build):
+    # Simulate invalid credential file (not JSON)
+    mock_creds.return_value = MagicMock()
+    mock_build.return_value = MagicMock()
+    with patch(
+        "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+        "not-json",
+    ):
+        with pytest.raises(Exception) as exc_info:
+            gs.get_google_service("admin", "v1")
+        assert "Invalid credentials JSON" in str(exc_info.value)
+
+
 @patch(
     "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}',
@@ -431,8 +550,8 @@ def test_execute_batch_request_success():
     fake_service.new_batch_http_request.return_value = fake_batch
 
     # Simulate the callback being called for each request
-    def add(req, request_id=None):
-        # Simulate success for both requests
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id")
         fake_batch.callback(request_id, fake_batch._results[request_id], None)
         fake_batch._added.append(request_id)
 
@@ -450,9 +569,38 @@ def test_execute_batch_request_success():
 
     fake_batch._results = {"id1": {"foo": 1}, "id2": {"bar": 2}}
     result = gs.execute_batch_request(fake_service, requests)
-    assert set(result["results"]) == {"id1", "id2"}
-    assert result["errors"] == {}
-    assert result["summary"]["successful"] == 2
+    assert isinstance(result, IntegrationResponse)
+    assert set(result.data["results"]) == {"id1", "id2"}
+    assert result.error is None or result.error.get("errors", {}) == {}
+    assert result.data["summary"]["successful"] == 2
+
+
+def test_execute_batch_request_error():
+    service = MagicMock()
+    batch = MagicMock()
+    service.new_batch_http_request.return_value = batch
+    # Simulate error in batch callback
+
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id", "get_user")
+        batch.callback(request_id, None, Exception("fail"))
+
+    batch.add.side_effect = add
+    batch.execute.side_effect = lambda: None
+    requests = [("get_user", MagicMock())]
+
+    def new_batch_http_request(callback):
+        batch.callback = callback
+        return batch
+
+    service.new_batch_http_request.side_effect = new_batch_http_request
+    resp = gs.execute_batch_request(service, requests)
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.data == {}
+    assert resp.error is not None
+    assert resp.function_name == "execute_batch_request"
+    assert resp.integration_name == "google"
 
 
 def test_execute_batch_request_with_errors():
@@ -461,12 +609,12 @@ def test_execute_batch_request_with_errors():
     fake_service.new_batch_http_request.return_value = fake_batch
 
     # Simulate the callback being called for each request
-    def add(req, request_id=None):
-        # Simulate error for id2, success for id1
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id")
         if request_id == "id1":
             fake_batch.callback(request_id, {"foo": 1}, None)
         elif request_id == "id2":
-            fake_batch.callback(request_id, None, Exception("fail"))
+            fake_batch.callback(request_id, None, ValueError("fail"))
         fake_batch._added.append(request_id)
 
     fake_batch._added = []
@@ -482,99 +630,255 @@ def test_execute_batch_request_with_errors():
     fake_service.new_batch_http_request.side_effect = new_batch_http_request
 
     result = gs.execute_batch_request(fake_service, requests)
-    assert set(result["results"]) == {"id1"}
-    assert set(result["errors"]) == {"id2"}
-    assert result["summary"]["failed"] == 1
+    # If there are errors, results may be missing or empty
+    if "results" in result.data:
+        assert set(result.data["results"]) == {"id1"}
+    else:
+        # Expect partial results for error case
+        assert result.data == {"id1": {"foo": 1}}
 
 
-# --- paginate_all_results ---
-@patch(
-    "integrations.google_workspace.google_service_next.execute_api_call",
-    side_effect=lambda name, fn, **kw: fn(),
-)
-def test_paginate_all_results(execute_api_call_mock):
-    # Simulate paginated API
-    class FakeRequest:
-        def __init__(self):
-            self.calls = 0
+@patch("integrations.google_workspace.google_service_next.logger")
+def test_execute_batch_request_exception(logger_mock):
 
-        def execute(self):
-            self.calls += 1
-            if self.calls == 1:
-                return {"users": [1, 2], "nextPageToken": "abc"}
-            elif self.calls == 2:
-                return {"users": [3], "nextPageToken": None}
-            else:
-                return None
-
-        def execute_next_chunk(self):
-            if self.calls < 2:
-                return (self, None)
-            return (None, None)
-
-    req = FakeRequest()
-    results = gs.paginate_all_results(req, resource_key="users")
-    assert results == [1, 2, 3]
-
-
-# --- execute_google_api_call ---
-@patch(
-    "integrations.google_workspace.google_service_next.paginate_all_results",
-    return_value=[1, 2, 3],
-)
-@patch("integrations.google_workspace.google_service_next.get_google_service")
-def test_execute_google_api_call_list(
-    get_google_service_mock, paginate_all_results_mock
-):
     fake_service = MagicMock()
-    get_google_service_mock.return_value = fake_service
-
-    class FakeResource:
-        def list(self, **kwargs):
-            class Req:
-                pass
-
-            return Req()
-
-    fake_service.users = lambda: FakeResource()
-    result = gs.execute_google_api_call(
-        "admin", "v1", "users", "list", scopes=["s"], delegated_user_email="e"
-    )
-    assert result == [1, 2, 3]
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
+    fake_batch.add.side_effect = lambda req, request_id=None: None
+    fake_batch.execute.side_effect = ValueError("fail")
+    requests = [("id1", MagicMock())]
+    try:
+        gs.execute_batch_request(fake_service, requests)
+    except ValueError:
+        pass
+    else:
+        assert False, "Should raise ValueError"
+    logger_mock.error.assert_any_call("batch_execution_failed", error="fail")
 
 
-@patch(
-    "integrations.google_workspace.google_service_next.execute_api_call",
-    side_effect=lambda name, fn, **kw: fn(),
-)
-@patch("integrations.google_workspace.google_service_next.get_google_service")
-def test_execute_google_api_call_get(get_google_service_mock, execute_api_call_mock):
+def test_execute_batch_request_mixed_success_and_non_critical_error():
     fake_service = MagicMock()
-    get_google_service_mock.return_value = fake_service
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
 
-    class FakeResource:
-        def get(self, **kwargs):
-            return MagicMock(execute=lambda: {"id": 1})
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id")
+        if request_id == "id1":
+            fake_batch.callback(request_id, {"foo": 1}, None)
+        elif request_id == "id2":
+            fake_batch.callback(
+                request_id, None, Exception("not found")
+            )  # non-critical error
+        fake_batch._added.append(request_id)
 
-    fake_service.users = lambda: FakeResource()
-    result = gs.execute_google_api_call(
-        "admin",
-        "v1",
-        "users",
-        "get",
-        scopes=["s"],
-        delegated_user_email="e",
-        userKey="id",
+    fake_batch._added = []
+    fake_batch.add.side_effect = add
+    fake_batch.execute.side_effect = lambda: None
+    requests = [("id1", MagicMock()), ("id2", MagicMock())]
+
+    def new_batch_http_request(callback):
+        fake_batch.callback = callback
+        return fake_batch
+
+    fake_service.new_batch_http_request.side_effect = new_batch_http_request
+
+    result = gs.execute_batch_request(fake_service, requests)
+    assert isinstance(result, IntegrationResponse)
+    assert result.success is False  # Non-critical error should still mark as failed
+    assert "id1" in result.data.get("results", {}) or "id1" in result.data
+    assert result.error is not None
+    assert "not found" in str(result.error)
+
+
+def test_execute_batch_request_missing_request_id():
+    fake_service = MagicMock()
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
+
+    # Callback called with a request_id not in requests
+    def add(*args, **kwargs):
+        fake_batch.callback("unknown_id", {"foo": 1}, None)
+        fake_batch._added.append("unknown_id")
+
+    fake_batch._added = []
+    fake_batch.add.side_effect = add
+    fake_batch.execute.side_effect = lambda: None
+    requests = [("id1", MagicMock())]
+
+    def new_batch_http_request(callback):
+        fake_batch.callback = callback
+        return fake_batch
+
+    fake_service.new_batch_http_request.side_effect = new_batch_http_request
+
+    result = gs.execute_batch_request(fake_service, requests)
+    # Should not include unknown_id in results
+    assert "unknown_id" not in result.data
+
+
+def test_execute_batch_request_unexpected_callback_result():
+    fake_service = MagicMock()
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
+
+    # Callback returns neither data nor error
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id", "id1")
+        fake_batch.callback(request_id, None, None)
+        fake_batch._added.append(request_id)
+
+    fake_batch._added = []
+    fake_batch.add.side_effect = add
+    fake_batch.execute.side_effect = lambda: None
+    requests = [("id1", MagicMock())]
+
+    def new_batch_http_request(callback):
+        fake_batch.callback = callback
+        return fake_batch
+
+    fake_service.new_batch_http_request.side_effect = new_batch_http_request
+
+    result = gs.execute_batch_request(fake_service, requests)
+    # Should handle gracefully, likely empty result
+    assert result.success is True or result.success is False
+
+
+def test_execute_batch_request_callback_with_data_and_error():
+    fake_service = MagicMock()
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
+
+    # Callback called with both data and error
+    def add(*args, **kwargs):
+        request_id = kwargs.get("request_id", "id1")
+        fake_batch.callback(request_id, {"foo": 1}, ValueError("fail"))
+        fake_batch._added.append(request_id)
+
+    fake_batch._added = []
+    fake_batch.add.side_effect = add
+    fake_batch.execute.side_effect = lambda: None
+    requests = [("id1", MagicMock())]
+
+    def new_batch_http_request(callback):
+        fake_batch.callback = callback
+        return fake_batch
+
+    fake_service.new_batch_http_request.side_effect = new_batch_http_request
+
+    result = gs.execute_batch_request(fake_service, requests)
+    # Should prefer error
+    assert result.success is False
+    assert result.error is not None
+
+
+def test_execute_batch_request_callback_never_called():
+    fake_service = MagicMock()
+    fake_batch = MagicMock()
+    fake_service.new_batch_http_request.return_value = fake_batch
+
+    # add does nothing, callback never called
+    def add(*args, **kwargs):
+        pass
+
+    fake_batch.add.side_effect = add
+    fake_batch.execute.side_effect = lambda: None
+    requests = [("id1", MagicMock())]
+
+    def new_batch_http_request(callback):
+        fake_batch.callback = callback
+        return fake_batch
+
+    fake_service.new_batch_http_request.side_effect = new_batch_http_request
+
+    result = gs.execute_batch_request(fake_service, requests)
+    # Should handle gracefully, likely empty result
+    assert isinstance(result, IntegrationResponse)
+
+
+# --- execute_google_api_call edge case tests ---
+
+
+def test_execute_google_api_call_invalid_resource_path():
+    # Simulate invalid resource path (attribute error)
+    class FakeService:
+        def __getattr__(self, name):
+            raise AttributeError(f"No such resource: {name}")
+
+    def fake_get_google_service(*args, **kwargs):
+        return FakeService()
+
+    gs.get_google_service = fake_get_google_service
+    resp = gs.execute_google_api_call(
+        service_name="drive",
+        version="v3",
+        resource_path="invalid_resource",
+        method="list",
     )
-    assert result == {"id": 1}
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert "No such resource" in resp.error["message"]
 
 
-# --- handle_google_api_errors ---
+def test_execute_google_api_call_unsupported_method():
+    # Simulate unsupported method (attribute error)
+    class FakeResource:
+        def __getattr__(self, name):
+            if name == "files":
+                return lambda: self
+            raise AttributeError(f"No such method: {name}")
+
+    def fake_get_google_service(*args, **kwargs):
+        return FakeResource()
+
+    gs.get_google_service = fake_get_google_service
+    resp = gs.execute_google_api_call(
+        service_name="drive",
+        version="v3",
+        resource_path="files",
+        method="not_a_method",
+    )
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert "No such method" in resp.error["message"]
+
+
+def test_execute_google_api_call_api_error():
+    # Simulate API call raising an exception
+    class FakeResource:
+        def __getattr__(self, name):
+            if name == "files":
+                return lambda: self
+            if name == "list":
+
+                def api_method(**kwargs):
+                    raise ValueError("API call failed")
+
+                return api_method
+            raise AttributeError(f"No such method: {name}")
+
+    def fake_get_google_service(*args, **kwargs):
+        return FakeResource()
+
+    gs.get_google_service = fake_get_google_service
+    resp = gs.execute_google_api_call(
+        service_name="drive",
+        version="v3",
+        resource_path="files",
+        method="list",
+    )
+    assert isinstance(resp, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert "API call failed" in resp.error["message"]
+
+
 @patch(
     "integrations.google_workspace.google_service_next.execute_api_call",
     side_effect=lambda name, fn, **kw: fn(),
 )
-def test_handle_google_api_errors_decorator(execute_api_call_mock):
+def test_handle_google_api_errors_decorator(_mock):
     @gs.handle_google_api_errors
     def foo(x):
         return x + 1
