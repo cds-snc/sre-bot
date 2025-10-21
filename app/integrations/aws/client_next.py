@@ -1,40 +1,30 @@
 """
 AWS Service Next Module
 
-This module provides centralized error handling, retry logic, standardized responses, and simplified pagination for AWS API calls, inspired by the Google Service Next module.
+Provides a unified, simplified interface for making AWS API calls with consistent error handling, retry logic, and standardized responses.
 
 Features:
-- Centralized error handling and retry logic
-- Standardized response format for consistent debugging
-- Simplified pagination for list operations
-
-Note:
-Unlike Google APIs, AWS/boto3 does NOT support generic batch API calls for unrelated operations. Each API call is a separate HTTP request. Some AWS services (like DynamoDB, SQS, S3) provide service-specific batch operations, but there is no universal batch API for arbitrary calls (e.g., Identity Store, SSO Admin, etc.).
+- Centralized error handling and configurable retry logic for all AWS API calls
+- Standardized IntegrationResponse model for all results and errors
+- Automatic pagination for supported list operations
+- Optional role assumption for cross-account access
+- Handles non-critical errors and throttling transparently
 
 Usage:
-    # Simple usage (auto-paginates list operations by default)
-    instances = execute_aws_api_call(
-        service_name="ec2",
-        method="describe_instances",
-        Filters=[{"Name": "instance-state-name", "Values": ["running"]}],
-    )
-
-    # Single page only (override auto-pagination)
-    single_page = execute_aws_api_call(
-        service_name="ec2",
-        method="describe_instances",
-        single_page=True,
-        Filters=[{"Name": "instance-state-name", "Values": ["running"]}],
-    )
-
-    # With standardized response format for better debugging
     response = execute_aws_api_call(
         service_name="ec2",
         method="describe_instances",
-        response_metadata=True,
         Filters=[{"Name": "instance-state-name", "Values": ["running"]}],
     )
-    # response = {"success": True, "data": {...}, "error": None, "function_name": "ec2_describe_instances"}
+    if response.success:
+        data = response.data
+    else:
+        error = response.error
+
+Notes:
+- All AWS API calls are executed with consistent error handling and response formatting.
+- Batch operations are supported for services with native batch APIs; others are handled via repeated calls.
+- All responses use the IntegrationResponse model for easy downstream processing.
 """
 
 import time
@@ -90,9 +80,6 @@ class AWSAPIError(Exception):
         self.error_code = error_code
         self.function_name = function_name
         super().__init__(message)
-
-
-# Helper functions moved to models.integrations for reuse across all integrations
 
 
 def _should_retry(error: Exception, attempt: int, max_attempts: int) -> bool:
