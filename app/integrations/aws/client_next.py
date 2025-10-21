@@ -260,7 +260,6 @@ def paginate_all_results(
             for key in keys:
                 if key in page:
                     results.extend(page[key])
-    logger.info("pagination_completed", total_results=len(results))
     return results
 
 
@@ -376,7 +375,7 @@ def execute_aws_api_call(
     non_critical: bool = False,
     return_none_on_error: bool = False,
     response_metadata: bool = False,
-    single_page: bool = False,
+    force_paginate: bool = False,
     **kwargs,
 ) -> Any:
     """
@@ -395,7 +394,7 @@ def execute_aws_api_call(
         non_critical (bool): Mark this call as non-critical (never raises exceptions).
         return_none_on_error (bool): Return None instead of raising on errors.
         response_metadata (bool): Return standardized response dict.
-        single_page (bool, optional): If True, return only one page (override auto-pagination).
+        force_paginate (bool, optional): If True, force pagination even for single-page results.
         **kwargs: Additional keyword arguments for the API call.
 
     Returns:
@@ -406,8 +405,12 @@ def execute_aws_api_call(
         client = get_aws_client(service_name, session_config, client_config, role_arn)
         api_method = getattr(client, method)
 
-        # Auto-paginate list operations unless single_page is explicitly requested
-        should_paginate = _can_paginate_method(client, method) and not single_page
+        # Auto-paginate list operations unless force_paginate is explicitly requested
+        should_paginate = (
+            force_paginate
+            or _can_paginate_method(client, method)
+            and not force_paginate
+        )
 
         if should_paginate:
             return paginate_all_results(client, method, keys, **kwargs)
