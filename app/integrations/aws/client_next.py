@@ -136,10 +136,8 @@ def _calculate_retry_delay(attempt: int) -> float:
 def _handle_final_error(
     error: Exception,
     function_name: str,
-    non_critical: bool = False,
-    response_metadata: bool = False,
-) -> Any:
-    """Handle the final error after all retries are exhausted."""
+) -> dict:
+    """Handle the final error after all retries are exhausted. Supports configured non-critical errors which log warnings instead of errors."""
     error_message = str(error).lower()
 
     # Check if this is a known non-critical error
@@ -156,26 +154,22 @@ def _handle_final_error(
                 isinstance(err, str) and (err in error_message) for err in function_errs
             )
 
-    is_non_critical = non_critical or is_non_critical_config
-
     error_code = (
         getattr(error, "response", {}).get("Error", {}).get("Code")
         if hasattr(error, "response")
         else None
     )
 
-    if is_non_critical:
+    if is_non_critical_config:
         logger.warning(
             "aws_api_non_critical_error",
             function=function_name,
             error=str(error),
             error_code=error_code,
         )
-        if response_metadata:
-            return _build_response(
-                False, None, _build_error_info(error, function_name), function_name
-            )
-        return None
+        return _build_response(
+            False, None, _build_error_info(error, function_name), function_name
+        )
     else:
         logger.error(
             "aws_api_error_final",
@@ -183,11 +177,9 @@ def _handle_final_error(
             error=str(error),
             error_code=error_code,
         )
-        if response_metadata:
-            return _build_response(
-                False, None, _build_error_info(error, function_name), function_name
-            )
-        return None
+        return _build_response(
+            False, None, _build_error_info(error, function_name), function_name
+        )
 
 
 def _can_paginate_method(client: BaseClient, method: str) -> bool:
@@ -215,6 +207,16 @@ def get_aws_client(
     role_arn: Optional[str] = None,
     session_name: str = "DefaultSession",
 ) -> BaseClient:
+    """
+    Create a boto3 AWS service client, optionally assuming a role.
+
+    Args:
+        service_name (str): The name of the AWS service.
+        session_config (dict, optional): Session configuration.
+        client_config (dict, optional): Client configuration.
+        role_arn (str, optional): The ARN of the IAM role to assume.
+        session_name (str): The name for the assumed role session.
+    """
     session_config = session_config or {"region_name": AWS_REGION}
     client_config = client_config or {"region_name": AWS_REGION}
     if role_arn:
@@ -234,7 +236,7 @@ def get_aws_client(
     return session.client(service_name, **client_config)
 
 
-def paginate_all_results(
+def _paginate_all_results(
     client: BaseClient, method: str, keys: Optional[List[str]] = None, **kwargs
 ) -> List[dict]:
     paginator = client.get_paginator(method)
@@ -257,11 +259,8 @@ def paginate_all_results(
 def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
-    non_critical: bool = False,
-    auto_retry: bool = True,
     max_retries: Optional[int] = None,
-    response_metadata: bool = False,
-) -> Any:
+) -> dict:
     """
     Module-level error handling for AWS API calls.
 
@@ -273,10 +272,9 @@ def execute_api_call(
         non_critical (bool): Mark this call as non-critical (never raises exceptions)
         auto_retry (bool): Enable automatic retry for retryable errors
         max_retries (int): Override default max retries
-        response_metadata (bool): Return standardized response dict
 
     Returns:
-        Any: The result of the API call or standardized response dict
+        dict: Standardized response dict
     """
     default_retries = ERROR_CONFIG.get("default_max_retries", 3)
     max_retry_attempts = (
@@ -302,14 +300,12 @@ def execute_api_call(
                     attempt=attempt + 1,
                 )
 
-            if response_metadata:
-                return _build_response(True, result, None, func_name)
-            return result
+            return _build_response(True, result, None, func_name)
 
         except (BotoCoreError, ClientError) as e:
             last_exception = e
 
-            if auto_retry and _should_retry(e, attempt, max_retry_attempts):
+            if _should_retry(e, attempt, max_retry_attempts):
                 delay = _calculate_retry_delay(attempt)
                 logger.warning(
                     "aws_api_retrying",
@@ -324,8 +320,6 @@ def execute_api_call(
             return _handle_final_error(
                 e,
                 func_name,
-                non_critical,
-                response_metadata=response_metadata,
             )
 
         except Exception as e:  # pylint: disable=broad-except
@@ -334,8 +328,6 @@ def execute_api_call(
             return _handle_final_error(
                 e,
                 func_name,
-                non_critical,
-                response_metadata=response_metadata,
             )
 
     # If we exit the retry loop without returning, use the last captured exception
@@ -345,8 +337,6 @@ def execute_api_call(
     return _handle_final_error(
         last_exception,
         func_name,
-        non_critical,
-        response_metadata=response_metadata,
     )
 
 
@@ -358,15 +348,13 @@ def execute_aws_api_call(
     session_config: Optional[dict] = None,
     client_config: Optional[dict] = None,
     max_retries: Optional[int] = None,
-    non_critical: bool = False,
-    response_metadata: bool = False,
     force_paginate: bool = False,
     **kwargs,
 ) -> Any:
     """
     Simplified version of execute_aws_api_call using module-level error handling.
 
-    Auto-paginates list operations by default (industry best practice).
+    Auto-paginates list operations by default.
 
     Args:
         service_name (str): The name of the AWS service.
@@ -376,9 +364,6 @@ def execute_aws_api_call(
         session_config (dict, optional): Session configuration.
         client_config (dict, optional): Client configuration.
         max_retries (int, optional): Override default max retries.
-        non_critical (bool): Mark this call as non-critical (never raises exceptions).
-        return_none_on_error (bool): Return None instead of raising on errors.
-        response_metadata (bool): Return standardized response dict.
         force_paginate (bool, optional): If True, force pagination even for single-page results.
         **kwargs: Additional keyword arguments for the API call.
 
@@ -398,7 +383,7 @@ def execute_aws_api_call(
         )
 
         if should_paginate:
-            return paginate_all_results(client, method, keys, **kwargs)
+            return _paginate_all_results(client, method, keys, **kwargs)
         else:
             return api_method(**kwargs)
 
@@ -407,8 +392,5 @@ def execute_aws_api_call(
     return execute_api_call(
         func_name,
         api_call,
-        non_critical=non_critical,
-        auto_retry=True,
         max_retries=max_retries,
-        response_metadata=response_metadata,
     )
