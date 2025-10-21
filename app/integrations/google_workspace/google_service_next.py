@@ -20,15 +20,24 @@ Functions:
 
 import json
 import time
+
 from functools import wraps
 from json import JSONDecodeError
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Callable, List, Optional, Tuple, Union, cast
 
 from core.config import settings
 from core.logging import get_module_logger
 from google.oauth2 import service_account
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
+
+# IntegrationResponse and helpers for standardized response modeling
+from models.integrations import (
+    IntegrationResponse,
+    build_error_info,
+    build_success_response,
+    build_error_response,
+)
 
 # Define the default arguments
 GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
@@ -69,30 +78,6 @@ class GoogleAPIError(Exception):
         self.function_name = function_name
         self.retry_after = retry_after
         super().__init__(message)
-
-
-def _build_error_info(error: Exception, function_name: str) -> dict:
-    """Helper to build error info dict from an exception."""
-    status_code = (
-        getattr(error, "resp", {}).get("status") if hasattr(error, "resp") else None
-    )
-    return {
-        "message": str(error),
-        "status_code": status_code,
-        "function_name": function_name,
-    }
-
-
-def _build_response(
-    success: bool, data: Any, error_info: Optional[dict], function_name: str
-) -> dict:
-    """Helper to build standardized response dict."""
-    return {
-        "success": success,
-        "data": data,
-        "error": error_info,
-        "function_name": function_name,
-    }
 
 
 def _calculate_retry_delay(attempt: int, status_code: int) -> float:
@@ -148,14 +133,11 @@ def _should_retry(
 def _handle_final_error(
     error: Exception,
     function_name: str,
-    non_critical: bool,
-    return_none_on_error: bool,
-    response_metadata: bool = False,
-) -> Any:
+) -> IntegrationResponse:
     """Handle the final error after all retries are exhausted."""
     error_message = str(error).lower()
 
-    # Check if this is a known non-critical error
+    # Check if this is a known non-critical error (only via config)
     raw_nc = (
         ERROR_CONFIG.get("non_critical_errors")
         if isinstance(ERROR_CONFIG, dict)
@@ -165,29 +147,26 @@ def _handle_final_error(
     if isinstance(raw_nc, dict):
         function_errs = raw_nc.get(function_name)
         if isinstance(function_errs, (list, tuple, set)):
-            # Defensive: ensure all elements are strings
             is_non_critical_config = any(
                 isinstance(err, str) and (err in error_message) for err in function_errs
             )
-
-    is_non_critical = non_critical or is_non_critical_config
 
     status_code = (
         getattr(error, "resp", {}).get("status") if hasattr(error, "resp") else None
     )
 
-    if is_non_critical:
+    if is_non_critical_config:
         logger.warning(
             "google_api_non_critical_error",
             function=function_name,
             error=str(error),
             status_code=status_code,
         )
-        if response_metadata:
-            return _build_response(
-                False, None, _build_error_info(error, function_name), function_name
-            )
-        return None
+        return build_error_response(
+            error=error,
+            function_name=function_name,
+            integration_name="google",
+        )
     else:
         logger.error(
             "google_api_error_final",
@@ -195,62 +174,60 @@ def _handle_final_error(
             error=str(error),
             status_code=status_code,
         )
-        if return_none_on_error:
-            if response_metadata:
-                return _build_response(
-                    False, None, _build_error_info(error, function_name), function_name
-                )
-            return None
-        raise GoogleAPIError(
-            message=str(error), status_code=status_code, function_name=function_name
-        ) from error
+        return build_error_response(
+            error=error,
+            function_name=function_name,
+            integration_name="google",
+        )
 
 
 def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
-    non_critical: bool = False,
-    auto_retry: bool = True,
     max_retries: Optional[int] = None,
-    return_none_on_error: bool = False,
-    response_metadata: bool = False,
-) -> Any:
+) -> IntegrationResponse:
     """
-    Module-level error handling for Google API calls.
-
-    This eliminates the need for decorators by providing centralized error handling.
+    Execute a Google API call with standardized error handling, retry logic, and response modeling.
 
     Args:
         func_name (str): Name of the calling function for logging
-        api_call (callable): The API call to execute
-        non_critical (bool): Treat errors as non-critical (log warning, return None)
-        auto_retry (bool): Enable automatic retry for retryable errors
-        max_retries (int): Override default max retries
-        return_none_on_error (bool): Return None instead of raising on errors
+        api_call (Callable[[], Any]): The API call to execute
+        max_retries (Optional[int]): Override default max retries (default from config)
 
     Returns:
-        Any: The result of the API call
+        IntegrationResponse: Standardized response object with success, data, error, function_name, and integration_name fields.
 
-    Example:
-        def my_api_function():
-            service = get_google_service("people", "v1")
-            request = service.people().get(resourceName="people/me")
-            return request.execute()
-
-        result = execute_api_call("my_api_function", my_api_function)
+    Notes:
+        - All errors are handled and returned as IntegrationResponse objects.
+        - Automatic retry is always enabled for retryable errors (no argument needed).
+        - Non-critical errors are only supported via config, not as a function argument.
+        - Legacy flags (response_metadata, non_critical, auto_retry, return_none_on_error) are no longer supported.
     """
-    max_retry_attempts = max_retries or ERROR_CONFIG["default_max_retries"]
+    max_retry_attempts = (
+        max_retries
+        if isinstance(max_retries, int)
+        else ERROR_CONFIG["default_max_retries"]
+    )
     last_exception: Optional[Exception] = None
 
     retry_codes = _get_retry_codes(ERROR_CONFIG)
 
-    for attempt in range(max_retry_attempts + 1):
+    for attempt in range(
+        max_retry_attempts
+        if isinstance(max_retry_attempts, int)
+        else int(max_retry_attempts) + 1
+    ):
         try:
             logger.debug(
                 "google_api_call_start",
                 function=func_name,
                 attempt=attempt + 1,
-                max_attempts=max_retry_attempts + 1,
+                max_attempts=(
+                    max_retry_attempts
+                    if isinstance(max_retry_attempts, int)
+                    else int(max_retry_attempts)
+                )
+                + 1,
             )
 
             result = api_call()
@@ -262,15 +239,21 @@ def execute_api_call(
                     attempt=attempt + 1,
                 )
 
-            if response_metadata:
-                return _build_response(True, result, None, func_name)
-            return result
+            return build_success_response(
+                data=result,
+                function_name=func_name,
+                integration_name="google",
+            )
 
         except HttpError as e:
             last_exception = e
             is_last_attempt = attempt == max_retry_attempts
 
-            if _should_retry(auto_retry, retry_codes, e, is_last_attempt):
+            if (
+                retry_codes is not None
+                and int(e.resp.status) in retry_codes
+                and not is_last_attempt
+            ):
                 delay = _calculate_retry_delay(attempt, e.resp.status)
                 logger.warning(
                     "google_api_retrying",
@@ -286,21 +269,13 @@ def execute_api_call(
             return _handle_final_error(
                 e,
                 func_name,
-                non_critical,
-                return_none_on_error,
-                response_metadata=response_metadata,
             )
 
         except Exception as e:  # pylint: disable=broad-except
             last_exception = e
-            is_last_attempt = attempt == max_retry_attempts
-
             return _handle_final_error(
                 e,
                 func_name,
-                non_critical,
-                return_none_on_error,
-                response_metadata=response_metadata,
             )
 
     # If we exit the retry loop without returning, use the last captured exception
@@ -310,9 +285,6 @@ def execute_api_call(
     return _handle_final_error(
         last_exception,
         func_name,
-        non_critical,
-        return_none_on_error,
-        response_metadata=response_metadata,
     )
 
 
@@ -369,42 +341,50 @@ def get_google_service(
 
 
 def execute_batch_request(
-    service: Resource, requests: List[Tuple], callback_fn: Optional[Callable] = None
-) -> Dict[str, Any]:
+    service: Resource,
+    requests: List[Tuple],
+    callback_fn: Optional[Callable] = None,
+) -> IntegrationResponse:
     """
-    Execute multiple API requests in a single batch with enhanced error handling.
+    Execute multiple Google API calls in a single batch request with standardized error handling and response modeling.
 
     Args:
-        service (Resource): The Google service resource.
-        requests (list): List of tuples (request_id, api_request).
-        callback_fn (callable): Optional callback function for handling responses.
+        service (Resource): Authenticated Google service resource
+        requests (List[Tuple]): List of (resource, method, params) tuples
+        callback_fn (Optional[Callable]): Optional callback for batch results
 
     Returns:
-        dict: Dict with results, errors, and summary statistics.
+        IntegrationResponse: Standardized response object with success, data, error, function_name, and integration_name fields.
 
-    Example:
-        requests = [
-            ("user1", service.users().get(userKey="user1@example.com")),
-            ("user2", service.users().get(userKey="user2@example.com"))
-        ]
-        results = execute_batch_request(service, requests)
+    Notes:
+        - All errors are handled and returned as IntegrationResponse objects.
+        - Legacy flags and response dicts are no longer supported.
     """
+
     results = {}
     errors = {}
 
     def enhanced_callback(request_id, response, exception):
         if exception:
-            error_info = _build_error_info(exception, request_id)
+            error_info = build_error_info(exception, function_name=request_id)
             error_info["timestamp"] = time.time()
             errors[request_id] = error_info
             logger.warning(
                 "batch_request_item_failed",
                 request_id=request_id,
                 error=str(exception),
-                status_code=error_info["status_code"],
+                status_code=error_info.get("status_code"),
             )
         else:
-            results[request_id] = response
+            # If standardized, extract IntegrationResponse fields
+            if isinstance(response, IntegrationResponse):
+                if response.success:
+                    results[request_id] = response.data
+                else:
+                    # If error, add to errors dict
+                    errors[request_id] = response.error or {"message": "Unknown error"}
+            else:
+                results[request_id] = response
 
     callback = callback_fn or enhanced_callback
     batch = service.new_batch_http_request(callback=callback)
@@ -431,34 +411,65 @@ def execute_batch_request(
         success_rate=successful_requests / total_requests if total_requests > 0 else 0,
     )
 
-    return {
-        "results": results,
-        "errors": errors,
-        "summary": {
-            "total": total_requests,
-            "successful": successful_requests,
-            "failed": failed_requests,
-            "success_rate": (
-                successful_requests / total_requests if total_requests > 0 else 0
-            ),
-        },
-    }
+    # Standardized IntegrationResponse for batch requests
+    if errors:
+        # If any errors occurred, return as error response
+        error_info = {
+            "errors": errors,
+            "summary": {
+                "total": total_requests,
+                "successful": successful_requests,
+                "failed": failed_requests,
+                "success_rate": (
+                    successful_requests / total_requests if total_requests > 0 else 0
+                ),
+            },
+        }
+        return build_error_response(
+            error=Exception("Batch request completed with errors"),
+            function_name="execute_batch_request",
+            integration_name="google",
+        ).model_copy(update={"data": results, "error": error_info})
+    else:
+        # All requests succeeded
+        data = {
+            "results": results,
+            "summary": {
+                "total": total_requests,
+                "successful": successful_requests,
+                "failed": failed_requests,
+                "success_rate": (
+                    successful_requests / total_requests if total_requests > 0 else 0
+                ),
+            },
+        }
+        return build_success_response(
+            data=data,
+            function_name="execute_batch_request",
+            integration_name="google",
+        )
 
 
-def paginate_all_results(request, resource_key: Optional[str] = None) -> List[dict]:
+def paginate_all_results(
+    request, resource_key: Optional[str] = None
+) -> IntegrationResponse:
     """
-    Simplified pagination using built-in Google API client features with error handling.
+    Simplified pagination using built-in Google API client features with standardized error handling and response modeling.
 
     Args:
         request: The initial API request object.
         resource_key (str): The key in response containing the list (auto-detected if None).
 
     Returns:
-        list: All results from all pages.
+        IntegrationResponse: Standardized response object with success, data, error, function_name, and integration_name fields.
 
     Example:
         request = service.users().list(customer=customer_id)
-        all_users = paginate_all_results(request, "users")
+        resp = paginate_all_results(request, "users")
+        if resp.success:
+            all_users = resp.data  # This will be the list of results
+        else:
+            error_info = resp.error
     """
 
     def paginate_call():
@@ -501,10 +512,16 @@ def paginate_all_results(request, resource_key: Optional[str] = None) -> List[di
         logger.info("pagination_completed", total_results=len(all_results))
         return all_results
 
-    return execute_api_call("paginate_all_results", paginate_call)
+    resp = execute_api_call("paginate_all_results", paginate_call)
+    if not isinstance(resp, IntegrationResponse):
+        resp = build_success_response(
+            data=resp,
+            function_name="paginate_all_results",
+            integration_name="google",
+        )
+    return resp
 
 
-# Backward compatibility function - simplified version using module-level error handling
 def execute_google_api_call(
     service_name: str,
     version: str,
@@ -512,28 +529,28 @@ def execute_google_api_call(
     method: str,
     scopes: Optional[List[str]] = None,
     delegated_user_email: Optional[str] = None,
-    single_page: bool = False,
-    non_critical: bool = False,
     **kwargs: Any,
-) -> Any:
+) -> IntegrationResponse:
     """
-    Simplified version of execute_google_api_call using built-in features and module-level error handling.
-
-    Auto-paginates list operations by default (industry best practice).
+    Execute a Google API call using the simplified module-level error handling and standardized response model.
 
     Args:
-        service_name (str): The name of the Google service.
-        version (str): The version of the Google service.
-        resource_path (str): The path to the resource (e.g., "users" or "groups.members").
-        method (str): The method to call on the resource.
-        scopes (list, optional): The scopes for the Google service.
-        delegated_user_email (str, optional): The email address of the user to impersonate.
-        single_page (bool, optional): If True, return only one page (override auto-pagination).
-        non_critical (bool, optional): Whether to treat errors as non-critical.
-        **kwargs: Additional keyword arguments for the API call.
+        service_name (str): Name of the Google service (e.g., "drive")
+        version (str): API version (e.g., "v3")
+        resource_path (str): Path to the resource (e.g., "files")
+        method (str): API method to call (e.g., "list")
+        scopes (Optional[List[str]]): OAuth scopes
+        delegated_user_email (Optional[str]): Email for delegated access
+        single_page (bool): If True, only fetch a single page of results
+        **kwargs: Additional parameters for the API call
 
     Returns:
-        Any: The result of the API call. For list operations, returns all results unless single_page=True.
+        IntegrationResponse: Standardized response object with success, data, error, function_name, and integration_name fields.
+
+    Notes:
+        - All errors are handled and returned as IntegrationResponse objects.
+        - Automatic retry is always enabled for retryable errors.
+        - Legacy flags and response dicts are no longer supported.
     """
 
     def api_call():
@@ -553,7 +570,7 @@ def execute_google_api_call(
         request = api_method(**kwargs)
 
         # Auto-paginate list operations unless single_page is explicitly requested
-        should_paginate = method == "list" and not single_page
+        should_paginate = method == "list"
 
         if should_paginate:
             # Use simplified pagination for list operations
@@ -567,14 +584,9 @@ def execute_google_api_call(
 
     # Use module-level error handling
     func_name = f"{service_name}_{version}_{resource_path}_{method}"
-    response_metadata = kwargs.pop("response_metadata", False)
     return execute_api_call(
         func_name,
         api_call,
-        non_critical=non_critical,
-        auto_retry=True,
-        return_none_on_error=non_critical,
-        response_metadata=response_metadata,
     )
 
 
@@ -588,20 +600,15 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Extract function name for logging
+    def wrapper(*args: Any, **kwargs: Any) -> IntegrationResponse:
         func_name = func.__name__
 
-        # Wrap original function call with module-level error handling
         def api_call():
             return func(*args, **kwargs)
 
         return execute_api_call(
             func_name,
             api_call,
-            non_critical=False,  # Default behavior
-            auto_retry=True,
-            return_none_on_error=False,
         )
 
     return wrapper
