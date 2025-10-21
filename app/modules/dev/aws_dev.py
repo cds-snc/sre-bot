@@ -4,6 +4,7 @@ import json
 import time
 from core.logging import get_module_logger
 from integrations.aws import identity_store, identity_store_next
+from models.integrations import IntegrationResponse
 
 logger = get_module_logger()
 
@@ -13,31 +14,16 @@ def aws_dev_command(ack, client, body, respond, logger):
 
     logger.info("aws_dev_command", body=body)
     respond("AWS dev command received!")
-    # result = performance_comparison_example(
-    #     legacy_func=identity_store.list_users,
-    #     next_func=identity_store_next.list_users,
-    #     legacy_formatter=format_users,
-    #     next_formatter=format_users,
-    # )
-    # result = performance_comparison_example(
-    #     legacy_func=identity_store.list_groups,
-    #     next_func=identity_store_next.list_groups,
-    #     legacy_formatter=format_groups,
-    #     next_formatter=format_groups,
-    # )
-    #
+
+    legacy_function = identity_store.list_groups_with_memberships
+    next_function = identity_store_next.list_groups_with_memberships
     result = performance_comparison_example(
-        legacy_func=identity_store.list_groups_with_memberships,
-        next_func=identity_store_next.list_groups_with_memberships,
+        legacy_func=legacy_function,
+        next_func=next_function,
         legacy_formatter=format_groups,
         next_formatter=format_groups,
     )
-    # result = performance_comparison_example(
-    #     # legacy_func=identity_store.list_groups_with_memberships,
-    #     next_func=identity_store_next.list_groups_with_memberships,
-    #     # legacy_formatter=format_groups,
-    #     next_formatter=format_groups,
-    # )
+
     try:
         with open("test_aws_next.json", "w", encoding="utf-8") as f:
             json.dump(result["next"]["result"], f, indent=2)
@@ -113,7 +99,16 @@ def performance_comparison_example(
     # Next-gen
     if next_func:
         start_time = time.time()
-        next_result = next_func()
+        response: IntegrationResponse = next_func()
+        if response.success:
+            next_result = response.data
+        else:
+            next_result = None
+            logger.error(
+                "Next-gen function failed",
+                function=next_label,
+                error=response.error,
+            )
         next_time = time.time() - start_time
         next_summary = (
             next_formatter(next_result)
