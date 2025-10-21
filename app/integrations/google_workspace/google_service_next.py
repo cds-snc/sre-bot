@@ -1,21 +1,34 @@
 """
-Simplified Google Service Module.
+Google Workspace API Integration Utilities
 
-This module provides streamlined functions to work with Google Workspace APIs,
-leveraging built-in Google API client features and enhanced error handling at the module level.
+This module provides streamlined, standardized utilities for interacting with Google Workspace APIs.
+It features:
 
-Functions:
-    get_google_service(service: str, version: str) -> googleapiclient.discovery.Resource:
-        Returns an authenticated Google service resource.
+- Centralized error handling and retry logic for all Google API calls
+- Standardized response modeling via IntegrationResponse objects
+- Batch request execution with integrated error and result aggregation
+- Simplified pagination for list operations
+- Service account authentication with delegated access and custom scopes
+- Backward-compatible decorator for legacy error handling
 
-    execute_api_call(func_name: str, api_call: Callable) -> Any:
-        Module-level error handling for all Google API calls.
+Key Functions:
+    - get_google_service(service: str, version: str, scopes: Optional[List[str]], delegated_user_email: Optional[str]) -> googleapiclient.discovery.Resource:
+        Returns an authenticated Google service resource using service account credentials.
 
-    execute_batch_request(service: Resource, requests: list) -> dict:
-        Execute multiple API calls in a single batch request with enhanced error handling.
+    - execute_api_call(func_name: str, api_call: Callable, max_retries: Optional[int] = None) -> IntegrationResponse:
+        Executes a Google API call with standardized error handling, retry logic, and response modeling.
 
-    execute_google_api_call(...) -> Any:
-        Simplified version using built-in features with integrated error handling.
+    - execute_batch_request(service: Resource, requests: List[Tuple], callback_fn: Optional[Callable] = None) -> IntegrationResponse:
+        Executes multiple API calls in a single batch request, aggregating results and errors.
+
+    - paginate_all_results(request, resource_key: Optional[str] = None) -> IntegrationResponse:
+        Paginates through all results for list operations, returning a standardized response.
+
+    - execute_google_api_call(service_name: str, version: str, resource_path: str, method: str, ...) -> IntegrationResponse:
+        Simplifies Google API calls with integrated error handling, pagination, and response modeling.
+
+    - handle_google_api_errors(func: Callable) -> Callable:
+        Decorator for backward compatibility, wrapping legacy functions with standardized error handling.
 """
 
 import json
