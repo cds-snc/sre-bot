@@ -249,8 +249,6 @@ def execute_api_call(
     Args:
         func_name (str): Name of the calling function for logging
         api_call (callable): The API call to execute
-        non_critical (bool): Mark this call as non-critical (never raises exceptions)
-        auto_retry (bool): Enable automatic retry for retryable errors
         max_retries (int): Override default max retries
 
     Returns:
