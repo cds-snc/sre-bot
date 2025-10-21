@@ -114,8 +114,7 @@ class TestListGroups:
         assert {g.get("GroupId") for g in resp.data} == {"g-1", "g-2"}
 
 
-class TestGetUser:
-    # ...existing code...
+class TestCreateUser:
     def test_create_user_success(self, monkeypatch):
         # fake_user_client available if deeper assertions are needed
         monkeypatch.setattr(
@@ -131,33 +130,6 @@ class TestGetUser:
         )
         assert_integration_success(resp)
         assert resp.data.get("UserId") == "u-10"
-
-
-class TestListGroupsWithMemberships:
-    def test_list_groups_with_memberships_happy_path(self, monkeypatch):
-        groups = [{"GroupId": "g-1", "DisplayName": "G1"}]
-        memberships = {"g-1": [{"MembershipId": "m-1", "MemberId": {"UserId": "u-1"}}]}
-        users = [{"UserId": "u-1", "UserName": "u1@example.com"}]
-        monkeypatch.setattr(
-            isn,
-            "list_groups",
-            lambda **kw: build_success_response(groups, "list_groups", "aws"),
-        )
-        monkeypatch.setattr(
-            isn,
-            "_fetch_group_memberships_parallel",
-            lambda gids, max_workers=10: memberships,
-        )
-        monkeypatch.setattr(
-            isn,
-            "list_users",
-            lambda **kw: build_success_response(users, "list_users", "aws"),
-        )
-        resp = isn.list_groups_with_memberships()
-        assert_integration_success(resp)
-        assert isinstance(resp.data, list)
-        assert resp.data[0]["GroupId"] == "g-1"
-        assert resp.data[0]["GroupMemberships"][0]["MembershipId"] == "m-1"
 
 
 class TestGroupMemberships:
@@ -241,6 +213,31 @@ class TestGroupMemberships:
 
 
 class TestListGroupsWithMemberships:
+    def test_list_groups_with_memberships_happy_path(self, monkeypatch):
+        groups = [{"GroupId": "g-1", "DisplayName": "G1"}]
+        memberships = {"g-1": [{"MembershipId": "m-1", "MemberId": {"UserId": "u-1"}}]}
+        users = [{"UserId": "u-1", "UserName": "u1@example.com"}]
+        monkeypatch.setattr(
+            isn,
+            "list_groups",
+            lambda **kw: build_success_response(groups, "list_groups", "aws"),
+        )
+        monkeypatch.setattr(
+            isn,
+            "_fetch_group_memberships_parallel",
+            lambda gids, max_workers=10: memberships,
+        )
+        monkeypatch.setattr(
+            isn,
+            "list_users",
+            lambda **kw: build_success_response(users, "list_users", "aws"),
+        )
+        resp = isn.list_groups_with_memberships()
+        assert_integration_success(resp)
+        assert isinstance(resp.data, list)
+        assert resp.data[0]["GroupId"] == "g-1"
+        assert resp.data[0]["GroupMemberships"][0]["MembershipId"] == "m-1"
+
     def test__fetch_group_memberships_parallel_error_handling(self, monkeypatch):
         # Simulate IntegrationResponse with success=False and non-list data
         def fake_list_group_memberships(group_id):
