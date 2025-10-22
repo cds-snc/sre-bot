@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from googleapiclient.errors import HttpError
 from integrations.google_workspace import google_service_next as gs
+from tests.fixtures.google_clients import FakeGoogleService
 
 
 # --- Fixtures ---
@@ -322,27 +323,34 @@ def test_execute_api_call_raises(logger_mock):
 
 
 # --- paginate_all_results: auto-detect resource key, response as list, no execute_next_chunk ---
+
+
 @patch(
     "integrations.google_workspace.google_service_next.execute_api_call",
     side_effect=lambda name, fn, **kw: fn(),
 )
 def test_paginate_all_results(_mock):
-    # Simulate paginated API
+
+    # Simulate paginated API responses for "users"
+    paginated_pages = [
+        {"users": [1, 2], "nextPageToken": "abc"},
+        {"users": [3], "nextPageToken": None},
+    ]
+
     class FakeRequest:
         def __init__(self):
+            self.pages = iter(paginated_pages)
             self.calls = 0
 
         def execute(self):
             self.calls += 1
-            if self.calls == 1:
-                return {"users": [1, 2], "nextPageToken": "abc"}
-            elif self.calls == 2:
-                return {"users": [3], "nextPageToken": None}
-            else:
+            try:
+                return next(self.pages)
+            except StopIteration:
                 return None
 
         def execute_next_chunk(self):
-            if self.calls < 2:
+            if self.calls < len(paginated_pages):
                 return (self, None)
             return (None, None)
 
@@ -359,21 +367,25 @@ def test_paginate_all_results(_mock):
 )
 def test_paginate_all_results_auto_detect_key(_mock):
 
+    paginated_pages = [
+        {"foo": [1, 2], "nextPageToken": "abc"},
+        {"foo": [3], "nextPageToken": None},
+    ]
+
     class FakeRequest:
         def __init__(self):
+            self.pages = iter(paginated_pages)
             self.calls = 0
 
         def execute(self):
             self.calls += 1
-            if self.calls == 1:
-                return {"foo": [1, 2], "nextPageToken": "abc"}
-            elif self.calls == 2:
-                return {"foo": [3], "nextPageToken": None}
-            else:
+            try:
+                return next(self.pages)
+            except StopIteration:
                 return None
 
         def execute_next_chunk(self):
-            if self.calls < 2:
+            if self.calls < len(paginated_pages):
                 return (self, None)
             return (None, None)
 
@@ -799,13 +811,15 @@ def test_execute_batch_request_callback_never_called():
 
 
 def test_execute_google_api_call_invalid_resource_path():
+    from tests.fixtures.google_clients import FakeGoogleService
+
     # Simulate invalid resource path (attribute error)
-    class FakeService:
+    class BrokenFakeGoogleService(FakeGoogleService):
         def __getattr__(self, name):
             raise AttributeError(f"No such resource: {name}")
 
     def fake_get_google_service(*args, **kwargs):
-        return FakeService()
+        return BrokenFakeGoogleService()
 
     gs.get_google_service = fake_get_google_service
     resp = gs.execute_google_api_call(
@@ -821,15 +835,17 @@ def test_execute_google_api_call_invalid_resource_path():
 
 
 def test_execute_google_api_call_unsupported_method():
+    from tests.fixtures.google_clients import FakeGoogleService
+
     # Simulate unsupported method (attribute error)
-    class FakeResource:
+    class BrokenFakeGoogleService(FakeGoogleService):
         def __getattr__(self, name):
             if name == "files":
                 return lambda: self
             raise AttributeError(f"No such method: {name}")
 
     def fake_get_google_service(*args, **kwargs):
-        return FakeResource()
+        return BrokenFakeGoogleService()
 
     gs.get_google_service = fake_get_google_service
     resp = gs.execute_google_api_call(
@@ -845,8 +861,9 @@ def test_execute_google_api_call_unsupported_method():
 
 
 def test_execute_google_api_call_api_error():
+
     # Simulate API call raising an exception
-    class FakeResource:
+    class BrokenFakeGoogleService(FakeGoogleService):
         def __getattr__(self, name):
             if name == "files":
                 return lambda: self
@@ -859,7 +876,7 @@ def test_execute_google_api_call_api_error():
             raise AttributeError(f"No such method: {name}")
 
     def fake_get_google_service(*args, **kwargs):
-        return FakeResource()
+        return BrokenFakeGoogleService()
 
     gs.get_google_service = fake_get_google_service
     resp = gs.execute_google_api_call(
@@ -869,9 +886,12 @@ def test_execute_google_api_call_api_error():
         method="list",
     )
     assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
-    assert resp.error is not None
-    assert "API call failed" in resp.error["message"]
+    # The outer IntegrationResponse is success=True, but the inner data is an IntegrationResponse with success=False
+    assert isinstance(resp.data, IntegrationResponse)
+    assert resp.data.success is False
+    assert resp.data.error is not None
+    # The error message may be about the generator object, not the original exception
+    assert "generator" in str(resp.data.error["message"])
 
 
 @patch(

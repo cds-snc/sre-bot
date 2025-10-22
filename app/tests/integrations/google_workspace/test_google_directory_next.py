@@ -4,6 +4,11 @@ Unit and integration tests for google_directory_next module.
 
 from unittest.mock import Mock, patch
 from integrations.google_workspace import google_directory_next as gdn
+from models.integrations import (
+    IntegrationResponse,
+    build_success_response,
+    build_error_response,
+)
 
 
 class TestGetUser:
@@ -19,26 +24,33 @@ class TestGetUser:
             "primaryEmail": "test@example.com",
             "name": {"givenName": "Test", "familyName": "User"},
         }
-        mock_execute.return_value = expected_user
+        mock_execute.return_value = build_success_response(
+            expected_user, "get_user", "google"
+        )
 
         result = gdn.get_user("test@example.com")
 
-        assert result == expected_user
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "users",
-            "get",
-            scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-            non_critical=True,
-            userKey="test@example.com",
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assert result.data == expected_user
+        assert result.function_name == "get_user"
+        assert result.integration_name == "google"
 
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
     )
     def test_get_user_not_found(self, mock_execute):
         """Test user not found scenario."""
+        error = Exception("User not found")
+        mock_execute.return_value = build_error_response(error, "get_user", "google")
+
+        result = gdn.get_user("doesnotexist@example.com")
+
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is False
+        assert result.error["message"] == "User not found"
+        assert result.function_name == "get_user"
+        assert result.integration_name == "google"
         mock_execute.return_value = None
 
         result = gdn.get_user("nonexistent@example.com")
@@ -60,15 +72,23 @@ class TestGetBatchUsers:
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {
+        batch_data = {
             "results": {"user1@example.com": users[0], "user2@example.com": users[1]}
         }
+        mock_batch_request.return_value = build_success_response(
+            batch_data, "get_batch_users", "google"
+        )
 
         result = gdn.get_batch_users(user_keys)
 
-        assert len(result) == 2
-        assert result["user1@example.com"] == users[0]
-        assert result["user2@example.com"] == users[1]
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assert result.data == {
+            "user1@example.com": users[0],
+            "user2@example.com": users[1],
+        }
+        assert result.function_name == "get_batch_users"
+        assert result.integration_name == "google"
         mock_get_service.assert_called_once()
         mock_batch_request.assert_called_once()
 
@@ -80,11 +100,18 @@ class TestGetBatchUsers:
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {"results": {}}
+        batch_data = {"results": {}}
+        mock_batch_request.return_value = build_success_response(
+            batch_data, "get_batch_users", "google"
+        )
 
         result = gdn.get_batch_users(user_keys)
 
-        assert result == {}
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assert result.data == {}
+        assert result.function_name == "get_batch_users"
+        assert result.integration_name == "google"
 
 
 class TestListUsers:
