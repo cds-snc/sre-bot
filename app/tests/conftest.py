@@ -9,12 +9,20 @@ from tests.factory_helpers import (
 
 
 # Google Discovery Directory Resource
-# Base fixtures
+# Legacy Fixtures
 @pytest.fixture
 def google_groups():
     def _google_groups(n=3, prefix="", domain="test.com"):
-        # Delegate to shared helper; return dicts
-        return make_google_groups(n=n, prefix=prefix, domain=domain, as_model=False)
+        return [
+            {
+                "id": f"{prefix}google_group_id{i+1}",
+                "name": f"{prefix}group-name{i+1}",
+                "email": f"{prefix}group-name{i+1}@{domain}",
+                "description": f"{prefix}description{i+1}",
+                "directMembersCount": i + 1,
+            }
+            for i in range(n)
+        ]
 
     return _google_groups
 
@@ -22,8 +30,28 @@ def google_groups():
 @pytest.fixture
 def google_users():
     def _google_users(n=3, prefix="", domain="test.com"):
-        # Delegate to shared helper; return dicts
-        return make_google_users(n=n, prefix=prefix, domain=domain, as_model=False)
+        users = []
+        for i in range(n):
+            user = {
+                "id": f"{prefix}user_id{i+1}",
+                "primaryEmail": f"{prefix}user-email{i+1}@{domain}",
+                "emails": [
+                    {
+                        "address": f"{prefix}user-email{i+1}@{domain}",
+                        "primary": True,
+                        "type": "work",
+                    }
+                ],
+                "suspended": False,
+                "name": {
+                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
+                    "familyName": f"Family_name_{i+1}",
+                    "givenName": f"Given_name_{i+1}",
+                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
+                },
+            }
+            users.append(user)
+        return users
 
     return _google_users
 
@@ -31,10 +59,88 @@ def google_users():
 @pytest.fixture
 def google_group_members(google_users):
     def _google_group_members(n=3, prefix="", domain="test.com"):
-        # Delegate to shared helper which creates member dicts embedding user details
-        return make_google_members(n=n, prefix=prefix, domain=domain, as_model=False)
+        users = google_users(n, prefix, domain)
+        return [
+            {
+                "kind": "admin#directory#member",
+                "email": user["primaryEmail"],
+                "role": "MEMBER",
+                "type": "USER",
+                "status": "ACTIVE",
+                "id": user["id"],
+            }
+            for user in users
+        ]
 
     return _google_group_members
+
+
+# Fixture with users
+@pytest.fixture
+def google_groups_w_users(google_groups, google_group_members, google_users):
+    def _google_groups_w_users(
+        n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
+    ):
+        groups = google_groups(n_groups, prefix=group_prefix, domain=domain)
+        members = google_group_members(n_users, prefix=user_prefix, domain=domain)
+        users = google_users(n_users, prefix=user_prefix, domain=domain)
+
+        combined_members = []
+        for member, user in zip(members, users):
+            combined_member = {**member, **user}
+            combined_members.append(combined_member)
+
+        for group in groups:
+            group["members"] = combined_members
+        return groups
+
+    return _google_groups_w_users
+
+
+# Additional fixtures for comprehensive testing
+@pytest.fixture
+def google_groups_with_legacy_structure(
+    google_group_factory, google_member_factory, google_user_factory
+):
+    """Factory to create groups with legacy-compatible member structure."""
+
+    def _factory(n_groups=1, n_members_per_group=2, domain="test.com"):
+        groups = google_group_factory(n_groups, domain=domain)
+        result = []
+
+        for i, group in enumerate(groups):
+            # Create members for this group
+            members = google_member_factory(
+                n_members_per_group, prefix=f"g{i}-", domain=domain
+            )
+            users = google_user_factory(
+                n_members_per_group, prefix=f"g{i}-", domain=domain
+            )
+
+            # Create legacy-compatible members with flattened user details
+            legacy_members = []
+            for member, user in zip(members, users):
+                # Ensure email consistency
+                member["email"] = user["primaryEmail"]
+
+                # Create legacy member with flattened user details
+                legacy_member = {**member}
+                legacy_member["user_details"] = user
+
+                # Flatten user details into top-level member dict (legacy compatibility)
+                for k, v in user.items():
+                    if k not in legacy_member:
+                        legacy_member[k] = v
+
+                legacy_members.append(legacy_member)
+
+            group_with_members = {**group}
+            group_with_members["members"] = legacy_members
+            result.append(group_with_members)
+
+        return result
+
+    return _factory
 
 
 # --- Google Directory API Pydantic factories ---
@@ -88,69 +194,6 @@ def google_member_factory():
     def _factory(n=3, prefix="", domain="test.com", as_model=False):
         # Delegate to shared helper to avoid duplicated logic
         return make_google_members(n=n, prefix=prefix, domain=domain, as_model=as_model)
-
-    return _factory
-
-
-# Fixture with users
-@pytest.fixture
-def google_groups_w_users(google_groups, google_group_members, google_users):
-    def _google_groups_w_users(
-        n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
-    ):
-        groups = make_google_groups(n=n_groups, prefix=group_prefix, domain=domain)
-        members = make_google_members(n=n_users, prefix=user_prefix, domain=domain)
-
-        # Attach the same members list to each group (mirrors previous behavior)
-        for group in groups:
-            group["members"] = members
-        return groups
-
-    return _google_groups_w_users
-
-
-# Additional fixtures for comprehensive testing
-@pytest.fixture
-def google_groups_with_legacy_structure(
-    google_group_factory, google_member_factory, google_user_factory
-):
-    """Factory to create groups with legacy-compatible member structure."""
-
-    def _factory(n_groups=1, n_members_per_group=2, domain="test.com"):
-        groups = google_group_factory(n_groups, domain=domain)
-        result = []
-
-        for i, group in enumerate(groups):
-            # Create members for this group
-            members = google_member_factory(
-                n_members_per_group, prefix=f"g{i}-", domain=domain
-            )
-            users = google_user_factory(
-                n_members_per_group, prefix=f"g{i}-", domain=domain
-            )
-
-            # Create legacy-compatible members with flattened user details
-            legacy_members = []
-            for member, user in zip(members, users):
-                # Ensure email consistency
-                member["email"] = user["primaryEmail"]
-
-                # Create legacy member with flattened user details
-                legacy_member = {**member}
-                legacy_member["user_details"] = user
-
-                # Flatten user details into top-level member dict (legacy compatibility)
-                for k, v in user.items():
-                    if k not in legacy_member:
-                        legacy_member[k] = v
-
-                legacy_members.append(legacy_member)
-
-            group_with_members = {**group}
-            group_with_members["members"] = legacy_members
-            result.append(group_with_members)
-
-        return result
 
     return _factory
 
