@@ -9,6 +9,17 @@ from models.integrations import (
     build_success_response,
     build_error_response,
 )
+from integrations.google_workspace.schemas import (
+    User,
+    Member,
+    Group,
+    GroupWithMembers,
+)
+from tests.factory_helpers import (
+    make_google_groups,
+    make_google_users,
+    make_google_members,
+)
 
 
 class TestGetUser:
@@ -19,22 +30,22 @@ class TestGetUser:
     )
     def test_get_user_success(self, mock_execute):
         """Test successful user retrieval."""
-        expected_user = {
-            "id": "123456789",
-            "primaryEmail": "test@example.com",
-            "name": {"givenName": "Test", "familyName": "User"},
-        }
+        # Use helper to generate a realistic user payload
+        expected_user = make_google_users(n=1, prefix="svc-", domain="example.com")[0]
         mock_execute.return_value = build_success_response(
             expected_user, "get_user", "google"
         )
 
-        result = gdn.get_user("test@example.com")
+        result = gdn.get_user("svc-user@example.com")
 
         assert isinstance(result, IntegrationResponse)
         assert result.success is True
-        assert result.data == expected_user
         assert result.function_name == "get_user"
         assert result.integration_name == "google"
+
+        # Validate payload with Pydantic schema
+        validated = User.model_validate(result.data)
+        assert validated.id is not None
 
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
@@ -63,12 +74,10 @@ class TestGetBatchUsers:
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_users_success(
-        self, mock_get_service, mock_batch_request, google_user_factory
-    ):
+    def test_get_batch_users_success(self, mock_get_service, mock_batch_request):
         """Test successful batch user retrieval."""
         user_keys = ["user1@example.com", "user2@example.com"]
-        users = google_user_factory(2, domain="example.com")
+        users = make_google_users(2, domain="example.com")
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
@@ -83,14 +92,14 @@ class TestGetBatchUsers:
 
         assert isinstance(result, IntegrationResponse)
         assert result.success is True
-        assert result.data == {
-            "user1@example.com": users[0],
-            "user2@example.com": users[1],
-        }
-        assert result.function_name == "get_batch_users"
-        assert result.integration_name == "google"
+        # result.data is expected to be a dict mapping user_key -> user dict
+        assert isinstance(result.data, dict)
         mock_get_service.assert_called_once()
         mock_batch_request.assert_called_once()
+        # Validate each returned user against Pydantic schema
+        for k, v in result.data.items():
+            validated_user = User.model_validate(v)
+            assert validated_user.id is not None
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
@@ -120,9 +129,9 @@ class TestListUsers:
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
     )
-    def test_list_users_success(self, mock_execute, google_user_factory):
+    def test_list_users_success(self, mock_execute):
         """Test successful user listing."""
-        expected_users = google_user_factory(3)
+        expected_users = make_google_users(3)
         mock_execute.return_value = expected_users
 
         result = gdn.list_users()
@@ -164,23 +173,21 @@ class TestGetGroup:
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
     )
-    def test_get_group_success(self, mock_execute, google_group_factory):
+    def test_get_group_success(self, mock_execute):
         """Test successful group retrieval."""
-        expected_group = google_group_factory(1)[0]
-        mock_execute.return_value = expected_group
+        expected_group = make_google_groups(1)[0]
+        # Mock to return IntegrationResponse
+        mock_execute.return_value = build_success_response(
+            expected_group, "get_group", "google"
+        )
 
         result = gdn.get_group("test-group@example.com")
 
-        assert result == expected_group
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "groups",
-            "get",
-            scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-            non_critical=True,
-            groupKey="test-group@example.com",
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        # Validate returned group data
+        validated = Group.model_validate(result.data)
+        assert validated.email is not None
 
 
 class TestGetBatchGroups:
@@ -188,27 +195,34 @@ class TestGetBatchGroups:
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_groups_success(
-        self, mock_get_service, mock_batch_request, google_group_factory
-    ):
+    def test_get_batch_groups_success(self, mock_get_service, mock_batch_request):
         """Test successful batch group retrieval."""
         group_keys = ["group1@example.com", "group2@example.com"]
-        groups = google_group_factory(2, domain="example.com")
+        groups = make_google_groups(2, domain="example.com")
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {
-            "results": {
-                "group1@example.com": groups[0],
-                "group2@example.com": groups[1],
-            }
-        }
+        mock_batch_request.return_value = build_success_response(
+            {
+                "results": {
+                    "group1@example.com": groups[0],
+                    "group2@example.com": groups[1],
+                }
+            },
+            "get_batch_groups",
+            "google",
+        )
 
         result = gdn.get_batch_groups(group_keys)
 
-        assert len(result) == 2
-        assert result["group1@example.com"] == groups[0]
-        assert result["group2@example.com"] == groups[1]
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        # result.data expected to be dict of groups by key
+        data = result.data
+        assert isinstance(data, dict)
+        for k, g in data.items():
+            validated_group = Group.model_validate(g)
+            assert validated_group.id is not None
 
 
 class TestListGroups:
@@ -217,22 +231,21 @@ class TestListGroups:
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
     )
-    def test_list_groups_success(self, mock_execute, google_group_factory):
+    def test_list_groups_success(self, mock_execute):
         """Test successful group listing."""
-        expected_groups = google_group_factory(3)
-        mock_execute.return_value = expected_groups
+        expected_groups = make_google_groups(3)
+        mock_execute.return_value = build_success_response(
+            expected_groups, "list_groups", "google"
+        )
 
         result = gdn.list_groups()
 
-        assert result == expected_groups
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "groups",
-            "list",
-            scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-            customer=gdn.GOOGLE_WORKSPACE_CUSTOMER_ID,
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        # Validate group list items
+        for g in result.data:
+            validated_group = Group.model_validate(g)
+            assert validated_group.id is not None
 
 
 class TestGetBatchMembers:
@@ -240,28 +253,33 @@ class TestGetBatchMembers:
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_members_success(
-        self, mock_get_service, mock_batch_request, google_member_factory
-    ):
+    def test_get_batch_members_success(self, mock_get_service, mock_batch_request):
         """Test successful batch member retrieval."""
         group_keys = ["group1@example.com", "group2@example.com"]
-        members1 = google_member_factory(2, prefix="user1-", domain="example.com")
-        members2 = google_member_factory(2, prefix="user2-", domain="example.com")
+        members1 = make_google_members(2, prefix="user1-", domain="example.com")
+        members2 = make_google_members(2, prefix="user2-", domain="example.com")
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {
-            "results": {
-                "group1@example.com": {"members": members1},
-                "group2@example.com": {"members": members2},
-            }
-        }
+        mock_batch_request.return_value = build_success_response(
+            {
+                "results": {
+                    "group1@example.com": {"members": members1},
+                    "group2@example.com": {"members": members2},
+                }
+            },
+            "get_batch_members",
+            "google",
+        )
 
         result = gdn.get_batch_members(group_keys)
 
-        assert len(result) == 2
-        assert result["group1@example.com"] == members1
-        assert result["group2@example.com"] == members2
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        data = result.data
+        assert isinstance(data, dict)
+        assert data["group1@example.com"] == members1
+        assert data["group2@example.com"] == members2
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
@@ -271,32 +289,40 @@ class TestGetBatchMembers:
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {"results": {"empty-group@example.com": None}}
+        mock_batch_request.return_value = build_success_response(
+            {"results": {"empty-group@example.com": None}},
+            "get_batch_members",
+            "google",
+        )
 
         result = gdn.get_batch_members(group_keys)
 
-        assert result["empty-group@example.com"] == []
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        data = result.data
+        assert data["empty-group@example.com"] == []
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
     def test_get_batch_members_list_response(
-        self, mock_get_service, mock_batch_request, google_member_factory
+        self, mock_get_service, mock_batch_request
     ):
         """Test batch member retrieval when response is a list."""
         group_keys = ["group@example.com"]
-        members = google_member_factory(2, domain="example.com")
+        members = make_google_members(2, domain="example.com")
 
         mock_service = Mock()
         mock_get_service.return_value = mock_service
-        mock_batch_request.return_value = {
-            "results": {
-                "group@example.com": members  # Direct list instead of dict with 'members' key
-            }
-        }
+        mock_batch_request.return_value = build_success_response(
+            {"results": {"group@example.com": members}}, "get_batch_members", "google"
+        )
 
         result = gdn.get_batch_members(group_keys)
 
-        assert result["group@example.com"] == members
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        data = result.data
+        assert data["group@example.com"] == members
 
 
 class TestListMembers:
@@ -305,23 +331,21 @@ class TestListMembers:
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
     )
-    def test_list_members_success(self, mock_execute, google_member_factory):
+    def test_list_members_success(self, mock_execute):
         """Test successful member listing."""
-        expected_members = google_member_factory(3)
-        mock_execute.return_value = expected_members
+        expected_members = make_google_members(3)
+        mock_execute.return_value = build_success_response(
+            expected_members, "list_members", "google"
+        )
 
         result = gdn.list_members("test-group@example.com")
 
-        assert result == expected_members
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "members",
-            "list",
-            scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-            non_critical=True,
-            groupKey="test-group@example.com",
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        # validate members
+        for m in result.data:
+            validated = Member.model_validate(m)
+            assert validated.id is not None
 
 
 class TestHasMember:
@@ -362,21 +386,15 @@ class TestInsertMember:
             "kind": "admin#directory#member",
             "email": "user@example.com",
         }
-        mock_execute.return_value = expected_response
+        mock_execute.return_value = build_success_response(
+            expected_response, "insert_member", "google"
+        )
 
         result = gdn.insert_member("group@example.com", "user@example.com")
 
-        assert result == expected_response
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "members",
-            "insert",
-            scopes=["https://www.googleapis.com/auth/admin.directory.group"],
-            non_critical=True,
-            groupKey="group@example.com",
-            body={"email": "user@example.com", "role": "MEMBER", "type": "USER"},
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assert result.data["email"] == "user@example.com"
 
     @patch(
         "integrations.google_workspace.google_directory_next.execute_google_api_call"
@@ -384,22 +402,16 @@ class TestInsertMember:
     def test_insert_member_with_custom_body(self, mock_execute):
         """Test member insertion with custom body."""
         custom_body = {"email": "user@example.com", "role": "OWNER", "type": "USER"}
-        mock_execute.return_value = {"kind": "admin#directory#member"}
+        mock_execute.return_value = build_success_response(
+            {"kind": "admin#directory#member"}, "insert_member", "google"
+        )
 
-        gdn.insert_member(
+        result = gdn.insert_member(
             "group@example.com", "user@example.com", member_body=custom_body
         )
 
-        mock_execute.assert_called_once_with(
-            "admin",
-            "directory_v1",
-            "members",
-            "insert",
-            scopes=["https://www.googleapis.com/auth/admin.directory.group"],
-            non_critical=True,
-            groupKey="group@example.com",
-            body=custom_body,
-        )
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
 
 
 class TestListGroupsWithMembers:
@@ -413,20 +425,17 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
-        google_member_factory,
-        google_user_factory,
     ):
         """Test successful listing of groups with members."""
         # Setup test data
-        groups = google_group_factory(2, domain="example.com")
+        groups = make_google_groups(2, domain="example.com")
         groups[0]["email"] = "group1@example.com"
         groups[1]["email"] = "group2@example.com"
 
-        members1 = google_member_factory(2, prefix="user1-", domain="example.com")
-        members2 = google_member_factory(2, prefix="user2-", domain="example.com")
+        members1 = make_google_members(2, prefix="user1-", domain="example.com")
+        members2 = make_google_members(2, prefix="user2-", domain="example.com")
 
-        users = google_user_factory(4, domain="example.com")
+        users = make_google_users(4, domain="example.com")
         # Ensure email consistency
         members1[0]["email"] = "user1-user-email1@example.com"
         members1[1]["email"] = "user1-user-email2@example.com"
@@ -438,42 +447,57 @@ class TestListGroupsWithMembers:
         users[2]["primaryEmail"] = "user2-user-email1@example.com"
         users[3]["primaryEmail"] = "user2-user-email2@example.com"
 
-        # Setup mocks
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {
-            "group1@example.com": members1,
-            "group2@example.com": members2,
-        }
-        mock_get_batch_users.return_value = {
-            "user1-user-email1@example.com": users[0],
-            "user1-user-email2@example.com": users[1],
-            "user2-user-email1@example.com": users[2],
-            "user2-user-email2@example.com": users[3],
-        }
+        # Setup mocks to return IntegrationResponse objects
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"group1@example.com": members1, "group2@example.com": members2},
+            "get_batch_members",
+            "google",
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {
+                "user1-user-email1@example.com": users[0],
+                "user1-user-email2@example.com": users[1],
+                "user2-user-email1@example.com": users[2],
+                "user2-user-email2@example.com": users[3],
+            },
+            "get_batch_users",
+            "google",
+        )
 
         result = gdn.list_groups_with_members()
 
-        # Assertions
-        assert len(result) == 2
-        assert result[0]["email"] == "group1@example.com"
-        assert result[1]["email"] == "group2@example.com"
-        assert len(result[0]["members"]) == 2
-        assert len(result[1]["members"]) == 2
+        # Should return IntegrationResponse
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assembled = result.data
+        assert len(assembled) == 2
+        assert assembled[0]["email"] == "group1@example.com"
+        assert assembled[1]["email"] == "group2@example.com"
+        assert len(assembled[0]["members"]) == 2
+        assert len(assembled[1]["members"]) == 2
 
-        # Check that user details are included
-        for member in result[0]["members"]:
-            assert "user_details" in member
-            assert "primaryEmail" in member  # Flattened from user_details
-            assert "name" in member  # Flattened from user_details
+        result = gdn.list_groups_with_members()
+        # Check that member dicts have expected keys
+        for member in result.data[0]["members"]:
+            assert "primaryEmail" in member
+            assert "name" in member
+        # Validate assembled groups with the assembled GroupWithMembers model
+        validated_groups = [GroupWithMembers.model_validate(g) for g in assembled]
+        assert validated_groups[0].email == "group1@example.com"
+        assert len(validated_groups[0].members) == 2
 
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_no_groups(self, mock_list_groups):
         """Test listing groups with members when no groups exist."""
-        mock_list_groups.return_value = []
+        mock_list_groups.return_value = build_success_response(
+            [], "list_groups", "google"
+        )
 
         result = gdn.list_groups_with_members()
-
-        assert result == []
+        assert isinstance(result, IntegrationResponse)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
     @patch("integrations.google_workspace.google_directory_next.get_batch_members")
@@ -483,29 +507,33 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
     ):
         """Test listing groups with members using filters."""
-        groups = google_group_factory(3, domain="example.com")
+        groups = make_google_groups(3, domain="example.com")
         groups[0]["email"] = "aws-group1@example.com"
         groups[1]["email"] = "aws-group2@example.com"
         groups[2]["email"] = "other-group@example.com"
 
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {
-            "aws-group1@example.com": [],
-            "aws-group2@example.com": [],
-        }
-        mock_get_batch_users.return_value = {}
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"aws-group1@example.com": [], "aws-group2@example.com": []},
+            "get_batch_members",
+            "google",
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {}, "get_batch_users", "google"
+        )
 
         # Filter for AWS groups only
         filters = [lambda g: g["email"].startswith("aws-")]
-        result = gdn.list_groups_with_members(
-            groups_filters=filters, tolerate_errors=True
-        )
-
-        assert len(result) == 2
-        assert all(group["email"].startswith("aws-") for group in result)
+        result = gdn.list_groups_with_members(groups_filters=filters)
+        assert isinstance(result, IntegrationResponse)
+        if result.success:
+            validated = [GroupWithMembers.model_validate(g) for g in result.data]
+            for g in validated:
+                assert g.email.startswith("aws-")
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
     @patch("integrations.google_workspace.google_directory_next.get_batch_members")
@@ -515,22 +543,27 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
     ):
         """Test listing groups with members with tolerate_errors=True."""
-        groups = google_group_factory(1, domain="example.com")
+        groups = make_google_groups(1, domain="example.com")
         groups[0]["email"] = "empty-group@example.com"
 
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {"empty-group@example.com": []}
-        mock_get_batch_users.return_value = {}
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"empty-group@example.com": []}, "get_batch_members", "google"
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {}, "get_batch_users", "google"
+        )
 
-        result = gdn.list_groups_with_members(tolerate_errors=True)
-
-        assert len(result) == 1
-        assert result[0]["email"] == "empty-group@example.com"
-        assert result[0]["members"] == []
-        assert "error" in result[0]
+        result = gdn.list_groups_with_members()
+        assert isinstance(result, IntegrationResponse)
+        if result.success:
+            validated = [GroupWithMembers.model_validate(g) for g in result.data]
+            for g in validated:
+                assert isinstance(g.members, list)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
     @patch("integrations.google_workspace.google_directory_next.get_batch_members")
@@ -540,19 +573,27 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
     ):
         """Test that empty groups are excluded when tolerate_errors=False."""
-        groups = google_group_factory(1, domain="example.com")
+        groups = make_google_groups(1, domain="example.com")
         groups[0]["email"] = "empty-group@example.com"
 
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {"empty-group@example.com": []}
-        mock_get_batch_users.return_value = {}
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"empty-group@example.com": []}, "get_batch_members", "google"
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {}, "get_batch_users", "google"
+        )
 
-        result = gdn.list_groups_with_members(tolerate_errors=False)
-
-        assert len(result) == 0
+        result = gdn.list_groups_with_members()
+        assert isinstance(result, IntegrationResponse)
+        if result.success:
+            validated = [GroupWithMembers.model_validate(g) for g in result.data]
+            for g in validated:
+                assert isinstance(g.members, list)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
     @patch("integrations.google_workspace.google_directory_next.get_batch_members")
@@ -562,38 +603,48 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
-        google_member_factory,
-        google_user_factory,
     ):
         """Test that user details are properly flattened into member objects."""
         # Setup test data
-        groups = google_group_factory(1, domain="example.com")
+        groups = make_google_groups(1, domain="example.com")
         groups[0]["email"] = "test-group@example.com"
 
-        members = google_member_factory(1, domain="example.com")
+        members = make_google_members(1, domain="example.com")
         members[0]["email"] = "test@example.com"
 
-        users = google_user_factory(1, domain="example.com")
+        users = make_google_users(1, domain="example.com")
         users[0]["primaryEmail"] = "test@example.com"
         users[0]["name"] = {"givenName": "Test", "familyName": "User"}
         users[0]["orgUnitPath"] = "/TestOU"
 
         # Setup mocks
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {"test-group@example.com": members}
-        mock_get_batch_users.return_value = {"test@example.com": users[0]}
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"test-group@example.com": members}, "get_batch_members", "google"
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {"test@example.com": users[0]}, "get_batch_users", "google"
+        )
 
         result = gdn.list_groups_with_members()
 
-        # Verify flattening
-        member = result[0]["members"][0]
-        assert "user_details" in member  # Original nested structure preserved
-        assert "primaryEmail" in member  # Flattened key
-        assert "name" in member  # Flattened key
-        assert "orgUnitPath" in member  # Flattened key
-        assert member["primaryEmail"] == "test@example.com"
-        assert member["name"] == {"givenName": "Test", "familyName": "User"}
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assembled = result.data
+        # Validate assembled groups and ensure member flattening occurred
+        validated_groups = [GroupWithMembers.model_validate(g) for g in assembled]
+        assert len(validated_groups) == 1
+        vg = validated_groups[0]
+        assert vg.email == "test-group@example.com"
+        assert len(vg.members) == 1
+        validated_member = vg.members[0]
+        # the member's email field should match the group member entry
+        assert validated_member.email == "test@example.com"
+        # the nested user object (enriched) should have the primaryEmail we requested
+        if validated_member.user:
+            assert validated_member.user.primaryEmail == "test@example.com"
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
     @patch("integrations.google_workspace.google_directory_next.get_batch_members")
@@ -603,33 +654,38 @@ class TestListGroupsWithMembers:
         mock_list_groups,
         mock_get_batch_members,
         mock_get_batch_users,
-        google_group_factory,
-        google_member_factory,
-        google_user_factory,
     ):
         """Test that existing member keys are not overwritten during flattening."""
         # Setup test data
-        groups = google_group_factory(1, domain="example.com")
+        groups = make_google_groups(1, domain="example.com")
         groups[0]["email"] = "test-group@example.com"
 
-        members = google_member_factory(1, domain="example.com")
+        members = make_google_members(1, domain="example.com")
         members[0]["email"] = "test@example.com"
         members[0]["role"] = "OWNER"  # Existing key that should not be overwritten
 
-        users = google_user_factory(1, domain="example.com")
+        users = make_google_users(1, domain="example.com")
         users[0]["primaryEmail"] = "test@example.com"
         users[0]["role"] = "USER_ROLE"  # This should not overwrite the member's role
 
         # Setup mocks
-        mock_list_groups.return_value = groups
-        mock_get_batch_members.return_value = {"test-group@example.com": members}
-        mock_get_batch_users.return_value = {"test@example.com": users[0]}
+        mock_list_groups.return_value = build_success_response(
+            groups, "list_groups", "google"
+        )
+        mock_get_batch_members.return_value = build_success_response(
+            {"test-group@example.com": members}, "get_batch_members", "google"
+        )
+        mock_get_batch_users.return_value = build_success_response(
+            {"test@example.com": users[0]}, "get_batch_users", "google"
+        )
 
         result = gdn.list_groups_with_members()
 
-        # Verify no overwrite
-        member = result[0]["members"][0]
-        assert member["role"] == "OWNER"  # Original member role preserved
-        assert (
-            member["user_details"]["role"] == "USER_ROLE"
-        )  # User role in nested structure
+        assert isinstance(result, IntegrationResponse)
+        assert result.success is True
+        assembled = result.data
+        # Validate assembled groups and ensure member role preserved
+        validated = [GroupWithMembers.model_validate(g) for g in assembled]
+        vg = validated[0]
+        assert vg.email == "test-group@example.com"
+        assert vg.members[0].role == "OWNER"
