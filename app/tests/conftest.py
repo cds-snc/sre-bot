@@ -1,15 +1,15 @@
 import pytest
-from integrations.google_workspace.schemas import (
-    Group,
-    User,
-    Member,
+from tests.factory_helpers import (
+    make_google_groups,
+    make_google_users,
+    make_google_members,
 )
 
 # Google API Python Client
 
 
 # Google Discovery Directory Resource
-# Base fixtures
+# Legacy Fixtures
 @pytest.fixture
 def google_groups():
     def _google_groups(n=3, prefix="", domain="test.com"):
@@ -73,127 +73,6 @@ def google_group_members(google_users):
         ]
 
     return _google_group_members
-
-
-# --- Google Directory API Pydantic factories ---
-
-
-@pytest.fixture
-def google_group_factory():
-    """
-    Factory fixture to generate a list of valid Google Group dicts for tests.
-    Usage:
-        groups = google_group_factory(n=2, prefix="dev-")
-        # returns a list of dicts (model_dump)
-    """
-
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        groups = [
-            Group(
-                id=f"{prefix}google_group_id{i+1}",
-                name=f"{prefix}group-name{i+1}",
-                email=f"{prefix}group-name{i+1}@{domain}",
-                description=f"{prefix}description{i+1}",
-                directMembersCount=i + 1,
-            )
-            for i in range(n)
-        ]
-        if as_model:
-            return groups
-        return [g.model_dump() for g in groups]
-
-    return _factory
-
-
-@pytest.fixture
-def google_user_factory():
-    """
-    Factory fixture to generate a list of valid Google User dicts or models for tests.
-    Usage:
-        users = google_user_factory(n=2, prefix="dev-")
-        # returns a list of dicts (model_dump)
-        users = google_user_factory(n=2, as_model=True)
-        # returns a list of User models
-    """
-
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        users = [
-            User(
-                id=f"{prefix}user_id{i+1}",
-                primaryEmail=f"{prefix}user-email{i+1}@{domain}",
-                emails=[
-                    {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
-                        "primary": True,
-                        "type": "work",
-                    }
-                ],
-                suspended=False,
-                name={
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
-                },
-            )
-            for i in range(n)
-        ]
-        if as_model:
-            return users
-        return [u.model_dump() for u in users]
-
-    return _factory
-
-
-@pytest.fixture
-def google_member_factory():
-    """
-    Factory fixture to generate a list of valid Google Member dicts or models for tests.
-    Usage:
-        members = google_member_factory(n=2, prefix="dev-")
-        # returns a list of dicts (model_dump)
-        members = google_member_factory(n=2, as_model=True)
-        # returns a list of Member models
-    """
-
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        users = [
-            User(
-                id=f"{prefix}user_id{i+1}",
-                primaryEmail=f"{prefix}user-email{i+1}@{domain}",
-                emails=[
-                    {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
-                        "primary": True,
-                        "type": "work",
-                    }
-                ],
-                suspended=False,
-                name={
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
-                },
-            )
-            for i in range(n)
-        ]
-        members = [
-            Member(
-                kind="admin#directory#member",
-                email=user.primaryEmail,
-                role="MEMBER",
-                type="USER",
-                status="ACTIVE",
-                id=user.id,
-            )
-            for user in users
-        ]
-        if as_model:
-            return members
-        return [m.model_dump() for m in members]
-
-    return _factory
 
 
 # Fixture with users
@@ -260,6 +139,61 @@ def google_groups_with_legacy_structure(
             result.append(group_with_members)
 
         return result
+
+    return _factory
+
+
+# --- Google Directory API Pydantic factories ---
+
+
+@pytest.fixture
+def google_group_factory():
+    """
+    Factory fixture to generate a list of valid Google Group dicts for tests.
+    Usage:
+        groups = google_group_factory(n=2, prefix="dev-")
+        # returns a list of dicts (model_dump)
+    """
+
+    def _factory(n=3, prefix="", domain="test.com", as_model=False):
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_groups(n=n, prefix=prefix, domain=domain, as_model=as_model)
+
+    return _factory
+
+
+@pytest.fixture
+def google_user_factory():
+    """
+    Factory fixture to generate a list of valid Google User dicts or models for tests.
+    Usage:
+        users = google_user_factory(n=2, prefix="dev-")
+        # returns a list of dicts (model_dump)
+        users = google_user_factory(n=2, as_model=True)
+        # returns a list of User models
+    """
+
+    def _factory(n=3, prefix="", domain="test.com", as_model=False):
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_users(n=n, prefix=prefix, domain=domain, as_model=as_model)
+
+    return _factory
+
+
+@pytest.fixture
+def google_member_factory():
+    """
+    Factory fixture to generate a list of valid Google Member dicts or models for tests.
+    Usage:
+        members = google_member_factory(n=2, prefix="dev-")
+        # returns a list of dicts (model_dump)
+        members = google_member_factory(n=2, as_model=True)
+        # returns a list of Member models
+    """
+
+    def _factory(n=3, prefix="", domain="test.com", as_model=False):
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_members(n=n, prefix=prefix, domain=domain, as_model=as_model)
 
     return _factory
 
