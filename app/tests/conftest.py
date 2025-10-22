@@ -1,8 +1,8 @@
 import pytest
-from integrations.google_workspace.schemas import (
-    Group,
-    User,
-    Member,
+from tests.factory_helpers import (
+    make_google_groups,
+    make_google_users,
+    make_google_members,
 )
 
 # Google API Python Client
@@ -13,16 +13,8 @@ from integrations.google_workspace.schemas import (
 @pytest.fixture
 def google_groups():
     def _google_groups(n=3, prefix="", domain="test.com"):
-        return [
-            {
-                "id": f"{prefix}google_group_id{i+1}",
-                "name": f"{prefix}group-name{i+1}",
-                "email": f"{prefix}group-name{i+1}@{domain}",
-                "description": f"{prefix}description{i+1}",
-                "directMembersCount": i + 1,
-            }
-            for i in range(n)
-        ]
+        # Delegate to shared helper; return dicts
+        return make_google_groups(n=n, prefix=prefix, domain=domain, as_model=False)
 
     return _google_groups
 
@@ -30,28 +22,8 @@ def google_groups():
 @pytest.fixture
 def google_users():
     def _google_users(n=3, prefix="", domain="test.com"):
-        users = []
-        for i in range(n):
-            user = {
-                "id": f"{prefix}user_id{i+1}",
-                "primaryEmail": f"{prefix}user-email{i+1}@{domain}",
-                "emails": [
-                    {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
-                        "primary": True,
-                        "type": "work",
-                    }
-                ],
-                "suspended": False,
-                "name": {
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
-                },
-            }
-            users.append(user)
-        return users
+        # Delegate to shared helper; return dicts
+        return make_google_users(n=n, prefix=prefix, domain=domain, as_model=False)
 
     return _google_users
 
@@ -59,18 +31,8 @@ def google_users():
 @pytest.fixture
 def google_group_members(google_users):
     def _google_group_members(n=3, prefix="", domain="test.com"):
-        users = google_users(n, prefix, domain)
-        return [
-            {
-                "kind": "admin#directory#member",
-                "email": user["primaryEmail"],
-                "role": "MEMBER",
-                "type": "USER",
-                "status": "ACTIVE",
-                "id": user["id"],
-            }
-            for user in users
-        ]
+        # Delegate to shared helper which creates member dicts embedding user details
+        return make_google_members(n=n, prefix=prefix, domain=domain, as_model=False)
 
     return _google_group_members
 
@@ -88,19 +50,8 @@ def google_group_factory():
     """
 
     def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        groups = [
-            Group(
-                id=f"{prefix}google_group_id{i+1}",
-                name=f"{prefix}group-name{i+1}",
-                email=f"{prefix}group-name{i+1}@{domain}",
-                description=f"{prefix}description{i+1}",
-                directMembersCount=i + 1,
-            )
-            for i in range(n)
-        ]
-        if as_model:
-            return groups
-        return [g.model_dump() for g in groups]
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_groups(n=n, prefix=prefix, domain=domain, as_model=as_model)
 
     return _factory
 
@@ -117,30 +68,8 @@ def google_user_factory():
     """
 
     def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        users = [
-            User(
-                id=f"{prefix}user_id{i+1}",
-                primaryEmail=f"{prefix}user-email{i+1}@{domain}",
-                emails=[
-                    {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
-                        "primary": True,
-                        "type": "work",
-                    }
-                ],
-                suspended=False,
-                name={
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
-                },
-            )
-            for i in range(n)
-        ]
-        if as_model:
-            return users
-        return [u.model_dump() for u in users]
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_users(n=n, prefix=prefix, domain=domain, as_model=as_model)
 
     return _factory
 
@@ -157,41 +86,8 @@ def google_member_factory():
     """
 
     def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        users = [
-            User(
-                id=f"{prefix}user_id{i+1}",
-                primaryEmail=f"{prefix}user-email{i+1}@{domain}",
-                emails=[
-                    {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
-                        "primary": True,
-                        "type": "work",
-                    }
-                ],
-                suspended=False,
-                name={
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
-                },
-            )
-            for i in range(n)
-        ]
-        members = [
-            Member(
-                kind="admin#directory#member",
-                email=user.primaryEmail,
-                role="MEMBER",
-                type="USER",
-                status="ACTIVE",
-                id=user.id,
-            )
-            for user in users
-        ]
-        if as_model:
-            return members
-        return [m.model_dump() for m in members]
+        # Delegate to shared helper to avoid duplicated logic
+        return make_google_members(n=n, prefix=prefix, domain=domain, as_model=as_model)
 
     return _factory
 
@@ -202,17 +98,12 @@ def google_groups_w_users(google_groups, google_group_members, google_users):
     def _google_groups_w_users(
         n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
     ):
-        groups = google_groups(n_groups, prefix=group_prefix, domain=domain)
-        members = google_group_members(n_users, prefix=user_prefix, domain=domain)
-        users = google_users(n_users, prefix=user_prefix, domain=domain)
+        groups = make_google_groups(n=n_groups, prefix=group_prefix, domain=domain)
+        members = make_google_members(n=n_users, prefix=user_prefix, domain=domain)
 
-        combined_members = []
-        for member, user in zip(members, users):
-            combined_member = {**member, **user}
-            combined_members.append(combined_member)
-
+        # Attach the same members list to each group (mirrors previous behavior)
         for group in groups:
-            group["members"] = combined_members
+            group["members"] = members
         return groups
 
     return _google_groups_w_users
