@@ -12,28 +12,39 @@ from integrations.google_workspace.google_service_next import (
     execute_google_api_call,
     get_google_service,
 )
+from models.integrations import (
+    IntegrationResponse,
+    build_success_response,
+    build_error_response,
+)
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
 logger = get_module_logger()
 
 
-def get_user(user_key: str, **kwargs) -> Optional[dict]:
-    """Get a user from Google Directory."""
+def get_user(user_key: str, **kwargs) -> IntegrationResponse:
+    """Get a user from Google Directory.
+
+    Returns an IntegrationResponse.
+    """
     return execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
         "get",
         scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        non_critical=True,
         userKey=user_key,
         **kwargs,
     )
 
 
-def get_batch_users(user_keys: List[str], **kwargs) -> Dict[str, Optional[dict]]:
-    """Get multiple users from Google Directory using batch requests."""
+def get_batch_users(user_keys: List[str], **kwargs) -> IntegrationResponse:
+    """Get multiple users from Google Directory using batch requests.
+
+    Returns an IntegrationResponse with data = {user_key: user_dict | None}
+    """
+    logger.info("get_batch_users", user_keys=user_keys, kwargs=kwargs)
     service = get_google_service(
         "admin",
         "directory_v1",
@@ -44,19 +55,28 @@ def get_batch_users(user_keys: List[str], **kwargs) -> Dict[str, Optional[dict]]
         req = service.users().get(userKey=user_key, **kwargs)
         requests.append((user_key, req))
 
-    batch_result = execute_batch_request(service, requests)
-    results = batch_result.get("results", {})
-    users_by_key: Dict[str, Optional[dict]] = {}
-    for user_key in user_keys:
-        user_data = results.get(user_key)
-        users_by_key[user_key] = user_data
+    resp = execute_batch_request(service, requests)
+    if not isinstance(resp, IntegrationResponse):
+        return build_error_response(
+            Exception("invalid batch response"), "get_batch_users", "google"
+        )
 
-    return users_by_key
+    if not resp.success:
+        return build_error_response(
+            Exception(str(resp.error)), "get_batch_users", "google"
+        )
+
+    results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
+    users_by_key: Dict[str, Optional[dict]] = {k: results.get(k) for k in user_keys}
+    return build_success_response(users_by_key, "get_batch_users", "google")
 
 
-def list_users(**kwargs) -> List[dict]:
-    """List all users from Google Directory with integrated error handling and auto-pagination."""
-    result = execute_google_api_call(
+def list_users(**kwargs) -> IntegrationResponse:
+    """List all users from Google Directory with integrated error handling and auto-pagination.
+
+    Returns an IntegrationResponse.
+    """
+    return execute_google_api_call(
         "admin",
         "directory_v1",
         "users",
@@ -65,25 +85,30 @@ def list_users(**kwargs) -> List[dict]:
         customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
         **kwargs,
     )
-    return result or []
 
 
-def get_group(group_key: str, **kwargs) -> Optional[dict]:
-    """Get a group from Google Directory with integrated error handling."""
+def get_group(group_key: str, **kwargs) -> IntegrationResponse:
+    """Get a group from Google Directory with integrated error handling.
+
+    Returns an IntegrationResponse.
+    """
     return execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
         "get",
         scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        non_critical=True,  # Group not found is acceptable
         groupKey=group_key,
         **kwargs,
     )
 
 
-def get_batch_groups(group_keys: List[str], **kwargs) -> Dict[str, Optional[dict]]:
-    """Get multiple groups from Google Directory using batch requests."""
+def get_batch_groups(group_keys: List[str], **kwargs) -> IntegrationResponse:
+    """Get multiple groups from Google Directory using batch requests.
+
+    Returns an IntegrationResponse with data = {group_key: group_dict | None}
+    """
+    logger.info("get_batch_groups", group_keys=group_keys, kwargs=kwargs)
     service = get_google_service(
         "admin",
         "directory_v1",
@@ -94,20 +119,28 @@ def get_batch_groups(group_keys: List[str], **kwargs) -> Dict[str, Optional[dict
         req = service.groups().get(groupKey=group_key, **kwargs)
         requests.append((group_key, req))
 
-    batch_result = execute_batch_request(service, requests)
-    results = batch_result.get("results", {})
+    resp = execute_batch_request(service, requests)
+    if not isinstance(resp, IntegrationResponse):
+        return build_error_response(
+            Exception("invalid batch response"), "get_batch_groups", "google"
+        )
 
-    groups_by_key: Dict[str, Optional[dict]] = {}
-    for group_key in group_keys:
-        group = results.get(group_key)
-        groups_by_key[group_key] = group
+    if not resp.success:
+        return build_error_response(
+            Exception(str(resp.error)), "get_batch_groups", "google"
+        )
 
-    return groups_by_key
+    results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
+    groups_by_key: Dict[str, Optional[dict]] = {k: results.get(k) for k in group_keys}
+    return build_success_response(groups_by_key, "get_batch_groups", "google")
 
 
-def list_groups(**kwargs) -> List[dict]:
-    """List all groups from Google Directory with integrated error handling and auto-pagination."""
-    result = execute_google_api_call(
+def list_groups(**kwargs) -> IntegrationResponse:
+    """List all groups from Google Directory with integrated error handling and auto-pagination.
+
+    Returns an IntegrationResponse.
+    """
+    return execute_google_api_call(
         "admin",
         "directory_v1",
         "groups",
@@ -116,11 +149,13 @@ def list_groups(**kwargs) -> List[dict]:
         customer=GOOGLE_WORKSPACE_CUSTOMER_ID,
         **kwargs,
     )
-    return result or []
 
 
-def get_member(group_key: str, member_key: str, **kwargs) -> Optional[dict]:
-    """Get a member of a group from Google Directory with integrated error handling."""
+def get_member(group_key: str, member_key: str, **kwargs) -> IntegrationResponse:
+    """Get a member of a group from Google Directory with integrated error handling.
+
+    Returns an IntegrationResponse.
+    """
     return execute_google_api_call(
         "admin",
         "directory_v1",
@@ -129,14 +164,13 @@ def get_member(group_key: str, member_key: str, **kwargs) -> Optional[dict]:
         scopes=[
             "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
         ],
-        non_critical=True,  # Member not found is acceptable
         groupKey=group_key,
         memberKey=member_key,
         **kwargs,
     )
 
 
-def get_batch_members(group_keys: List[str], **kwargs) -> Dict[str, List[dict]]:
+def get_batch_members(group_keys: List[str], **kwargs) -> IntegrationResponse:
     """Get multiple groups' members using batch requests.
 
     Args:
@@ -146,7 +180,7 @@ def get_batch_members(group_keys: List[str], **kwargs) -> Dict[str, List[dict]]:
     Returns:
         Dict[str, List[dict]]: A dictionary mapping group keys to their members.
     """
-
+    logger.info("get_batch_members", group_keys=group_keys, kwargs=kwargs)
     service = get_google_service(
         "admin",
         "directory_v1",
@@ -157,9 +191,18 @@ def get_batch_members(group_keys: List[str], **kwargs) -> Dict[str, List[dict]]:
         req = service.members().list(groupKey=group_key, **kwargs)
         requests.append((group_key, req))
 
-    batch_result = execute_batch_request(service, requests)
-    results = batch_result.get("results", {})
+    resp = execute_batch_request(service, requests)
+    if not isinstance(resp, IntegrationResponse):
+        return build_error_response(
+            Exception("invalid batch response"), "get_batch_members", "google"
+        )
 
+    if not resp.success:
+        return build_error_response(
+            Exception(str(resp.error)), "get_batch_members", "google"
+        )
+
+    results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
     members_by_group: Dict[str, List[dict]] = {}
     for group_key in group_keys:
         members = results.get(group_key)
@@ -173,27 +216,31 @@ def get_batch_members(group_keys: List[str], **kwargs) -> Dict[str, List[dict]]:
         else:
             members_by_group[group_key] = []
 
-    return members_by_group
+    return build_success_response(members_by_group, "get_batch_members", "google")
 
 
-def list_members(group_key: str, **kwargs) -> List[dict]:
-    """List all members of a group from Google Directory with integrated error handling and auto-pagination."""
-    result = execute_google_api_call(
+def list_members(group_key: str, **kwargs) -> IntegrationResponse:
+    """List all members of a group from Google Directory with integrated error handling and auto-pagination.
+
+    Returns an IntegrationResponse.
+    """
+    return execute_google_api_call(
         "admin",
         "directory_v1",
         "members",
         "list",
         scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        non_critical=True,
         groupKey=group_key,
         **kwargs,
     )
-    return result or []
 
 
-def has_member(group_key: str, member_key: str, **kwargs) -> bool:
-    """Check if a member exists in a group with integrated error handling."""
-    member = execute_google_api_call(
+def has_member(group_key: str, member_key: str, **kwargs) -> IntegrationResponse:
+    """Check if a member exists in a group with integrated error handling.
+
+    Returns an IntegrationResponse whose data is truthy/falsey indicating membership.
+    """
+    return execute_google_api_call(
         "admin",
         "directory_v1",
         "members",
@@ -201,12 +248,10 @@ def has_member(group_key: str, member_key: str, **kwargs) -> bool:
         scopes=[
             "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
         ],
-        non_critical=True,  # Member not found is acceptable
         groupKey=group_key,
         memberKey=member_key,
         **kwargs,
     )
-    return member
 
 
 def insert_member(
@@ -216,45 +261,80 @@ def insert_member(
     type_: str = "USER",
     member_body: Optional[dict] = None,
     **kwargs,
-) -> Optional[dict]:
+) -> IntegrationResponse:
     """
     Insert a member into a group. Supports both simple and advanced usage.
     If member_body is provided, it overrides email/role/type_.
     """
     if member_body is None:
-        body = {"email": email, "role": role, "type": type_}
-    else:
-        body = member_body
+        member_body = {"email": email, "role": role, "type": type_}
 
+    # delegate error handling to execute_google_api_call (google_service_next)
     return execute_google_api_call(
         "admin",
         "directory_v1",
         "members",
         "insert",
         scopes=["https://www.googleapis.com/auth/admin.directory.group"],
-        non_critical=True,
         groupKey=group_key,
-        body=body,
+        body=member_body,
         **kwargs,
     )
+
+
+def _assemble_groups_with_members(
+    groups_list: List[dict],
+    members_by_group: Dict[str, List[dict]],
+    users_by_email: Dict[str, dict],
+    members_kwargs: Optional[dict],
+) -> List[dict]:
+    results: List[dict] = []
+    for g in groups_list:
+        if not isinstance(g, dict):
+            continue
+        key = g.get("email") or g.get("id")
+        if not key:
+            continue
+        members = members_by_group.get(key, [])
+        enriched_members: List[dict] = []
+        for m in members:
+            if not isinstance(m, dict):
+                continue
+            member_copy = dict(m)
+            email = m.get("email")
+            if email:
+                user = users_by_email.get(email)
+                if user and isinstance(user, dict) and user.get("primaryEmail"):
+                    member_copy["user"] = user
+                    # backward-compat: flatten certain fields
+                    for k, v in user.items():
+                        if k not in member_copy:
+                            member_copy[k] = v
+            enriched_members.append(member_copy)
+
+        if (
+            not enriched_members
+            and members_kwargs
+            and members_kwargs.get("exclude_empty_groups")
+        ):
+            continue
+
+        g_copy = dict(g)
+        g_copy["members"] = enriched_members
+        results.append(g_copy)
+    return results
 
 
 def list_groups_with_members(
     groups_filters: Optional[list] = None,
     groups_kwargs: Optional[dict] = None,
     members_kwargs: Optional[dict] = None,
-    tolerate_errors: bool = False,
-) -> list:
+) -> IntegrationResponse:
     """
     List all groups in the Google Workspace domain with their members.
 
-    Args:
-        groups_filters (list, optional): A list of filter functions to apply to groups. Example: [lambda g: g['email'].startswith('aws-')]
-        groups_kwargs (dict, optional): Additional keyword arguments for listing groups.
-        members_kwargs (dict, optional): Additional keyword arguments for listing members.
-        tolerate_errors (bool, optional): If True, groups with member fetch errors are included without members.
-    Returns:
-        list: A list of group objects with members. Any group without members will not be included.
+    Returns an IntegrationResponse whose data is a list of groups with an added
+    "members" key containing the group's members (possibly enriched with user details).
     """
     logger.info(
         "listing_groups_with_members",
@@ -262,67 +342,49 @@ def list_groups_with_members(
         members_kwargs=members_kwargs,
         groups_filters=groups_filters,
     )
-    # 1. Fetch groups
-    groups = list_groups(**(groups_kwargs or {}))
-    if not groups:
-        return []
 
-    logger.info("groups_listed", count=len(groups))
-    # 2. Apply filters if provided
+    # Get groups - google_service_next handles all error cases
+    groups_resp = list_groups(**(groups_kwargs or {}))
+    if not groups_resp.success:
+        return groups_resp
+
+    # Apply filters and early return if empty
+    groups_list = groups_resp.data or []
     if groups_filters:
-        for groups_filter in groups_filters:
-            groups = [g for g in groups if groups_filter(g)]
-        logger.info("groups_filtered", count=len(groups), groups_filters=groups_filters)
+        groups_list = [g for g in groups_list if all(f(g) for f in groups_filters)]
 
-    # 3. Batch fetch groups members
-    group_emails = [g["email"] for g in groups if "email" in g]
-    members_by_group = get_batch_members(group_emails)
-
-    logger.info("members_batch_fetched", count=len(members_by_group))
-    # 4. Collect unique member emails across all groups
+    if not groups_list:
+        return build_error_response(
+            error=Exception("No groups found for filters"),
+            function_name="list_groups_with_members",
+            integration_name="google",
+        )
+    # Get members for all groups - google_service_next handles all error cases
+    group_keys = [g.get("email") for g in groups_list]
+    members_resp = get_batch_members(group_keys, **(members_kwargs or {}))
+    if not members_resp.success:
+        return members_resp
+    members_by_group: Dict[str, List[dict]] = (
+        members_resp.data
+        if isinstance(members_resp.data, dict)
+        else {k: [] for k in group_keys}
+    )
+    # Collect member emails and fetch user details - google_service_next handles all error cases
     member_emails = {
-        m["email"]
+        email
         for members in members_by_group.values()
         for m in members
-        if "email" in m
+        if isinstance(m, dict) and (email := m.get("email")) is not None
     }
 
-    # 5. Batch fetch all members details for all groups
-    users_by_email = get_batch_users(list(member_emails)) if member_emails else {}
-    logger.info("members_batch_fetched", count=len(users_by_email))
+    users_by_email: Dict[str, dict] = {}
+    if member_emails:
+        users_resp = get_batch_users(list(member_emails))
+        if users_resp.success:
+            users_by_email = users_resp.data or {}
 
-    # 6. Assemble final groups with members
-    groups_with_members = []
-    for group in groups:
-        if not isinstance(group, dict):
-            continue
-        group_email = group.get("email", {})
-        members = members_by_group.get(group_email, [])
-        error_info = None
-        if not members and tolerate_errors:
-            error_info = "No members found or error in member fetch."
-        processed_members = []
-        for m in members:
-            member_copy = dict(m)
-            email = m.get("email")
-            if email and email in users_by_email:
-                user_details = users_by_email[email]
-                member_copy["user_details"] = user_details
-                # BACKWARD COMPATIBILITY: Flatten user_details into top-level member dict
-                # TODO: To be deprecated in future versions
-                if isinstance(user_details, dict):
-                    # Flatten user_details into the top-level member dict
-                    for k, v in user_details.items():
-                        if k not in member_copy:
-                            member_copy[k] = v
-            processed_members.append(member_copy)
-        group_obj = dict(group) if isinstance(group, dict) else {}
-        group_obj["members"] = processed_members
-        group_obj["email"] = group_email
-        if error_info:
-            group_obj["error"] = error_info
-        # Only include groups with members, unless tolerate_errors is True
-        if processed_members or tolerate_errors:
-            groups_with_members.append(group_obj)
-    logger.info("groups_with_members_listed", count=len(groups_with_members))
-    return groups_with_members
+    # Assemble final results
+    results = _assemble_groups_with_members(
+        groups_list, members_by_group, users_by_email, members_kwargs
+    )
+    return build_success_response(results, "list_groups_with_members", "google")
