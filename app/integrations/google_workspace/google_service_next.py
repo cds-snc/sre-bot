@@ -590,13 +590,16 @@ def execute_google_api_call(
             resource_key = resource_path.split(".")[
                 -1
             ]  # e.g., "users" from "users" or "members" from "groups.members"
-            return paginate_all_results(request, resource_key)
+            result = paginate_all_results(request, resource_key)
+            if isinstance(result, IntegrationResponse):
+                return result.data
+            return result
         else:
             # Simple execution for non-list operations or when single_page=True
             return request.execute()
 
     # Use module-level error handling
-    func_name = f"{service_name}_{version}_{resource_path}_{method}"
+    func_name = f"{method}"
     return execute_api_call(
         func_name,
         api_call,
