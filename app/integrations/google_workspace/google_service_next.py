@@ -252,6 +252,11 @@ def execute_api_call(
                     attempt=attempt + 1,
                 )
 
+            # If the inner api_call already returned a standardized
+            # IntegrationResponse, propagate it directly to avoid nesting.
+            if isinstance(result, IntegrationResponse):
+                return result
+
             return build_success_response(
                 data=result,
                 function_name=func_name,
@@ -590,10 +595,7 @@ def execute_google_api_call(
             resource_key = resource_path.split(".")[
                 -1
             ]  # e.g., "users" from "users" or "members" from "groups.members"
-            result = paginate_all_results(request, resource_key)
-            if isinstance(result, IntegrationResponse):
-                return result.data
-            return result
+            return paginate_all_results(request, resource_key)
         else:
             # Simple execution for non-list operations or when single_page=True
             return request.execute()
