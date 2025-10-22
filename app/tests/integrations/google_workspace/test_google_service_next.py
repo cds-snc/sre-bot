@@ -886,12 +886,10 @@ def test_execute_google_api_call_api_error():
         method="list",
     )
     assert isinstance(resp, IntegrationResponse)
-    # The outer IntegrationResponse is success=True, but the inner data is an IntegrationResponse with success=False
-    assert isinstance(resp.data, IntegrationResponse)
-    assert resp.data.success is False
-    assert resp.data.error is not None
-    # The error message may be about the generator object, not the original exception
-    assert "generator" in str(resp.data.error["message"])
+    assert not isinstance(resp.data, IntegrationResponse)
+    assert resp.success is False
+    assert resp.error is not None
+    assert "generator" in str(resp.error["message"])
 
 
 @patch(
