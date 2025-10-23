@@ -45,7 +45,6 @@ def log_group_action(payload: Dict[str, Any]) -> None:
 
 def get_audit_trail(group_id: str, limit: int = 50) -> list:
     """Get audit trail for a specific group (placeholder for future implementation)."""
-    # This would query your audit storage (database, Sentinel, etc.)
     # For now, return empty list as placeholder
     logger.info(f"Retrieving audit trail for group {group_id} (limit: {limit})")
     return []
@@ -53,6 +52,5 @@ def get_audit_trail(group_id: str, limit: int = 50) -> list:
 
 def get_user_audit_trail(user_email: str, limit: int = 50) -> list:
     """Get audit trail for a specific user's group actions (placeholder)."""
-    # This would query your audit storage for user-specific actions
     logger.info(f"Retrieving audit trail for user {user_email} (limit: {limit})")
     return []
