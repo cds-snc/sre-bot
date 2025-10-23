@@ -9,6 +9,7 @@ logger = get_module_logger()
 # Email validation regex
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
+# TODO: refactor to use the core.settings configuration for valid providers/actions
 # Valid group actions
 VALID_ACTIONS = {"add_member", "remove_member", "list_members", "get_details"}
 
