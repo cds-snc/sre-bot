@@ -105,28 +105,28 @@ class GroupProvider(ABC):
     # ------------------------------------------------------------------
     # Higher-level wrapper methods: call sync provider methods, wrap in OperationResult
     # ------------------------------------------------------------------
-    def get_user_managed_groups_result(self, user_email: str) -> OperationResult:
+    def get_user_managed_groups_result(self, user_key: str) -> OperationResult:
         """
         Wraps get_user_managed_groups in an OperationResult.
 
         Args:
-            user_email: The user's email address.
+            user_key: The user's email address.
 
         Returns:
             OperationResult containing a list of managed groups under 'groups'.
         """
         return self._opresult_wrapper(
-            self.get_user_managed_groups, user_email, data_key="groups"
+            self.get_user_managed_groups, user_key, data_key="groups"
         )
 
     def add_member_result(
-        self, group_id: str, member: dict | str, justification: str
+        self, group_key: str, member: dict | str, justification: str
     ) -> OperationResult:
         """
         Wraps add_member in an OperationResult.
 
         Args:
-            group_id: The group identifier.
+            group_key: The group identifier.
             member: Member dict or email string.
             justification: Reason for adding the member.
 
@@ -134,17 +134,17 @@ class GroupProvider(ABC):
             OperationResult containing the added member under 'member'.
         """
         return self._opresult_wrapper(
-            self.add_member, group_id, member, justification, data_key="member"
+            self.add_member, group_key, member, justification, data_key="member"
         )
 
     def remove_member_result(
-        self, group_id: str, member: dict | str, justification: str
+        self, group_key: str, member: dict | str, justification: str
     ) -> OperationResult:
         """
         Wraps remove_member in an OperationResult.
 
         Args:
-            group_id: The group identifier.
+            group_key: The group identifier.
             member: Member dict or email string.
             justification: Reason for removing the member.
 
@@ -152,30 +152,30 @@ class GroupProvider(ABC):
             OperationResult containing the removal result.
         """
         return self._opresult_wrapper(
-            self.remove_member, group_id, member, justification
+            self.remove_member, group_key, member, justification
         )
 
-    def get_group_members_result(self, group_id: str, **kwargs) -> OperationResult:
+    def get_group_members_result(self, group_key: str, **kwargs) -> OperationResult:
         """
         Wraps get_group_members in an OperationResult.
 
         Args:
-            group_id: The group identifier.
+            group_key: The group identifier.
             **kwargs: Additional filter arguments.
 
         Returns:
             OperationResult containing a list of members under 'members'.
         """
         return self._opresult_wrapper(
-            self.get_group_members, group_id, **kwargs, data_key="members"
+            self.get_group_members, group_key, **kwargs, data_key="members"
         )
 
     def validate_permissions_result(
-        self, user_email: str, group_id: str, action: str
+        self, user_key: str, group_key: str, action: str
     ) -> OperationResult:
         """Validate permissions and wrap result in OperationResult."""
         return self._opresult_wrapper(
-            self.validate_permissions, user_email, group_id, action
+            self.validate_permissions, user_key, group_key, action
         )
 
     # Required: capabilities property
@@ -220,9 +220,7 @@ class GroupProvider(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def validate_permissions(
-        self, user_email: str, group_key: str, action: str
-    ) -> bool:
+    def validate_permissions(self, user_key: str, group_key: str, action: str) -> bool:
         """Validate permissions synchronously."""
         raise NotImplementedError()
 
