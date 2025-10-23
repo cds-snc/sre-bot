@@ -1,0 +1,243 @@
+from __future__ import annotations
+
+from enum import Enum
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from core.config import settings
+
+
+class OperationStatus(Enum):
+    SUCCESS = "success"
+    TRANSIENT_ERROR = "transient_error"  # Retryable
+    PERMANENT_ERROR = "permanent_error"  # Do not retry
+    UNAUTHORIZED = "unauthorized"
+    NOT_FOUND = "not_found"
+
+
+@dataclass
+class OperationResult:
+    """Uniform result returned from provider operations.
+
+    status: OperationStatus -- high-level outcome
+    message: str -- human-friendly message (for logs/troubleshooting)
+    data: Optional[Dict[str, Any]] -- optional payload
+    error_code: Optional[str] -- optional machine error code
+    retry_after: Optional[int] -- seconds until retry when rate-limited
+    """
+
+    status: OperationStatus
+    message: str
+    data: Optional[Dict[str, Any]] = None
+    error_code: Optional[str] = None
+    retry_after: Optional[int] = None  # Seconds for rate limiting
+
+
+@dataclass
+class ProviderCapabilities:
+    supports_user_creation: bool = False
+    supports_user_deletion: bool = False
+    supports_group_creation: bool = False  # Should always be False
+    supports_group_deletion: bool = False  # Should always be False
+    supports_member_management: bool = True
+    supports_batch_operations: bool = False
+    max_batch_size: int = 1
+
+    @classmethod
+    def from_config(cls, provider_name: str) -> "ProviderCapabilities":
+        cfg = getattr(settings, "groups", None)
+        if not cfg:
+            return cls()
+        provider_cfg = (
+            cfg.providers.get(provider_name, {})
+            if isinstance(cfg.providers, dict)
+            else {}
+        )
+        return cls(
+            supports_user_creation=provider_cfg.get("capabilities", {}).get(
+                "supports_user_creation", False
+            ),
+            supports_user_deletion=provider_cfg.get("capabilities", {}).get(
+                "supports_user_deletion", False
+            ),
+            supports_group_creation=provider_cfg.get("capabilities", {}).get(
+                "supports_group_creation", False
+            ),
+            supports_group_deletion=provider_cfg.get("capabilities", {}).get(
+                "supports_group_deletion", False
+            ),
+            supports_member_management=provider_cfg.get("capabilities", {}).get(
+                "supports_member_management", True
+            ),
+            supports_batch_operations=provider_cfg.get("capabilities", {}).get(
+                "supports_batch_operations", False
+            ),
+            max_batch_size=provider_cfg.get("capabilities", {}).get(
+                "max_batch_size", 1
+            ),
+        )
+
+
+class GroupProvider(ABC):
+    """Abstract Base Class for group providers.
+
+    Providers are required to implement synchronous (sync) methods first.
+    Async wrappers are provided for compatibility and future migration.
+    When the application is refactored for async, providers should implement
+    native async methods and may override the async wrappers.
+
+    Implementations MUST remain stateless (no per-request mutable attrs).
+    """
+
+    def _opresult_wrapper(self, func, *args, data_key=None, **kwargs):
+        """Wrap a function call in an OperationResult."""
+        try:
+            result = func(*args, **kwargs)
+            data = {data_key: result} if data_key else result
+            return OperationResult(
+                status=OperationStatus.SUCCESS, message="ok", data=data
+            )
+        except Exception as e:
+            return OperationResult(
+                status=OperationStatus.TRANSIENT_ERROR, message=str(e)
+            )
+
+    # ------------------------------------------------------------------
+    # Higher-level wrapper methods: call sync provider methods, wrap in OperationResult
+    # ------------------------------------------------------------------
+    def get_user_managed_groups_result(self, user_email: str) -> OperationResult:
+        """
+        Wraps get_user_managed_groups in an OperationResult.
+
+        Args:
+            user_email: The user's email address.
+
+        Returns:
+            OperationResult containing a list of managed groups under 'groups'.
+        """
+        return self._opresult_wrapper(
+            self.get_user_managed_groups, user_email, data_key="groups"
+        )
+
+    def add_member_result(
+        self, group_id: str, member: dict | str, justification: str
+    ) -> OperationResult:
+        """
+        Wraps add_member in an OperationResult.
+
+        Args:
+            group_id: The group identifier.
+            member: Member dict or email string.
+            justification: Reason for adding the member.
+
+        Returns:
+            OperationResult containing the added member under 'member'.
+        """
+        return self._opresult_wrapper(
+            self.add_member, group_id, member, justification, data_key="member"
+        )
+
+    def remove_member_result(
+        self, group_id: str, member: dict | str, justification: str
+    ) -> OperationResult:
+        """
+        Wraps remove_member in an OperationResult.
+
+        Args:
+            group_id: The group identifier.
+            member: Member dict or email string.
+            justification: Reason for removing the member.
+
+        Returns:
+            OperationResult containing the removal result.
+        """
+        return self._opresult_wrapper(
+            self.remove_member, group_id, member, justification
+        )
+
+    def get_group_members_result(self, group_id: str, **kwargs) -> OperationResult:
+        """
+        Wraps get_group_members in an OperationResult.
+
+        Args:
+            group_id: The group identifier.
+            **kwargs: Additional filter arguments.
+
+        Returns:
+            OperationResult containing a list of members under 'members'.
+        """
+        return self._opresult_wrapper(
+            self.get_group_members, group_id, **kwargs, data_key="members"
+        )
+
+    def validate_permissions_result(
+        self, user_email: str, group_id: str, action: str
+    ) -> OperationResult:
+        """Validate permissions and wrap result in OperationResult."""
+        return self._opresult_wrapper(
+            self.validate_permissions, user_email, group_id, action
+        )
+
+    # Required: capabilities property
+    @property
+    @abstractmethod
+    def capabilities(self) -> ProviderCapabilities:
+        """Provider capability descriptor (read-only).
+
+        Providers should instantiate from `ProviderCapabilities.from_config(name)`
+        or return a constant describing supported features.
+        """
+        pass
+
+    @abstractmethod
+    def get_user_managed_groups(self, user_key: str) -> list[dict]:
+        """Return a list of canonical group dicts the user can manage (sync).
+
+        Implementors must provide this synchronous method.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def add_member(
+        self, group_key: str, member_key: dict | str, justification: str
+    ) -> dict:
+        """Add a member synchronously and return a canonical member dict.
+
+        Implementors must provide this synchronous method.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def remove_member(
+        self, group_key: str, member: dict | str, justification: str
+    ) -> dict:
+        """Remove a member synchronously and return canonical member dict."""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_group_members(self, group_key: str, **kwargs) -> list[dict]:
+        """Return list of canonical member dicts (sync)."""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def validate_permissions(
+        self, user_email: str, group_key: str, action: str
+    ) -> bool:
+        """Validate permissions synchronously."""
+        raise NotImplementedError()
+
+    def create_group(self, *args, **kwargs):
+        """Explicitly disabled - groups managed via IaC"""
+        raise NotImplementedError("Group creation disabled - managed via IaC")
+
+    def delete_group(self, *args, **kwargs):
+        """Explicitly disabled - groups managed via IaC"""
+        raise NotImplementedError("Group deletion disabled - managed via IaC")
+
+    def create_user(self, user_data: dict) -> dict:
+        """Create a user synchronously and return canonical user dict."""
+        raise NotImplementedError("User creation not implemented in this provider.")
+
+    def delete_user(self, user_key: str) -> dict:
+        """Delete a user synchronously and return canonical user dict."""
+        raise NotImplementedError("User deletion not implemented in this provider.")
