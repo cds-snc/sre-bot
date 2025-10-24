@@ -249,6 +249,21 @@ class SreOpsSettings(BaseSettings):
     )
 
 
+class GroupsFeatureSettings(BaseSettings):
+    # Per-provider configuration map. Example:
+    # providers = {
+    #   "google": {"enabled": True, "capabilities": {"supports_member_management": True}},
+    #   "aws": {"enabled": True}
+    # }
+    providers: dict[str, dict] = Field(default_factory=dict, alias="GROUP_PROVIDERS")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class ServerSettings(BaseSettings):
     """Server configuration settings."""
 
@@ -335,6 +350,7 @@ class Settings(BaseSettings):
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
     sre_ops: SreOpsSettings
+    groups: GroupsFeatureSettings
 
     # Development settings
     dev: DevSettings
@@ -363,6 +379,7 @@ class Settings(BaseSettings):
             "feat_incident": IncidentFeatureSettings,
             "sre_ops": SreOpsSettings,
             "dev": DevSettings,
+            "groups": GroupsFeatureSettings,
         }
 
         for setting_name, setting_class in settings_map.items():
