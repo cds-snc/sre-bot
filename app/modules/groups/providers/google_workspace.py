@@ -185,8 +185,7 @@ class GoogleWorkspaceProvider(GroupProvider):
         else:
             raw = resp or []
         members = [
-            self._map_google_member_to_normalized(m) if isinstance(m, dict) else m
-            for m in raw
+            self._map_google_member_to_normalized(m) for m in raw if isinstance(m, dict)
         ]
         return members
 
