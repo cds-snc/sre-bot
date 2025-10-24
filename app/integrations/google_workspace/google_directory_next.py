@@ -138,6 +138,13 @@ def get_batch_groups(group_keys: List[str], **kwargs) -> IntegrationResponse:
 def list_groups(**kwargs) -> IntegrationResponse:
     """List all groups from Google Directory with integrated error handling and auto-pagination.
 
+    Note: Can be used to list all groups for a user by passing a query parameter with the memberKey.
+
+    e.g., to list all groups for a user with email user@example.com, you can use:
+    ```
+    list_groups(query="memberKey:user@example.com")
+    ```
+
     Returns an IntegrationResponse.
     """
     return execute_google_api_call(
@@ -220,9 +227,18 @@ def get_batch_members(group_keys: List[str], **kwargs) -> IntegrationResponse:
 
 
 def list_members(group_key: str, **kwargs) -> IntegrationResponse:
-    """List all members of a group from Google Directory with integrated error handling and auto-pagination.
+    """List all members of a group from Google Directory.
 
-    Returns an IntegrationResponse.
+    This uses the simplified Google service functions which handle error
+    reporting and auto-pagination.
+
+    Args:
+        group_key: The group's email address or unique id.
+        **kwargs: Additional keyword arguments forwarded to the underlying API call.
+
+    Returns:
+        IntegrationResponse: The result of the list operation. On success,
+        ``data`` contains the list of members.
     """
     return execute_google_api_call(
         "admin",
@@ -263,8 +279,23 @@ def insert_member(
     **kwargs,
 ) -> IntegrationResponse:
     """
-    Insert a member into a group. Supports both simple and advanced usage.
-    If member_body is provided, it overrides email/role/type_.
+    Inserts a member into the specified Google Workspace group. If
+    ``member_body`` is provided it overrides ``email``, ``role``, and
+    ``type_``.
+
+    Args:
+        group_key: The group's email address or unique id.
+        email: The member's email address.
+        role: Role for the new member (for example, "MEMBER", "OWNER", "MANAGER").
+        type_: The member type (for example, "USER", "GROUP", "CUSTOMER", "DOMAIN").
+        member_body: Optional dictionary representing the member resource. If
+            provided, this object is sent as the request body and takes precedence
+            over ``email``, ``role``, and ``type_``.
+        **kwargs: Additional keyword arguments forwarded to the underlying API call.
+
+    Returns:
+        IntegrationResponse: The result of the insert operation. On success,
+        ``data`` contains the inserted member resource.
     """
     if member_body is None:
         member_body = {"email": email, "role": role, "type": type_}
@@ -279,6 +310,28 @@ def insert_member(
         groupKey=group_key,
         body=member_body,
         **kwargs,
+    )
+
+
+def delete_member(group_key: str, member_key: str) -> IntegrationResponse:
+    """Delete a member from a Google Workspace group.
+
+    Args:
+        group_key: The group's email address or unique id.
+        member_key: The member's email address or unique id.
+
+    Returns:
+        IntegrationResponse: The result of the delete operation. On success,
+        ``data`` is typically None.
+    """
+    return execute_google_api_call(
+        "admin",
+        "directory_v1",
+        "members",
+        "delete",
+        scopes=["https://www.googleapis.com/auth/admin.directory.group"],
+        groupKey=group_key,
+        memberKey=member_key,
     )
 
 
