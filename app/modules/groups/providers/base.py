@@ -81,12 +81,9 @@ class ProviderCapabilities:
 class GroupProvider(ABC):
     """Abstract Base Class for group providers.
 
-    Providers are required to implement synchronous (sync) methods first.
-    Async wrappers are provided for compatibility and future migration.
-    When the application is refactored for async, providers should implement
-    native async methods and may override the async wrappers.
-
-    Implementations MUST remain stateless (no per-request mutable attrs).
+    Providers are required to implement synchronous (sync) methods.
+    All operations should be stateless and thread-safe.
+    Implementations MUST remain stateless (no per-request mutable attributes).
     """
 
     def _opresult_wrapper(self, func, *args, data_key=None, **kwargs):
