@@ -250,12 +250,53 @@ class SreOpsSettings(BaseSettings):
 
 
 class GroupsFeatureSettings(BaseSettings):
-    # Per-provider configuration map. Example:
-    # providers = {
-    #   "google": {"enabled": True, "capabilities": {"supports_member_management": True}},
-    #   "aws": {"enabled": True}
+    # Per-provider configuration. Each key is a provider name with a dict value
+    # Example:
+    # GROUP_PROVIDERS={
+    #   "google": {"enabled": True, "primary": True, "capabilities": {...}},
+    #   "aws": {"enabled": True, "prefix": "aws", "capabilities": {...}},
     # }
     providers: dict[str, dict] = Field(default_factory=dict, alias="GROUP_PROVIDERS")
+
+    @field_validator("providers", mode="after")
+    @classmethod
+    def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
+        """Simple validation for GROUP_PROVIDERS:
+
+        - Ensure there is exactly one provider has `primary=True`.
+        - Warn if no provider is primary.
+        - Warn for non-primary providers missing `prefix` (used for mapping).
+        """
+        try:
+            if not v or not isinstance(v, dict):
+                return {}
+
+            primary_count = 0
+            for pname, cfg in v.items():
+                if isinstance(cfg, dict) and cfg.get("primary"):
+                    primary_count += 1
+
+            if primary_count != 1:
+                # Fail-fast: require exactly one primary provider to enable groups feature
+                raise ValueError(
+                    "GROUP_PROVIDERS configuration must contain exactly one provider with 'primary': True."
+                )
+
+            for pname, cfg in v.items():
+                if not (isinstance(cfg, dict) and cfg.get("primary")):
+                    if not (isinstance(cfg, dict) and cfg.get("prefix")):
+                        logger.warning(
+                            "provider_missing_prefix",
+                            provider=pname,
+                            msg=(
+                                "Non-primary provider has no 'prefix' configured; mapping to primary provider may fail"
+                            ),
+                        )
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            logger.warning(f"Could not validate providers configuration: {e}")
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",
