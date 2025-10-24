@@ -6,7 +6,12 @@ import types
 import asyncio
 from core.config import settings
 from core.logging import get_module_logger
-from modules.groups.providers.base import GroupProvider, ProviderCapabilities, OperationResult, OperationStatus
+from modules.groups.providers.base import (
+    GroupProvider,
+    ProviderCapabilities,
+    OperationResult,
+    OperationStatus,
+)
 
 logger = get_module_logger()
 
