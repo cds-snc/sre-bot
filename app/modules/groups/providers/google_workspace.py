@@ -25,7 +25,7 @@ from modules.groups.providers.base import GroupProvider, ProviderCapabilities
 
 
 class GoogleWorkspaceProvider(GroupProvider):
-    """Google Workspace provider implementing the async GroupProvider contract.
+    """Google Workspace provider implementing the GroupProvider contract.
     This provider uses the existing synchronous module-level helpers via
     the sync-first methods defined in the base class.
     """
