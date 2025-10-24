@@ -40,6 +40,8 @@ class ProviderCapabilities:
     supports_group_creation: bool = False  # Should always be False
     supports_group_deletion: bool = False  # Should always be False
     supports_member_management: bool = True
+    # Whether the provider exposes role information (e.g., Google can indicate MANAGER)
+    provides_role_info: bool = False
     supports_batch_operations: bool = False
     max_batch_size: int = 1
 
@@ -69,6 +71,9 @@ class ProviderCapabilities:
             supports_member_management=provider_cfg.get("capabilities", {}).get(
                 "supports_member_management", True
             ),
+            provides_role_info=provider_cfg.get("capabilities", {}).get(
+                "provides_role_info", False
+            ),
             supports_batch_operations=provider_cfg.get("capabilities", {}).get(
                 "supports_batch_operations", False
             ),
@@ -76,6 +81,27 @@ class ProviderCapabilities:
                 "max_batch_size", 1
             ),
         )
+
+
+def opresult_wrapper(data_key=None):
+    """Decorator to wrap a method call in an OperationResult."""
+
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+                data = {data_key: result} if data_key else result
+                return OperationResult(
+                    status=OperationStatus.SUCCESS, message="ok", data=data
+                )
+            except Exception as e:
+                return OperationResult(
+                    status=OperationStatus.TRANSIENT_ERROR, message=str(e)
+                )
+
+        return wrapper
+
+    return decorator
 
 
 class GroupProvider(ABC):
@@ -86,95 +112,6 @@ class GroupProvider(ABC):
     Implementations MUST remain stateless (no per-request mutable attributes).
     """
 
-    def _opresult_wrapper(self, func, *args, data_key=None, **kwargs):
-        """Wrap a function call in an OperationResult."""
-        try:
-            result = func(*args, **kwargs)
-            data = {data_key: result} if data_key else result
-            return OperationResult(
-                status=OperationStatus.SUCCESS, message="ok", data=data
-            )
-        except Exception as e:
-            return OperationResult(
-                status=OperationStatus.TRANSIENT_ERROR, message=str(e)
-            )
-
-    # ------------------------------------------------------------------
-    # Higher-level wrapper methods: call sync provider methods, wrap in OperationResult
-    # ------------------------------------------------------------------
-    def get_user_managed_groups_result(self, user_key: str) -> OperationResult:
-        """
-        Wraps get_user_managed_groups in an OperationResult.
-
-        Args:
-            user_key: The user's email address.
-
-        Returns:
-            OperationResult containing a list of managed groups under 'groups'.
-        """
-        return self._opresult_wrapper(
-            self.get_user_managed_groups, user_key, data_key="groups"
-        )
-
-    def add_member_result(
-        self, group_key: str, member: dict | str, justification: str
-    ) -> OperationResult:
-        """
-        Wraps add_member in an OperationResult.
-
-        Args:
-            group_key: The group identifier.
-            member: Member dict or email string.
-            justification: Reason for adding the member.
-
-        Returns:
-            OperationResult containing the added member under 'member'.
-        """
-        return self._opresult_wrapper(
-            self.add_member, group_key, member, justification, data_key="member"
-        )
-
-    def remove_member_result(
-        self, group_key: str, member: dict | str, justification: str
-    ) -> OperationResult:
-        """
-        Wraps remove_member in an OperationResult.
-
-        Args:
-            group_key: The group identifier.
-            member: Member dict or email string.
-            justification: Reason for removing the member.
-
-        Returns:
-            OperationResult containing the removal result.
-        """
-        return self._opresult_wrapper(
-            self.remove_member, group_key, member, justification
-        )
-
-    def get_group_members_result(self, group_key: str, **kwargs) -> OperationResult:
-        """
-        Wraps get_group_members in an OperationResult.
-
-        Args:
-            group_key: The group identifier.
-            **kwargs: Additional filter arguments.
-
-        Returns:
-            OperationResult containing a list of members under 'members'.
-        """
-        return self._opresult_wrapper(
-            self.get_group_members, group_key, **kwargs, data_key="members"
-        )
-
-    def validate_permissions_result(
-        self, user_key: str, group_key: str, action: str
-    ) -> OperationResult:
-        """Validate permissions and wrap result in OperationResult."""
-        return self._opresult_wrapper(
-            self.validate_permissions, user_key, group_key, action
-        )
-
     # Required: capabilities property
     @property
     @abstractmethod
@@ -184,10 +121,9 @@ class GroupProvider(ABC):
         Providers should instantiate from `ProviderCapabilities.from_config(name)`
         or return a constant describing supported features.
         """
-        pass
 
     @abstractmethod
-    def get_user_managed_groups(self, user_key: str) -> list[dict]:
+    def get_user_managed_groups(self, user_key: str) -> OperationResult:
         """Return a list of canonical group dicts the user can manage (sync).
 
         Implementors must provide this synchronous method.
@@ -196,28 +132,43 @@ class GroupProvider(ABC):
 
     @abstractmethod
     def add_member(
-        self, group_key: str, member_key: dict | str, justification: str
-    ) -> dict:
+        self, group_key: str, member_data: dict | str, justification: str
+    ) -> OperationResult:
         """Add a member synchronously and return a canonical member dict.
 
-        Implementors must provide this synchronous method.
+        Args:
+            group_key: The group identifier (normalized string).
+            member_data: Member dict or string identifier (generic, normalized).
+            justification: Reason for adding the member.
+
+        Returns:
+            Canonical member dict.
         """
         raise NotImplementedError()
 
     @abstractmethod
     def remove_member(
-        self, group_key: str, member: dict | str, justification: str
-    ) -> dict:
-        """Remove a member synchronously and return canonical member dict."""
+        self, group_key: str, member_data: dict | str, justification: str
+    ) -> OperationResult:
+        """Remove a member synchronously and return canonical member dict.
+
+        Args:
+            group_key: The group identifier (normalized string).
+            member_data: Member dict or string identifier (generic, normalized).
+            justification: Reason for removing the member.
+
+        Returns:
+            Canonical member dict.
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def get_group_members(self, group_key: str, **kwargs) -> list[dict]:
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
         """Return list of canonical member dicts (sync)."""
         raise NotImplementedError()
 
     @abstractmethod
-    def validate_permissions(self, user_key: str, group_key: str, action: str) -> bool:
+    def validate_permissions(self, user_key: str, group_key: str, action: str) -> OperationResult:
         """Validate permissions synchronously."""
         raise NotImplementedError()
 
@@ -229,10 +180,10 @@ class GroupProvider(ABC):
         """Explicitly disabled - groups managed via IaC"""
         raise NotImplementedError("Group deletion disabled - managed via IaC")
 
-    def create_user(self, user_data: dict) -> dict:
+    def create_user(self, user_data: dict) -> OperationResult:
         """Create a user synchronously and return canonical user dict."""
         raise NotImplementedError("User creation not implemented in this provider.")
 
-    def delete_user(self, user_key: str) -> dict:
+    def delete_user(self, user_key: str) -> OperationResult:
         """Delete a user synchronously and return canonical user dict."""
         raise NotImplementedError("User deletion not implemented in this provider.")
