@@ -55,7 +55,12 @@ def test_register_class_and_instance_and_invalid(
         def delete_user(self, user_key: str) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def list_groups(self) -> OperationResult:
+        def list_groups(self, **kwargs) -> OperationResult:
+            return OperationResult(
+                status=OperationStatus.SUCCESS, message="ok", data={}
+            )
+
+        def list_groups_with_members(self, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
@@ -129,7 +134,10 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self):
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+        
+        def list_groups_with_members(self, **kwargs):
             raise NotImplementedError()
 
     # Mark provider as disabled in config
@@ -237,7 +245,10 @@ def test_get_active_providers_filter_and_all(safe_providers_import):
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self):
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+        
+        def list_groups_with_members(self, **kwargs):
             raise NotImplementedError()
 
     mod.PROVIDER_REGISTRY["p1"] = P()
@@ -315,7 +326,10 @@ def test_validate_startup_configuration_requires_role_info(
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self):
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
             raise NotImplementedError()
 
     # Register primary in the registry without provides_role_info
@@ -400,6 +414,9 @@ def test_validate_startup_configuration_behaviour(
             raise NotImplementedError()
 
         def list_groups(self):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
             raise NotImplementedError()
 
     mod.PROVIDER_REGISTRY["primary"] = P()
