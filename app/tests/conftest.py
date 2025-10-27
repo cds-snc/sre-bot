@@ -1,9 +1,223 @@
+import importlib
+import sys
+import types
+from importlib import util
+from pathlib import Path
+from types import ModuleType
+
+import core.config as core_config
 import pytest
 from tests.factory_helpers import (
     make_google_groups,
-    make_google_users,
     make_google_members,
+    make_google_users,
 )
+
+# Ensure the application package root is on sys.path so test collection can
+# import application modules (e.g. `core.config`). Pytest imports conftest
+# during collection which may run before the project's package root is on
+# sys.path depending on invocation. Add it explicitly.
+project_root = "/workspace/app"
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+
+@pytest.fixture
+def safe_providers_import(monkeypatch):
+    """Import `modules.groups.providers` safely for tests.
+
+    This fixture temporarily stubs `importlib.import_module` so that
+    submodule imports under `modules.groups.providers.*` are blocked
+    during the initial import. It also forces `core.config.settings.groups`
+    to be an empty mapping during import so module-level startup
+    validation is skipped. After the import the real import function is
+    restored.
+    """
+    original_import = importlib.import_module
+
+    def _stub_import(name, package=None):
+        if (
+            name.startswith("modules.groups.providers.")
+            and name != "modules.groups.providers"
+        ):
+            raise ImportError("submodule imports stubbed in tests")
+        return original_import(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", _stub_import)
+
+    # Ensure settings.groups.providers is an empty mapping during import
+    monkeypatch.setattr(
+        core_config.settings,
+        "groups",
+        types.SimpleNamespace(providers={}),
+        raising=False,
+    )
+
+    # Force a fresh import. Instead of using the normal import machinery
+    # which would execute `modules/__init__.py` (and by extension
+    # `modules.groups.__init__.py`, which now auto-initializes the
+    # groups module), load the providers package directly from its
+    # file. Create lightweight entries for `modules` and
+    # `modules.groups` in sys.modules so relative/absolute imports
+    # inside the providers package resolve without triggering the
+    # package initializers.
+    sys.modules.pop("modules.groups.providers", None)
+
+    project_root = Path(__file__).resolve().parents[1]
+    providers_init = project_root / "modules" / "groups" / "providers" / "__init__.py"
+
+    # Insert lightweight package modules to avoid executing real package __init__
+    if "modules" not in sys.modules:
+        pkg = ModuleType("modules")
+        pkg.__path__ = [str(project_root / "modules")]
+        sys.modules["modules"] = pkg
+
+    if "modules.groups" not in sys.modules:
+        grp_pkg = ModuleType("modules.groups")
+        grp_pkg.__path__ = [str(project_root / "modules" / "groups")]
+        sys.modules["modules.groups"] = grp_pkg
+
+    spec = util.spec_from_file_location("modules.groups.providers", str(providers_init))
+    mod = util.module_from_spec(spec)
+    # register before executing so imports inside the module can reference it
+    sys.modules["modules.groups.providers"] = mod
+    spec.loader.exec_module(mod)
+
+    # Defer provider registration: replace the real register_provider with
+    # a decorator that stores the decorated objects so tests can import
+    # provider submodules safely without causing instantiation/validation
+    # at import time. Tests can call `mod.register_deferred_providers()` to
+    # perform the real registration later (after setting up `settings`).
+    orig_register = getattr(mod, "register_provider")
+    mod._deferred_registry = {}
+
+    def _deferred_register(name: str):
+        def _decorator(obj):
+            # Attempt immediate registration (tests expect explicit
+            # calls to `register_provider` to register immediately).
+            # Keep a record in the deferred registry for debugging if
+            # needed.
+            mod._deferred_registry[name] = obj
+            try:
+                orig_register(name)(obj)
+            except Exception:
+                # If registration fails, keep the deferred entry and
+                # re-raise so tests see the original error.
+                raise
+            return obj
+
+        return _decorator
+
+    def _apply_deferred_registrations() -> None:
+        """Instantiate and register any previously-decorated providers.
+
+        This should be called by tests after they have configured
+        `core.config.settings.groups.providers` as needed.
+        """
+        # replay deferred registrations using the original register
+        for name, obj in list(mod._deferred_registry.items()):
+            # call the original register_provider to perform real
+            # instantiation/registration and remove from deferred map
+            try:
+                orig_register(name)(obj)
+            finally:
+                mod._deferred_registry.pop(name, None)
+
+    # replace the package-level decorator with the deferred variant
+    monkeypatch.setattr(mod, "register_provider", _deferred_register, raising=True)
+    # expose helper for tests
+    # create the attribute on the module if it doesn't exist
+    monkeypatch.setattr(
+        mod, "register_deferred_providers", _apply_deferred_registrations, raising=False
+    )
+
+    # restore importlib.import_module to avoid affecting other imports
+    monkeypatch.setattr(importlib, "import_module", original_import)
+
+    return mod
+
+
+@pytest.fixture
+def groups_providers(monkeypatch):
+    """Provide a test-controlled `settings.groups.providers` mapping.
+
+    Yields a small namespace with convenience helpers and a mutable
+    `providers` dict that tests can mutate. The original
+    `core.config.settings.groups` is restored after the test.
+    """
+    orig_has = hasattr(core_config.settings, "groups")
+    orig_groups = getattr(core_config.settings, "groups", None)
+
+    providers = {}
+
+    # Ensure settings.groups exists and exposes the providers mapping
+    monkeypatch.setattr(
+        core_config.settings,
+        "groups",
+        types.SimpleNamespace(providers=providers),
+        raising=False,
+    )
+
+    def set_providers(d: dict):
+        # Replace the providers mapping with the provided dict
+        monkeypatch.setattr(core_config.settings.groups, "providers", d, raising=False)
+
+    def clear_providers():
+        providers.clear()
+
+    def remove_groups():
+        # Remove the groups attribute to simulate missing config
+        try:
+            monkeypatch.delattr(core_config.settings, "groups", raising=False)
+        except Exception:
+            # best-effort removal
+            try:
+                delattr(core_config.settings, "groups")
+            except Exception:
+                pass
+
+    helper = types.SimpleNamespace(
+        providers=providers,
+        set_providers=set_providers,
+        clear_providers=clear_providers,
+        remove_groups=remove_groups,
+    )
+
+    try:
+        yield helper
+    finally:
+        # Restore original groups attribute
+        if orig_has:
+            monkeypatch.setattr(
+                core_config.settings, "groups", orig_groups, raising=False
+            )
+        else:
+            try:
+                monkeypatch.delattr(core_config.settings, "groups", raising=False)
+            except Exception:
+                try:
+                    delattr(core_config.settings, "groups")
+                except Exception:
+                    pass
+
+
+@pytest.fixture
+def set_provider_capability(groups_providers):
+    """Return a helper to set the `provides_role_info` capability for a
+    provider in `settings.groups.providers` using the `groups_providers`
+    test helper.
+    """
+
+    def _setter(provider_name: str, provides_role: bool):
+        gp = groups_providers
+        gp.providers.setdefault(provider_name, {})
+        gp.providers[provider_name].setdefault("capabilities", {})
+        gp.providers[provider_name]["capabilities"][
+            "provides_role_info"
+        ] = provides_role
+
+    return _setter
+
 
 # Google API Python Client
 
