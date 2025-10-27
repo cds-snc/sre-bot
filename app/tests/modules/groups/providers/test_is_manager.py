@@ -111,21 +111,20 @@ def test_aws_is_manager_toggles(
         _list_group_memberships_for_member,
     )
 
-    # Case A: provides_role_info = True -> direct check returns role
+    # Case A: AWS provider does not support is_manager; expect NOT_IMPLEMENTED
     set_provider_capability("aws", True)
     res = prov.is_manager("u-1", "g-1")
-    assert res.status == OperationStatus.SUCCESS
-    assert res.data is not None
-    assert res.data.get("allowed") is True
-    assert res.data.get("role") == "MANAGER"
+    # AWS provider should signal not implemented / not supported
+    assert res.status == OperationStatus.PERMANENT_ERROR
+    assert res.message is not None
+    assert "not supported" in (res.message or "").lower()
 
     # Case B: provides_role_info = False -> fallback to base implementation
     # For AWS fallback, base will call get_user_managed_groups which is not
-    # implemented; so ensure it returns PERMANENT_ERROR NOT_IMPLEMENTED
+    # implemented; AWS should still indicate not implemented for is_manager
     set_provider_capability("aws", False)
     res2 = prov.is_manager("u-1", "g-1")
-    # When fallback cannot be satisfied, base returns PERMANENT_ERROR
-    assert res2.status in (OperationStatus.PERMANENT_ERROR, OperationStatus.SUCCESS)
+    assert res2.status == OperationStatus.PERMANENT_ERROR
 
     # Negative case: when the membership listing does not include the group,
     # the provider should report allowed=False
@@ -139,6 +138,7 @@ def test_aws_is_manager_toggles(
     )
     set_provider_capability("aws", True)
     res3 = prov.is_manager("u-1", "g-1")
-    assert res3.status == OperationStatus.SUCCESS
-    assert res3.data is not None
-    assert res3.data.get("allowed") is False
+    # AWS provider should still mark is_manager as not supported
+    assert res3.status == OperationStatus.PERMANENT_ERROR
+    assert res3.message is not None
+    assert "not supported" in (res3.message or "").lower()
