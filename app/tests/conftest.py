@@ -5,21 +5,27 @@ from importlib import util
 from pathlib import Path
 from types import ModuleType
 
+# Ensure the application package root is on sys.path so importing application
+# modules (e.g. `core.config`) works during pytest collection. Pytest may
+# import `conftest` before the project root is on sys.path depending on
+# invocation; add it explicitly here before importing application modules.
+project_root = "/workspace/app"
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import core.config as core_config
 import pytest
-from tests.factory_helpers import (
+from tests.factories.google import (
     make_google_groups,
     make_google_members,
     make_google_users,
 )
-
-# Ensure the application package root is on sys.path so test collection can
-# import application modules (e.g. `core.config`). Pytest imports conftest
-# during collection which may run before the project's package root is on
-# sys.path depending on invocation. Add it explicitly.
-project_root = "/workspace/app"
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+from tests.factories.aws import (
+    make_aws_users,
+    make_aws_groups,
+    make_aws_groups_memberships,
+    make_aws_groups_w_users,
+)
 
 
 @pytest.fixture
@@ -436,71 +442,34 @@ def google_batch_response_factory():
 
 @pytest.fixture
 def aws_users():
-    def _aws_users(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
-        users = []
-        for i in range(n):
-            user = {
-                "UserName": f"{prefix}user-email{i+1}@{domain}",
-                "UserId": f"{prefix}user_id{i+1}",
-                "Name": {
-                    "FamilyName": f"Family_name_{i+1}",
-                    "GivenName": f"Given_name_{i+1}",
-                },
-                "DisplayName": f"Given_name_{i+1} Family_name_{i+1}",
-                "Emails": [
-                    {
-                        "Value": f"{prefix}user-email{i+1}@{domain}",
-                        "Type": "work",
-                        "Primary": True,
-                    }
-                ],
-                "IdentityStoreId": f"{store_id}",
-            }
-            users.append(user)
-        return users
+    # Delegate to factory implementation
+    def _wrapper(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
+        return make_aws_users(n=n, prefix=prefix, domain=domain, store_id=store_id)
 
-    return _aws_users
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups():
-    def _aws_groups(n=3, prefix="", store_id="d-123412341234"):
-        return [
-            {
-                "GroupId": f"{prefix}aws-group_id{i+1}",
-                "DisplayName": f"{prefix}group-name{i+1}",
-                "Description": f"A group to test resolving AWS-group{i+1} memberships",
-                "IdentityStoreId": f"{store_id}",
-            }
-            for i in range(n)
-        ]
+    def _wrapper(n=3, prefix="", store_id="d-123412341234"):
+        return make_aws_groups(n=n, prefix=prefix, store_id=store_id)
 
-    return _aws_groups
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups_memberships():
-    def _aws_groups_memberships(n=3, prefix="", group_id=1, store_id="d-123412341234"):
-        return {
-            "GroupMemberships": [
-                {
-                    "IdentityStoreId": f"{store_id}",
-                    "MembershipId": f"{prefix}membership_id_{i+1}",
-                    "GroupId": f"{prefix}aws-group_id{group_id}",
-                    "MemberId": {
-                        "UserId": f"{prefix}user_id{i+1}",
-                    },
-                }
-                for i in range(n)
-            ]
-        }
+    def _wrapper(n=3, prefix="", group_id=1, store_id="d-123412341234"):
+        return make_aws_groups_memberships(
+            n=n, prefix=prefix, group_id=group_id, store_id=store_id
+        )
 
-    return _aws_groups_memberships
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
-    def _aws_groups_w_users(
+    def _wrapper(
         n_groups=1,
         n_users=3,
         group_prefix="",
@@ -508,16 +477,13 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
         domain="test.com",
         store_id="d-123412341234",
     ):
-        groups = aws_groups(n_groups, group_prefix, store_id)
-        users = aws_users(n_users, user_prefix, domain, store_id)
-        for i, group in enumerate(groups):
-            memberships = aws_groups_memberships(
-                n_users, group_prefix, i + 1, store_id
-            )["GroupMemberships"]
-            group["GroupMemberships"] = [
-                {**membership, "MemberId": user}
-                for user, membership in zip(users, memberships)
-            ]
-        return groups
+        return make_aws_groups_w_users(
+            n_groups=n_groups,
+            n_users=n_users,
+            group_prefix=group_prefix,
+            user_prefix=user_prefix,
+            domain=domain,
+            store_id=store_id,
+        )
 
-    return _aws_groups_w_users
+    return _wrapper
