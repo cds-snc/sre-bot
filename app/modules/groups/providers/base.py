@@ -178,11 +178,21 @@ class GroupProvider(ABC):
     def list_groups(self, **kwargs) -> OperationResult:
         """Return list of canonical group dicts from the provider."""
 
-    def create_group(self, *args, **kwargs):
-        raise NotImplementedError("Group creation disabled - managed via IaC")
+    @abstractmethod
+    def list_groups_with_members(self, **kwargs) -> OperationResult:
+        """Return list of canonical group dicts with members from the provider."""
 
-    def delete_group(self, *args, **kwargs):
-        raise NotImplementedError("Group deletion disabled - managed via IaC")
+    def create_group(self, *args, **kwargs) -> OperationResult:
+        """Group creation is disabled; managed via IaC."""
+        return OperationResult.permanent_error(
+            "Group creation disabled - managed via IaC", error_code="NOT_IMPLEMENTED"
+        )
+
+    def delete_group(self, *args, **kwargs) -> OperationResult:
+        """Group deletion is disabled; managed via IaC."""
+        return OperationResult.permanent_error(
+            "Group deletion disabled - managed via IaC", error_code="NOT_IMPLEMENTED"
+        )
 
     def create_user(self, user_data: NormalizedMember) -> OperationResult:
         raise NotImplementedError("User creation not implemented in this provider.")
