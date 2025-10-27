@@ -19,8 +19,6 @@ from modules.groups.providers.base import (
     GroupProvider,
     ProviderCapabilities,
     opresult_wrapper,
-    OperationResult,
-    provider_provides_role_info,
 )
 
 
