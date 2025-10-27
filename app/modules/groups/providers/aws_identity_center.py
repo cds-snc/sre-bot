@@ -18,35 +18,34 @@ from modules.groups.schemas import (
 from modules.groups.providers.base import (
     GroupProvider,
     ProviderCapabilities,
+    opresult_wrapper,
+    OperationResult,
+    provider_provides_role_info,
 )
 
 
+@register_provider("aws")
 class AwsIdentityCenterProvider(GroupProvider):
-    """AWS Identity Center provider implementing the GroupProvider contract."""
+    """AWS Identity Center provider implementing the GroupProvider contract.
 
-    def get_user_managed_groups(self, user_key: str) -> list[dict]:
-        return self.get_user_managed_groups_sync(user_key)
+    Third party provider: AWS Identity Center (successor to AWS SSO)
 
-    def add_member(
-        self, group_key: str, member: dict | str, justification: str
-    ) -> dict:
-        member_dict = {"email": member} if isinstance(member, str) else member
-        return self.add_member_sync(group_key, member_dict, justification)
+    Supports:
+    - User creation
+    - User deletion
+    - Membership creation
+    - Membership deletion
+    - Fetching groups
 
-    def remove_member(
-        self, group_key: str, member: dict | str, justification: str
-    ) -> dict:
-        member_dict = {"email": member} if isinstance(member, str) else member
-        return self.remove_member_sync(group_key, member_dict, justification)
-
-    def get_group_members(self, group_key: str, **kwargs) -> list[dict]:
-        return self.get_group_members_sync(group_key, **kwargs)
-
-    def validate_permissions(self, user_key: str, group_key: str, action: str) -> bool:
-        return self.validate_permissions_sync(user_key, group_key, action)
+    IMPORTANT: This provider is responsible for converting all AWS-specific
+    schemas (AwsUser, AwsGroup) to canonical NormalizedMember and NormalizedGroup
+    dataclasses. The provider owns all validation and conversion logic for its
+    provider-specific data.
+    """
 
     @property
     def capabilities(self) -> ProviderCapabilities:
+        """Return provider capabilities."""
         return ProviderCapabilities(supports_member_management=True)
 
     # ------------------------------------------------------------------
@@ -124,11 +123,25 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError("aws get_user failed", response=resp)
         return resp.data or {}
 
-    def _map_aws_member_to_normalized(self, member: dict) -> dict:
+    def _normalize_member_from_aws(self, member_data: dict) -> NormalizedMember:
+        """Convert an AWS member response to a NormalizedMember.
+
+        This is AWS's responsibility: take its schema and produce the canonical
+        normalized member contract.
+
+        Args:
+            member_data: A dict response from AWS Identity Store API.
+
+        Returns:
+            A NormalizedMember instance.
+
+        Raises:
+            IntegrationError: If the member data is invalid for AWS's schema.
+        """
         try:
-            u = AwsUser.model_validate(member)
+            u = AwsUser.model_validate(member_data)
         except Exception as exc:
-            raise IntegrationError("aws member validation failed") from exc
+            raise IntegrationError("aws member_data validation failed") from exc
 
         email = None
         emails = getattr(u, "Emails", None)
@@ -139,7 +152,7 @@ class AwsIdentityCenterProvider(GroupProvider):
                 if hasattr(first, "Value")
                 else first.get("Value") if isinstance(first, dict) else None
             )
-        email = email or getattr(u, "UserName", None) or member.get("email")
+        email = email or getattr(u, "UserName", None) or member_data.get("email")
 
         member_id = getattr(u, "UserId", None)
 
@@ -150,20 +163,34 @@ class AwsIdentityCenterProvider(GroupProvider):
             first_name = getattr(name, "GivenName", None)
             family_name = getattr(name, "FamilyName", None)
 
-        nm = NormalizedMember(
+        return NormalizedMember(
             email=email,
             id=member_id,
             role=None,
             provider_member_id=member_id,
             first_name=first_name,
             family_name=family_name,
-            raw=member,
+            raw=member_data,
         )
-        return as_canonical_dict(nm)
 
-    def _map_aws_group_to_normalized(
+    def _normalize_group_from_aws(
         self, group: dict, members: List[Dict] | None = None
-    ) -> dict:
+    ) -> NormalizedGroup:
+        """Convert an AWS group response to a NormalizedGroup.
+
+        This is AWS's responsibility: take its schema and produce the canonical
+        normalized group contract with normalized members.
+
+        Args:
+            group: A dict response from AWS Identity Store API.
+            members: Optional pre-fetched member list to include in the group.
+
+        Returns:
+            A NormalizedGroup instance.
+
+        Raises:
+            IntegrationError: If the group data is invalid for AWS's schema.
+        """
         try:
             g = AwsGroup.model_validate(group)
         except Exception as exc:
@@ -181,13 +208,9 @@ class AwsIdentityCenterProvider(GroupProvider):
         if isinstance(raw_members, list):
             for m in raw_members:
                 if isinstance(m, dict):
-                    # Enforce strict member normalization: let validation errors
-                    # propagate instead of silently skipping malformed members.
-                    normalized_members.append(
-                        NormalizedMember(**self._map_aws_member_to_normalized(m))
-                    )
+                    normalized_members.append(self._normalize_member_from_aws(m))
 
-        ng = NormalizedGroup(
+        return NormalizedGroup(
             id=gid,
             name=name,
             description=description,
@@ -195,74 +218,56 @@ class AwsIdentityCenterProvider(GroupProvider):
             members=normalized_members,
             raw=group,
         )
-        return as_canonical_dict(ng)
 
-    def _add_user(self, user_key: str, first_name: str, family_name: str):
-        if not hasattr(identity_store, "create_user"):
-            raise IntegrationError(
-                "aws identity_store missing create_user", response=None
-            )
-        resp = identity_store.create_user(
-            user_key, first_name=first_name, family_name=family_name
+    def _resolve_member_identifier(self, member_data: dict | str) -> str:
+        """Convert member_data input to an AWS-compatible identifier.
+
+        This provider method handles the flexibility of accepting str or dict,
+        but validates and converts to what AWS expects.
+
+        Args:
+            member_data: Either a string email or a dict with email/id keys.
+
+        Returns:
+            An AWS member identifier (email string).
+
+        Raises:
+            ValueError: If the input cannot be resolved to a member identifier.
+        """
+        if isinstance(member_data, str):
+            if not member_data.strip():
+                raise ValueError("Member identifier string cannot be empty")
+            return member_data.strip()
+
+        if isinstance(member_data, dict):
+            email = member_data.get("email")
+            if not email:
+                raise ValueError("Member dict must contain 'email' field")
+            return email
+
+        raise TypeError(
+            f"member_data must be str or dict; got {type(member_data).__name__}"
         )
-        if not hasattr(resp, "success"):
-            raise IntegrationError(
-                "aws create_user returned unexpected type", response=resp
-            )
-        if not resp.success:
-            raise IntegrationError("aws create_user failed", response=resp)
-        return self._map_aws_member_to_normalized(resp.data)
 
-    def _get_user_managed_groups(self, member: Dict | str) -> List[Dict]:
-        if isinstance(member, str):
-            email = member
-        elif isinstance(member, dict):
-            email = member.get("email")
-        else:
-            email = None
+    @opresult_wrapper(data_key="result")
+    def add_member(
+        self, group_key: str, member_data: dict | str, justification: str
+    ) -> dict:
+        """Add a member to a group and return the normalized member dict.
 
+        Args:
+            group_key: AWS group key.
+            member_data: Member identifier (str email) or dict with email.
+            justification: Reason for adding (for audit logs).
+
+        Returns:
+            A canonical member dict (normalized NormalizedMember).
+        """
+        if not isinstance(member_data, dict):
+            raise ValueError("member_data must be a dict containing at least 'email'")
+        email = member_data.get("email")
         if not email:
-            raise ValueError("member.email is required")
-        # Resolve the user's id and use the memberships listing path.
-        # Backward-compat branch that accepted a direct get_groups_for_user
-        # call is removed: integrations must support member id resolution
-        # and return IntegrationResponse-like objects.
-        user_id = self._ensure_user_id_from_email(email)
-        if not hasattr(identity_store, "list_group_memberships_for_member"):
-            raise IntegrationError(
-                "aws identity_store missing list_group_memberships_for_member",
-                response=None,
-            )
-        resp = identity_store.list_group_memberships_for_member(user_id, role="MANAGER")
-        if not hasattr(resp, "success"):
-            raise IntegrationError(
-                "aws list_group_memberships_for_member returned unexpected type",
-                response=resp,
-            )
-        if not resp.success:
-            raise IntegrationError(
-                "aws list_group_memberships_for_member failed", response=resp
-            )
-        raw = resp.data or []
-
-        groups = []
-        for m in raw:
-            if not isinstance(m, dict):
-                continue
-            group_payload = m.get("Group") or m.get("group")
-            # Only accept a full Group payload (dict). If the membership entry
-            # lacks a group object (e.g., only contains an id), skip it — the
-            # integration should provide sufficient payloads in the IntegrationResponse.
-            if isinstance(group_payload, dict):
-                groups.append(self._map_aws_group_to_normalized(group_payload))
-        return groups
-
-    def _add_member(self, group_key: str, member: Dict, justification: str) -> Dict:
-        if not isinstance(member, dict):
-            raise ValueError("member must be a dict containing at least 'email'")
-        email = member.get("email")
-        if not email:
-            raise ValueError("member.email is required")
+            raise ValueError("member_data.email is required")
 
         user_id = self._ensure_user_id_from_email(email)
         if not hasattr(identity_store, "create_group_membership"):
@@ -283,14 +288,27 @@ class AwsIdentityCenterProvider(GroupProvider):
         member_payload = {"email": email, "id": user_id}
         if user_data:
             member_payload.update({"Name": user_data.get("Name") or {}})
-        return self._map_aws_member_to_normalized(member_payload)
+        return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
-    def _remove_member(self, group_key: str, member: Dict, justification: str) -> Dict:
-        if not isinstance(member, dict):
-            raise ValueError("member must be a dict containing at least 'email'")
-        email = member.get("email")
+    @opresult_wrapper(data_key="result")
+    def remove_member(
+        self, group_key: str, member_data: dict | str, justification: str
+    ) -> dict:
+        """Remove a member from a group and return the normalized member dict.
+
+        Args:
+            group_key: AWS group key.
+            member_data: Member identifier (str email) or dict with email.
+            justification: Reason for removal (for audit logs).
+
+        Returns:
+            A canonical member dict (normalized NormalizedMember).
+        """
+        if not isinstance(member_data, dict):
+            raise ValueError("member_data must be a dict containing at least 'email'")
+        email = member_data.get("email")
         if not email:
-            raise ValueError("member.email is required")
+            raise ValueError("member_data.email is required")
         user_id = self._ensure_user_id_from_email(email)
         membership_id = self._resolve_membership_id(group_key, user_id)
         if not hasattr(identity_store, "delete_group_membership"):
@@ -311,9 +329,11 @@ class AwsIdentityCenterProvider(GroupProvider):
         member_payload = {"email": email, "id": user_id}
         if user_data:
             member_payload.update({"Name": user_data.get("Name") or {}})
-        return self._map_aws_member_to_normalized(member_payload)
+        return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
-    def _get_group_members(self, group_key: str) -> List[Dict]:
+    @opresult_wrapper(data_key="members")
+    def get_group_members(self, group_key: str, **kwargs) -> list[dict]:
+        """AWS returns the list of canonical memberships, not the user details."""
         if not hasattr(identity_store, "list_group_memberships"):
             raise IntegrationError(
                 "aws identity_store missing list_group_memberships", response=None
@@ -332,6 +352,8 @@ class AwsIdentityCenterProvider(GroupProvider):
             if not isinstance(m, dict):
                 continue
             member_id = None
+            # TODO: FIX the AWS SDK does not return the UserId, a subsequent
+            # call to get_user_details will need to handle this case.
             if "MemberId" in m and isinstance(m["MemberId"], dict):
                 member_id = m["MemberId"].get("UserId")
             user_data = None
@@ -349,46 +371,53 @@ class AwsIdentityCenterProvider(GroupProvider):
                     else member_payload.get("email")
                 )
                 member_payload["id"] = member_payload.get("UserId") or member_id
-                members.append(self._map_aws_member_to_normalized(member_payload))
+                members.append(
+                    as_canonical_dict(self._normalize_member_from_aws(member_payload))
+                )
                 continue
             member_payload["id"] = member_id
             member_payload["email"] = None
-            members.append(self._map_aws_member_to_normalized(member_payload))
+            members.append(
+                as_canonical_dict(self._normalize_member_from_aws(member_payload))
+            )
         return members
 
-    def _validate_permissions(self, user_key: str, group_key: str, action: str) -> bool:
-        user_groups = self._get_user_managed_groups(user_key)
-        return any(group.get("id") == group_key for group in user_groups)
+    @opresult_wrapper(data_key="groups")
+    def list_groups(self, **kwargs) -> list[dict]:
+        if not hasattr(identity_store, "list_groups"):
+            raise IntegrationError(
+                "aws identity_store missing list_groups", response=None
+            )
+        resp = identity_store.list_groups(**kwargs)
+        if not hasattr(resp, "success"):
+            raise IntegrationError(
+                "aws list_groups returned unexpected type", response=resp
+            )
+        if not resp.success:
+            raise IntegrationError("aws list_groups failed", response=resp)
+        raw = resp.data or []
 
-    # Module-level sync helpers (kept below) are the canonical sync
-    # implementations. Providers implement the sync_* methods below and
-    # delegate to those helpers. We intentionally avoid duplicating
-    # non-suffixed instance methods to reduce confusion.
+        groups = []
+        for g in raw:
+            if isinstance(g, dict):
+                # Normalize using the provider normalizer
+                groups.append(as_canonical_dict(self._normalize_group_from_aws(g)))
+        return groups
 
-    # ------------------------------------------------------------------
-    # Sync implementations required by the sync-first GroupProvider base
-    # class. These delegate to the existing module-level sync helpers so
-    # providers remain sync-capable.
-    # ------------------------------------------------------------------
-    def get_user_managed_groups_sync(self, user_key: str) -> List[Dict]:
-        return self._get_user_managed_groups(user_key)
+    @opresult_wrapper(data_key="groups")
+    def list_groups_with_members(self, **kwargs):
+        resp = identity_store.list_groups_with_memberships(**kwargs)
+        if not hasattr(resp, "success"):
+            raise IntegrationError(
+                "aws list_groups_with_members returned unexpected type", response=resp
+            )
+        if not resp.success:
+            raise IntegrationError("aws list_groups_with_members failed", response=resp)
+        raw = resp.data or []
 
-    def add_member_sync(self, group_key: str, member: Dict, justification: str) -> Dict:
-        return self._add_member(group_key, member, justification)
-
-    def remove_member_sync(
-        self, group_key: str, member: Dict, justification: str
-    ) -> Dict:
-        return self._remove_member(group_key, member, justification)
-
-    def get_group_members_sync(self, group_key: str, **kwargs) -> List[Dict]:
-        return self._get_group_members(group_key)
-
-    def validate_permissions_sync(
-        self, user_key: str, group_key: str, action: str
-    ) -> bool:
-        return self._validate_permissions(user_key, group_key, action)
-
-
-# Register an instance of the provider
-register_provider("aws")(AwsIdentityCenterProvider())
+        groups = []
+        for g in raw:
+            if isinstance(g, dict):
+                # Normalize using the provider normalizer
+                groups.append(as_canonical_dict(self._normalize_group_from_aws(g)))
+        return groups
