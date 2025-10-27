@@ -304,6 +304,20 @@ class GroupsFeatureSettings(BaseSettings):
         extra="ignore",
     )
 
+    def __init__(self, **kwargs):
+        """Allow programmatic construction using the `providers` keyword.
+
+        The field uses the alias `GROUP_PROVIDERS` for environment loading.
+        When callers pass `providers=` directly (common in unit tests), map
+        that to the alias so the normal BaseSettings initialization and
+        validators (including the primary-provider check) run as expected.
+        """
+        if "providers" in kwargs and "GROUP_PROVIDERS" not in kwargs:
+            # Move the programmatic `providers` into the alias key so
+            # Pydantic/Settings machinery and field validators run.
+            kwargs["GROUP_PROVIDERS"] = kwargs.pop("providers")
+        super().__init__(**kwargs)
+
 
 class ServerSettings(BaseSettings):
     """Server configuration settings."""
