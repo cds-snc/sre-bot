@@ -74,6 +74,7 @@ class Group(BaseModel):
     model_config = {"extra": "ignore"}
 
     @field_validator("directMembersCount", mode="before")
+    @classmethod
     def _coerce_direct_members_count(cls, v):
         if v is None:
             return None
