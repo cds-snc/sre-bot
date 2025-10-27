@@ -127,3 +127,24 @@ try:
 except Exception as exc:
     logger.error("provider_startup_validation_failed", error=str(exc))
     raise
+
+
+def load_providers() -> None:
+    """Discover and import provider modules under this package.
+
+    This will import every top-level module in the `modules.groups.providers`
+    package (skipping private modules). Import errors are logged and do not
+    halt startup so a single faulty provider doesn't block all providers.
+    """
+    import importlib
+    import pkgutil
+
+    for finder, modname, ispkg in pkgutil.iter_modules(__path__):
+        # skip private modules
+        if modname.startswith("_"):
+            continue
+        full_name = f"{__name__}.{modname}"
+        try:
+            importlib.import_module(full_name)
+        except Exception as e:
+            logger.warning("provider_import_failed", module=full_name, error=str(e))
