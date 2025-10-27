@@ -1,3 +1,5 @@
+"""Provider contracts and capability logic for group providers."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -5,6 +7,7 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from core.config import settings
+from modules.groups.schemas import NormalizedMember
 
 
 class OperationStatus(Enum):
@@ -32,6 +35,47 @@ class OperationResult:
     error_code: Optional[str] = None
     retry_after: Optional[int] = None  # Seconds for rate limiting
 
+    @classmethod
+    def success(
+        cls, data: Optional[Dict[str, Any]] = None, message: str = "ok"
+    ) -> "OperationResult":
+        """Create a SUCCESS OperationResult with optional data."""
+        return cls(status=OperationStatus.SUCCESS, message=message, data=data)
+
+    @classmethod
+    def error(
+        cls,
+        status: OperationStatus,
+        message: str,
+        error_code: Optional[str] = None,
+        retry_after: Optional[int] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> "OperationResult":
+        """Create an error OperationResult with optional metadata."""
+        return cls(
+            status=status,
+            message=message,
+            data=data,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+
+    @classmethod
+    def transient_error(
+        cls, message: str, error_code: Optional[str] = None
+    ) -> "OperationResult":
+        return cls.error(
+            OperationStatus.TRANSIENT_ERROR, message, error_code=error_code
+        )
+
+    @classmethod
+    def permanent_error(
+        cls, message: str, error_code: Optional[str] = None
+    ) -> "OperationResult":
+        return cls.error(
+            OperationStatus.PERMANENT_ERROR, message, error_code=error_code
+        )
+
 
 @dataclass
 class ProviderCapabilities:
@@ -40,7 +84,6 @@ class ProviderCapabilities:
     supports_group_creation: bool = False  # Should always be False
     supports_group_deletion: bool = False  # Should always be False
     supports_member_management: bool = True
-    # Whether the provider exposes role information (e.g., Google can indicate MANAGER)
     provides_role_info: bool = False
     supports_batch_operations: bool = False
     max_batch_size: int = 1
@@ -55,32 +98,35 @@ class ProviderCapabilities:
             if isinstance(cfg.providers, dict)
             else {}
         )
-        return cls(
-            supports_user_creation=provider_cfg.get("capabilities", {}).get(
-                "supports_user_creation", False
-            ),
-            supports_user_deletion=provider_cfg.get("capabilities", {}).get(
-                "supports_user_deletion", False
-            ),
-            supports_group_creation=provider_cfg.get("capabilities", {}).get(
-                "supports_group_creation", False
-            ),
-            supports_group_deletion=provider_cfg.get("capabilities", {}).get(
-                "supports_group_deletion", False
-            ),
-            supports_member_management=provider_cfg.get("capabilities", {}).get(
-                "supports_member_management", True
-            ),
-            provides_role_info=provider_cfg.get("capabilities", {}).get(
-                "provides_role_info", False
-            ),
-            supports_batch_operations=provider_cfg.get("capabilities", {}).get(
-                "supports_batch_operations", False
-            ),
-            max_batch_size=provider_cfg.get("capabilities", {}).get(
-                "max_batch_size", 1
-            ),
+        caps = (
+            provider_cfg.get("capabilities", {})
+            if isinstance(provider_cfg, dict)
+            else {}
         )
+        return cls(
+            supports_user_creation=caps.get("supports_user_creation", False),
+            supports_user_deletion=caps.get("supports_user_deletion", False),
+            supports_group_creation=caps.get("supports_group_creation", False),
+            supports_group_deletion=caps.get("supports_group_deletion", False),
+            supports_member_management=caps.get("supports_member_management", True),
+            provides_role_info=caps.get("provides_role_info", False),
+            supports_batch_operations=caps.get("supports_batch_operations", False),
+            max_batch_size=caps.get("max_batch_size", 1),
+        )
+
+
+def provider_supports(provider_name: str, capability: str) -> bool:
+    """Return whether the named provider advertises a given capability."""
+    try:
+        caps = ProviderCapabilities.from_config(provider_name)
+        return bool(getattr(caps, capability, False))
+    except Exception:
+        return False
+
+
+def provider_provides_role_info(provider_name: str) -> bool:
+    """Convenience wrapper for the common 'provides_role_info' check."""
+    return provider_supports(provider_name, "provides_role_info")
 
 
 def opresult_wrapper(data_key=None):
@@ -105,85 +151,99 @@ def opresult_wrapper(data_key=None):
 
 
 class GroupProvider(ABC):
-    """Abstract Base Class for group providers.
+    """Abstract Base Class for group providers."""
 
-    Providers are required to implement synchronous (sync) methods.
-    All operations should be stateless and thread-safe.
-    Implementations MUST remain stateless (no per-request mutable attributes).
-    """
-
-    # Required: capabilities property
     @property
     @abstractmethod
     def capabilities(self) -> ProviderCapabilities:
-        """Provider capability descriptor (read-only).
-
-        Providers should instantiate from `ProviderCapabilities.from_config(name)`
-        or return a constant describing supported features.
-        """
-
-    @abstractmethod
-    def get_user_managed_groups(self, user_key: str) -> OperationResult:
-        """Return a list of canonical group dicts the user can manage (sync).
-
-        Implementors must provide this synchronous method.
-        """
-        raise NotImplementedError()
+        """Provider capability descriptor."""
 
     @abstractmethod
     def add_member(
-        self, group_key: str, member_data: dict | str, justification: str
+        self, group_key: str, member_data: NormalizedMember, justification: str
     ) -> OperationResult:
-        """Add a member synchronously and return a canonical member dict.
-
-        Args:
-            group_key: The group identifier (normalized string).
-            member_data: Member dict or string identifier (generic, normalized).
-            justification: Reason for adding the member.
-
-        Returns:
-            Canonical member dict.
-        """
-        raise NotImplementedError()
+        """Add a member synchronously and return a canonical member dict."""
 
     @abstractmethod
     def remove_member(
-        self, group_key: str, member_data: dict | str, justification: str
+        self, group_key: str, member_data: NormalizedMember, justification: str
     ) -> OperationResult:
-        """Remove a member synchronously and return canonical member dict.
-
-        Args:
-            group_key: The group identifier (normalized string).
-            member_data: Member dict or string identifier (generic, normalized).
-            justification: Reason for removing the member.
-
-        Returns:
-            Canonical member dict.
-        """
-        raise NotImplementedError()
+        """Remove a member synchronously and return canonical member dict."""
 
     @abstractmethod
     def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
-        """Return list of canonical member dicts (sync)."""
-        raise NotImplementedError()
+        """Return list of canonical member dicts."""
 
     @abstractmethod
-    def validate_permissions(self, user_key: str, group_key: str, action: str) -> OperationResult:
-        """Validate permissions synchronously."""
-        raise NotImplementedError()
+    def list_groups(self, **kwargs) -> OperationResult:
+        """Return list of canonical group dicts from the provider."""
 
     def create_group(self, *args, **kwargs):
-        """Explicitly disabled - groups managed via IaC"""
         raise NotImplementedError("Group creation disabled - managed via IaC")
 
     def delete_group(self, *args, **kwargs):
-        """Explicitly disabled - groups managed via IaC"""
         raise NotImplementedError("Group deletion disabled - managed via IaC")
 
-    def create_user(self, user_data: dict) -> OperationResult:
-        """Create a user synchronously and return canonical user dict."""
+    def create_user(self, user_data: NormalizedMember) -> OperationResult:
         raise NotImplementedError("User creation not implemented in this provider.")
 
     def delete_user(self, user_key: str) -> OperationResult:
-        """Delete a user synchronously and return canonical user dict."""
         raise NotImplementedError("User deletion not implemented in this provider.")
+
+    def validate_permissions(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        raise NotImplementedError()
+
+    def get_user_managed_groups(self, user_key: str) -> OperationResult:
+        raise NotImplementedError()
+
+    def is_manager(self, user_key: str, group_key: str) -> OperationResult:
+        try:
+            try:
+                perm = self.validate_permissions(user_key, group_key, "manage")
+                if isinstance(perm, OperationResult):
+                    data = perm.data or {}
+                    if "allowed" in data or "role" in data:
+                        return OperationResult.success(
+                            data={k: data[k] for k in ("allowed", "role") if k in data}
+                        )
+            except NotImplementedError:
+                pass
+
+            try:
+                groups = self.get_user_managed_groups(user_key)
+                if isinstance(groups, OperationResult):
+                    data = groups.data or {}
+                    for g in data.get("groups", []) or []:
+                        if g.get("id") == group_key:
+                            return OperationResult.success(
+                                data={"role": g.get("role"), "allowed": True}
+                            )
+                    return OperationResult.success(data={"allowed": False})
+            except NotImplementedError:
+                pass
+
+            return OperationResult.permanent_error(
+                "is_manager not supported", error_code="NOT_IMPLEMENTED"
+            )
+        except Exception as e:
+            return OperationResult.transient_error(str(e))
+
+
+class PrimaryGroupProvider(GroupProvider):
+    """Abstract subclass for primary/canonical providers."""
+
+    @abstractmethod
+    def validate_permissions(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        """Validate permissions for a user on a group."""
+
+    @abstractmethod
+    def get_user_managed_groups(self, user_key: str) -> OperationResult:
+        """Return a list of canonical group dicts the user can manage."""
+
+    @abstractmethod
+    def is_manager(self, user_key: str, group_key: str) -> OperationResult:
+        """Direct role-check for whether the user is manager for the group."""
