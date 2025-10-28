@@ -19,7 +19,7 @@ def test_map_google_member_to_normalized_basic(safe_providers_import):
         "name": {"givenName": "Alice", "familyName": "Smith"},
     }
 
-    res = p._normalize_member_from_google(raw_member)
+    res = p._normalize_member_from_google(raw_member, include_raw=True)
     assert isinstance(
         res, type(p._normalize_member_from_google({}))
     )  # NormalizedMember
@@ -158,7 +158,7 @@ def test_direct_members_count_coercion(safe_providers_import):
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
-    mapped = p._normalize_group_from_google(raw_group)
+    mapped = p._normalize_group_from_google(raw_group, include_raw=True)
     assert isinstance(mapped, type(p._normalize_group_from_google({})))
 
 
@@ -184,12 +184,15 @@ def test_group_with_member_with_user_enrichment(safe_providers_import):
             }
         ],
     }
-    mapped = p._normalize_group_from_google(raw_group)
+    mapped = p._normalize_group_from_google(raw_group, include_raw=True)
     assert isinstance(mapped, type(p._normalize_group_from_google({})))
     assert hasattr(mapped, "members")
     assert len(mapped.members) == 1
-    # The normalized member raw should include the nested user object
-    assert mapped.members[0].raw.get("user") is not None
+    # The group's raw payload should include the nested user object for the member
+    assert mapped.raw is not None
+    assert (
+        mapped.raw.get("members") and mapped.raw["members"][0].get("user") is not None
+    )
 
 
 def test_get_group_members_handles_unexpected_shapes(

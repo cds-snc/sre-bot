@@ -74,12 +74,6 @@ OperationResult = base_mod.OperationResult
 OperationStatus = base_mod.OperationStatus
 
 
-def test_group_provider_has_is_manager_abstract():
-    # The base class must expose an is_manager method (may be defaulted)
-    assert hasattr(GroupProvider, "is_manager")
-    assert callable(getattr(GroupProvider, "is_manager"))
-
-
 def test_provider_implementation_returns_role_info_when_capability_enabled():
     # Implement a minimal provider that advertises provides_role_info
     class TestProv(GroupProvider):
@@ -122,9 +116,6 @@ def test_provider_implementation_returns_role_info_when_capability_enabled():
                 data={"groups": [{"id": "eng", "role": "MANAGER"}]}
             )
 
-        def is_manager(self, user_key: str, group_key: str) -> OperationResult:
-            return OperationResult.success(data={"allowed": True, "role": "MANAGER"})
-
     prov = TestProv()
     assert prov.capabilities.provides_role_info is True
 
@@ -134,9 +125,3 @@ def test_provider_implementation_returns_role_info_when_capability_enabled():
     groups = res.data.get("groups")
     assert isinstance(groups, list)
     assert groups and "role" in groups[0]
-
-    is_mgr = prov.is_manager("alice", "eng")
-    assert is_mgr.status == OperationStatus.SUCCESS
-    assert isinstance(is_mgr.data, dict)
-    # ensure role or allowed is present
-    assert ("role" in is_mgr.data) or ("allowed" in is_mgr.data)

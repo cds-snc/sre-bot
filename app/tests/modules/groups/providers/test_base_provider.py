@@ -9,7 +9,7 @@ class DummyProvider(GroupProvider):
     def capabilities(self):
         return super().capabilities
 
-    def get_user_managed_groups(self, user_key):
+    def get_groups_for_user(self, user_key):
         return [{"id": "g1"}, {"id": "g2"}]
 
     def add_member(self, group_key, member_key, justification):
@@ -41,7 +41,7 @@ def test_create_user_not_implemented():
         def capabilities(self):
             return super().capabilities
 
-        def get_user_managed_groups(self, user_key):
+        def get_groups_for_user(self, user_key):
             raise NotImplementedError()
 
         def add_member(self, group_key, member_key, justification):

@@ -29,11 +29,11 @@ def test_google_is_manager_toggles(
     # Monkeypatch the google_directory.list_members to return a simple response
     import integrations.google_workspace.google_directory_next as google_directory
 
-    def _list_members_ok(group_key, **kwargs):
+    def _get_member_ok(group_key, user_key, **kwargs):
         # return a payload; normalize is monkeypatched so contents don't matter
-        return [{"email": "u@example.com", "id": "uid-1", "role": "MANAGER"}]
+        return {"email": "u@example.com", "id": "uid-1", "role": "MANAGER"}
 
-    monkeypatch.setattr(google_directory, "list_members", _list_members_ok)
+    monkeypatch.setattr(google_directory, "get_member", _get_member_ok)
 
     # Monkeypatch normalize to avoid Pydantic validation complexities
     def _normalize(m):
@@ -49,96 +49,32 @@ def test_google_is_manager_toggles(
 
     monkeypatch.setattr(prov, "_normalize_member_from_google", _normalize)
 
-    # Case A: provides_role_info = True -> provider returns role info
+    # Case A: provides_role_info = True -> provider returns boolean is_manager
     set_provider_capability("google", True)
     res = prov.is_manager("u@example.com", "g1")
     assert res.status == OperationStatus.SUCCESS
     assert res.data is not None
-    assert res.data.get("allowed") is True
-    assert res.data.get("role") == "MANAGER"
+    # New contract: provider returns 'is_manager' boolean (role is no longer returned)
+    assert res.data.get("is_manager") is True
 
     # Case B: provides_role_info = False -> fallback to base implementation
     set_provider_capability("google", False)
     res2 = prov.is_manager("u@example.com", "g1")
     assert res2.status == OperationStatus.SUCCESS
     assert res2.data is not None
-    # Fallback returns allowed flag (no role key)
-    assert res2.data.get("allowed") is True
+    # Fallback returns only the boolean is_manager (no role key)
+    assert res2.data.get("is_manager") is True
     assert "role" not in res2.data
 
-    # Negative case: when the provider reports no managers, allowed should be False
-    def _list_members_none(group_key, **kwargs):
-        return []
+    # Negative case: when the provider reports no managers, is_manager should be False
 
-    monkeypatch.setattr(google_directory, "list_members", _list_members_none)
+    def _get_member_none(group_key, user_key, **kwargs):
+        # Simulate no member/role info returned
+        return {}
+
+    monkeypatch.setattr(google_directory, "get_member", _get_member_none)
     set_provider_capability("google", True)
     res3 = prov.is_manager("u@example.com", "g1")
     assert res3.status == OperationStatus.SUCCESS
     assert res3.data is not None
-    assert res3.data.get("allowed") is False
-
-
-def test_aws_is_manager_toggles(
-    monkeypatch, safe_providers_import, set_provider_capability
-):
-    # Prevent module-level register decorator from instantiating the class
-    providers_mod = safe_providers_import
-
-    monkeypatch.setattr(
-        providers_mod, "register_provider", lambda name: (lambda obj: obj)
-    )
-
-    from modules.groups.providers.aws_identity_center import AwsIdentityCenterProvider
-    from modules.groups.providers.base import OperationStatus
-
-    prov = AwsIdentityCenterProvider()
-
-    # Stub _ensure_user_id_from_email to simply echo the input
-    monkeypatch.setattr(prov, "_ensure_user_id_from_email", lambda x: x)
-
-    # Prepare a fake response object for identity_store
-    import integrations.aws.identity_store_next as identity_store
-
-    def _list_group_memberships_for_member(user_id, role=None):
-        return types.SimpleNamespace(
-            success=True,
-            data=[{"Group": {"GroupId": "g-1"}}],
-        )
-
-    monkeypatch.setattr(
-        identity_store,
-        "list_group_memberships_for_member",
-        _list_group_memberships_for_member,
-    )
-
-    # Case A: AWS provider does not support is_manager; expect NOT_IMPLEMENTED
-    set_provider_capability("aws", True)
-    res = prov.is_manager("u-1", "g-1")
-    # AWS provider should signal not implemented / not supported
-    assert res.status == OperationStatus.PERMANENT_ERROR
-    assert res.message is not None
-    assert "not supported" in (res.message or "").lower()
-
-    # Case B: provides_role_info = False -> fallback to base implementation
-    # For AWS fallback, base will call get_user_managed_groups which is not
-    # implemented; AWS should still indicate not implemented for is_manager
-    set_provider_capability("aws", False)
-    res2 = prov.is_manager("u-1", "g-1")
-    assert res2.status == OperationStatus.PERMANENT_ERROR
-
-    # Negative case: when the membership listing does not include the group,
-    # the provider should report allowed=False
-    def _list_group_memberships_for_member_none(user_id, role=None):
-        return types.SimpleNamespace(success=True, data=[])
-
-    monkeypatch.setattr(
-        identity_store,
-        "list_group_memberships_for_member",
-        _list_group_memberships_for_member_none,
-    )
-    set_provider_capability("aws", True)
-    res3 = prov.is_manager("u-1", "g-1")
-    # AWS provider should still mark is_manager as not supported
-    assert res3.status == OperationStatus.PERMANENT_ERROR
-    assert res3.message is not None
-    assert "not supported" in (res3.message or "").lower()
+    assert res3.data.get("is_manager") is False

@@ -341,7 +341,7 @@ def test_list_groups_with_members(monkeypatch, safe_providers_import):
     assert res.data["groups"][0]["id"] == "g1"
 
 
-def test_validate_permissions_and_get_user_managed_groups(
+def test_validate_permissions_and_get_groups_for_user(
     monkeypatch, safe_providers_import
 ):
     google_mod = _import_provider(safe_providers_import)
@@ -369,7 +369,7 @@ def test_validate_permissions_and_get_user_managed_groups(
     assert vp2.status == OperationStatus.SUCCESS
     assert vp2.data and vp2.data.get("allowed") is False
 
-    # get_user_managed_groups success
+    # get_groups_for_user success
     monkeypatch.setattr(
         google_mod.google_directory,
         "list_groups",
@@ -377,7 +377,7 @@ def test_validate_permissions_and_get_user_managed_groups(
             success=True, data=[{"id": "g1", "email": "g1@example.com"}]
         ),
     )
-    ug = p.get_user_managed_groups("u@e")
+    ug = p.get_groups_for_user("u@e")
     assert ug.status == OperationStatus.SUCCESS
     assert isinstance(ug.data["groups"], list)
 
@@ -392,8 +392,8 @@ def test_is_manager_paths(monkeypatch, safe_providers_import):
     # Case: member found among MANAGERs
     monkeypatch.setattr(
         google_mod.google_directory,
-        "list_members",
-        lambda group_key, **kwargs: SimpleNamespace(
+        "get_member",
+        lambda group_key, user_key, **kwargs: SimpleNamespace(
             success=True,
             data=[{"id": "m1", "email": "mgr@example.com", "role": "MANAGER"}],
         ),
@@ -401,13 +401,13 @@ def test_is_manager_paths(monkeypatch, safe_providers_import):
     res = p.is_manager("mgr@example.com", "g1")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
-    assert res.data and res.data.get("allowed") is True
+    assert res.data and res.data.get("is_manager") is True
 
     # Case: integration error -> transient_error returned
     monkeypatch.setattr(
         google_mod.google_directory,
-        "list_members",
-        lambda group_key, **kwargs: SimpleNamespace(success=False, data=None),
+        "get_member",
+        lambda group_key, user_key, **kwargs: SimpleNamespace(success=False, data=None),
     )
     res2 = p.is_manager("any@example.com", "g1")
     assert res2.status == OperationStatus.TRANSIENT_ERROR
@@ -420,11 +420,11 @@ def test_is_manager_paths(monkeypatch, safe_providers_import):
     monkeypatch.setattr(
         GroupProvider,
         "is_manager",
-        lambda self, u, g: OperationResult.success(data={"allowed": False}),
+        lambda self, u, g: OperationResult.success(data={"is_manager": False}),
     )
     res3 = p.is_manager("u@example.com", "g1")
     assert res3.status == OperationStatus.SUCCESS
-    assert res3.data and res3.data.get("allowed") is False
+    assert res3.data and res3.data.get("is_manager") is False
 
 
 def test_is_manager_integration_error_returns_transient(
@@ -442,7 +442,7 @@ def test_is_manager_integration_error_returns_transient(
     def _raise(*a, **k):
         raise IntegrationError("boom")
 
-    monkeypatch.setattr(google_mod.google_directory, "list_members", _raise)
+    monkeypatch.setattr(google_mod.google_directory, "get_member", _raise)
 
     res = p.is_manager("u@example.com", "g1")
     assert isinstance(res, OperationResult)
@@ -465,7 +465,7 @@ def test_is_manager_unexpected_exception_returns_transient_with_message(
     def _raise_runtime(*a, **k):
         raise RuntimeError("unexpected failure")
 
-    monkeypatch.setattr(google_mod.google_directory, "list_members", _raise_runtime)
+    monkeypatch.setattr(google_mod.google_directory, "get_member", _raise_runtime)
 
     res = p.is_manager("u@example.com", "g1")
     assert isinstance(res, OperationResult)
@@ -509,9 +509,9 @@ def test_list_groups_with_members_filters_invalid_groups(
     assert groups[1]["id"] is None
 
 
-def test_get_user_managed_groups_with_raw_list(monkeypatch, safe_providers_import):
+def test_get_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
     """Todo #10: when list_groups returns a raw list (not IntegrationResponse-like),
-    get_user_managed_groups should normalize and return OperationResult.SUCCESS.
+    get_groups_for_user should normalize and return OperationResult.SUCCESS.
     """
     google_mod = _import_provider(safe_providers_import)
     p = google_mod.GoogleWorkspaceProvider()
@@ -525,7 +525,7 @@ def test_get_user_managed_groups_with_raw_list(monkeypatch, safe_providers_impor
         ],
     )
 
-    res = p.get_user_managed_groups("u@e")
+    res = p.get_groups_for_user("u@e")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert res.data and "groups" in res.data
