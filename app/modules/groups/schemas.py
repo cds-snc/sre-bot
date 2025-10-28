@@ -11,6 +11,18 @@ from typing import List, Optional, Any, Dict
 
 @dataclass
 class NormalizedMember:
+    """Normalized representation of a group member.
+    Attributes:
+        email: The email address of the member.
+        id: The unique identifier of the member.
+        role: The role of the member in the group (e.g., 'owner', '
+            'member').
+        provider_member_id: The provider-specific identifier for the member.
+        first_name: The first name of the member, if available.
+        family_name: The family name of the member, if available.
+        raw: The original raw data from the provider for reference.
+    """
+
     email: Optional[str]
     id: Optional[str]
     role: Optional[str]
