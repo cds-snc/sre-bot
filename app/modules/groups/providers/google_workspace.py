@@ -18,9 +18,6 @@ from modules.groups.providers.base import (
     PrimaryGroupProvider,
     ProviderCapabilities,
     opresult_wrapper,
-    OperationResult,
-    provider_provides_role_info,
-    GroupProvider,
 )
 
 
@@ -49,7 +46,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return email
 
     def _normalize_group_from_google(
-        self, group: Dict, members: Optional[List[Dict]] = None
+        self,
+        group: Dict,
+        members: Optional[List[Dict]] = None,
+        include_raw: bool = True,
     ) -> NormalizedGroup:
         """Convert a Google group response to a NormalizedGroup with local-part ID."""
         try:
@@ -75,10 +75,12 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             description=description,
             provider="google",
             members=normalized_members,
-            raw=group,
+            raw=group if include_raw else None,
         )
 
-    def _normalize_member_from_google(self, member: Dict) -> NormalizedMember:
+    def _normalize_member_from_google(
+        self, member: Dict, include_raw: bool = True
+    ) -> NormalizedMember:
         """Convert a Google member response to a NormalizedMember."""
         try:
             g = GoogleMember.model_validate(member)
@@ -103,9 +105,9 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             id=member_id,
             role=role,
             provider_member_id=member_id,
-            first_name=first_name,
-            family_name=family_name,
-            raw=member,
+            first_name=first_name.strip() if first_name else None,
+            family_name=family_name.strip() if family_name else None,
+            raw=member if include_raw else None,
         )
 
     def _resolve_member_identifier(
@@ -239,7 +241,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         This method is not implemented for Google Workspace as it would
         require excessive API calls to fetch members for each group.
         """
-        resp = google_directory.list_groups_with_members(**kwargs)
+        users_kwargs = {"fields": "primaryEmail,name"}
+        resp = google_directory.list_groups_with_members(
+            users_kwargs=users_kwargs, **kwargs
+        )
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError(
                 "google list_groups_with_members failed", response=resp
@@ -275,7 +280,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return False
 
     @opresult_wrapper(data_key="groups")
-    def get_user_managed_groups(self, user_key: str) -> List[Dict]:
+    def get_groups_for_user(self, user_key: str, **kwargs) -> List[Dict]:
         """Return canonical groups for which `user_key` is a member.
 
         Args:
@@ -284,7 +289,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             A list of canonical group dicts (normalized NormalizedGroup).
         """
-        resp = google_directory.list_groups(query=f"memberKey={user_key}")
+        resp = google_directory.list_groups(query=f"memberKey={user_key}", **kwargs)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google list_groups failed", response=resp)
         raw = resp.data if hasattr(resp, "data") else resp
@@ -294,35 +299,58 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(g, dict)
         ]
 
-    def is_manager(self, user_key: str, group_key: str) -> OperationResult:
+    @opresult_wrapper(data_key="groups")
+    def get_groups_managed_by_user(self, user_key: str, **kwargs) -> List[Dict]:
+        """Return groups keys where the user is a MANAGER or OWNER.
+
+        Args:
+            user_key: A Google member key (email or ID).
+
+        Returns:
+            A list of group keys (emails) where the user is a MANAGER or OWNER.
+        """
+        resp = google_directory.list_groups(query=f"memberKey={user_key}", **kwargs)
+        if hasattr(resp, "success") and not resp.success:
+            raise IntegrationError("google list_groups failed", response=resp)
+        raw = resp.data if hasattr(resp, "data") else resp
+        groups_emails = []
+        if isinstance(raw, list):
+            for g in raw:
+                if isinstance(g, dict):
+                    groups_emails.append(g.get("email", ""))
+        resp = google_directory.get_batch_members_for_user(
+            group_keys=groups_emails, user_key=user_key
+        )
+        if hasattr(resp, "success") and not resp.success:
+            raise IntegrationError(
+                "google get_batch_members_for_user failed", response=resp
+            )
+        batch_data = resp.data if hasattr(resp, "data") else resp
+        managed_groups = []
+        if isinstance(batch_data, dict):
+            for group_email, info in batch_data.items():
+                if not group_email:
+                    continue
+                if isinstance(info, dict):
+                    role = info.get("role")
+                    if role in ("MANAGER", "OWNER"):
+                        managed_groups.append(group_email)
+
+        return sorted(dict.fromkeys(managed_groups))
+
+    @opresult_wrapper(data_key="is_manager")
+    def is_manager(self, user_key: str, group_key: str) -> bool:
         """Efficiently determine whether `user_key` is a manager of `group_key`.
 
         Honor runtime configuration: if the provider is not expected to expose
         role information (per settings), fall back to the base implementation
         which will try other helpers.
         """
-        # Respect configuration-driven capability flag. The explicit call to
-        # GroupProvider.is_manager ensures we invoke the concrete base
-        # implementation (PrimaryGroupProvider declares is_manager as an
-        # abstractmethod and does not provide a fallback implementation).
-        if not provider_provides_role_info("google"):
-            return GroupProvider.is_manager(self, user_key, group_key)
 
-        try:
-            resp = google_directory.list_members(group_key, roles="MANAGER")
-            if hasattr(resp, "success") and not resp.success:
-                raise IntegrationError("google list_members failed", response=resp)
-            members = resp.data if hasattr(resp, "data") else resp
-            for m in members or []:
-                if isinstance(m, dict):
-                    normalized = self._normalize_member_from_google(m)
-                    if normalized.email == user_key or normalized.id == user_key:
-                        return OperationResult.success(
-                            data={"allowed": True, "role": "MANAGER"}
-                        )
-            return OperationResult.success(data={"allowed": False})
-        except IntegrationError:
-            # Integration-specific errors should be surfaced as transient
-            return OperationResult.transient_error("google integration error")
-        except Exception as e:
-            return OperationResult.transient_error(str(e))
+        resp = google_directory.get_member(group_key, user_key)
+        if hasattr(resp, "success") and not resp.success:
+            raise IntegrationError("google get_member failed", response=resp)
+        member = resp.data if hasattr(resp, "data") else resp
+        if isinstance(member, dict) and "role" in member:
+            return member.get("role") in ["MANAGER", "OWNER"]
+        return False
