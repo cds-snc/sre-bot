@@ -1,13 +1,11 @@
 from typing import Dict, List, Optional, Any
 
 from integrations.aws import identity_store_next as identity_store
-
-try:
-    from integrations.aws.schemas import User as AwsUser, Group as AwsGroup
-except Exception as exc:
-    raise TypeError(
-        "Could not import module for provider function: integrations.aws.schemas"
-    ) from exc
+from integrations.aws.schemas import (
+    User as AwsUser,
+    Group as AwsGroup,
+    GroupMembership as AwsGroupMembership,
+)
 from modules.groups.errors import IntegrationError
 from modules.groups.providers import register_provider
 from modules.groups.schemas import (
@@ -121,14 +119,16 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError("aws get_user failed", response=resp)
         return resp.data or {}
 
-    def _normalize_member_from_aws(self, member_data: dict) -> NormalizedMember:
+    def _normalize_member_from_aws(
+        self, member_data: dict, include_raw: bool = False
+    ) -> NormalizedMember:
         """Convert an AWS member response to a NormalizedMember.
 
         This is AWS's responsibility: take its schema and produce the canonical
         normalized member contract.
 
         Args:
-            member_data: A dict response from AWS Identity Store API.
+            member_data: A dict response from AWS Identity Store API. Could be GroupMembership or User object.
 
         Returns:
             A NormalizedMember instance.
@@ -136,43 +136,50 @@ class AwsIdentityCenterProvider(GroupProvider):
         Raises:
             IntegrationError: If the member data is invalid for AWS's schema.
         """
-        try:
-            u = AwsUser.model_validate(member_data)
-        except Exception as exc:
-            raise IntegrationError("aws member_data validation failed") from exc
 
-        email = None
-        emails = getattr(u, "Emails", None)
-        if isinstance(emails, list) and emails:
-            first = emails[0]
-            email = (
-                getattr(first, "Value", None)
-                if hasattr(first, "Value")
-                else first.get("Value") if isinstance(first, dict) else None
-            )
-        email = email or getattr(u, "UserName", None) or member_data.get("email")
-
-        member_id = getattr(u, "UserId", None)
-
-        first_name = None
-        family_name = None
-        name = getattr(u, "Name", None)
-        if name:
-            first_name = getattr(name, "GivenName", None)
-            family_name = getattr(name, "FamilyName", None)
+        if "MembershipId" in member_data and "UserDetails" in member_data:
+            try:
+                gm = AwsGroupMembership.model_validate(member_data)
+                details = gm.UserDetails if gm.UserDetails else AwsUser()
+                provider_member_id = gm.MembershipId
+            except Exception as exc:
+                raise IntegrationError(
+                    "aws group membership validation failed"
+                ) from exc
+        else:
+            try:
+                details = AwsUser.model_validate(member_data)
+                provider_member_id = None
+            except Exception as exc:
+                raise IntegrationError("aws user validation failed") from exc
 
         return NormalizedMember(
-            email=email,
-            id=member_id,
+            email=(
+                details.Emails[0].Value
+                if details.Emails and len(details.Emails) > 0
+                else None
+            ),
+            id=details.UserId if details.UserId else None,
             role=None,
-            provider_member_id=member_id,
-            first_name=first_name,
-            family_name=family_name,
-            raw=member_data,
+            provider_member_id=provider_member_id,
+            first_name=(
+                details.Name.GivenName.strip()
+                if details.Name and details.Name.GivenName
+                else None
+            ),
+            family_name=(
+                details.Name.FamilyName.strip()
+                if details.Name and details.Name.FamilyName
+                else None
+            ),
+            raw=member_data if include_raw else None,
         )
 
     def _normalize_group_from_aws(
-        self, group: dict, members: List[Dict] | None = None
+        self,
+        group: dict,
+        memberships: List[Dict] | None = None,
+        include_raw: bool = False,
     ) -> NormalizedGroup:
         """Convert an AWS group response to a NormalizedGroup.
 
@@ -198,13 +205,16 @@ class AwsIdentityCenterProvider(GroupProvider):
         name = getattr(g, "DisplayName", None) or gid
         description = getattr(g, "Description", None)
 
-        raw_members = members
-        if raw_members is None:
-            raw_members = group.get("members") if isinstance(group, dict) else None
+        raw_memberships = memberships
+        if raw_memberships is None:
+            if isinstance(group, dict):
+                raw_memberships = group.get("GroupMemberships")
+            else:
+                raw_memberships = None
 
         normalized_members = []
-        if isinstance(raw_members, list):
-            for m in raw_members:
+        if isinstance(raw_memberships, list):
+            for m in raw_memberships:
                 if isinstance(m, dict):
                     normalized_members.append(self._normalize_member_from_aws(m))
 
@@ -214,7 +224,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             description=description,
             provider="aws",
             members=normalized_members,
-            raw=group,
+            raw=group if include_raw else None,
         )
 
     def _resolve_member_identifier(self, member_data: dict | str) -> str:
