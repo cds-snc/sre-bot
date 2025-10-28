@@ -195,50 +195,22 @@ class GroupProvider(ABC):
         )
 
     def create_user(self, user_data: NormalizedMember) -> OperationResult:
+        """Create a user and return the result."""
         raise NotImplementedError("User creation not implemented in this provider.")
 
     def delete_user(self, user_key: str) -> OperationResult:
+        """Delete a user and return the result."""
         raise NotImplementedError("User deletion not implemented in this provider.")
 
     def validate_permissions(
         self, user_key: str, group_key: str, action: str
     ) -> OperationResult:
+        """Validate permissions for a user on a group."""
         raise NotImplementedError()
 
-    def get_user_managed_groups(self, user_key: str) -> OperationResult:
+    def get_groups_for_user(self, user_key: str, **kwargs) -> OperationResult:
+        """Return a list of canonical group dicts the user can manage."""
         raise NotImplementedError()
-
-    def is_manager(self, user_key: str, group_key: str) -> OperationResult:
-        try:
-            try:
-                perm = self.validate_permissions(user_key, group_key, "manage")
-                if isinstance(perm, OperationResult):
-                    data = perm.data or {}
-                    if "allowed" in data or "role" in data:
-                        return OperationResult.success(
-                            data={k: data[k] for k in ("allowed", "role") if k in data}
-                        )
-            except NotImplementedError:
-                pass
-
-            try:
-                groups = self.get_user_managed_groups(user_key)
-                if isinstance(groups, OperationResult):
-                    data = groups.data or {}
-                    for g in data.get("groups", []) or []:
-                        if g.get("id") == group_key:
-                            return OperationResult.success(
-                                data={"role": g.get("role"), "allowed": True}
-                            )
-                    return OperationResult.success(data={"allowed": False})
-            except NotImplementedError:
-                pass
-
-            return OperationResult.permanent_error(
-                "is_manager not supported", error_code="NOT_IMPLEMENTED"
-            )
-        except Exception as e:
-            return OperationResult.transient_error(str(e))
 
 
 class PrimaryGroupProvider(GroupProvider):
@@ -249,10 +221,6 @@ class PrimaryGroupProvider(GroupProvider):
         self, user_key: str, group_key: str, action: str
     ) -> OperationResult:
         """Validate permissions for a user on a group."""
-
-    @abstractmethod
-    def get_user_managed_groups(self, user_key: str) -> OperationResult:
-        """Return a list of canonical group dicts the user can manage."""
 
     @abstractmethod
     def is_manager(self, user_key: str, group_key: str) -> OperationResult:
