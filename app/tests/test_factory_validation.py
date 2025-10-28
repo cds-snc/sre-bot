@@ -1,5 +1,5 @@
 from integrations.google_workspace.schemas import GroupsResult, User, Member
-from tests.factory_helpers import (
+from tests.factories.google import (
     make_google_groups,
     make_google_users,
     make_google_members,
