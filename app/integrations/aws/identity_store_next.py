@@ -240,6 +240,23 @@ def list_groups(
 
     Returns:
         IntegrationResponse: Standardized response model for external API integrations.
+
+    Example:
+        ```
+        result = list_groups()
+        if result.success:
+            groups = result.data  # List of groups
+        else:
+            logger.error("Failed to list groups", error=result.error)
+        # Filters can be applied, e.g.:
+        filters = [
+            {
+                "AttributePath": "DisplayName",
+                "AttributeValue": "Group-Name", # Supports exact match only
+            }
+        ]
+        result = list_groups(Filters=filters)
+        ```
     """
 
     return execute_aws_api_call(
@@ -499,7 +516,7 @@ def get_batch_groups(group_ids: List[str], **kwargs) -> IntegrationResponse:
 
 
 def _fetch_group_memberships_parallel(
-    group_ids: List[str], max_workers: int = 10
+    group_ids: List[str], max_workers: int = 10, **kwargs
 ) -> Dict[str, List[Dict[str, Any]]]:
     """Parallel helper function to fetch memberships for multiple groups."""
     memberships_by_group = {}
@@ -507,7 +524,8 @@ def _fetch_group_memberships_parallel(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
         future_to_gid = {
-            executor.submit(list_group_memberships, gid): gid for gid in group_ids
+            executor.submit(list_group_memberships, gid, **kwargs): gid
+            for gid in group_ids
         }
         # Collect results as they complete
         for future in as_completed(future_to_gid):
@@ -597,6 +615,9 @@ def _assemble_groups_with_memberships(
 
 def list_groups_with_memberships(
     groups_filters: Optional[List] = None,
+    groups_kwargs: Optional[Dict[str, Any]] = None,
+    memberships_kwargs: Optional[Dict[str, Any]] = None,
+    users_kwargs: Optional[Dict[str, Any]] = None,
     tolerate_errors: bool = False,
 ) -> IntegrationResponse:
     """
@@ -614,12 +635,15 @@ def list_groups_with_memberships(
     """
     logger.info(
         "listing_groups_with_memberships",
+        groups_kwargs=groups_kwargs,
+        memberships_kwargs=memberships_kwargs,
+        users_kwargs=users_kwargs,
         groups_filters=groups_filters,
         tolerate_errors=tolerate_errors,
     )
 
     # 1. Fetch all groups
-    response: IntegrationResponse = list_groups()
+    response: IntegrationResponse = list_groups(**(groups_kwargs or {}))
     if response.success and isinstance(response.data, list):
         groups: List[Dict[str, Any]] = response.data
     else:
@@ -639,11 +663,12 @@ def list_groups_with_memberships(
 
     # 3. Batch fetch group memberships using our utility functions
     group_ids = [g["GroupId"] for g in groups if "GroupId" in g]
-    memberships_by_group = _fetch_group_memberships_parallel(group_ids)
-    logger.info("memberships_batch_fetched", count=len(memberships_by_group))
+    memberships_by_group = _fetch_group_memberships_parallel(
+        group_ids, **memberships_kwargs or {}
+    )
 
     # 5. Batch fetch all user details using our utility function
-    response = list_users()
+    response = list_users(**(users_kwargs or {}))
     if not response.success:
         return build_error_response(
             error=Exception("Failed to list users"),
