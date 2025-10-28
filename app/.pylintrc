@@ -1,0 +1,6 @@
+[MASTER]
+init-hook='import sys,os; p=os.getcwd(); import os as _o;
+for _ in range(6): c=_o.path.join(p,"app");
+if _o.path.isdir(c): sys.path.insert(0,_o.path.abspath(c)); break;
+if _o.path.basename(p)=="app": sys.path.insert(0,_o.path.abspath(p)); break;
+p=_o.path.dirname(p)'
