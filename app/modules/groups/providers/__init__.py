@@ -121,12 +121,10 @@ def _validate_startup_configuration() -> None:
         )
 
 
-# Run startup validation after providers are loaded
-try:
-    _validate_startup_configuration()
-except Exception as exc:
-    logger.error("provider_startup_validation_failed", error=str(exc))
-    raise
+# NOTE: Do not validate startup configuration at package import time.
+# Validation is performed after explicit provider discovery via `load_providers()`
+# to avoid import-order issues where callers import the package before
+# provider submodules are imported/registered.
 
 
 def load_providers() -> None:
@@ -148,3 +146,17 @@ def load_providers() -> None:
             importlib.import_module(full_name)
         except Exception as e:
             logger.warning("provider_import_failed", module=full_name, error=str(e))
+
+    # After attempting to import provider modules, validate the startup
+    # configuration so we fail fast if the configured primary provider was
+    # not registered or does not advertise required capabilities.
+    try:
+        _validate_startup_configuration()
+    except Exception as exc:
+        logger.error(
+            "provider_startup_validation_failed",
+            component="providers",
+            module_path=__name__,
+            error=str(exc),
+        )
+        raise
