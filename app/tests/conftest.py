@@ -4,16 +4,6 @@ import types
 from importlib import util
 from pathlib import Path
 from types import ModuleType
-
-# Ensure the application package root is on sys.path so importing application
-# modules (e.g. `core.config`) works during pytest collection. Pytest may
-# import `conftest` before the project root is on sys.path depending on
-# invocation; add it explicitly here before importing application modules.
-project_root = "/workspace/app"
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-import core.config as core_config
 import pytest
 from tests.factories.google import (
     make_google_groups,
@@ -25,7 +15,18 @@ from tests.factories.aws import (
     make_aws_groups,
     make_aws_groups_memberships,
     make_aws_groups_w_users,
+    make_aws_groups_w_users_with_legacy,
 )
+
+# Ensure the application package root is on sys.path so importing application
+# modules (e.g. `core.config`) works during pytest collection. Pytest may
+# import `conftest` before the project root is on sys.path depending on
+# invocation; add it explicitly here before importing application modules.
+project_root = "/workspace/app"
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+import core.config as core_config
 
 
 @pytest.fixture
@@ -478,6 +479,28 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
         store_id="d-123412341234",
     ):
         return make_aws_groups_w_users(
+            n_groups=n_groups,
+            n_users=n_users,
+            group_prefix=group_prefix,
+            user_prefix=user_prefix,
+            domain=domain,
+            store_id=store_id,
+        )
+
+    return _wrapper
+
+
+@pytest.fixture
+def aws_groups_w_users_with_legacy():
+    def _wrapper(
+        n_groups=1,
+        n_users=3,
+        group_prefix="",
+        user_prefix="",
+        domain="test.com",
+        store_id="d-123412341234",
+    ):
+        return make_aws_groups_w_users_with_legacy(
             n_groups=n_groups,
             n_users=n_users,
             group_prefix=group_prefix,
