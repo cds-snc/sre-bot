@@ -15,7 +15,7 @@ from integrations.google_workspace.schemas import (
     Group,
     GroupWithMembers,
 )
-from tests.factory_helpers import (
+from tests.factories.google import (
     make_google_groups,
     make_google_users,
     make_google_members,
@@ -249,11 +249,13 @@ class TestListGroups:
 
 
 class TestGetBatchMembers:
-    """Test cases for get_batch_members function."""
+    """Test cases for get_batch_group_members function."""
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_members_success(self, mock_get_service, mock_batch_request):
+    def test_get_batch_group_members_success(
+        self, mock_get_service, mock_batch_request
+    ):
         """Test successful batch member retrieval."""
         group_keys = ["group1@example.com", "group2@example.com"]
         members1 = make_google_members(2, prefix="user1-", domain="example.com")
@@ -268,11 +270,11 @@ class TestGetBatchMembers:
                     "group2@example.com": {"members": members2},
                 }
             },
-            "get_batch_members",
+            "get_batch_group_members",
             "google",
         )
 
-        result = gdn.get_batch_members(group_keys)
+        result = gdn.get_batch_group_members(group_keys)
 
         assert isinstance(result, IntegrationResponse)
         assert result.success is True
@@ -283,7 +285,9 @@ class TestGetBatchMembers:
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_members_no_members(self, mock_get_service, mock_batch_request):
+    def test_get_batch_group_members_no_members(
+        self, mock_get_service, mock_batch_request
+    ):
         """Test batch member retrieval when groups have no members."""
         group_keys = ["empty-group@example.com"]
 
@@ -291,11 +295,11 @@ class TestGetBatchMembers:
         mock_get_service.return_value = mock_service
         mock_batch_request.return_value = build_success_response(
             {"results": {"empty-group@example.com": None}},
-            "get_batch_members",
+            "get_batch_group_members",
             "google",
         )
 
-        result = gdn.get_batch_members(group_keys)
+        result = gdn.get_batch_group_members(group_keys)
 
         assert isinstance(result, IntegrationResponse)
         assert result.success is True
@@ -304,7 +308,7 @@ class TestGetBatchMembers:
 
     @patch("integrations.google_workspace.google_directory_next.execute_batch_request")
     @patch("integrations.google_workspace.google_directory_next.get_google_service")
-    def test_get_batch_members_list_response(
+    def test_get_batch_group_members_list_response(
         self, mock_get_service, mock_batch_request
     ):
         """Test batch member retrieval when response is a list."""
@@ -314,10 +318,12 @@ class TestGetBatchMembers:
         mock_service = Mock()
         mock_get_service.return_value = mock_service
         mock_batch_request.return_value = build_success_response(
-            {"results": {"group@example.com": members}}, "get_batch_members", "google"
+            {"results": {"group@example.com": members}},
+            "get_batch_group_members",
+            "google",
         )
 
-        result = gdn.get_batch_members(group_keys)
+        result = gdn.get_batch_group_members(group_keys)
 
         assert isinstance(result, IntegrationResponse)
         assert result.success is True
@@ -418,12 +424,14 @@ class TestListGroupsWithMembers:
     """Test cases for list_groups_with_members function."""
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_success(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test successful listing of groups with members."""
@@ -451,9 +459,9 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
+        mock_get_batch_group_members.return_value = build_success_response(
             {"group1@example.com": members1, "group2@example.com": members2},
-            "get_batch_members",
+            "get_batch_group_members",
             "google",
         )
         mock_get_batch_users.return_value = build_success_response(
@@ -500,12 +508,14 @@ class TestListGroupsWithMembers:
         assert isinstance(result, IntegrationResponse)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_with_filters(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test listing groups with members using filters."""
@@ -517,9 +527,9 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
+        mock_get_batch_group_members.return_value = build_success_response(
             {"aws-group1@example.com": [], "aws-group2@example.com": []},
-            "get_batch_members",
+            "get_batch_group_members",
             "google",
         )
         mock_get_batch_users.return_value = build_success_response(
@@ -536,12 +546,14 @@ class TestListGroupsWithMembers:
                 assert g.email.startswith("aws-")
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_tolerate_errors(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test listing groups with members with tolerate_errors=True."""
@@ -551,8 +563,8 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
-            {"empty-group@example.com": []}, "get_batch_members", "google"
+        mock_get_batch_group_members.return_value = build_success_response(
+            {"empty-group@example.com": []}, "get_batch_group_members", "google"
         )
         mock_get_batch_users.return_value = build_success_response(
             {}, "get_batch_users", "google"
@@ -566,12 +578,14 @@ class TestListGroupsWithMembers:
                 assert isinstance(g.members, list)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_exclude_empty_groups(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test that empty groups are excluded when tolerate_errors=False."""
@@ -581,8 +595,8 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
-            {"empty-group@example.com": []}, "get_batch_members", "google"
+        mock_get_batch_group_members.return_value = build_success_response(
+            {"empty-group@example.com": []}, "get_batch_group_members", "google"
         )
         mock_get_batch_users.return_value = build_success_response(
             {}, "get_batch_users", "google"
@@ -596,12 +610,14 @@ class TestListGroupsWithMembers:
                 assert isinstance(g.members, list)
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_user_details_flattening(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test that user details are properly flattened into member objects."""
@@ -621,8 +637,8 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
-            {"test-group@example.com": members}, "get_batch_members", "google"
+        mock_get_batch_group_members.return_value = build_success_response(
+            {"test-group@example.com": members}, "get_batch_group_members", "google"
         )
         mock_get_batch_users.return_value = build_success_response(
             {"test@example.com": users[0]}, "get_batch_users", "google"
@@ -647,12 +663,14 @@ class TestListGroupsWithMembers:
             assert validated_member.user.primaryEmail == "test@example.com"
 
     @patch("integrations.google_workspace.google_directory_next.get_batch_users")
-    @patch("integrations.google_workspace.google_directory_next.get_batch_members")
+    @patch(
+        "integrations.google_workspace.google_directory_next.get_batch_group_members"
+    )
     @patch("integrations.google_workspace.google_directory_next.list_groups")
     def test_list_groups_with_members_no_key_conflicts(
         self,
         mock_list_groups,
-        mock_get_batch_members,
+        mock_get_batch_group_members,
         mock_get_batch_users,
     ):
         """Test that existing member keys are not overwritten during flattening."""
@@ -672,8 +690,8 @@ class TestListGroupsWithMembers:
         mock_list_groups.return_value = build_success_response(
             groups, "list_groups", "google"
         )
-        mock_get_batch_members.return_value = build_success_response(
-            {"test-group@example.com": members}, "get_batch_members", "google"
+        mock_get_batch_group_members.return_value = build_success_response(
+            {"test-group@example.com": members}, "get_batch_group_members", "google"
         )
         mock_get_batch_users.return_value = build_success_response(
             {"test@example.com": users[0]}, "get_batch_users", "google"
