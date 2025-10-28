@@ -50,7 +50,7 @@ def make_aws_groups_memberships(n=3, prefix="", group_id=1, store_id="d-12341234
     }
 
 
-def make_aws_groups_w_users(
+def make_aws_groups_w_users_with_legacy(
     n_groups=1,
     n_users=3,
     group_prefix="",
@@ -68,4 +68,31 @@ def make_aws_groups_w_users(
             {**membership, "MemberId": user}
             for user, membership in zip(users, memberships)
         ]
+    return groups
+
+
+def make_aws_groups_w_users(
+    n_groups=1,
+    n_users=3,
+    group_prefix="",
+    user_prefix="",
+    domain="test.com",
+    store_id="d-123412341234",
+):
+    groups = make_aws_groups(n_groups, group_prefix, store_id)
+    users = make_aws_users(n_users, user_prefix, domain, store_id)
+    for i, group in enumerate(groups):
+        memberships = make_aws_groups_memberships(
+            n_users, group_prefix, i + 1, store_id
+        )["GroupMemberships"]
+        group["GroupMemberships"] = []
+        for user, membership in zip(users, memberships):
+            user_details = user.copy()
+            user_details["Emails"] = [
+                {**email, "Type": email["Type"].upper()}
+                for email in user_details.get("Emails", [])
+            ]
+            group["GroupMemberships"].append(
+                {**membership, "UserDetails": user_details}
+            )
     return groups

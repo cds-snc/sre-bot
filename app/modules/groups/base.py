@@ -66,9 +66,17 @@ def get_user_managed_groups(
                     )
                     result[name] = []
             elif hasattr(provider, "get_user_managed_groups"):
-                # Legacy sync method
-                groups = provider.get_user_managed_groups(user_email)
-                result[name] = groups
+                # Synchronous provider method returning OperationResult
+                op: OperationResult = provider.get_user_managed_groups(user_email)
+                if op.status == OperationStatus.SUCCESS:
+                    data = op.data or {}
+                    groups = data.get("members") or data.get("result") or []
+                    result[name] = groups
+                else:
+                    logger.warning(
+                        f"Provider {name} returned error status: {op.status}"
+                    )
+                    result[name] = []
             else:
                 logger.warning(
                     f"Provider {name} has no list/get_user_managed_groups method"
@@ -129,12 +137,21 @@ def add_member_to_group(
             )
             return op.data or {}
         elif hasattr(provider, "add_member"):
-            # Legacy sync method - keep existing IntegrationError behaviour
+            # Synchronous provider method returning OperationResult
             try:
-                result = provider.add_member(group_id, member_email, justification)
+                op: OperationResult = provider.add_member(
+                    group_id, member_email, justification
+                )
             except IntegrationError as ie:
                 logger.error(f"IntegrationError while adding member: {ie}")
                 return _map_integration_error_to_response(ie)
+            if op.status != OperationStatus.SUCCESS:
+                return format_error_response(
+                    action="add_member",
+                    error_message=op.message,
+                    error_code="PROVIDER_ERROR",
+                    details=op.data,
+                )
             dispatch_event(
                 "group.member.added",
                 {
@@ -143,10 +160,10 @@ def add_member_to_group(
                     "requestor_email": requestor_email,
                     "provider": provider_type,
                     "justification": justification,
-                    "result": result,
+                    "result": op.data,
                 },
             )
-            return result
+            return op.data or {}
         else:
             return format_error_response(
                 action="add_member",
@@ -192,9 +209,16 @@ def remove_member_from_group(
                 )
                 if not can_modify:
                     if hasattr(provider, "validate_permissions"):
-                        if not provider.validate_permissions(
+                        vp_op: OperationResult = provider.validate_permissions(
                             requestor_email, group_id, "remove_member"
-                        ):
+                        )
+                        if vp_op.status == OperationStatus.SUCCESS:
+                            allowed = (vp_op.data or {}).get("allowed")
+                            if not allowed:
+                                raise PermissionError(
+                                    f"User {requestor_email} cannot modify group {group_id}"
+                                )
+                        else:
                             raise PermissionError(
                                 f"User {requestor_email} cannot modify group {group_id}"
                             )
@@ -203,9 +227,16 @@ def remove_member_from_group(
                             f"User {requestor_email} cannot modify group {group_id}"
                         )
         elif hasattr(provider, "validate_permissions"):
-            if not provider.validate_permissions(
+            vp_op: OperationResult = provider.validate_permissions(
                 requestor_email, group_id, "remove_member"
-            ):
+            )
+            if vp_op.status == OperationStatus.SUCCESS:
+                allowed = (vp_op.data or {}).get("allowed")
+                if not allowed:
+                    raise PermissionError(
+                        f"User {requestor_email} cannot modify group {group_id}"
+                    )
+            else:
                 raise PermissionError(
                     f"User {requestor_email} cannot modify group {group_id}"
                 )
@@ -290,9 +321,19 @@ def validate_group_permissions(
                 m.get("email") == user_email for m in members if isinstance(m, dict)
             )
     except Exception:
-        # fall back to sync method
+        # fall back to sync method that returns OperationResult
         try:
-            return provider.validate_permissions(user_email, group_id, action)
+            vp_op: OperationResult = provider.validate_permissions(
+                user_email, group_id, action
+            )
+            if vp_op.status == OperationStatus.SUCCESS:
+                # Expect providers to return {'allowed': bool} in data
+                return bool(
+                    (vp_op.data or {}).get("allowed")
+                    or (vp_op.data or {}).get("result")
+                    or False
+                )
+            return False
         except AttributeError:
             return False
 

@@ -22,6 +22,15 @@ class NormalizedMember:
 
 @dataclass
 class NormalizedGroup:
+    """Normalized representation of a group.
+    Attributes:
+        id: The unique identifier of the group.
+        name: The display name of the group.
+        description: A brief description of the group.
+        provider: The name of the provider (e.g., 'google', 'aws').
+        members: A list of NormalizedMember instances representing group members.
+    """
+
     id: Optional[str]
     name: Optional[str]
     description: Optional[str]
@@ -116,11 +125,17 @@ def group_from_dict(d: dict, provider: str) -> NormalizedGroup:
     )
 
 
-def as_canonical_dict(obj):
+def as_canonical_dict(obj) -> dict:
     """Return a JSON-serializable canonical dict for a NormalizedGroup/Member.
 
     Providers can call this to return plain dictionaries to core flows or API
     layers without leaking provider internals.
+
+    Args:
+        obj: A NormalizedMember, NormalizedGroup, or already a dict.
+
+    Returns:
+        A plain dict representation suitable for JSON serialization.
     """
     try:
         return asdict(obj)
