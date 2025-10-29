@@ -126,4 +126,11 @@ def extract_orchestration_response_for_api(
     Currently passthrough; future logic may map status codes based on primary
     and propagation results.
     """
-    return orch_response, status_code
+    # If orchestration marked the overall result as failure, return 500 to
+    # surface the error to API clients; otherwise use the provided status_code.
+    try:
+        success = bool(orch_response.get("success", False))
+    except Exception:
+        success = False
+
+    return orch_response, (status_code if success else 500)
