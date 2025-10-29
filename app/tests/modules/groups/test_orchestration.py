@@ -1,3 +1,4 @@
+# python
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 import pytest
@@ -16,8 +17,8 @@ def _transient_result_fn(msg):
     return DummyOp(status="TRANSIENT", message=msg)
 
 
-@patch("modules.groups.group_name_mapping.map_provider_group_id", return_value="a-my-group")
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.map_provider_group_id", return_value="a-my-group")
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
 def test_map_secondary_to_primary_group_success(mock_get_primary, mock_map):
     res = orch.map_secondary_to_primary_group("aws", "my-group")
     assert res == "a-my-group"
@@ -26,15 +27,15 @@ def test_map_secondary_to_primary_group_success(mock_get_primary, mock_map):
     )
 
 
-@patch("modules.groups.group_name_mapping.map_provider_group_id", side_effect=Exception("boom"))
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.map_provider_group_id", side_effect=Exception("boom"))
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
 def test_map_secondary_to_primary_group_raises_on_failure(mock_get_primary, mock_map):
     with pytest.raises(ValueError):
         orch.map_secondary_to_primary_group("aws", "my-group")
 
 
-@patch("modules.groups.group_name_mapping.map_provider_group_id", return_value="my-group")
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.map_provider_group_id", return_value="my-group")
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
 def test_map_primary_to_secondary_group_success(mock_get_primary, mock_map):
     res = orch.map_primary_to_secondary_group("g-my-group", "aws")
     assert res == "my-group"
@@ -43,28 +44,20 @@ def test_map_primary_to_secondary_group_success(mock_get_primary, mock_map):
     )
 
 
-@patch("modules.groups.schemas.NormalizedMember")
-def test_normalize_member_for_provider_valid_and_invalid(mock_nm_cls):
-    # Fake the NormalizedMember constructor behavior
-    class FakeNM:
-        def __init__(self, **kwargs):
-            self._kw = kwargs
-
-    mock_nm_cls.side_effect = FakeNM
-
+def test_normalize_member_for_provider_valid_and_invalid():
     nm = orch.normalize_member_for_provider("user@example.com", "aws")
-    assert isinstance(nm, FakeNM)
-    assert nm._kw["email"] == "user@example.com"
+    # returned object should expose email attribute and match input
+    assert hasattr(nm, "email") and nm.email == "user@example.com"
 
     with pytest.raises(ValueError):
         orch.normalize_member_for_provider("not-an-email", "aws")
 
 
 @patch(
-    "modules.groups.providers.base.OperationResult",
+    "modules.groups.orchestration.OperationResult",
     new=SimpleNamespace(transient_error=staticmethod(lambda msg: DummyOp(status="TRANSIENT", message=msg))),
 )
-@patch("modules.groups.providers.base.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
+@patch("modules.groups.orchestration.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
 def test_validate_group_in_provider_with_opresult_and_plain_success():
     provider = MagicMock()
     provider.get_group_members.return_value = DummyOp(status="SUCCESS")
@@ -96,14 +89,14 @@ def test__unwrap_opresult_data_variants():
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch("modules.groups.orchestration.map_primary_to_secondary_group", return_value="mapped-sec-grp")
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
-@patch("modules.groups.providers.get_active_providers")
-@patch("modules.groups.providers.get_primary_provider")
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.get_active_providers")
+@patch("modules.groups.orchestration.get_primary_provider")
 @patch(
-    "modules.groups.providers.base.OperationResult",
+    "modules.groups.orchestration.OperationResult",
     new=SimpleNamespace(transient_error=staticmethod(lambda msg: DummyOp(status="TRANSIENT", message=msg))),
 )
-@patch("modules.groups.providers.base.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
+@patch("modules.groups.orchestration.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
 def test_add_member_to_group_primary_failure_no_propagation(
     mock_get_primary,
     mock_get_active,
@@ -120,7 +113,10 @@ def test_add_member_to_group_primary_failure_no_propagation(
     mock_get_primary.return_value = primary
     mock_get_active.return_value = fake_active
     # uuid4 is imported at module level, patch where used
-    with patch("modules.groups.orchestration.uuid4", return_value=SimpleNamespace(__str__=lambda self: "cid")):
+    with patch(
+        "modules.groups.orchestration.uuid4",
+        return_value=SimpleNamespace(__str__=lambda self: "cid"),
+    ):
         res = orch.add_member_to_group("grp", "user@example.com", "just")
 
     mock_fmt.assert_called_once()
@@ -131,14 +127,14 @@ def test_add_member_to_group_primary_failure_no_propagation(
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch("modules.groups.orchestration.map_primary_to_secondary_group", return_value="mapped-sec-grp")
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
-@patch("modules.groups.providers.get_active_providers")
-@patch("modules.groups.providers.get_primary_provider")
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.get_active_providers")
+@patch("modules.groups.orchestration.get_primary_provider")
 @patch(
-    "modules.groups.providers.base.OperationResult",
+    "modules.groups.orchestration.OperationResult",
     new=SimpleNamespace(transient_error=staticmethod(lambda msg: DummyOp(status="TRANSIENT", message=msg))),
 )
-@patch("modules.groups.providers.base.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
+@patch("modules.groups.orchestration.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
 def test_add_member_to_group_primary_success_secondary_partial_failure(
     mock_get_primary,
     mock_get_active,
@@ -170,14 +166,14 @@ def test_add_member_to_group_primary_success_secondary_partial_failure(
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch("modules.groups.orchestration.map_primary_to_secondary_group", return_value="mapped-sec-grp")
-@patch("modules.groups.providers.get_primary_provider_name", return_value="google")
-@patch("modules.groups.providers.get_active_providers")
-@patch("modules.groups.providers.get_primary_provider")
+@patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
+@patch("modules.groups.orchestration.get_active_providers")
+@patch("modules.groups.orchestration.get_primary_provider")
 @patch(
-    "modules.groups.providers.base.OperationResult",
+    "modules.groups.orchestration.OperationResult",
     new=SimpleNamespace(transient_error=staticmethod(lambda msg: DummyOp(status="TRANSIENT", message=msg))),
 )
-@patch("modules.groups.providers.base.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
+@patch("modules.groups.orchestration.OperationStatus", new=SimpleNamespace(SUCCESS="SUCCESS"))
 def test_remove_member_from_group_propagation_and_partial(
     mock_get_primary,
     mock_get_active,
