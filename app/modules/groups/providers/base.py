@@ -84,6 +84,7 @@ class ProviderCapabilities:
     supports_group_creation: bool = False  # Should always be False
     supports_group_deletion: bool = False  # Should always be False
     supports_member_management: bool = True
+    is_primary: bool = False
     provides_role_info: bool = False
     supports_batch_operations: bool = False
     max_batch_size: int = 1
@@ -136,6 +137,10 @@ def opresult_wrapper(data_key=None):
         def wrapper(*args, **kwargs):
             try:
                 result = func(*args, **kwargs)
+                # If the provider already returned an OperationResult, pass it
+                # through unchanged (avoid double-wrapping).
+                if isinstance(result, OperationResult):
+                    return result
                 data = {data_key: result} if data_key else result
                 return OperationResult(
                     status=OperationStatus.SUCCESS, message="ok", data=data
@@ -201,12 +206,6 @@ class GroupProvider(ABC):
     def delete_user(self, user_key: str) -> OperationResult:
         """Delete a user and return the result."""
         raise NotImplementedError("User deletion not implemented in this provider.")
-
-    def validate_permissions(
-        self, user_key: str, group_key: str, action: str
-    ) -> OperationResult:
-        """Validate permissions for a user on a group."""
-        raise NotImplementedError()
 
     def get_groups_for_user(self, user_key: str, **kwargs) -> OperationResult:
         """Return a list of canonical group dicts the user can manage."""
