@@ -168,6 +168,17 @@ def get_primary_provider() -> GroupProvider:
     return PROVIDER_REGISTRY[_PRIMARY_PROVIDER_NAME]
 
 
+def get_primary_provider_name() -> str:
+    """Return the name of the primary provider.
+
+    Raises ValueError if no primary provider is active.
+    """
+    if _PRIMARY_PROVIDER_NAME is None:
+        raise ValueError("No primary provider set. Call activate_providers() first.")
+
+    return _PRIMARY_PROVIDER_NAME
+
+
 def get_provider(provider_name: str) -> GroupProvider:
     """Get provider instance by name.
 
