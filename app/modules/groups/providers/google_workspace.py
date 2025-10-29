@@ -49,7 +49,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         self,
         group: Dict,
         members: Optional[List[Dict]] = None,
-        include_raw: bool = True,
+        include_raw: bool = False,
     ) -> NormalizedGroup:
         """Convert a Google group response to a NormalizedGroup with local-part ID."""
         try:
@@ -79,7 +79,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         )
 
     def _normalize_member_from_google(
-        self, member: Dict, include_raw: bool = True
+        self, member: Dict, include_raw: bool = False
     ) -> NormalizedMember:
         """Convert a Google member response to a NormalizedMember."""
         try:
