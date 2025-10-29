@@ -281,18 +281,39 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return False
 
     @opresult_wrapper(data_key="groups")
-    def get_groups_for_user(self, user_key: str, **kwargs) -> List[Dict]:
+    def get_groups_for_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> List[Dict]:
         """Return canonical groups for which `user_key` is a member.
 
         Args:
             user_key: A Google member key (email or ID).
+            provider_name: Optional provider name filter.
 
         Returns:
             A list of canonical group dicts (normalized NormalizedGroup).
         """
-        resp = google_directory.list_groups(query=f"memberKey={user_key}", **kwargs)
+        users_kwargs = {"fields": "primaryEmail,name"}
+        groups_kwargs = {"query": "memberKey=" + user_key}
+        if provider_name and provider_name != "google":
+            groups_filters = [
+                lambda g: isinstance(g, dict)
+                and g.get("email", "").lower().startswith(provider_name.lower())
+            ]
+            resp = google_directory.list_groups_with_members(
+                groups_filters=groups_filters,
+                groups_kwargs=groups_kwargs,
+                users_kwargs=users_kwargs,
+                **kwargs,
+            )
+        else:
+            resp = google_directory.list_groups_with_members(
+                groups_kwargs=groups_kwargs, users_kwargs=users_kwargs, **kwargs
+            )
         if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError("google list_groups failed", response=resp)
+            raise IntegrationError(
+                "google list_groups_with_members failed", response=resp
+            )
         raw = resp.data if hasattr(resp, "data") else resp
         return [
             as_canonical_dict(self._normalize_group_from_google(g))
