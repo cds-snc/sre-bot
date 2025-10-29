@@ -35,6 +35,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities."""
         return ProviderCapabilities(
+            is_primary=True,
             supports_member_management=True,
             provides_role_info=True,
         )

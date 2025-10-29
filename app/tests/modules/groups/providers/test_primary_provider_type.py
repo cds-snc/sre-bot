@@ -78,6 +78,8 @@ def test_get_primary_provider_is_primary_type(safe_providers_import):
 
     # Register our DummyPrimary as the provider named "dummy"
     mod.register_provider("dummy")(DummyPrimary)
+    # Activate so the provider is instantiated (new contract requires explicit activation)
+    mod.activate_providers()
 
     # Now assert get_primary_provider() returns an instance of PrimaryGroupProvider
     prov = mod.get_primary_provider()

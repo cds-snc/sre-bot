@@ -82,6 +82,9 @@ def test_primary_provider_exists_and_has_methods(
 
     # Register dummy provider (will read the patched settings)
     mod.register_provider("dummy")(DummyProvider)
+    # Activation is explicit in the new contract
+    mod.PROVIDER_REGISTRY.clear()
+    mod.activate_providers()
 
     provider = mod.get_provider("dummy")
 
@@ -118,6 +121,8 @@ def test_method_signatures_have_expected_params(
     DummyProvider = _make_dummy_provider(GroupProvider, ProviderCapabilities)
     mod.register_provider("dummy")(DummyProvider)
 
+    # Explicit activation required by new contract
+    mod.activate_providers()
     provider = mod.get_provider("dummy")
 
     for method_name in ("add_member", "remove_member"):

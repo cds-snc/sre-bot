@@ -68,19 +68,20 @@ def test_register_class_and_instance_and_invalid(
     # Provide config so non-primary providers may register (require prefix)
     groups_providers.set_providers({"dummy": {"enabled": True, "prefix": "d"}})
 
-    # Register a class (deferred register in conftest will use the
-    # current settings when called)
+    # Register a class (discovery only)
+    mod.PROVIDER_REGISTRY.clear()
     mod.register_provider("dummy")(DummyProvider)
+
+    # Activation must be explicit in the new contract
+    mod.activate_providers()
     assert "dummy" in mod.PROVIDER_REGISTRY
     assert isinstance(mod.PROVIDER_REGISTRY["dummy"], GroupProvider)
 
-    # Register an instance
-    mod.PROVIDER_REGISTRY.pop("dummy", None)
+    # Registering instances via the decorator is no longer supported
     inst = DummyProvider()
     groups_providers.providers["dummy_inst"] = {"enabled": True, "prefix": "di"}
-    mod.register_provider("dummy_inst")(inst)
-    assert "dummy_inst" in mod.PROVIDER_REGISTRY
-    assert mod.PROVIDER_REGISTRY["dummy_inst"] is inst
+    with pytest.raises(TypeError):
+        mod.register_provider("dummy_inst")(inst)
 
     # Invalid object registration should raise TypeError
     with pytest.raises(TypeError):
@@ -143,8 +144,12 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
     # Mark provider as disabled in config
     groups_providers.providers["disabled"] = {"enabled": False, "prefix": "dis"}
 
-    # Attempt registration; decorator should return early and not add to registry
+    # Decorator should record discovery but activation should skip instantiation
     mod.register_provider("disabled")(DisabledProvider)
+    # Discovery does not populate PROVIDER_REGISTRY until activation
+    assert "disabled" not in mod.PROVIDER_REGISTRY
+    # Now activate providers; disabled provider should not be instantiated
+    mod.activate_providers()
     assert "disabled" not in mod.PROVIDER_REGISTRY
 
 
@@ -159,7 +164,48 @@ def test_get_primary_provider_name_and_prefixes(
             "aws": {"prefix": "aws"},
         }
     )
-    assert prov.get_primary_provider_name() == "google"
+    # Register dummy provider classes so activation can instantiate them
+    from modules.groups.providers.base import GroupProvider, ProviderCapabilities
+
+    class DummyPrimary(GroupProvider):
+        def __init__(self):
+            self._capabilities = ProviderCapabilities(provides_role_info=True)
+
+        @property
+        def capabilities(self):
+            return self._capabilities
+
+        def get_group_members(self, group_key: str, **kwargs):
+            raise NotImplementedError()
+
+        def add_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def remove_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def get_groups_for_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def validate_permissions(self, user_key: str, group_key: str, action: str):
+            raise NotImplementedError()
+
+        def create_user(self, user_data: dict):
+            raise NotImplementedError()
+
+        def delete_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
+            raise NotImplementedError()
+
+    prov.register_provider("google")(DummyPrimary)
+    prov.register_provider("aws")(DummyPrimary)
+    prov.activate_providers()
+    assert prov._PRIMARY_PROVIDER_NAME == "google"
     # Note: `get_provider_prefixes()` was removed from the providers
     # module; only assert the primary provider selection here.
 
@@ -171,13 +217,15 @@ def test_get_primary_provider_name_raises_when_not_configured(
 
     # Case A: providers present but empty dict
     groups_providers.set_providers({})
+    # Activation should fail to determine a primary when no providers configured
     with pytest.raises(ValueError):
-        mod.get_primary_provider_name()
+        mod.activate_providers()
 
     # Case B: simulate missing groups entirely
     groups_providers.remove_groups()
     with pytest.raises(ValueError):
-        mod.get_primary_provider_name()
+        # activating with empty providers mapping should raise when primary cannot be determined
+        mod.activate_providers()
 
 
 def test_get_primary_provider_name_returns_primary(
@@ -195,7 +243,49 @@ def test_get_primary_provider_name_returns_primary(
         }
     )
 
-    assert mod.get_primary_provider_name() == "aws"
+    # Register dummy classes and activate
+    from modules.groups.providers.base import GroupProvider, ProviderCapabilities
+
+    class Dummy(GroupProvider):
+        def __init__(self):
+            self._capabilities = ProviderCapabilities()
+
+        @property
+        def capabilities(self):
+            return self._capabilities
+
+        def get_group_members(self, group_key: str, **kwargs):
+            raise NotImplementedError()
+
+        def add_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def remove_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def get_groups_for_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def validate_permissions(self, user_key: str, group_key: str, action: str):
+            raise NotImplementedError()
+
+        def create_user(self, user_data: dict):
+            raise NotImplementedError()
+
+        def delete_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
+            raise NotImplementedError()
+
+    mod.register_provider("google")(Dummy)
+    mod.register_provider("aws")(Dummy)
+    mod.register_provider("extra")(Dummy)
+    mod.activate_providers()
+    assert mod._PRIMARY_PROVIDER_NAME == "aws"
 
 
 def test_get_provider_unknown_raises(safe_providers_import):
@@ -277,7 +367,7 @@ def test_validate_startup_configuration_primary_not_registered(
     mod.PROVIDER_REGISTRY.clear()
 
     with pytest.raises(RuntimeError):
-        mod._validate_startup_configuration()
+        mod._validate_startup()
 
 
 def test_validate_startup_configuration_requires_role_info(
@@ -337,14 +427,16 @@ def test_validate_startup_configuration_requires_role_info(
     mod.PROVIDER_REGISTRY["primary"] = Primary()
 
     with pytest.raises(RuntimeError):
-        mod._validate_startup_configuration()
+        mod._validate_startup()
 
     # Now advertise provides_role_info and validation should pass
     mod.PROVIDER_REGISTRY["primary"]._capabilities = ProviderCapabilities(
         provides_role_info=True
     )
     # Should not raise
-    mod._validate_startup_configuration()
+    # The validator requires a primary to be set during activation; set it here
+    mod._PRIMARY_PROVIDER_NAME = "primary"
+    mod._validate_startup()
 
 
 def test_get_primary_provider_name_and_errors(safe_providers_import, groups_providers):
@@ -353,12 +445,57 @@ def test_get_primary_provider_name_and_errors(safe_providers_import, groups_prov
     groups_providers.set_providers(
         {"a": {"primary": True, "prefix": "p", "enabled": True}}
     )
-    assert mod.get_primary_provider_name() == "a"
+    # Register a simple provider class and activate to set primary
+    from modules.groups.providers.base import GroupProvider, ProviderCapabilities
+
+    class A(GroupProvider):
+        def __init__(self):
+            self._capabilities = ProviderCapabilities()
+
+        @property
+        def capabilities(self):
+            return self._capabilities
+
+        def get_group_members(self, group_key: str, **kwargs):
+            raise NotImplementedError()
+
+        def add_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def remove_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def get_groups_for_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def validate_permissions(self, user_key: str, group_key: str, action: str):
+            raise NotImplementedError()
+
+        def create_user(self, user_data: dict):
+            raise NotImplementedError()
+
+        def delete_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
+            raise NotImplementedError()
+
+    mod.register_provider("a")(A)
+    mod.activate_providers()
+    assert mod._PRIMARY_PROVIDER_NAME == "a"
 
     # No primary configured -> ValueError
     groups_providers.set_providers({})
+    # If discovered classes remain activation may still succeed (single discovered
+    # provider can become the primary). Clear discovered classes and registry to
+    # simulate truly no providers configured/discovered.
+    mod.DISCOVERED_PROVIDER_CLASSES.clear()
+    mod.PROVIDER_REGISTRY.clear()
     with pytest.raises(ValueError):
-        mod.get_primary_provider_name()
+        mod.activate_providers()
 
 
 def test_validate_startup_configuration_behaviour(
@@ -372,7 +509,10 @@ def test_validate_startup_configuration_behaviour(
     groups_providers.set_providers({})
     mod.PROVIDER_REGISTRY.clear()
     # Should not raise
-    mod._validate_startup_configuration()
+    # No providers and no primary set: _validate_startup should raise because
+    # the new implementation requires a primary to be set during activation.
+    with pytest.raises(RuntimeError):
+        mod._validate_startup()
 
     # Configure a primary but do not register it -> should raise at validation time
     groups_providers.set_providers(
@@ -380,7 +520,7 @@ def test_validate_startup_configuration_behaviour(
     )
     mod.PROVIDER_REGISTRY.clear()
     with pytest.raises(RuntimeError):
-        mod._validate_startup_configuration()
+        mod._validate_startup()
 
     # Register primary but without provides_role_info -> should raise
     class P(GroupProvider):
@@ -421,11 +561,13 @@ def test_validate_startup_configuration_behaviour(
 
     mod.PROVIDER_REGISTRY["primary"] = P()
     with pytest.raises(RuntimeError):
-        mod._validate_startup_configuration()
+        mod._validate_startup()
 
     # Now advertise provides_role_info and validation should pass
     mod.PROVIDER_REGISTRY["primary"]._capabilities = ProviderCapabilities(
         provides_role_info=True
     )
     # Should not raise
-    mod._validate_startup_configuration()
+    # To make validation pass, set a primary and advertise provides_role_info
+    mod._PRIMARY_PROVIDER_NAME = "primary"
+    mod._validate_startup()
