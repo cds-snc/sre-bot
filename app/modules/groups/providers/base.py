@@ -207,7 +207,9 @@ class GroupProvider(ABC):
         """Delete a user and return the result."""
         raise NotImplementedError("User deletion not implemented in this provider.")
 
-    def get_groups_for_user(self, user_key: str, **kwargs) -> OperationResult:
+    def get_groups_for_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
         """Return a list of canonical group dicts the user can manage."""
         raise NotImplementedError()
 
