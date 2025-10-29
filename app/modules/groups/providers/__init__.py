@@ -1,144 +1,205 @@
 """Provider registry and helpers for group providers.
 
-This module maintains the provider registry and exposes decorators and
-helpers for registering and accessing provider implementations.
+SIMPLE ACTIVATION MODEL:
+1. @register_provider decorator → DISCOVERED_PROVIDER_CLASSES (class registration)
+2. activate_providers() → reads config ONCE, instantiates, populates PROVIDER_REGISTRY
+3. Helper functions → only query PROVIDER_REGISTRY, no config re-parsing
 
-All provider contracts, capabilities, and abstract base classes are defined
-in `modules.groups.providers.base`.
+Config overrides applied ONLY during activate_providers(), then discarded.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Type
+
 from core.config import settings
 from core.logging import get_module_logger
 from modules.groups.providers.base import GroupProvider
 
 logger = get_module_logger()
 
+# Registry of instantiated providers (populated at activation time)
 PROVIDER_REGISTRY: Dict[str, GroupProvider] = {}
+
+# Discovery registry: decorator records provider classes here during import
+DISCOVERED_PROVIDER_CLASSES: Dict[str, Type[GroupProvider]] = {}
+
+# Primary provider name (set once during activate_providers())
+_PRIMARY_PROVIDER_NAME: Optional[str] = None
 
 
 def register_provider(name: str):
-    """Decorator to register a provider class or instance.
+    """Decorator to register a provider class.
 
-    Usage:
-        @register_provider("google")
-        class GoogleWorkspaceProvider(GroupProvider):
-            ...
+    Records the class in DISCOVERED_PROVIDER_CLASSES.
+    Instantiation happens later during activate_providers().
     """
 
     def decorator(obj):
-        instance = obj() if isinstance(obj, type) else obj
+        if not isinstance(obj, type):
+            raise TypeError("register_provider decorator must be applied to a class")
 
-        if not isinstance(instance, GroupProvider):
+        if not issubclass(obj, GroupProvider):
             raise TypeError(
-                f"Registered provider must implement GroupProvider: {name}, got {type(instance)}"
+                f"Registered provider must subclass GroupProvider: {name}, got {obj}"
             )
 
-        if name in PROVIDER_REGISTRY:
-            raise RuntimeError(f"Provider already registered with name: {name}")
+        if name in DISCOVERED_PROVIDER_CLASSES:
+            raise RuntimeError(f"Provider already discovered with name: {name}")
 
-        # Check config for enabled/disabled
-        provider_cfg = {}
-        if getattr(settings, "groups", None) and isinstance(
-            settings.groups.providers, dict
-        ):
-            provider_cfg = settings.groups.providers.get(name, {}) or {}
-        enabled = provider_cfg.get("enabled", True)
-        if not enabled:
-            logger.info("provider_disabled_by_config", provider=name)
-            return obj
-
-        PROVIDER_REGISTRY[name] = instance
-        logger.info("provider_registered", provider=name, type=type(instance).__name__)
+        DISCOVERED_PROVIDER_CLASSES[name] = obj
+        logger.debug("provider_discovered", provider=name, class_name=obj.__name__)
         return obj
 
     return decorator
 
 
-def get_primary_provider_name() -> str:
-    """Return the configured primary provider name."""
-    provs = getattr(settings, "groups", None) and getattr(
+def activate_providers() -> None:
+    """Instantiate discovered providers with config overrides.
+
+    - Reads config ONCE from settings
+    - Instantiates each discovered provider
+    - Determines and caches primary provider
+    - No lazy activation; all done at startup
+    """
+    global _PRIMARY_PROVIDER_NAME
+
+    # Read config once
+    provs_cfg = getattr(settings, "groups", None) and getattr(
         settings.groups, "providers", {}
     )
-    if not provs or not isinstance(provs, dict):
-        raise ValueError("GROUP_PROVIDERS is not configured")
-    for name, cfg in provs.items():
+    provs_cfg = provs_cfg if isinstance(provs_cfg, dict) else {}
+
+    # Instantiate all discovered providers
+    for name, provider_cls in DISCOVERED_PROVIDER_CLASSES.items():
+        cfg = provs_cfg.get(name, {})
+        enabled = cfg.get("enabled", True)
+
+        if not enabled:
+            logger.info("provider_disabled_by_config", provider=name)
+            continue
+
+        try:
+            # Use from_config if available, else default instantiation
+            if hasattr(provider_cls, "from_config") and callable(
+                getattr(provider_cls, "from_config")
+            ):
+                instance = provider_cls.from_config(cfg)
+            else:
+                init_kwargs = (
+                    cfg.get("init_kwargs", {}) if isinstance(cfg, dict) else {}
+                )
+                try:
+                    instance = provider_cls(**init_kwargs)
+                except TypeError:
+                    instance = provider_cls()
+
+            if not isinstance(instance, GroupProvider):
+                raise TypeError(f"Provider must be a GroupProvider instance: {name}")
+
+            PROVIDER_REGISTRY[name] = instance
+            logger.info(
+                "provider_activated", provider=name, type=type(instance).__name__
+            )
+        except Exception as e:
+            logger.error("provider_activation_failed", provider=name, error=str(e))
+            raise
+
+    # Determine primary provider
+    _PRIMARY_PROVIDER_NAME = _determine_primary(provs_cfg)
+    logger.info("primary_provider_set", provider=_PRIMARY_PROVIDER_NAME)
+
+
+def _determine_primary(provs_cfg: Dict) -> str:
+    """Determine the primary provider from registry or config.
+
+    Priority:
+    1. Provider marked primary=True in config
+    2. Single provider with is_primary=True capability
+    3. Only provider in registry
+    4. Single discovered provider (if registry empty)
+    """
+    # Check config for explicit primary
+    for name, cfg in provs_cfg.items():
         if isinstance(cfg, dict) and cfg.get("primary"):
+            if name not in PROVIDER_REGISTRY:
+                raise ValueError(
+                    f"Primary provider '{name}' not in registry. "
+                    "Ensure it's discovered and enabled."
+                )
             return name
-    raise ValueError("No primary provider configured in GROUP_PROVIDERS")
+
+    # Check capabilities in registry
+    if PROVIDER_REGISTRY:
+        primaries = [
+            n
+            for n, p in PROVIDER_REGISTRY.items()
+            if getattr(p.capabilities, "is_primary", False)
+        ]
+        if len(primaries) == 1:
+            return primaries[0]
+        if len(primaries) > 1:
+            raise RuntimeError(f"Multiple providers claim is_primary=True: {primaries}")
+        # Single provider in registry
+        if len(PROVIDER_REGISTRY) == 1:
+            return next(iter(PROVIDER_REGISTRY.keys()))
+
+    # Fallback: single discovered (not yet instantiated)
+    if len(DISCOVERED_PROVIDER_CLASSES) == 1:
+        return next(iter(DISCOVERED_PROVIDER_CLASSES.keys()))
+
+    raise ValueError(
+        "Cannot determine primary provider. "
+        "Ensure at least one provider is configured/discovered."
+    )
 
 
 def get_primary_provider() -> GroupProvider:
-    """Return the registered primary provider instance."""
-    name = get_primary_provider_name()
-    return get_provider(name)
+    """Return the primary provider instance.
+
+    Raises ValueError if no primary provider is active.
+    """
+    if _PRIMARY_PROVIDER_NAME is None:
+        raise ValueError("No primary provider set. Call activate_providers() first.")
+
+    if _PRIMARY_PROVIDER_NAME not in PROVIDER_REGISTRY:
+        raise ValueError(
+            f"Primary provider '{_PRIMARY_PROVIDER_NAME}' not in registry."
+        )
+
+    return PROVIDER_REGISTRY[_PRIMARY_PROVIDER_NAME]
 
 
 def get_provider(provider_name: str) -> GroupProvider:
-    """Get provider instance by name (raises ValueError if unknown)."""
+    """Get provider instance by name.
+
+    Raises ValueError if provider not in registry.
+    """
     if provider_name not in PROVIDER_REGISTRY:
         raise ValueError(f"Unknown provider: {provider_name}")
+
     return PROVIDER_REGISTRY[provider_name]
 
 
 def get_active_providers(
     provider_filter: Optional[str] = None,
 ) -> Dict[str, GroupProvider]:
-    """Get all active providers or filtered by name."""
+    """Get active providers, optionally filtered by name."""
     if provider_filter:
         return {provider_filter: get_provider(provider_filter)}
-    return PROVIDER_REGISTRY
 
-
-def _validate_startup_configuration() -> None:
-    """Validate provider configuration at startup."""
-    provs = getattr(settings, "groups", None) and getattr(
-        settings.groups, "providers", {}
-    )
-    if not provs:
-        logger.info(
-            "provider_startup_validation_skipped", reason="no providers configured"
-        )
-        return
-
-    try:
-        primary_name = get_primary_provider_name()
-    except Exception as e:
-        raise RuntimeError(f"Provider configuration error: {e}") from e
-
-    if primary_name not in PROVIDER_REGISTRY:
-        raise RuntimeError(
-            f"Primary provider '{primary_name}' is configured but not registered. "
-            "Ensure the provider module is imported and register_provider() is applied."
-        )
-
-    primary = PROVIDER_REGISTRY[primary_name]
-    caps = getattr(primary, "capabilities", None)
-    if not caps or not getattr(caps, "provides_role_info", False):
-        raise RuntimeError(
-            f"Primary provider '{primary_name}' does not advertise provides_role_info=True. "
-            "Primary provider must expose role information for permission checks."
-        )
-
-
-# NOTE: Do not validate startup configuration at package import time.
-# Validation is performed after explicit provider discovery via `load_providers()`
-# to avoid import-order issues where callers import the package before
-# provider submodules are imported/registered.
+    return PROVIDER_REGISTRY.copy()
 
 
 def load_providers() -> None:
-    """Discover and import provider modules under this package.
+    """Discover and import provider modules, then activate.
 
-    This will import every top-level module in the `modules.groups.providers`
-    package (skipping private modules). Import errors are logged and do not
-    halt startup so a single faulty provider doesn't block all providers.
+    - Imports all top-level modules (skips private)
+    - Calls activate_providers() to instantiate and set primary
+    - Validates startup config
     """
     import importlib
     import pkgutil
 
     for finder, modname, ispkg in pkgutil.iter_modules(__path__):
-        # skip private modules
         if modname.startswith("_"):
             continue
         full_name = f"{__name__}.{modname}"
@@ -147,16 +208,29 @@ def load_providers() -> None:
         except Exception as e:
             logger.warning("provider_import_failed", module=full_name, error=str(e))
 
-    # After attempting to import provider modules, validate the startup
-    # configuration so we fail fast if the configured primary provider was
-    # not registered or does not advertise required capabilities.
-    try:
-        _validate_startup_configuration()
-    except Exception as exc:
-        logger.error(
-            "provider_startup_validation_failed",
-            component="providers",
-            module_path=__name__,
-            error=str(exc),
+    # Activate providers and set primary
+    activate_providers()
+
+    # Validate startup state
+    _validate_startup()
+
+
+def _validate_startup() -> None:
+    """Validate that primary provider meets requirements."""
+    if _PRIMARY_PROVIDER_NAME is None:
+        raise RuntimeError("No primary provider configured.")
+
+    primary = get_primary_provider()
+    caps = getattr(primary, "capabilities", None)
+
+    if not caps or not getattr(caps, "provides_role_info", False):
+        raise RuntimeError(
+            f"Primary provider '{_PRIMARY_PROVIDER_NAME}' "
+            "does not advertise provides_role_info=True."
         )
-        raise
+
+    logger.info(
+        "provider_startup_validated",
+        primary=_PRIMARY_PROVIDER_NAME,
+        total_active=len(PROVIDER_REGISTRY),
+    )
