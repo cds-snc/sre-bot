@@ -55,7 +55,7 @@ def _send_slack_notification(user_email: str, message: str, provider: str) -> No
 
 
 def send_email_notification(user_email: str, subject: str, message: str) -> None:
-    """Send email notification using Notify service."""
+    """Send email notification using Google Workspace Gmail service."""
     try:
         # Placeholder for email notification
         logger.info(
