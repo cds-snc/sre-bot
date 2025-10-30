@@ -155,15 +155,12 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         )
 
     @opresult_wrapper(data_key="result")
-    def add_member(
-        self, group_key: str, member_data: NormalizedMember, justification: str
-    ) -> Dict:
+    def add_member(self, group_key: str, member_data: NormalizedMember) -> Dict:
         """Add a member to a group and return the normalized member dict.
 
         Args:
             group_key: Google group key.
             member_data: Member identifier (str email) or dict with email/id.
-            justification: Reason for adding (for audit logs).
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
@@ -177,15 +174,12 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return {}
 
     @opresult_wrapper(data_key="result")
-    def remove_member(
-        self, group_key: str, member_data: NormalizedMember, justification: str
-    ) -> Dict:
+    def remove_member(self, group_key: str, member_data: NormalizedMember) -> Dict:
         """Remove a member from a group.
 
         Args:
             group_key: Google group key.
             member_data: Member identifier (str email) or dict with email/id.
-            justification: Reason for removal (for audit logs).
 
         Returns:
             A status dict confirming removal.

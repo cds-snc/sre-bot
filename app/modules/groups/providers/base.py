@@ -185,13 +185,13 @@ class GroupProvider(ABC):
 
     @abstractmethod
     def add_member(
-        self, group_key: str, member_data: NormalizedMember, justification: str
+        self, group_key: str, member_data: NormalizedMember
     ) -> OperationResult:
         """Add a member synchronously and return a canonical member dict."""
 
     @abstractmethod
     def remove_member(
-        self, group_key: str, member_data: NormalizedMember, justification: str
+        self, group_key: str, member_data: NormalizedMember
     ) -> OperationResult:
         """Remove a member synchronously and return canonical member dict."""
 

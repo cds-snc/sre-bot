@@ -258,15 +258,12 @@ class AwsIdentityCenterProvider(GroupProvider):
         )
 
     @opresult_wrapper(data_key="result")
-    def add_member(
-        self, group_key: str, member_data: dict | str, justification: str
-    ) -> dict:
+    def add_member(self, group_key: str, member_data: dict | str) -> dict:
         """Add a member to a group and return the normalized member dict.
 
         Args:
             group_key: AWS group key.
             member_data: Member identifier (str email) or dict with email.
-            justification: Reason for adding (for audit logs).
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
@@ -299,15 +296,12 @@ class AwsIdentityCenterProvider(GroupProvider):
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
     @opresult_wrapper(data_key="result")
-    def remove_member(
-        self, group_key: str, member_data: dict | str, justification: str
-    ) -> dict:
+    def remove_member(self, group_key: str, member_data: dict | str) -> dict:
         """Remove a member from a group and return the normalized member dict.
 
         Args:
             group_key: AWS group key.
             member_data: Member identifier (str email) or dict with email.
-            justification: Reason for removal (for audit logs).
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
