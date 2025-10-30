@@ -11,8 +11,6 @@ Config overrides applied ONLY during activate_providers(), then discarded.
 import importlib
 import pkgutil
 from typing import Dict, Optional, Type
-
-from core.config import settings
 from core.logging import get_module_logger
 from modules.groups.providers.base import GroupProvider
 
@@ -73,42 +71,37 @@ def activate_providers() -> str:
         RuntimeError: on duplicate prefix collisions or when provider
             instantiation/validation fails.
     """
-    # Read config once
-    provs_cfg = getattr(settings, "groups", None) and getattr(
-        settings.groups, "providers", {}
-    )
-    provs_cfg = provs_cfg if isinstance(provs_cfg, dict) else {}
-
-    # Instantiate all discovered providers
+    # Instantiate all discovered providers into a fresh local registry.
+    # Note: Per simplified activation model we do NOT consult core config
+    # (settings.groups.*) here. Providers should be constructible without
+    # global config or expose an explicit classmethod `from_config()` that
+    # accepts no arguments if needed.
+    new_registry: Dict[str, GroupProvider] = {}
     for name, provider_cls in DISCOVERED_PROVIDER_CLASSES.items():
-        cfg = provs_cfg.get(name, {})
-        enabled = cfg.get("enabled", True)
-
-        if not enabled:
-            logger.info("provider_disabled_by_config", provider=name)
-            continue
-
         try:
-            # Prefer parameterless construction so providers supply sensible defaults
+            # Prefer parameterless construction so providers supply sensible
+            # defaults. If the provider requires custom construction, it may
+            # provide a no-arg `from_config()` classmethod to be invoked here.
             try:
                 instance = provider_cls()
-            except TypeError:
-                # Provider requires args — fall back to lightweight init:
-                # - Prefer from_config if present (last resort)
-                # - Else use init_kwargs from config
+            except TypeError as e:
+                # Provider's __init__ requires args. Try explicit, no-arg
+                # fallback constructors.
                 if hasattr(provider_cls, "from_config") and callable(
                     getattr(provider_cls, "from_config")
                 ):
-                    instance = provider_cls.from_config(cfg)
+                    # Call from_config with no args (explicit opt-in)
+                    instance = provider_cls.from_config()
+                elif hasattr(provider_cls, "from_empty_config") and callable(
+                    getattr(provider_cls, "from_empty_config")
+                ):
+                    instance = provider_cls.from_empty_config()
                 else:
-                    init_kwargs = (
-                        cfg.get("init_kwargs", {}) if isinstance(cfg, dict) else {}
-                    )
-                    try:
-                        instance = provider_cls(**init_kwargs)
-                    except TypeError:
-                        # Final fallback: attempt parameterless construction again
-                        instance = provider_cls()
+                    raise RuntimeError(
+                        f"Provider '{name}' cannot be constructed without "
+                        "activation config. Implement a no-arg __init__ or "
+                        "a no-arg classmethod 'from_config'/'from_empty_config'."
+                    ) from e
 
             if not isinstance(instance, GroupProvider):
                 raise TypeError(f"Provider must be a GroupProvider instance: {name}")
@@ -116,9 +109,9 @@ def activate_providers() -> str:
             # Attach registration name to the instance for clarity
             setattr(instance, "name", name)
 
-            # Apply provider-provided defaults (activation metadata).
-            # Providers may expose `default_prefix` or `prefix`; prefer explicit
-            # provider attribute, then fall back to the registration name.
+            # Apply provider-provided defaults for prefix (activation-time
+            # metadata). Prefer explicit `default_prefix` attribute, then the
+            # provider's `prefix` property, and finally the registration name.
             default_prefix = None
             if hasattr(instance, "default_prefix"):
                 default_prefix = getattr(instance, "default_prefix")
@@ -128,30 +121,12 @@ def activate_providers() -> str:
             if isinstance(default_prefix, str):
                 default_prefix = default_prefix.strip() or None
 
-            # Ensure a sensible default exists (use registration name)
             if default_prefix is None:
                 default_prefix = name
 
-            # Set activation-time canonical prefix
             setattr(instance, "_prefix", default_prefix)
 
-            # Now apply explicit config override if present (config wins)
-            if isinstance(cfg, dict) and "prefix" in cfg:
-                raw = cfg.get("prefix")
-                override = None
-                if isinstance(raw, str):
-                    raw = raw.strip()
-                    override = raw if raw else None
-                # If override provided (non-empty), apply it
-                if override:
-                    setattr(instance, "_prefix", override)
-                    logger.info(
-                        "provider_prefix_overridden",
-                        provider=name,
-                        prefix=override,
-                    )
-
-            PROVIDER_REGISTRY[name] = instance
+            new_registry[name] = instance
             logger.info(
                 "provider_activated", provider=name, type=type(instance).__name__
             )
@@ -161,7 +136,7 @@ def activate_providers() -> str:
 
     # Validate uniqueness of non-empty prefixes (fail fast on collisions)
     prefixes: Dict[str, list] = {}
-    for n, inst in PROVIDER_REGISTRY.items():
+    for n, inst in new_registry.items():
         p = getattr(inst, "_prefix", None)
         if p:
             prefixes.setdefault(p, []).append(n)
@@ -170,53 +145,53 @@ def activate_providers() -> str:
         logger.error("duplicate_provider_prefixes", duplicates=dupes)
         raise RuntimeError(f"Duplicate provider prefixes detected: {dupes}")
 
-    # Determine primary provider
-    provider_name = _determine_primary(provs_cfg)
+    # Determine primary provider based on the freshly-built registry.
+    provider_name = _determine_primary(registry=new_registry)
+
+    # Atomically swap the active provider registry and record primary
+    PROVIDER_REGISTRY.clear()
+    PROVIDER_REGISTRY.update(new_registry)
+    global _PRIMARY_PROVIDER_NAME
+    _PRIMARY_PROVIDER_NAME = provider_name
+
     logger.info("primary_provider_set", provider=provider_name)
     return provider_name
 
 
-def _determine_primary(provs_cfg: Dict) -> str:
-    """Determine the primary provider from registry or config.
+def _determine_primary(registry: Optional[Dict[str, GroupProvider]] = None) -> str:
+    """Determine the primary provider from the freshly-built registry.
 
-    Priority:
-    1. Provider marked primary=True in config
-    2. Single provider with is_primary=True capability
-    3. Only provider in registry
-    4. Single discovered provider (if registry empty)
+    Simplified priority:
+    1. Exactly one provider in registry with `capabilities.is_primary == True`
+    2. If registry contains exactly one provider, choose it
+    3. Otherwise raise ValueError and require explicit class-level primary
+       designation or single-provider deployment.
     """
-    # Check config for explicit primary
-    for name, cfg in provs_cfg.items():
-        if isinstance(cfg, dict) and cfg.get("primary"):
-            if name not in PROVIDER_REGISTRY:
-                raise ValueError(
-                    f"Primary provider '{name}' not in registry. "
-                    "Ensure it's discovered and enabled."
-                )
-            return name
+    reg = registry if registry is not None else PROVIDER_REGISTRY
 
-    # Check capabilities in registry
-    if PROVIDER_REGISTRY:
-        primaries = [
-            n
-            for n, p in PROVIDER_REGISTRY.items()
-            if getattr(p.capabilities, "is_primary", False)
-        ]
-        if len(primaries) == 1:
-            return primaries[0]
-        if len(primaries) > 1:
-            raise RuntimeError(f"Multiple providers claim is_primary=True: {primaries}")
-        # Single provider in registry
-        if len(PROVIDER_REGISTRY) == 1:
-            return next(iter(PROVIDER_REGISTRY.keys()))
+    if not reg:
+        # If nothing instantiated but exactly one discovered provider, use it
+        if len(DISCOVERED_PROVIDER_CLASSES) == 1:
+            return next(iter(DISCOVERED_PROVIDER_CLASSES.keys()))
+        raise ValueError(
+            "Cannot determine primary provider: no active providers found."
+        )
 
-    # Fallback: single discovered (not yet instantiated)
-    if len(DISCOVERED_PROVIDER_CLASSES) == 1:
-        return next(iter(DISCOVERED_PROVIDER_CLASSES.keys()))
+    primaries = [
+        n for n, p in reg.items() if getattr(p.capabilities, "is_primary", False)
+    ]
+    if len(primaries) == 1:
+        return primaries[0]
+    if len(primaries) > 1:
+        raise RuntimeError(f"Multiple providers claim is_primary=True: {primaries}")
+
+    if len(reg) == 1:
+        return next(iter(reg.keys()))
 
     raise ValueError(
-        "Cannot determine primary provider. "
-        "Ensure at least one provider is configured/discovered."
+        "Cannot determine primary provider. Multiple providers active and "
+        "none declare `is_primary=True`. Mark one provider's capabilities "
+        "with is_primary=True or reduce to a single provider."
     )
 
 
