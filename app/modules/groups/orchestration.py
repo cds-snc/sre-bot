@@ -6,7 +6,7 @@ inside functions to avoid import-time failures during incremental rollout.
 """
 
 from uuid import uuid4
-from typing import Dict
+from typing import Dict, List, TYPE_CHECKING, cast
 from core.logging import get_module_logger
 from modules.groups import (
     reconciliation_integration as ri,
@@ -22,9 +22,14 @@ from modules.groups.providers.base import (
     OperationResult,
     GroupProvider,
 )
-from modules.groups.group_name_mapping import map_provider_group_id
-from modules.groups.schemas import NormalizedMember
+from modules.groups.schemas import NormalizedGroup
+from modules.groups.mappings import (
+    map_primary_to_secondary_group,
+    normalize_member_for_provider,
+)
 
+if TYPE_CHECKING:  # avoid runtime import cycles for typing
+    from modules.groups.types import OrchestrationResponseTypedDict, OperationResultLike
 
 logger = get_module_logger()
 
@@ -46,127 +51,6 @@ def get_enabled_secondary_providers() -> Dict[str, GroupProvider]:
         for name, provider in all_providers.items()
         if name != primary_name
     }
-
-
-def map_secondary_to_primary_group(
-    secondary_provider: str, secondary_group_id: str
-) -> str:
-    """Map secondary provider's group ID to primary provider's equivalent.
-
-    Uses `group_name_mapping.py` helpers to translate between provider-specific
-    group ID formats.
-
-    Args:
-        secondary_provider: Name of secondary provider (e.g., 'aws', 'google')
-        secondary_group_id: Group ID in secondary provider format
-
-    Returns:
-        Group ID in primary provider format
-
-    Raises:
-        ValueError: If mapping cannot be performed
-    """
-    primary_provider_name = get_primary_provider_name()
-
-    try:
-        primary_group_id = map_provider_group_id(
-            from_provider=secondary_provider,
-            from_group_id=secondary_group_id,
-            to_provider=primary_provider_name,
-        )
-        logger.info(
-            "group_mapping_secondary_to_primary",
-            from_provider=secondary_provider,
-            from_id=secondary_group_id,
-            to_id=primary_group_id,
-        )
-        return primary_group_id
-    except Exception as e:
-        logger.error(
-            "group_mapping_failed",
-            from_provider=secondary_provider,
-            from_id=secondary_group_id,
-            error=str(e),
-        )
-        raise ValueError(
-            f"Cannot map {secondary_provider} group '{secondary_group_id}' to {primary_provider_name}: {e}"
-        ) from e
-
-
-def map_primary_to_secondary_group(
-    primary_group_id: str, secondary_provider: str
-) -> str:
-    """Map primary provider's group ID to secondary provider's equivalent.
-
-    Reverse mapping for propagation: used when executing operations on secondary providers.
-
-    Args:
-        primary_group_id: Group ID in primary provider format
-        secondary_provider: Name of secondary provider to map to
-
-    Returns:
-        Group ID in secondary provider format
-
-    Raises:
-        ValueError: If mapping cannot be performed
-    """
-    primary_provider_name = get_primary_provider_name()
-
-    try:
-        secondary_group_id = map_provider_group_id(
-            from_provider=primary_provider_name,
-            from_group_id=primary_group_id,
-            to_provider=secondary_provider,
-        )
-        logger.info(
-            "group_mapping_primary_to_secondary",
-            from_id=primary_group_id,
-            to_provider=secondary_provider,
-            to_id=secondary_group_id,
-        )
-        return secondary_group_id
-    except Exception as e:
-        logger.error(
-            "group_mapping_failed",
-            from_id=primary_group_id,
-            to_provider=secondary_provider,
-            error=str(e),
-        )
-        raise ValueError(
-            f"Cannot map {primary_provider_name} group '{primary_group_id}' to {secondary_provider}: {e}"
-        ) from e
-
-
-def normalize_member_for_provider(
-    member_email: str, provider_type: str
-) -> NormalizedMember:
-    """Convert email address to provider-specific NormalizedMember.
-
-    Each provider may have different member identifier requirements.
-    This function normalizes the input to what the provider expects.
-
-    Args:
-        member_email: Email address of member
-        provider_type: Name of provider
-
-    Returns:
-        NormalizedMember instance ready for provider API call
-
-    Raises:
-        ValueError: If email is invalid or provider unknown
-    """
-    if not member_email or "@" not in member_email:
-        raise ValueError(f"Invalid email: {member_email}")
-
-    # All providers currently use email-only normalization
-    # Future: extend this to provider-specific logic as needed
-    return NormalizedMember(
-        email=member_email,
-        id=None,
-        role=None,
-        provider_member_id=None,
-        raw=None,
-    )
 
 
 def validate_group_in_provider(group_id: str, provider: GroupProvider) -> bool:
@@ -219,10 +103,9 @@ def _unwrap_opresult_data(op):
 def _call_provider_method(
     provider: GroupProvider,
     method_name: str,
-    group_id: str,
-    member: NormalizedMember,
-    justification: str,
+    *p_args,
     correlation_id: str | None = None,
+    **p_kwargs,
 ) -> OperationResult:
     """Call a provider method safely and return an OperationResult.
 
@@ -241,7 +124,7 @@ def _call_provider_method(
             f"Provider {provider.__class__.__name__} missing method {method_name}"
         )
     try:
-        return method(group_id, member, justification)
+        return method(*p_args, **p_kwargs)
     except Exception as e:
         logger.warning(
             "provider_method_exception",
@@ -256,11 +139,10 @@ def _call_provider_method(
 def _propagate_to_secondaries(
     primary_group_id: str,
     member_email: str,
-    justification: str,
     op_name: str,
     action: str,
-    correlation_id: str | None = None,
-) -> Dict[str, OperationResult]:
+    correlation_id: str,
+) -> Dict[str, "OperationResultLike"]:
     """Propagate an operation to all secondary providers.
 
     Returns a dict mapping provider name -> OperationResult.
@@ -280,7 +162,7 @@ def _propagate_to_secondaries(
             sec_member = normalize_member_for_provider(member_email, provider_type=name)
 
             sec_op = _call_provider_method(
-                prov, op_name, sec_group, sec_member, justification, correlation_id
+                prov, op_name, sec_group, sec_member, correlation_id
             )
             results[name] = sec_op
 
@@ -293,7 +175,6 @@ def _propagate_to_secondaries(
                         group_id=sec_group,
                         member_email=member_email,
                         action=action,
-                        justification=justification,
                         error_message=err_msg,
                     )
                 except Exception:
@@ -311,7 +192,45 @@ def _propagate_to_secondaries(
     return results
 
 
-def _orchestrate_member_operation(
+def _perform_read_operation(
+    op_name: str,
+    action: str,
+    *p_args,
+    **p_kwargs,
+) -> OperationResult:
+    """Call a read-only provider method safely and return an OperationResult.
+
+    Handles missing methods and exceptions, returning a transient error
+    OperationResult on failure.
+    """
+
+    primary = get_primary_provider()
+
+    logger.info(
+        "perform_read_op_start",
+        primary=primary.__class__.__name__,
+        op_name=op_name,
+        action=action,
+    )
+
+    try:
+        result = _call_provider_method(primary, op_name, *p_args, **p_kwargs)
+    except Exception as e:
+        logger.error(
+            "primary_read_op_exception",
+            error=str(e),
+            exc_info=True,
+        )
+        result = OperationResult.transient_error(str(e))
+    if getattr(result, "status", None) != OperationStatus.SUCCESS:
+        logger.warning(
+            "perform_read_op_failed",
+            primary_status=getattr(result, "status", None),
+        )
+    return result
+
+
+def _orchestrate_write_operation(
     primary_group_id: str,
     member_email: str,
     justification: str,
@@ -319,7 +238,7 @@ def _orchestrate_member_operation(
     action: str,
     provider_hint: str | None = None,
     correlation_id: str | None = None,
-) -> dict:
+) -> "OrchestrationResponseTypedDict":
     """Generic orchestration: run primary op then propagate to secondaries.
 
     Args:
@@ -333,6 +252,9 @@ def _orchestrate_member_operation(
 
     Returns:
         Orchestration response dict from orchestration_responses.format_orchestration_response.
+
+    TODO: Justification handling/enforcement to audit logs.
+        Providers do not handle the justification, they provide wrappers around the API calls only.
     """
     if not correlation_id:
         correlation_id = str(uuid4())
@@ -356,7 +278,6 @@ def _orchestrate_member_operation(
             op_name,
             primary_group_id,
             member_obj,
-            justification,
             correlation_id,
         )
     except Exception as e:
@@ -370,24 +291,32 @@ def _orchestrate_member_operation(
 
     # If primary failed, do not propagate
     if getattr(primary_result, "status", None) != OperationStatus.SUCCESS:
-        logger.info(
+        logger.warning(
             "orchestration_primary_failed",
             correlation_id=correlation_id,
             primary_status=getattr(primary_result, "status", None),
         )
-        return orr.format_orchestration_response(
-            primary_result,
-            {},
-            False,
-            correlation_id,
-            action=action,
-            group_id=primary_group_id,
-            member_email=member_email,
+        return cast(
+            "OrchestrationResponseTypedDict",
+            orr.format_orchestration_response(
+                primary_result,
+                {},
+                False,
+                correlation_id,
+                action=action,
+                group_id=primary_group_id,
+                member_email=member_email,
+            ),
         )
+
+    # TODO: record justification for audit
+    logger.warning(
+        "justification_recording_not_implemented", justification=justification
+    )
 
     # Primary succeeded; propagate to secondaries using helper
     propagation_results = _propagate_to_secondaries(
-        primary_group_id, member_email, justification, op_name, action, correlation_id
+        primary_group_id, member_email, op_name, action, correlation_id
     )
 
     has_partial = any(
@@ -395,14 +324,20 @@ def _orchestrate_member_operation(
         for r in propagation_results.values()
     )
 
-    return orr.format_orchestration_response(
-        primary_result,
-        propagation_results,
-        has_partial,
-        correlation_id,
-        action=action,
-        group_id=primary_group_id,
-        member_email=member_email,
+    # cast propagation results to OperationResultLike mapping for formatter
+    propagation_like = cast(Dict[str, "OperationResultLike"], propagation_results)
+
+    return cast(
+        "OrchestrationResponseTypedDict",
+        orr.format_orchestration_response(
+            primary_result,
+            propagation_like,
+            has_partial,
+            correlation_id,
+            action=action,
+            group_id=primary_group_id,
+            member_email=member_email,
+        ),
     )
 
 
@@ -412,13 +347,13 @@ def add_member_to_group(
     justification: str,
     provider_hint: str | None = None,
     correlation_id: str | None = None,
-):
+) -> "OrchestrationResponseTypedDict":
     """Orchestrate adding a member: primary-first then propagate to secondaries.
 
     Returns an orchestration response dict as produced by
     `orchestration_responses.format_orchestration_response`.
     """
-    return _orchestrate_member_operation(
+    return _orchestrate_write_operation(
         primary_group_id=primary_group_id,
         member_email=member_email,
         justification=justification,
@@ -435,12 +370,12 @@ def remove_member_from_group(
     justification: str,
     provider_hint: str | None = None,
     correlation_id: str | None = None,
-):
+) -> "OrchestrationResponseTypedDict":
     """Orchestrate removing a member: primary-first then propagate to secondaries.
 
     Returns an orchestration response dict.
     """
-    return _orchestrate_member_operation(
+    return _orchestrate_write_operation(
         primary_group_id=primary_group_id,
         member_email=member_email,
         justification=justification,
@@ -449,3 +384,29 @@ def remove_member_from_group(
         provider_hint=provider_hint,
         correlation_id=correlation_id,
     )
+
+
+def get_groups_for_user(
+    user_email: str,
+    provider_type: str | None = None,
+) -> List[NormalizedGroup]:
+    """Get groups for a user from the primary provider.
+
+    Args:
+        user_email: Email of the user to look up.
+        provider_type: Optional provider type hint.
+    """
+    op = _perform_read_operation(
+        op_name="get_groups_for_user",
+        action="get_groups_for_user",
+        user_key=user_email,
+        provider_name=provider_type,
+    )
+
+    # On failure, return an empty list rather than an OperationResult
+    if getattr(op, "status", None) != OperationStatus.SUCCESS:
+        return []
+    if op.data is None or not isinstance(op.data, dict):
+        return []
+    return op.data.get("groups", [])
+
