@@ -77,7 +77,7 @@ def test_add_member_with_no_data_returns_empty_dict(monkeypatch, safe_providers_
         lambda group_key, member_key: SimpleNamespace(success=True, data=None),
     )
 
-    res = p.add_member("g1", "someone@example.com", "justification")
+    res = p.add_member("g1", "someone@example.com")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert res.data and "result" in res.data
@@ -255,7 +255,7 @@ def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_impor
         lambda group_key, member_key: SimpleNamespace(success=True, data=fake_member),
     )
 
-    res = p.add_member("g1", "new@example.com", "justification")
+    res = p.add_member("g1", "new@example.com")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert res.data and "result" in res.data
@@ -267,7 +267,7 @@ def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_impor
         "insert_member",
         lambda group_key, member_key: SimpleNamespace(success=False, data=None),
     )
-    res2 = p.add_member("g1", "new@example.com", "justification")
+    res2 = p.add_member("g1", "new@example.com")
     assert isinstance(res2, OperationResult)
     assert res2.status == OperationStatus.TRANSIENT_ERROR
 
@@ -277,7 +277,7 @@ def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_impor
         "delete_member",
         lambda group_key, member_key: SimpleNamespace(success=True, data=None),
     )
-    rem = p.remove_member("g1", "m1", "reason")
+    rem = p.remove_member("g1", "m1")
     assert isinstance(rem, OperationResult)
     assert rem.status == OperationStatus.SUCCESS
     assert rem.data and rem.data.get("result", {}).get("status") == "removed"
@@ -288,7 +288,7 @@ def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_impor
         "delete_member",
         lambda group_key, member_key: SimpleNamespace(success=False, data=None),
     )
-    rem2 = p.remove_member("g1", "m1", "reason")
+    rem2 = p.remove_member("g1", "m1")
     assert rem2.status == OperationStatus.TRANSIENT_ERROR
 
 

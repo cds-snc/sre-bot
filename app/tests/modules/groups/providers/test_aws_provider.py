@@ -486,14 +486,14 @@ def test_resolve_member_identifier_wrong_type_raises(safe_providers_import):
 
 
 def test_add_member_rejects_non_dict(provider):
-    res = provider.add_member("g1", "not-a-dict", "justification")
+    res = provider.add_member("g1", "not-a-dict")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
     assert "member_data must be a dict" in (res.message or "")
 
 
 def test_add_member_missing_email_rejects(provider):
-    res = provider.add_member("g1", {"not": "email"}, "justification")
+    res = provider.add_member("g1", {"not": "email"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
     assert "member_data.email is required" in (res.message or "")
@@ -506,7 +506,7 @@ def test_add_member_missing_create_group_membership(id_store_factory, provider):
 
     id_store_factory(get_user_by_username=fake_get_user_by_username)
 
-    res = provider.add_member("g1", {"email": "x@y"}, "just")
+    res = provider.add_member("g1", {"email": "x@y"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
     assert "create_group_membership" in (res.message or "")
@@ -526,7 +526,7 @@ def test_add_member_create_group_membership_unexpected_response(
         get_user_by_username=fake_get_user_by_username,
     )
 
-    res = provider.add_member("g1", {"email": "x@y"}, "just")
+    res = provider.add_member("g1", {"email": "x@y"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
     assert "create_group_membership returned unexpected type" in (res.message or "")
@@ -556,7 +556,7 @@ def test_add_member_success_returns_normalized(
     )
 
     # allow_minimal_pydantic fixture monkeypatches AwsUser/AwsGroup
-    res = provider.add_member("g1", {"email": "x@y"}, "just")
+    res = provider.add_member("g1", {"email": "x@y"})
     # opresult_wrapper returns OperationResult, ensure success and payload shape
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
@@ -572,13 +572,13 @@ def test_add_member_success_returns_normalized(
 
 
 def test_remove_member_rejects_non_dict(provider):
-    res = provider.remove_member("g1", "not-a-dict", "just")
+    res = provider.remove_member("g1", "not-a-dict")
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
 
 
 def test_remove_member_missing_email_rejects(provider):
-    res = provider.remove_member("g1", {"not": "email"}, "just")
+    res = provider.remove_member("g1", {"not": "email"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
 
@@ -596,7 +596,7 @@ def test_remove_member_missing_delete_group_membership(
     # ensure delete_group_membership missing
     monkeypatch.setattr(provider_module, "identity_store", types.SimpleNamespace())
 
-    res = provider.remove_member("g1", {"email": "x@y"}, "just")
+    res = provider.remove_member("g1", {"email": "x@y"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
 
@@ -624,7 +624,7 @@ def test_remove_member_delete_group_membership_unexpected_response(
         types.SimpleNamespace(delete_group_membership=fake_delete_group_membership),
     )
 
-    res = provider.remove_member("g1", {"email": "x@y"}, "just")
+    res = provider.remove_member("g1", {"email": "x@y"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.TRANSIENT_ERROR
 
@@ -655,7 +655,7 @@ def test_remove_member_success_returns_normalized(
         delete_group_membership=fake_delete_group_membership, get_user=fake_get_user
     )
 
-    res = provider.remove_member("g1", {"email": "b@c"}, "just")
+    res = provider.remove_member("g1", {"email": "b@c"})
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert isinstance(res.data.get("result"), dict)

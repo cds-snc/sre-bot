@@ -106,9 +106,9 @@ def test_add_member_success_and_failure(monkeypatch, safe_providers_import):
         "insert_member",
         lambda group_key, member_key: SimpleNamespace(success=True, data=fake_member),
     )
-    res = p.add_member("g1", "new@example.com", "reason")
+    res = p.add_member("g1", "new@example.com")
     assert isinstance(
-        res, type(p.add_member("g1", "new@example.com", "reason"))
+        res, type(p.add_member("g1", "new@example.com"))
     )  # OperationResult
     assert res.status.name == "SUCCESS"
     assert res.data["result"]["email"] == "new@example.com"
@@ -121,7 +121,7 @@ def test_add_member_success_and_failure(monkeypatch, safe_providers_import):
     )
     # opresult_wrapper converts exceptions into an OperationResult with
     # TRANSIENT_ERROR rather than letting IntegrationError propagate.
-    res2 = p.add_member("g1", "new@example.com", "reason")
+    res2 = p.add_member("g1", "new@example.com")
     assert res2.status.name == "TRANSIENT_ERROR"
 
 
@@ -137,9 +137,9 @@ def test_remove_member_success(monkeypatch, safe_providers_import):
         "delete_member",
         lambda group_key, member_key: SimpleNamespace(success=True, data=None),
     )
-    res = p.remove_member("g1", "m1", "reason")
+    res = p.remove_member("g1", "m1")
     assert isinstance(
-        res, type(p.remove_member("g1", "m1", "reason"))
+        res, type(p.remove_member("g1", "m1"))
     )  # OperationResult
     assert res.status.name == "SUCCESS"
     assert res.data["result"]["status"] == "removed"
