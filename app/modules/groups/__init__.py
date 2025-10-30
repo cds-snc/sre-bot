@@ -11,13 +11,12 @@ Features:
 - Multiple interfaces (API, Slack commands, webhooks)
 - Comprehensive audit logging
 """
+from core.logging import get_module_logger
 
 from modules.groups.event_system import register_event_handler, dispatch_event
 from modules.groups.base import (
-    get_user_managed_groups,
     add_member_to_group,
     remove_member_from_group,
-    validate_group_permissions,
 )
 from modules.groups.api import (
     handle_add_member_request,
@@ -41,17 +40,16 @@ from modules.groups.responses import (
     format_error_response,
     format_slack_response,
 )
-from modules.groups.providers import get_provider, get_active_providers
+from modules.groups.providers import get_provider, get_active_providers, load_providers
 
 # Import event handlers to register them
 from modules.groups import events  # noqa: F401
 
+
 __all__ = [
     # Core functions
-    "get_user_managed_groups",
     "add_member_to_group",
     "remove_member_from_group",
-    "validate_group_permissions",
     # API interfaces
     "handle_add_member_request",
     "handle_remove_member_request",
@@ -82,16 +80,14 @@ __all__ = [
     "events",
 ]
 
+logger = get_module_logger()
+
 
 def initialize_groups_module():
     """Initialize the groups module and load providers."""
-    from modules.groups.providers import load_providers
 
     load_providers()
 
-    from core.logging import get_module_logger
-
-    logger = get_module_logger()
     logger.info("Groups membership module initialized successfully")
 
 
