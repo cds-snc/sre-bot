@@ -138,9 +138,7 @@ def test_remove_member_success(monkeypatch, safe_providers_import):
         lambda group_key, member_key: SimpleNamespace(success=True, data=None),
     )
     res = p.remove_member("g1", "m1")
-    assert isinstance(
-        res, type(p.remove_member("g1", "m1"))
-    )  # OperationResult
+    assert isinstance(res, type(p.remove_member("g1", "m1")))  # OperationResult
     assert res.status.name == "SUCCESS"
     assert res.data["result"]["status"] == "removed"
 
