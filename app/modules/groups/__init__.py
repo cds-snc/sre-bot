@@ -13,9 +13,10 @@ Features:
 """
 
 from modules.groups.event_system import register_event_handler, dispatch_event
-from modules.groups.base import (
+from modules.groups.orchestration import (
     add_member_to_group,
     remove_member_from_group,
+    get_groups_for_user
 )
 from modules.groups.api import (
     handle_add_member_request,
@@ -46,15 +47,16 @@ from modules.groups import events  # noqa: F401
 
 
 __all__ = [
-    # Core functions
-    "add_member_to_group",
-    "remove_member_from_group",
     # API interfaces
     "handle_add_member_request",
     "handle_remove_member_request",
     "handle_list_user_groups_request",
     "handle_bulk_operations_request",
     "webhook_handler",
+    # Orchestration
+    "add_member_to_group",
+    "remove_member_from_group",
+    "get_groups_for_user",
     # Slack interfaces
     "slack_add_member",
     "slack_remove_member",
