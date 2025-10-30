@@ -288,92 +288,92 @@ def map_primary_to_secondary_group(
         ) from e
 
 
-def map_normalized_groups_list_to_providers(
-    groups: List[NormalizedGroup],
-) -> GroupsMap:
-    """Map a list of NormalizedGroup to a dict by provider.
+# def map_normalized_groups_list_to_providers(
+#     groups: List[NormalizedGroup],
+# ) -> GroupsMap:
+#     """Map a list of NormalizedGroup to a dict by provider.
 
-    Args:
-        groups: List of NormalizedGroup instances
+#     Args:
+#         groups: List of NormalizedGroup instances
 
-    Returns:
-        Dict mapping provider name → list of NormalizedMember for that provider
-    """
-    provider_map: Dict[str, List[NormalizedGroup]] = {}
-    for group in groups:
-        # Support both dict-like and attribute-like group representations.
-        if isinstance(group, dict):
-            provider = group.get("provider")
-        else:
-            provider = getattr(group, "provider", None)
+#     Returns:
+#         Dict mapping provider name → list of NormalizedMember for that provider
+#     """
+#     provider_map: Dict[str, List[NormalizedGroup]] = {}
+#     for group in groups:
+#         # Support both dict-like and attribute-like group representations.
+#         if isinstance(group, dict):
+#             provider = group.get("provider")
+#         else:
+#             provider = getattr(group, "provider", None)
 
-        provider = provider or "unknown"
-        if provider not in provider_map:
-            provider_map[provider] = []
-        provider_map[provider].append(group)
-    return provider_map
+#         provider = provider or "unknown"
+#         if provider not in provider_map:
+#             provider_map[provider] = []
+#         provider_map[provider].append(group)
+#     return provider_map
 
 
-def map_normalized_groups_list_to_providers_with_association(
-    groups: List[NormalizedGroup],
-    provider_registry: Optional[Mapping[str, object]] = None,
-) -> GroupsMap:
-    """Map groups into a provider map and associate primary-style names
-    to a resolved provider when a known prefix is present.
+# def map_normalized_groups_list_to_providers_with_association(
+#     groups: List[NormalizedGroup],
+#     provider_registry: Optional[Mapping[str, object]] = None,
+# ) -> GroupsMap:
+#     """Map groups into a provider map and associate primary-style names
+#     to a resolved provider when a known prefix is present.
 
-    This is intentionally small and imperative: it will try to parse a
-    primary-style id/name and, when a prefix maps to a known provider,
-    update the group's `provider` value and group it under that provider.
-    """
-    provs = _ensure_providers_activated(provider_registry)
+#     This is intentionally small and imperative: it will try to parse a
+#     primary-style id/name and, when a prefix maps to a known provider,
+#     update the group's `provider` value and group it under that provider.
+#     """
+#     provs = _ensure_providers_activated(provider_registry)
 
-    # Build prefix -> provider_name map deterministically
-    prefix_to_provider = {
-        (getattr(provs[p], "prefix", p) or p): p for p in sorted(provs.keys())
-    }
+#     # Build prefix -> provider_name map deterministically
+#     prefix_to_provider = {
+#         (getattr(provs[p], "prefix", p) or p): p for p in sorted(provs.keys())
+#     }
 
-    provider_map: Dict[str, List[NormalizedGroup]] = {}
+#     provider_map: Dict[str, List[NormalizedGroup]] = {}
 
-    for group in groups:
-        # pick candidate primary-style identifier
-        if isinstance(group, dict):
-            primary_name = group.get("id") or group.get("name")
-        else:
-            primary_name = getattr(group, "id", None) or getattr(group, "name", None)
+#     for group in groups:
+#         # pick candidate primary-style identifier
+#         if isinstance(group, dict):
+#             primary_name = group.get("id") or group.get("name")
+#         else:
+#             primary_name = getattr(group, "id", None) or getattr(group, "name", None)
 
-        resolved_provider: Optional[str] = None
-        if primary_name:
-            parsed = None
-            try:
-                parsed = parse_primary_group_name(primary_name, provider_registry=provs)
-            except ValueError:
-                parsed = None
+#         resolved_provider: Optional[str] = None
+#         if primary_name:
+#             parsed = None
+#             try:
+#                 parsed = parse_primary_group_name(primary_name, provider_registry=provs)
+#             except ValueError:
+#                 parsed = None
 
-            if parsed:
-                prefix = parsed.get("prefix")
-                if prefix:
-                    resolved_provider = prefix_to_provider.get(prefix)
+#             if parsed:
+#                 prefix = parsed.get("prefix")
+#                 if prefix:
+#                     resolved_provider = prefix_to_provider.get(prefix)
 
-        # apply resolved provider when available
-        if resolved_provider:
-            if isinstance(group, dict):
-                group["provider"] = resolved_provider
-            else:
-                try:
-                    setattr(group, "provider", resolved_provider)
-                except (AttributeError, TypeError):
-                    # best-effort: ignore when object is not writable
-                    logger.debug("provider_mutation_failed", group=str(primary_name))
+#         # apply resolved provider when available
+#         if resolved_provider:
+#             if isinstance(group, dict):
+#                 group["provider"] = resolved_provider
+#             else:
+#                 try:
+#                     setattr(group, "provider", resolved_provider)
+#                 except (AttributeError, TypeError):
+#                     # best-effort: ignore when object is not writable
+#                     logger.debug("provider_mutation_failed", group=str(primary_name))
 
-        provider = (
-            group.get("provider")
-            if isinstance(group, dict)
-            else getattr(group, "provider", None)
-        )
-        provider = provider or "unknown"
-        provider_map.setdefault(provider, []).append(group)
+#         provider = (
+#             group.get("provider")
+#             if isinstance(group, dict)
+#             else getattr(group, "provider", None)
+#         )
+#         provider = provider or "unknown"
+#         provider_map.setdefault(provider, []).append(group)
 
-    return provider_map
+#     return provider_map
 
 
 def normalize_member_for_provider(
@@ -408,3 +408,100 @@ def normalize_member_for_provider(
         provider_member_id=None,
         raw=None,
     )
+
+
+def map_normalized_groups_list_to_providers(groups: List[NormalizedGroup]) -> GroupsMap:
+    """Deprecated: use map_normalized_groups_to_providers instead."""
+    return map_normalized_groups_to_providers(groups, associate=False)
+
+
+def map_normalized_groups_list_to_providers_with_association(
+    groups: List[NormalizedGroup],
+    provider_registry: Optional[Mapping[str, object]] = None,
+) -> GroupsMap:
+    """Deprecated: use map_normalized_groups_to_providers instead."""
+    return map_normalized_groups_to_providers(
+        groups, associate=True, provider_registry=provider_registry
+    )
+
+
+def map_normalized_groups_to_providers(
+    groups: List[NormalizedGroup],
+    *,
+    associate: bool = False,
+    provider_registry: Optional[Mapping[str, object]] = None,
+) -> GroupsMap:
+    """Map a list of NormalizedGroup to a dict by provider.
+    When `associate` is True the function will attempt to detect primary-style
+    group names (prefix-canonical) and associate them to a resolved provider
+    using `provider_registry` (or active providers if not provided). When a
+    resolved provider is found the group's `provider` attribute/key will be
+    updated (best-effort) and the group will be grouped under that provider.
+
+    Args:
+        groups: List of NormalizedGroup instances (can be dict-like or objects).
+        associate: If True, attempt prefix-based provider association.
+        provider_registry: Optional mapping of provider_name -> provider instance
+            used for deterministic prefix resolution when `associate` is True.
+
+    Returns:
+        Dict mapping provider name → list of NormalizedGroup for that provider.
+    """
+    provider_map: Dict[str, List[NormalizedGroup]] = {}
+
+    # Prepare association helpers only when needed
+    provs = None
+    prefix_to_provider: Optional[Dict[str, str]] = None
+    if associate:
+        provs = _ensure_providers_activated(provider_registry)
+        # Build prefix -> provider_name map deterministically
+        prefix_to_provider = {
+            (getattr(provs[p], "prefix", p) or p): p for p in sorted(provs.keys())
+        }
+
+    for group in groups:
+        # Candidate primary-style identifier (id or name)
+        primary_name = None
+        if isinstance(group, dict):
+            primary_name = group.get("id") or group.get("name")
+        else:
+            primary_name = getattr(group, "id", None) or getattr(group, "name", None)
+
+        # Attempt to resolve a provider from a primary-style name when asked
+        if associate and primary_name:
+            try:
+                parsed = parse_primary_group_name(primary_name, provider_registry=provs)
+            except ValueError:
+                parsed = None
+
+            if parsed:
+                prefix = parsed.get("prefix")
+                if prefix and prefix_to_provider:
+                    resolved_provider = prefix_to_provider.get(prefix)
+                else:
+                    resolved_provider = None
+            else:
+                resolved_provider = None
+
+            # apply resolved provider when available (best-effort)
+            if resolved_provider:
+                if isinstance(group, dict):
+                    group["provider"] = resolved_provider
+                else:
+                    try:
+                        setattr(group, "provider", resolved_provider)
+                    except (AttributeError, TypeError):
+                        logger.debug(
+                            "provider_mutation_failed", group=str(primary_name)
+                        )
+
+        # Read provider from group (dict or attribute)
+        provider = (
+            group.get("provider")
+            if isinstance(group, dict)
+            else getattr(group, "provider", None)
+        )
+        provider = provider or "unknown"
+        provider_map.setdefault(provider, []).append(group)
+
+    return provider_map
