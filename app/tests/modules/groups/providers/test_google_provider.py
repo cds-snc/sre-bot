@@ -372,12 +372,12 @@ def test_validate_permissions_and_get_groups_for_user(
     # get_groups_for_user success
     monkeypatch.setattr(
         google_mod.google_directory,
-        "list_groups",
+        "list_groups_with_members",
         lambda **kwargs: SimpleNamespace(
             success=True, data=[{"id": "g1", "email": "g1@example.com"}]
         ),
     )
-    ug = p.get_groups_for_user("u@e")
+    ug = p.get_groups_for_user("u@e", None)
     assert ug.status == OperationStatus.SUCCESS
     assert isinstance(ug.data["groups"], list)
 
@@ -531,13 +531,13 @@ def test_get_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
     # monkeypatch to return a raw list of groups
     monkeypatch.setattr(
         google_mod.google_directory,
-        "list_groups",
+        "list_groups_with_members",
         lambda **kwargs: [
             {"id": "g-raw", "email": "raw@example.com", "name": "RawGroup"}
         ],
     )
 
-    res = p.get_groups_for_user("u@e")
+    res = p.get_groups_for_user("u@e", None)
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert res.data and "groups" in res.data
