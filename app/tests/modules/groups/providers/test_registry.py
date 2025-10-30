@@ -10,6 +10,127 @@ from modules.groups.providers.base import (
 from modules.groups.schemas import NormalizedMember
 
 
+class SuccessProvider(GroupProvider):
+    """Provider that returns successful OperationResult for common calls."""
+
+    def __init__(self, provides_role_info: bool = False, is_primary: bool = False):
+        self._capabilities = ProviderCapabilities(
+            provides_role_info=provides_role_info, is_primary=is_primary
+        )
+
+    @property
+    def capabilities(self):
+        return self._capabilities
+
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+    def add_member(
+        self, group_key: str, member_data, justification: str
+    ) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def remove_member(
+        self, group_key: str, member_data, justification: str
+    ) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def get_groups_for_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+    def create_user(self, user_data: NormalizedMember) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def delete_user(self, user_key: str) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def list_groups(self, **kwargs) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+    def list_groups_with_members(self, **kwargs) -> OperationResult:
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+
+class NoopProvider(GroupProvider):
+    """Provider that raises NotImplementedError for operations."""
+
+    def __init__(self, provides_role_info: bool = False, is_primary: bool = False):
+        self._capabilities = ProviderCapabilities(
+            provides_role_info=provides_role_info, is_primary=is_primary
+        )
+
+    @property
+    def capabilities(self):
+        return self._capabilities
+
+    def get_group_members(self, group_key: str, **kwargs):
+        raise NotImplementedError()
+
+    def add_member(self, group_key: str, member_data, justification: str):
+        raise NotImplementedError()
+
+    def remove_member(self, group_key: str, member_data, justification: str):
+        raise NotImplementedError()
+
+    def get_groups_for_user(self, user_key: str, *args, **kwargs):
+        raise NotImplementedError()
+
+    def validate_permissions(self, user_key: str, group_key: str, action: str):
+        raise NotImplementedError()
+
+    def create_user(self, user_data: dict):
+        raise NotImplementedError()
+
+    def delete_user(self, user_key: str):
+        raise NotImplementedError()
+
+    def list_groups(self, **kwargs):
+        raise NotImplementedError()
+
+    def list_groups_with_members(self, **kwargs):
+        raise NotImplementedError()
+
+
+class PNoneProvider(GroupProvider):
+    """Provider used in tests that expect capabilities to be None."""
+
+    def __init__(self):
+        pass
+
+    @property
+    def capabilities(self):
+        return None
+
+    def get_group_members(self, group_key: str, **kwargs):
+        raise NotImplementedError()
+
+    def add_member(self, group_key: str, member_data, justification: str):
+        raise NotImplementedError()
+
+    def remove_member(self, group_key: str, member_data, justification: str):
+        raise NotImplementedError()
+
+    def get_groups_for_user(self, user_key: str):
+        raise NotImplementedError()
+
+    def validate_permissions(self, user_key: str, group_key: str, action: str):
+        raise NotImplementedError()
+
+    def create_user(self, user_data: dict):
+        raise NotImplementedError()
+
+    def delete_user(self, user_key: str):
+        raise NotImplementedError()
+
+    def list_groups(self, **kwargs):
+        raise NotImplementedError()
+
+    def list_groups_with_members(self, **kwargs):
+        raise NotImplementedError()
+
+
 def test_register_class_and_instance_and_invalid(
     safe_providers_import, groups_providers
 ):
@@ -288,7 +409,6 @@ def test_get_primary_provider_name_returns_primary(
             "extra": {"prefix": "x"},
         }
     )
-
 
     class Dummy(GroupProvider):
         def __init__(self):
