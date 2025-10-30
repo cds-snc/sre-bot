@@ -409,4 +409,3 @@ def get_groups_for_user(
     if op.data is None or not isinstance(op.data, dict):
         return []
     return op.data.get("groups", [])
-
