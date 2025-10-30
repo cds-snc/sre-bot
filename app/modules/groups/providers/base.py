@@ -159,6 +159,26 @@ class GroupProvider(ABC):
     """Abstract Base Class for group providers."""
 
     @property
+    def prefix(self) -> str:
+        """Provider prefix used for composing/parsing primary-style group names.
+
+        Default behavior: use the provider registration `name` attribute when
+        present on the instance. Providers may override this property to
+        return a different prefix. The provider registry will also apply any
+        configured overrides (settings) to the instance at activation time.
+        """
+        # Activation-time override (set by registry when applying config)
+        override = getattr(self, "_prefix", None)
+        if override:
+            return str(override)
+        # Prefer an explicit registration name attribute when available.
+        name = getattr(self, "name", None)
+        if name:
+            return str(name)
+        # Fallback to a deterministic class-derived name.
+        return self.__class__.__name__.lower()
+
+    @property
     @abstractmethod
     def capabilities(self) -> ProviderCapabilities:
         """Provider capability descriptor."""
