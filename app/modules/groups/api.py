@@ -5,28 +5,31 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
-from modules.groups.base import (
-    add_member_to_group,
-    get_user_managed_groups,
-    remove_member_from_group,
-    validate_group_permissions,
-)
 from modules.groups.event_system import dispatch_event
+from modules.groups.mappings import (
+    map_normalized_groups_list_to_providers_with_association as map_groups_w_association,
+)
+from modules.groups.orchestration import (
+    add_member_to_group,
+    get_groups_for_user,
+    remove_member_from_group,
+)
 from modules.groups.responses import (
     format_bulk_operation_response,
     format_error_response,
     format_group_list_response,
     format_permission_error_response,
+    format_slack_response,
     format_success_response,
     format_validation_error_response,
+    format_webhook_response,
 )
+from modules.groups.schemas import GroupsMap, NormalizedGroup
 from modules.groups.validation import (
     sanitize_input,
     validate_bulk_operation,
     validate_group_membership_payload,
 )
-from modules.groups.responses import format_slack_response
-from modules.groups.responses import format_webhook_response
 
 logger = get_module_logger()
 
@@ -46,26 +49,37 @@ def handle_add_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         provider_type = sanitize_input(payload["provider_type"])
         justification = sanitize_input(payload.get("justification", ""), max_length=500)
 
-        # Dispatch event to handle the request
-        dispatch_event(
-            "group.member.add_requested",
-            {
-                "group_id": group_id,
-                "member_email": member_email,
-                "requestor_email": requestor_email,
-                "provider_type": provider_type,
-                "justification": justification,
-            },
-        )
-
-        # Perform the operation
+        # Perform the core operation first (primary provider + propagation).
+        # Event dispatch is a side-effect/audit hook and must not change
+        # the API response if handlers fail, so we run it after the core
+        # operation and guard against exceptions.
         result = add_member_to_group(
-            group_id=group_id,
+            primary_group_id=group_id,
             member_email=member_email,
             justification=justification,
-            provider_type=provider_type,
-            requestor_email=requestor_email,
+            provider_hint=provider_type,
         )
+
+        # Dispatch event to handle the request. Event handlers must not
+        # break the synchronous API path; catch and log any errors from
+        # the event system to keep the API surface robust.
+        try:
+            dispatch_event(
+                "group.member.add_requested",
+                {
+                    "group_id": group_id,
+                    "member_email": member_email,
+                    "requestor_email": requestor_email,
+                    "provider_type": provider_type,
+                    "justification": justification,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "event_handler_error",
+                handler_event="group.member.add_requested",
+                error=str(e),
+            )
 
         # If the core flow returned an error dict (for example, mapped IntegrationError),
         # pass it through unchanged so the API surface returns a proper error.
@@ -108,15 +122,44 @@ def handle_remove_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         provider_type = sanitize_input(payload["provider_type"])
         justification = sanitize_input(payload.get("justification", ""), max_length=500)
 
-        # Perform the operation
-        result = remove_member_from_group(
-            group_id=group_id,
-            member_email=member_email,
-            justification=justification,
-            provider_type=provider_type,
-            requestor_email=requestor_email,
-        )
+        # Perform the core operation first (primary provider + propagation).
+        # Event dispatch is a side-effect/audit hook and must not change
+        # the API response if handlers fail, so we run it after the core
+        # operation and guard against exceptions.
+        try:
+            result = remove_member_from_group(
+                primary_group_id=group_id,
+                member_email=member_email,
+                justification=justification,
+                provider_hint=provider_type,
+            )
+        except Exception as e:
+            # Ensure provider errors are mapped to API errors
+            logger.error(f"Error removing member from group: {e}")
+            return format_error_response(
+                action="remove_member",
+                error_message=str(e),
+                error_code="OPERATION_FAILED",
+            )
 
+        # Dispatch event as a non-blocking side-effect; log but ignore errors
+        try:
+            dispatch_event(
+                "group.member.remove_requested",
+                {
+                    "group_id": group_id,
+                    "member_email": member_email,
+                    "requestor_email": requestor_email,
+                    "provider_type": provider_type,
+                    "justification": justification,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "event_handler_error",
+                handler_event="group.member.remove_requested",
+                error=str(e),
+            )
         if isinstance(result, dict) and result.get("success") is False:
             return result
 
@@ -142,7 +185,7 @@ def handle_remove_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def handle_list_user_groups_request(
-    user_email: str, provider_type: Optional[str] = None
+    user_email: str, manageable: bool = False, provider_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """Handle request to list groups user can manage."""
     try:
@@ -151,10 +194,16 @@ def handle_list_user_groups_request(
         if provider_type:
             provider_type = sanitize_input(provider_type)
 
-        # Get user's manageable groups
-        groups = get_user_managed_groups(user_email, provider_type)
+        # Primary returns a list[NormalizedGroup] (or dict-form of same).
+        groups_list: List[NormalizedGroup] = get_groups_for_user(
+            user_email, provider_type
+        )
+        logger.warning("groups_list_received", groups=groups_list)
+        if not isinstance(groups_list, list):
+            groups_list = []
 
-        return format_group_list_response(groups, user_email)
+        providers_map: GroupsMap = map_groups_w_association(groups_list)
+        return format_group_list_response(providers_map, manageable, user_email)
 
     except Exception as e:
         logger.error(f"Error listing user groups: {e}")
@@ -254,16 +303,21 @@ def slack_remove_member(payload: Dict[str, Any]) -> str:
     return format_slack_response(result)
 
 
-def slack_list_groups(user_email: str, provider_type: Optional[str] = None) -> str:
+def slack_list_groups(
+    user_email: str, manageable: bool = False, provider_type: Optional[str] = None
+) -> str:
     """Slack interface for listing user's groups."""
 
-    result = handle_list_user_groups_request(user_email, provider_type)
+    result = handle_list_user_groups_request(
+        user_email, manageable=manageable, provider_type=provider_type
+    )
     if result["success"]:
         groups_summary = []
         for provider, groups in result["providers"].items():
             groups_summary.append(f"• {provider.upper()}: {len(groups)} groups")
-
-        return "📂 Your manageable groups:\n" + "\n".join(groups_summary)
+        if manageable:
+            return "📂 Your manageable groups:\n" + "\n".join(groups_summary)
+        return "📂 Your groups:\n" + "\n".join(groups_summary)
     else:
         return format_slack_response(result)
 
