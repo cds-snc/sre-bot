@@ -6,9 +6,15 @@ from slack_sdk import WebClient
 from slack_bolt import Ack, Respond
 
 from core.logging import get_module_logger
-from modules.groups.api import slack_add_member, slack_remove_member, slack_list_groups
+from modules.groups.api import (
+    slack_add_member,
+    slack_remove_member,
+    slack_list_groups,
+)
+from modules.groups.providers import get_active_providers
 from modules.groups.validation import validate_email, validate_provider_type
 from integrations.slack import users as slack_users
+
 
 logger = get_module_logger()
 
@@ -33,6 +39,10 @@ def handle_groups_command(
         _handle_add_command(client, body, respond, args[1:])
     elif action == "remove":
         _handle_remove_command(client, body, respond, args[1:])
+    elif action == "manage":
+        _handle_list_manageable_groups_command(client, body, respond, args[1:])
+    elif action == "providers":
+        _handle_list_active_providers_command(client, body, respond, args[1:])
     else:
         respond(
             f"Unknown command: {action}. Use `/sre groups help` for available commands."
@@ -148,6 +158,35 @@ def _handle_remove_command(
     except Exception as e:
         logger.error(f"Error in groups remove command: {e}")
         respond("❌ Error removing member from group. Please try again later.")
+
+
+def _handle_list_manageable_groups_command(
+    client, body: Dict[str, Any], respond: Respond, args: List[str]
+):
+    """Handle groups manage command. Lists all manageable groups for the user."""
+    user_email = slack_users.get_user_email_from_body(client, body)
+    if not user_email:
+        respond("❌ Could not determine your email address.")
+        return
+
+    provider_type = None
+    if args and args[0] in ["aws", "google", "azure"]:
+        provider_type = args[0]
+
+    try:
+        result = slack_list_groups(user_email, True, provider_type)
+        respond(result)
+    except Exception as e:
+        logger.error(f"Error in groups list command: {e}")
+        respond("❌ Error retrieving your groups. Please try again later.")
+
+
+def _handle_list_active_providers_command(
+    client, body: Dict[str, Any], respond: Respond, args: List[str]
+):
+    """Handle groups providers command."""
+    active_providers = get_active_providers().keys()
+    respond(f"✅ Active group providers: {', '.join(active_providers)}")
 
 
 def _get_help_text() -> str:
