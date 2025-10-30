@@ -12,7 +12,7 @@ from core.config import settings
 logger = get_module_logger()
 
 
-def get_reconciliation_store():
+def get_reconciliation_store() -> Optional[object]:
     """Return configured reconciliation store instance placeholder.
 
     Phase 3 will replace this placeholder with a DynamoDB-backed store.
@@ -38,7 +38,6 @@ def enqueue_failed_propagation(
     group_id: str,
     member_email: str,
     action: str,
-    justification: str,
     error_message: str,
 ) -> Optional[str]:
     """Enqueue failed propagation for durable retry (placeholder).
