@@ -153,3 +153,7 @@ def as_canonical_dict(obj) -> dict:
         return asdict(obj)
     except (TypeError, ValueError):
         return obj
+
+
+# Type alias for a provider -> list of normalized groups mapping
+GroupsMap = Dict[str, List[NormalizedGroup]]
