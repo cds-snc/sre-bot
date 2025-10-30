@@ -1,10 +1,36 @@
 # modules/groups/responses.py
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.logging import get_module_logger
+from modules.groups.schemas import GroupsMap
+from modules.groups.errors import IntegrationError
 
 logger = get_module_logger()
+
+
+def _map_integration_error_to_response(err: IntegrationError) -> Dict:
+    """Convert IntegrationError to a minimal API error dict using format_error_response.
+
+    Keep the mapping small: include the integration error message and, when present,
+    surface a compact diagnostic in `details` from the wrapped IntegrationResponse.
+    """
+    resp = getattr(err, "response", None)
+    details = None
+    if resp is not None:
+        # Keep only small, useful metadata for API responses
+        details = {
+            "integration_success": getattr(resp, "success", None),
+            "integration_error": getattr(resp, "error", None),
+            "integration_meta": getattr(resp, "meta", None),
+        }
+
+    return format_error_response(
+        action="integration_error",
+        error_message=str(err),
+        error_code="INTEGRATION_ERROR",
+        details=details,
+    )
 
 
 def format_success_response(
@@ -21,7 +47,7 @@ def format_success_response(
         "group_id": group_id,
         "member_email": member_email,
         "provider": provider,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": _get_success_message(action, member_email, group_id, provider),
     }
 
@@ -42,7 +68,7 @@ def format_error_response(
         "success": False,
         "action": action,
         "error": error_message,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     if error_code:
@@ -63,7 +89,7 @@ def format_validation_error_response(
         "error": "Validation failed",
         "error_code": "VALIDATION_ERROR",
         "validation_errors": validation_result.get("errors", []),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -78,22 +104,46 @@ def format_permission_error_response(
         "user_email": user_email,
         "group_id": group_id,
         "action": action,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
 def format_group_list_response(
-    groups: Dict[str, List[Dict]], user_email: str
+    groups: GroupsMap,
+    manageable: bool,
+    user_email: str,
 ) -> Dict[str, Any]:
-    """Format response for listing user's manageable groups."""
-    total_groups = sum(len(provider_groups) for provider_groups in groups.values())
+    """Format response for listing user's groups."""
+    total_groups = len(groups)
+
+    if manageable:
+        filtered_groups = {}
+        for provider, group_list in groups.items():
+            filtered = []
+            for group in group_list:
+                for member in group.members:
+                    if (
+                        member.email == user_email
+                        and member.role
+                        and member.role.lower()
+                        in (
+                            "owner",
+                            "manager",
+                        )
+                    ):
+                        filtered.append(group)
+                        break
+            if filtered:
+                filtered_groups[provider] = filtered
+        groups = filtered_groups
+        total_groups = sum(len(glist) for glist in filtered_groups.values())
 
     return {
         "success": True,
         "user_email": user_email,
         "total_groups": total_groups,
         "providers": groups,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -107,7 +157,7 @@ def format_group_members_response(
         "provider": provider,
         "member_count": len(members),
         "members": members,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -126,7 +176,7 @@ def format_bulk_operation_response(
         "failed_count": len(failed),
         "results": results,
         "summary": {"successful": successful, "failed": failed},
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
