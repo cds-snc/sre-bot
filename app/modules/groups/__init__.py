@@ -11,7 +11,6 @@ Features:
 - Multiple interfaces (API, Slack commands, webhooks)
 - Comprehensive audit logging
 """
-from core.logging import get_module_logger
 
 from modules.groups.event_system import register_event_handler, dispatch_event
 from modules.groups.base import (
@@ -40,7 +39,7 @@ from modules.groups.responses import (
     format_error_response,
     format_slack_response,
 )
-from modules.groups.providers import get_provider, get_active_providers, load_providers
+from modules.groups.providers import get_provider, get_active_providers
 
 # Import event handlers to register them
 from modules.groups import events  # noqa: F401
@@ -79,17 +78,3 @@ __all__ = [
     "dispatch_event",
     "events",
 ]
-
-logger = get_module_logger()
-
-
-def initialize_groups_module():
-    """Initialize the groups module and load providers."""
-
-    load_providers()
-
-    logger.info("Groups membership module initialized successfully")
-
-
-# Auto-initialize when module is imported
-initialize_groups_module()
