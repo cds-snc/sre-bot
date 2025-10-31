@@ -155,9 +155,14 @@ class OperationItem(BaseModel):
     payload: Annotated[Dict[str, Any], Field(..., description="Operation payload")]
 
     @model_validator(mode="before")
-    def validate_payload(self, values):
-        op = values.get("operation")
-        payload = values.get("payload")
+    def validate_payload(cls, values):  # pylint: disable=no-self-argument
+        try:
+            op = values.get("operation")
+            payload = values.get("payload")
+        except Exception:
+            # If values isn't a mapping, return it to allow Pydantic to
+            # raise the appropriate error downstream.
+            return values
         if op == OperationType.ADD_MEMBER:
             AddMemberRequest(**payload)
         elif op == OperationType.REMOVE_MEMBER:
