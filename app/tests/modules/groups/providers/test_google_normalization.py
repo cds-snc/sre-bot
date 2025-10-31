@@ -196,7 +196,7 @@ def test_group_with_member_with_user_enrichment(safe_providers_import):
 def test_get_group_members_handles_unexpected_shapes(
     monkeypatch, safe_providers_import
 ):
-    prov = safe_providers_import
+    _ = safe_providers_import
     import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
@@ -219,7 +219,7 @@ def test_get_group_members_handles_unexpected_shapes(
 
 
 def test_validate_permissions_failure_modes(monkeypatch, safe_providers_import):
-    prov = safe_providers_import
+    _ = safe_providers_import
     import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
