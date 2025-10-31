@@ -10,7 +10,7 @@ from modules.groups.schemas import NormalizedMember
 class MapNormalizedGroupsListToProvidersTests:
 
     @patch("modules.groups.mappings.get_active_providers")
-    def test_map_normalized_groups_list_to_providers_handles_dict_and_namespace_and_unknown(
+    def test_map_normalized_groups_to_providers_handles_dict_and_namespace_and_unknown(
         self,
         mock_get_active,
     ):
@@ -19,12 +19,12 @@ class MapNormalizedGroupsListToProvidersTests:
 
         ns = SimpleNamespace(id="h", provider="google")
         groups = [{"id": "g", "provider": "aws"}, ns, {"id": "no_provider"}]
-        res = gm.map_normalized_groups_list_to_providers(groups)
+        res = gm.map_normalized_groups_to_providers(groups)
         assert "aws" in res and isinstance(res["aws"], list)
         assert "google" in res and isinstance(res["google"], list)
         assert "unknown" in res and isinstance(res["unknown"], list)
 
-    def test_map_normalized_groups_list_to_providers_object_and_dict(self):
+    def test_map_normalized_groups_to_providers_object_and_dict(self):
         class G:
             def __init__(self, provider=None, id=None):
                 self.provider = provider
@@ -32,15 +32,12 @@ class MapNormalizedGroupsListToProvidersTests:
 
         d = {"provider": "a", "id": "1"}
         o = G(provider="b", id="2")
-        res = gm.map_normalized_groups_list_to_providers([d, o])
+        res = gm.map_normalized_groups_to_providers([d, o])
         assert "a" in res and "b" in res
         assert res["a"][0]["id"] == "1"
         assert getattr(res["b"][0], "id") == "2"
 
-
-class MapNormalizedGroupsListToProvidersWithAssociationTests:
-
-    def test_map_normalized_groups_list_to_providers_with_association_updates_provider_for_known_prefix(
+    def test_map_normalized_groups_to_providers_updates_provider_for_known_prefix(
         self,
     ):
         # provider registry with prefixes
@@ -52,16 +49,14 @@ class MapNormalizedGroupsListToProvidersWithAssociationTests:
         # dict-style group that should be associated to aws via 'a-' prefix
         groups = [{"id": "a-my", "provider": "unknown"}]
 
-        res = gm.map_normalized_groups_list_to_providers_with_association(
-            groups, provider_registry=provs
-        )
+        res = gm.map_normalized_groups_to_providers(groups, provider_registry=provs)
         # provider should be updated to 'aws'
         assert "aws" in res
         assert any(
             (isinstance(g, dict) and g.get("provider") == "aws") for g in res["aws"]
         )
 
-    def test_map_normalized_groups_list_to_providers_with_association_handles_immutable_object(
+    def test_map_normalized_groups_to_providers_handles_immutable_object(
         self,
     ):
         class ReadOnlyGroup:
@@ -94,13 +89,11 @@ class MapNormalizedGroupsListToProvidersWithAssociationTests:
         groups = [fg]
 
         # Should not raise when trying to set provider on an immutable object
-        res = gm.map_normalized_groups_list_to_providers_with_association(
-            groups, provider_registry=provs
-        )
+        res = gm.map_normalized_groups_to_providers(groups, provider_registry=provs)
         # group should still appear under some provider key (unknown if not writable)
         assert any(len(v) > 0 for v in res.values())
 
-    def test_map_normalized_groups_list_to_providers_with_association_longest_prefix_win(
+    def test_map_normalized_groups_to_providers_longest_prefix_win(
         self,
     ):
         provs = {
@@ -108,14 +101,12 @@ class MapNormalizedGroupsListToProvidersWithAssociationTests:
             "ab": SimpleNamespace(prefix="ab"),
         }
         groups = [{"id": "ab-my", "provider": "unknown"}]
-        res = gm.map_normalized_groups_list_to_providers_with_association(
-            groups, provider_registry=provs
-        )
+        res = gm.map_normalized_groups_to_providers(groups, provider_registry=provs)
         # group should be associated with provider 'ab'
         assert "ab" in res
         assert any(isinstance(g, dict) and g.get("provider") == "ab" for g in res["ab"])
 
-    def test_map_normalized_groups_list_to_providers_with_association_immutable_group(
+    def test_map_normalized_groups_to_providers_immutable_group(
         self,
     ):
         # Immutable-like object: setting attributes will raise
@@ -128,15 +119,13 @@ class MapNormalizedGroupsListToProvidersWithAssociationTests:
 
         registry = {"aws": {"prefix": "aws"}}
         g = Immutable("aws-my-group")
-        res = gm.map_normalized_groups_list_to_providers_with_association(
-            [g], provider_registry=registry
-        )
+        res = gm.map_normalized_groups_to_providers([g], provider_registry=registry)
         # Mutation should fail and the group falls back to 'unknown'
         assert "unknown" in res
         assert res["unknown"][0] is g
 
     @patch("modules.groups.mappings.get_active_providers")
-    def test_map_normalized_groups_list_to_providers_with_association_uses_active_providers(
+    def test_map_normalized_groups_to_providers_uses_active_providers(
         self, mock_get_active
     ):
         mock_get_active.return_value = {
@@ -144,7 +133,7 @@ class MapNormalizedGroupsListToProvidersWithAssociationTests:
             "google": SimpleNamespace(prefix="g"),
         }
         groups = [{"id": "a-special", "provider": None}]
-        res = gm.map_normalized_groups_list_to_providers_with_association(groups)
+        res = gm.map_normalized_groups_to_providers(groups)
         assert "aws" in res
         assert any(
             isinstance(g, dict) and g.get("provider") == "aws" for g in res["aws"]
