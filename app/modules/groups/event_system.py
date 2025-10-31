@@ -82,7 +82,7 @@ def _get_or_create_executor(max_workers: int = 4) -> Optional[ThreadPoolExecutor
 
     Returns None when the executor has been explicitly shut down.
     """
-    global _EXECUTOR, _executor_shutdown
+    global _EXECUTOR
     with _executor_lock:
         if _executor_shutdown:
             return None
