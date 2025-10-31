@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from core.logging import get_module_logger
 from modules.groups.models import GroupsMap
 from modules.groups.errors import IntegrationError
-from modules.groups.mappings import filter_groups_for_user_roles
+from modules.groups import service
 
 logger = get_module_logger()
 
@@ -116,7 +116,7 @@ def format_group_list_response(
 ) -> Dict[str, Any]:
     """Format response for listing user's groups."""
     if manageable:
-        groups = filter_groups_for_user_roles(groups, user_email, ["manager", "owner"])
+        groups = service.filter_groups_for_user_roles(groups, user_email, ["manager", "owner"])
 
     total_groups = len(groups)
     return {
