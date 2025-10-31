@@ -99,22 +99,13 @@ def validate_group_in_provider(group_id: str, provider: GroupProvider) -> bool:
     Returns:
         True if group exists and is accessible, False otherwise
     """
-    try:
-        result = provider.get_group_members(group_id)
-        # If OperationResult-like, check status attribute
-        if hasattr(result, "status"):
-
-            return result.status == OperationStatus.SUCCESS
-        # otherwise assume success when no exception raised
-        return True
-    except Exception as e:
-        logger.warning(
-            "group_validation_failed",
-            group_id=group_id,
-            provider=provider.__class__.__name__,
-            error=str(e),
-        )
-        return False
+    # Delegate to the service boundary so the small helper lives on the
+    # public service surface. Pass through the local OperationStatus so
+    # tests that patch `orchestration.OperationStatus` observe the same
+    # enum values when the service evaluates success.
+    return service_layer.validate_group_in_provider(
+        group_id, provider, op_status=OperationStatus
+    )
 
 
 def _unwrap_opresult_data(op):

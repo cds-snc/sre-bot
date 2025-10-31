@@ -22,6 +22,7 @@ from modules.groups import schemas
 from modules.groups import validation
 from modules.groups import mappings
 from modules.groups import providers as _providers
+from modules.groups.providers.base import OperationStatus, GroupProvider
 
 logger = get_module_logger()
 
@@ -362,3 +363,34 @@ def filter_groups_for_user_roles(groups, user_email: str, user_roles: list):
     internal mapping helpers.
     """
     return mappings.filter_groups_for_user_roles(groups, user_email, user_roles)
+
+
+def validate_group_in_provider(
+    group_id: str, provider: GroupProvider, op_status: object | None = None
+) -> bool:
+    """Check if group exists and is accessible in provider.
+
+    This function used to live in `orchestration.py`. It is a small,
+    provider-aware helper that verifies accessibility by attempting a
+    read operation (calls `get_group_members`). Moving it into the
+    service boundary keeps orchestration focused on flow control while
+    keeping caller-facing helpers discoverable on `service`.
+
+    Returns True when the provider indicates success, False otherwise.
+    """
+    try:
+        result = provider.get_group_members(group_id)
+        # If OperationResult-like, check the status attribute
+        if hasattr(result, "status"):
+            status_enum = op_status if op_status is not None else OperationStatus
+            return result.status == getattr(status_enum, "SUCCESS", "SUCCESS")
+        # otherwise assume success when no exception raised
+        return True
+    except Exception as e:
+        logger.warning(
+            "group_validation_failed",
+            group_id=group_id,
+            provider=provider.__class__.__name__,
+            error=str(e),
+        )
+        return False
