@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 import pytest
 from modules.groups import mappings as gm
-from modules.groups.models import NormalizedMember
+
+# NormalizedMember import removed — not used in these tests (fixes flake8 F401)
 
 
 class LocalNameFromPrimaryTests:
