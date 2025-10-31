@@ -1,4 +1,4 @@
-import types
+# 'types' import removed — not used in this test (fixes flake8 F401)
 
 
 def test_google_is_manager_toggles(

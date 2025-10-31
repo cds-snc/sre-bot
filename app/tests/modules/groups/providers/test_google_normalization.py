@@ -1,14 +1,14 @@
-import pytest
-
+import importlib
 from types import SimpleNamespace
-from modules.groups.errors import IntegrationError
+
+import pytest
 from integrations.google_workspace import google_directory_next as google_directory
 from integrations.google_workspace.schemas import Group as GoogleGroup
+from modules.groups.errors import IntegrationError
 
 
 def test_map_google_member_to_normalized_basic(safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -33,7 +33,6 @@ def test_map_google_member_to_normalized_basic(safe_providers_import):
 
 def test_map_google_group_to_normalized_with_members(safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -73,7 +72,6 @@ def test_map_google_group_to_normalized_with_members(safe_providers_import):
 
 def test_map_google_member_to_normalized_invalid_payload(safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -84,7 +82,6 @@ def test_map_google_member_to_normalized_invalid_payload(safe_providers_import):
 
 def test_map_google_group_to_normalized_invalid_payload(safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -94,7 +91,6 @@ def test_map_google_group_to_normalized_invalid_payload(safe_providers_import):
 
 def test_add_member_success_and_failure(monkeypatch, safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -127,7 +123,6 @@ def test_add_member_success_and_failure(monkeypatch, safe_providers_import):
 
 def test_remove_member_success(monkeypatch, safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -152,7 +147,6 @@ def test_direct_members_count_coercion(safe_providers_import):
 
     # provider mapping should still succeed
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -162,7 +156,6 @@ def test_direct_members_count_coercion(safe_providers_import):
 
 def test_group_with_member_with_user_enrichment(safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -197,7 +190,6 @@ def test_get_group_members_handles_unexpected_shapes(
     monkeypatch, safe_providers_import
 ):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
@@ -220,7 +212,6 @@ def test_get_group_members_handles_unexpected_shapes(
 
 def test_validate_permissions_failure_modes(monkeypatch, safe_providers_import):
     _ = safe_providers_import
-    import importlib
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
     p = google_mod.GoogleWorkspaceProvider()
