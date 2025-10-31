@@ -322,21 +322,6 @@ def normalize_member_for_provider(
     )
 
 
-def map_normalized_groups_list_to_providers(groups: List[NormalizedGroup]) -> GroupsMap:
-    """Deprecated: use map_normalized_groups_to_providers instead."""
-    return map_normalized_groups_to_providers(groups, associate=False)
-
-
-def map_normalized_groups_list_to_providers_with_association(
-    groups: List[NormalizedGroup],
-    provider_registry: Optional[Mapping[str, object]] = None,
-) -> GroupsMap:
-    """Deprecated: use map_normalized_groups_to_providers instead."""
-    return map_normalized_groups_to_providers(
-        groups, associate=True, provider_registry=provider_registry
-    )
-
-
 def map_normalized_groups_to_providers(
     groups: List[NormalizedGroup],
     *,
@@ -417,3 +402,56 @@ def map_normalized_groups_to_providers(
         provider_map.setdefault(provider, []).append(group)
 
     return provider_map
+
+
+def filter_groups_for_user_roles(
+    groups: GroupsMap, user_email: str, user_roles: List[str]
+) -> GroupsMap:
+    """Filter groups map to only include groups the user has roles in.
+
+    Args:
+        groups: GroupsMap mapping provider name → list of NormalizedGroup
+        user_email: Email address of the user
+        user_roles: List of roles the user has (e.g., ['admin', 'member'])
+
+    Returns:
+        Filtered GroupsMap with only groups the user has roles in.
+    """
+    filtered_map: GroupsMap = {}
+
+    # fast return if no roles specified; return all groups
+    if not user_roles:
+        return groups
+
+    for provider, group_list in groups.items():
+        filtered_groups = []
+        for group in group_list:
+            group_members = []
+            if isinstance(group, dict):
+                group_members = group.get("members", [])
+            else:
+                group_members = getattr(group, "members", []) or []
+
+            # Check if user has any role in this group
+            for member in group_members:
+                member_email = None
+                member_role = None
+                if isinstance(member, dict):
+                    member_email = member.get("email")
+                    member_role = member.get("role")
+                else:
+                    member_email = getattr(member, "email", None)
+                    member_role = getattr(member, "role", None)
+
+                if (
+                    member_email == user_email
+                    and member_role
+                    and member_role.lower() in [r.lower() for r in user_roles]
+                ):
+                    filtered_groups.append(group)
+                    break  # No need to check other members
+
+        if filtered_groups:
+            filtered_map[provider] = filtered_groups
+
+    return filtered_map
