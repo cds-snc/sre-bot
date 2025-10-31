@@ -10,6 +10,7 @@ from modules.groups.api import (
     slack_add_member,
     slack_remove_member,
     slack_list_groups,
+    slack_manage_groups,
 )
 from modules.groups.providers import get_active_providers
 from modules.groups.validation import validate_email, validate_provider_type
@@ -40,7 +41,7 @@ def handle_groups_command(
     elif action == "remove":
         _handle_remove_command(client, body, respond, args[1:])
     elif action == "manage":
-        _handle_list_manageable_groups_command(client, body, respond, args[1:])
+        _handle_manage_command(client, body, respond, args[1:])
     elif action == "providers":
         _handle_list_active_providers_command(client, body, respond, args[1:])
     else:
@@ -160,7 +161,7 @@ def _handle_remove_command(
         respond("❌ Error removing member from group. Please try again later.")
 
 
-def _handle_list_manageable_groups_command(
+def _handle_manage_command(
     client, body: Dict[str, Any], respond: Respond, args: List[str]
 ):
     """Handle groups manage command. Lists all manageable groups for the user."""
@@ -174,7 +175,7 @@ def _handle_list_manageable_groups_command(
         provider_type = args[0]
 
     try:
-        result = slack_list_groups(user_email, True, provider_type)
+        result = slack_manage_groups(user_email, provider_type)
         respond(result)
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
