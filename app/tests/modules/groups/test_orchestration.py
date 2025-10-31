@@ -18,12 +18,12 @@ def _transient_result_fn(msg):
 
 
 def test_normalize_member_for_provider_valid_and_invalid():
-    nm = orch.normalize_member_for_provider("user@example.com", "aws")
+    nm = orch.service_layer.normalize_member_for_provider("user@example.com", "aws")
     # returned object should expose email attribute and match input
     assert hasattr(nm, "email") and nm.email == "user@example.com"
 
     with pytest.raises(ValueError):
-        orch.normalize_member_for_provider("not-an-email", "aws")
+        orch.service_layer.normalize_member_for_provider("not-an-email", "aws")
 
 
 @patch(

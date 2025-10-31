@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from modules.groups import mappings as gm
+from modules.groups import service as gs
 from modules.groups.models import NormalizedMember
 
 
@@ -143,18 +144,18 @@ class MapNormalizedGroupsListToProvidersTests:
 class NormalizeMemberForProviderTests:
     def test_normalize_member_for_provider_valid_and_invalid(self):
         # valid
-        nm = gm.normalize_member_for_provider("a@b.com", "aws")
+        nm = gs.normalize_member_for_provider("a@b.com", "aws")
         assert nm.email == "a@b.com"
 
         # invalid
         with pytest.raises(ValueError):
-            gm.normalize_member_for_provider("no-at", "aws")
+            gs.normalize_member_for_provider("no-at", "aws")
 
     def test_normalize_member_for_provider_invalid_and_valid(self):
         with pytest.raises(ValueError):
-            gm.normalize_member_for_provider("noats", "aws")
+            gs.normalize_member_for_provider("noats", "aws")
 
-        nm = gm.normalize_member_for_provider("a@b", "aws")
+        nm = gs.normalize_member_for_provider("a@b", "aws")
         assert isinstance(nm, NormalizedMember)
         assert nm.email == "a@b"
         assert nm.id is None
