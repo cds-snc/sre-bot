@@ -13,39 +13,14 @@ ThreadPoolExecutor to avoid making changes to the existing synchronous
 will move the dispatcher into `event_system` itself.
 """
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Dict, List
-
+from typing import Any, List
 from core.logging import get_module_logger
-
 from modules.groups import orchestration
 from modules.groups import event_system
 from modules.groups import schemas
 
 logger = get_module_logger()
-
-# Small executor for background tasks (bounded to avoid runaway thread growth)
-_EXECUTOR = ThreadPoolExecutor(max_workers=4)
-
-
-def _dispatch_event_background(event_type: str, payload: Dict[str, Any]) -> None:
-    """Submit an event dispatch to a background thread (fire-and-forget).
-
-    Exceptions raised by handlers are caught inside the worker so they don't
-    propagate to the caller.
-    """
-
-    def _worker(evt: str, p: Dict[str, Any]) -> None:
-        try:
-            event_system.dispatch_event(evt, p)
-        except Exception as e:  # pragma: no cover - defensive logging
-            logger.exception("background_event_handler_failed", service_event=evt, error=str(e))
-
-    try:
-        _EXECUTOR.submit(_worker, event_type, payload)
-    except Exception:  # pragma: no cover - very defensive
-        logger.exception("failed_to_submit_event_to_executor", service_event=event_type)
 
 
 def _parse_timestamp(ts: str | None) -> datetime:
@@ -81,7 +56,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
     # Fire-and-forget event for downstream handlers (audit, notifications)
     try:
-        _dispatch_event_background(
+        event_system.dispatch_background(
             "group.member.add_requested",
             (
                 {"orchestration": orch, "request": request.model_dump()}
@@ -119,7 +94,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
     )
 
     try:
-        _dispatch_event_background(
+        event_system.dispatch_background(
             "group.member.remove_requested",
             (
                 {"orchestration": orch, "request": request.model_dump()}
