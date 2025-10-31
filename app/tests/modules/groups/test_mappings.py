@@ -255,7 +255,7 @@ class ExtractPrefixesFromRegistryTests:
 class MapSecondaryPrimaryGroupTests:
     """Tests for mapping between secondary and primary group IDs."""
 
-    @patch("modules.groups.mappings.map_provider_group_id", return_value="a-my-group")
+    @patch("modules.groups.service.map_provider_group_id", return_value="a-my-group")
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_map_secondary_to_primary_group_success(self, mock_get_primary, mock_map):
         res = gm.map_secondary_to_primary_group("aws", "my-group")
@@ -265,7 +265,7 @@ class MapSecondaryPrimaryGroupTests:
         )
 
     @patch(
-        "modules.groups.mappings.map_provider_group_id", side_effect=Exception("boom")
+        "modules.groups.service.map_provider_group_id", side_effect=Exception("boom")
     )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_map_secondary_to_primary_group_raises_on_failure(
@@ -274,7 +274,7 @@ class MapSecondaryPrimaryGroupTests:
         with pytest.raises(ValueError):
             gm.map_secondary_to_primary_group("aws", "my-group")
 
-    @patch("modules.groups.mappings.map_provider_group_id", return_value="id")
+    @patch("modules.groups.service.map_provider_group_id", return_value="id")
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="primary")
     def test_map_secondary_to_primary_group_error_path(
         self, mock_get_primary, mock_map
@@ -286,7 +286,7 @@ class MapSecondaryPrimaryGroupTests:
 
 class MapPrimaryToSecondaryGroupTests:
 
-    @patch("modules.groups.mappings.map_provider_group_id", return_value="my-group")
+    @patch("modules.groups.service.map_provider_group_id", return_value="my-group")
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_map_primary_to_secondary_group_success(self, mock_get_primary, mock_map):
         res = gm.map_primary_to_secondary_group("g-my-group", "aws")
@@ -296,7 +296,7 @@ class MapPrimaryToSecondaryGroupTests:
         )
 
     @patch(
-        "modules.groups.mappings.map_provider_group_id", side_effect=Exception("boom")
+        "modules.groups.service.map_provider_group_id", side_effect=Exception("boom")
     )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_map_primary_to_secondary_group_raises_on_failure(
@@ -305,7 +305,7 @@ class MapPrimaryToSecondaryGroupTests:
         with pytest.raises(ValueError):
             gm.map_primary_to_secondary_group("g-my-group", "aws")
 
-    @patch("modules.groups.mappings.map_provider_group_id", return_value="id")
+    @patch("modules.groups.service.map_provider_group_id", return_value="id")
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="primary")
     def test_map_primary_to_secondary_group_error_path(
         self, mock_get_primary, mock_map

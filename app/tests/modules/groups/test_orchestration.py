@@ -72,7 +72,7 @@ def test__unwrap_opresult_data_variants():
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
-    "modules.groups.orchestration.map_primary_to_secondary_group",
+    "modules.groups.service.map_primary_to_secondary_group",
     return_value="mapped-sec-grp",
 )
 @patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
@@ -88,6 +88,18 @@ def test__unwrap_opresult_data_variants():
 )
 @patch(
     "modules.groups.orchestration.OperationStatus",
+    new=SimpleNamespace(SUCCESS="SUCCESS"),
+)
+@patch(
+    "modules.groups.service.OperationResult",
+    new=SimpleNamespace(
+        transient_error=staticmethod(
+            lambda msg: DummyOp(status="TRANSIENT", message=msg)
+        )
+    ),
+)
+@patch(
+    "modules.groups.service.OperationStatus",
     new=SimpleNamespace(SUCCESS="SUCCESS"),
 )
 def test_add_member_to_group_primary_failure_no_propagation(
@@ -123,7 +135,7 @@ def test_add_member_to_group_primary_failure_no_propagation(
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
-    "modules.groups.orchestration.map_primary_to_secondary_group",
+    "modules.groups.service.map_primary_to_secondary_group",
     return_value="mapped-sec-grp",
 )
 @patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
@@ -139,6 +151,18 @@ def test_add_member_to_group_primary_failure_no_propagation(
 )
 @patch(
     "modules.groups.orchestration.OperationStatus",
+    new=SimpleNamespace(SUCCESS="SUCCESS"),
+)
+@patch(
+    "modules.groups.service.OperationResult",
+    new=SimpleNamespace(
+        transient_error=staticmethod(
+            lambda msg: DummyOp(status="TRANSIENT", message=msg)
+        )
+    ),
+)
+@patch(
+    "modules.groups.service.OperationStatus",
     new=SimpleNamespace(SUCCESS="SUCCESS"),
 )
 def test_add_member_to_group_primary_success_secondary_partial_failure(
@@ -177,7 +201,7 @@ def test_add_member_to_group_primary_success_secondary_partial_failure(
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
-    "modules.groups.orchestration.map_primary_to_secondary_group",
+    "modules.groups.service.map_primary_to_secondary_group",
     return_value="mapped-sec-grp",
 )
 @patch("modules.groups.orchestration.get_primary_provider_name", return_value="google")
@@ -193,6 +217,18 @@ def test_add_member_to_group_primary_success_secondary_partial_failure(
 )
 @patch(
     "modules.groups.orchestration.OperationStatus",
+    new=SimpleNamespace(SUCCESS="SUCCESS"),
+)
+@patch(
+    "modules.groups.service.OperationResult",
+    new=SimpleNamespace(
+        transient_error=staticmethod(
+            lambda msg: DummyOp(status="TRANSIENT", message=msg)
+        )
+    ),
+)
+@patch(
+    "modules.groups.service.OperationStatus",
     new=SimpleNamespace(SUCCESS="SUCCESS"),
 )
 def test_remove_member_from_group_propagation_and_partial(
