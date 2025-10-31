@@ -4,7 +4,7 @@
 from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
-from modules.groups import service, schemas, models
+from modules.groups import service, schemas
 
 # orchestration functions are called from `service` now; keep imports minimal
 from modules.groups.responses import (
