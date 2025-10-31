@@ -1,4 +1,6 @@
-from modules.groups import service, orchestration, event_system
+import pytest
+
+from modules.groups import service, orchestration, event_system, validation
 from modules.groups import schemas
 
 
@@ -143,3 +145,101 @@ def test_bulk_operations_calls_add_and_remove(monkeypatch):
     assert isinstance(res.results, list)
     assert len(res.results) == 2
     assert res.summary["success"] == 2
+
+
+def test_add_member_validation_fails(monkeypatch):
+    """If semantic validation fails at the service boundary, raise ValueError."""
+    # Force the validation layer to reject the group id
+    monkeypatch.setattr(validation, "validate_group_id", lambda gid, prov: False)
+
+    req = schemas.AddMemberRequest(
+        group_id="g-bad",
+        member_email="u@example.com",
+        provider=schemas.ProviderType.GOOGLE,
+    )
+
+    with pytest.raises(ValueError):
+        service.add_member(req)
+
+
+def test_add_member_propagation_partial_failure(monkeypatch):
+    """Orchestration can report propagation failures while primary succeeded."""
+    orch_resp = {
+        "success": True,
+        "group_id": "g-prop",
+        "member_email": "u2@example.com",
+        "timestamp": "2025-01-02T00:00:00Z",
+        "propagation": [{"provider": "aws", "success": False, "error": "timeout"}],
+    }
+
+    monkeypatch.setattr(orchestration, "add_member_to_group", lambda *a, **k: orch_resp)
+    monkeypatch.setattr(event_system, "dispatch_background", lambda *a, **k: None)
+
+    req = schemas.AddMemberRequest(
+        group_id="g-prop",
+        member_email="u2@example.com",
+        provider=schemas.ProviderType.GOOGLE,
+    )
+
+    res = service.add_member(req)
+
+    assert res.success is True
+    assert res.group_id == "g-prop"
+    # orchestration details preserved
+    assert res.details and res.details.get("orchestration")
+    assert res.details["orchestration"].get("propagation")[0]["success"] is False
+
+
+def test_bulk_operations_partial_failure(monkeypatch):
+    """Bulk operations should report per-item failures without raising."""
+
+    def fail_add(_):
+        raise Exception("add failed")
+
+    from datetime import datetime
+
+    def ok_remove(_):
+        return schemas.ActionResponse(
+            success=True,
+            action=schemas.OperationType.REMOVE_MEMBER,
+            timestamp=datetime.utcnow(),
+        )
+
+    monkeypatch.setattr(service, "add_member", fail_add)
+    monkeypatch.setattr(service, "remove_member", ok_remove)
+
+    ops = [
+        {
+            "operation": "add_member",
+            "payload": {
+                "group_id": "g1",
+                "member_email": "a@example.com",
+                "provider": "google",
+            },
+        },
+        {
+            "operation": "remove_member",
+            "payload": {
+                "group_id": "g2",
+                "member_email": "b@example.com",
+                "provider": "google",
+            },
+        },
+    ]
+
+    req = schemas.BulkOperationsRequest(
+        operations=[
+            schemas.OperationItem(
+                operation=schemas.OperationType.ADD_MEMBER, payload=ops[0]["payload"]
+            ),
+            schemas.OperationItem(
+                operation=schemas.OperationType.REMOVE_MEMBER, payload=ops[1]["payload"]
+            ),
+        ]
+    )
+
+    res = service.bulk_operations(req)
+
+    assert isinstance(res.results, list)
+    # one failed, one succeeded
+    assert res.summary["success"] == 1
