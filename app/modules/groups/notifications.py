@@ -9,6 +9,12 @@ logger = get_module_logger()
 def send_group_notifications(payload: Dict[str, Any]) -> None:
     """Send notifications for group membership changes."""
 
+    # New nested event contract: original request under 'request' and
+    # orchestration details under 'orchestration'. Use those fields for
+    # notification content. Tests will be updated to send the new shape.
+    req = payload.get("request", {})
+    orch = payload.get("orchestration") or {}
+
     action = (
         "added to" if "added" in str(payload.get("event_type", "")) else "removed from"
     )
@@ -16,20 +22,20 @@ def send_group_notifications(payload: Dict[str, Any]) -> None:
     try:
         # Send notification to requester
         _send_slack_notification(
-            user_email=payload.get("requestor_email"),
-            message=f"✅ Successfully {action} {payload.get('member_email')} {action.split()[1]} group {payload.get('group_id')}",
-            provider=payload.get("provider"),
+            user_email=req.get("requestor") or req.get("requestor_email"),
+            message=f"✅ Successfully {action} {req.get('member_email')} {action.split()[1]} group {req.get('group_id')}",
+            provider=req.get("provider") or orch.get("provider"),
         )
 
         # Send notification to member being added/removed (if different from requester)
-        member_email = payload.get("member_email")
-        requestor_email = payload.get("requestor_email")
+        member_email = req.get("member_email")
+        requestor_email = req.get("requestor") or req.get("requestor_email")
 
         if member_email and member_email != requestor_email:
             _send_slack_notification(
                 user_email=member_email,
-                message=f"📋 You have been {action} group {payload.get('group_id')} by {requestor_email}",
-                provider=payload.get("provider"),
+                message=f"📋 You have been {action} group {req.get('group_id')} by {requestor_email}",
+                provider=req.get("provider") or orch.get("provider"),
             )
 
         logger.info("Successfully sent group membership notifications")
@@ -68,6 +74,9 @@ def send_email_notification(user_email: str, subject: str, message: str) -> None
 
 def format_group_update_message(payload: Dict[str, Any]) -> str:
     """Format a user-friendly message for group updates."""
+    req = payload.get("request", {})
+    orch = payload.get("orchestration") or {}
+
     action = (
         "added to" if "added" in str(payload.get("event_type", "")) else "removed from"
     )
@@ -75,12 +84,12 @@ def format_group_update_message(payload: Dict[str, Any]) -> str:
     message = f"""
 Group Membership Update:
 
-• Member: {payload.get('member_email')}
+• Member: {req.get('member_email')}
 • Action: {action}
-• Group: {payload.get('group_id')}
-• Provider: {payload.get('provider', 'Unknown')}
-• Requested by: {payload.get('requestor_email')}
-• Justification: {payload.get('justification', 'Not provided')}
+• Group: {req.get('group_id')}
+• Provider: {req.get('provider', orch.get('provider', 'Unknown'))}
+• Requested by: {req.get('requestor') or req.get('requestor_email')}
+• Justification: {req.get('justification', 'Not provided')}
 • Timestamp: {payload.get('timestamp', 'Unknown')}
 """
 
