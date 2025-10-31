@@ -19,6 +19,7 @@ from core.logging import get_module_logger
 from modules.groups import orchestration
 from modules.groups import event_system
 from modules.groups import schemas
+from modules.groups import validation
 
 logger = get_module_logger()
 
@@ -47,6 +48,21 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     function schedules a background event `group.member.add_requested` with
     the orchestration response plus the original request payload.
     """
+    # Semantic validation: move input validation responsibility to the service
+    provider_type = request.provider.value if request.provider else None
+    if provider_type and not validation.validate_provider_type(provider_type):
+        raise ValueError(f"invalid provider: {provider_type}")
+
+    if not validation.validate_group_id(request.group_id, provider_type or ""):
+        raise ValueError(
+            f"invalid group_id for provider {provider_type}: {request.group_id}"
+        )
+
+    if request.justification and not validation.validate_justification(
+        request.justification
+    ):
+        raise ValueError("justification too short")
+
     orch = orchestration.add_member_to_group(
         primary_group_id=request.group_id,
         member_email=request.member_email,
@@ -86,6 +102,21 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
     Schedules `group.member.remove_requested` as a background event and returns
     an `ActionResponse` summarizing the orchestration outcome.
     """
+    # Semantic validation performed at service boundary
+    provider_type = request.provider.value if request.provider else None
+    if provider_type and not validation.validate_provider_type(provider_type):
+        raise ValueError(f"invalid provider: {provider_type}")
+
+    if not validation.validate_group_id(request.group_id, provider_type or ""):
+        raise ValueError(
+            f"invalid group_id for provider {provider_type}: {request.group_id}"
+        )
+
+    if request.justification and not validation.validate_justification(
+        request.justification
+    ):
+        raise ValueError("justification too short")
+
     orch = orchestration.remove_member_from_group(
         primary_group_id=request.group_id,
         member_email=request.member_email,
