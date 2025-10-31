@@ -102,15 +102,15 @@ def _handle_add_command(
         return
 
     try:
-        req_kwargs = {
-            "group_id": group_id,
-            "member_email": member_email,
-            "provider": provider_type,
-            "justification": justification,
-            "requestor": requestor_email,
-        }
-        # Build Pydantic request and call service directly
-        add_req = schemas.AddMemberRequest(**req_kwargs)
+        # Build Pydantic request and call service directly. Coerce provider to
+        # the ProviderType enum so downstream code receives normalized types.
+        add_req = schemas.AddMemberRequest(
+            group_id=group_id,
+            member_email=member_email,
+            provider=schemas.ProviderType(provider_type),
+            justification=justification,
+            requestor=requestor_email,
+        )
         result = service.add_member(add_req)
 
         # Format Slack-friendly text
@@ -154,14 +154,13 @@ def _handle_remove_command(
         return
 
     try:
-        req_kwargs = {
-            "group_id": group_id,
-            "member_email": member_email,
-            "provider": provider_type,
-            "justification": justification,
-            "requestor": requestor_email,
-        }
-        remove_req = schemas.RemoveMemberRequest(**req_kwargs)
+        remove_req = schemas.RemoveMemberRequest(
+            group_id=group_id,
+            member_email=member_email,
+            provider=schemas.ProviderType(provider_type),
+            justification=justification,
+            requestor=requestor_email,
+        )
         result = service.remove_member(remove_req)
         respond(
             responses.format_slack_response(

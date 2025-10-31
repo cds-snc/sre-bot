@@ -4,7 +4,7 @@
 from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
-from modules.groups import service
+from modules.groups import service, schemas, models
 
 # orchestration functions are called from `service` now; keep imports minimal
 from modules.groups.responses import (
@@ -45,12 +45,13 @@ def handle_add_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         # Build Pydantic request and delegate to the service layer which will
         # call orchestration and schedule events asynchronously.
         try:
-            from modules.groups import schemas
-
+            # Build Pydantic request using the public schemas boundary. Coerce
+            # provider string into the ProviderType enum to make the service
+            # contract explicit and strict.
             req = schemas.AddMemberRequest(
                 group_id=group_id,
                 member_email=member_email,
-                provider=provider_type,
+                provider=schemas.ProviderType(provider_type),
                 justification=justification,
                 requestor=requestor_email,
             )
@@ -106,12 +107,10 @@ def handle_remove_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         # operation and guard against exceptions.
         # Build Pydantic request and delegate to service layer
         try:
-            from modules.groups import schemas
-
             req = schemas.RemoveMemberRequest(
                 group_id=group_id,
                 member_email=member_email,
-                provider=provider_type,
+                provider=schemas.ProviderType(provider_type),
                 justification=justification,
                 requestor=requestor_email,
             )
@@ -153,9 +152,10 @@ def handle_list_user_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        from modules.groups import schemas
-
-        req = schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+        req = schemas.ListGroupsRequest(
+            user_email=user_email,
+            provider=(schemas.ProviderType(provider_type) if provider_type else None),
+        )
         groups_list: List[NormalizedGroup] = service.list_groups(req)
         logger.warning("groups_list_received", groups=groups_list)
         if not isinstance(groups_list, list):
@@ -186,9 +186,10 @@ def handle_manage_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        from modules.groups import schemas
-
-        req = schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+        req = schemas.ListGroupsRequest(
+            user_email=user_email,
+            provider=(schemas.ProviderType(provider_type) if provider_type else None),
+        )
         groups_list: List[NormalizedGroup] = service.list_groups(req)
         logger.warning("groups_list_received", groups=groups_list)
         if not isinstance(groups_list, list):
