@@ -155,7 +155,7 @@ class OperationItem(BaseModel):
     payload: Annotated[Dict[str, Any], Field(..., description="Operation payload")]
 
     @model_validator(mode="before")
-    def validate_payload(cls, values):
+    def validate_payload(self, values):
         op = values.get("operation")
         payload = values.get("payload")
         if op == OperationType.ADD_MEMBER:
