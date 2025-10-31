@@ -5,9 +5,6 @@ from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
 from modules.groups import service
-from modules.groups.mappings import (
-    map_normalized_groups_to_providers,
-)
 
 # orchestration functions are called from `service` now; keep imports minimal
 from modules.groups.responses import (
@@ -164,7 +161,7 @@ def handle_list_user_groups_request(
         if not isinstance(groups_list, list):
             groups_list = []
 
-        providers_map: GroupsMap = map_normalized_groups_to_providers(
+        providers_map: GroupsMap = service.map_normalized_groups_to_providers(
             groups_list, associate=True
         )
         return format_group_list_response(providers_map, user_email=user_email)
@@ -197,7 +194,7 @@ def handle_manage_groups_request(
         if not isinstance(groups_list, list):
             groups_list = []
 
-        providers_map: GroupsMap = map_normalized_groups_to_providers(
+        providers_map: GroupsMap = service.map_normalized_groups_to_providers(
             groups_list, associate=True
         )
         return format_group_list_response(
