@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Any, List
 from core.logging import get_module_logger
 from modules.groups import orchestration
+from modules.groups import orchestration_responses as orr
 from modules.groups import event_system
 from modules.groups import schemas
 from modules.groups import validation
@@ -120,31 +121,57 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         justification=request.justification or "",
         provider_hint=(request.provider.value if request.provider else None),
     )
+    # If orchestration returns OperationResult objects (raw), map them to
+    # the existing orchestration response dict shape using the formatter.
+    if (
+        isinstance(orch, dict)
+        and "primary" in orch
+        and not isinstance(orch.get("primary"), dict)
+    ):
+        try:
+            formatted = orr.format_orchestration_response(
+                orch["primary"],
+                orch.get("propagation", {}),
+                orch.get("partial_failures", False),
+                orch.get("correlation_id"),
+                action=orch.get("action", "add_member"),
+                group_id=orch.get("group_id"),
+                member_email=orch.get("member_email"),
+            )
+        except Exception:
+            # Fallback to original raw form if formatting fails
+            formatted = orch
+    else:
+        formatted = orch
 
     # Fire-and-forget event for downstream handlers (audit, notifications)
-    # Emit the canonical post-write event so consumers receive the final
-    # orchestration result alongside the original request payload.
     try:
         event_system.dispatch_background(
             "group.member.added",
             (
-                {"orchestration": orch, "request": request.model_dump()}
+                {"orchestration": formatted, "request": request.model_dump()}
                 if hasattr(request, "model_dump")
-                else {"orchestration": orch, "request": request.dict()}
+                else {"orchestration": formatted, "request": request.dict()}
             ),
         )
     except Exception:  # pragma: no cover - defensive
         logger.exception("failed_to_schedule_add_member_event")
 
-    ts = _parse_timestamp(orch.get("timestamp"))
+    ts = _parse_timestamp(
+        formatted.get("timestamp") if isinstance(formatted, dict) else None
+    )
 
     return schemas.ActionResponse(
-        success=bool(orch.get("success", False)),
+        success=bool(
+            formatted.get("success", False) if isinstance(formatted, dict) else False
+        ),
         action=schemas.OperationType.ADD_MEMBER,
-        group_id=orch.get("group_id"),
-        member_email=orch.get("member_email"),
+        group_id=(formatted.get("group_id") if isinstance(formatted, dict) else None),
+        member_email=(
+            formatted.get("member_email") if isinstance(formatted, dict) else None
+        ),
         provider=request.provider,
-        details={"orchestration": orch},
+        details={"orchestration": formatted},
         timestamp=ts,
     )
 
@@ -192,28 +219,54 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
         justification=request.justification or "",
         provider_hint=(request.provider.value if request.provider else None),
     )
+    # Format orchestration response when orchestration returns raw OperationResult objects
+    if (
+        isinstance(orch, dict)
+        and "primary" in orch
+        and not isinstance(orch.get("primary"), dict)
+    ):
+        try:
+            formatted = orr.format_orchestration_response(
+                orch["primary"],
+                orch.get("propagation", {}),
+                orch.get("partial_failures", False),
+                orch.get("correlation_id"),
+                action=orch.get("action", "remove_member"),
+                group_id=orch.get("group_id"),
+                member_email=orch.get("member_email"),
+            )
+        except Exception:
+            formatted = orch
+    else:
+        formatted = orch
 
     try:
         event_system.dispatch_background(
             "group.member.removed",
             (
-                {"orchestration": orch, "request": request.model_dump()}
+                {"orchestration": formatted, "request": request.model_dump()}
                 if hasattr(request, "model_dump")
-                else {"orchestration": orch, "request": request.dict()}
+                else {"orchestration": formatted, "request": request.dict()}
             ),
         )
     except Exception:  # pragma: no cover - defensive
         logger.exception("failed_to_schedule_remove_member_event")
 
-    ts = _parse_timestamp(orch.get("timestamp"))
+    ts = _parse_timestamp(
+        formatted.get("timestamp") if isinstance(formatted, dict) else None
+    )
 
     return schemas.ActionResponse(
-        success=bool(orch.get("success", False)),
+        success=bool(
+            formatted.get("success", False) if isinstance(formatted, dict) else False
+        ),
         action=schemas.OperationType.REMOVE_MEMBER,
-        group_id=orch.get("group_id"),
-        member_email=orch.get("member_email"),
+        group_id=(formatted.get("group_id") if isinstance(formatted, dict) else None),
+        member_email=(
+            formatted.get("member_email") if isinstance(formatted, dict) else None
+        ),
         provider=request.provider,
-        details={"orchestration": orch},
+        details={"orchestration": formatted},
         timestamp=ts,
     )
 

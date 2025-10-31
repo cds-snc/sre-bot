@@ -6,12 +6,9 @@ inside functions to avoid import-time failures during incremental rollout.
 """
 
 from uuid import uuid4
-from typing import Dict, List, TYPE_CHECKING, cast
+from typing import Dict, List, TYPE_CHECKING
 from core.logging import get_module_logger
-from modules.groups import (
-    reconciliation_integration as ri,
-    orchestration_responses as orr,
-)
+from modules.groups import reconciliation_integration as ri
 from modules.groups.providers import (
     get_active_providers,
     get_primary_provider,
@@ -320,25 +317,24 @@ def _orchestrate_write_operation(
         )
         primary_result = OperationResult.transient_error(str(e))
 
-    # If primary failed, do not propagate
+    # If primary failed, do not propagate. Return raw result objects and
+    # leave formatting to the service boundary so the orchestration layer
+    # focuses on provider coordination only.
     if getattr(primary_result, "status", None) != OperationStatus.SUCCESS:
         logger.warning(
             "orchestration_primary_failed",
             correlation_id=correlation_id,
             primary_status=getattr(primary_result, "status", None),
         )
-        return cast(
-            "OrchestrationResponseTypedDict",
-            orr.format_orchestration_response(
-                primary_result,
-                {},
-                False,
-                correlation_id,
-                action=action,
-                group_id=primary_group_id,
-                member_email=member_email,
-            ),
-        )
+        return {
+            "primary": primary_result,
+            "propagation": {},
+            "partial_failures": False,
+            "correlation_id": correlation_id,
+            "action": action,
+            "group_id": primary_group_id,
+            "member_email": member_email,
+        }
 
     # TODO: record justification for audit
     logger.warning(
@@ -355,21 +351,18 @@ def _orchestrate_write_operation(
         for r in propagation_results.values()
     )
 
-    # cast propagation results to OperationResultLike mapping for formatter
-    propagation_like = cast(Dict[str, "OperationResultLike"], propagation_results)
-
-    return cast(
-        "OrchestrationResponseTypedDict",
-        orr.format_orchestration_response(
-            primary_result,
-            propagation_like,
-            has_partial,
-            correlation_id,
-            action=action,
-            group_id=primary_group_id,
-            member_email=member_email,
-        ),
-    )
+    # Return raw results; formatting (to dicts/timestamps) lives on the
+    # service boundary so controllers and consumers receive stable
+    # serializable payloads from the service layer.
+    return {
+        "primary": primary_result,
+        "propagation": propagation_results,
+        "partial_failures": has_partial,
+        "correlation_id": correlation_id,
+        "action": action,
+        "group_id": primary_group_id,
+        "member_email": member_email,
+    }
 
 
 def add_member_to_group(
