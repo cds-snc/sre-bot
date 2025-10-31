@@ -154,6 +154,38 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             f"member_data must be str or dict; got {type(member_data).__name__}"
         )
 
+    def _list_groups_with_members_for_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> List[Dict]:
+        """List groups with members for a user (not implemented for Google)."""
+        users_kwargs = {"fields": "primaryEmail,name"}
+        groups_kwargs = {"query": "memberKey=" + user_key}
+        if provider_name and provider_name != "google":
+            groups_filters = [
+                lambda g: isinstance(g, dict)
+                and g.get("email", "").lower().startswith(provider_name.lower())
+            ]
+            resp = google_directory.list_groups_with_members(
+                groups_filters=groups_filters,
+                groups_kwargs=groups_kwargs,
+                users_kwargs=users_kwargs,
+                **kwargs,
+            )
+        else:
+            resp = google_directory.list_groups_with_members(
+                groups_kwargs=groups_kwargs, users_kwargs=users_kwargs, **kwargs
+            )
+        if hasattr(resp, "success") and not resp.success:
+            raise IntegrationError(
+                "google list_groups_with_members failed", response=resp
+            )
+        raw = resp.data if hasattr(resp, "data") else resp
+        return [
+            as_canonical_dict(self._normalize_group_from_google(g))
+            for g in (raw or [])
+            if isinstance(g, dict)
+        ]
+
     @opresult_wrapper(data_key="result")
     def add_member(self, group_key: str, member_data: NormalizedMember) -> Dict:
         """Add a member to a group and return the normalized member dict.
@@ -316,7 +348,9 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @opresult_wrapper(data_key="groups")
-    def get_groups_managed_by_user(self, user_key: str, **kwargs) -> List[Dict]:
+    def list_groups_managed_by_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> List[Dict]:
         """Return groups keys where the user is a MANAGER or OWNER.
 
         Args:
@@ -325,34 +359,20 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             A list of group keys (emails) where the user is a MANAGER or OWNER.
         """
-        resp = google_directory.list_groups(query=f"memberKey={user_key}", **kwargs)
-        if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError("google list_groups failed", response=resp)
-        raw = resp.data if hasattr(resp, "data") else resp
-        groups_emails = []
-        if isinstance(raw, list):
-            for g in raw:
-                if isinstance(g, dict):
-                    groups_emails.append(g.get("email", ""))
-        resp = google_directory.get_batch_members_for_user(
-            group_keys=groups_emails, user_key=user_key
+        groups_list = self._list_groups_with_members_for_user(
+            user_key, provider_name=provider_name, **kwargs
         )
-        if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError(
-                "google get_batch_members_for_user failed", response=resp
-            )
-        batch_data = resp.data if hasattr(resp, "data") else resp
-        managed_groups = []
-        if isinstance(batch_data, dict):
-            for group_email, info in batch_data.items():
-                if not group_email:
+        managed_groups: List[Dict] = []
+        if isinstance(groups_list, list):
+            for group in groups_list:
+                if not group or not isinstance(group, dict):
                     continue
-                if isinstance(info, dict):
-                    role = info.get("role")
+                if isinstance(group, dict):
+                    role = group.get("role")
                     if role in ("MANAGER", "OWNER"):
-                        managed_groups.append(group_email)
+                        managed_groups.append(group)
 
-        return sorted(dict.fromkeys(managed_groups))
+        return managed_groups
 
     @opresult_wrapper(data_key="is_manager")
     def is_manager(self, user_key: str, group_key: str) -> bool:
