@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from core.logging import get_module_logger
 from modules.groups import service, schemas, models
@@ -38,10 +38,14 @@ def remove_member_endpoint(request: schemas.RemoveMemberRequest):
 
 
 @router.get("/", response_model=List[dict])
-def list_groups_endpoint(user_email: str, provider: Optional[str] = None):
+def list_groups_endpoint(request: schemas.ListGroupsRequest = Depends()):
+    """List groups for a user.
+
+    Accepts query parameters that map to `schemas.ListGroupsRequest` so OpenAPI
+    documents the expected parameters (`user_email`, optional `provider`).
+    """
     try:
-        req = schemas.ListGroupsRequest(user_email=user_email, provider=provider)
-        groups = service.list_groups(req)
+        groups = service.list_groups(request)
         # Convert dataclasses to serializable dicts
         return [models.as_canonical_dict(g) for g in groups]
     except Exception as e:
