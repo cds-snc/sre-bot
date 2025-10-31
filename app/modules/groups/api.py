@@ -1,7 +1,6 @@
 # modules/groups/api.py
 """API interface for groups membership management."""
 
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
