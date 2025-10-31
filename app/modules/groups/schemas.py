@@ -155,5 +155,5 @@ def as_canonical_dict(obj) -> dict:
         return obj
 
 
-# Type alias for a provider -> list of normalized groups mapping
+# Type alias for a provider -> list of normalized groups mapping per provider
 GroupsMap = Dict[str, List[NormalizedGroup]]
