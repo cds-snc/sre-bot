@@ -25,8 +25,8 @@ from modules.groups.providers.base import (
 from modules.groups.models import NormalizedGroup
 from modules.groups.mappings import (
     map_primary_to_secondary_group,
-    normalize_member_for_provider,
 )
+from modules.groups import service as service_layer
 
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
     from modules.groups.types import OrchestrationResponseTypedDict, OperationResultLike
@@ -159,7 +159,9 @@ def _propagate_to_secondaries(
             continue
         try:
             sec_group = map_primary_to_secondary_group(primary_group_id, name)
-            sec_member = normalize_member_for_provider(member_email, provider_type=name)
+            sec_member = service_layer.normalize_member_for_provider(
+                member_email, provider_type=name
+            )
 
             sec_op = _call_provider_method(
                 prov, op_name, sec_group, sec_member, correlation_id
@@ -260,7 +262,7 @@ def _orchestrate_write_operation(
         correlation_id = str(uuid4())
 
     primary = get_primary_provider()
-    member_obj = normalize_member_for_provider(
+    member_obj = service_layer.normalize_member_for_provider(
         member_email, provider_type=provider_hint or ""
     )
 
