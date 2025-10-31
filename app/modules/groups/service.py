@@ -20,6 +20,8 @@ from modules.groups import orchestration
 from modules.groups import event_system
 from modules.groups import schemas
 from modules.groups import validation
+from modules.groups import mappings
+from modules.groups import providers as _providers
 
 logger = get_module_logger()
 
@@ -63,8 +65,28 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     ):
         raise ValueError("justification too short")
 
+    # If caller supplied a non-primary provider group id, map it to the
+    # primary provider format before calling orchestration. This keeps
+    # orchestration focused on provider coordination and reduces mapping
+    # responsibilities there.
+    primary_group_id = request.group_id
+    try:
+        primary_name = _providers.get_primary_provider_name()
+    except Exception:
+        primary_name = None
+
+    if provider_type and primary_name and provider_type != primary_name:
+        try:
+            primary_group_id = mappings.map_provider_group_id(
+                from_provider=provider_type,
+                from_group_id=request.group_id,
+                to_provider=primary_name,
+            )
+        except Exception as e:
+            raise ValueError(f"failed_to_map_group_id: {e}")
+
     orch = orchestration.add_member_to_group(
-        primary_group_id=request.group_id,
+        primary_group_id=primary_group_id,
         member_email=request.member_email,
         justification=request.justification or "",
         provider_hint=(request.provider.value if request.provider else None),
@@ -117,8 +139,24 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
     ):
         raise ValueError("justification too short")
 
+    primary_group_id = request.group_id
+    try:
+        primary_name = _providers.get_primary_provider_name()
+    except Exception:
+        primary_name = None
+
+    if provider_type and primary_name and provider_type != primary_name:
+        try:
+            primary_group_id = mappings.map_provider_group_id(
+                from_provider=provider_type,
+                from_group_id=request.group_id,
+                to_provider=primary_name,
+            )
+        except Exception as e:
+            raise ValueError(f"failed_to_map_group_id: {e}")
+
     orch = orchestration.remove_member_from_group(
-        primary_group_id=request.group_id,
+        primary_group_id=primary_group_id,
         member_email=request.member_email,
         justification=request.justification or "",
         provider_hint=(request.provider.value if request.provider else None),
