@@ -116,7 +116,9 @@ def format_group_list_response(
 ) -> Dict[str, Any]:
     """Format response for listing user's groups."""
     if manageable:
-        groups = service.filter_groups_for_user_roles(groups, user_email, ["manager", "owner"])
+        groups = service.filter_groups_for_user_roles(
+            groups, user_email, ["manager", "owner"]
+        )
 
     total_groups = len(groups)
     return {
