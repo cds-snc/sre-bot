@@ -7,11 +7,12 @@ from typing import Any, Dict, List, Optional
 from core.logging import get_module_logger
 from modules.groups.event_system import dispatch_event
 from modules.groups.mappings import (
-    map_normalized_groups_list_to_providers_with_association as map_groups_w_association,
+    map_normalized_groups_to_providers,
 )
 from modules.groups.orchestration import (
     add_member_to_group,
     get_groups_for_user,
+    list_groups_managed_by_user,
     remove_member_from_group,
 )
 from modules.groups.responses import (
@@ -185,7 +186,7 @@ def handle_remove_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def handle_list_user_groups_request(
-    user_email: str, manageable: bool = False, provider_type: Optional[str] = None
+    user_email: str, provider_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """Handle request to list groups user can manage."""
     try:
@@ -202,8 +203,42 @@ def handle_list_user_groups_request(
         if not isinstance(groups_list, list):
             groups_list = []
 
-        providers_map: GroupsMap = map_groups_w_association(groups_list)
-        return format_group_list_response(providers_map, manageable, user_email)
+        providers_map: GroupsMap = map_normalized_groups_to_providers(
+            groups_list, associate=True
+        )
+        return format_group_list_response(providers_map, user_email=user_email)
+
+    except Exception as e:
+        logger.error(f"Error listing user groups: {e}")
+        return format_error_response(
+            action="list_user_groups",
+            error_message=str(e),
+            error_code="OPERATION_FAILED",
+        )
+
+
+def handle_manage_groups_request(
+    user_email: str, provider_type: Optional[str] = None
+) -> Dict[str, Any]:
+    """Handle request to list groups user can manage."""
+    try:
+        # Sanitize input
+        user_email = sanitize_input(user_email)
+        if provider_type:
+            provider_type = sanitize_input(provider_type)
+
+        # Primary returns a list[NormalizedGroup] (or dict-form of same).
+        groups_list: List[NormalizedGroup] = list_groups_managed_by_user(
+            user_email, provider_type
+        )
+        logger.warning("groups_list_received", groups=groups_list)
+        if not isinstance(groups_list, list):
+            groups_list = []
+
+        providers_map: GroupsMap = map_normalized_groups_to_providers(
+            groups_list, associate=True
+        )
+        return format_group_list_response(providers_map, user_email=user_email)
 
     except Exception as e:
         logger.error(f"Error listing user groups: {e}")
@@ -262,10 +297,10 @@ def handle_check_permissions_request(
         action = sanitize_input(action)
         provider_type = sanitize_input(provider_type)
 
-        # Check permissions
-        has_permission = validate_group_permissions(
-            user_email, group_id, action, provider_type
-        )
+        # # Check permissions
+        # has_permission = validate_group_permissions(
+        #     user_email, group_id, action, provider_type
+        # )
 
         return {
             "success": True,
@@ -303,21 +338,28 @@ def slack_remove_member(payload: Dict[str, Any]) -> str:
     return format_slack_response(result)
 
 
-def slack_list_groups(
-    user_email: str, manageable: bool = False, provider_type: Optional[str] = None
-) -> str:
+def slack_list_groups(user_email: str, provider_type: Optional[str] = None) -> str:
     """Slack interface for listing user's groups."""
 
-    result = handle_list_user_groups_request(
-        user_email, manageable=manageable, provider_type=provider_type
-    )
+    result = handle_list_user_groups_request(user_email, provider_type=provider_type)
     if result["success"]:
         groups_summary = []
         for provider, groups in result["providers"].items():
             groups_summary.append(f"• {provider.upper()}: {len(groups)} groups")
-        if manageable:
-            return "📂 Your manageable groups:\n" + "\n".join(groups_summary)
         return "📂 Your groups:\n" + "\n".join(groups_summary)
+    else:
+        return format_slack_response(result)
+
+
+def slack_manage_groups(user_email: str, provider_type: Optional[str] = None) -> str:
+    """Slack interface for listing user's groups."""
+
+    result = handle_manage_groups_request(user_email, provider_type=provider_type)
+    if result["success"]:
+        groups_summary = []
+        for provider, groups in result["providers"].items():
+            groups_summary.append(f"• {provider.upper()}: {len(groups)} groups")
+        return "📂 Your manageable groups:\n" + "\n".join(groups_summary)
     else:
         return format_slack_response(result)
 
