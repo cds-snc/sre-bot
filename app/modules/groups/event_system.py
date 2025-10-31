@@ -67,7 +67,9 @@ def _background_worker(evt: str, p: Dict[str, Any]) -> None:
     try:
         dispatch_event(evt, p)
     except Exception as e:  # pragma: no cover - defensive logging
-        logger.exception("background_event_dispatch_failed", event=evt, error=str(e))
+        logger.exception(
+            "background_event_dispatch_failed", service_event=evt, error=str(e)
+        )
 
 
 def dispatch_background(event_type: str, payload: Dict[str, Any]) -> None:
