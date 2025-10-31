@@ -51,6 +51,7 @@ __all__ = [
     "map_normalized_groups_to_providers",
     "filter_groups_for_user_roles",
     "map_primary_to_secondary_group",
+    "OperationResult"
 ]
 
 
