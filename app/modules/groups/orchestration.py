@@ -103,8 +103,10 @@ def validate_group_in_provider(group_id: str, provider: GroupProvider) -> bool:
     # public service surface. Pass through the local OperationStatus so
     # tests that patch `orchestration.OperationStatus` observe the same
     # enum values when the service evaluates success.
+    # Use the OperationStatus exposed on the service boundary so tests that
+    # patch `modules.groups.service.OperationStatus` control evaluation.
     return service_layer.validate_group_in_provider(
-        group_id, provider, op_status=OperationStatus
+        group_id, provider, op_status=service_layer.OperationStatus
     )
 
 

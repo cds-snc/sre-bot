@@ -22,7 +22,11 @@ from modules.groups import schemas
 from modules.groups import validation
 from modules.groups import mappings
 from modules.groups import providers as _providers
-from modules.groups.providers.base import OperationStatus, GroupProvider
+from modules.groups.providers.base import (
+    OperationStatus,
+    GroupProvider,
+    OperationResult,
+)
 
 logger = get_module_logger()
 

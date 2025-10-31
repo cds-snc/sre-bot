@@ -27,7 +27,7 @@ def test_normalize_member_for_provider_valid_and_invalid():
 
 
 @patch(
-    "modules.groups.orchestration.OperationResult",
+    "modules.groups.service.OperationResult",
     new=SimpleNamespace(
         transient_error=staticmethod(
             lambda msg: DummyOp(status="TRANSIENT", message=msg)
@@ -35,7 +35,7 @@ def test_normalize_member_for_provider_valid_and_invalid():
     ),
 )
 @patch(
-    "modules.groups.orchestration.OperationStatus",
+    "modules.groups.service.OperationStatus",
     new=SimpleNamespace(SUCCESS="SUCCESS"),
 )
 def test_validate_group_in_provider_with_opresult_and_plain_success():
