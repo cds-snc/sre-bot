@@ -1,8 +1,7 @@
 """Canonical normalized models for the groups module.
 
 Providers should aim to expose data that can be converted to these
-lightweight structures. Keep these simple (dataclasses) so they are easy to
-construct in providers and easy to consume in core flows and tests.
+lightweight structures.
 """
 
 from dataclasses import dataclass, asdict
