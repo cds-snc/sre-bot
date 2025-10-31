@@ -256,3 +256,19 @@ def primary_group_to_canonical(
     group identifiers without reaching into the low-level mapping module.
     """
     return mappings.primary_group_to_canonical(primary_group_name, prefixes)
+
+
+def parse_primary_group_name(
+    primary_group_name: str, *, provider_registry: dict | None = None
+) -> dict:
+    """Service-level wrapper for parsing primary provider group identifiers.
+
+    Delegates to `modules.groups.mappings.parse_primary_group_name` but is
+    provided here so callers (controllers, commands, tests) can depend on the
+    service boundary instead of importing low-level mapping helpers.
+    """
+    # Delegate to mappings implementation. Keep signature compatible with
+    # existing callers (accept `provider_registry` for deterministic tests).
+    return mappings.parse_primary_group_name(
+        primary_group_name, provider_registry=provider_registry
+    )
