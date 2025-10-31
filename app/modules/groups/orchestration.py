@@ -23,15 +23,29 @@ from modules.groups.providers.base import (
     GroupProvider,
 )
 from modules.groups.models import NormalizedGroup
-from modules.groups.mappings import (
-    map_primary_to_secondary_group,
-)
+
+# prefer using the service boundary for mapping helpers to reduce coupling
+# and allow mappings implementation to evolve without impacting callers.
 from modules.groups import service as service_layer
 
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
     from modules.groups.types import OrchestrationResponseTypedDict, OperationResultLike
 
 logger = get_module_logger()
+
+
+def map_primary_to_secondary_group(
+    primary_group_id: str, secondary_provider: str
+) -> str:
+    """Compatibility delegator that forwards to the service mapping wrapper.
+
+    Tests and some call sites may patch or import this symbol from
+    `modules.groups.orchestration`. Keeping a thin delegator here preserves
+    that contract while the implementation lives behind `service`.
+    """
+    return service_layer.map_primary_to_secondary_group(
+        primary_group_id, secondary_provider
+    )
 
 
 def get_enabled_secondary_providers() -> Dict[str, GroupProvider]:
@@ -158,6 +172,8 @@ def _propagate_to_secondaries(
         if name == primary_name:
             continue
         try:
+            # Call the local delegator so unit tests can patch
+            # `modules.groups.orchestration.map_primary_to_secondary_group`.
             sec_group = map_primary_to_secondary_group(primary_group_id, name)
             sec_member = service_layer.normalize_member_for_provider(
                 member_email, provider_type=name

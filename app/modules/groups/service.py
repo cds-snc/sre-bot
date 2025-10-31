@@ -45,6 +45,7 @@ __all__ = [
     "normalize_member_for_provider",
     "map_normalized_groups_to_providers",
     "filter_groups_for_user_roles",
+    "map_primary_to_secondary_group",
 ]
 
 
@@ -316,6 +317,18 @@ def map_provider_group_id(
         to_provider=to_provider,
         provider_registry=provider_registry,
     )
+
+
+def map_primary_to_secondary_group(
+    primary_group_id: str, secondary_provider: str
+) -> str:
+    """Map a primary provider group id to a secondary provider's id.
+
+    Public wrapper around `mappings.map_primary_to_secondary_group` so
+    callers can rely on the service boundary rather than importing mapping
+    helpers directly from `mappings`.
+    """
+    return mappings.map_primary_to_secondary_group(primary_group_id, secondary_provider)
 
 
 def normalize_member_for_provider(member_email: str, provider_type: str):
