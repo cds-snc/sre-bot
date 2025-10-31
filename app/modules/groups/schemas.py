@@ -302,6 +302,29 @@ class ActionResponse(BaseModel):
     ]
 
 
+class MemberResponse(BaseModel):
+    """Pydantic representation of a normalized group member for API responses."""
+
+    email: Annotated[Optional[EmailStr], Field(default=None)] = None
+    id: Annotated[Optional[str], Field(default=None)] = None
+    role: Annotated[Optional[str], Field(default=None)] = None
+    provider_member_id: Annotated[Optional[str], Field(default=None)] = None
+    first_name: Annotated[Optional[str], Field(default=None)] = None
+    family_name: Annotated[Optional[str], Field(default=None)] = None
+    raw: Annotated[Optional[Dict[str, Any]], Field(default=None)] = None
+
+
+class GroupResponse(BaseModel):
+    """Pydantic representation of a normalized group for API responses."""
+
+    id: Annotated[Optional[str], Field(default=None)] = None
+    name: Annotated[Optional[str], Field(default=None)] = None
+    description: Annotated[Optional[str], Field(default=None)] = None
+    provider: Annotated[str, Field(...)]
+    members: Annotated[List[MemberResponse], Field(default_factory=list)]
+    raw: Annotated[Optional[Dict[str, Any]], Field(default=None)] = None
+
+
 class BulkOperationResponse(BaseModel):
     """Schema for bulk operation response."""
 

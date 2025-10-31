@@ -1,12 +1,15 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 
 from core.logging import get_module_logger
 from modules.groups import service, schemas, models
 
 logger = get_module_logger()
 
+# Controllers are thin adapters: they accept Pydantic request models, call the
+# service boundary, and return Pydantic response models. We intentionally do
+# NOT keep any legacy compatibility shims.
 router = APIRouter(prefix="/api/v1/groups", tags=["groups"])
 
 
@@ -17,46 +20,29 @@ def add_member_endpoint(request: schemas.AddMemberRequest):
     Delegates to the `service.add_member` function and returns the
     Pydantic `ActionResponse` model directly.
     """
-    try:
-        return service.add_member(request)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    except Exception as e:
-        logger.exception("add_member_endpoint_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.add_member(request)
 
 
 @router.post("/remove", response_model=schemas.ActionResponse)
 def remove_member_endpoint(request: schemas.RemoveMemberRequest):
-    try:
-        return service.remove_member(request)
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    except Exception as e:
-        logger.exception("remove_member_endpoint_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.remove_member(request)
 
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=List[schemas.GroupResponse])
 def list_groups_endpoint(request: schemas.ListGroupsRequest = Depends()):
     """List groups for a user.
 
     Accepts query parameters that map to `schemas.ListGroupsRequest` so OpenAPI
     documents the expected parameters (`user_email`, optional `provider`).
     """
-    try:
-        groups = service.list_groups(request)
-        # Convert dataclasses to serializable dicts
-        return [models.as_canonical_dict(g) for g in groups]
-    except Exception as e:
-        logger.exception("list_groups_endpoint_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    groups = service.list_groups(request)
+    # Convert dataclasses to Pydantic response models
+    return [
+        schemas.GroupResponse.model_validate(models.as_canonical_dict(g))
+        for g in groups
+    ]
 
 
 @router.post("/bulk", response_model=schemas.BulkOperationResponse)
 def bulk_operations_endpoint(request: schemas.BulkOperationsRequest):
-    try:
-        return service.bulk_operations(request)
-    except Exception as e:
-        logger.exception("bulk_operations_endpoint_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    return service.bulk_operations(request)
