@@ -1,4 +1,4 @@
-from modules.groups.schemas import NormalizedMember
+from modules.groups.models import NormalizedMember
 from modules.groups.providers.base import ProviderCapabilities
 
 

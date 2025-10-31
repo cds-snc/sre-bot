@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from modules.groups import mappings as gm
-from modules.groups.schemas import NormalizedMember
+from modules.groups.models import NormalizedMember
 
 
 class MapNormalizedGroupsListToProvidersTests:

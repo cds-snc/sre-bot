@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from modules.groups.providers.base import OperationResult, OperationStatus
-from modules.groups.schemas import NormalizedMember
+from modules.groups.models import NormalizedMember
 from modules.groups.errors import IntegrationError
 
 

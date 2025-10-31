@@ -12,7 +12,7 @@ def test_google_is_manager_toggles(
     )
 
     from modules.groups.providers.google_workspace import GoogleWorkspaceProvider
-    from modules.groups.schemas import NormalizedMember
+    from modules.groups.models import NormalizedMember
     from modules.groups.providers.base import OperationStatus
 
     # Prepare a concrete provider instance (GoogleWorkspaceProvider is missing
