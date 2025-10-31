@@ -341,7 +341,7 @@ def test_list_groups_with_members(monkeypatch, safe_providers_import):
     assert res.data["groups"][0]["id"] == "g1"
 
 
-def test_validate_permissions_and_get_groups_for_user(
+def test_validate_permissions_and_list_groups_for_user(
     monkeypatch, safe_providers_import
 ):
     google_mod = _import_provider(safe_providers_import)
@@ -369,7 +369,7 @@ def test_validate_permissions_and_get_groups_for_user(
     assert vp2.status == OperationStatus.SUCCESS
     assert vp2.data and vp2.data.get("allowed") is False
 
-    # get_groups_for_user success
+    # list_groups_for_user success
     monkeypatch.setattr(
         google_mod.google_directory,
         "list_groups_with_members",
@@ -377,7 +377,7 @@ def test_validate_permissions_and_get_groups_for_user(
             success=True, data=[{"id": "g1", "email": "g1@example.com"}]
         ),
     )
-    ug = p.get_groups_for_user("u@e", None)
+    ug = p.list_groups_for_user("u@e", None)
     assert ug.status == OperationStatus.SUCCESS
     assert isinstance(ug.data["groups"], list)
 
@@ -521,9 +521,9 @@ def test_list_groups_with_members_filters_invalid_groups(
     assert groups[1]["id"] is None
 
 
-def test_get_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
+def test_list_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
     """Todo #10: when list_groups returns a raw list (not IntegrationResponse-like),
-    get_groups_for_user should normalize and return OperationResult.SUCCESS.
+    list_groups_for_user should normalize and return OperationResult.SUCCESS.
     """
     google_mod = _import_provider(safe_providers_import)
     p = google_mod.GoogleWorkspaceProvider()
@@ -537,7 +537,7 @@ def test_get_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
         ],
     )
 
-    res = p.get_groups_for_user("u@e", None)
+    res = p.list_groups_for_user("u@e", None)
     assert isinstance(res, OperationResult)
     assert res.status == OperationStatus.SUCCESS
     assert res.data and "groups" in res.data

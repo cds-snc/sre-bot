@@ -35,7 +35,7 @@ class SuccessProvider(GroupProvider):
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-    def get_groups_for_user(
+    def list_groups_for_user(
         self, user_key: str, provider_name: Optional[str], **kwargs
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
@@ -74,7 +74,7 @@ class NoopProvider(GroupProvider):
     def remove_member(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
-    def get_groups_for_user(self, user_key: str, *args, **kwargs):
+    def list_groups_for_user(self, user_key: str, *args, **kwargs):
         raise NotImplementedError()
 
     def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -112,7 +112,7 @@ class PNoneProvider(GroupProvider):
     def remove_member(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
-    def get_groups_for_user(self, user_key: str):
+    def list_groups_for_user(self, user_key: str):
         raise NotImplementedError()
 
     def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -162,7 +162,7 @@ def test_register_class_and_instance_and_invalid(
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def get_groups_for_user(
+        def list_groups_for_user(
             self, user_key: str, provider_name: Optional[str], **kwargs
         ) -> OperationResult:
             return OperationResult(
@@ -241,7 +241,7 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -307,7 +307,7 @@ def test_get_primary_provider_name_and_prefixes(
         def remove_member(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def get_groups_for_user(
+        def list_groups_for_user(
             self, user_key: str, provider_name: Optional[str], **kwargs
         ):
             return OperationResult(
@@ -347,7 +347,7 @@ def test_get_primary_provider_name_and_prefixes(
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -429,7 +429,7 @@ def test_get_primary_provider_name_returns_primary(
         def remove_member(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def get_groups_for_user(
+        def list_groups_for_user(
             self, user_key: str, provider_name: Optional[str], **kwargs
         ):
             return OperationResult(
@@ -467,7 +467,7 @@ def test_get_primary_provider_name_returns_primary(
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -525,7 +525,7 @@ def test_get_active_providers_filter_and_all(safe_providers_import):
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -605,7 +605,7 @@ def test_validate_startup_configuration_requires_role_info(
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -664,7 +664,7 @@ def test_get_primary_provider_name_and_errors(safe_providers_import, groups_prov
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):
@@ -738,7 +738,7 @@ def test_validate_startup_configuration_behaviour(
         def remove_member(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             raise NotImplementedError()
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):

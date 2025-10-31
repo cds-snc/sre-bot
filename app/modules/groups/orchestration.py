@@ -386,7 +386,7 @@ def remove_member_from_group(
     )
 
 
-def get_groups_for_user(
+def list_groups_for_user(
     user_email: str,
     provider_type: str | None = None,
 ) -> List[NormalizedGroup]:
@@ -397,8 +397,8 @@ def get_groups_for_user(
         provider_type: Optional provider type hint.
     """
     op = _perform_read_operation(
-        op_name="get_groups_for_user",
-        action="get_groups_for_user",
+        op_name="list_groups_for_user",
+        action="list_groups_for_user",
         user_key=user_email,
         provider_name=provider_type,
     )

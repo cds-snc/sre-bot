@@ -32,7 +32,7 @@ def _make_dummy_provider(GroupProvider, ProviderCapabilities):
         def remove_member(self, group_key: str, member_data, justification: str):
             return None
 
-        def get_groups_for_user(self, user_key: str):
+        def list_groups_for_user(self, user_key: str):
             return None
 
         def validate_permissions(self, user_key: str, group_key: str, action: str):

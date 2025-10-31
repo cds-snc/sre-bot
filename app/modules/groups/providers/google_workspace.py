@@ -307,7 +307,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return False
 
     @opresult_wrapper(data_key="groups")
-    def get_groups_for_user(
+    def list_groups_for_user(
         self, user_key: str, provider_name: Optional[str], **kwargs
     ) -> List[Dict]:
         """Return canonical groups for which `user_key` is a member.

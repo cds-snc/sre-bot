@@ -111,7 +111,7 @@ def test_provider_implementation_returns_role_info_when_capability_enabled():
         ) -> OperationResult:
             return OperationResult.success(data={"allowed": True})
 
-        def get_groups_for_user(self, user_key: str) -> OperationResult:
+        def list_groups_for_user(self, user_key: str) -> OperationResult:
             return OperationResult.success(
                 data={"groups": [{"id": "eng", "role": "MANAGER"}]}
             )
@@ -119,7 +119,7 @@ def test_provider_implementation_returns_role_info_when_capability_enabled():
     prov = TestProv()
     assert prov.capabilities.provides_role_info is True
 
-    res = prov.get_groups_for_user("alice")
+    res = prov.list_groups_for_user("alice")
     assert res.status == OperationStatus.SUCCESS
     assert isinstance(res.data, dict)
     groups = res.data.get("groups")

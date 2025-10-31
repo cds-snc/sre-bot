@@ -49,7 +49,7 @@ class AsyncGroupProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_groups_for_user(self, user_email: str) -> OperationResult:
+    async def list_groups_for_user(self, user_email: str) -> OperationResult:
         """Return OperationResult with canonical group dicts the user can manage."""
         raise NotImplementedError()
 

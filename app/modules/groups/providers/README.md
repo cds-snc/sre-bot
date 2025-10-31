@@ -20,6 +20,7 @@ Activation rules (developer-facing)
 Activation behavior
 
 - `load_providers()` will import provider modules under this package.
+  - App's main.py is expected to call this during startup.
 - `activate_providers()` will instantiate discovered provider classes using
   the rules above. It no longer consults global `settings.groups.*` for
   per-provider overrides.
@@ -30,8 +31,3 @@ Activation behavior
   3. Otherwise activation fails and asks for an explicit `is_primary` mark or
      a single-provider deployment.
 
-Migration notes
-
-- If your provider currently requires activation-time settings from
-  `core.config.settings`, update it to provide a no-arg constructor or the
-  `from_config()`/`from_empty_config()` factory.

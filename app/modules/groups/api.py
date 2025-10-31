@@ -11,7 +11,7 @@ from modules.groups.mappings import (
 )
 from modules.groups.orchestration import (
     add_member_to_group,
-    get_groups_for_user,
+    list_groups_for_user,
     list_groups_managed_by_user,
     remove_member_from_group,
 )
@@ -196,7 +196,7 @@ def handle_list_user_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        groups_list: List[NormalizedGroup] = get_groups_for_user(
+        groups_list: List[NormalizedGroup] = list_groups_for_user(
             user_email, provider_type
         )
         logger.warning("groups_list_received", groups=groups_list)
@@ -228,7 +228,7 @@ def handle_manage_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        groups_list: List[NormalizedGroup] = get_groups_for_user(
+        groups_list: List[NormalizedGroup] = list_groups_for_user(
             user_email, provider_type
         )
         logger.warning("groups_list_received", groups=groups_list)
@@ -238,7 +238,9 @@ def handle_manage_groups_request(
         providers_map: GroupsMap = map_normalized_groups_to_providers(
             groups_list, associate=True
         )
-        return format_group_list_response(providers_map, user_email=user_email, manageable=True)
+        return format_group_list_response(
+            providers_map, user_email=user_email, manageable=True
+        )
 
     except Exception as e:
         logger.error(f"Error listing user groups: {e}")

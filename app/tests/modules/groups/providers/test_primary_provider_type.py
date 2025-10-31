@@ -39,7 +39,7 @@ def test_get_primary_provider_is_primary_type(safe_providers_import):
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def get_groups_for_user(self, user_key: str) -> OperationResult:
+        def list_groups_for_user(self, user_key: str) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
