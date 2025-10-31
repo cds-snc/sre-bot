@@ -1,42 +1,29 @@
-"""Groups Membership Events"""
+"""Groups membership event consumers.
+
+This module contains only passive, post-write consumers (audit and
+notifications) that subscribe to canonical events emitted by the service
+boundary. All write operations (adds/removes) are performed by the
+`service` layer; legacy handlers that invoked `base` helpers have been
+removed to enforce the new architecture.
+"""
+
+from typing import Dict, Any
 
 from modules.groups.event_system import register_event_handler
+from core.logging import get_module_logger
 from modules.groups.audit import log_group_action
 from modules.groups.notifications import send_group_notifications
-from modules.groups.base import add_member_to_group, remove_member_from_group
 
-
-@register_event_handler("group.member.add_requested")
-def handle_member_add_request(payload):
-    """Handle member addition from any interface."""
-
-    result = add_member_to_group(
-        group_id=payload["group_id"],
-        member_email=payload["member_email"],
-        justification=payload["justification"],
-        provider_type=payload["provider_type"],
-        requestor_email=payload["requestor_email"],
-    )
-    return result
-
-
-@register_event_handler("group.member.remove_requested")
-def handle_member_remove_request(payload):
-    """Handle member removal from any interface."""
-
-    result = remove_member_from_group(
-        group_id=payload["group_id"],
-        member_email=payload["member_email"],
-        justification=payload["justification"],
-        provider_type=payload["provider_type"],
-        requestor_email=payload["requestor_email"],
-    )
-    return result
+logger = get_module_logger()
 
 
 @register_event_handler("group.member.added")
-def handle_member_added(payload):
-    """Handle post-addition tasks."""
+def handle_member_added(payload: Dict[str, Any]) -> None:
+    """Handle post-addition tasks (audit + notifications).
+
+    Expects the canonical nested event payload produced by the service, e.g.
+    {"orchestration": {...}, "request": {...}, "event_type": "group.member.added"}
+    """
 
     # Log to Sentinel for audit
     log_group_action(payload)
@@ -46,8 +33,8 @@ def handle_member_added(payload):
 
 
 @register_event_handler("group.member.removed")
-def handle_member_removed(payload):
-    """Handle post-removal tasks."""
+def handle_member_removed(payload: Dict[str, Any]) -> None:
+    """Handle post-removal tasks (audit + notifications)."""
 
     # Log to Sentinel for audit
     log_group_action(payload)
