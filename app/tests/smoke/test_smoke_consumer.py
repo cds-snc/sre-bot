@@ -17,7 +17,7 @@ class SmokeProvider:
         return True
 
     def add_member(self, group_id, member_email, justification):
-        return {"member": member_email, "status": "added"}
+        return OperationResult.success({"member": member_email, "status": "added"})
 
 
 def test_smoke_provider_and_event_dispatch(monkeypatch):
@@ -53,24 +53,35 @@ def test_smoke_provider_and_event_dispatch(monkeypatch):
     def _capture(payload):
         captured.append(payload)
 
-    # Call add member API which should dispatch the event
-    payload = {
+    # Make background dispatch synchronous for test determinism
+    monkeypatch.setattr(
+        event_system,
+        "dispatch_background",
+        lambda event_type, payload: event_system.dispatch_event(event_type, payload),
+    )
+
+    # Call add member API which should dispatch the event using the new
+    # service payload contract (request nested under 'request').
+    request_payload = {
         "group_id": "arn:aws:iam::123456789012:group/smoke-group",
         "member_email": "new@example.com",
-        "requestor_email": "admin@example.com",
-        "provider_type": "aws",
+        "requestor": "admin@example.com",
+        "provider": "aws",
         "justification": "smoke test",
     }
 
     add_req = schemas.AddMemberRequest(
-        group_id=payload["group_id"],
-        member_email=payload["member_email"],
-        provider=schemas.ProviderType(payload["provider_type"]),
-        justification=payload.get("justification"),
-        requestor=payload.get("requestor_email"),
+        group_id=request_payload["group_id"],
+        member_email=request_payload["member_email"],
+        provider=schemas.ProviderType(request_payload["provider"]),
+        justification=request_payload.get("justification"),
+        requestor=request_payload.get("requestor"),
     )
     add_res = service.add_member(add_req)
     assert hasattr(add_res, "success")
-    # Ensure our handler received the event
+    # Ensure our handler received the event and it follows the new contract
     assert len(captured) >= 1
-    assert captured[0]["member_email"] == "new@example.com"
+    received = captured[0]
+    assert isinstance(received, dict)
+    assert "request" in received and isinstance(received["request"], dict)
+    assert received["request"].get("member_email") == "new@example.com"
