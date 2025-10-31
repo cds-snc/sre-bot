@@ -2,6 +2,7 @@ import pytest
 
 from modules.groups import service, orchestration, event_system, validation
 from modules.groups import schemas
+from modules.groups.providers.base import OperationResult
 
 
 class DummyOp:
@@ -243,3 +244,113 @@ def test_bulk_operations_partial_failure(monkeypatch):
     assert isinstance(res.results, list)
     # one failed, one succeeded
     assert res.summary["success"] == 1
+
+
+def test_orchestration_primary_transient_error(monkeypatch):
+    """When orchestration primary is transient error, service returns failure
+    and still schedules the background event."""
+    primary = OperationResult.transient_error("rate limited", error_code="RATE_LIMIT")
+    orch_resp = {
+        "primary": primary,
+        "propagation": {},
+        "partial_failures": False,
+        "correlation_id": "cid-1",
+        "action": "add_member",
+        "group_id": "g3",
+        "member_email": "p@example.com",
+    }
+
+    monkeypatch.setattr(orchestration, "add_member_to_group", lambda *a, **k: orch_resp)
+
+    dispatched = {}
+    monkeypatch.setattr(
+        event_system,
+        "dispatch_background",
+        lambda et, payload: dispatched.update({"et": et, "payload": payload}),
+    )
+
+    req = schemas.AddMemberRequest(
+        group_id="g3",
+        member_email="p@example.com",
+        provider=schemas.ProviderType.GOOGLE,
+    )
+    res = service.add_member(req)
+
+    assert res.success is False
+    assert res.details and res.details.get("orchestration")
+    # formatted orchestration should include error_code via formatting
+    orch = res.details["orchestration"]
+    assert orch.get("correlation_id") == "cid-1"
+    assert dispatched.get("et") == "group.member.added"
+
+
+def test_orchestration_success_with_propagation_failure(monkeypatch):
+    """Primary success but propagation has a permanent error; details preserved."""
+    primary = OperationResult.success(data={"id": "ok"}, message="ok")
+    propagation = {
+        "aws": OperationResult.permanent_error("not found", error_code="NOT_FOUND")
+    }
+    orch_resp = {
+        "primary": primary,
+        "propagation": propagation,
+        "partial_failures": True,
+        "correlation_id": "cid-2",
+        "action": "add_member",
+        "group_id": "g-prop",
+        "member_email": "u2@example.com",
+    }
+
+    monkeypatch.setattr(orchestration, "add_member_to_group", lambda *a, **k: orch_resp)
+    monkeypatch.setattr(event_system, "dispatch_background", lambda *a, **k: None)
+
+    req = schemas.AddMemberRequest(
+        group_id="g-prop",
+        member_email="u2@example.com",
+        provider=schemas.ProviderType.GOOGLE,
+    )
+    res = service.add_member(req)
+
+    assert res.success is True
+    orch = res.details["orchestration"]
+    # propagation should be formatted into dict with provider keys
+    assert orch.get("partial_failures") is True
+    prop = orch.get("propagation")
+    # propagation entries are dicts after formatting
+    assert isinstance(prop.get("aws"), dict)
+    assert prop.get("aws").get("error_code") == "NOT_FOUND"
+
+
+def test_orchestration_already_formatted_dict(monkeypatch):
+    """If orchestration returns an already-formatted dict, service passes it through."""
+    formatted = {
+        "success": True,
+        "correlation_id": "cid-3",
+        "action": "remove_member",
+        "primary": {"status": "SUCCESS", "message": "ok"},
+        "propagation": {},
+        "partial_failures": False,
+        "timestamp": "2025-01-01T00:00:00Z",
+        "group_id": "g4",
+        "member_email": "z@example.com",
+    }
+
+    monkeypatch.setattr(
+        orchestration, "remove_member_from_group", lambda *a, **k: formatted
+    )
+    called = {}
+    monkeypatch.setattr(
+        event_system,
+        "dispatch_background",
+        lambda et, payload: called.update({"et": et}),
+    )
+
+    req = schemas.RemoveMemberRequest(
+        group_id="g4",
+        member_email="z@example.com",
+        provider=schemas.ProviderType.GOOGLE,
+    )
+    res = service.remove_member(req)
+
+    assert res.success is True
+    assert res.group_id == "g4"
+    assert called.get("et") == "group.member.removed"
