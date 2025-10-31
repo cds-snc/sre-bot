@@ -65,10 +65,6 @@ def test__unwrap_opresult_data_variants():
     assert orch._unwrap_opresult_data(obj3) == 42
 
 
-@patch(
-    "modules.groups.orchestration.orr.format_orchestration_response",
-    return_value={"ok": True},
-)
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
@@ -109,7 +105,6 @@ def test_add_member_to_group_primary_failure_no_propagation(
     mock_map,
     mock_logger,
     mock_enqueue,
-    mock_fmt,
 ):
     primary = MagicMock()
     primary.add_member.side_effect = Exception("primary fail")
@@ -124,14 +119,12 @@ def test_add_member_to_group_primary_failure_no_propagation(
     ):
         res = orch.add_member_to_group("grp", "user@example.com", "just")
 
-    mock_fmt.assert_called_once()
-    assert res == {"ok": True}
+    # Orchestration now returns raw OperationResult objects; assert shape
+    assert isinstance(res, dict)
+    assert "primary" in res and "propagation" in res
+    assert res["propagation"] == {}
 
 
-@patch(
-    "modules.groups.orchestration.orr.format_orchestration_response",
-    return_value={"ok": True},
-)
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
@@ -172,7 +165,6 @@ def test_add_member_to_group_primary_success_secondary_partial_failure(
     mock_map,
     mock_logger,
     mock_enqueue,
-    mock_fmt,
 ):
     primary = MagicMock()
     primary.add_member.return_value = DummyOp(
@@ -189,17 +181,12 @@ def test_add_member_to_group_primary_success_secondary_partial_failure(
 
     res = orch.add_member_to_group("grp", "user@example.com", "just")
 
-    # enqueue may be invoked depending on OperationResult/OperationStatus
-    # resolution in the test environment; accept 0 or 1 calls here.
+    # Orchestration returns raw results; ensure propagation info present
     assert mock_enqueue.call_count in (0, 1)
-    mock_fmt.assert_called_once()
-    assert res == {"ok": True}
+    assert isinstance(res, dict)
+    assert "propagation" in res
 
 
-@patch(
-    "modules.groups.orchestration.orr.format_orchestration_response",
-    return_value={"ok": True},
-)
 @patch("modules.groups.orchestration.ri.enqueue_failed_propagation")
 @patch("modules.groups.orchestration.logger")
 @patch(
@@ -240,7 +227,6 @@ def test_remove_member_from_group_propagation_and_partial(
     mock_map,
     mock_logger,
     mock_enqueue,
-    mock_fmt,
 ):
     primary = MagicMock()
     primary.remove_member.return_value = DummyOp(
@@ -257,5 +243,6 @@ def test_remove_member_from_group_propagation_and_partial(
 
     res = orch.remove_member_from_group("grp", "user@example.com", "just")
 
-    mock_fmt.assert_called_once()
-    assert res == {"ok": True}
+    # Orchestration returns raw result objects with propagation details
+    assert isinstance(res, dict)
+    assert "primary" in res and "propagation" in res
