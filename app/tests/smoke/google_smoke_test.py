@@ -33,13 +33,13 @@ load_dotenv()
 import sys
 import os
 
-# if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
-#     import pytest as _pytest
+if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
+    import pytest as _pytest
 
-#     _pytest.skip(
-#         "Skipping google smoke tests by default. Set RUN_SMOKE_TESTS=1 to enable.",
-#         allow_module_level=True,
-#     )
+    _pytest.skip(
+        "Skipping google smoke tests by default. Set RUN_SMOKE_TESTS=1 to enable.",
+        allow_module_level=True,
+    )
 
 
 from core.config import settings  # noqa: E402
