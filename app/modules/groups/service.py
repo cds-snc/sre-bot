@@ -25,6 +25,28 @@ from modules.groups import providers as _providers
 
 logger = get_module_logger()
 
+# Public service boundary - stable entry points for callers (controllers, Slack
+# handlers, and in-process integrations). Mapping implementations live in
+# `modules.groups.mappings` and are intentionally kept separate so that
+# complex, provider-aware logic stays isolated and testable. Callers should
+# import and use the functions exported in `__all__` below instead of
+# importing helpers directly from `mappings.py`.
+
+# Explicit public API for the groups service module. Keep this list small and
+# stable to reduce churn for callers.
+__all__ = [
+    "add_member",
+    "remove_member",
+    "list_groups",
+    "bulk_operations",
+    "map_provider_group_id",
+    "parse_primary_group_name",
+    "primary_group_to_canonical",
+    "normalize_member_for_provider",
+    "map_normalized_groups_to_providers",
+    "filter_groups_for_user_roles",
+]
+
 
 def _parse_timestamp(ts: str | None) -> datetime:
     """Parse ISO timestamp returned by orchestration into a datetime.
@@ -249,11 +271,12 @@ def bulk_operations(
 def primary_group_to_canonical(
     primary_group_name: str, prefixes: list | None = None
 ) -> str:
-    """Helper to extract canonical group name from a primary provider identifier.
+    """Return canonical group name for a primary provider identifier.
 
-    This is a thin wrapper around `modules.groups.mappings.primary_group_to_canonical`
-    provided at the service boundary so controllers or callers can canonicalize
-    group identifiers without reaching into the low-level mapping module.
+    Use this service wrapper instead of importing the mapping helper directly.
+    The implementation lives in `modules.groups.mappings`; this wrapper is the
+    supported public boundary so mapping internals can change without
+    impacting callers.
     """
     return mappings.primary_group_to_canonical(primary_group_name, prefixes)
 
@@ -261,11 +284,11 @@ def primary_group_to_canonical(
 def parse_primary_group_name(
     primary_group_name: str, *, provider_registry: dict | None = None
 ) -> dict:
-    """Service-level wrapper for parsing primary provider group identifiers.
+    """Parse a primary provider group identifier into prefix + canonical.
 
-    Delegates to `modules.groups.mappings.parse_primary_group_name` but is
-    provided here so callers (controllers, commands, tests) can depend on the
-    service boundary instead of importing low-level mapping helpers.
+    Public wrapper around the mapping implementation. Callers should use this
+    function rather than `mappings.parse_primary_group_name` so the service
+    boundary remains stable.
     """
     # Delegate to mappings implementation. Keep signature compatible with
     # existing callers (accept `provider_registry` for deterministic tests).
@@ -281,11 +304,11 @@ def map_provider_group_id(
     *,
     provider_registry: dict | None = None,
 ) -> str:
-    """Service-level wrapper for provider group id mapping.
+    """Map a group id from one provider to another.
 
-    Delegates to `modules.groups.mappings.map_provider_group_id` so callers
-    (controllers, Slack handlers, tests) can rely on the service boundary for
-    mapping behavior instead of importing the low-level mapping helpers.
+    Public wrapper. Use this function as the canonical mapping API; the heavy
+    implementation lives in `modules.groups.mappings` and may change over
+    time. Keeping callers pointed at the service reduces coupling.
     """
     return mappings.map_provider_group_id(
         from_provider=from_provider,
@@ -296,10 +319,11 @@ def map_provider_group_id(
 
 
 def normalize_member_for_provider(member_email: str, provider_type: str):
-    """Service-level wrapper for member normalization.
+    """Normalize a member identifier for a specific provider.
 
-    Delegates to `modules.groups.mappings.normalize_member_for_provider` so
-    callers can depend on the service boundary for member normalization.
+    Public wrapper around the mapping implementation. Callers should import
+    and use this service function so provider-specific normalization logic is
+    encapsulated and can evolve without changing call sites.
     """
     return mappings.normalize_member_for_provider(member_email, provider_type)
 
@@ -307,9 +331,10 @@ def normalize_member_for_provider(member_email: str, provider_type: str):
 def map_normalized_groups_to_providers(
     groups, *, associate: bool = False, provider_registry: dict | None = None
 ) -> dict:
-    """Service wrapper for mapping normalized groups to providers.
+    """Group a list of normalized groups by provider (optionally associate by prefix).
 
-    Delegates to `modules.groups.mappings.map_normalized_groups_to_providers`.
+    Public wrapper that delegates to the mapping implementation. Use this
+    wrapper as the maintained public API for grouping behavior.
     """
     return mappings.map_normalized_groups_to_providers(
         groups, associate=associate, provider_registry=provider_registry
@@ -317,5 +342,10 @@ def map_normalized_groups_to_providers(
 
 
 def filter_groups_for_user_roles(groups, user_email: str, user_roles: list):
-    """Service wrapper for filtering groups by user roles."""
+    """Filter a groups map to only include groups the user holds the given roles in.
+
+    Public wrapper. Callers should use this service function to keep
+    role-filtering logic behind the service boundary instead of relying on
+    internal mapping helpers.
+    """
     return mappings.filter_groups_for_user_roles(groups, user_email, user_roles)
