@@ -25,7 +25,7 @@ from modules.groups.responses import (
     format_validation_error_response,
     format_webhook_response,
 )
-from modules.groups.schemas import GroupsMap, NormalizedGroup
+from modules.groups.models import GroupsMap, NormalizedGroup
 from modules.groups.validation import (
     sanitize_input,
     validate_bulk_operation,

@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from core.logging import get_module_logger
-from modules.groups.schemas import GroupsMap
+from modules.groups.models import GroupsMap
 from modules.groups.errors import IntegrationError
 from modules.groups.mappings import filter_groups_for_user_roles
 

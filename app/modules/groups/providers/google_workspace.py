@@ -9,7 +9,7 @@ from integrations.google_workspace.schemas import (
 )
 from modules.groups.providers import register_provider
 from modules.groups.errors import IntegrationError
-from modules.groups.schemas import (
+from modules.groups.models import (
     as_canonical_dict,
     NormalizedMember,
     NormalizedGroup,

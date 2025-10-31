@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from core.config import settings
-from modules.groups.schemas import NormalizedMember
+from modules.groups.models import NormalizedMember
 
 
 class OperationStatus(Enum):

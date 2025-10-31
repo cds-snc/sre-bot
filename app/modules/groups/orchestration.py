@@ -22,7 +22,7 @@ from modules.groups.providers.base import (
     OperationResult,
     GroupProvider,
 )
-from modules.groups.schemas import NormalizedGroup
+from modules.groups.models import NormalizedGroup
 from modules.groups.mappings import (
     map_primary_to_secondary_group,
     normalize_member_for_provider,

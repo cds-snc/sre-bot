@@ -22,7 +22,7 @@ from modules.groups.providers import (
     get_active_providers,
     get_primary_provider_name,
 )
-from modules.groups.schemas import NormalizedMember, NormalizedGroup, GroupsMap
+from modules.groups.models import NormalizedMember, NormalizedGroup, GroupsMap
 
 logger = get_module_logger()
 
