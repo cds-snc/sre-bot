@@ -177,7 +177,12 @@ class BulkOperationsRequest(BaseModel):
 
     operations: Annotated[
         List[OperationItem],
-        Field(..., min_items=1, max_items=100, description="List of operations"),
+        Field(
+            ...,
+            min_length=1,
+            max_length=100,
+            description="List of operations",
+        ),
     ]
 
 
