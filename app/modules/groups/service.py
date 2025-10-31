@@ -293,3 +293,12 @@ def map_provider_group_id(
         to_provider=to_provider,
         provider_registry=provider_registry,
     )
+
+
+def normalize_member_for_provider(member_email: str, provider_type: str):
+    """Service-level wrapper for member normalization.
+
+    Delegates to `modules.groups.mappings.normalize_member_for_provider` so
+    callers can depend on the service boundary for member normalization.
+    """
+    return mappings.normalize_member_for_provider(member_email, provider_type)
