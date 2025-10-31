@@ -409,3 +409,28 @@ def get_groups_for_user(
     if op.data is None or not isinstance(op.data, dict):
         return []
     return op.data.get("groups", [])
+
+
+def list_groups_managed_by_user(
+    user_email: str,
+    provider_type: str | None = None,
+) -> List[NormalizedGroup]:
+    """Get groups manageable by a user from the primary provider.
+
+    Args:
+        user_email: Email of the user to look up.
+        provider_type: Optional provider type hint.
+    """
+    op = _perform_read_operation(
+        op_name="list_groups_managed_by_user",
+        action="list_groups_managed_by_user",
+        user_key=user_email,
+        provider_name=provider_type,
+    )
+
+    # On failure, return an empty list rather than an OperationResult
+    if getattr(op, "status", None) != OperationStatus.SUCCESS:
+        return []
+    if op.data is None or not isinstance(op.data, dict):
+        return []
+    return op.data.get("groups", [])
