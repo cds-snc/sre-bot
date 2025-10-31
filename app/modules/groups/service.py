@@ -302,3 +302,20 @@ def normalize_member_for_provider(member_email: str, provider_type: str):
     callers can depend on the service boundary for member normalization.
     """
     return mappings.normalize_member_for_provider(member_email, provider_type)
+
+
+def map_normalized_groups_to_providers(
+    groups, *, associate: bool = False, provider_registry: dict | None = None
+) -> dict:
+    """Service wrapper for mapping normalized groups to providers.
+
+    Delegates to `modules.groups.mappings.map_normalized_groups_to_providers`.
+    """
+    return mappings.map_normalized_groups_to_providers(
+        groups, associate=associate, provider_registry=provider_registry
+    )
+
+
+def filter_groups_for_user_roles(groups, user_email: str, user_roles: list):
+    """Service wrapper for filtering groups by user roles."""
+    return mappings.filter_groups_for_user_roles(groups, user_email, user_roles)
