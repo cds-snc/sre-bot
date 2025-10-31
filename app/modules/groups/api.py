@@ -5,16 +5,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
-from modules.groups.event_system import dispatch_event
+from modules.groups import service
 from modules.groups.mappings import (
     map_normalized_groups_to_providers,
 )
-from modules.groups.orchestration import (
-    add_member_to_group,
-    list_groups_for_user,
-    list_groups_managed_by_user,
-    remove_member_from_group,
-)
+
+# orchestration functions are called from `service` now; keep imports minimal
 from modules.groups.responses import (
     format_bulk_operation_response,
     format_error_response,
@@ -50,50 +46,35 @@ def handle_add_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         provider_type = sanitize_input(payload["provider_type"])
         justification = sanitize_input(payload.get("justification", ""), max_length=500)
 
-        # Perform the core operation first (primary provider + propagation).
-        # Event dispatch is a side-effect/audit hook and must not change
-        # the API response if handlers fail, so we run it after the core
-        # operation and guard against exceptions.
-        result = add_member_to_group(
-            primary_group_id=group_id,
-            member_email=member_email,
-            justification=justification,
-            provider_hint=provider_type,
-        )
-
-        # Dispatch event to handle the request. Event handlers must not
-        # break the synchronous API path; catch and log any errors from
-        # the event system to keep the API surface robust.
+        # Build Pydantic request and delegate to the service layer which will
+        # call orchestration and schedule events asynchronously.
         try:
-            dispatch_event(
-                "group.member.add_requested",
-                {
-                    "group_id": group_id,
-                    "member_email": member_email,
-                    "requestor_email": requestor_email,
-                    "provider_type": provider_type,
-                    "justification": justification,
-                },
-            )
-        except Exception as e:
-            logger.warning(
-                "event_handler_error",
-                handler_event="group.member.add_requested",
-                error=str(e),
-            )
+            from modules.groups import schemas
 
-        # If the core flow returned an error dict (for example, mapped IntegrationError),
-        # pass it through unchanged so the API surface returns a proper error.
-        if isinstance(result, dict) and result.get("success") is False:
-            return result
+            req = schemas.AddMemberRequest(
+                group_id=group_id,
+                member_email=member_email,
+                provider=provider_type,
+                justification=justification,
+                requestor=requestor_email,
+            )
+            result = service.add_member(req)
 
-        return format_success_response(
-            action="add_member",
-            group_id=group_id,
-            member_email=member_email,
-            provider=provider_type,
-            details=result,
-        )
+            # result is an ActionResponse Pydantic model; convert to dict for
+            # existing formatting helpers.
+            resp = (
+                result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            )
+            return format_success_response(
+                action="add_member",
+                group_id=resp.get("group_id", group_id),
+                member_email=resp.get("member_email", member_email),
+                provider=(resp.get("provider") or provider_type),
+                details=resp,
+            )
+        except Exception:
+            # Let outer except blocks handle logging/permission errors
+            raise
 
     except PermissionError:
         return format_permission_error_response(
@@ -127,50 +108,30 @@ def handle_remove_member_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         # Event dispatch is a side-effect/audit hook and must not change
         # the API response if handlers fail, so we run it after the core
         # operation and guard against exceptions.
+        # Build Pydantic request and delegate to service layer
         try:
-            result = remove_member_from_group(
-                primary_group_id=group_id,
+            from modules.groups import schemas
+
+            req = schemas.RemoveMemberRequest(
+                group_id=group_id,
                 member_email=member_email,
+                provider=provider_type,
                 justification=justification,
-                provider_hint=provider_type,
+                requestor=requestor_email,
             )
-        except Exception as e:
-            # Ensure provider errors are mapped to API errors
-            logger.error(f"Error removing member from group: {e}")
-            return format_error_response(
+            result = service.remove_member(req)
+            resp = (
+                result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            )
+            return format_success_response(
                 action="remove_member",
-                error_message=str(e),
-                error_code="OPERATION_FAILED",
+                group_id=resp.get("group_id", group_id),
+                member_email=resp.get("member_email", member_email),
+                provider=(resp.get("provider") or provider_type),
+                details=resp,
             )
-
-        # Dispatch event as a non-blocking side-effect; log but ignore errors
-        try:
-            dispatch_event(
-                "group.member.remove_requested",
-                {
-                    "group_id": group_id,
-                    "member_email": member_email,
-                    "requestor_email": requestor_email,
-                    "provider_type": provider_type,
-                    "justification": justification,
-                },
-            )
-        except Exception as e:
-            logger.warning(
-                "event_handler_error",
-                handler_event="group.member.remove_requested",
-                error=str(e),
-            )
-        if isinstance(result, dict) and result.get("success") is False:
-            return result
-
-        return format_success_response(
-            action="remove_member",
-            group_id=group_id,
-            member_email=member_email,
-            provider=provider_type,
-            details=result,
-        )
+        except Exception:
+            raise
 
     except PermissionError:
         return format_permission_error_response(
@@ -196,9 +157,10 @@ def handle_list_user_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        groups_list: List[NormalizedGroup] = list_groups_for_user(
-            user_email, provider_type
-        )
+        from modules.groups import schemas
+
+        req = schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+        groups_list: List[NormalizedGroup] = service.list_groups(req)
         logger.warning("groups_list_received", groups=groups_list)
         if not isinstance(groups_list, list):
             groups_list = []
@@ -228,9 +190,10 @@ def handle_manage_groups_request(
             provider_type = sanitize_input(provider_type)
 
         # Primary returns a list[NormalizedGroup] (or dict-form of same).
-        groups_list: List[NormalizedGroup] = list_groups_for_user(
-            user_email, provider_type
-        )
+        from modules.groups import schemas
+
+        req = schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+        groups_list: List[NormalizedGroup] = service.list_groups(req)
         logger.warning("groups_list_received", groups=groups_list)
         if not isinstance(groups_list, list):
             groups_list = []
@@ -304,15 +267,13 @@ def handle_check_permissions_request(
         #     user_email, group_id, action, provider_type
         # )
 
-        return {
-            "success": True,
-            "user_email": user_email,
-            "group_id": group_id,
-            "action": action,
-            "provider": provider_type,
-            "has_permission": has_permission,
-            "timestamp": datetime.utcnow().isoformat(),
-        }
+        # Permission checking implementation is feature-dependent. For now,
+        # return a simple success=False with PERMISSION_CHECK_NOT_IMPLEMENTED
+        return format_error_response(
+            action="check_permissions",
+            error_message="Permission check not implemented",
+            error_code="PERMISSION_CHECK_NOT_IMPLEMENTED",
+        )
 
     except Exception as e:
         logger.error(f"Error checking permissions: {e}")
