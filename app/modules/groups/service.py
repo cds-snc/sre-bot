@@ -51,7 +51,7 @@ __all__ = [
     "map_normalized_groups_to_providers",
     "filter_groups_for_user_roles",
     "map_primary_to_secondary_group",
-    "OperationResult"
+    "OperationResult",
 ]
 
 
@@ -122,9 +122,11 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     )
 
     # Fire-and-forget event for downstream handlers (audit, notifications)
+    # Emit the canonical post-write event so consumers receive the final
+    # orchestration result alongside the original request payload.
     try:
         event_system.dispatch_background(
-            "group.member.add_requested",
+            "group.member.added",
             (
                 {"orchestration": orch, "request": request.model_dump()}
                 if hasattr(request, "model_dump")
@@ -193,7 +195,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
 
     try:
         event_system.dispatch_background(
-            "group.member.remove_requested",
+            "group.member.removed",
             (
                 {"orchestration": orch, "request": request.model_dump()}
                 if hasattr(request, "model_dump")
