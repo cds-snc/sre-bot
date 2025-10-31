@@ -244,3 +244,15 @@ def bulk_operations(
     }
 
     return schemas.BulkOperationResponse(results=results, summary=summary)
+
+
+def primary_group_to_canonical(
+    primary_group_name: str, prefixes: list | None = None
+) -> str:
+    """Helper to extract canonical group name from a primary provider identifier.
+
+    This is a thin wrapper around `modules.groups.mappings.primary_group_to_canonical`
+    provided at the service boundary so controllers or callers can canonicalize
+    group identifiers without reaching into the low-level mapping module.
+    """
+    return mappings.primary_group_to_canonical(primary_group_name, prefixes)
