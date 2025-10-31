@@ -272,3 +272,24 @@ def parse_primary_group_name(
     return mappings.parse_primary_group_name(
         primary_group_name, provider_registry=provider_registry
     )
+
+
+def map_provider_group_id(
+    from_provider: str,
+    from_group_id: str,
+    to_provider: str,
+    *,
+    provider_registry: dict | None = None,
+) -> str:
+    """Service-level wrapper for provider group id mapping.
+
+    Delegates to `modules.groups.mappings.map_provider_group_id` so callers
+    (controllers, Slack handlers, tests) can rely on the service boundary for
+    mapping behavior instead of importing the low-level mapping helpers.
+    """
+    return mappings.map_provider_group_id(
+        from_provider=from_provider,
+        from_group_id=from_group_id,
+        to_provider=to_provider,
+        provider_registry=provider_registry,
+    )
