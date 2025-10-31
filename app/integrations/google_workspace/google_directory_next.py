@@ -44,7 +44,7 @@ def get_batch_users(user_keys: List[str], **kwargs) -> IntegrationResponse:
 
     Returns an IntegrationResponse with data = {user_key: user_dict | None}
     """
-    logger.info("get_batch_users", user_keys=user_keys, kwargs=kwargs)
+    logger.debug("get_batch_users", user_keys=user_keys, kwargs=kwargs)
     service = get_google_service(
         "admin",
         "directory_v1",
@@ -182,7 +182,7 @@ def get_batch_members_for_user(
     group_keys: List[str], user_key: str, **kwargs
 ) -> IntegrationResponse:
     """Get multiple groups' member object for a user using batch requests."""
-    logger.info(
+    logger.debug(
         "get_batch_members_for_user",
         group_keys=group_keys,
         user_key=user_key,
@@ -230,7 +230,7 @@ def get_batch_group_members(group_keys: List[str], **kwargs) -> IntegrationRespo
     Returns:
         Dict[str, List[dict]]: A dictionary mapping group keys to their members.
     """
-    logger.info("get_batch_group_members", group_keys=group_keys, kwargs=kwargs)
+    logger.debug("get_batch_group_members", group_keys=group_keys, kwargs=kwargs)
     service = get_google_service(
         "admin",
         "directory_v1",
