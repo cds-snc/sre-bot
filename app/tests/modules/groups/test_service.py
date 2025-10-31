@@ -47,8 +47,9 @@ def test_add_member_schedules_event(monkeypatch):
     # Event scheduled (fire-and-forget uses executor; we patched dispatch_event)
     # The background submission may not have run yet; ensure dispatcher was submitted by calling executor worker synchronously
     # But since we patched dispatch_event, we can inspect dispatched dict
-    # Allow for eventual consistency in the test via simple check
-    assert dispatched.get("event_type") == "group.member.add_requested"
+    # Allow for eventual consistency in the test via simple check. The
+    # service now emits the final canonical event name after orchestration.
+    assert dispatched.get("event_type") == "group.member.added"
 
 
 def test_remove_member_schedules_event(monkeypatch):
@@ -80,7 +81,8 @@ def test_remove_member_schedules_event(monkeypatch):
 
     assert res.success is True
     assert res.group_id == "g2"
-    assert called.get("event") == "group.member.remove_requested"
+    # Service emits the canonical post-write event name now
+    assert called.get("event") == "group.member.removed"
 
 
 def test_bulk_operations_calls_add_and_remove(monkeypatch):
