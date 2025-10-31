@@ -10,26 +10,34 @@ logger = get_module_logger()
 
 def log_group_action(payload: Dict[str, Any]) -> None:
     """Log group membership action to Sentinel for audit trail."""
+    # Expect the new nested event contract where the original request is
+    # provided under the 'request' key and orchestration details under
+    # 'orchestration'. Fall back to top-level keys only if the structure
+    # isn't present (defensive but tests will be updated to pass the new
+    # contract).
+    req = payload.get("request") or {}
+    orch = payload.get("orchestration") or payload.get("result")
 
-    # Extract action type from the payload
+    # Determine action type from the event_type or orchestration keys
     action_type = "unknown"
-    if "member_email" in payload and "result" in payload:
-        if "added" in str(payload.get("event_type", "")):
-            action_type = "member_added"
-        elif "removed" in str(payload.get("event_type", "")):
-            action_type = "member_removed"
+    if "added" in str(payload.get("event_type", "")):
+        action_type = "member_added"
+    elif "removed" in str(payload.get("event_type", "")):
+        action_type = "member_removed"
 
     audit_event = {
         "event_type": "group_membership_change",
         "action": action_type,
         "timestamp": datetime.utcnow().isoformat(),
-        "group_id": payload.get("group_id"),
-        "member_email": payload.get("member_email"),
-        "requestor_email": payload.get("requestor_email"),
-        "provider": payload.get("provider"),
-        "justification": payload.get("justification"),
-        "success": payload.get("result") is not None,
-        "result_details": payload.get("result"),
+        "group_id": req.get("group_id") or payload.get("group_id"),
+        "member_email": req.get("member_email") or payload.get("member_email"),
+        "requestor_email": req.get("requestor")
+        or payload.get("requestor_email")
+        or payload.get("requestor"),
+        "provider": req.get("provider") or payload.get("provider"),
+        "justification": req.get("justification") or payload.get("justification"),
+        "success": bool(orch),
+        "result_details": orch,
     }
 
     # Log locally
