@@ -11,6 +11,7 @@ from pydantic import (
 
 class ProviderType(str, Enum):
     """Schema for provider types."""
+
     GOOGLE = "google"
     OKTA = "okta"
     AZURE = "azure"
@@ -20,12 +21,14 @@ class ProviderType(str, Enum):
 
 class OperationType(str, Enum):
     """Schema for operation types."""
+
     ADD_MEMBER = "add_member"
     REMOVE_MEMBER = "remove_member"
 
 
 class PermissionAction(str, Enum):
     """Schema for permission actions."""
+
     VIEW = "view"
     EDIT = "edit"
     DELETE = "delete"
@@ -34,6 +37,7 @@ class PermissionAction(str, Enum):
 
 class AddMemberRequest(BaseModel):
     """Schema for adding a member to a group."""
+
     group_id: Annotated[
         str,
         Field(
@@ -86,6 +90,7 @@ class AddMemberRequest(BaseModel):
 
 class RemoveMemberRequest(BaseModel):
     """Schema for removing a member from a group."""
+
     group_id: Annotated[
         str,
         Field(
@@ -138,6 +143,7 @@ class RemoveMemberRequest(BaseModel):
 
 class OperationItem(BaseModel):
     """Schema for a single operation item."""
+
     operation: Annotated[
         OperationType,
         Field(
@@ -163,6 +169,7 @@ class OperationItem(BaseModel):
 
 class BulkOperationsRequest(BaseModel):
     """Schema for bulk operations request."""
+
     operations: Annotated[
         List[OperationItem],
         Field(..., min_items=1, max_items=100, description="List of operations"),
@@ -171,6 +178,7 @@ class BulkOperationsRequest(BaseModel):
 
 class ListGroupsRequest(BaseModel):
     """Schema for listing groups."""
+
     user_email: Annotated[
         EmailStr,
         Field(
@@ -191,6 +199,7 @@ class ListGroupsRequest(BaseModel):
 
 class CheckPermissionsRequest(BaseModel):
     """Schema for checking permissions on a group."""
+
     user_email: Annotated[
         EmailStr,
         Field(
@@ -224,6 +233,7 @@ class CheckPermissionsRequest(BaseModel):
 
 class ActionResponse(BaseModel):
     """Schema for the response of an action."""
+
     success: Annotated[
         bool,
         Field(
@@ -284,6 +294,7 @@ class ActionResponse(BaseModel):
 
 class BulkOperationResponse(BaseModel):
     """Schema for bulk operation response."""
+
     results: Annotated[
         List[ActionResponse], Field(..., description="List of action responses")
     ]
@@ -299,6 +310,7 @@ class BulkOperationResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Schema for error responses."""
+
     success: Annotated[
         bool,
         Field(
