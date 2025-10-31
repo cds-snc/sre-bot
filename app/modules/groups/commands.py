@@ -6,12 +6,7 @@ from slack_sdk import WebClient
 from slack_bolt import Ack, Respond
 
 from core.logging import get_module_logger
-from modules.groups.api import (
-    slack_add_member,
-    slack_remove_member,
-    slack_list_groups,
-    slack_manage_groups,
-)
+from modules.groups import service, responses, schemas
 from modules.groups.providers import get_active_providers
 from modules.groups.validation import validate_email, validate_provider_type
 from integrations.slack import users as slack_users
@@ -64,8 +59,14 @@ def _handle_list_command(
         provider_type = args[0]
 
     try:
-        result = slack_list_groups(user_email, provider_type)
-        respond(result)
+        req = (
+            schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+            if provider_type
+            else schemas.ListGroupsRequest(user_email=user_email)
+        )
+        groups = service.list_groups(req)
+        # Simple user-friendly Slack message
+        respond(f"✅ Retrieved {len(groups)} groups")
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
         respond("❌ Error retrieving your groups. Please try again later.")
@@ -100,17 +101,24 @@ def _handle_add_command(
         respond("❌ Could not determine your email address.")
         return
 
-    payload = {
-        "member_email": member_email,
-        "group_id": group_id,
-        "provider_type": provider_type,
-        "requestor_email": requestor_email,
-        "justification": justification,
-    }
-
     try:
-        result = slack_add_member(payload)
-        respond(result)
+        req_kwargs = {
+            "group_id": group_id,
+            "member_email": member_email,
+            "provider": provider_type,
+            "justification": justification,
+            "requestor": requestor_email,
+        }
+        # Build Pydantic request and call service directly
+        add_req = schemas.AddMemberRequest(**req_kwargs)
+        result = service.add_member(add_req)
+
+        # Format Slack-friendly text
+        respond(
+            responses.format_slack_response(
+                result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            )
+        )
     except Exception as e:
         logger.error(f"Error in groups add command: {e}")
         respond("❌ Error adding member to group. Please try again later.")
@@ -145,17 +153,21 @@ def _handle_remove_command(
         respond("❌ Could not determine your email address.")
         return
 
-    payload = {
-        "member_email": member_email,
-        "group_id": group_id,
-        "provider_type": provider_type,
-        "requestor_email": requestor_email,
-        "justification": justification,
-    }
-
     try:
-        result = slack_remove_member(payload)
-        respond(result)
+        req_kwargs = {
+            "group_id": group_id,
+            "member_email": member_email,
+            "provider": provider_type,
+            "justification": justification,
+            "requestor": requestor_email,
+        }
+        remove_req = schemas.RemoveMemberRequest(**req_kwargs)
+        result = service.remove_member(remove_req)
+        respond(
+            responses.format_slack_response(
+                result.model_dump() if hasattr(result, "model_dump") else result.dict()
+            )
+        )
     except Exception as e:
         logger.error(f"Error in groups remove command: {e}")
         respond("❌ Error removing member from group. Please try again later.")
@@ -175,8 +187,13 @@ def _handle_manage_command(
         provider_type = args[0]
 
     try:
-        result = slack_manage_groups(user_email, provider_type)
-        respond(result)
+        req = (
+            schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+            if provider_type
+            else schemas.ListGroupsRequest(user_email=user_email)
+        )
+        groups = service.list_groups(req)
+        respond(f"✅ Retrieved {len(groups)} manageable groups")
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
         respond("❌ Error retrieving your groups. Please try again later.")
