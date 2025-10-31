@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from core.logging import get_module_logger
 from modules.groups.schemas import GroupsMap
 from modules.groups.errors import IntegrationError
+from modules.groups.mappings import filter_groups_for_user_roles
 
 logger = get_module_logger()
 
@@ -110,34 +111,14 @@ def format_permission_error_response(
 
 def format_group_list_response(
     groups: GroupsMap,
-    manageable: bool,
     user_email: str,
+    manageable: bool = False,
 ) -> Dict[str, Any]:
     """Format response for listing user's groups."""
-    total_groups = len(groups)
-
     if manageable:
-        filtered_groups = {}
-        for provider, group_list in groups.items():
-            filtered = []
-            for group in group_list:
-                for member in group.members:
-                    if (
-                        member.email == user_email
-                        and member.role
-                        and member.role.lower()
-                        in (
-                            "owner",
-                            "manager",
-                        )
-                    ):
-                        filtered.append(group)
-                        break
-            if filtered:
-                filtered_groups[provider] = filtered
-        groups = filtered_groups
-        total_groups = sum(len(glist) for glist in filtered_groups.values())
+        groups = filter_groups_for_user_roles(groups, user_email, ["manager", "owner"])
 
+    total_groups = len(groups)
     return {
         "success": True,
         "user_email": user_email,
