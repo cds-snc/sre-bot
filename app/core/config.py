@@ -382,6 +382,62 @@ class GroupsFeatureSettings(BaseSettings):
             logger.warning(f"Could not validate providers configuration: {e}")
         return v
 
+    # Reconciliation configuration
+    reconciliation_enabled: bool = Field(
+        default=True,
+        alias="RECONCILIATION_ENABLED",
+        description="Enable reconciliation for failed propagations",
+    )
+
+    reconciliation_backend: str = Field(
+        default="memory",
+        alias="RECONCILIATION_BACKEND",
+        description="Reconciliation backend: 'memory', 'dynamodb', or 'sqs'",
+    )
+
+    reconciliation_max_attempts: int = Field(
+        default=5,
+        alias="RECONCILIATION_MAX_ATTEMPTS",
+        description="Maximum retry attempts before moving to DLQ",
+    )
+
+    reconciliation_base_delay_seconds: int = Field(
+        default=60,
+        alias="RECONCILIATION_BASE_DELAY_SECONDS",
+        description="Base delay for exponential backoff (seconds)",
+    )
+
+    reconciliation_max_delay_seconds: int = Field(
+        default=3600,
+        alias="RECONCILIATION_MAX_DELAY_SECONDS",
+        description="Maximum delay for exponential backoff (seconds)",
+    )
+
+    # Circuit breaker configuration
+    circuit_breaker_enabled: bool = Field(
+        default=True,
+        alias="CIRCUIT_BREAKER_ENABLED",
+        description="Enable circuit breaker for providers to prevent cascading failures",
+    )
+
+    circuit_breaker_failure_threshold: int = Field(
+        default=5,
+        alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+        description="Number of consecutive failures before opening circuit",
+    )
+
+    circuit_breaker_timeout_seconds: int = Field(
+        default=60,
+        alias="CIRCUIT_BREAKER_TIMEOUT_SECONDS",
+        description="Seconds to wait before attempting recovery (HALF_OPEN state)",
+    )
+
+    circuit_breaker_half_open_max_calls: int = Field(
+        default=3,
+        alias="CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS",
+        description="Maximum concurrent requests allowed in HALF_OPEN state",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

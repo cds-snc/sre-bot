@@ -31,6 +31,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     logic for its provider-specific data.
     """
 
+    def __init__(self):
+        """Initialize the provider with circuit breaker support."""
+        super().__init__()
+
     @property
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities."""
@@ -187,7 +191,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @opresult_wrapper(data_key="result")
-    def add_member(self, group_key: str, member_data: NormalizedMember) -> Dict:
+    def _add_member_impl(self, group_key: str, member_data: NormalizedMember) -> Dict:
         """Add a member to a group and return the normalized member dict.
 
         Args:
@@ -206,7 +210,9 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return {}
 
     @opresult_wrapper(data_key="result")
-    def remove_member(self, group_key: str, member_data: NormalizedMember) -> Dict:
+    def _remove_member_impl(
+        self, group_key: str, member_data: NormalizedMember
+    ) -> Dict:
         """Remove a member from a group.
 
         Args:
@@ -223,7 +229,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return {"status": "removed"}
 
     @opresult_wrapper(data_key="members")
-    def get_group_members(self, group_key: str, **kwargs) -> List[Dict]:
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> List[Dict]:
         """Return normalized members of a group.
 
         Args:
@@ -244,10 +250,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @opresult_wrapper(data_key="groups")
-    def list_groups(self, **kwargs) -> List[Dict]:
+    def _list_groups_impl(self, **kwargs) -> List[Dict]:
         """Return normalized groups from Google Workspace.
 
-        This implements the abstract `list_groups` method required by
+        This implements the abstract `_list_groups_impl` method required by
         GroupProvider/PrimaryGroupProvider so provider classes can be
         instantiated safely at decoration/import time in tests and runtime.
         """
@@ -262,7 +268,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @opresult_wrapper(data_key="groups")
-    def list_groups_with_members(self, **kwargs) -> List[Dict]:
+    def _list_groups_with_members_impl(self, **kwargs) -> List[Dict]:
         """Return normalized groups with members from Google Workspace.
 
         This method is not implemented for Google Workspace as it would

@@ -39,6 +39,10 @@ class AwsIdentityCenterProvider(GroupProvider):
     provider-specific data.
     """
 
+    def __init__(self):
+        """Initialize the provider with circuit breaker support."""
+        super().__init__()
+
     @property
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities."""
@@ -258,7 +262,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         )
 
     @opresult_wrapper(data_key="result")
-    def add_member(self, group_key: str, member_data: dict | str) -> dict:
+    def _add_member_impl(self, group_key: str, member_data: dict | str) -> dict:
         """Add a member to a group and return the normalized member dict.
 
         Args:
@@ -296,7 +300,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
     @opresult_wrapper(data_key="result")
-    def remove_member(self, group_key: str, member_data: dict | str) -> dict:
+    def _remove_member_impl(self, group_key: str, member_data: dict | str) -> dict:
         """Remove a member from a group and return the normalized member dict.
 
         Args:
@@ -334,7 +338,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
     @opresult_wrapper(data_key="members")
-    def get_group_members(self, group_key: str, **kwargs) -> list[dict]:
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> list[dict]:
         """AWS returns the list of canonical memberships, not the user details."""
         if not hasattr(identity_store, "list_group_memberships"):
             raise IntegrationError(
@@ -385,7 +389,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         return members
 
     @opresult_wrapper(data_key="groups")
-    def list_groups(self, **kwargs) -> list[dict]:
+    def _list_groups_impl(self, **kwargs) -> list[dict]:
         if not hasattr(identity_store, "list_groups"):
             raise IntegrationError(
                 "aws identity_store missing list_groups", response=None
@@ -407,7 +411,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         return groups
 
     @opresult_wrapper(data_key="groups")
-    def list_groups_with_members(self, **kwargs):
+    def _list_groups_with_members_impl(self, **kwargs):
         resp = identity_store.list_groups_with_memberships(**kwargs)
         if not hasattr(resp, "success"):
             raise IntegrationError(

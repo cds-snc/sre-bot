@@ -7,7 +7,15 @@ from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from core.config import settings
+from core.logging import get_module_logger
 from modules.groups.models import NormalizedMember
+from modules.groups.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    register_circuit_breaker,
+)
+
+logger = get_module_logger()
 
 
 class OperationStatus(Enum):
@@ -158,6 +166,23 @@ def opresult_wrapper(data_key=None):
 class GroupProvider(ABC):
     """Abstract Base Class for group providers."""
 
+    def __init__(self):
+        """Initialize provider with circuit breaker."""
+        # Create circuit breaker for this provider
+        provider_name = self.__class__.__name__
+
+        if settings.groups.circuit_breaker_enabled:
+            self._circuit_breaker = CircuitBreaker(
+                name=provider_name,
+                failure_threshold=settings.groups.circuit_breaker_failure_threshold,
+                timeout_seconds=settings.groups.circuit_breaker_timeout_seconds,
+                half_open_max_calls=settings.groups.circuit_breaker_half_open_max_calls,
+            )
+            # Register in global registry for monitoring
+            register_circuit_breaker(self._circuit_breaker)
+        else:
+            self._circuit_breaker = None
+
     @property
     def prefix(self) -> str:
         """Provider prefix used for composing/parsing primary-style group names.
@@ -197,29 +222,159 @@ class GroupProvider(ABC):
         override = getattr(self, "_capability_override", None)
         return override if override is not None else self.capabilities
 
-    @abstractmethod
     def add_member(
         self, group_key: str, member_data: NormalizedMember
     ) -> OperationResult:
-        """Add a member synchronously and return a canonical member dict."""
+        """Add a member synchronously and return a canonical member dict.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _add_member_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._add_member_impl, group_key, member_data
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_add_member",
+                    provider=self.__class__.__name__,
+                    group_key=group_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._add_member_impl(group_key, member_data)
 
     @abstractmethod
+    def _add_member_impl(
+        self, group_key: str, member_data: NormalizedMember
+    ) -> OperationResult:
+        """Implementation of add_member (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of add_member.
+        """
+
     def remove_member(
         self, group_key: str, member_data: NormalizedMember
     ) -> OperationResult:
-        """Remove a member synchronously and return canonical member dict."""
+        """Remove a member synchronously and return canonical member dict.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _remove_member_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._remove_member_impl, group_key, member_data
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_remove_member",
+                    provider=self.__class__.__name__,
+                    group_key=group_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._remove_member_impl(group_key, member_data)
 
     @abstractmethod
+    def _remove_member_impl(
+        self, group_key: str, member_data: NormalizedMember
+    ) -> OperationResult:
+        """Implementation of remove_member (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of remove_member.
+        """
+
     def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
-        """Return list of canonical member dicts."""
+        """Return list of canonical member dicts.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _get_group_members_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._get_group_members_impl, group_key, **kwargs
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_get_group_members",
+                    provider=self.__class__.__name__,
+                    group_key=group_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._get_group_members_impl(group_key, **kwargs)
 
     @abstractmethod
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
+        """Implementation of get_group_members (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of get_group_members.
+        """
+
     def list_groups(self, **kwargs) -> OperationResult:
-        """Return list of canonical group dicts from the provider."""
+        """Return list of canonical group dicts from the provider.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _list_groups_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(self._list_groups_impl, **kwargs)
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_list_groups",
+                    provider=self.__class__.__name__,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._list_groups_impl(**kwargs)
 
     @abstractmethod
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
+        """Implementation of list_groups (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of list_groups.
+        """
+
     def list_groups_with_members(self, **kwargs) -> OperationResult:
-        """Return list of canonical group dicts with members from the provider."""
+        """Return list of canonical group dicts with members from the provider.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _list_groups_with_members_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._list_groups_with_members_impl, **kwargs
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_list_groups_with_members",
+                    provider=self.__class__.__name__,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._list_groups_with_members_impl(**kwargs)
+
+    @abstractmethod
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
+        """Implementation of list_groups_with_members (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of list_groups_with_members.
+        """
 
     def create_group(self, *args, **kwargs) -> OperationResult:
         """Group creation is disabled; managed via IaC."""
@@ -246,6 +401,29 @@ class GroupProvider(ABC):
     ) -> OperationResult:
         """Return a list of canonical group dicts the user can manage."""
         raise NotImplementedError()
+
+    def get_circuit_breaker_stats(self) -> dict:
+        """Get circuit breaker statistics for this provider.
+
+        Returns:
+            Dictionary with circuit breaker state and statistics, or empty dict if disabled.
+        """
+        if self._circuit_breaker:
+            return self._circuit_breaker.get_stats()
+        return {"enabled": False, "message": "Circuit breaker disabled"}
+
+    def reset_circuit_breaker(self) -> None:
+        """Manually reset circuit breaker to CLOSED state.
+
+        Use this for admin operations when you know a provider has recovered
+        but the circuit is still open.
+        """
+        if self._circuit_breaker:
+            self._circuit_breaker.reset()
+            logger.info(
+                "provider_circuit_breaker_manually_reset",
+                provider=self.__class__.__name__,
+            )
 
 
 class PrimaryGroupProvider(GroupProvider):
