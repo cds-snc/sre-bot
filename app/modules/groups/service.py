@@ -22,6 +22,7 @@ from modules.groups import event_system
 from modules.groups import schemas
 from modules.groups import validation
 from modules.groups import mappings
+from modules.groups import idempotency
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
     OperationStatus,
@@ -79,7 +80,21 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     Returns an `ActionResponse` Pydantic model summarizing the result. This
     function schedules a background event `group.member.add_requested` with
     the orchestration response plus the original request payload.
+    
+    Implements idempotency: if the same idempotency_key is used within the TTL
+    window, the cached response is returned without re-executing the operation.
     """
+    # Check idempotency cache first
+    cached_response = idempotency.get_cached_response(request.idempotency_key)
+    if cached_response is not None:
+        logger.info(
+            "idempotent_request_detected",
+            idempotency_key=request.idempotency_key,
+            group_id=request.group_id,
+            member_email=request.member_email,
+        )
+        return cached_response
+    
     # Semantic validation: move input validation responsibility to the service
     provider_type = request.provider.value if request.provider else None
     if provider_type and not validation.validate_provider_type(provider_type):
@@ -161,7 +176,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         formatted.get("timestamp") if isinstance(formatted, dict) else None
     )
 
-    return schemas.ActionResponse(
+    response = schemas.ActionResponse(
         success=bool(
             formatted.get("success", False) if isinstance(formatted, dict) else False
         ),
@@ -174,6 +189,12 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         details={"orchestration": formatted},
         timestamp=ts,
     )
+    
+    # Cache successful responses only
+    if response.success:
+        idempotency.cache_response(request.idempotency_key, response)
+    
+    return response
 
 
 def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionResponse:
@@ -181,7 +202,22 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
 
     Schedules `group.member.remove_requested` as a background event and returns
     an `ActionResponse` summarizing the orchestration outcome.
+
+    Idempotency: Requests with the same `idempotency_key` within the TTL window
+    (1 hour) will return the cached response without re-executing the operation.
+    Failures are not cached to preserve retry semantics.
     """
+    # Check cache for idempotent request
+    cached_response = idempotency.get_cached_response(request.idempotency_key)
+    if cached_response:
+        logger.info(
+            "idempotent_request_detected",
+            idempotency_key=request.idempotency_key,
+            group_id=request.group_id,
+            member_email=request.member_email,
+        )
+        return cached_response
+
     # Semantic validation performed at service boundary
     provider_type = request.provider.value if request.provider else None
     if provider_type and not validation.validate_provider_type(provider_type):
@@ -256,7 +292,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
         formatted.get("timestamp") if isinstance(formatted, dict) else None
     )
 
-    return schemas.ActionResponse(
+    response = schemas.ActionResponse(
         success=bool(
             formatted.get("success", False) if isinstance(formatted, dict) else False
         ),
@@ -269,6 +305,12 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
         details={"orchestration": formatted},
         timestamp=ts,
     )
+
+    # Cache successful responses for idempotency
+    if response.success:
+        idempotency.cache_response(request.idempotency_key, response)
+
+    return response
 
 
 def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:

@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Annotated
 from datetime import datetime
 from enum import Enum
+from uuid import uuid4
 from pydantic import (
     BaseModel,
     EmailStr,
@@ -86,6 +87,14 @@ class AddMemberRequest(BaseModel):
             json_schema_extra={"example": {"ticket_id": "JIRA-123"}},
         ),
     ] = None
+    idempotency_key: Annotated[
+        str,
+        Field(
+            default_factory=lambda: str(uuid4()),
+            description="Idempotency key for request deduplication (auto-generated if not provided)",
+            json_schema_extra={"example": "550e8400-e29b-41d4-a716-446655440000"},
+        ),
+    ]
 
 
 class RemoveMemberRequest(BaseModel):
@@ -139,6 +148,14 @@ class RemoveMemberRequest(BaseModel):
             json_schema_extra={"example": {"ticket_id": "JIRA-456"}},
         ),
     ] = None
+    idempotency_key: Annotated[
+        str,
+        Field(
+            default_factory=lambda: str(uuid4()),
+            description="Idempotency key for request deduplication (auto-generated if not provided)",
+            json_schema_extra={"example": "550e8400-e29b-41d4-a716-446655440000"},
+        ),
+    ]
 
 
 class OperationItem(BaseModel):

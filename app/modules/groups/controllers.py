@@ -19,12 +19,29 @@ def add_member_endpoint(request: schemas.AddMemberRequest):
 
     Delegates to the `service.add_member` function and returns the
     Pydantic `ActionResponse` model directly.
+
+    **Idempotency:**
+    - Each request includes an `idempotency_key` field (auto-generated UUID if not provided)
+    - Requests with the same `idempotency_key` within 1 hour return the cached response
+    - Failed operations are NOT cached to preserve retry semantics
+    - Use the same `idempotency_key` for retries to avoid duplicate group additions
     """
     return service.add_member(request)
 
 
 @router.post("/remove", response_model=schemas.ActionResponse)
 def remove_member_endpoint(request: schemas.RemoveMemberRequest):
+    """Remove member endpoint.
+
+    Delegates to the `service.remove_member` function and returns the
+    Pydantic `ActionResponse` model directly.
+
+    **Idempotency:**
+    - Each request includes an `idempotency_key` field (auto-generated UUID if not provided)
+    - Requests with the same `idempotency_key` within 1 hour return the cached response
+    - Failed operations are NOT cached to preserve retry semantics
+    - Use the same `idempotency_key` for retries to avoid duplicate group removals
+    """
     return service.remove_member(request)
 
 

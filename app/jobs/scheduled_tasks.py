@@ -10,6 +10,7 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
+from modules.groups import idempotency
 
 from core.logging import get_module_logger
 
@@ -46,6 +47,7 @@ def init(bot):
     # schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
+    schedule.every(5).minutes.do(safe_run(idempotency.cleanup_expired_entries))
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
     schedule.every().day.at("00:00").do(
         safe_run(spending.generate_spending_data), logger=logger
