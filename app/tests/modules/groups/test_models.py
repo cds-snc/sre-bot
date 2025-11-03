@@ -1,10 +1,19 @@
+"""Legacy tests for groups module data models.
+
+These tests have been migrated to tests/unit/modules/groups/test_models.py
+but are retained here for verification during the transition period.
+"""
+
 from modules.groups.models import (
     member_from_dict,
     group_from_dict,
     as_canonical_dict,
 )
 
+import pytest
 
+
+@pytest.mark.legacy
 def test_normalized_member_from_dict_and_to_canonical():
     data = {
         "email": "user@example.com",
@@ -22,6 +31,7 @@ def test_normalized_member_from_dict_and_to_canonical():
     assert canon["first_name"] == "User"
 
 
+@pytest.mark.legacy
 def test_normalized_group_from_dict_and_as_canonical():
     data = {
         "id": "group-123",
@@ -45,6 +55,7 @@ def test_normalized_group_from_dict_and_as_canonical():
     assert isinstance(canon.get("members"), list)
 
 
+@pytest.mark.legacy
 def test_group_member_helpers_roundtrip():
     # Ensure helpers that convert between representations work as expected
     member = member_from_dict(
@@ -56,6 +67,7 @@ def test_group_member_helpers_roundtrip():
     assert m2.first_name in ("Round", None)
 
 
+@pytest.mark.legacy
 def test_member_from_dict_extracts_names_from_simple_payload():
     payload = {
         "email": "alice@example.com",
@@ -73,6 +85,7 @@ def test_member_from_dict_extracts_names_from_simple_payload():
     assert d["first_name"] == "Alice"
 
 
+@pytest.mark.legacy
 def test_member_from_dict_fallback_display_name_split():
     payload = {
         "primaryEmail": "bob@example.com",
@@ -85,6 +98,7 @@ def test_member_from_dict_fallback_display_name_split():
     assert m.family_name == "Builder"
 
 
+@pytest.mark.legacy
 def test_member_from_dict_handles_missing_fields():
     payload = {"something": "else"}
     m = member_from_dict(payload, "aws")
