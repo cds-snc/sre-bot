@@ -226,6 +226,111 @@ def set_provider_capability(groups_providers):
     return _setter
 
 
+@pytest.fixture
+def mock_provider_config():
+    """Factory for creating provider configuration dictionaries.
+
+    Returns a function that generates provider config dicts with
+    sensible defaults for testing configuration-driven activation.
+
+    Usage:
+        config = mock_provider_config(
+            provider_name="google",
+            enabled=True,
+            primary=True,
+            prefix="g",
+            capabilities={"supports_member_management": True}
+        )
+    """
+
+    def _factory(
+        provider_name: str,
+        enabled: bool = True,
+        primary: bool = False,
+        prefix: str = None,
+        capabilities: dict = None,
+    ) -> dict:
+        config = {"enabled": enabled}
+
+        if primary:
+            config["primary"] = True
+
+        if prefix:
+            config["prefix"] = prefix
+
+        if capabilities:
+            config["capabilities"] = capabilities
+
+        return {provider_name: config}
+
+    return _factory
+
+
+@pytest.fixture
+def single_provider_config(mock_provider_config):
+    """Provider configuration with single enabled primary provider.
+
+    Returns:
+        dict: Configuration for a single Google Workspace provider
+    """
+    return mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        capabilities={"supports_member_management": True, "provides_role_info": True},
+    )
+
+
+@pytest.fixture
+def multi_provider_config(mock_provider_config):
+    """Provider configuration with multiple enabled providers.
+
+    Returns:
+        dict: Configuration for Google (primary) and AWS (secondary) providers
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        capabilities={"supports_member_management": True, "provides_role_info": True},
+    )
+
+    aws_cfg = mock_provider_config(
+        provider_name="aws",
+        enabled=True,
+        primary=False,
+        prefix="aws",
+        capabilities={
+            "supports_member_management": True,
+            "supports_batch_operations": True,
+            "max_batch_size": 100,
+        },
+    )
+
+    # Merge both configs
+    config = {**google_cfg, **aws_cfg}
+    return config
+
+
+@pytest.fixture
+def disabled_provider_config(mock_provider_config):
+    """Provider configuration with one enabled and one disabled provider.
+
+    Returns:
+        dict: Configuration with Google enabled (primary) and AWS disabled
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google", enabled=True, primary=True
+    )
+
+    aws_cfg = mock_provider_config(
+        provider_name="aws", enabled=False, prefix="aws"  # Explicitly disabled
+    )
+
+    config = {**google_cfg, **aws_cfg}
+    return config
+
+
 # Google API Python Client
 
 

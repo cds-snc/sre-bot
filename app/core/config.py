@@ -250,48 +250,132 @@ class SreOpsSettings(BaseSettings):
 
 
 class GroupsFeatureSettings(BaseSettings):
+    """Configuration for the groups feature and provider management.
+
+    Providers Configuration (GROUP_PROVIDERS):
+    -----------------------------------------
+    Configure per-provider behavior including enable/disable, primary provider
+    selection, prefix overrides, and capability overrides.
+
+    Schema:
+        providers: Dict[str, Dict[str, Any]]
+            Key: Provider name (e.g., "google", "aws")
+            Value: Provider configuration dict with the following fields:
+
+            - enabled (bool, optional): Whether to activate this provider.
+              Default: True. Set to False to disable a provider without
+              removing configuration.
+
+            - primary (bool, optional): Whether this provider is the primary.
+              Exactly one provider must have primary=True. The primary provider
+              is used for group creation and as the canonical source of truth.
+              Default: False
+
+            - prefix (str, optional): Override the provider's default prefix
+              used for group key mapping. Non-primary providers should have
+              a prefix to enable proper group name mapping.
+              Example: "aws" for AWS Identity Center groups
+
+            - capabilities (dict, optional): Override provider capabilities.
+              Merged with provider defaults (config takes precedence).
+              Available capability fields:
+                * supports_user_creation (bool): Can create users
+                * supports_user_deletion (bool): Can delete users
+                * supports_group_creation (bool): Can create groups (always False)
+                * supports_group_deletion (bool): Can delete groups (always False)
+                * supports_member_management (bool): Can add/remove members
+                * is_primary (bool): Mark as primary via capability
+                * provides_role_info (bool): Provides role/membership type info
+                * supports_batch_operations (bool): Supports batch operations
+                * max_batch_size (int): Maximum batch operation size
+
+    Example Configuration:
+        GROUP_PROVIDERS = {
+            "google": {
+                "enabled": True,
+                "primary": True,
+                "capabilities": {
+                    "provides_role_info": True,
+                    "supports_member_management": True
+                }
+            },
+            "aws": {
+                "enabled": True,
+                "prefix": "aws",
+                "capabilities": {
+                    "supports_member_management": True,
+                    "supports_batch_operations": True,
+                    "max_batch_size": 100
+                }
+            }
+        }
+
+    Validation:
+        - Exactly one provider must have primary=True
+        - Disabled providers (enabled=False) are excluded from activation
+        - Non-primary providers should have a prefix for proper mapping
+    """
+
     # Per-provider configuration. Each key is a provider name with a dict value
-    # Example:
-    # GROUP_PROVIDERS={
-    #   "google": {"enabled": True, "primary": True, "capabilities": {...}},
-    #   "aws": {"enabled": True, "prefix": "aws", "capabilities": {...}},
-    # }
-    providers: dict[str, dict] = Field(default_factory=dict, alias="GROUP_PROVIDERS")
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        alias="GROUP_PROVIDERS",
+        description="Per-provider configuration for enable/disable, primary selection, prefix, and capabilities",
+    )
 
     @field_validator("providers", mode="after")
     @classmethod
     def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
-        """Simple validation for GROUP_PROVIDERS:
+        """Validation for GROUP_PROVIDERS configuration.
 
-        - Ensure there is exactly one provider has `primary=True`.
-        - Warn if no provider is primary.
-        - Warn for non-primary providers missing `prefix` (used for mapping).
+        Rules:
+        - Filter to only enabled providers (enabled != False)
+        - Ensure exactly one enabled provider has primary=True
+        - Warn if non-primary enabled providers are missing prefix
+
+        Disabled providers (enabled=False) are excluded from all validation
+        checks since they won't be activated.
         """
         try:
             if not v or not isinstance(v, dict):
                 return {}
 
-            primary_count = 0
-            for pname, cfg in v.items():
-                if isinstance(cfg, dict) and cfg.get("primary"):
-                    primary_count += 1
+            # Filter to only enabled providers
+            enabled_providers = {
+                pname: cfg
+                for pname, cfg in v.items()
+                if isinstance(cfg, dict) and cfg.get("enabled", True)
+            }
+
+            if not enabled_providers:
+                logger.warning("no_enabled_providers_configured")
+                return v
+
+            # Count primary providers among enabled providers only
+            primary_count = sum(
+                1
+                for cfg in enabled_providers.values()
+                if isinstance(cfg, dict) and cfg.get("primary")
+            )
 
             if primary_count != 1:
-                # Fail-fast: require exactly one primary provider to enable groups feature
+                # Fail-fast: require exactly one enabled primary provider
                 raise ValueError(
-                    "GROUP_PROVIDERS configuration must contain exactly one provider with 'primary': True."
+                    f"GROUP_PROVIDERS configuration must contain exactly one enabled provider "
+                    f"with 'primary': True. Found {primary_count} enabled primary provider(s)."
                 )
 
-            for pname, cfg in v.items():
-                if not (isinstance(cfg, dict) and cfg.get("primary")):
-                    if not (isinstance(cfg, dict) and cfg.get("prefix")):
-                        logger.warning(
-                            "provider_missing_prefix",
-                            provider=pname,
-                            msg=(
-                                "Non-primary provider has no 'prefix' configured; mapping to primary provider may fail"
-                            ),
-                        )
+            # Warn about enabled non-primary providers missing prefix
+            for pname, cfg in enabled_providers.items():
+                if not cfg.get("primary") and not cfg.get("prefix"):
+                    logger.warning(
+                        "provider_missing_prefix",
+                        provider=pname,
+                        msg=(
+                            "Enabled non-primary provider has no 'prefix' configured; "
+                            "mapping to primary provider may fail"
+                        ),
+                    )
         except Exception as e:
             if isinstance(e, ValueError):
                 raise

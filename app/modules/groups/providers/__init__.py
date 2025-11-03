@@ -57,27 +57,29 @@ def activate_providers() -> str:
     config overrides.
 
     Behavior:
-    - Read config once.
-    - Instantiate discovered provider classes preferring a no-config
-      instantiation (providers should expose sensible defaults).
-    - Apply provider-provided defaults (e.g. default_prefix / prefix) to the
-      instance as activation-time metadata (instance._prefix).
-    - If config contains an explicit override for a provider (cfg["prefix"]),
-      normalize and apply that override after defaults.
+    - Read config once from settings.groups.providers.
+    - Filter out providers with enabled=False in config.
+    - Instantiate remaining discovered provider classes.
+    - Apply provider-provided defaults and config overrides.
     - Populate PROVIDER_REGISTRY and validate uniqueness of activated prefixes.
     - Determine and return the primary provider name.
 
     Raises:
-        RuntimeError: on duplicate prefix collisions or when provider
-            instantiation/validation fails.
+        RuntimeError: on duplicate prefix collisions, disabled primary provider,
+            or when provider instantiation/validation fails.
     """
-    # Instantiate all discovered providers into a fresh local registry.
-    # Note: Per simplified activation model we do NOT consult core config
-    # (settings.groups.*) here. Providers should be constructible without
-    # global config or expose an explicit classmethod `from_config()` that
-    # accepts no arguments if needed.
+    from core.config import settings  # Import at function level to avoid circular deps
+
+    provider_configs = settings.groups.providers or {}
+
+    # Filter discovered providers based on config
     new_registry: Dict[str, GroupProvider] = {}
     for name, provider_cls in DISCOVERED_PROVIDER_CLASSES.items():
+        # Check if provider is explicitly disabled
+        provider_cfg = provider_configs.get(name, {})
+        if not provider_cfg.get("enabled", True):  # Default to enabled if not specified
+            logger.info("provider_disabled_by_config", provider=name)
+            continue
         try:
             # Prefer parameterless construction so providers supply sensible
             # defaults. If the provider requires custom construction, it may
@@ -124,11 +126,48 @@ def activate_providers() -> str:
             if default_prefix is None:
                 default_prefix = name
 
-            setattr(instance, "_prefix", default_prefix)
+            # Apply prefix from config if provided
+            config_prefix = provider_cfg.get("prefix")
+            if config_prefix and isinstance(config_prefix, str):
+                setattr(instance, "_prefix", config_prefix.strip())
+                logger.debug(
+                    "provider_prefix_overridden", provider=name, prefix=config_prefix
+                )
+            else:
+                setattr(instance, "_prefix", default_prefix)
+
+            # Apply capability overrides from config if provided
+            config_capabilities = provider_cfg.get("capabilities")
+            if config_capabilities and isinstance(config_capabilities, dict):
+                # Get current capabilities from provider
+                original_capabilities = instance.capabilities
+
+                # Create a new ProviderCapabilities instance with merged values
+                # Config overrides take precedence over provider defaults
+                from dataclasses import asdict
+
+                caps_dict = asdict(original_capabilities)
+                caps_dict.update(config_capabilities)
+
+                # Create merged capabilities and store on instance
+                merged_caps = type(original_capabilities)(**caps_dict)
+
+                # Store override on the instance - the instance will check this
+                # in its capabilities property getter
+                setattr(instance, "_capability_override", merged_caps)
+
+                logger.debug(
+                    "provider_capabilities_overridden",
+                    provider=name,
+                    overrides=config_capabilities,
+                )
 
             new_registry[name] = instance
             logger.info(
-                "provider_activated", provider=name, type=type(instance).__name__
+                "provider_activated",
+                provider=name,
+                type=type(instance).__name__,
+                prefix=getattr(instance, "_prefix"),
             )
         except Exception as e:  # noqa: B902 - log and re-raise activation errors
             logger.error("provider_activation_failed", provider=name, error=str(e))
@@ -164,21 +203,32 @@ def _determine_primary(registry: Optional[Dict[str, GroupProvider]] = None) -> s
     Simplified priority:
     1. Exactly one provider in registry with `capabilities.is_primary == True`
     2. If registry contains exactly one provider, choose it
-    3. Otherwise raise ValueError and require explicit class-level primary
-       designation or single-provider deployment.
+    3. Otherwise raise ValueError
+
+    Note: This function only considers ACTIVE providers (those in the registry).
+    Disabled providers are filtered out during activate_providers().
     """
+    from core.config import settings
+
     reg = registry if registry is not None else PROVIDER_REGISTRY
+    provider_configs = settings.groups.providers or {}
 
     if not reg:
         # If nothing instantiated but exactly one discovered provider, use it
         if len(DISCOVERED_PROVIDER_CLASSES) == 1:
-            return next(iter(DISCOVERED_PROVIDER_CLASSES.keys()))
+            single_name = next(iter(DISCOVERED_PROVIDER_CLASSES.keys()))
+            # Check if that single provider is disabled
+            if not provider_configs.get(single_name, {}).get("enabled", True):
+                raise ValueError(
+                    f"Cannot determine primary provider: sole provider '{single_name}' is disabled in config."
+                )
+            return single_name
         raise ValueError(
             "Cannot determine primary provider: no active providers found."
         )
 
     primaries = [
-        n for n, p in reg.items() if getattr(p.capabilities, "is_primary", False)
+        n for n, p in reg.items() if getattr(p.get_capabilities(), "is_primary", False)
     ]
     if len(primaries) == 1:
         return primaries[0]

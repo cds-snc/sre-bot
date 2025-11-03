@@ -14,6 +14,11 @@ from modules import (
 )
 from core.config import settings
 from core.logging import get_module_logger
+from modules.groups.providers import (
+    activate_providers,
+    get_active_providers,
+    get_primary_provider_name,
+)
 from server import bot_middleware, server
 
 from jobs import scheduled_tasks
@@ -68,6 +73,24 @@ def main(bot):
         server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
 
 
+# Ensure providers are activated once per FastAPI process at startup.
+def providers_startup():
+    try:
+        primary = activate_providers()
+        # store for app-wide access
+        server_app.state.providers = get_active_providers()
+        server_app.state.primary_provider_name = get_primary_provider_name()
+        logger.info(
+            "providers_activated",
+            primary=primary,
+            total=len(server_app.state.providers),
+        )
+    except Exception as e:
+        # Fail fast on provider activation error
+        logger.error("providers_activation_failed", error=str(e))
+        raise
+
+
 def get_bot():
     SLACK_TOKEN = settings.slack.SLACK_TOKEN
     if not bool(SLACK_TOKEN):
@@ -95,4 +118,10 @@ bot = get_bot()
 
 if bot:
     server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
+    # register providers activation first so any handlers registered in main()
+    # can rely on active providers.
+    server_app.add_event_handler("startup", providers_startup)
     server_app.add_event_handler("startup", partial(main, bot))
+else:
+    # Even when Slack is not present, activate providers for FastAPI-first usage
+    server_app.add_event_handler("startup", providers_startup)

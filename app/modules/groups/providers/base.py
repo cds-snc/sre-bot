@@ -181,7 +181,21 @@ class GroupProvider(ABC):
     @property
     @abstractmethod
     def capabilities(self) -> ProviderCapabilities:
-        """Provider capability descriptor."""
+        """Provider capability descriptor.
+
+        Subclasses must implement this to return their default capabilities.
+        The activation system may override these with config-driven values.
+        """
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Get effective capabilities, respecting config overrides.
+
+        Returns:
+            ProviderCapabilities instance, either the config-overridden version
+            (if _capability_override is set) or the provider's default capabilities.
+        """
+        override = getattr(self, "_capability_override", None)
+        return override if override is not None else self.capabilities
 
     @abstractmethod
     def add_member(
