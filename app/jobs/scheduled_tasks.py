@@ -11,6 +11,7 @@ from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
 from modules.groups import idempotency
+from modules.groups import reconciliation_worker
 
 from core.logging import get_module_logger
 
@@ -48,6 +49,9 @@ def init(bot):
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
     schedule.every(5).minutes.do(safe_run(idempotency.cleanup_expired_entries))
+    schedule.every(5).minutes.do(
+        safe_run(reconciliation_worker.process_reconciliation_batch)
+    )
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
     schedule.every().day.at("00:00").do(
         safe_run(spending.generate_spending_data), logger=logger

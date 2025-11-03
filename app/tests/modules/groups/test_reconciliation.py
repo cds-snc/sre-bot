@@ -478,7 +478,7 @@ class TestEndToEndWorkflow:
 
             # Fetch records due for retry
             due = store.fetch_due()
-            
+
             # If no records due, the record is already in DLQ
             if len(due) == 0:
                 break

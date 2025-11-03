@@ -187,9 +187,7 @@ class InMemoryReconciliationStore:
         with self._lock:
             self._mark_permanent_failure_locked(record_id, reason)
 
-    def _mark_permanent_failure_locked(
-        self, record_id: str, reason: str
-    ) -> None:
+    def _mark_permanent_failure_locked(self, record_id: str, reason: str) -> None:
         """Internal version of mark_permanent_failure (assumes lock is held)."""
         rec = self._store.get(record_id)
         if not rec:
