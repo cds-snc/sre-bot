@@ -70,7 +70,13 @@ def activate_providers() -> str:
     """
     from core.config import settings  # Import at function level to avoid circular deps
 
-    provider_configs = settings.groups.providers or {}
+    try:
+        provider_configs = settings.groups.providers or {}
+    except AttributeError:
+        raise ValueError(
+            "Groups configuration not found in settings. "
+            "Ensure core.config has groups configured."
+        )
 
     # Filter discovered providers based on config
     new_registry: Dict[str, GroupProvider] = {}

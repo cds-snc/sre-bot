@@ -1,6 +1,25 @@
 # flake8: noqa
 """Test registry behaviors for group providers.
 
+IMPORTANT: NEW CONTRACT after Recommendation 2 (Configuration-Driven Activation)
+
+Provider Activation Contract:
+- Discovery Phase: `register_provider()` decorator records classes in DISCOVERED_PROVIDER_CLASSES
+- Activation Phase: `activate_providers()` calls settings.groups.providers to filter by enabled field
+  - Disabled providers (enabled=False in config) are NEVER instantiated
+  - Disabled providers do NOT appear in PROVIDER_REGISTRY after activation
+  - Only enabled providers are instantiated and added to PROVIDER_REGISTRY
+- Primary Determination: After activation, _determine_primary() selects the primary provider
+  - If only one enabled provider exists, it becomes primary
+  - If multiple enabled providers exist, exactly one must have is_primary=True in capabilities
+  - If only a disabled provider is discovered, ValueError is raised
+  - If no enabled providers are discovered, ValueError is raised
+
+Key Rules for Tests:
+1. If testing with only one provider, make sure it's enabled (or test expects error)
+2. To test disabled behavior, register at least 2 providers with 1+ enabled as primary
+3. Use groups_providers fixture to set provider config (enabled/disabled/primary/prefix/capabilities)
+
 Note: this file contains intentionally complex test functions that exercise
 many branches of provider activation logic. For lint cleanup during the
 migration, disable flake8 checks for this file.
@@ -224,15 +243,59 @@ def test_register_class_and_instance_and_invalid(
 
 
 def test_register_skips_when_disabled(safe_providers_import, groups_providers):
-    """Provider registration should be skipped when the provider is disabled
+    """Provider registration should be skipped when the provider is disabled.
 
-    This covers the branch where `register_provider` reads the provider config
-    and returns early when `enabled` is False.
+    Tests the NEW contract after Recommendation 2:
+    - `register_provider()` decorator records discovery (populates DISCOVERED_PROVIDER_CLASSES)
+    - `activate_providers()` reads settings.groups.providers config and filters by `enabled` field
+    - Disabled providers (enabled=False) are never instantiated
+    - Disabled providers should NOT appear in PROVIDER_REGISTRY after activation
     """
     mod = safe_providers_import
     mod.PROVIDER_REGISTRY.clear()
 
+    class EnabledProvider(GroupProvider):
+        """Mock enabled provider to pass primary determination."""
+
+        def __init__(self):
+            self._capabilities = ProviderCapabilities(
+                provides_role_info=True, is_primary=True
+            )
+
+        @property
+        def capabilities(self):
+            return self._capabilities
+
+        def get_group_members(self, group_key: str, **kwargs):
+            raise NotImplementedError()
+
+        def add_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def remove_member(self, group_key: str, member_data, justification: str):
+            raise NotImplementedError()
+
+        def list_groups_for_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def validate_permissions(self, user_key: str, group_key: str, action: str):
+            raise NotImplementedError()
+
+        def create_user(self, user_data: dict):
+            raise NotImplementedError()
+
+        def delete_user(self, user_key: str):
+            raise NotImplementedError()
+
+        def list_groups(self, **kwargs):
+            raise NotImplementedError()
+
+        def list_groups_with_members(self, **kwargs):
+            raise NotImplementedError()
+
     class DisabledProvider(GroupProvider):
+        """Mock disabled provider to test skipping."""
+
         def __init__(self):
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
@@ -267,18 +330,29 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def list_groups_with_members(self, **kwargs):
             raise NotImplementedError()
 
-    # Mark provider as disabled in config
-    groups_providers.providers["disabled"] = {"enabled": False, "prefix": "dis"}
+    # Configure: one enabled provider (primary) and one disabled provider
+    groups_providers.set_providers(
+        {
+            "enabled": {"enabled": True, "primary": True, "prefix": "ena"},
+            "disabled": {"enabled": False, "prefix": "dis"},
+        }
+    )
 
-    # Decorator should record discovery but activation should skip instantiation
+    # Discovery phase: register both providers
+    mod.register_provider("enabled")(EnabledProvider)
     mod.register_provider("disabled")(DisabledProvider)
+
     # Discovery does not populate PROVIDER_REGISTRY until activation
+    assert "enabled" not in mod.PROVIDER_REGISTRY
     assert "disabled" not in mod.PROVIDER_REGISTRY
-    # Now activate providers; disabled provider should not be instantiated
+
+    # Activation phase: only enabled providers are instantiated
     mod.activate_providers()
-    # New contract: activation does not consult settings and will instantiate
-    # discovered providers. Expect the provider to be present after activation.
-    assert "disabled" in mod.PROVIDER_REGISTRY
+
+    # After activation: enabled provider IS in registry
+    assert "enabled" in mod.PROVIDER_REGISTRY
+    # After activation: disabled provider is NOT in registry (contract)
+    assert "disabled" not in mod.PROVIDER_REGISTRY
 
 
 def test_get_primary_provider_name_and_prefixes(

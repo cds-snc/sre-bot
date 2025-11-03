@@ -19,8 +19,12 @@ from modules.groups.models import NormalizedMember
 from typing import Optional
 
 
-class TestProvider(GroupProvider):
-    """Minimal test provider for configuration testing."""
+class FakeProvider(GroupProvider):
+    """Minimal test provider for configuration testing.
+
+    Note: Named FakeProvider instead of TestProvider to avoid pytest collection
+    warnings about test classes with __init__ constructors.
+    """
 
     def __init__(self):
         self._capabilities = ProviderCapabilities(
@@ -64,8 +68,12 @@ class TestProvider(GroupProvider):
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
 
-class TestPrimaryProvider(TestProvider):
-    """Test provider with is_primary capability."""
+class FakePrimaryProvider(FakeProvider):
+    """Test provider with is_primary capability.
+
+    Note: Named FakePrimaryProvider instead of TestPrimaryProvider to avoid pytest
+    collection warnings about test classes with __init__ constructors.
+    """
 
     def __init__(self):
         super().__init__()
@@ -86,7 +94,7 @@ class TestEnabledDisabledFiltering:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register test provider
-        mod.register_provider("google")(TestPrimaryProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
 
         # Configure via single_provider_config fixture
         from core.config import settings
@@ -109,8 +117,8 @@ class TestEnabledDisabledFiltering:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register both providers
-        mod.register_provider("google")(TestPrimaryProvider)
-        mod.register_provider("aws")(TestProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
+        mod.register_provider("aws")(FakeProvider)
 
         # Configure with one disabled
         from core.config import settings
@@ -136,8 +144,8 @@ class TestEnabledDisabledFiltering:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register both providers
-        mod.register_provider("google")(TestPrimaryProvider)
-        mod.register_provider("aws")(TestProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
+        mod.register_provider("aws")(FakeProvider)
 
         # Configure with both enabled
         from core.config import settings
@@ -161,7 +169,7 @@ class TestEnabledDisabledFiltering:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider
-        mod.register_provider("google")(TestProvider)
+        mod.register_provider("google")(FakeProvider)
 
         # Configure as disabled
         from core.config import settings
@@ -183,7 +191,7 @@ class TestPrefixOverrides:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider
-        mod.register_provider("aws")(TestProvider)
+        mod.register_provider("aws")(FakeProvider)
 
         # Configure with custom prefix
         from core.config import settings
@@ -212,7 +220,7 @@ class TestPrefixOverrides:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider with default prefix
-        mod.register_provider("google")(TestPrimaryProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
 
         # Configure without prefix override
         from core.config import settings
@@ -240,7 +248,7 @@ class TestCapabilityOverrides:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider
-        mod.register_provider("test")(TestProvider)
+        mod.register_provider("test")(FakeProvider)
 
         # Configure with capability overrides
         from core.config import settings
@@ -281,7 +289,7 @@ class TestCapabilityOverrides:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider
-        mod.register_provider("test")(TestProvider)
+        mod.register_provider("test")(FakeProvider)
 
         # Configure with capability override
         from core.config import settings
@@ -316,7 +324,7 @@ class TestCapabilityOverrides:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register provider
-        mod.register_provider("google")(TestPrimaryProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
 
         # Configure without capability overrides
         from core.config import settings
@@ -347,7 +355,7 @@ class TestPrimaryProviderValidation:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register single provider
-        mod.register_provider("google")(TestProvider)
+        mod.register_provider("google")(FakeProvider)
 
         # Configure as disabled
         from core.config import settings
@@ -367,8 +375,8 @@ class TestPrimaryProviderValidation:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register two providers
-        mod.register_provider("google")(TestPrimaryProvider)
-        mod.register_provider("aws")(TestProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
+        mod.register_provider("aws")(FakeProvider)
 
         # Configure google as primary but disabled
         from core.config import settings
@@ -447,8 +455,8 @@ class TestConfigurationIntegration:
         mod.DISCOVERED_PROVIDER_CLASSES.clear()
 
         # Register both providers
-        mod.register_provider("google")(TestPrimaryProvider)
-        mod.register_provider("aws")(TestProvider)
+        mod.register_provider("google")(FakePrimaryProvider)
+        mod.register_provider("aws")(FakeProvider)
 
         # Configure via fixture
         from core.config import settings
