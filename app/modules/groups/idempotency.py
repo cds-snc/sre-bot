@@ -30,8 +30,7 @@ def cleanup_expired_entries() -> None:
         now = time.time()
         with _CACHE_LOCK:
             expired_keys = [
-                key for key, (_, expiry) in _IDEMPOTENCY_CACHE.items()
-                if expiry < now
+                key for key, (_, expiry) in _IDEMPOTENCY_CACHE.items() if expiry < now
             ]
             for key in expired_keys:
                 _IDEMPOTENCY_CACHE.pop(key, None)

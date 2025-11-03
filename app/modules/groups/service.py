@@ -80,7 +80,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     Returns an `ActionResponse` Pydantic model summarizing the result. This
     function schedules a background event `group.member.add_requested` with
     the orchestration response plus the original request payload.
-    
+
     Implements idempotency: if the same idempotency_key is used within the TTL
     window, the cached response is returned without re-executing the operation.
     """
@@ -94,7 +94,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             member_email=request.member_email,
         )
         return cached_response
-    
+
     # Semantic validation: move input validation responsibility to the service
     provider_type = request.provider.value if request.provider else None
     if provider_type and not validation.validate_provider_type(provider_type):
@@ -189,11 +189,11 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         details={"orchestration": formatted},
         timestamp=ts,
     )
-    
+
     # Cache successful responses only
     if response.success:
         idempotency.cache_response(request.idempotency_key, response)
-    
+
     return response
 
 
