@@ -17,6 +17,8 @@ def test_get_primary_provider_is_primary_type(safe_providers_import):
     # minimal concrete primary provider implementation
     class DummyPrimary(PrimaryGroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             # advertise role info as required for primaries
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
@@ -24,17 +26,17 @@ def test_get_primary_provider_is_primary_type(safe_providers_import):
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def add_member(
+        def _add_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def remove_member(
+        def _remove_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
@@ -58,12 +60,12 @@ def test_get_primary_provider_is_primary_type(safe_providers_import):
         def delete_user(self, user_key: str) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def list_groups(self, **kwargs) -> OperationResult:
+        def _list_groups_impl(self, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def list_groups_with_members(self, **kwargs) -> OperationResult:
+        def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )

@@ -79,31 +79,34 @@ def test_provider_implementation_returns_role_info_when_capability_enabled():
     class TestProv(GroupProvider):
         def __init__(self):
             self._capabilities = ProviderCapabilities(provides_role_info=True)
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def add_member(
+        # Implement the new _*_impl methods (circuit breaker interface)
+        def _add_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult.success(data={"result": {}})
 
-        def remove_member(
+        def _remove_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult.success(data={"result": {}})
 
-        def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
             return OperationResult.success(data={"members": []})
 
-        def list_groups(self, **kwargs) -> OperationResult:
+        def _list_groups_impl(self, **kwargs) -> OperationResult:
             # return a group that includes a role field to satisfy role-aware contract
             return OperationResult.success(
                 data={"groups": [{"id": "eng", "role": "MANAGER"}]}
             )
 
-        def list_groups_with_members(self, **kwargs) -> OperationResult:
+        def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
             return OperationResult.success(data={"groups": []})
 
         def validate_permissions(

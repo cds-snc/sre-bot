@@ -17,19 +17,21 @@ def _make_dummy_provider(GroupProvider, ProviderCapabilities):
 
     class DummyProvider(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             return None
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             return None
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             return None
 
         def list_groups_for_user(self, user_key: str):
@@ -44,10 +46,10 @@ def _make_dummy_provider(GroupProvider, ProviderCapabilities):
         def delete_user(self, user_key: str):
             return None
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             return None
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             return None
 
     return DummyProvider

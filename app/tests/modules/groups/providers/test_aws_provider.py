@@ -7,6 +7,22 @@ import pytest
 from modules.groups.providers.base import OperationResult, OperationStatus
 from modules.groups.models import NormalizedMember
 from modules.groups.errors import IntegrationError
+from unittest.mock import patch
+
+
+def _mock_settings():
+    """Create mock settings with circuit breaker config."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        groups=SimpleNamespace(
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+            providers={},
+        )
+    )
 
 
 def _import_provider(safe_providers_import):
@@ -40,8 +56,13 @@ def provider_module(safe_providers_import):
 
 
 @pytest.fixture
-def provider(provider_module):
+def provider(provider_module, monkeypatch):
     """Instantiate and return a fresh provider instance."""
+    # Mock settings with circuit breaker config
+    monkeypatch.setattr(
+        "modules.groups.providers.base.settings",
+        _mock_settings(),
+    )
     return provider_module.AwsIdentityCenterProvider()
 
 
@@ -449,40 +470,40 @@ def test_normalize_group_from_aws_with_members(allow_minimal_pydantic, provider)
 
 def test_resolve_member_identifier_with_string(safe_providers_import):
     mod = _import_provider(safe_providers_import)
-    prov = mod.AwsIdentityCenterProvider()
-
-    assert prov._resolve_member_identifier("user@example.com") == "user@example.com"
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        prov = mod.AwsIdentityCenterProvider()
+        assert prov._resolve_member_identifier("user@example.com") == "user@example.com"
 
 
 def test_resolve_member_identifier_empty_string_raises(safe_providers_import):
     mod = _import_provider(safe_providers_import)
-    prov = mod.AwsIdentityCenterProvider()
-
-    with pytest.raises(ValueError):
-        prov._resolve_member_identifier("")
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        prov = mod.AwsIdentityCenterProvider()
+        with pytest.raises(ValueError):
+            prov._resolve_member_identifier("")
 
 
 def test_resolve_member_identifier_with_dict(safe_providers_import):
     mod = _import_provider(safe_providers_import)
-    prov = mod.AwsIdentityCenterProvider()
-
-    assert prov._resolve_member_identifier({"email": "a@b.com"}) == "a@b.com"
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        prov = mod.AwsIdentityCenterProvider()
+        assert prov._resolve_member_identifier({"email": "a@b.com"}) == "a@b.com"
 
 
 def test_resolve_member_identifier_dict_missing_email_raises(safe_providers_import):
     mod = _import_provider(safe_providers_import)
-    prov = mod.AwsIdentityCenterProvider()
-
-    with pytest.raises(ValueError):
-        prov._resolve_member_identifier({"id": "u-1"})
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        prov = mod.AwsIdentityCenterProvider()
+        with pytest.raises(ValueError):
+            prov._resolve_member_identifier({"id": "u-1"})
 
 
 def test_resolve_member_identifier_wrong_type_raises(safe_providers_import):
     mod = _import_provider(safe_providers_import)
-    prov = mod.AwsIdentityCenterProvider()
-
-    with pytest.raises(TypeError):
-        prov._resolve_member_identifier(123)
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        prov = mod.AwsIdentityCenterProvider()
+        with pytest.raises(TypeError):
+            prov._resolve_member_identifier(123)
 
 
 def test_add_member_rejects_non_dict(provider):

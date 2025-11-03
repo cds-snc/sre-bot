@@ -1,5 +1,6 @@
 import importlib
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -14,16 +15,30 @@ def _import_provider(safe_providers_import):
     return importlib.import_module("modules.groups.providers.google_workspace")
 
 
+def _mock_settings():
+    """Create mock settings with circuit breaker config."""
+    return SimpleNamespace(
+        groups=SimpleNamespace(
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+            providers={},
+        )
+    )
+
+
 def test_capabilities_and_get_local_part(safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
-    caps = p.capabilities
-    assert caps.supports_member_management is True
-    assert caps.provides_role_info is True
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
+        caps = p.capabilities
+        assert caps.supports_member_management is True
+        assert caps.provides_role_info is True
 
-    assert p._get_local_part("alice@example.com") == "alice"
-    assert p._get_local_part(None) is None
-    assert p._get_local_part("no-at-symbol") == "no-at-symbol"
+        assert p._get_local_part("alice@example.com") == "alice"
+        assert p._get_local_part(None) is None
+        assert p._get_local_part("no-at-symbol") == "no-at-symbol"
 
 
 def test_normalize_group_missing_email_and_name(safe_providers_import):
@@ -31,37 +46,40 @@ def test_normalize_group_missing_email_and_name(safe_providers_import):
     returns a NormalizedGroup without raising exceptions.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
-    # group with no email and no name
-    raw = {"id": "g-raw"}
-    ng = p._normalize_group_from_google(raw)
-    # local-part fallback needs an email; without email gid will be same as email (None)
-    assert ng is not None
-    assert ng.provider == "google"
-    # since there is no email, id should be None (gid computed from email)
-    assert ng.id is None or ng.id == "g-raw" or isinstance(ng.id, str)
-    # name falls back to email or gid; ensure no exception and name set to something predictable
-    assert ng.name is None or isinstance(ng.name, str)
+        # group with no email and no name
+        raw = {"id": "g-raw"}
+        ng = p._normalize_group_from_google(raw)
+        # local-part fallback needs an email; without email gid will be same as email (None)
+        assert ng is not None
+        assert ng.provider == "google"
+        # since there is no email, id should be None (gid computed from email)
+        assert ng.id is None or ng.id == "g-raw" or isinstance(ng.id, str)
+        # name falls back to email or gid; ensure no exception and name set to something predictable
+        assert ng.name is None or isinstance(ng.name, str)
 
 
 def test_resolve_normalizedmember_missing_email_and_id_raises(safe_providers_import):
     """Test a NormalizedMember without email or id must raise ValueError."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
-    nm = NormalizedMember(email=None, id=None, role=None, provider_member_id=None)
-    with pytest.raises(ValueError):
-        p._resolve_member_identifier(nm)
+        nm = NormalizedMember(email=None, id=None, role=None, provider_member_id=None)
+        with pytest.raises(ValueError):
+            p._resolve_member_identifier(nm)
 
 
 def test_resolve_dict_missing_id_or_email_raises(safe_providers_import):
     """Test a dict input without email/primaryEmail/id should raise ValueError."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
-    with pytest.raises(ValueError):
-        p._resolve_member_identifier({})
+        with pytest.raises(ValueError):
+            p._resolve_member_identifier({})
 
 
 def test_add_member_with_no_data_returns_empty_dict(monkeypatch, safe_providers_import):
@@ -69,19 +87,20 @@ def test_add_member_with_no_data_returns_empty_dict(monkeypatch, safe_providers_
     add_member should return an OperationResult with empty result dict.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
-    monkeypatch.setattr(
-        google_mod.google_directory,
-        "insert_member",
-        lambda group_key, member_key: SimpleNamespace(success=True, data=None),
-    )
+        monkeypatch.setattr(
+            google_mod.google_directory,
+            "insert_member",
+            lambda group_key, member_key: SimpleNamespace(success=True, data=None),
+        )
 
-    res = p.add_member("g1", "someone@example.com")
-    assert isinstance(res, OperationResult)
-    assert res.status == OperationStatus.SUCCESS
-    assert res.data and "result" in res.data
-    assert res.data["result"] == {}
+        res = p.add_member("g1", "someone@example.com")
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        assert res.data and "result" in res.data
+        assert res.data["result"] == {}
 
 
 def test_remove_member_integration_failure_returns_transient(
@@ -89,23 +108,25 @@ def test_remove_member_integration_failure_returns_transient(
 ):
     """Test when delete_member returns success=False, provider should yield TRANSIENT_ERROR."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
-    monkeypatch.setattr(
-        google_mod.google_directory,
-        "delete_member",
-        lambda group_key, member_key: SimpleNamespace(success=False, data=None),
-    )
+        monkeypatch.setattr(
+            google_mod.google_directory,
+            "delete_member",
+            lambda group_key, member_key: SimpleNamespace(success=False, data=None),
+        )
 
-    res = p.remove_member("g1", "user@example.com", "just")
-    assert isinstance(res, OperationResult)
-    assert res.status == OperationStatus.TRANSIENT_ERROR
+        res = p.remove_member("g1", "user@example.com")
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
 
 
 def test_get_group_members_with_raw_list(monkeypatch, safe_providers_import):
     """Todo #6: list_members returns a raw list (not IntegrationResponse-like)."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     monkeypatch.setattr(
         google_mod.google_directory,
@@ -123,7 +144,8 @@ def test_get_group_members_with_raw_list(monkeypatch, safe_providers_import):
 def test_list_groups_with_raw_list(monkeypatch, safe_providers_import):
     """Todo #7: list_groups returns a raw list of group dicts."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     monkeypatch.setattr(
         google_mod.google_directory,
@@ -146,7 +168,8 @@ def test_list_groups_with_members_integration_failure(
 ):
     """Todo #8: when the underlying integration returns success=False, provider should propagate transient error."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     monkeypatch.setattr(
         google_mod.google_directory,
@@ -162,7 +185,8 @@ def test_list_groups_with_members_integration_failure(
 def test_validate_permissions_match_by_id(monkeypatch, safe_providers_import):
     """Todo #9: ensure validate_permissions matches member id as well as email."""
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     monkeypatch.setattr(
         google_mod.google_directory,
@@ -181,7 +205,8 @@ def test_validate_permissions_match_by_id(monkeypatch, safe_providers_import):
 
 def test_normalize_member_and_group_success_and_failure(safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     raw_member = {
         "id": "m1",
@@ -219,7 +244,8 @@ def test_normalize_member_and_group_success_and_failure(safe_providers_import):
 
 def test_resolve_member_identifier_various_inputs(safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # NormalizedMember with email
     nm = NormalizedMember(email="e@x.com", id=None, role=None, provider_member_id=None)
@@ -246,7 +272,8 @@ def test_resolve_member_identifier_various_inputs(safe_providers_import):
 
 def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     fake_member = {"id": "m10", "email": "new@example.com", "role": "MEMBER"}
     monkeypatch.setattr(
@@ -294,7 +321,8 @@ def test_add_and_remove_member_operationresult(monkeypatch, safe_providers_impor
 
 def test_get_group_members_and_list_groups(monkeypatch, safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # list_members returns mixed shapes; only dicts normalized
     monkeypatch.setattr(
@@ -325,7 +353,8 @@ def test_get_group_members_and_list_groups(monkeypatch, safe_providers_import):
 
 def test_list_groups_with_members(monkeypatch, safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # stub underlying integration function
     groups = [{"id": "g1", "email": "g1@example.com", "name": "G1"}]
@@ -345,7 +374,8 @@ def test_validate_permissions_and_list_groups_for_user(
     monkeypatch, safe_providers_import
 ):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # validate_permissions: list_members failure -> transient
     monkeypatch.setattr(
@@ -384,7 +414,8 @@ def test_validate_permissions_and_list_groups_for_user(
 
 def test_is_manager_paths(monkeypatch, safe_providers_import):
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # Force provider_provides_role_info True path (patch the shared base helper)
     monkeypatch.setattr(
@@ -440,7 +471,8 @@ def test_is_manager_integration_error_returns_transient(
     is_manager should return an OperationResult.transient_error.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # force provider to report role info available (patch base helper)
     monkeypatch.setattr(
@@ -466,7 +498,8 @@ def test_is_manager_unexpected_exception_returns_transient_with_message(
     the exception message.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # ensure provider claims to expose role info (patch shared base helper)
     monkeypatch.setattr(
@@ -493,7 +526,8 @@ def test_list_groups_with_members_filters_invalid_groups(
     entries when normalizing and only return valid canonical groups.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     mixed = [
         "not-a-dict",
@@ -526,7 +560,8 @@ def test_list_groups_for_user_with_raw_list(monkeypatch, safe_providers_import):
     list_groups_for_user should normalize and return OperationResult.SUCCESS.
     """
     google_mod = _import_provider(safe_providers_import)
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # monkeypatch to return a raw list of groups
     monkeypatch.setattr(

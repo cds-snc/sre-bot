@@ -27,6 +27,8 @@ class FakeProvider(GroupProvider):
     """
 
     def __init__(self):
+        # Skip circuit breaker init for test provider
+        self._circuit_breaker = None
         self._capabilities = ProviderCapabilities(
             supports_member_management=True, provides_role_info=False
         )
@@ -37,15 +39,15 @@ class FakeProvider(GroupProvider):
         # to avoid recursion during activation
         return self._capabilities
 
-    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
-    def add_member(
+    def _add_member_impl(
         self, group_key: str, member_data, justification: str = ""
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-    def remove_member(
+    def _remove_member_impl(
         self, group_key: str, member_data, justification: str = ""
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
@@ -61,10 +63,10 @@ class FakeProvider(GroupProvider):
     def delete_user(self, user_key: str) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-    def list_groups(self, **kwargs) -> OperationResult:
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
-    def list_groups_with_members(self, **kwargs) -> OperationResult:
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
 

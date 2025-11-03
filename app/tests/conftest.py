@@ -52,11 +52,17 @@ def safe_providers_import(monkeypatch):
 
     monkeypatch.setattr(importlib, "import_module", _stub_import)
 
-    # Ensure settings.groups.providers is an empty mapping during import
+    # Ensure settings.groups includes circuit breaker config and empty providers during import
     monkeypatch.setattr(
         core_config.settings,
         "groups",
-        types.SimpleNamespace(providers={}),
+        types.SimpleNamespace(
+            providers={},
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+        ),
         raising=False,
     )
 

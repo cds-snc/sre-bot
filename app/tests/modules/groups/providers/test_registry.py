@@ -41,6 +41,10 @@ class SuccessProvider(GroupProvider):
     """Provider that returns successful OperationResult for common calls."""
 
     def __init__(self, provides_role_info: bool = False, is_primary: bool = False):
+        # Skip circuit breaker init for test provider
+        self._circuit_breaker = None
+        # Skip circuit breaker init for test provider
+        self._circuit_breaker = None
         self._capabilities = ProviderCapabilities(
             provides_role_info=provides_role_info, is_primary=is_primary
         )
@@ -49,15 +53,15 @@ class SuccessProvider(GroupProvider):
     def capabilities(self):
         return self._capabilities
 
-    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
-    def add_member(
+    def _add_member_impl(
         self, group_key: str, member_data, justification: str
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-    def remove_member(
+    def _remove_member_impl(
         self, group_key: str, member_data, justification: str
     ) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
@@ -73,10 +77,10 @@ class SuccessProvider(GroupProvider):
     def delete_user(self, user_key: str) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-    def list_groups(self, **kwargs) -> OperationResult:
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
-    def list_groups_with_members(self, **kwargs) -> OperationResult:
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
 
@@ -84,6 +88,8 @@ class NoopProvider(GroupProvider):
     """Provider that raises NotImplementedError for operations."""
 
     def __init__(self, provides_role_info: bool = False, is_primary: bool = False):
+        # Skip circuit breaker init for test provider
+        self._circuit_breaker = None
         self._capabilities = ProviderCapabilities(
             provides_role_info=provides_role_info, is_primary=is_primary
         )
@@ -92,13 +98,13 @@ class NoopProvider(GroupProvider):
     def capabilities(self):
         return self._capabilities
 
-    def get_group_members(self, group_key: str, **kwargs):
+    def _get_group_members_impl(self, group_key: str, **kwargs):
         raise NotImplementedError()
 
-    def add_member(self, group_key: str, member_data, justification: str):
+    def _add_member_impl(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
-    def remove_member(self, group_key: str, member_data, justification: str):
+    def _remove_member_impl(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
     def list_groups_for_user(self, user_key: str, *args, **kwargs):
@@ -113,10 +119,10 @@ class NoopProvider(GroupProvider):
     def delete_user(self, user_key: str):
         raise NotImplementedError()
 
-    def list_groups(self, **kwargs):
+    def _list_groups_impl(self, **kwargs):
         raise NotImplementedError()
 
-    def list_groups_with_members(self, **kwargs):
+    def _list_groups_with_members_impl(self, **kwargs):
         raise NotImplementedError()
 
 
@@ -124,19 +130,21 @@ class PNoneProvider(GroupProvider):
     """Provider used in tests that expect capabilities to be None."""
 
     def __init__(self):
+        # Skip circuit breaker init for test provider
+        self._circuit_breaker = None
         pass
 
     @property
     def capabilities(self):
         return None
 
-    def get_group_members(self, group_key: str, **kwargs):
+    def _get_group_members_impl(self, group_key: str, **kwargs):
         raise NotImplementedError()
 
-    def add_member(self, group_key: str, member_data, justification: str):
+    def _add_member_impl(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
-    def remove_member(self, group_key: str, member_data, justification: str):
+    def _remove_member_impl(self, group_key: str, member_data, justification: str):
         raise NotImplementedError()
 
     def list_groups_for_user(self, user_key: str):
@@ -151,10 +159,10 @@ class PNoneProvider(GroupProvider):
     def delete_user(self, user_key: str):
         raise NotImplementedError()
 
-    def list_groups(self, **kwargs):
+    def _list_groups_impl(self, **kwargs):
         raise NotImplementedError()
 
-    def list_groups_with_members(self, **kwargs):
+    def _list_groups_with_members_impl(self, **kwargs):
         raise NotImplementedError()
 
 
@@ -168,23 +176,25 @@ def test_register_class_and_instance_and_invalid(
 
     class DummyProvider(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def add_member(
+        def _add_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def remove_member(
+        def _remove_member_impl(
             self, group_key: str, member_data, justification: str
         ) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
@@ -202,12 +212,12 @@ def test_register_class_and_instance_and_invalid(
         def delete_user(self, user_key: str) -> OperationResult:
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def list_groups(self, **kwargs) -> OperationResult:
+        def _list_groups_impl(self, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def list_groups_with_members(self, **kwargs) -> OperationResult:
+        def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
@@ -258,6 +268,8 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         """Mock enabled provider to pass primary determination."""
 
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities(
                 provides_role_info=True, is_primary=True
             )
@@ -266,13 +278,13 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -287,29 +299,31 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     class DisabledProvider(GroupProvider):
         """Mock disabled provider to test skipping."""
 
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -324,10 +338,10 @@ def test_register_skips_when_disabled(safe_providers_import, groups_providers):
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     # Configure: one enabled provider (primary) and one disabled provider
@@ -369,6 +383,8 @@ def test_get_primary_provider_name_and_prefixes(
 
     class DummyPrimary(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             # This class represents an explicitly primary provider for the test
             self._capabilities = ProviderCapabilities(
                 provides_role_info=True, is_primary=True
@@ -378,15 +394,15 @@ def test_get_primary_provider_name_and_prefixes(
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
         def list_groups_for_user(
@@ -402,31 +418,33 @@ def test_get_primary_provider_name_and_prefixes(
         def delete_user(self, user_key: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
     class DummyNonPrimary(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities(provides_role_info=True)
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -441,10 +459,10 @@ def test_get_primary_provider_name_and_prefixes(
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     # Register google as the primary-capability provider and aws as non-primary
@@ -494,21 +512,23 @@ def test_get_primary_provider_name_returns_primary(
 
     class Dummy(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities()
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
         def list_groups_for_user(
@@ -524,12 +544,12 @@ def test_get_primary_provider_name_returns_primary(
         def delete_user(self, user_key: str):
             return OperationResult(status=OperationStatus.SUCCESS, message="ok")
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             return OperationResult(
                 status=OperationStatus.SUCCESS, message="ok", data={}
             )
@@ -540,13 +560,13 @@ def test_get_primary_provider_name_returns_primary(
             # Mark this provider as primary via capabilities (new contract)
             return ProviderCapabilities(is_primary=True)
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -561,10 +581,10 @@ def test_get_primary_provider_name_returns_primary(
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     mod.register_provider("google")(Dummy)
@@ -592,19 +612,21 @@ def test_get_active_providers_filter_and_all(safe_providers_import):
 
     class P(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             pass
 
         @property
         def capabilities(self):
             return None
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -619,10 +641,10 @@ def test_get_active_providers_filter_and_all(safe_providers_import):
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     mod.PROVIDER_REGISTRY["p1"] = P()
@@ -671,6 +693,8 @@ def test_validate_startup_configuration_requires_role_info(
 
     class Primary(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             # default capabilities (provides_role_info=False)
             self._capabilities = ProviderCapabilities()
 
@@ -678,13 +702,13 @@ def test_validate_startup_configuration_requires_role_info(
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -699,10 +723,10 @@ def test_validate_startup_configuration_requires_role_info(
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     # Register primary in the registry without provides_role_info
@@ -731,19 +755,21 @@ def test_get_primary_provider_name_and_errors(safe_providers_import, groups_prov
 
     class A(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             self._capabilities = ProviderCapabilities()
 
         @property
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -758,10 +784,10 @@ def test_get_primary_provider_name_and_errors(safe_providers_import, groups_prov
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self, **kwargs):
+        def _list_groups_impl(self, **kwargs):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     mod.register_provider("a")(A)
@@ -804,6 +830,8 @@ def test_validate_startup_configuration_behaviour(
     # Register primary but without provides_role_info -> should raise
     class P(GroupProvider):
         def __init__(self):
+            # Skip circuit breaker init for test provider
+            self._circuit_breaker = None
             # default capabilities (False)
             self._capabilities = ProviderCapabilities()
 
@@ -811,13 +839,13 @@ def test_validate_startup_configuration_behaviour(
         def capabilities(self):
             return self._capabilities
 
-        def get_group_members(self, group_key: str, **kwargs):
+        def _get_group_members_impl(self, group_key: str, **kwargs):
             raise NotImplementedError()
 
-        def add_member(self, group_key: str, member_data, justification: str):
+        def _add_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
-        def remove_member(self, group_key: str, member_data, justification: str):
+        def _remove_member_impl(self, group_key: str, member_data, justification: str):
             raise NotImplementedError()
 
         def list_groups_for_user(self, user_key: str):
@@ -832,10 +860,10 @@ def test_validate_startup_configuration_behaviour(
         def delete_user(self, user_key: str):
             raise NotImplementedError()
 
-        def list_groups(self):
+        def _list_groups_impl(self):
             raise NotImplementedError()
 
-        def list_groups_with_members(self, **kwargs):
+        def _list_groups_with_members_impl(self, **kwargs):
             raise NotImplementedError()
 
     mod.PROVIDER_REGISTRY["primary"] = P()

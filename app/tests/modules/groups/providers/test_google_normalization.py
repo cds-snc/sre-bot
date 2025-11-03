@@ -5,13 +5,30 @@ import pytest
 from integrations.google_workspace import google_directory_next as google_directory
 from integrations.google_workspace.schemas import Group as GoogleGroup
 from modules.groups.errors import IntegrationError
+from unittest.mock import patch
+
+
+
+def _mock_settings():
+    """Create mock settings with circuit breaker config."""
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        groups=SimpleNamespace(
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+            providers={},
+        )
+    )
 
 
 def test_map_google_member_to_normalized_basic(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     raw_member = {
         "id": "m1",
         "email": "user@example.com",
@@ -35,7 +52,8 @@ def test_map_google_group_to_normalized_with_members(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     raw_group = {
         "id": "g1",
         "email": "group@example.com",
@@ -74,7 +92,8 @@ def test_map_google_member_to_normalized_invalid_payload(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     # Non-dict payload should trigger validation -> IntegrationError
     with pytest.raises(IntegrationError):
         p._normalize_member_from_google(123)
@@ -84,7 +103,8 @@ def test_map_google_group_to_normalized_invalid_payload(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     with pytest.raises(IntegrationError):
         p._normalize_group_from_google(None)
 
@@ -93,7 +113,8 @@ def test_add_member_success_and_failure(monkeypatch, safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # success case: insert_member returns successful IntegrationResponse-like object
     fake_member = {"id": "m10", "email": "new@example.com", "role": "MEMBER"}
@@ -125,7 +146,8 @@ def test_remove_member_success(monkeypatch, safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     monkeypatch.setattr(
         google_directory,
@@ -149,7 +171,8 @@ def test_direct_members_count_coercion(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     mapped = p._normalize_group_from_google(raw_group, include_raw=True)
     assert isinstance(mapped, type(p._normalize_group_from_google({})))
 
@@ -158,7 +181,8 @@ def test_group_with_member_with_user_enrichment(safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     raw_group = {
         "id": "g2",
         "email": "group2@example.com",
@@ -192,7 +216,8 @@ def test_get_group_members_handles_unexpected_shapes(
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
     # list_members returns mixed types: non-dict entries should be ignored
     monkeypatch.setattr(
         google_directory,
@@ -214,7 +239,8 @@ def test_validate_permissions_failure_modes(monkeypatch, safe_providers_import):
     _ = safe_providers_import
 
     google_mod = importlib.import_module("modules.groups.providers.google_workspace")
-    p = google_mod.GoogleWorkspaceProvider()
+    with patch("modules.groups.providers.base.settings", _mock_settings()):
+        p = google_mod.GoogleWorkspaceProvider()
 
     # Case: list_members returns success=False -> IntegrationError
     monkeypatch.setattr(
