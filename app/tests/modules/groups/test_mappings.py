@@ -7,6 +7,8 @@ from modules.groups import mappings as gm
 
 # NormalizedMember import removed — not used in these tests (fixes flake8 F401)
 
+pytestmark = pytest.mark.legacy
+
 
 class LocalNameFromPrimaryTests:
     def test_local_name_from_primary_handles_email_local_part_and_empty(self):

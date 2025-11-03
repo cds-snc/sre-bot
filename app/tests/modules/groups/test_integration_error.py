@@ -1,8 +1,10 @@
 import types
 
 from modules.groups.errors import IntegrationError
+import pytest
 
 
+@pytest.mark.legacy
 def test_integration_error_has_response_field():
     # Create a lightweight stand-in for IntegrationResponse
     fake_response = types.SimpleNamespace(
