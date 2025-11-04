@@ -500,7 +500,7 @@ class TestBulkOperationsEndpoint:
             ]
         }
 
-        def mock_bulk(req):
+        def mock_bulk(req):  # pylint: disable=unused-argument
             results = [
                 schemas.ActionResponse(
                     success=True,
@@ -982,7 +982,7 @@ class TestMultiEndpointWorkflows:
         """Test workflow: bulk operations with errors -> list results."""
         call_count = [0]
 
-        def mock_bulk(req):
+        def mock_bulk(req):  # pylint: disable=unused-argument
             call_count[0] += 1
             results = [
                 schemas.ActionResponse(
@@ -1016,16 +1016,20 @@ class TestMultiEndpointWorkflows:
             json={
                 "operations": [
                     {
-                        "type": "add_member",
-                        "group_id": "group-1",
-                        "member_email": "user1@example.com",
-                        "provider": "google",
+                        "operation": "add_member",
+                        "payload": {
+                            "group_id": "group-1",
+                            "member_email": "user1@example.com",
+                            "provider": "google",
+                        },
                     },
                     {
-                        "type": "add_member",
-                        "group_id": "group-2",
-                        "member_email": "user2@example.com",
-                        "provider": "google",
+                        "operation": "add_member",
+                        "payload": {
+                            "group_id": "group-2",
+                            "member_email": "user2@example.com",
+                            "provider": "google",
+                        },
                     },
                 ]
             },
