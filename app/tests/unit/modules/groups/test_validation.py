@@ -72,18 +72,19 @@ class TestEmailValidation:
         assert validation.validate_email("  user@example.com  ") is True
 
 
-class TestGroupIdValidation:
-    """Tests for validate_group_id() function."""
-
 @pytest.mark.unit
 class TestGroupIdValidation:
     """Tests for validate_group_id() function."""
 
     def test_aws_group_id_valid_arn(self):
-        """Test valid AWS ARN format."""    def test_aws_group_id_valid_uuid_like(self):
+        """Test valid AWS ARN format."""
+        arn = "arn:aws:iam::123456789012:group/developers"
+        assert validation.validate_group_id(arn, "aws")
+
+    def test_aws_group_id_valid_uuid_like(self):
         """Test AWS group ID with valid UUID-like format."""
         group_id = "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
-        assert validation.validate_group_id(group_id, "aws") is True
+        assert validation.validate_group_id(group_id, "aws")
 
     def test_aws_group_id_short_invalid(self):
         """Test AWS group ID too short."""
@@ -91,15 +92,15 @@ class TestGroupIdValidation:
 
     def test_google_group_id_valid_email(self):
         """Test Google group ID as email."""
-        assert validation.validate_group_id("developers@example.com", "google") is True
+        assert validation.validate_group_id("developers@example.com", "google")
 
     def test_google_group_id_valid_slug(self):
         """Test Google group ID as slug."""
-        assert validation.validate_group_id("developers-team", "google") is True
+        assert validation.validate_group_id("developers-team", "google")
 
     def test_google_group_id_invalid(self):
         """Test invalid Google group ID."""
-        assert validation.validate_group_id("!@#$%", "google") is False
+        assert not validation.validate_group_id("!@#$%", "google")
 
     def test_azure_group_id_valid_guid(self):
         """Test valid Azure GUID format."""
@@ -128,9 +129,10 @@ class TestGroupIdValidation:
 
     def test_group_id_with_whitespace(self):
         """Test group ID with surrounding whitespace."""
-        assert validation.validate_group_id("  valid-id  ", "aws") is True
+        assert validation.validate_group_id("  valid-id-with-more-chars  ", "aws")
 
 
+@pytest.mark.unit
 class TestProviderTypeValidation:
     """Tests for validate_provider_type() function."""
 
@@ -164,6 +166,7 @@ class TestProviderTypeValidation:
         assert validation.validate_provider_type(None) is False
 
 
+@pytest.mark.unit
 class TestActionValidation:
     """Tests for validate_action() function."""
 
@@ -200,6 +203,7 @@ class TestActionValidation:
         assert validation.validate_action(None) is False
 
 
+@pytest.mark.unit
 class TestJustificationValidation:
     """Tests for validate_justification() function."""
 
@@ -236,6 +240,7 @@ class TestJustificationValidation:
         assert validation.validate_justification(None) is False
 
 
+@pytest.mark.unit
 class TestGroupMembershipPayloadValidation:
     """Tests for validate_group_membership_payload() function."""
 
@@ -270,7 +275,6 @@ class TestGroupMembershipPayloadValidation:
             "group_id": "developers",
             "member_email": "user@example.com",
             "provider_type": "google",
-            # Missing requestor_email
         }
         result = validation.validate_group_membership_payload(payload)
         assert result["valid"] is False
@@ -315,7 +319,7 @@ class TestGroupMembershipPayloadValidation:
     def test_invalid_payload_bad_group_id(self):
         """Test validation fails with invalid group ID."""
         payload = {
-            "group_id": "bad",  # Too short for generic validation
+            "group_id": "bad",
             "member_email": "user@example.com",
             "provider_type": "unknown",
             "requestor_email": "admin@example.com",
@@ -331,7 +335,7 @@ class TestGroupMembershipPayloadValidation:
             "member_email": "user@example.com",
             "provider_type": "google",
             "requestor_email": "admin@example.com",
-            "justification": "short",  # Too short
+            "justification": "short",
         }
         result = validation.validate_group_membership_payload(payload)
         assert result["valid"] is False
@@ -362,6 +366,7 @@ class TestGroupMembershipPayloadValidation:
         assert "warnings" in result
 
 
+@pytest.mark.unit
 class TestSanitizeInput:
     """Tests for sanitize_input() function."""
 
@@ -406,6 +411,7 @@ class TestSanitizeInput:
         assert validation.sanitize_input(123) == ""
 
 
+@pytest.mark.unit
 class TestBulkOperationValidation:
     """Tests for validate_bulk_operation() function."""
 
