@@ -66,7 +66,11 @@ def _handle_list_command(
         )
         groups = service.list_groups(req)
         # Simple user-friendly Slack message
-        respond(f"✅ Retrieved {len(groups)} groups")
+        group_stringified = []
+        for group in groups:
+            if isinstance(group, dict):
+                group_stringified.append(f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')})")
+        respond(f"✅ Retrieved {len(groups)} groups:\n" + "\n".join(group_stringified))
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
         respond("❌ Error retrieving your groups. Please try again later.")
