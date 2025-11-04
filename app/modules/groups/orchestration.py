@@ -190,7 +190,7 @@ def _propagate_to_secondaries(
             )
 
             sec_op = _call_provider_method(
-                prov, op_name, sec_group, sec_member, correlation_id
+                prov, op_name, sec_group, sec_member, correlation_id=correlation_id
             )
             results[name] = sec_op
 
@@ -306,7 +306,7 @@ def _orchestrate_write_operation(
             op_name,
             primary_group_id,
             member_obj,
-            correlation_id,
+            correlation_id=correlation_id,
         )
     except Exception as e:
         logger.error(
