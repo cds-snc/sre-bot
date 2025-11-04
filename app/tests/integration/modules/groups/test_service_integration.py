@@ -23,6 +23,7 @@ Test organization:
 import pytest
 from unittest.mock import MagicMock
 from datetime import datetime
+from pydantic import ValidationError
 
 from modules.groups import service, schemas
 
@@ -378,7 +379,7 @@ class TestBulkOperationsService:
                         "group_id": "group-1",
                         "member_email": "user1@example.com",
                         "provider": "google",
-                        "justification": "test",
+                        "justification": "User joining team project",
                     },
                 ),
             ]
@@ -568,24 +569,16 @@ class TestServiceErrorHandling:
         self,
         monkeypatch,
     ):
-        """Service validates justification."""
-        # ARRANGE
-        request = schemas.AddMemberRequest(
-            group_id="group-1",
-            member_email="user@example.com",
-            provider="google",
-            justification="x",  # Too short
-        )
-
-        # Mock validation to fail
-        monkeypatch.setattr(
-            "modules.groups.validation.validate_justification",
-            MagicMock(return_value=False),
-        )
-
-        # ACT & ASSERT
-        with pytest.raises(ValueError):
-            service.add_member(request)
+        """Service validates justification - short justification rejected by Pydantic."""
+        # ARRANGE - Try to create request with justification that's too short
+        # This should be caught by Pydantic validation, not by service
+        with pytest.raises(ValidationError):
+            schemas.AddMemberRequest(
+                group_id="group-1",
+                member_email="user@example.com",
+                provider="google",
+                justification="x",  # Too short - less than 10 chars required
+            )
 
     def test_event_dispatch_failure_does_not_prevent_response(
         self,

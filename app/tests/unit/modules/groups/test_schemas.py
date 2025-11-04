@@ -25,12 +25,13 @@ class TestAddMemberRequest:
             group_id="group-1",
             member_email="user@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="User joining engineering team",
         )
 
         assert request.group_id == "group-1"
         assert request.member_email == "user@example.com"
         assert request.provider == schemas.ProviderType.GOOGLE
-        assert request.justification is None
+        assert request.justification == "User joining engineering team"
         assert request.requestor is None
         assert request.metadata is None
         assert request.idempotency_key is not None
@@ -60,6 +61,7 @@ class TestAddMemberRequest:
                 group_id="group-1",
                 member_email="not-an-email",
                 provider=schemas.ProviderType.GOOGLE,
+                justification="User joining engineering team",
             )
 
         errors = exc_info.value.errors()
@@ -72,6 +74,7 @@ class TestAddMemberRequest:
                 group_id="",
                 member_email="user@example.com",
                 provider=schemas.ProviderType.GOOGLE,
+                justification="User joining engineering team",
             )
 
         errors = exc_info.value.errors()
@@ -84,6 +87,7 @@ class TestAddMemberRequest:
                 group_id="group-1",
                 member_email="user@example.com",
                 provider="invalid_provider",
+                justification="User joining engineering team",
             )
 
     def test_add_member_request_max_justification_length(self):
@@ -125,12 +129,13 @@ class TestRemoveMemberRequest:
             group_id="group-1",
             member_email="user@example.com",
             provider=schemas.ProviderType.AWS,
+            justification="User no longer requires access",
         )
 
         assert request.group_id == "group-1"
         assert request.member_email == "user@example.com"
         assert request.provider == schemas.ProviderType.AWS
-        assert request.justification is None
+        assert request.justification == "User no longer requires access"
 
     def test_remove_member_request_with_justification(self):
         """RemoveMemberRequest accepts justification."""
@@ -185,6 +190,7 @@ class TestOperationItem:
                 "group_id": "g-1",
                 "member_email": "u@example.com",
                 "provider": "google",
+                "justification": "User joining team project",
             },
         )
 
@@ -199,6 +205,7 @@ class TestOperationItem:
                 "group_id": "g-1",
                 "member_email": "u@example.com",
                 "provider": "google",
+                "justification": "User leaving team project",
             },
         )
 
@@ -227,6 +234,7 @@ class TestBulkOperationsRequest:
                         "group_id": "g-1",
                         "member_email": "u1@example.com",
                         "provider": "google",
+                        "justification": "User joining team project",
                     },
                 ),
                 schemas.OperationItem(
@@ -235,6 +243,7 @@ class TestBulkOperationsRequest:
                         "group_id": "g-1",
                         "member_email": "u2@example.com",
                         "provider": "google",
+                        "justification": "User leaving team project",
                     },
                 ),
             ]
@@ -259,6 +268,7 @@ class TestBulkOperationsRequest:
                     "group_id": f"g-{i}",
                     "member_email": f"u{i}@example.com",
                     "provider": "google",
+                    "justification": "User joining team project",
                 },
             )
             for i in range(101)
@@ -429,6 +439,7 @@ class TestProviderType:
             group_id="g-1",
             member_email="user@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="User joining team project",
         )
         assert request.provider == schemas.ProviderType.GOOGLE
 
@@ -437,6 +448,7 @@ class TestProviderType:
             group_id="g-1",
             member_email="user@example.com",
             provider="aws",
+            justification="User joining team project",
         )
         assert request2.provider == schemas.ProviderType.AWS
 

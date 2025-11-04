@@ -85,6 +85,7 @@ class TestAddMemberAuditLogging:
             group_id="team@example.com",
             member_email="alice@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Adding new team member",
             requestor="admin@example.com",
         )
 
@@ -127,6 +128,7 @@ class TestAddMemberAuditLogging:
             group_id="team@example.com",
             member_email="alice@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Adding new team member",
             idempotency_key=str(uuid4()),  # Different key for second request
         )
 
@@ -134,6 +136,7 @@ class TestAddMemberAuditLogging:
             group_id="team@example.com",
             member_email="alice@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Adding new team member",
             idempotency_key=str(uuid4()),  # Different key
         )
 
@@ -220,6 +223,7 @@ class TestRemoveMemberAuditLogging:
             group_id="team@example.com",
             member_email="bob@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Access revoked for offboarding",
         )
 
         # Call service and expect exception
@@ -261,6 +265,7 @@ class TestAuditLoggingEventDispatch:
             group_id="team@example.com",
             member_email="alice@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Adding new team member",
         )
 
         # Call service
@@ -293,6 +298,7 @@ class TestAuditLoggingEventDispatch:
             group_id="team@example.com",
             member_email="bob@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            justification="Access revoked for offboarding",
         )
 
         service.remove_member(req)

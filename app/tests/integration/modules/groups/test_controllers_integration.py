@@ -59,6 +59,7 @@ class TestAddMemberEndpoint:
             "group_id": "group-123",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User joining the team project",
         }
 
         def mock_add(req):
@@ -165,6 +166,7 @@ class TestAddMemberEndpoint:
             "group_id": "group-123",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User joining the team project",
         }
 
         def mock_add(req):
@@ -201,6 +203,7 @@ class TestRemoveMemberEndpoint:
             "group_id": "group-789",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User no longer requires access",
         }
 
         def mock_remove(req):
@@ -274,6 +277,7 @@ class TestRemoveMemberEndpoint:
             "group_id": "group-789",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User no longer requires access",
             "idempotency_key": idempotency_key,
         }
 
@@ -434,6 +438,7 @@ class TestBulkOperationsEndpoint:
                         "group_id": "group-1",
                         "member_email": "user1@example.com",
                         "provider": "google",
+                        "justification": "User joining team project",
                     },
                 },
                 {
@@ -442,6 +447,7 @@ class TestBulkOperationsEndpoint:
                         "group_id": "group-2",
                         "member_email": "user2@example.com",
                         "provider": "aws",
+                        "justification": "User joining team project",
                     },
                 },
             ]
@@ -487,6 +493,7 @@ class TestBulkOperationsEndpoint:
                         "group_id": "group-1",
                         "member_email": "user1@example.com",
                         "provider": "google",
+                        "justification": "User joining team project",
                     },
                 },
                 {
@@ -495,6 +502,7 @@ class TestBulkOperationsEndpoint:
                         "group_id": "group-404",
                         "member_email": "user2@example.com",
                         "provider": "google",
+                        "justification": "User joining team project",
                     },
                 },
             ]
@@ -791,6 +799,7 @@ class TestResponseSerialization:
             "group_id": "group-123",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User joining the team project",
             "metadata": {"ticket": "JIRA-123"},
         }
 
@@ -884,6 +893,7 @@ class TestErrorResponseHandling:
             "group_id": "group-123",
             "member_email": "user@example.com",
             "provider": "google",
+            "justification": "User joining the team project",
         }
 
         # FastAPI will catch the exception and return 500
@@ -944,6 +954,7 @@ class TestMultiEndpointWorkflows:
                 "group_id": group_id,
                 "member_email": member_email,
                 "provider": "google",
+                "justification": "User joining the team project",
             },
         )
         assert add_response.status_code == 200
@@ -963,6 +974,7 @@ class TestMultiEndpointWorkflows:
                 "group_id": group_id,
                 "member_email": member_email,
                 "provider": "google",
+                "justification": "User no longer requires access",
             },
         )
         assert remove_response.status_code == 200
@@ -1011,6 +1023,7 @@ class TestMultiEndpointWorkflows:
                             "group_id": "group-1",
                             "member_email": "user1@example.com",
                             "provider": "google",
+                            "justification": "User joining team project",
                         },
                     },
                     {
@@ -1019,6 +1032,7 @@ class TestMultiEndpointWorkflows:
                             "group_id": "group-2",
                             "member_email": "user2@example.com",
                             "provider": "google",
+                            "justification": "User joining team project",
                         },
                     },
                 ]
