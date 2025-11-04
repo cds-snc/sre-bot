@@ -69,7 +69,9 @@ def _handle_list_command(
         group_stringified = []
         for group in groups:
             if isinstance(group, dict):
-                group_stringified.append(f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')})")
+                group_stringified.append(
+                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')})"
+                )
         respond(f"✅ Retrieved {len(groups)} groups:\n" + "\n".join(group_stringified))
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
@@ -86,7 +88,8 @@ def _handle_add_command(
         )
         return
 
-    member_email = args[0] # could be either email or slack handle; if starts with @ try resolving to email
+    # could be either email or slack handle; if starts with @ try resolving to email
+    member_email = args[0]
     if member_email.startswith("@"):
         resolved_email = slack_users.get_user_email_from_handle(client, member_email)
         if not resolved_email:
@@ -144,7 +147,14 @@ def _handle_remove_command(
         )
         return
 
+    # could be either email or slack handle; if starts with @ try resolving to email
     member_email = args[0]
+    if member_email.startswith("@"):
+        resolved_email = slack_users.get_user_email_from_handle(client, member_email)
+        if not resolved_email:
+            respond(f"❌ Could not resolve Slack handle {member_email} to an email.")
+            return
+        member_email = resolved_email
     group_id = args[1]
     provider_type = args[2]
     justification = " ".join(args[3:]) if len(args) > 3 else "Removed via Slack command"
@@ -158,7 +168,7 @@ def _handle_remove_command(
         respond("❌ Invalid provider. Must be one of: aws, google, azure")
         return
 
-    requestor_email = body.get("user", {}).get("email")
+    requestor_email = slack_users.get_user_email_from_body(client, body)
     if not requestor_email:
         respond("❌ Could not determine your email address.")
         return
