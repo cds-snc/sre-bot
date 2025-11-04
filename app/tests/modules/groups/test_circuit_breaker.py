@@ -8,6 +8,8 @@ from modules.groups.circuit_breaker import (
     CircuitState,
 )
 
+pytestmark = pytest.mark.legacy
+
 
 class TestCircuitBreakerStates:
     """Test circuit breaker state transitions."""

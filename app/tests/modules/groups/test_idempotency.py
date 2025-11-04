@@ -4,7 +4,12 @@ import time
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from modules.groups import idempotency, schemas, service
+
+
+pytestmark = pytest.mark.legacy
 
 
 class TestIdempotencyCacheModule:

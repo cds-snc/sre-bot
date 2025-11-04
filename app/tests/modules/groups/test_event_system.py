@@ -1,6 +1,11 @@
 from threading import Event
 
+import pytest
+
 from modules.groups import event_system
+
+
+pytestmark = pytest.mark.legacy
 
 
 def test_register_and_dispatch_event_synchronous():

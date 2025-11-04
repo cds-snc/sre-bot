@@ -3,11 +3,17 @@
 import time
 import threading
 from datetime import datetime, timedelta
+
+import pytest
+
 from modules.groups.reconciliation import (
     InMemoryReconciliationStore,
     FailedPropagation,
 )
 from modules.groups import reconciliation_integration as ri
+
+
+pytestmark = pytest.mark.legacy
 
 
 class TestInMemoryReconciliationStoreBasics:

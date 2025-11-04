@@ -7,6 +7,8 @@ from modules.groups import mappings as gm
 from modules.groups import service as gs
 from modules.groups.models import NormalizedMember
 
+pytestmark = pytest.mark.legacy
+
 
 class MapNormalizedGroupsListToProvidersTests:
 
