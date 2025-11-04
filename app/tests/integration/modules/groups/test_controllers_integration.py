@@ -537,22 +537,12 @@ class TestBulkOperationsEndpoint:
         assert body["summary"]["failed"] == 1
 
     def test_bulk_operations_empty(self, client, monkeypatch):
-        """Test bulk operations with empty operations list."""
+        """Test bulk operations with empty operations list is rejected."""
         request_data = {"operations": []}
 
-        def mock_bulk(req):  # pylint: disable=unused-argument
-            return schemas.BulkOperationResponse(
-                results=[],
-                summary={"success": 0, "failed": 0},
-            )
-
-        monkeypatch.setattr(service, "bulk_operations", mock_bulk)
-
         response = client.post("/api/v1/groups/bulk", json=request_data)
-        assert response.status_code == 200
-        body = response.json()
-        assert body["results"] == []
-        assert body["summary"]["success"] == 0
+        # Empty operations should be rejected by validation (min_length=1)
+        assert response.status_code == 422
 
     def test_bulk_operations_max_size_validation(self, client):
         """Test bulk operations respects max operations limit."""
@@ -832,7 +822,7 @@ class TestResponseSerialization:
         """Test GroupResponse serialization with members."""
         user_email = "user@example.com"
 
-        def mock_list(req):
+        def mock_list(req):  # pylint: disable=unused-argument
             group_dict = {
                 "id": "group-1",
                 "name": "Engineering",
