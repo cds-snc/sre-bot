@@ -59,6 +59,80 @@ __all__ = [
 ]
 
 
+def _check_user_is_manager(
+    user_email: str, group_id: str, provider_type: str | None = None
+) -> bool:
+    """Check if user is a manager of the group using primary provider's is_manager().
+
+    Uses the primary provider as the source of truth for permission verification.
+    Handles OperationResult wrapper from provider's is_manager() method.
+
+    Args:
+        user_email: Email of user to check
+        group_id: Group ID (may be from secondary provider, will be mapped to primary format)
+        provider_type: Optional provider type. If secondary provider, group_id will be
+                      mapped to primary format first.
+
+    Returns:
+        True if user is a manager, False otherwise
+
+    Raises:
+        ValueError: If primary provider not available or group lookup fails
+    """
+    try:
+        primary_name = _providers.get_primary_provider_name()
+        primary_provider = _providers.get_active_providers().get(primary_name)
+
+        if not primary_provider:
+            raise ValueError(f"Primary provider '{primary_name}' not available")
+
+        # If provider_type is secondary, map group_id to primary format
+        mapped_group_id = group_id
+        if provider_type and primary_name and provider_type != primary_name:
+            try:
+                mapped_group_id = mappings.map_provider_group_id(
+                    from_provider=provider_type,
+                    from_group_id=group_id,
+                    to_provider=primary_name,
+                )
+            except Exception as e:
+                logger.warning(
+                    "failed_to_map_group_id_for_permission_check",
+                    error=str(e),
+                    from_provider=provider_type,
+                    to_provider=primary_name,
+                )
+                raise ValueError(f"Failed to map group ID: {e}") from e
+
+        # Call is_manager on primary provider
+        result = primary_provider.is_manager(user_email, mapped_group_id)
+
+        # Handle OperationResult wrapper if returned
+        if isinstance(result, OperationResult):
+            if result.status != OperationStatus.SUCCESS:
+                logger.warning(
+                    "is_manager_operation_failed",
+                    user_email=user_email,
+                    group_id=mapped_group_id,
+                    status=result.status,
+                    message=result.message,
+                )
+                return False
+            return bool(result.data.get("is_manager", False)) if result.data else False
+
+        # Direct boolean return
+        return bool(result)
+
+    except Exception as e:
+        logger.warning(
+            "permission_check_failed",
+            error=str(e),
+            user_email=user_email,
+            group_id=group_id,
+        )
+        raise
+
+
 def _parse_timestamp(ts: str | None) -> datetime:
     """Parse ISO timestamp returned by orchestration into a datetime.
 
@@ -125,6 +199,27 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             provider=provider_type,
         )
         raise
+
+    # Check if requestor is a manager of the group (permission enforcement)
+    try:
+        if not _check_user_is_manager(
+            user_email=request.requestor,
+            group_id=request.group_id,
+            provider_type=provider_type,
+        ):
+            raise validation.ValidationError(
+                f"User {request.requestor} is not a manager of group {request.group_id}"
+            )
+    except validation.ValidationError:
+        raise
+    except Exception as e:
+        logger.warning(
+            "permission_check_error_add_member",
+            error=str(e),
+            requestor=request.requestor,
+            group_id=request.group_id,
+        )
+        raise validation.ValidationError(f"Permission check failed: {e}") from e
 
     # If caller supplied a non-primary provider group id, map it to the
     # primary provider format before calling orchestration. This keeps
@@ -298,6 +393,27 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             provider=provider_type,
         )
         raise
+
+    # Check if requestor is a manager of the group (permission enforcement)
+    try:
+        if not _check_user_is_manager(
+            user_email=request.requestor,
+            group_id=request.group_id,
+            provider_type=provider_type,
+        ):
+            raise validation.ValidationError(
+                f"User {request.requestor} is not a manager of group {request.group_id}"
+            )
+    except validation.ValidationError:
+        raise
+    except Exception as e:
+        logger.warning(
+            "permission_check_error_remove_member",
+            error=str(e),
+            requestor=request.requestor,
+            group_id=request.group_id,
+        )
+        raise validation.ValidationError(f"Permission check failed: {e}") from e
 
     primary_group_id = request.group_id
     try:
