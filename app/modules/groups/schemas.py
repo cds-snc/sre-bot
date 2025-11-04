@@ -78,7 +78,11 @@ class PermissionAction(str, Enum):
 
 
 class AddMemberRequest(BaseModel):
-    """Schema for adding a member to a group."""
+    """Schema for adding a member to a group.
+
+    All fields are required except requestor and metadata. Justification is
+    required for audit and compliance purposes.
+    """
 
     group_id: Annotated[
         str,
@@ -104,14 +108,17 @@ class AddMemberRequest(BaseModel):
         ),
     ]
     justification: Annotated[
-        Optional[str],
+        str,
         Field(
-            default=None,
+            ...,
+            min_length=10,
             max_length=500,
-            description="Justification for adding member",
-            json_schema_extra={"example": "Access required for project X"},
+            description="Justification for adding member (required, minimum 10 characters)",
+            json_schema_extra={
+                "example": "User joining engineering team to work on backend services"
+            },
         ),
-    ] = None
+    ]
     requestor: Annotated[
         Optional[EmailStr],
         Field(
@@ -139,7 +146,11 @@ class AddMemberRequest(BaseModel):
 
 
 class RemoveMemberRequest(BaseModel):
-    """Schema for removing a member from a group."""
+    """Schema for removing a member from a group.
+
+    All fields are required except requestor and metadata. Justification is
+    required for audit and compliance purposes.
+    """
 
     group_id: Annotated[
         str,
@@ -165,14 +176,17 @@ class RemoveMemberRequest(BaseModel):
         ),
     ]
     justification: Annotated[
-        Optional[str],
+        str,
         Field(
-            default=None,
+            ...,
+            min_length=10,
             max_length=500,
-            description="Justification for removing member",
-            json_schema_extra={"example": "No longer needed"},
+            description="Justification for removing member (required, minimum 10 characters)",
+            json_schema_extra={
+                "example": "User no longer requires access to this group"
+            },
         ),
-    ] = None
+    ]
     requestor: Annotated[
         Optional[EmailStr],
         Field(
