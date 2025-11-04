@@ -34,7 +34,9 @@ def test_init(schedule_mock):
     # Since all tasks now use safe_run, we can't directly check for the original functions
     # Instead, verify the number of calls to schedule.do()
     do_calls = [call for call in schedule_mock.mock_calls if ".do(" in str(call)]
-    assert len(do_calls) == 5  # Total number of scheduled tasks
+    # The scheduled tasks were expanded to include groups reconciliation and
+    # idempotency cleanup, so there are now 7 total scheduled .do() calls.
+    assert len(do_calls) == 7  # Total number of scheduled tasks
 
     # Verify parameters without checking the function directly
     # For daily tasks
@@ -49,7 +51,9 @@ def test_init(schedule_mock):
     minutes_do_calls = [
         call for call in schedule_mock.mock_calls if ".minutes.do(" in str(call)
     ]
-    assert len(minutes_do_calls) == 2  # Two 5-minute tasks
+    # There are now four 5-minute interval tasks (heartbeat, healthchecks,
+    # idempotency cleanup and reconciliation worker)
+    assert len(minutes_do_calls) == 4  # Four 5-minute tasks
 
     hours_do_calls = [
         call for call in schedule_mock.mock_calls if ".hours.do(" in str(call)
@@ -75,7 +79,7 @@ def test_safe_run(mock_logger):
 
     # Setup
     def test_job():
-        raise Exception("Test exception")
+        raise RuntimeError("Test exception")
 
     test_job.__name__ = "test_job"  # Set the name for the error message
 
@@ -118,7 +122,7 @@ def test_scheduler_heartbeat(mock_time, mock_logger):
 @patch("jobs.scheduled_tasks.schedule")
 @patch("jobs.scheduled_tasks.threading")
 @patch("jobs.scheduled_tasks.time")
-def test_run_continuously(time_mock, threading_mock, schedule_mock):
+def test_run_continuously(_time_mock, threading_mock, _schedule_mock):
     cease_continuous_run = MagicMock()
     cease_continuous_run.is_set.return_value = True
     threading_mock.Event.return_value = cease_continuous_run
