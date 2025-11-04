@@ -1,7 +1,29 @@
-"""Canonical normalized models for the groups module.
+"""Provider-agnostic normalized data models for the groups module.
 
-Providers should aim to expose data that can be converted to these
-lightweight structures.
+This module defines lightweight dataclass models used internally to represent
+group and member data in a provider-neutral way. These are NOT Pydantic models
+and do NOT provide runtime validation—they prioritize performance and simplicity.
+
+Key purpose:
+  - Canonical structures that all providers normalize to
+  - Bridge between provider-specific APIs and business logic
+  - Internal representation (not for external API responses)
+
+Key distinctions:
+  - models.py: Internal normalized structures (dataclasses, no validation)
+  - schemas.py: API contracts with Pydantic (full validation)
+  - types.py: Internal protocol hints (TypedDict, no validation)
+
+Relationships:
+  - NormalizedMember → Converted to MemberResponse for API responses (schemas.py)
+  - NormalizedGroup → Converted to GroupResponse for API responses (schemas.py)
+  - Helper functions (member_from_dict, group_from_dict) are used by providers
+    to normalize provider-specific data into these structures
+
+Usage:
+  - Imported by: providers, orchestration.py, mappings.py, responses.py, reconciliation_worker.py
+  - Providers should call member_from_dict() and group_from_dict() to normalize data
+  - Business logic operates on NormalizedMember/NormalizedGroup before returning to API
 """
 
 from dataclasses import dataclass, asdict
@@ -11,11 +33,17 @@ from typing import List, Optional, Any, Dict
 @dataclass
 class NormalizedMember:
     """Normalized representation of a group member.
+
+    Lightweight dataclass (not Pydantic) for performance. Used internally
+    to represent members in a provider-agnostic way.
+
+    For API responses, convert to schemas.MemberResponse using Pydantic
+    serialization.
+
     Attributes:
         email: The email address of the member.
         id: The unique identifier of the member.
-        role: The role of the member in the group (e.g., 'owner', '
-            'member').
+        role: The role of the member in the group (e.g., 'owner', 'member').
         provider_member_id: The provider-specific identifier for the member.
         first_name: The first name of the member, if available.
         family_name: The family name of the member, if available.
@@ -34,12 +62,20 @@ class NormalizedMember:
 @dataclass
 class NormalizedGroup:
     """Normalized representation of a group.
+
+    Lightweight dataclass (not Pydantic) for performance. Used internally
+    to represent groups in a provider-agnostic way.
+
+    For API responses, convert to schemas.GroupResponse using Pydantic
+    serialization.
+
     Attributes:
         id: The unique identifier of the group.
         name: The display name of the group.
         description: A brief description of the group.
         provider: The name of the provider (e.g., 'google', 'aws').
         members: A list of NormalizedMember instances representing group members.
+        raw: The original raw data from the provider for reference.
     """
 
     id: Optional[str]
@@ -51,11 +87,22 @@ class NormalizedGroup:
 
 
 def member_from_dict(d: dict, provider: str) -> NormalizedMember:
-    """Lightweight conversion helper - providers can call this when returning dicts.
+    """Convert a provider member dict into a NormalizedMember.
 
-    Adds the original `raw` payload on the NormalizedMember so callers can
-    access provider-specific fields when necessary.
+    Helper for providers to normalize their raw member data into the canonical
+    internal structure. This function:
+      1. Handles multiple provider-specific field name variations
+      2. Preserves the original raw payload for debugging/provider-specific logic
+      3. Returns a lightweight NormalizedMember for business logic use
+
+    Args:
+        d: Raw provider member data dict
+        provider: Provider name (for context; not used in normalization)
+
+    Returns:
+        NormalizedMember with extracted/normalized fields and original raw data
     """
+
     # mark provider as used (keeps the signature stable for callers)
     _ = provider
     if not isinstance(d, dict):
@@ -105,9 +152,20 @@ def member_from_dict(d: dict, provider: str) -> NormalizedMember:
 def group_from_dict(d: dict, provider: str) -> NormalizedGroup:
     """Convert a provider group dict into a NormalizedGroup.
 
-    The original raw payload is preserved in `.raw` to aid adapters or
-    downstream logic that needs provider-specific fields.
+    Helper for providers to normalize their raw group data into the canonical
+    internal structure. This function:
+      1. Handles multiple provider-specific field name variations
+      2. Normalizes member data using member_from_dict()
+      3. Preserves the original raw payload for debugging/provider-specific logic
+
+    Args:
+        d: Raw provider group data dict
+        provider: Provider name used for context and member normalization
+
+    Returns:
+        NormalizedGroup with extracted/normalized fields, members, and original raw data
     """
+
     if not isinstance(d, dict):
         return NormalizedGroup(
             id=None,
@@ -139,6 +197,7 @@ def group_from_dict(d: dict, provider: str) -> NormalizedGroup:
 def as_canonical_dict(obj) -> dict:
     """Return a JSON-serializable canonical dict for a NormalizedGroup/Member.
 
+    Converts dataclass instances to plain dicts suitable for JSON serialization.
     Providers can call this to return plain dictionaries to core flows or API
     layers without leaking provider internals.
 
@@ -148,6 +207,7 @@ def as_canonical_dict(obj) -> dict:
     Returns:
         A plain dict representation suitable for JSON serialization.
     """
+
     try:
         return asdict(obj)
     except (TypeError, ValueError):

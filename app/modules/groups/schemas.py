@@ -361,7 +361,14 @@ class ActionResponse(BaseModel):
 
 
 class MemberResponse(BaseModel):
-    """Pydantic representation of a normalized group member for API responses."""
+    """API response model for a group member.
+
+    This is the Pydantic serialization view of NormalizedMember (see models.py).
+    Used when returning member information in API responses. Provides validation
+    and OpenAPI schema generation.
+
+    Relationship: NormalizedMember → MemberResponse (for API)
+    """
 
     email: Annotated[Optional[EmailStr], Field(default=None)] = None
     id: Annotated[Optional[str], Field(default=None)] = None
@@ -373,7 +380,15 @@ class MemberResponse(BaseModel):
 
 
 class GroupResponse(BaseModel):
-    """Pydantic representation of a normalized group for API responses."""
+    """API response model for a group.
+
+    This is the Pydantic serialization view of NormalizedGroup (see models.py).
+    Used when returning group information in API responses. Provides validation
+    and OpenAPI schema generation.
+
+    Relationship: NormalizedGroup → GroupResponse (for API)
+    Contains a list of MemberResponse for group members.
+    """
 
     id: Annotated[Optional[str], Field(default=None)] = None
     name: Annotated[Optional[str], Field(default=None)] = None
@@ -384,7 +399,15 @@ class GroupResponse(BaseModel):
 
 
 class BulkOperationResponse(BaseModel):
-    """Schema for bulk operation response."""
+    """Schema for bulk operation response.
+
+    Key distinction from types.OrchestrationResponseTypedDict:
+      - This (schemas): API response contract with Pydantic validation
+      - types: Internal orchestration contract (TypedDict, no validation)
+
+    Used by API endpoints to return results of bulk operations with a
+    summary of successes and failures.
+    """
 
     results: Annotated[
         List[ActionResponse], Field(..., description="List of action responses")
