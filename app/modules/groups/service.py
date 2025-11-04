@@ -15,6 +15,7 @@ will move the dispatcher into `event_system` itself.
 
 from datetime import datetime
 from typing import Any, List
+from uuid import uuid4
 from core.logging import get_module_logger
 from modules.groups import orchestration
 from modules.groups import orchestration_responses as orr
@@ -23,6 +24,7 @@ from modules.groups import schemas
 from modules.groups import validation
 from modules.groups import mappings
 from modules.groups import idempotency
+from modules.groups import audit
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
     OperationStatus,
@@ -83,7 +85,12 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
     Implements idempotency: if the same idempotency_key is used within the TTL
     window, the cached response is returned without re-executing the operation.
+
+    All operations are logged to the audit trail synchronously before returning.
     """
+    # Generate correlation ID for tracing this request through the system
+    correlation_id = str(uuid4())
+
     # Check idempotency cache first
     cached_response = idempotency.get_cached_response(request.idempotency_key)
     if cached_response is not None:
@@ -92,6 +99,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             idempotency_key=request.idempotency_key,
             group_id=request.group_id,
             member_email=request.member_email,
+            correlation_id=correlation_id,
         )
         return cached_response
 
@@ -130,71 +138,107 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         except Exception as e:
             raise ValueError(f"failed_to_map_group_id: {e}")
 
-    orch = orchestration.add_member_to_group(
-        primary_group_id=primary_group_id,
-        member_email=request.member_email,
-        justification=request.justification or "",
-        provider_hint=(request.provider.value if request.provider else None),
-    )
-    # If orchestration returns OperationResult objects (raw), map them to
-    # the existing orchestration response dict shape using the formatter.
-    if (
-        isinstance(orch, dict)
-        and "primary" in orch
-        and not isinstance(orch.get("primary"), dict)
-    ):
-        try:
-            formatted = orr.format_orchestration_response(
-                orch["primary"],
-                orch.get("propagation", {}),
-                orch.get("partial_failures", False),
-                orch.get("correlation_id"),
-                action=orch.get("action", "add_member"),
-                group_id=orch.get("group_id"),
-                member_email=orch.get("member_email"),
-            )
-        except Exception:
-            # Fallback to original raw form if formatting fails
-            formatted = orch
-    else:
-        formatted = orch
-
-    # Fire-and-forget event for downstream handlers (audit, notifications)
     try:
-        event_system.dispatch_background(
-            "group.member.added",
-            (
-                {"orchestration": formatted, "request": request.model_dump()}
-                if hasattr(request, "model_dump")
-                else {"orchestration": formatted, "request": request.dict()}
-            ),
+        orch = orchestration.add_member_to_group(
+            primary_group_id=primary_group_id,
+            member_email=request.member_email,
+            justification=request.justification or "",
+            provider_hint=(request.provider.value if request.provider else None),
         )
-    except Exception:  # pragma: no cover - defensive
-        logger.exception("failed_to_schedule_add_member_event")
+        # If orchestration returns OperationResult objects (raw), map them to
+        # the existing orchestration response dict shape using the formatter.
+        if (
+            isinstance(orch, dict)
+            and "primary" in orch
+            and not isinstance(orch.get("primary"), dict)
+        ):
+            try:
+                formatted = orr.format_orchestration_response(
+                    orch["primary"],
+                    orch.get("propagation", {}),
+                    orch.get("partial_failures", False),
+                    orch.get("correlation_id"),
+                    action=orch.get("action", "add_member"),
+                    group_id=orch.get("group_id"),
+                    member_email=orch.get("member_email"),
+                )
+            except Exception:
+                # Fallback to original raw form if formatting fails
+                formatted = orch
+        else:
+            formatted = orch
 
-    ts = _parse_timestamp(
-        formatted.get("timestamp") if isinstance(formatted, dict) else None
-    )
-
-    response = schemas.ActionResponse(
-        success=bool(
+        success = bool(
             formatted.get("success", False) if isinstance(formatted, dict) else False
-        ),
-        action=schemas.OperationType.ADD_MEMBER,
-        group_id=(formatted.get("group_id") if isinstance(formatted, dict) else None),
-        member_email=(
-            formatted.get("member_email") if isinstance(formatted, dict) else None
-        ),
-        provider=request.provider,
-        details={"orchestration": formatted},
-        timestamp=ts,
-    )
+        )
 
-    # Cache successful responses only
-    if response.success:
-        idempotency.cache_response(request.idempotency_key, response)
+        # Write audit entry (synchronous, before returning)
+        audit_entry = audit.create_audit_entry_from_operation(
+            correlation_id=correlation_id,
+            action="add_member",
+            group_id=request.group_id,
+            provider=request.provider.value if request.provider else "unknown",
+            success=success,
+            requestor=request.requestor,
+            member_email=request.member_email,
+            justification=request.justification,
+            metadata={"orchestration": formatted},
+        )
+        audit.write_audit_entry(audit_entry)
 
-    return response
+        # Fire-and-forget event for downstream handlers (audit, notifications)
+        try:
+            event_system.dispatch_background(
+                "group.member.added",
+                (
+                    {"orchestration": formatted, "request": request.model_dump()}
+                    if hasattr(request, "model_dump")
+                    else {"orchestration": formatted, "request": request.dict()}
+                ),
+            )
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("failed_to_schedule_add_member_event")
+
+        ts = _parse_timestamp(
+            formatted.get("timestamp") if isinstance(formatted, dict) else None
+        )
+
+        response = schemas.ActionResponse(
+            success=success,
+            action=schemas.OperationType.ADD_MEMBER,
+            group_id=(
+                formatted.get("group_id") if isinstance(formatted, dict) else None
+            ),
+            member_email=(
+                formatted.get("member_email") if isinstance(formatted, dict) else None
+            ),
+            provider=request.provider,
+            details={"orchestration": formatted, "correlation_id": correlation_id},
+            timestamp=ts,
+        )
+
+        # Cache successful responses only
+        if response.success:
+            idempotency.cache_response(request.idempotency_key, response)
+
+        return response
+
+    except Exception as e:
+        # Write failure audit entry
+        audit_entry = audit.create_audit_entry_from_operation(
+            correlation_id=correlation_id,
+            action="add_member",
+            group_id=request.group_id,
+            provider=request.provider.value if request.provider else "unknown",
+            success=False,
+            requestor=request.requestor,
+            member_email=request.member_email,
+            justification=request.justification,
+            error_message=str(e),
+            metadata={"exception_type": type(e).__name__},
+        )
+        audit.write_audit_entry(audit_entry)
+        raise
 
 
 def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionResponse:
@@ -206,7 +250,12 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
     Idempotency: Requests with the same `idempotency_key` within the TTL window
     (1 hour) will return the cached response without re-executing the operation.
     Failures are not cached to preserve retry semantics.
+
+    All operations are logged to the audit trail synchronously before returning.
     """
+    # Generate correlation ID for tracing this request through the system
+    correlation_id = str(uuid4())
+
     # Check cache for idempotent request
     cached_response = idempotency.get_cached_response(request.idempotency_key)
     if cached_response:
@@ -215,6 +264,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             idempotency_key=request.idempotency_key,
             group_id=request.group_id,
             member_email=request.member_email,
+            correlation_id=correlation_id,
         )
         return cached_response
 
@@ -249,68 +299,104 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
         except Exception as e:
             raise ValueError(f"failed_to_map_group_id: {e}")
 
-    orch = orchestration.remove_member_from_group(
-        primary_group_id=primary_group_id,
-        member_email=request.member_email,
-        justification=request.justification or "",
-        provider_hint=(request.provider.value if request.provider else None),
-    )
-    # Format orchestration response when orchestration returns raw OperationResult objects
-    if (
-        isinstance(orch, dict)
-        and "primary" in orch
-        and not isinstance(orch.get("primary"), dict)
-    ):
-        try:
-            formatted = orr.format_orchestration_response(
-                orch["primary"],
-                orch.get("propagation", {}),
-                orch.get("partial_failures", False),
-                orch.get("correlation_id"),
-                action=orch.get("action", "remove_member"),
-                group_id=orch.get("group_id"),
-                member_email=orch.get("member_email"),
-            )
-        except Exception:
-            formatted = orch
-    else:
-        formatted = orch
-
     try:
-        event_system.dispatch_background(
-            "group.member.removed",
-            (
-                {"orchestration": formatted, "request": request.model_dump()}
-                if hasattr(request, "model_dump")
-                else {"orchestration": formatted, "request": request.dict()}
-            ),
+        orch = orchestration.remove_member_from_group(
+            primary_group_id=primary_group_id,
+            member_email=request.member_email,
+            justification=request.justification or "",
+            provider_hint=(request.provider.value if request.provider else None),
         )
-    except Exception:  # pragma: no cover - defensive
-        logger.exception("failed_to_schedule_remove_member_event")
+        # Format orchestration response when orchestration returns raw OperationResult objects
+        if (
+            isinstance(orch, dict)
+            and "primary" in orch
+            and not isinstance(orch.get("primary"), dict)
+        ):
+            try:
+                formatted = orr.format_orchestration_response(
+                    orch["primary"],
+                    orch.get("propagation", {}),
+                    orch.get("partial_failures", False),
+                    orch.get("correlation_id"),
+                    action=orch.get("action", "remove_member"),
+                    group_id=orch.get("group_id"),
+                    member_email=orch.get("member_email"),
+                )
+            except Exception:
+                formatted = orch
+        else:
+            formatted = orch
 
-    ts = _parse_timestamp(
-        formatted.get("timestamp") if isinstance(formatted, dict) else None
-    )
-
-    response = schemas.ActionResponse(
-        success=bool(
+        success = bool(
             formatted.get("success", False) if isinstance(formatted, dict) else False
-        ),
-        action=schemas.OperationType.REMOVE_MEMBER,
-        group_id=(formatted.get("group_id") if isinstance(formatted, dict) else None),
-        member_email=(
-            formatted.get("member_email") if isinstance(formatted, dict) else None
-        ),
-        provider=request.provider,
-        details={"orchestration": formatted},
-        timestamp=ts,
-    )
+        )
 
-    # Cache successful responses for idempotency
-    if response.success:
-        idempotency.cache_response(request.idempotency_key, response)
+        # Write audit entry (synchronous, before returning)
+        audit_entry = audit.create_audit_entry_from_operation(
+            correlation_id=correlation_id,
+            action="remove_member",
+            group_id=request.group_id,
+            provider=request.provider.value if request.provider else "unknown",
+            success=success,
+            requestor=request.requestor,
+            member_email=request.member_email,
+            justification=request.justification,
+            metadata={"orchestration": formatted},
+        )
+        audit.write_audit_entry(audit_entry)
 
-    return response
+        try:
+            event_system.dispatch_background(
+                "group.member.removed",
+                (
+                    {"orchestration": formatted, "request": request.model_dump()}
+                    if hasattr(request, "model_dump")
+                    else {"orchestration": formatted, "request": request.dict()}
+                ),
+            )
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("failed_to_schedule_remove_member_event")
+
+        ts = _parse_timestamp(
+            formatted.get("timestamp") if isinstance(formatted, dict) else None
+        )
+
+        response = schemas.ActionResponse(
+            success=success,
+            action=schemas.OperationType.REMOVE_MEMBER,
+            group_id=(
+                formatted.get("group_id") if isinstance(formatted, dict) else None
+            ),
+            member_email=(
+                formatted.get("member_email") if isinstance(formatted, dict) else None
+            ),
+            provider=request.provider,
+            details={"orchestration": formatted, "correlation_id": correlation_id},
+            timestamp=ts,
+        )
+
+        # Cache successful responses for idempotency
+        if response.success:
+            idempotency.cache_response(request.idempotency_key, response)
+
+        return response
+
+    except Exception as e:
+        # Write failure audit entry
+        audit_entry = audit.create_audit_entry_from_operation(
+            correlation_id=correlation_id,
+            action="remove_member",
+            group_id=request.group_id,
+            provider=request.provider.value if request.provider else "unknown",
+            success=False,
+            requestor=request.requestor,
+            member_email=request.member_email,
+            justification=request.justification,
+            error_message=str(e),
+            metadata={"exception_type": type(e).__name__},
+        )
+        audit.write_audit_entry(audit_entry)
+        raise
 
 
 def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:

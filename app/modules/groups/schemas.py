@@ -358,6 +358,14 @@ class ActionResponse(BaseModel):
             json_schema_extra={"example": "2024-06-01T12:00:00Z"},
         ),
     ]
+    correlation_id: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Unique correlation ID for tracing this request",
+            json_schema_extra={"example": "550e8400-e29b-41d4-a716-446655440000"},
+        ),
+    ] = None
 
 
 class MemberResponse(BaseModel):

@@ -1,64 +1,150 @@
-# modules/groups/audit.py
-from typing import Dict, Any
-from datetime import datetime
+"""Audit logging for group operations.
 
+Provides structured audit logging with support for:
+- Stage 1: Synchronous writes to Sentinel structured logs
+- Stage 2: Synchronous writes to DynamoDB with TTL (future implementation)
+
+All group operations should generate audit entries for compliance.
+Audit entries are written synchronously to ensure a guaranteed audit trail.
+"""
+
+from datetime import datetime
+from typing import Any, Dict, Optional
+from pydantic import BaseModel, Field
 from core.logging import get_module_logger
-from integrations.sentinel import log_to_sentinel
 
 logger = get_module_logger()
 
 
-def log_group_action(payload: Dict[str, Any]) -> None:
-    """Log group membership action to Sentinel for audit trail."""
-    # Expect the new nested event contract where the original request is
-    # provided under the 'request' key and orchestration details under
-    # 'orchestration'. Fall back to top-level keys only if the structure
-    # isn't present (defensive but tests will be updated to pass the new
-    # contract).
-    req = payload.get("request") or {}
-    orch = payload.get("orchestration") or payload.get("result")
+class AuditEntry(BaseModel):
+    """Structured audit entry for group operations.
 
-    # Determine action type from the event_type or orchestration keys
-    action_type = "unknown"
-    if "added" in str(payload.get("event_type", "")):
-        action_type = "member_added"
-    elif "removed" in str(payload.get("event_type", "")):
-        action_type = "member_removed"
+    Attributes:
+        correlation_id: Unique ID for this request (for tracing)
+        timestamp: ISO 8601 timestamp of operation
+        action: Operation type (add_member, remove_member, etc.)
+        group_id: Group identifier
+        member_email: Member email (if applicable)
+        provider: Provider name (google, aws, etc.)
+        success: Whether operation succeeded
+        requestor: User who initiated the operation
+        justification: Justification provided by requestor
+        error_message: Error message if operation failed
+        metadata: Additional operation-specific data
+        ttl_seconds: TTL for DynamoDB (Stage 2 only)
+    """
 
-    audit_event = {
-        "event_type": "group_membership_change",
-        "action": action_type,
-        "timestamp": datetime.utcnow().isoformat(),
-        "group_id": req.get("group_id") or payload.get("group_id"),
-        "member_email": req.get("member_email") or payload.get("member_email"),
-        "requestor_email": req.get("requestor")
-        or payload.get("requestor_email")
-        or payload.get("requestor"),
-        "provider": req.get("provider") or payload.get("provider"),
-        "justification": req.get("justification") or payload.get("justification"),
-        "success": bool(orch),
-        "result_details": orch,
-    }
+    correlation_id: str
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    action: str
+    group_id: str
+    member_email: Optional[str] = None
+    provider: str
+    success: bool
+    requestor: Optional[str] = None
+    justification: Optional[str] = None
+    error_message: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    ttl_seconds: int = Field(default=7776000)  # 90 days
 
-    # Log locally
-    logger.info("group_membership_audit", **audit_event)
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "correlation_id": "req-123-456",
+                "timestamp": "2025-01-08T12:00:00Z",
+                "action": "add_member",
+                "group_id": "engineering@company.com",
+                "member_email": "alice@company.com",
+                "provider": "google",
+                "success": True,
+                "requestor": "bob@company.com",
+                "justification": "Alice joining engineering team",
+                "metadata": {"propagation_count": 2},
+            }
+        }
 
-    # Send to Sentinel for external audit
-    try:
-        log_to_sentinel("group_membership_change", audit_event)
-        logger.debug("Successfully logged group action to Sentinel")
-    except (ConnectionError, TimeoutError, ValueError) as e:
-        logger.error(f"Failed to log group action to Sentinel: {e}")
+
+def write_audit_entry(entry: AuditEntry) -> None:
+    """Write audit entry (Stage 1: Sentinel only).
+
+    Stage 1: Writes structured log to Sentinel/structlog
+    Stage 2: Will also write to DynamoDB
+
+    This function is synchronous and blocks until audit is written.
+
+    Args:
+        entry: AuditEntry to write
+    """
+    # Stage 1: Write to structured logs
+    logger.info(
+        "audit_entry",
+        correlation_id=entry.correlation_id,
+        timestamp=entry.timestamp,
+        action=entry.action,
+        group_id=entry.group_id,
+        member_email=entry.member_email,
+        provider=entry.provider,
+        success=entry.success,
+        requestor=entry.requestor,
+        justification=entry.justification,
+        error_message=entry.error_message,
+        metadata=entry.metadata,
+    )
+
+    # Stage 2: Will add DynamoDB write here
+    # _write_to_dynamodb(entry)
+
+
+def create_audit_entry_from_operation(
+    correlation_id: str,
+    action: str,
+    group_id: str,
+    provider: str,
+    success: bool,
+    requestor: Optional[str] = None,
+    member_email: Optional[str] = None,
+    justification: Optional[str] = None,
+    error_message: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> AuditEntry:
+    """Factory function to create audit entries from operation results.
+
+    Args:
+        correlation_id: Request correlation ID for tracing
+        action: Operation type (add_member, remove_member, list_groups, etc.)
+        group_id: Group identifier
+        provider: Provider name
+        success: Whether operation succeeded
+        requestor: User who initiated operation
+        member_email: Member email (for add/remove operations)
+        justification: Justification provided by requestor
+        error_message: Error message if operation failed
+        metadata: Additional operation-specific data
+
+    Returns:
+        AuditEntry ready to write
+    """
+    return AuditEntry(
+        correlation_id=correlation_id,
+        action=action,
+        group_id=group_id,
+        member_email=member_email,
+        provider=provider,
+        success=success,
+        requestor=requestor,
+        justification=justification,
+        error_message=error_message,
+        metadata=metadata or {},
+    )
 
 
 def get_audit_trail(group_id: str, limit: int = 50) -> list:
-    """Get audit trail for a specific group (placeholder for future implementation)."""
-    # For now, return empty list as placeholder
+    """Get audit trail for a specific group (placeholder for Stage 2)."""
     logger.info(f"Retrieving audit trail for group {group_id} (limit: {limit})")
     return []
 
 
 def get_user_audit_trail(user_email: str, limit: int = 50) -> list:
-    """Get audit trail for a specific user's group actions (placeholder)."""
+    """Get audit trail for a specific user's group actions (placeholder for Stage 2)."""
     logger.info(f"Retrieving audit trail for user {user_email} (limit: {limit})")
     return []
