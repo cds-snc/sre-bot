@@ -1,5 +1,6 @@
 """Google Workspace Provider"""
 
+import os
 from typing import Dict, List, Optional
 
 from integrations.google_workspace import google_directory_next as google_directory
@@ -34,6 +35,32 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     def __init__(self):
         """Initialize the provider with circuit breaker support."""
         super().__init__()
+        self.requires_email_format = True
+        self.domain = None
+
+    def _set_domain_from_config(self) -> None:
+        """Extract domain from config or SRE_BOT_EMAIL environment variable.
+
+        Priority:
+        1. groups.group_domain from config if set
+        2. Domain extracted from SRE_BOT_EMAIL if available
+        3. Remain None if neither is available
+        """
+        from core.config import settings
+
+        # Try configured domain first
+        if hasattr(settings, "groups") and hasattr(settings.groups, "group_domain"):
+            configured_domain = settings.groups.group_domain
+            if configured_domain:
+                self.domain = configured_domain
+                return
+
+        # Fall back to extracting domain from SRE_BOT_EMAIL
+        sre_email = getattr(settings, "sre_email", None) or os.environ.get(
+            "SRE_BOT_EMAIL"
+        )
+        if sre_email and "@" in sre_email:
+            self.domain = sre_email.split("@", 1)[1]
 
     @property
     def capabilities(self) -> ProviderCapabilities:
