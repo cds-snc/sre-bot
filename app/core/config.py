@@ -451,6 +451,14 @@ class GroupsFeatureSettings(BaseSettings):
         description="Minimum length for justification text",
     )
 
+    # Group domain configuration for email-based providers
+    group_domain: str = Field(
+        default="",
+        alias="GROUP_DOMAIN",
+        description="Domain suffix for group email addresses (e.g., 'cds-snc.ca'). "
+        "Used by primary provider when full email format is required.",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
