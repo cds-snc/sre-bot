@@ -117,6 +117,12 @@ def activate_providers() -> str:
             # Attach registration name to the instance for clarity
             setattr(instance, "name", name)
 
+            # Call provider's domain configuration if available
+            if hasattr(instance, "_set_domain_from_config") and callable(
+                getattr(instance, "_set_domain_from_config")
+            ):
+                instance._set_domain_from_config()
+
             # Apply provider-provided defaults for prefix (activation-time
             # metadata). Prefer explicit `default_prefix` attribute, then the
             # provider's `prefix` property, and finally the registration name.
