@@ -9,6 +9,9 @@ with support for:
 """
 
 import pytest
+
+pytestmark = pytest.mark.legacy
+
 from modules.groups.providers.base import (
     GroupProvider,
     ProviderCapabilities,
