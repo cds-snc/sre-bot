@@ -92,6 +92,57 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise ValueError(f"could not resolve user id for email={email}")
         return uid
 
+    def _resolve_group_id(self, group_key: str) -> str:
+        """Resolve a group identifier to AWS GroupId (UUID format).
+
+        AWS Identity Center APIs accept either:
+        - GroupId: UUID format (e.g., 906abc12-d3e4-5678-90ab-cdef12345678)
+        - DisplayName: canonical name (e.g., digitaltransformationoffice-ai-staging-admin)
+
+        This method checks if the input is already a UUID. If not, it calls
+        get_group_by_name to resolve the display name to a GroupId.
+
+        Args:
+            group_key: Either a UUID GroupId or a display name
+
+        Returns:
+            AWS GroupId in UUID format
+
+        Raises:
+            IntegrationError: If group cannot be resolved
+        """
+        import re
+
+        # AWS GroupId pattern: ([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}
+        # Simplified check: if it looks like a UUID, assume it's already a GroupId
+        uuid_pattern = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        if re.match(uuid_pattern, group_key.strip()):
+            return group_key.strip()
+
+        # Not a UUID, treat as display name and resolve
+        if not hasattr(identity_store, "get_group_by_name"):
+            raise IntegrationError(
+                "aws identity_store missing get_group_by_name", response=None
+            )
+
+        resp = identity_store.get_group_by_name(group_key)
+        if not hasattr(resp, "success"):
+            raise IntegrationError(
+                "aws get_group_by_name returned unexpected type", response=resp
+            )
+        if not resp.success:
+            raise IntegrationError(
+                f"aws resolve group id failed for display name: {group_key}",
+                response=resp,
+            )
+
+        # Extract GroupId from response
+        group_id = self._extract_id_from_resp(resp, ["GroupId", "Id"])
+        if not group_id:
+            raise ValueError(f"could not resolve group id for display name={group_key}")
+
+        return group_id
+
     def _resolve_membership_id(self, group_key: str, user_id: str) -> str:
         if not hasattr(identity_store, "get_group_membership_id"):
             raise IntegrationError(
@@ -262,28 +313,40 @@ class AwsIdentityCenterProvider(GroupProvider):
         )
 
     @opresult_wrapper(data_key="result")
-    def _add_member_impl(self, group_key: str, member_data: dict | str) -> dict:
+    def _add_member_impl(
+        self, group_key: str, member_data: NormalizedMember | dict | str
+    ) -> dict:
         """Add a member to a group and return the normalized member dict.
 
         Args:
-            group_key: AWS group key.
-            member_data: Member identifier (str email) or dict with email.
+            group_key: AWS group key (UUID or display name).
+            member_data: Member identifier (NormalizedMember, str email, or dict with email).
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
+        # Handle NormalizedMember input (from orchestration propagation)
+        if isinstance(member_data, NormalizedMember):
+            email = getattr(member_data, "email", None)
+            if not email:
+                raise ValueError("NormalizedMember must include email")
+            member_data = {"email": email}
+
         if not isinstance(member_data, dict):
             raise ValueError("member_data must be a dict containing at least 'email'")
         email = member_data.get("email")
         if not email:
             raise ValueError("member_data.email is required")
 
+        # Resolve group_key to UUID format
+        resolved_group_id = self._resolve_group_id(group_key)
+
         user_id = self._ensure_user_id_from_email(email)
         if not hasattr(identity_store, "create_group_membership"):
             raise IntegrationError(
                 "aws identity_store missing create_group_membership", response=None
             )
-        resp = identity_store.create_group_membership(group_key, user_id)
+        resp = identity_store.create_group_membership(resolved_group_id, user_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
                 "aws create_group_membership returned unexpected type", response=resp
@@ -300,23 +363,36 @@ class AwsIdentityCenterProvider(GroupProvider):
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
     @opresult_wrapper(data_key="result")
-    def _remove_member_impl(self, group_key: str, member_data: dict | str) -> dict:
+    def _remove_member_impl(
+        self, group_key: str, member_data: NormalizedMember | dict | str
+    ) -> dict:
         """Remove a member from a group and return the normalized member dict.
 
         Args:
-            group_key: AWS group key.
-            member_data: Member identifier (str email) or dict with email.
+            group_key: AWS group key (UUID or display name).
+            member_data: Member identifier (NormalizedMember, str email, or dict with email).
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
+        # Handle NormalizedMember input (from orchestration propagation)
+        if isinstance(member_data, NormalizedMember):
+            email = getattr(member_data, "email", None)
+            if not email:
+                raise ValueError("NormalizedMember must include email")
+            member_data = {"email": email}
+
         if not isinstance(member_data, dict):
             raise ValueError("member_data must be a dict containing at least 'email'")
         email = member_data.get("email")
         if not email:
             raise ValueError("member_data.email is required")
+
+        # Resolve group_key to UUID format
+        resolved_group_id = self._resolve_group_id(group_key)
+
         user_id = self._ensure_user_id_from_email(email)
-        membership_id = self._resolve_membership_id(group_key, user_id)
+        membership_id = self._resolve_membership_id(resolved_group_id, user_id)
         if not hasattr(identity_store, "delete_group_membership"):
             raise IntegrationError(
                 "aws identity_store missing delete_group_membership", response=None
@@ -340,11 +416,14 @@ class AwsIdentityCenterProvider(GroupProvider):
     @opresult_wrapper(data_key="members")
     def _get_group_members_impl(self, group_key: str, **kwargs) -> list[dict]:
         """AWS returns the list of canonical memberships, not the user details."""
+        # Resolve group_key to UUID format for consistency
+        resolved_group_id = self._resolve_group_id(group_key)
+
         if not hasattr(identity_store, "list_group_memberships"):
             raise IntegrationError(
                 "aws identity_store missing list_group_memberships", response=None
             )
-        resp = identity_store.list_group_memberships(group_key)
+        resp = identity_store.list_group_memberships(resolved_group_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
                 "aws list_group_memberships returned unexpected type", response=resp
