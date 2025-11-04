@@ -438,6 +438,19 @@ class GroupsFeatureSettings(BaseSettings):
         description="Maximum concurrent requests allowed in HALF_OPEN state",
     )
 
+    # Justification enforcement configuration
+    require_justification: bool = Field(
+        default=True,
+        alias="REQUIRE_JUSTIFICATION",
+        description="Require justification for group operations",
+    )
+
+    min_justification_length: int = Field(
+        default=10,
+        alias="MIN_JUSTIFICATION_LENGTH",
+        description="Minimum length for justification text",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
