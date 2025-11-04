@@ -120,11 +120,15 @@ def map_provider_group_id(
     if from_provider == to_provider:
         return from_group_id
 
-    # Derive canonical name if input might be primary-style
+    # Derive canonical name by trying to extract any recognized provider prefix
+    # This handles both primary-style inputs ("aws-groupname") and secondary-style inputs
     canonical = from_group_id
-    if from_provider == primary:
+    try:
         parsed = parse_primary_group_name(from_group_id, provider_registry=provs)
-        canonical = parsed.get("canonical") or canonical
+        if parsed.get("prefix"):  # Only use parsed result if a prefix was detected
+            canonical = parsed.get("canonical") or canonical
+    except Exception:
+        pass  # If parsing fails, use input as-is
 
     # If target is primary, compose primary group name using source provider's prefix
     if to_provider == primary:
@@ -133,7 +137,18 @@ def map_provider_group_id(
             raise ValueError(f"Unknown source provider: {from_provider}")
         prefix = getattr(src_inst, "prefix", from_provider)
         # Use '-' as canonical separator
-        return f"{prefix}-{canonical}"
+        result = f"{prefix}-{canonical}"
+
+        # If primary provider requires email format, append domain
+        primary_inst = provs.get(primary)
+        if primary_inst:
+            requires_email = getattr(primary_inst, "requires_email_format", False)
+            if requires_email:
+                domain = getattr(primary_inst, "domain", None)
+                if domain:
+                    result = f"{result}@{domain}"
+
+        return result
 
     # Mapping to non-primary provider: return canonical name by convention
     return canonical
