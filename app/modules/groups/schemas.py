@@ -1,3 +1,33 @@
+"""API validation and response schemas using Pydantic.
+
+This module defines all request and response models for the groups API.
+All classes extend Pydantic BaseModel and provide:
+  - Runtime input validation
+  - OpenAPI/JSON schema generation
+  - Type safety with Annotated field hints
+  - Serialization/deserialization support
+
+Key distinction from models.py:
+  - schemas.py: API contracts with full Pydantic validation
+  - models.py: Internal normalized structures (dataclasses, no validation)
+
+Key distinction from types.py:
+  - schemas.py: API validation contracts with Pydantic
+  - types.py: Internal protocol hints (TypedDict, no validation)
+
+Important relationships:
+  - MemberResponse and GroupResponse are API serialization views of
+    NormalizedMember and NormalizedGroup (see models.py)
+  - ProviderType and OperationType enums are used by both APIs and
+    internal orchestration for consistency
+  - Request models (AddMemberRequest, RemoveMemberRequest, etc.) are
+    validated here before passing to service layer
+
+Usage:
+  - Imported by: api.py, controllers.py, commands.py, idempotency.py
+  - All API endpoints should accept/return these models
+"""
+
 from typing import Any, Dict, List, Optional, Annotated
 from datetime import datetime
 from enum import Enum
@@ -11,7 +41,11 @@ from pydantic import (
 
 
 class ProviderType(str, Enum):
-    """Schema for provider types."""
+    """Schema for provider types.
+
+    Enum of supported identity/group providers. Shared across API requests
+    and internal business logic for consistency.
+    """
 
     GOOGLE = "google"
     OKTA = "okta"
@@ -21,14 +55,21 @@ class ProviderType(str, Enum):
 
 
 class OperationType(str, Enum):
-    """Schema for operation types."""
+    """Schema for operation types.
+
+    Enum of supported group membership operations. Used in both API requests
+    (BulkOperationsRequest) and internal responses (ActionResponse).
+    """
 
     ADD_MEMBER = "add_member"
     REMOVE_MEMBER = "remove_member"
 
 
 class PermissionAction(str, Enum):
-    """Schema for permission actions."""
+    """Schema for permission actions.
+
+    Enum of permission-related actions supported by the groups API.
+    """
 
     VIEW = "view"
     EDIT = "edit"
