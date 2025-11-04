@@ -105,18 +105,26 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
     # Semantic validation: move input validation responsibility to the service
     provider_type = request.provider.value if request.provider else None
-    if provider_type and not validation.validate_provider_type(provider_type):
-        raise ValueError(f"invalid provider: {provider_type}")
 
-    if not validation.validate_group_id(request.group_id, provider_type or ""):
-        raise ValueError(
-            f"invalid group_id for provider {provider_type}: {request.group_id}"
+    try:
+        # Validate provider type
+        if provider_type and not validation.validate_provider_type(provider_type):
+            raise validation.ValidationError(f"Invalid provider: {provider_type}")
+
+        # Validate group ID format
+        validation.validate_group_id(request.group_id, provider_type or "")
+
+        # Validate justification (required by default per config)
+        validation.validate_justification(request.justification, required=True)
+    except validation.ValidationError as e:
+        logger.warning(
+            "validation_error_add_member",
+            error=str(e),
+            group_id=request.group_id,
+            member_email=request.member_email,
+            provider=provider_type,
         )
-
-    if request.justification and not validation.validate_justification(
-        request.justification
-    ):
-        raise ValueError("justification too short")
+        raise
 
     # If caller supplied a non-primary provider group id, map it to the
     # primary provider format before calling orchestration. This keeps
@@ -270,18 +278,26 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
 
     # Semantic validation performed at service boundary
     provider_type = request.provider.value if request.provider else None
-    if provider_type and not validation.validate_provider_type(provider_type):
-        raise ValueError(f"invalid provider: {provider_type}")
 
-    if not validation.validate_group_id(request.group_id, provider_type or ""):
-        raise ValueError(
-            f"invalid group_id for provider {provider_type}: {request.group_id}"
+    try:
+        # Validate provider type
+        if provider_type and not validation.validate_provider_type(provider_type):
+            raise validation.ValidationError(f"Invalid provider: {provider_type}")
+
+        # Validate group ID format
+        validation.validate_group_id(request.group_id, provider_type or "")
+
+        # Validate justification (required by default per config)
+        validation.validate_justification(request.justification, required=True)
+    except validation.ValidationError as e:
+        logger.warning(
+            "validation_error_remove_member",
+            error=str(e),
+            group_id=request.group_id,
+            member_email=request.member_email,
+            provider=provider_type,
         )
-
-    if request.justification and not validation.validate_justification(
-        request.justification
-    ):
-        raise ValueError("justification too short")
+        raise
 
     primary_group_id = request.group_id
     try:
