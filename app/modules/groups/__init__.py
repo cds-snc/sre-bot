@@ -18,16 +18,6 @@ from modules.groups.orchestration import (
     remove_member_from_group,
     list_groups_for_user,
 )
-from modules.groups.api import (
-    handle_add_member_request,
-    handle_remove_member_request,
-    handle_list_user_groups_request,
-    handle_bulk_operations_request,
-    slack_add_member,
-    slack_remove_member,
-    slack_list_groups,
-    webhook_handler,
-)
 from modules.groups.commands import handle_groups_command, register_groups_commands
 from modules.groups.validation import (
     validate_email,
@@ -47,20 +37,11 @@ from modules.groups import events  # noqa: F401
 
 
 __all__ = [
-    # API interfaces
-    "handle_add_member_request",
-    "handle_remove_member_request",
-    "handle_list_user_groups_request",
-    "handle_bulk_operations_request",
-    "webhook_handler",
     # Orchestration
     "add_member_to_group",
     "remove_member_from_group",
     "list_groups_for_user",
     # Slack interfaces
-    "slack_add_member",
-    "slack_remove_member",
-    "slack_list_groups",
     "handle_groups_command",
     "register_groups_commands",
     # Validation
