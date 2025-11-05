@@ -2,6 +2,7 @@
 
 import types
 from typing import Dict, Any
+from unittest.mock import MagicMock
 import pytest
 
 
@@ -22,9 +23,67 @@ def mock_settings_groups():
             reconciliation_backoff_max=3600,
             reconciliation_max_retries=3,
             primary_provider="google",
-            providers={},
+            providers={
+                "google": {"enabled": True, "primary": True, "prefix": "g"},
+                "aws": {"enabled": True, "primary": False, "prefix": "aws"},
+            },
         )
     )
+
+
+@pytest.fixture
+def mock_primary_provider():
+    """Mock primary provider with is_manager method.
+
+    Returns a MagicMock configured as PrimaryGroupProvider with:
+    - is_manager() method
+    - prefix, primary attributes
+
+    Usage:
+        provider = mock_primary_provider
+        provider.is_manager.return_value = True
+    """
+    provider = MagicMock()
+    provider.prefix = "g"
+    provider.primary = True
+    provider.is_manager = MagicMock(return_value=True)
+    return provider
+
+
+@pytest.fixture
+def mock_secondary_provider():
+    """Mock secondary provider without is_manager method.
+
+    Returns a MagicMock configured as secondary provider with:
+    - prefix, primary attributes
+    - NO is_manager() method (not part of contract)
+
+    Usage:
+        provider = mock_secondary_provider
+        provider.add_member = MagicMock(return_value=...)
+    """
+    provider = MagicMock()
+    provider.prefix = "aws"
+    provider.primary = False
+    # Explicitly remove is_manager to match secondary provider contract
+    provider.is_manager = None
+    return provider
+
+
+@pytest.fixture
+def mock_providers_registry(mock_primary_provider, mock_secondary_provider):
+    """Mock provider registry with google primary and aws secondary.
+
+    Returns dict mapping provider names to mock instances.
+
+    Usage:
+        with patch("modules.groups.providers.get_active_providers", return_value=mock_providers_registry):
+            ...
+    """
+    return {
+        "google": mock_primary_provider,
+        "aws": mock_secondary_provider,
+    }
 
 
 @pytest.fixture

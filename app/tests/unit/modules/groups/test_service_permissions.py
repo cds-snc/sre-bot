@@ -10,7 +10,7 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from modules.groups import service
 from modules.groups import schemas
@@ -21,83 +21,55 @@ from modules.groups.providers.base import OperationResult, OperationStatus
 class TestCheckUserIsManager:
     """Tests for _check_user_is_manager helper function."""
 
-    @pytest.fixture
-    def mock_primary_provider(self):
-        """Mock primary provider with is_manager method."""
-        provider = MagicMock()
-        provider.is_manager = MagicMock(return_value=True)
-        return provider
-
-    @pytest.fixture
-    def mock_providers_dict(self, mock_primary_provider):
-        """Mock active providers dictionary."""
-        return {
-            "google": mock_primary_provider,
-        }
-
     def test_check_manager_returns_true_when_manager(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
+        self, mock_primary_provider, mock_providers_registry
     ):
         """Returns True when user is a manager."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
         mock_primary_provider.is_manager.return_value = True
 
-        result = service._check_user_is_manager(
-            user_email="manager@example.com",
-            group_id="test-group",
-        )
+        with patch(
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                mock_get_prim_prov.return_value = mock_primary_provider
+                mock_get_prim_name.return_value = "google"
 
-        assert result is True
-        mock_primary_provider.is_manager.assert_called_once_with(
-            "manager@example.com", "test-group"
-        )
+                result = service._check_user_is_manager(
+                    user_email="manager@example.com",
+                    group_id="test-group",
+                )
+
+                assert result is True
+                mock_primary_provider.is_manager.assert_called_once_with(
+                    "manager@example.com", "test-group"
+                )
 
     def test_check_manager_returns_false_when_not_manager(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
+        self, mock_primary_provider, mock_providers_registry
     ):
         """Returns False when user is not a manager."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
         mock_primary_provider.is_manager.return_value = False
 
-        result = service._check_user_is_manager(
-            user_email="user@example.com",
-            group_id="test-group",
-        )
+        with patch(
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                mock_get_prim_prov.return_value = mock_primary_provider
+                mock_get_prim_name.return_value = "google"
 
-        assert result is False
+                result = service._check_user_is_manager(
+                    user_email="user@example.com",
+                    group_id="test-group",
+                )
 
-    def test_check_manager_with_operation_result_success(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
-    ):
+                assert result is False
+
+    def test_check_manager_with_operation_result_success(self, mock_primary_provider):
         """Handles OperationResult wrapper from provider."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
         result_obj = OperationResult(
             status=OperationStatus.SUCCESS,
             message="ok",
@@ -105,27 +77,24 @@ class TestCheckUserIsManager:
         )
         mock_primary_provider.is_manager.return_value = result_obj
 
-        result = service._check_user_is_manager(
-            user_email="manager@example.com",
-            group_id="test-group",
-        )
+        with patch(
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                mock_get_prim_prov.return_value = mock_primary_provider
+                mock_get_prim_name.return_value = "google"
 
-        assert result is True
+                result = service._check_user_is_manager(
+                    user_email="manager@example.com",
+                    group_id="test-group",
+                )
 
-    def test_check_manager_with_operation_result_failure(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
-    ):
+                assert result is True
+
+    def test_check_manager_with_operation_result_failure(self, mock_primary_provider):
         """Returns False when OperationResult is not successful."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
         result_obj = OperationResult(
             status=OperationStatus.TRANSIENT_ERROR,
             message="error",
@@ -133,92 +102,92 @@ class TestCheckUserIsManager:
         )
         mock_primary_provider.is_manager.return_value = result_obj
 
-        result = service._check_user_is_manager(
-            user_email="user@example.com",
-            group_id="test-group",
-        )
+        with patch(
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                mock_get_prim_prov.return_value = mock_primary_provider
+                mock_get_prim_name.return_value = "google"
 
-        assert result is False
+                result = service._check_user_is_manager(
+                    user_email="user@example.com",
+                    group_id="test-group",
+                )
+
+                assert result is False
 
     def test_check_manager_maps_secondary_provider_group_id(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
+        self, mock_primary_provider
     ):
         """Maps group ID from secondary provider to primary format."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
         mock_primary_provider.is_manager.return_value = True
 
         with patch(
-            "modules.groups.service.mappings.map_provider_group_id",
-            return_value="aws-test-group@cds-snc.ca",
-        ) as mock_map:
-            result = service._check_user_is_manager(
-                user_email="manager@example.com",
-                group_id="test-group",
-                provider_type="aws",
-            )
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                with patch(
+                    "modules.groups.service.mappings.map_provider_group_id"
+                ) as mock_map:
+                    mock_get_prim_prov.return_value = mock_primary_provider
+                    mock_get_prim_name.return_value = "google"
+                    mock_map.return_value = "g-test-group"
 
-            assert result is True
-            mock_map.assert_called_once()
-            # Verify is_manager was called with mapped group ID
-            mock_primary_provider.is_manager.assert_called_once_with(
-                "manager@example.com", "aws-test-group@cds-snc.ca"
-            )
+                    result = service._check_user_is_manager(
+                        user_email="manager@example.com",
+                        group_id="test-group",
+                        provider_type="aws",
+                    )
 
-    def test_check_manager_raises_when_primary_provider_missing(
-        self, monkeypatch, mock_providers_dict
-    ):
+                    assert result is True
+                    mock_map.assert_called_once_with(
+                        from_provider="aws",
+                        from_group_id="test-group",
+                        to_provider="google",
+                    )
+                    # Verify is_manager was called with mapped group ID
+                    mock_primary_provider.is_manager.assert_called_once_with(
+                        "manager@example.com", "g-test-group"
+                    )
+
+    def test_check_manager_raises_when_primary_provider_missing(self):
         """Raises ValueError when primary provider not available."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: {},  # Empty providers dict
-        )
-
-        with pytest.raises(ValueError, match="Primary provider"):
-            service._check_user_is_manager(
-                user_email="user@example.com",
-                group_id="test-group",
-            )
-
-    def test_check_manager_raises_on_mapping_failure(
-        self, monkeypatch, mock_providers_dict, mock_primary_provider
-    ):
-        """Raises when group ID mapping fails."""
-        monkeypatch.setattr(
-            service._providers,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-        monkeypatch.setattr(
-            service._providers,
-            "get_active_providers",
-            lambda: mock_providers_dict,
-        )
-
         with patch(
-            "modules.groups.service.mappings.map_provider_group_id",
-            side_effect=ValueError("Mapping failed"),
-        ):
-            with pytest.raises(ValueError, match="Failed to map group ID"):
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            mock_get_prim_prov.side_effect = RuntimeError("No primary provider")
+
+            with pytest.raises(ValueError, match="Primary provider"):
                 service._check_user_is_manager(
                     user_email="user@example.com",
                     group_id="test-group",
-                    provider_type="aws",
                 )
+
+    def test_check_manager_raises_on_mapping_failure(self, mock_primary_provider):
+        """Raises when group ID mapping fails."""
+        with patch(
+            "modules.groups.service._providers.get_primary_provider"
+        ) as mock_get_prim_prov:
+            with patch(
+                "modules.groups.service._providers.get_primary_provider_name"
+            ) as mock_get_prim_name:
+                with patch(
+                    "modules.groups.service.mappings.map_provider_group_id"
+                ) as mock_map:
+                    mock_get_prim_prov.return_value = mock_primary_provider
+                    mock_get_prim_name.return_value = "google"
+                    mock_map.side_effect = ValueError("Unknown provider: xyz")
+
+                    with pytest.raises(ValueError, match="Failed to map group ID"):
+                        service._check_user_is_manager(
+                            user_email="user@example.com",
+                            group_id="test-group",
+                            provider_type="xyz",
+                        )
 
 
 class TestAddMemberPermissionEnforcement:

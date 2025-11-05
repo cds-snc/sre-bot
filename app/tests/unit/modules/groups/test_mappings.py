@@ -391,7 +391,7 @@ class TestMapSecondaryToPrimaryGroup:
         )
 
     @patch(
-        "modules.groups.service.map_provider_group_id", side_effect=Exception("error")
+        "modules.groups.mappings.map_provider_group_id", side_effect=Exception("error")
     )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_raises_on_mapping_failure(self, mock_get_primary, mock_map):
@@ -399,12 +399,13 @@ class TestMapSecondaryToPrimaryGroup:
         with pytest.raises(ValueError):
             gm.map_secondary_to_primary_group("aws", "my-group")
 
-    @patch("modules.groups.service.map_provider_group_id", return_value="result")
+    @patch(
+        "modules.groups.mappings.map_provider_group_id",
+        side_effect=RuntimeError("Service error"),
+    )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_error_message_includes_context(self, mock_get_primary, mock_map):
         """map_secondary_to_primary_group error message includes provider info."""
-        # Configure to actually call the service function
-        mock_map.side_effect = RuntimeError("Service error")
         with pytest.raises(ValueError) as exc_info:
             gm.map_secondary_to_primary_group("aws", "my-group")
         assert "Cannot map" in str(exc_info.value)
@@ -425,7 +426,7 @@ class TestMapPrimaryToSecondaryGroup:
         )
 
     @patch(
-        "modules.groups.service.map_provider_group_id", side_effect=Exception("error")
+        "modules.groups.mappings.map_provider_group_id", side_effect=Exception("error")
     )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_raises_on_mapping_failure(self, mock_get_primary, mock_map):
@@ -433,11 +434,13 @@ class TestMapPrimaryToSecondaryGroup:
         with pytest.raises(ValueError):
             gm.map_primary_to_secondary_group("g-my-group", "aws")
 
-    @patch("modules.groups.service.map_provider_group_id", return_value="result")
+    @patch(
+        "modules.groups.mappings.map_provider_group_id",
+        side_effect=RuntimeError("Service error"),
+    )
     @patch("modules.groups.mappings.get_primary_provider_name", return_value="google")
     def test_error_message_includes_context(self, mock_get_primary, mock_map):
         """map_primary_to_secondary_group error message includes provider info."""
-        mock_map.side_effect = RuntimeError("Service error")
         with pytest.raises(ValueError) as exc_info:
             gm.map_primary_to_secondary_group("g-my-group", "aws")
         assert "Cannot map" in str(exc_info.value)
