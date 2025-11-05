@@ -33,6 +33,9 @@ class TestMapProviderGroupIdWithDomain:
         return {
             "google": google_provider,
             "aws": aws_provider,
+            "other": MagicMock(
+                prefix="other", requires_email_format=False, domain=None
+            ),
         }
 
     @pytest.fixture
@@ -51,6 +54,9 @@ class TestMapProviderGroupIdWithDomain:
         return {
             "google": google_provider,
             "aws": aws_provider,
+            "other": MagicMock(
+                prefix="other", requires_email_format=False, domain=None
+            ),
         }
 
     @pytest.fixture
@@ -69,6 +75,9 @@ class TestMapProviderGroupIdWithDomain:
         return {
             "google": google_provider,
             "aws": aws_provider,
+            "other": MagicMock(
+                prefix="other", requires_email_format=False, domain=None
+            ),
         }
 
     def test_map_to_primary_with_domain_appended(
