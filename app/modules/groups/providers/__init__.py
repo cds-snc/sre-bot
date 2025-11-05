@@ -12,7 +12,7 @@ import importlib
 import pkgutil
 from typing import Dict, Optional, Type
 from core.logging import get_module_logger
-from modules.groups.providers.base import GroupProvider
+from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 
 logger = get_module_logger()
 
@@ -257,7 +257,7 @@ def _determine_primary(registry: Optional[Dict[str, GroupProvider]] = None) -> s
     )
 
 
-def get_primary_provider() -> GroupProvider:
+def get_primary_provider() -> PrimaryGroupProvider:
     """Return the primary provider instance.
 
     Raises ValueError if no primary provider is active.
