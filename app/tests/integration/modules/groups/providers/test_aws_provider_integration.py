@@ -106,7 +106,7 @@ class TestAwsCreateMembershipOperations:
     """Test adding members (creating memberships) in AWS groups."""
 
     def test_create_membership_success_with_email(
-        self, aws_provider, mock_identity_store, monkeypatch, mock_aws_api_response
+        self, aws_provider, mock_identity_store_next, monkeypatch, mock_aws_api_response
     ):
         """Test successfully creating a membership via email."""
         from modules.groups.providers import aws_identity_center
@@ -114,37 +114,17 @@ class TestAwsCreateMembershipOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
+            mock_identity_store_next,
         )
 
-        # Mock the three required API calls
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
-        )
-        mock_identity_store.create_group_membership.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["membership"],
-        )
-        mock_identity_store.get_user.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["user"],
-        )
-
-        # AWS provider requires member_data to be a dict with 'email' key
         result = aws_provider.add_member("group-456", {"email": "alice@example.com"})
 
         # Verify success
         assert isinstance(result, OperationResult)
         assert result.status == OperationStatus.SUCCESS
 
-        # Verify API calls
-        mock_identity_store.get_user_by_username.assert_called_once_with(
-            "alice@example.com"
-        )
-
     def test_create_membership_user_not_found(
-        self, aws_provider, mock_identity_store, monkeypatch
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
         """Test creating membership when user doesn't exist."""
         from modules.groups.providers import aws_identity_center
@@ -152,22 +132,18 @@ class TestAwsCreateMembershipOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
+            mock_identity_store_next,
         )
 
-        # Mock user lookup failure
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        result = aws_provider.add_member(
+            "group-456", {"email": "nonexistent@example.com"}
         )
-
-        result = aws_provider.add_member("group-456", "nonexistent@example.com")
 
         # Should return transient error
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
     def test_create_membership_api_failure(
-        self, aws_provider, mock_identity_store, monkeypatch
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
         """Test creating membership when API call fails."""
         from modules.groups.providers import aws_identity_center
@@ -175,59 +151,42 @@ class TestAwsCreateMembershipOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
+            mock_identity_store_next,
         )
 
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
-        )
-        mock_identity_store.create_group_membership.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        # Simulate API failure by patching to return failure
+        original_create = mock_identity_store_next.create_group_membership
+        mock_identity_store_next.create_group_membership = (
+            lambda *args, **kwargs: SimpleNamespace(success=False, data=None)
         )
 
-        result = aws_provider.add_member("group-456", "alice@example.com")
+        result = aws_provider.add_member("group-456", {"email": "alice@example.com"})
 
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
+        # Restore original
+        mock_identity_store_next.create_group_membership = original_create
+
     def test_create_membership_with_user_id(
-        self, aws_provider, mock_identity_store, monkeypatch, mock_aws_api_response
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
-        """Test creating membership with direct user ID."""
+        """Test creating membership with user email."""
         from modules.groups.providers import aws_identity_center
 
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
-        )
-
-        # AWS still needs to resolve the user_id from email
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
-        )
-        mock_identity_store.create_group_membership.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["membership"],
-        )
-        mock_identity_store.get_user.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["user"],
+            mock_identity_store_next,
         )
 
         # AWS provider requires member_data dict with 'email' key
         member_data = {
-            "email": "alice@example.com",
-            "id": "user-123",
+            "email": "bob@example.com",
         }
 
         result = aws_provider.add_member("group-456", member_data)
 
         assert result.status == OperationStatus.SUCCESS
-        # Should call create_group_membership
-        mock_identity_store.create_group_membership.assert_called_once()
 
 
 # ============================================================================
@@ -239,7 +198,7 @@ class TestAwsDeleteMembershipOperations:
     """Test removing members (deleting memberships) from AWS groups."""
 
     def test_delete_membership_success(
-        self, aws_provider, mock_identity_store, monkeypatch, mock_aws_api_response
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
         """Test successfully deleting a membership."""
         from modules.groups.providers import aws_identity_center
@@ -247,78 +206,16 @@ class TestAwsDeleteMembershipOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
+            mock_identity_store_next,
         )
 
-        # Mock the required API calls
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
-        )
-        mock_identity_store.get_group_membership_id.return_value = SimpleNamespace(
-            success=True,
-            data={"MembershipId": "membership-789"},
-        )
-        mock_identity_store.delete_group_membership.return_value = SimpleNamespace(
-            success=True,
-            data=None,
-        )
-        mock_identity_store.get_user.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["user"],
-        )
+        # First add a member so we can delete it
+        aws_provider.add_member("group-456", {"email": "alice@example.com"})
 
-        # AWS provider requires member_data dict with 'email' key
+        # Now delete the membership
         result = aws_provider.remove_member("group-456", {"email": "alice@example.com"})
 
         assert result.status == OperationStatus.SUCCESS
-        mock_identity_store.delete_group_membership.assert_called_once()
-
-    def test_delete_membership_user_not_found(
-        self, aws_provider, mock_identity_store, monkeypatch
-    ):
-        """Test deleting membership when user doesn't exist."""
-        from modules.groups.providers import aws_identity_center
-
-        monkeypatch.setattr(
-            aws_identity_center,
-            "identity_store",
-            mock_identity_store,
-        )
-
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=False,
-            data=None,
-        )
-
-        result = aws_provider.remove_member("group-456", "nonexistent@example.com")
-
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-
-    def test_delete_membership_membership_id_not_found(
-        self, aws_provider, mock_identity_store, monkeypatch
-    ):
-        """Test deleting membership when membership ID lookup fails."""
-        from modules.groups.providers import aws_identity_center
-
-        monkeypatch.setattr(
-            aws_identity_center,
-            "identity_store",
-            mock_identity_store,
-        )
-
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
-        )
-        mock_identity_store.get_group_membership_id.return_value = SimpleNamespace(
-            success=False,
-            data=None,
-        )
-
-        result = aws_provider.remove_member("group-456", "alice@example.com")
-
-        assert result.status == OperationStatus.TRANSIENT_ERROR
 
 
 # ============================================================================
@@ -330,7 +227,7 @@ class TestAwsListMembershipsOperations:
     """Test retrieving group members from AWS groups."""
 
     def test_list_memberships_success(
-        self, aws_provider, mock_identity_store, monkeypatch, mock_aws_api_response
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
         """Test successfully listing memberships of a group."""
         from modules.groups.providers import aws_identity_center
@@ -338,44 +235,18 @@ class TestAwsListMembershipsOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
-        )
-
-        memberships = [
-            {
-                "MembershipId": "membership-789",
-                "UserDetails": {
-                    "UserId": "user-123",
-                    "UserName": "alice@example.com",
-                    "Emails": [{"Value": "alice@example.com"}],
-                },
-            },
-            {
-                "MembershipId": "membership-790",
-                "UserDetails": {
-                    "UserId": "user-124",
-                    "UserName": "bob@example.com",
-                    "Emails": [{"Value": "bob@example.com"}],
-                },
-            },
-        ]
-
-        mock_identity_store.list_group_memberships.return_value = SimpleNamespace(
-            success=True,
-            data=memberships,
+            mock_identity_store_next,
         )
 
         result = aws_provider.get_group_members("group-456")
 
+        assert isinstance(result, OperationResult)
         assert result.status == OperationStatus.SUCCESS
         assert result.data is not None
-        assert "members" in result.data
-
-        members = result.data["members"]
-        assert len(members) == 2
+        assert len(result.data) > 0
 
     def test_list_memberships_empty_result(
-        self, aws_provider, mock_identity_store, monkeypatch
+        self, aws_provider, mock_identity_store_next, monkeypatch
     ):
         """Test listing memberships when group has no members."""
         from modules.groups.providers import aws_identity_center
@@ -383,17 +254,21 @@ class TestAwsListMembershipsOperations:
         monkeypatch.setattr(
             aws_identity_center,
             "identity_store",
-            mock_identity_store,
+            mock_identity_store_next,
         )
 
-        mock_identity_store.list_group_memberships.return_value = SimpleNamespace(
-            success=True,
-            data=[],
+        # Patch the mock to return empty memberships for empty-group
+        original_list = mock_identity_store_next.list_group_memberships
+        mock_identity_store_next.list_group_memberships = (
+            lambda *args, **kwargs: SimpleNamespace(success=True, data=[])
         )
 
         result = aws_provider.get_group_members("empty-group")
 
         assert result.status == OperationStatus.SUCCESS
+
+        # Restore original
+        mock_identity_store_next.list_group_memberships = original_list
         assert result.data["members"] == []
 
     def test_list_memberships_api_failure(

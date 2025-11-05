@@ -398,6 +398,88 @@ def mock_logger(monkeypatch):
 
 
 # ============================================================================
+# Provider Setup Fixtures
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def activate_test_providers(monkeypatch):
+    """Activate mock providers for integration testing.
+
+    Sets up google (primary) and aws (secondary) providers with
+    proper configuration and mocked methods.
+    """
+    from unittest.mock import MagicMock
+    from modules.groups import providers as providers_module
+
+    # Create mock primary provider (google)
+    mock_google = MagicMock()
+    mock_google.prefix = "g"
+    mock_google.primary = True
+    mock_google.is_manager = MagicMock(return_value=True)
+    mock_google.add_member = MagicMock()
+    mock_google.remove_member = MagicMock()
+    mock_google.get_group_members = MagicMock()
+
+    # Create mock secondary provider (aws)
+    mock_aws = MagicMock()
+    mock_aws.prefix = "aws"
+    mock_aws.primary = False
+    mock_aws.add_member = MagicMock()
+    mock_aws.remove_member = MagicMock()
+    mock_aws.get_group_members = MagicMock()
+
+    # Mock provider registry
+    mock_registry = {
+        "google": mock_google,
+        "aws": mock_aws,
+    }
+
+    # Patch provider functions
+    monkeypatch.setattr(
+        providers_module,
+        "get_active_providers",
+        lambda: mock_registry,
+    )
+    monkeypatch.setattr(
+        providers_module,
+        "get_primary_provider",
+        lambda: mock_google,
+    )
+    monkeypatch.setattr(
+        providers_module,
+        "get_primary_provider_name",
+        lambda: "google",
+    )
+    # Also patch mappings module's imported helpers so functions that
+    # performed `from modules.groups.providers import get_active_providers`
+    # will see the mocked registry during tests.
+    try:
+        from modules.groups import mappings as mappings_module
+
+        monkeypatch.setattr(
+            mappings_module,
+            "get_active_providers",
+            lambda: mock_registry,
+        )
+        monkeypatch.setattr(
+            mappings_module,
+            "get_primary_provider_name",
+            lambda: "google",
+        )
+    except Exception:
+        # If mappings isn't importable in some contexts, ignore - primary
+        # functions are patched on the providers module which covers most uses.
+        pass
+
+    return {
+        "google": mock_google,
+        "aws": mock_aws,
+        "registry": mock_registry,
+    }
+
+
+# ============================================================================
 # Test Markers
 # ============================================================================
 

@@ -167,6 +167,122 @@ def mock_google_api_errors():
 
 
 @pytest.fixture
+def mock_identity_store_next():
+    """Mock integrations.aws.identity_store_next module.
+
+    Provides mocked responses for AWS Identity Store API calls.
+    Responses follow SimpleNamespace with success/data structure.
+    """
+    from types import SimpleNamespace
+
+    mock = MagicMock()
+
+    # get_group_by_name: resolves display name to UUID GroupId
+    def get_group_by_name(display_name):
+        """Mock get_group_by_name - resolve display name to GroupId."""
+        # Map common test group names to UUIDs
+        group_map = {
+            "group-456": "12345678-1234-5678-1234-567890abcdef",
+            "empty-group": "87654321-4321-8765-4321-fedcba098765",
+            "test-group": "aaaabbbb-cccc-dddd-eeee-ffffgggghhhh",
+        }
+        group_id = group_map.get(display_name)
+        if group_id:
+            return SimpleNamespace(
+                success=True,
+                data={"GroupId": group_id, "DisplayName": display_name},
+            )
+        return SimpleNamespace(success=False, data=None)
+
+    # get_user_by_username: resolve email to UserId
+    def get_user_by_username(email):
+        """Mock get_user_by_username - resolve email to UserId."""
+        user_map = {
+            "alice@example.com": "user-111",
+            "bob@example.com": "user-222",
+            "charlie@example.com": "user-333",
+        }
+        user_id = user_map.get(email)
+        if user_id:
+            return SimpleNamespace(
+                success=True,
+                data={"UserId": user_id, "UserName": email},
+            )
+        return SimpleNamespace(success=False, data=None)
+
+    # get_user: fetch full user details
+    def get_user(user_id):
+        """Mock get_user - fetch full user details."""
+        user_map = {
+            "user-111": {
+                "UserId": "user-111",
+                "UserName": "alice@example.com",
+                "Emails": [{"Value": "alice@example.com"}],
+                "Name": {"GivenName": "Alice", "FamilyName": "Smith"},
+            },
+            "user-222": {
+                "UserId": "user-222",
+                "UserName": "bob@example.com",
+                "Emails": [{"Value": "bob@example.com"}],
+                "Name": {"GivenName": "Bob", "FamilyName": "Jones"},
+            },
+            "user-333": {
+                "UserId": "user-333",
+                "UserName": "charlie@example.com",
+                "Emails": [{"Value": "charlie@example.com"}],
+                "Name": {"GivenName": "Charlie", "FamilyName": "Brown"},
+            },
+        }
+        user_data = user_map.get(user_id)
+        if user_data:
+            return SimpleNamespace(success=True, data=user_data)
+        return SimpleNamespace(success=False, data=None)
+
+    # create_group_membership: add user to group
+    def create_group_membership(group_id, user_id):
+        """Mock create_group_membership."""
+        return SimpleNamespace(
+            success=True,
+            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"},
+        )
+
+    # delete_group_membership: remove user from group
+    def delete_group_membership(membership_id):
+        """Mock delete_group_membership."""
+        return SimpleNamespace(success=True, data=None)
+
+    # get_group_membership_id: lookup membership for user in group
+    def get_group_membership_id(group_id, user_id):
+        """Mock get_group_membership_id."""
+        return SimpleNamespace(
+            success=True,
+            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"},
+        )
+
+    # list_group_memberships: list members of a group
+    def list_group_memberships(group_id):
+        """Mock list_group_memberships."""
+        memberships = [
+            {
+                "MembershipId": f"membership-{group_id[:8]}-user-111",
+                "GroupId": group_id,
+                "MemberId": {"UserId": "user-111"},
+            },
+        ]
+        return SimpleNamespace(success=True, data=memberships)
+
+    mock.get_group_by_name = get_group_by_name
+    mock.get_user_by_username = get_user_by_username
+    mock.get_user = get_user
+    mock.create_group_membership = create_group_membership
+    mock.delete_group_membership = delete_group_membership
+    mock.get_group_membership_id = get_group_membership_id
+    mock.list_group_memberships = list_group_memberships
+
+    return mock
+
+
+@pytest.fixture
 def mock_aws_identity_store_client():
     """Mock AWS Identity Store API client.
 
