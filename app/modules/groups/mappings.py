@@ -109,6 +109,9 @@ def map_provider_group_id(
     Callers may pass a
     `provider_registry` mapping for deterministic prefix resolution. If not
     provided the function falls back to the active providers.
+
+    Raises:
+        ValueError: If from_provider or to_provider is unknown
     """
     if not from_provider or not to_provider or not from_group_id:
         raise ValueError("from_provider, to_provider and from_group_id are required")
@@ -119,6 +122,12 @@ def map_provider_group_id(
     # Short-circuit same-provider mapping
     if from_provider == to_provider:
         return from_group_id
+
+    # Validate both source and target providers exist in registry
+    if from_provider not in provs:
+        raise ValueError(f"Unknown source provider: {from_provider}")
+    if to_provider not in provs:
+        raise ValueError(f"Unknown target provider: {to_provider}")
 
     # Derive canonical name by trying to extract any recognized provider prefix
     # This handles both primary-style inputs ("aws-groupname") and secondary-style inputs
@@ -132,10 +141,7 @@ def map_provider_group_id(
 
     # If target is primary, compose primary group name using source provider's prefix
     if to_provider == primary:
-        src_inst = provs.get(from_provider)
-        if not src_inst:
-            raise ValueError(f"Unknown source provider: {from_provider}")
-        prefix = getattr(src_inst, "prefix", from_provider)
+        prefix = getattr(provs[from_provider], "prefix", from_provider)
         # Use '-' as canonical separator
         result = f"{prefix}-{canonical}"
 
