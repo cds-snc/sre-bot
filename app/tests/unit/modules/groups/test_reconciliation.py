@@ -6,7 +6,7 @@ claim semantics, DLQ behavior, and thread safety.
 
 import pytest
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from modules.groups.reconciliation import (
@@ -74,9 +74,9 @@ class TestSaveAndRetrieve:
             op_status="retryable_error",
         )
 
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         store.save_failed_propagation(record)
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         assert before <= record.created_at <= after
         assert before <= record.updated_at <= after
@@ -126,7 +126,7 @@ class TestFetchDue:
 
         # Simulate time passing
         with store._lock:
-            store._store[record_id].updated_at = datetime.utcnow() - timedelta(
+            store._store[record_id].updated_at = datetime.now(timezone.utc) - timedelta(
                 seconds=61
             )
 
@@ -149,9 +149,9 @@ class TestFetchDue:
             record_id = store.save_failed_propagation(record)
             # Make all due immediately
             with store._lock:
-                store._store[record_id].updated_at = datetime.utcnow() - timedelta(
-                    seconds=61
-                )
+                store._store[record_id].updated_at = datetime.now(
+                    timezone.utc
+                ) - timedelta(seconds=61)
 
         # Fetch with limit
         due = store.fetch_due(limit=3)
@@ -170,7 +170,7 @@ class TestFetchDue:
 
         # Make due
         with store._lock:
-            store._store[record_id].updated_at = datetime.utcnow() - timedelta(
+            store._store[record_id].updated_at = datetime.now(timezone.utc) - timedelta(
                 seconds=61
             )
 
@@ -197,7 +197,7 @@ class TestFetchDue:
 
         # Make it due for retry too (past backoff)
         with store._lock:
-            store._store[record_id].updated_at = datetime.utcnow() - timedelta(
+            store._store[record_id].updated_at = datetime.now(timezone.utc) - timedelta(
                 seconds=61
             )
             # Manually expire the claim
@@ -279,15 +279,15 @@ class TestClaimSemantics:
 
         with patch("modules.groups.reconciliation.datetime") as mock_datetime:
             # Claim at 1000
-            mock_datetime.utcnow.return_value.timestamp.return_value = 1000.0
+            mock_datetime.now.return_value.timestamp.return_value = 1000.0
             assert store.claim_record(record_id, "worker-1", lease_seconds=10) is True
 
             # Cannot reclaim at 1005 (within lease until 1010)
-            mock_datetime.utcnow.return_value.timestamp.return_value = 1005.0
+            mock_datetime.now.return_value.timestamp.return_value = 1005.0
             assert store.claim_record(record_id, "worker-2", lease_seconds=300) is False
 
             # Can reclaim at 1011 (after lease at 1010)
-            mock_datetime.utcnow.return_value.timestamp.return_value = 1011.0
+            mock_datetime.now.return_value.timestamp.return_value = 1011.0
             assert store.claim_record(record_id, "worker-2", lease_seconds=300) is True
 
     def test_claim_stores_worker_id(self):
@@ -473,9 +473,9 @@ class TestIncrementAttempt:
         )
         record_id = store.save_failed_propagation(record)
 
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
         store.increment_attempt(record_id)
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
 
         with store._lock:
             assert before <= store._store[record_id].updated_at <= after
