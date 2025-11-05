@@ -8,7 +8,7 @@ All group operations should generate audit entries for compliance.
 Audit entries are written synchronously to ensure a guaranteed audit trail.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 from core.logging import get_module_logger
@@ -35,7 +35,7 @@ class AuditEntry(BaseModel):
     """
 
     correlation_id: str
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     action: str
     group_id: str
     member_email: Optional[str] = None

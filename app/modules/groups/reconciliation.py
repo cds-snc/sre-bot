@@ -1,6 +1,6 @@
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol
 
 from core.logging import get_module_logger
@@ -32,8 +32,8 @@ class FailedPropagation:
     op_data: Optional[Dict[str, Any]] = None
     attempts: int = 0
     last_error: Optional[str] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ReconciliationStore(Protocol):
@@ -98,8 +98,8 @@ class InMemoryReconciliationStore:
             self._next_id += 1
             record.id = record_id
             record.attempts = 0
-            record.created_at = datetime.utcnow()
-            record.updated_at = datetime.utcnow()
+            record.created_at = datetime.now(timezone.utc)
+            record.updated_at = datetime.now(timezone.utc)
             self._store[record_id] = record
             logger.info(
                 "saved_failed_propagation",
@@ -112,7 +112,7 @@ class InMemoryReconciliationStore:
     def fetch_due(self, limit: int = 100) -> List[FailedPropagation]:
         """Return records that are due for retry (not claimed, within retry window)."""
         with self._lock:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             due = []
 
             for record_id, record in self._store.items():
@@ -157,12 +157,12 @@ class InMemoryReconciliationStore:
             if record_id in self._claims:
                 # Check if existing claim expired
                 claim = self._claims[record_id]
-                if claim["expires_at"] > datetime.utcnow().timestamp():
+                if claim["expires_at"] > datetime.now(timezone.utc).timestamp():
                     return False  # Still claimed
 
             self._claims[record_id] = {
                 "worker": worker_id,
-                "expires_at": datetime.utcnow().timestamp() + lease_seconds,
+                "expires_at": datetime.now(timezone.utc).timestamp() + lease_seconds,
             }
             logger.debug("claimed_record", record_id=record_id, worker=worker_id)
             return True
@@ -195,7 +195,7 @@ class InMemoryReconciliationStore:
 
         rec.op_status = "permanent_error"
         rec.last_error = reason
-        rec.updated_at = datetime.utcnow()
+        rec.updated_at = datetime.now(timezone.utc)
 
         # Move to DLQ
         self._dlq[record_id] = rec
@@ -223,7 +223,7 @@ class InMemoryReconciliationStore:
 
             rec.attempts += 1
             rec.last_error = last_error
-            rec.updated_at = datetime.utcnow()
+            rec.updated_at = datetime.now(timezone.utc)
 
             # Check if max attempts reached
             if rec.attempts >= self._max_attempts:

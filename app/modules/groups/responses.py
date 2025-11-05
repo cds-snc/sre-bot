@@ -226,7 +226,7 @@ def format_api_response(
     """Format response for API endpoints."""
     response = {
         "status_code": status_code,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "data": data,
     }
 

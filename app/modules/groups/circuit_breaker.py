@@ -14,7 +14,7 @@ State transitions:
 
 import threading
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Any, Optional, Dict
 
 from core.logging import get_module_logger
@@ -96,7 +96,7 @@ class CircuitBreaker:
                     self._transition_to_half_open()
                 else:
                     elapsed = (
-                        datetime.utcnow() - self._last_failure_time
+                        datetime.now(timezone.utc) - self._last_failure_time
                     ).total_seconds()
                     remaining = self.timeout_seconds - elapsed
                     logger.warning(
@@ -164,7 +164,7 @@ class CircuitBreaker:
         """Handle failed request."""
         with self._lock:
             self._failure_count += 1
-            self._last_failure_time = datetime.utcnow()
+            self._last_failure_time = datetime.now(timezone.utc)
 
             if self._state == CircuitState.HALF_OPEN:
                 # Failed during recovery test, go back to OPEN
@@ -198,7 +198,7 @@ class CircuitBreaker:
         """Check if enough time has passed to attempt recovery."""
         if self._last_failure_time is None:
             return True
-        elapsed = datetime.utcnow() - self._last_failure_time
+        elapsed = datetime.now(timezone.utc) - self._last_failure_time
         return elapsed >= timedelta(seconds=self.timeout_seconds)
 
     def _transition_to_closed(self):

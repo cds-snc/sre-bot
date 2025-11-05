@@ -13,7 +13,7 @@ ThreadPoolExecutor to avoid making changes to the existing synchronous
 will move the dispatcher into `event_system` itself.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List
 from uuid import uuid4
 from core.logging import get_module_logger
@@ -80,11 +80,13 @@ def _check_user_is_manager(
         ValueError: If primary provider not available or group lookup fails
     """
     try:
-        primary_name = _providers.get_primary_provider_name()
-        primary_provider = _providers.get_active_providers().get(primary_name)
-
-        if not primary_provider:
-            raise ValueError(f"Primary provider '{primary_name}' not available")
+        try:
+            # Use registry helper to obtain the primary provider instance
+            primary_provider = _providers.get_primary_provider()
+            primary_name = _providers.get_primary_provider_name()
+        except Exception as e:
+            # Normalize registry errors to ValueError for callers
+            raise ValueError(f"Primary provider not available: {e}") from e
 
         # If provider_type is secondary, map group_id to primary format
         mapped_group_id = group_id
@@ -140,14 +142,14 @@ def _parse_timestamp(ts: str | None) -> datetime:
     does not accept literal 'Z', so normalize it to '+00:00' when present.
     """
     if not ts:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
     try:
         if ts.endswith("Z"):
             ts = ts[:-1] + "+00:00"
         return datetime.fromisoformat(ts)
     except Exception:
         logger.warning("failed_to_parse_timestamp", timestamp=ts)
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
 
 def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
@@ -568,7 +570,7 @@ def bulk_operations(
                 res = schemas.ActionResponse(
                     success=False,
                     action=op,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                 )
         except Exception as e:
             logger.exception("bulk_operation_item_failed", operation=op, error=str(e))
@@ -576,7 +578,7 @@ def bulk_operations(
                 success=False,
                 action=op,
                 details={"error": str(e)},
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         results.append(res)
