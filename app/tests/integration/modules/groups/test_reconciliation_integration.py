@@ -11,7 +11,7 @@ Each test:
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from modules.groups.reconciliation import (
@@ -125,7 +125,7 @@ class TestReconciliationStoreBasics:
         # Simulate time passing by modifying updated_at
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Act
         due = store.fetch_due()
@@ -150,7 +150,7 @@ class TestReconciliationStoreBasics:
         # Force record to be due
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Claim the record
         store.claim_record(record_id, "worker-1", lease_seconds=300)
@@ -177,7 +177,7 @@ class TestReconciliationStoreBasics:
         # Make record due
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Claim with short lease
         store.claim_record(record_id, "worker-1", lease_seconds=1)
@@ -185,7 +185,9 @@ class TestReconciliationStoreBasics:
         # Simulate lease expiration
         with store._lock:
             claim = store._claims[record_id]
-            claim["expires_at"] = (datetime.utcnow() - timedelta(seconds=1)).timestamp()
+            claim["expires_at"] = (
+                datetime.now(timezone.utc) - timedelta(seconds=1)
+            ).timestamp()
 
         # Act
         due = store.fetch_due()
