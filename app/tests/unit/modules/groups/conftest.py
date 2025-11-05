@@ -5,6 +5,10 @@ from typing import Dict, Any
 from unittest.mock import MagicMock
 import pytest
 
+# Import provider registry so we can reset it between tests to avoid
+# cross-test state pollution from provider activation tests.
+from modules.groups.providers import PROVIDER_REGISTRY as _PROV_REG
+
 
 @pytest.fixture
 def mock_settings_groups():
@@ -84,6 +88,71 @@ def mock_providers_registry(mock_primary_provider, mock_secondary_provider):
         "google": mock_primary_provider,
         "aws": mock_secondary_provider,
     }
+
+
+# Ensure provider registry is reset to a stable baseline for each unit test
+# to avoid cross-test pollution when tests directly mutate the global
+# `PROVIDER_REGISTRY` in `modules.groups.providers`.
+_PROV_REG_BASELINE = dict(_PROV_REG)
+
+
+@pytest.fixture(autouse=True)
+def _reset_provider_registry():
+    """Reset `modules.groups.providers.PROVIDER_REGISTRY` to a known baseline
+    before and after each test to ensure tests don't leak state between them.
+
+    Tests that intentionally manipulate the registry (provider activation
+    tests) may still run correctly because they explicitly set/clear the
+    registry; this fixture simply guarantees isolation between tests.
+    """
+    # restore baseline before test
+    _PROV_REG.clear()
+    _PROV_REG.update(_PROV_REG_BASELINE)
+    try:
+        yield
+    finally:
+        # restore baseline after test
+        _PROV_REG.clear()
+        _PROV_REG.update(_PROV_REG_BASELINE)
+
+
+@pytest.fixture(autouse=True)
+def _patch_mappings_helpers(monkeypatch, mock_providers_registry):
+    """Patch mapping module helpers to use the test provider registry.
+
+    Many unit tests call mapping helpers without passing an explicit
+    `provider_registry`. Patch `modules.groups.mappings.get_active_providers`
+    and `get_primary_provider_name` to return the controlled test registry so
+    mapping logic is deterministic and isolated from global activation state.
+    """
+    # Accept arbitrary args/kwargs to match real function signature which may
+    # accept a provider_filter parameter in some call sites.
+    monkeypatch.setattr(
+        "modules.groups.mappings.get_active_providers",
+        lambda *a, **kw: mock_providers_registry,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "modules.groups.mappings.get_primary_provider_name",
+        lambda: "google",
+        raising=False,
+    )
+
+    # Also patch the service-facing provider helpers so that code which calls
+    # `modules.groups.service._providers.get_active_providers` or
+    # `modules.groups.service._providers.get_primary_provider_name` sees the
+    # same deterministic test registry and primary provider name.
+    monkeypatch.setattr(
+        "modules.groups.service._providers.get_active_providers",
+        lambda *a, **kw: mock_providers_registry,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "modules.groups.service._providers.get_primary_provider_name",
+        lambda: "google",
+        raising=False,
+    )
+    yield
 
 
 @pytest.fixture
