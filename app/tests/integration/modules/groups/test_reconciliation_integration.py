@@ -487,7 +487,7 @@ class TestReconciliationRetryWorkflow:
         # Force record to be due
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Act - fetch due records
         due = store.fetch_due()
@@ -549,7 +549,7 @@ class TestReconciliationRetryWorkflow:
         store.increment_attempt(record_id, "Attempt 1 failed")
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(
                 seconds=121
             )  # 120s backoff + 1s
 
@@ -557,7 +557,7 @@ class TestReconciliationRetryWorkflow:
         store.increment_attempt(record_id, "Attempt 2 failed")
         with store._lock:
             stored = store._store[record_id]
-            stored.updated_at = datetime.utcnow() - timedelta(
+            stored.updated_at = datetime.now(timezone.utc) - timedelta(
                 seconds=241
             )  # 240s backoff + 1s
 
@@ -597,7 +597,7 @@ class TestReconciliationMultipleRecords:
             # Make due
             with store._lock:
                 stored = store._store[record_id]
-                stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+                stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Act
         due = store.fetch_due(limit=10)
@@ -623,7 +623,7 @@ class TestReconciliationMultipleRecords:
             # Make due
             with store._lock:
                 stored = store._store[record_id]
-                stored.updated_at = datetime.utcnow() - timedelta(seconds=61)
+                stored.updated_at = datetime.now(timezone.utc) - timedelta(seconds=61)
 
         # Act
         due = store.fetch_due(limit=2)
