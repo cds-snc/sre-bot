@@ -469,7 +469,10 @@ def execute_batch_request(
 
 
 def paginate_all_results(
-    request, resource_key: Optional[str] = None
+    request,
+    resource_key: Optional[str] = None,
+    list_resource: Optional[Resource] = None,
+    method_name: Optional[str] = None,
 ) -> IntegrationResponse:
     """
     Simplified pagination using built-in Google API client features with standardized error handling and response modeling.
@@ -489,12 +492,15 @@ def paginate_all_results(
         else:
             error_info = resp.error
     """
+    logger.warning("paginate_all_results_initiated")
 
     def paginate_call():
         all_results = []
         current_request = request
+        page_number = 0
 
         while current_request is not None:
+            page_number += 1
             response = current_request.execute()
 
             if response:
@@ -509,25 +515,44 @@ def paginate_all_results(
                 else:
                     detected_key = resource_key
 
+                # extract items from current page
                 if (
                     detected_key
                     and isinstance(response, dict)
                     and detected_key in response
                 ):
-                    all_results.extend(response[detected_key])
+                    page_items = response[detected_key]
+                    if isinstance(page_items, list):
+                        all_results.extend(page_items)
                 elif isinstance(response, list):
                     all_results.extend(response)
 
-                # Use built-in pagination if available
-                current_request = (
-                    current_request.execute_next_chunk()[0]
-                    if hasattr(current_request, "execute_next_chunk")
-                    else None
-                )
+                # Get next page if available
+                next_page_token = response.get("nextPageToken")
+                if next_page_token and list_resource and method_name:
+                    next_method_name = f"{method_name}_next"
+                    list_next_method = getattr(list_resource, next_method_name, None)
+                    if list_next_method:
+                        try:
+                            # pylint: disable=not-callable
+                            current_request = list_next_method(
+                                current_request, response
+                            )
+                        except Exception as e:
+                            logger.error("pagination_error", error=str(e))
+                            current_request = None
+                    else:
+                        current_request = None
+                else:
+                    current_request = None
             else:
                 break
 
-        logger.info("pagination_completed", total_results=len(all_results))
+        logger.info(
+            "pagination_completed",
+            total_results=len(all_results),
+            total_pages=page_number,
+        )
         return all_results
 
     resp = execute_api_call("paginate_all_results", paginate_call)
@@ -555,7 +580,7 @@ def execute_google_api_call(
     Args:
         service_name (str): Name of the Google service (e.g., "drive")
         version (str): API version (e.g., "v3")
-        resource_path (str): Path to the resource (e.g., "files")
+        resource_path (str): Path to the resource (e.g., "files" or "spreadsheets.values")
         method (str): API method to call (e.g., "list")
         scopes (Optional[List[str]]): OAuth scopes
         delegated_user_email (Optional[str]): Email for delegated access
@@ -572,30 +597,30 @@ def execute_google_api_call(
     """
 
     def api_call():
+        # Step 1: Get the root service connection with authentication
         service = get_google_service(
             service_name, version, scopes, delegated_user_email
         )
 
-        # Traverse resource path
-        resource_obj = service
+        # Step 2: Traverse resource path
+        resource_chain = service
         for resource in resource_path.split("."):
-            resource_obj = getattr(resource_obj, resource)()
+            resource_chain = getattr(resource_chain, resource)()
 
-        # Get API method
-        api_method = getattr(resource_obj, method)
+        # Step 3: Get API method for the final resource
+        api_method = getattr(resource_chain, method)
 
-        # Create request
+        # Step 4: Create request with parameters
         request = api_method(**kwargs)
 
-        # Auto-paginate list operations unless single_page is explicitly requested
-        should_paginate = method == "list"
-
-        if should_paginate:
+        if method == "list":
             # Use simplified pagination for list operations
             resource_key = resource_path.split(".")[
                 -1
             ]  # e.g., "users" from "users" or "members" from "groups.members"
-            return paginate_all_results(request, resource_key)
+            return paginate_all_results(
+                request, resource_key, list_resource=resource_chain, method_name=method
+            )
         else:
             # Simple execution for non-list operations or when single_page=True
             return request.execute()
