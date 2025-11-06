@@ -13,6 +13,7 @@ import pytest
 import types
 from modules.groups.providers.aws_identity_center import AwsIdentityCenterProvider
 from modules.groups.models import NormalizedMember, NormalizedGroup
+from modules.groups.providers.base import OperationResult, OperationStatus
 
 
 @pytest.mark.unit
@@ -537,3 +538,259 @@ class TestAwsProviderIntegration:
         assert result.members[0].first_name == "User"
         assert result.members[0].family_name == "One"
         assert result.members[1].first_name is None
+
+
+@pytest.mark.unit
+class TestAwsProviderApiInteractions:
+    """Tests that exercise identity_store integration points and error branches."""
+
+    def test_resolve_group_id_raises_when_get_group_missing(self, monkeypatch):
+        provider = AwsIdentityCenterProvider()
+        # Remove get_group_by_name on the actual imported module used by provider
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            None,
+            raising=False,
+        )
+        with pytest.raises(Exception):
+            provider._resolve_group_id("non-uuid-name")
+
+    def test_resolve_group_id_raises_on_unexpected_response_type(self, monkeypatch):
+        provider = AwsIdentityCenterProvider()
+
+        class BadResp:
+            pass
+
+        def fake_get_group_by_name(name):
+            return BadResp()
+
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            fake_get_group_by_name,
+            raising=False,
+        )
+        with pytest.raises(Exception):
+            provider._resolve_group_id("non-uuid-name")
+
+    def test_get_group_members_handles_missing_user_details(self, monkeypatch):
+        provider = AwsIdentityCenterProvider()
+
+        # Mock list_group_memberships to return memberships without MemberId
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.list_group_memberships",
+            lambda gid: types.SimpleNamespace(
+                success=True, data=[{"MembershipId": "m-1"}]
+            ),
+            raising=False,
+        )
+
+        # Mock get_group_by_name to return a valid id so _resolve_group_id won't fail
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            lambda name: types.SimpleNamespace(
+                success=True, data={"GroupId": "group-1"}
+            ),
+            raising=False,
+        )
+
+        # Mock get_user to raise IntegrationError to simulate missing details
+        def fake_get_user(uid):
+            return types.SimpleNamespace(success=False, data=None)
+
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user",
+            fake_get_user,
+            raising=False,
+        )
+
+        res = provider._get_group_members_impl("group-1")
+        # Decorator wraps result in OperationResult; inspect .data
+        assert isinstance(res, OperationResult)
+        members = res.data.get("members")
+        assert isinstance(members, list)
+        assert len(members) == 1
+
+    def test_add_member_raises_when_missing_identity_methods(self, monkeypatch):
+        provider = AwsIdentityCenterProvider()
+
+        # Ensure resolve_group_id returns the input UUID (simulate already-id)
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            None,
+            raising=False,
+        )
+
+        # Remove get_user_by_username to trigger IntegrationError in _ensure_user_id_from_email
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user_by_username",
+            None,
+            raising=False,
+        )
+
+        res = provider._add_member_impl("group-1", {"email": "user@x"})
+        # opresult_wrapper catches exceptions and returns a transient error
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_add_member_success_returns_normalized_member(self, monkeypatch):
+        """Simulate successful add: identity_store methods return success and provider returns normalized member."""
+        provider = AwsIdentityCenterProvider()
+
+        # Simulate _resolve_group_id returning the group id directly by having
+        # get_group_by_name return a successful result with GroupId
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            lambda name: types.SimpleNamespace(
+                success=True, data={"GroupId": "group-1"}
+            ),
+            raising=False,
+        )
+
+        # Simulate get_user_by_username returning user id
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user_by_username",
+            lambda email: types.SimpleNamespace(
+                success=True, data={"UserId": "user-1"}
+            ),
+            raising=False,
+        )
+
+        # Simulate create_group_membership success
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.create_group_membership",
+            lambda gid, uid: types.SimpleNamespace(
+                success=True, data={"MembershipId": "m-1"}
+            ),
+            raising=False,
+        )
+
+        # Simulate get_user returning full details
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user",
+            lambda uid: types.SimpleNamespace(
+                success=True,
+                data={
+                    "UserId": "user-1",
+                    "Emails": [{"Value": "alice@example.com"}],
+                    "Name": {"GivenName": "Alice", "FamilyName": "Example"},
+                },
+            ),
+            raising=False,
+        )
+
+        res = provider._add_member_impl("my-group", {"email": "alice@example.com"})
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        member = res.data.get("result")
+        assert member is not None
+        # The normalizer may not populate all fields for this combined path.
+        # Ensure we received a canonical member dict with expected keys.
+        assert isinstance(member, dict)
+        assert "id" in member
+        assert "email" in member
+
+    def test_remove_member_success_returns_normalized_member(self, monkeypatch):
+        """Simulate successful remove: identity_store methods return success and provider returns normalized member."""
+        provider = AwsIdentityCenterProvider()
+
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_by_name",
+            lambda name: types.SimpleNamespace(
+                success=True, data={"GroupId": "group-1"}
+            ),
+            raising=False,
+        )
+
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user_by_username",
+            lambda email: types.SimpleNamespace(
+                success=True, data={"UserId": "user-1"}
+            ),
+            raising=False,
+        )
+
+        # Simulate resolve membership id
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_group_membership_id",
+            lambda gid, uid: types.SimpleNamespace(
+                success=True, data={"MembershipId": "m-1"}
+            ),
+            raising=False,
+        )
+
+        # Simulate delete_group_membership success
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.delete_group_membership",
+            lambda membership_id: types.SimpleNamespace(success=True, data={}),
+            raising=False,
+        )
+
+        # Simulate get_user returning full details
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.get_user",
+            lambda uid: types.SimpleNamespace(
+                success=True,
+                data={
+                    "UserId": "user-1",
+                    "Emails": [{"Value": "bob@example.com"}],
+                    "Name": {"GivenName": "Bob", "FamilyName": "Builder"},
+                },
+            ),
+            raising=False,
+        )
+
+        res = provider._remove_member_impl("my-group", {"email": "bob@example.com"})
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        member = res.data.get("result")
+        assert member is not None
+        assert isinstance(member, dict)
+        assert "id" in member
+        assert "email" in member
+
+    def test_list_groups_raises_when_method_missing(self, monkeypatch):
+        """If the identity_store lacks list_groups, provider should raise IntegrationError."""
+        provider = AwsIdentityCenterProvider()
+        # Remove the attribute entirely so hasattr checks fail
+        monkeypatch.delattr(
+            "integrations.aws.identity_store_next.list_groups",
+            raising=False,
+        )
+
+        res = provider._list_groups_impl()
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_list_groups_returns_empty_pages(self, monkeypatch):
+        """Simulate list_groups returning empty pages (no groups)."""
+        provider = AwsIdentityCenterProvider()
+
+        # identity_store.list_groups returns OperationResult-like object
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.list_groups",
+            lambda **kw: types.SimpleNamespace(success=True, data=[]),
+            raising=False,
+        )
+
+        res = provider._list_groups_impl()
+        assert isinstance(res, OperationResult)
+        groups = res.data.get("groups")
+        assert groups == []
+
+    def test_list_groups_with_memberships_handles_unexpected_response(
+        self, monkeypatch
+    ):
+        """If list_groups_with_memberships returns unexpected type, provider raises."""
+        provider = AwsIdentityCenterProvider()
+
+        class BadResp:
+            pass
+
+        monkeypatch.setattr(
+            "integrations.aws.identity_store_next.list_groups_with_memberships",
+            lambda **kw: BadResp(),
+            raising=False,
+        )
+        res = provider._list_groups_with_members_impl()
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
