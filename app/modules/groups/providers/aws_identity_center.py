@@ -144,9 +144,9 @@ class AwsIdentityCenterProvider(GroupProvider):
         return group_id
 
     def _resolve_membership_id(self, group_key: str, user_id: str) -> str:
-        """Resolve the membership ID for a user in a group. 
+        """Resolve the membership ID for a user in a group.
             AWS Identity Center APIs uses memberships to associate users to groups.
-        
+
         Args:
             group_key: AWS group key (UUID or display name).
             user_id: AWS user ID.
