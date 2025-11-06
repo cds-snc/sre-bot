@@ -35,7 +35,9 @@ class AuditEntry(BaseModel):
     """
 
     correlation_id: str
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     action: str
     group_id: str
     member_email: Optional[str] = None
