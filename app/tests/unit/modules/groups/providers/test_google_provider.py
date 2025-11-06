@@ -10,6 +10,8 @@ Note: Integration tests (actual API calls) are in tests/modules/groups/providers
 """
 
 import pytest
+import types
+from modules.groups.providers.base import OperationResult, OperationStatus
 from modules.groups.providers.google_workspace import GoogleWorkspaceProvider
 from modules.groups.models import NormalizedMember, NormalizedGroup
 
@@ -560,3 +562,79 @@ class TestGoogleProviderIntegration:
         assert caps.supports_group_deletion is False
         assert caps.supports_user_creation is False
         assert caps.supports_user_deletion is False
+
+    def test_list_members_handles_unexpected_response(self, monkeypatch):
+        """If google_directory.list_members returns an error-like resp, wrapper should surface transient error."""
+        provider = GoogleWorkspaceProvider()
+
+        # Simulate google_directory.list_members returning an OperationResult-like failure
+        monkeypatch.setattr(
+            "integrations.google_workspace.google_directory_next.list_members",
+            lambda group_key, **kw: types.SimpleNamespace(success=False, data=None),
+            raising=False,
+        )
+
+        res = provider._get_group_members_impl("developers@company.com")
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_validate_permissions_detects_manager(self, monkeypatch):
+        """validate_permissions should return True when user is a MANAGER."""
+        provider = GoogleWorkspaceProvider()
+
+        # Simulate list_members returning only managers when roles='MANAGER'.
+        manager = {"email": "manager@company.com", "id": "m2", "role": "MANAGER"}
+
+        def fake_list_members(group_key, **kw):
+            # The provider calls list_members(..., roles='MANAGER') so emulate that
+            if kw.get("roles") == "MANAGER":
+                return types.SimpleNamespace(success=True, data=[manager])
+            # Default to empty list for other queries
+            return types.SimpleNamespace(success=True, data=[])
+
+        monkeypatch.setattr(
+            "integrations.google_workspace.google_directory_next.list_members",
+            fake_list_members,
+            raising=False,
+        )
+
+        res = provider.validate_permissions(
+            "manager@company.com", "developers@company.com", "write"
+        )
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        assert res.data.get("allowed") is True
+
+        res = provider.validate_permissions("m2", "developers@company.com", "write")
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        assert res.data.get("allowed") is True
+
+        res = provider.validate_permissions(
+            "user1@company.com", "developers@company.com", "write"
+        )
+        assert isinstance(res, OperationResult)
+        assert res.status == OperationStatus.SUCCESS
+        assert res.data.get("allowed") is False
+
+    def test_set_domain_from_config_and_env(self, monkeypatch):
+        """_set_domain_from_config should prefer settings value, then env SRE_BOT_EMAIL."""
+        provider = GoogleWorkspaceProvider()
+
+        # Patch core.config.settings for configured domain
+        import types as _types
+
+        fake_settings = _types.SimpleNamespace()
+        fake_settings.groups = _types.SimpleNamespace(group_domain="configured.com")
+        fake_settings.sre_email = None
+
+        monkeypatch.setattr("core.config.settings", fake_settings, raising=False)
+        provider._set_domain_from_config()
+        assert provider.domain == "configured.com"
+
+        # Now remove configured domain and set environment variable fallback
+        fake_settings.groups.group_domain = None
+        monkeypatch.setenv("SRE_BOT_EMAIL", "bot@env-domain.com")
+        provider.domain = None
+        provider._set_domain_from_config()
+        assert provider.domain == "env-domain.com"
