@@ -331,8 +331,8 @@ def get_group_membership_id(
     Get the membership ID for a user in a group.
 
     Args:
-        group_id (str): The group ID
-        user_id (str): The user ID
+        group_id (str): The group ID; either a UUID or display name
+        user_id (str): The user ID; either a UUID or username, typically email
         **kwargs: Additional parameters for the API call
 
     Returns:
