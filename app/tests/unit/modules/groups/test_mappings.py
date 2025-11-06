@@ -444,3 +444,59 @@ class TestMapPrimaryToSecondaryGroup:
         with pytest.raises(ValueError) as exc_info:
             gm.map_primary_to_secondary_group("g-my-group", "aws")
         assert "Cannot map" in str(exc_info.value)
+
+
+@pytest.mark.unit
+class TestFilterGroupsForUserRoles:
+    """Tests for filter_groups_for_user_roles() helper."""
+
+    def test_empty_user_roles_returns_all(self):
+        groups = {
+            "aws": [{"id": "g1"}],
+            "google": [{"id": "g2"}],
+        }
+        # empty roles should return original groups map
+        result = gm.filter_groups_for_user_roles(groups, "user@example.com", [])
+        assert result == groups
+
+    def test_filters_dict_members_by_role(self):
+        groups = {
+            "aws": [
+                {
+                    "id": "g1",
+                    "members": [
+                        {"email": "u@example.com", "role": "Admin"},
+                        {"email": "other@example.com", "role": "member"},
+                    ],
+                }
+            ],
+            "google": [
+                {"id": "g2", "members": [{"email": "u@example.com", "role": "viewer"}]}
+            ],
+        }
+
+        result = gm.filter_groups_for_user_roles(groups, "u@example.com", ["admin"])
+        # only aws group should remain because role matches (case-insensitive)
+        assert "aws" in result and "google" not in result
+        assert result["aws"][0]["id"] == "g1"
+
+    def test_filters_object_members_and_case_insensitive_roles(self):
+        from types import SimpleNamespace
+
+        member = SimpleNamespace(email="u@example.com", role="Member")
+        other = SimpleNamespace(email="x@example.com", role="admin")
+        grp = SimpleNamespace(id="g3", members=[member, other])
+
+        groups = {"svc": [grp]}
+
+        result = gm.filter_groups_for_user_roles(groups, "u@example.com", ["member"])
+        assert "svc" in result
+        assert result["svc"][0].id == "g3"
+
+    def test_no_matching_roles_returns_empty(self):
+        groups = {
+            "a": [{"id": "g1", "members": [{"email": "someone@x", "role": "owner"}]}]
+        }
+        result = gm.filter_groups_for_user_roles(groups, "u@example.com", ["admin"])
+        # Should be empty since no member matches
+        assert result == {}
