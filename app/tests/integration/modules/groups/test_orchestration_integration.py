@@ -57,7 +57,7 @@ class TestOrchestrationAddMemberMultiProvider:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
 
@@ -142,7 +142,7 @@ class TestOrchestrationAddMemberMultiProvider:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
         monkeypatch.setattr(
@@ -204,7 +204,7 @@ class TestOrchestrationAddMemberMultiProvider:
             ),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="secondary-group-id"),
         )
         monkeypatch.setattr(
@@ -252,7 +252,7 @@ class TestOrchestrationAddMemberMultiProvider:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
         monkeypatch.setattr(
@@ -308,7 +308,7 @@ class TestOrchestrationRemoveMemberMultiProvider:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
 
@@ -354,7 +354,7 @@ class TestOrchestrationRemoveMemberMultiProvider:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
         monkeypatch.setattr(
@@ -540,7 +540,7 @@ class TestOrchestrationErrorHandling:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
         monkeypatch.setattr(
@@ -592,7 +592,7 @@ class TestOrchestrationMappingAndNormalization:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="aws-group-id"),
         )
         monkeypatch.setattr(
@@ -640,7 +640,7 @@ class TestOrchestrationMappingAndNormalization:
             MagicMock(return_value={"google": primary, "aws": aws_prov}),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             mock_map,
         )
 
@@ -696,7 +696,7 @@ class TestOrchestrationWorkflowIntegration:
             ),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="secondary-group-id"),
         )
 
@@ -757,7 +757,7 @@ class TestOrchestrationWorkflowIntegration:
             ),
         )
         monkeypatch.setattr(
-            "modules.groups.orchestration.map_primary_to_secondary_group",
+            "modules.groups.service.map_primary_to_secondary_group",
             MagicMock(return_value="secondary-group-id"),
         )
         monkeypatch.setattr(

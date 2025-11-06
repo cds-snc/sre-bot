@@ -31,40 +31,6 @@ if TYPE_CHECKING:  # avoid runtime import cycles for typing
 logger = get_module_logger()
 
 
-def map_primary_to_secondary_group(
-    primary_group_id: str, secondary_provider: str
-) -> str:
-    """Compatibility delegator that forwards to the service mapping wrapper.
-
-    Tests and some call sites may patch or import this symbol from
-    `modules.groups.orchestration`. Keeping a thin delegator here preserves
-    that contract while the implementation lives behind `service`.
-    """
-    return service_layer.map_primary_to_secondary_group(
-        primary_group_id, secondary_provider
-    )
-
-
-def map_provider_group_id(
-    from_provider: str,
-    from_group_id: str,
-    to_provider: str,
-    *,
-    provider_registry: dict | None = None,
-) -> str:
-    """Compatibility delegator forwarding provider-group mapping to service.
-
-    Keeping this symbol on the `orchestration` module preserves the
-    historical surface tests and callers may patch `orchestration.map_provider_group_id`.
-    """
-    return service_layer.map_provider_group_id(
-        from_provider=from_provider,
-        from_group_id=from_group_id,
-        to_provider=to_provider,
-        provider_registry=provider_registry,
-    )
-
-
 def get_enabled_secondary_providers() -> Dict[str, GroupProvider]:
     """Return all active providers EXCEPT primary.
 
@@ -182,9 +148,12 @@ def _propagate_to_secondaries(
         if name == primary_name:
             continue
         try:
-            # Call the local delegator so unit tests can patch
-            # `modules.groups.orchestration.map_primary_to_secondary_group`.
-            sec_group = map_primary_to_secondary_group(primary_group_id, name)
+            # Use service layer mapping which is the canonical API for group ID
+            # mapping across providers. Tests should patch
+            # `modules.groups.service.map_primary_to_secondary_group` not orchestration.
+            sec_group = service_layer.map_primary_to_secondary_group(
+                primary_group_id, name
+            )
             sec_member = service_layer.normalize_member_for_provider(
                 member_email, provider_type=name
             )
