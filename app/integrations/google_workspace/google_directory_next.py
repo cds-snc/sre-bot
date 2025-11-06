@@ -74,7 +74,18 @@ def get_batch_users(user_keys: List[str], **kwargs) -> IntegrationResponse:
 def list_users(**kwargs) -> IntegrationResponse:
     """List all users from Google Directory with integrated error handling and auto-pagination.
 
-    Returns an IntegrationResponse.
+    Args:
+        **kwargs: Additional parameters for the API call. For the Google Directory API,
+            the 'fields' parameter must use the resource-wrapped format.
+            E.g., fields="users(name,primaryEmail)" not fields="name,primaryEmail".
+
+    Returns:
+        IntegrationResponse.
+
+    Example:
+        result = list_users(fields="users(name,primaryEmail,email)")
+        if result.success:
+            users = result.data
     """
     return execute_google_api_call(
         "admin",
@@ -138,15 +149,19 @@ def get_batch_groups(group_keys: List[str], **kwargs) -> IntegrationResponse:
 def list_groups(**kwargs) -> IntegrationResponse:
     """List all groups from Google Directory with integrated error handling and auto-pagination.
 
-    Note: Can be used to list all groups for a user by passing a query parameter with the memberKey.
+    Args:
+        **kwargs: Additional parameters for the API call. For the Google Directory API,
+            the 'fields' parameter must use the resource-wrapped format.
+            E.g., fields="groups(email,name)" not fields="email,name".
+            Can also filter by member: query="memberKey:user@example.com"
+            or by email pattern: query="email:prefix*"
 
-    e.g., to list all groups for a user with email user@example.com, you can use:
-    ```
-    list_groups(query="memberKey:user@example.com")
-    list_groups(query="email:prefix*")
-    ```
+    Returns:
+        IntegrationResponse.
 
-    Returns an IntegrationResponse.
+    Example:
+        result = list_groups(fields="groups(email,name,description)")
+        result = list_groups(query="memberKey:user@example.com")
     """
     return execute_google_api_call(
         "admin",
@@ -278,10 +293,18 @@ def list_members(group_key: str, **kwargs) -> IntegrationResponse:
     Args:
         group_key: The group's email address or unique id.
         **kwargs: Additional keyword arguments forwarded to the underlying API call.
+            For the Google Directory API, the 'fields' parameter must use the
+            resource-wrapped format. E.g., fields="members(email,role)"
+            not fields="email,role".
 
     Returns:
         IntegrationResponse: The result of the list operation. On success,
         ``data`` contains the list of members.
+
+    Example:
+        result = list_members("group@example.com", fields="members(email,role)")
+        if result.success:
+            members = result.data
     """
     return execute_google_api_call(
         "admin",
