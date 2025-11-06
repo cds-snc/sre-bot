@@ -26,9 +26,7 @@ class TestIntegrationError:
     def test_integration_error_with_response(self):
         """Test construction with response object."""
         fake_response = types.SimpleNamespace(
-            success=False, 
-            data={"error": "boom"},
-            meta={"code": 500}
+            success=False, data={"error": "boom"}, meta={"code": 500}
         )
         error = IntegrationError("Operation failed", response=fake_response)
         assert error.response is fake_response
@@ -97,8 +95,7 @@ class TestIntegrationError:
     def test_integration_error_response_with_data_dict(self):
         """Test error with response containing data dictionary."""
         fake_response = types.SimpleNamespace(
-            success=False,
-            data={"error": "Not found", "code": "404"}
+            success=False, data={"error": "Not found", "code": "404"}
         )
         error = IntegrationError("Not found", response=fake_response)
         assert error.response.data["error"] == "Not found"
@@ -108,7 +105,7 @@ class TestIntegrationError:
         """Test error with response containing metadata."""
         fake_response = types.SimpleNamespace(
             success=False,
-            meta={"timestamp": "2024-01-01T00:00:00Z", "request_id": "12345"}
+            meta={"timestamp": "2024-01-01T00:00:00Z", "request_id": "12345"},
         )
         error = IntegrationError("Server error", response=fake_response)
         assert error.response.meta["timestamp"] == "2024-01-01T00:00:00Z"
@@ -157,16 +154,10 @@ class TestIntegrationError:
             data={
                 "error": {
                     "code": "INVALID_REQUEST",
-                    "details": {
-                        "field": "email",
-                        "reason": "Invalid format"
-                    }
+                    "details": {"field": "email", "reason": "Invalid format"},
                 }
             },
-            meta={
-                "retry_after": 60,
-                "request_id": "req-12345-abcde"
-            }
+            meta={"retry_after": 60, "request_id": "req-12345-abcde"},
         )
         error = IntegrationError("Validation failed", response=fake_response)
         assert error.response.data["error"]["code"] == "INVALID_REQUEST"
@@ -186,7 +177,7 @@ class TestIntegrationError:
         response2 = types.SimpleNamespace(id=2)
         error1 = IntegrationError("Error 1", response=response1)
         error2 = IntegrationError("Error 2", response=response2)
-        
+
         assert error1.response.id == 1
         assert error2.response.id == 2
         assert str(error1) == "Error 1"
