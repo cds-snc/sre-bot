@@ -1,6 +1,7 @@
 # modules/groups/commands.py
 """Command handlers for Slack integration."""
 
+import uuid
 from typing import Dict, Any, List
 from slack_sdk import WebClient
 from slack_bolt import Ack, Respond
@@ -96,7 +97,7 @@ def _handle_add_command(
             respond(f"❌ Could not resolve Slack handle {member_email} to an email.")
             return
         member_email = resolved_email
-    group_id = args[1]
+    group_id = args[1].lower()
     provider_type = args[2]
     justification = " ".join(args[3:]) if len(args) > 3 else "Added via Slack command"
 
@@ -123,6 +124,7 @@ def _handle_add_command(
             provider=schemas.ProviderType(provider_type),
             justification=justification,
             requestor=requestor_email,
+            idempotency_key=str(uuid.uuid4()),
         )
         result = service.add_member(add_req)
 
@@ -155,8 +157,8 @@ def _handle_remove_command(
             respond(f"❌ Could not resolve Slack handle {member_email} to an email.")
             return
         member_email = resolved_email
-    group_id = args[1]
-    provider_type = args[2]
+    group_id = args[1].lower()
+    provider_type = args[2].lower()
     justification = " ".join(args[3:]) if len(args) > 3 else "Removed via Slack command"
 
     # Validate inputs
@@ -180,6 +182,7 @@ def _handle_remove_command(
             provider=schemas.ProviderType(provider_type),
             justification=justification,
             requestor=requestor_email,
+            idempotency_key=str(uuid.uuid4()),
         )
         result = service.remove_member(remove_req)
         respond(
