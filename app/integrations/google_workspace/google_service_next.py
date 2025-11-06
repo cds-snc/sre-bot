@@ -516,6 +516,7 @@ def paginate_all_results(
                     detected_key = resource_key
 
                 # extract items from current page
+                page_item_count = 0
                 if (
                     detected_key
                     and isinstance(response, dict)
@@ -523,12 +524,23 @@ def paginate_all_results(
                 ):
                     page_items = response[detected_key]
                     if isinstance(page_items, list):
+                        page_item_count = len(page_items)
                         all_results.extend(page_items)
                 elif isinstance(response, list):
+                    page_item_count = len(response)
                     all_results.extend(response)
 
                 # Get next page if available
                 next_page_token = response.get("nextPageToken")
+
+                logger.debug(
+                    "pagination_page_processed",
+                    page_number=page_number,
+                    page_items=page_item_count,
+                    total_items=len(all_results),
+                    has_next_page=bool(next_page_token),
+                )
+
                 if next_page_token and list_resource and method_name:
                     next_method_name = f"{method_name}_next"
                     list_next_method = getattr(list_resource, next_method_name, None)
@@ -542,8 +554,14 @@ def paginate_all_results(
                             logger.error("pagination_error", error=str(e))
                             current_request = None
                     else:
+                        logger.warning(
+                            "pagination_method_not_found",
+                            expected_method=next_method_name,
+                        )
                         current_request = None
                 else:
+                    if not next_page_token:
+                        logger.debug("pagination_complete_no_next_token")
                     current_request = None
             else:
                 break
@@ -578,22 +596,26 @@ def execute_google_api_call(
     Execute a Google API call using the simplified module-level error handling and standardized response model.
 
     Args:
-        service_name (str): Name of the Google service (e.g., "drive")
-        version (str): API version (e.g., "v3")
-        resource_path (str): Path to the resource (e.g., "files" or "spreadsheets.values")
-        method (str): API method to call (e.g., "list")
-        scopes (Optional[List[str]]): OAuth scopes
+        service_name (str): Name of the Google service (e.g., "admin", "sheets", "docs")
+        version (str): API version (e.g., "directory_v1", "v4")
+        resource_path (str): Path to the resource (e.g., "users" or "groups.members")
+        method (str): API method to call (e.g., "list", "get")
+        scopes (Optional[List[str]]): OAuth scopes required for the API call
         delegated_user_email (Optional[str]): Email for delegated access
-        single_page (bool): If True, only fetch a single page of results
-        **kwargs: Additional parameters for the API call
+        **kwargs: Additional parameters for the API call. These are passed directly
+            to the underlying Google API method with no transformation. For different
+            Google APIs, parameter formats may vary (e.g., Directory API fields parameter
+            requires resource-wrapping: "users(name,email)" not "name,email").
 
     Returns:
         IntegrationResponse: Standardized response object with success, data, error, function_name, and integration_name fields.
 
     Notes:
         - All errors are handled and returned as IntegrationResponse objects.
-        - Automatic retry is always enabled for retryable errors.
-        - Legacy flags and response dicts are no longer supported.
+        - Automatic retry is always enabled for retryable errors (429, 500, 502, 503, 504).
+        - For list operations (method="list"), automatic pagination is enabled.
+        - Parameters are passed through unchanged; callers are responsible for
+          formatting them according to the specific Google API requirements.
     """
 
     def api_call():
@@ -610,7 +632,20 @@ def execute_google_api_call(
         # Step 3: Get API method for the final resource
         api_method = getattr(resource_chain, method)
 
-        # Step 4: Create request with parameters
+        # Step 4: For list operations with fields parameter, ensure nextPageToken is included
+        if method == "list" and "fields" in kwargs:
+            fields = kwargs["fields"]
+            # Only add nextPageToken if it's not already present
+            if "nextPageToken" not in fields:
+                # Append nextPageToken to the fields parameter
+                kwargs["fields"] = f"{fields},nextPageToken"
+                logger.debug(
+                    "pagination_fields_enhanced",
+                    original_fields=fields,
+                    enhanced_fields=kwargs["fields"],
+                )
+
+        # Step 5: Create request with parameters (potentially modified for pagination)
         request = api_method(**kwargs)
 
         if method == "list":
@@ -622,7 +657,7 @@ def execute_google_api_call(
                 request, resource_key, list_resource=resource_chain, method_name=method
             )
         else:
-            # Simple execution for non-list operations or when single_page=True
+            # Simple execution for non-list operations
             return request.execute()
 
     # Use module-level error handling
