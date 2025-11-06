@@ -15,6 +15,10 @@ from modules.groups.providers.base import (
     provider_supports,
     provider_provides_role_info,
 )
+from modules.groups.providers.base import GroupProvider
+import types
+from unittest.mock import MagicMock
+from modules.groups import circuit_breaker as cb_mod
 
 
 # ============================================================================
@@ -451,3 +455,127 @@ class TestOperationResultEdgeCases:
         assert result.data is None
         assert result.error_code is None
         assert result.retry_after is None
+
+
+@pytest.mark.unit
+class TestGroupProviderCircuitBreaker:
+    """Tests for GroupProvider circuit breaker integration and behavior."""
+
+    def _make_mock_settings(self, enabled: bool = True):
+        st = types.SimpleNamespace()
+        st.groups = types.SimpleNamespace(
+            circuit_breaker_enabled=enabled,
+            circuit_breaker_failure_threshold=2,
+            circuit_breaker_timeout_seconds=1,
+            circuit_breaker_half_open_max_calls=1,
+            providers={},
+        )
+        return st
+
+    def test_provider_init_disables_circuit_breaker_when_config_off(self, monkeypatch):
+        monkeypatch.setattr(
+            "modules.groups.providers.base.settings",
+            self._make_mock_settings(enabled=False),
+        )
+
+        class DummyProvider(GroupProvider):
+            @property
+            def capabilities(self):
+                return ProviderCapabilities()
+
+            def _add_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _remove_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _get_group_members_impl(self, group_key, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_with_members_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+        p = DummyProvider()
+        # When circuit breaker disabled, internal attribute should be None
+        assert getattr(p, "_circuit_breaker") is None
+        stats = p.get_circuit_breaker_stats()
+        assert stats["enabled"] is False
+
+    def test_provider_registers_circuit_breaker_and_stats_available(self, monkeypatch):
+        # enable circuit breaker in settings
+        monkeypatch.setattr(
+            "modules.groups.providers.base.settings",
+            self._make_mock_settings(enabled=True),
+        )
+
+        class DummyProvider(GroupProvider):
+            @property
+            def capabilities(self):
+                return ProviderCapabilities()
+
+            def _add_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _remove_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _get_group_members_impl(self, group_key, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_with_members_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+        name = DummyProvider.__name__
+        p = DummyProvider()
+        # Ensure the circuit breaker is registered in the global registry
+        stats_all = cb_mod.get_all_circuit_breaker_stats()
+        assert name in stats_all
+        stats = p.get_circuit_breaker_stats()
+        assert isinstance(stats, dict)
+
+        # cleanup registry to avoid cross-test pollution
+        reg = getattr(cb_mod, "_circuit_breaker_registry", None)
+        if reg and name in reg:
+            reg.pop(name, None)
+
+    def test_add_member_returns_transient_when_circuit_open(self, monkeypatch):
+        monkeypatch.setattr(
+            "modules.groups.providers.base.settings",
+            self._make_mock_settings(enabled=True),
+        )
+
+        class DummyProvider(GroupProvider):
+            @property
+            def capabilities(self):
+                return ProviderCapabilities()
+
+            def _add_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _remove_member_impl(self, group_key, member_data):
+                return OperationResult.success()
+
+            def _get_group_members_impl(self, group_key, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+            def _list_groups_with_members_impl(self, **kwargs):
+                return OperationResult.success(data=[])
+
+        p = DummyProvider()
+        # Replace the real circuit breaker with a mock that raises open error
+        mock_cb = MagicMock()
+        mock_cb.call.side_effect = cb_mod.CircuitBreakerOpenError("open")
+        p._circuit_breaker = mock_cb
+
+        res = p.add_member("g", None)
+        assert res.status == OperationStatus.TRANSIENT_ERROR
+        assert res.error_code == "CIRCUIT_BREAKER_OPEN"
