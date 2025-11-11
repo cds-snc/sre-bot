@@ -29,6 +29,7 @@ from modules.groups.providers.base import (
     OperationStatus,
     HealthCheckResult,
     provider_operation,
+    validate_member_email,
 )
 
 logger = get_module_logger()
@@ -242,28 +243,6 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             raw=member if include_raw else None,
         )
 
-    def _validate_email(self, email: str) -> str:
-        """Validate and return email address.
-
-        Args:
-            email: Email address to validate
-
-        Returns:
-            The validated email address
-
-        Raises:
-            ValueError: If email is empty or doesn't contain @
-        """
-        if not email or not isinstance(email, str):
-            raise ValueError(
-                f"Email must be a non-empty string, got {type(email).__name__}"
-            )
-        if not email.strip():
-            raise ValueError("Email cannot be empty or whitespace")
-        if "@" not in email:
-            raise ValueError(f"Invalid email format: {email}")
-        return email.strip()
-
     def _list_groups_with_members_for_user(
         self, user_key: str, provider_name: Optional[str], **kwargs
     ) -> List[Dict]:
@@ -307,7 +286,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             A canonical member dict (normalized NormalizedMember)
         """
-        validated_email = self._validate_email(member_email)
+        validated_email = validate_member_email(member_email)
         resp = google_directory.insert_member(group_key, validated_email)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google insert_member failed", response=resp)
@@ -326,7 +305,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             A status dict confirming removal
         """
-        validated_email = self._validate_email(member_email)
+        validated_email = validate_member_email(member_email)
         resp = google_directory.delete_member(group_key, validated_email)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google delete_member failed", response=resp)
