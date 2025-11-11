@@ -62,9 +62,8 @@ def parse_primary_group_name(
     """Return {'prefix': Optional[str], 'canonical': str}.
 
     If `provider_registry` is provided, it is used to build a deterministic
-    mapping of provider prefixes. The function prefers the `prefix` attribute
-    on provider instances; if absent the provider's registered name is used as
-    the effective prefix.
+    mapping of provider prefixes. The function uses each provider's
+    `get_mapping_prefix()` method to determine its mapping prefix.
     """
     name = _local_name_from_primary(primary_group_name).strip()
     if not name:
@@ -72,11 +71,19 @@ def parse_primary_group_name(
 
     provs = _ensure_providers_activated(provider_registry)
 
-    # Build deterministic prefix -> [provider_name] mapping
+    # Build deterministic prefix -> [provider_name] mapping using provider method
     prefix_map: Dict[str, list] = {}
     for provider_name in sorted(provs.keys()):
         inst = provs[provider_name]
-        p = getattr(inst, "prefix", None) or provider_name
+        # Use provider's get_mapping_prefix() method if available
+        if hasattr(inst, "get_mapping_prefix") and callable(
+            getattr(inst, "get_mapping_prefix")
+        ):
+            p = inst.get_mapping_prefix()
+        else:
+            # Fallback to attribute introspection for backward compatibility
+            p = getattr(inst, "prefix", None) or provider_name
+
         if p:
             prefix_map.setdefault(p, []).append(provider_name)
 
@@ -141,9 +148,17 @@ def map_provider_group_id(
 
     # If target is primary, compose primary group name using source provider's prefix
     if to_provider == primary:
-        prefix = getattr(provs[from_provider], "prefix", from_provider)
+        # Use provider's get_mapping_prefix() method if available
+        if hasattr(provs[from_provider], "get_mapping_prefix") and callable(
+            getattr(provs[from_provider], "get_mapping_prefix")
+        ):
+            prefix = provs[from_provider].get_mapping_prefix()
+        else:
+            # Fallback to attribute introspection
+            prefix = getattr(provs[from_provider], "prefix", from_provider)
+
         # Use '-' as canonical separator
-        result = f"{prefix}-{canonical}"
+        result = f"{prefix}-{canonical}" if prefix else canonical
 
         # If primary provider requires email format, append domain
         primary_inst = provs.get(primary)
@@ -372,10 +387,19 @@ def map_normalized_groups_to_providers(
     prefix_to_provider: Optional[Dict[str, str]] = None
     if associate:
         provs = _ensure_providers_activated(provider_registry)
-        # Build prefix -> provider_name map deterministically
-        prefix_to_provider = {
-            (getattr(provs[p], "prefix", p) or p): p for p in sorted(provs.keys())
-        }
+        # Build prefix -> provider_name map deterministically using get_mapping_prefix()
+        prefix_to_provider = {}
+        for p in sorted(provs.keys()):
+            if hasattr(provs[p], "get_mapping_prefix") and callable(
+                getattr(provs[p], "get_mapping_prefix")
+            ):
+                prefix = provs[p].get_mapping_prefix()
+            else:
+                # Fallback to attribute introspection
+                prefix = getattr(provs[p], "prefix", p) or p
+
+            if prefix:
+                prefix_to_provider[prefix] = p
 
     for group in groups:
         # Candidate primary-style identifier (id or name)
