@@ -28,12 +28,15 @@ from modules.groups.providers.base import (
     ProviderCapabilities,
     HealthCheckResult,
     opresult_wrapper,
+    validate_member_email,
 )
 
 logger = get_module_logger()
 
 # AWS GroupId UUID pattern - used to distinguish GroupIds from display names
-AWS_GROUP_UUID_PATTERN = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+AWS_GROUP_UUID_PATTERN = (
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
 @register_provider("aws")
@@ -234,28 +237,6 @@ class AwsIdentityCenterProvider(GroupProvider):
             f"got {type(data).__name__}"
         )
 
-    def _validate_email(self, email: str) -> str:
-        """Validate and return email address.
-
-        Args:
-            email: Email address to validate
-
-        Returns:
-            The validated email address
-
-        Raises:
-            ValueError: If email is empty or doesn't contain @
-        """
-        if not email or not isinstance(email, str):
-            raise ValueError(
-                f"Email must be a non-empty string, got {type(email).__name__}"
-            )
-        if not email.strip():
-            raise ValueError("Email cannot be empty or whitespace")
-        if "@" not in email:
-            raise ValueError(f"Invalid email format: {email}")
-        return email.strip()
-
     def _ensure_user_id_from_email(self, email: str) -> str:
         if not hasattr(identity_store, "get_user_by_username"):
             raise IntegrationError(
@@ -312,7 +293,9 @@ class AwsIdentityCenterProvider(GroupProvider):
             )
 
         # Extract GroupId from response
-        group_id = self._extract_id_from_resp(resp, ["GroupId", "Id"], "get_group_by_name")
+        group_id = self._extract_id_from_resp(
+            resp, ["GroupId", "Id"], "get_group_by_name"
+        )
         return group_id
 
     def _resolve_membership_id(self, group_key: str, user_id: str) -> str:
@@ -334,7 +317,9 @@ class AwsIdentityCenterProvider(GroupProvider):
             )
         if not resp.success:
             raise IntegrationError("aws resolve membership id failed", response=resp)
-        mid = self._extract_id_from_resp(resp, ["MembershipId", "MembershipId"], "get_group_membership_id")
+        mid = self._extract_id_from_resp(
+            resp, ["MembershipId", "MembershipId"], "get_group_membership_id"
+        )
         return mid
 
     def _fetch_user_details(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -468,7 +453,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
-        validated_email = self._validate_email(member_email)
+        validated_email = validate_member_email(member_email)
 
         # Resolve group_key to UUID format
         resolved_group_id = self._resolve_group_id(group_key)
@@ -505,7 +490,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
-        validated_email = self._validate_email(member_email)
+        validated_email = validate_member_email(member_email)
 
         # Resolve group_key to UUID format
         resolved_group_id = self._resolve_group_id(group_key)
