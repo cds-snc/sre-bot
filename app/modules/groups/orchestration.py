@@ -154,12 +154,10 @@ def _propagate_to_secondaries(
             sec_group = service_layer.map_primary_to_secondary_group(
                 primary_group_id, name
             )
-            sec_member = service_layer.normalize_member_for_provider(
-                member_email, provider_type=name
-            )
-
+            # Phase 1: Provider methods now accept member_email directly (string)
+            # Email validation happens at the provider layer via validate_member_email()
             sec_op = _call_provider_method(
-                prov, op_name, sec_group, sec_member, correlation_id=correlation_id
+                prov, op_name, sec_group, member_email, correlation_id=correlation_id
             )
             results[name] = sec_op
 
@@ -257,9 +255,8 @@ def _orchestrate_write_operation(
         correlation_id = str(uuid4())
 
     primary = get_primary_provider()
-    member_obj = service_layer.normalize_member_for_provider(
-        member_email, provider_type=provider_hint or ""
-    )
+    # Phase 1: Provider methods now accept member_email directly (string)
+    # Email validation happens at the provider layer via validate_member_email()
 
     logger.info(
         "orchestration_member_operation_start",
@@ -274,7 +271,7 @@ def _orchestrate_write_operation(
             primary,
             op_name,
             primary_group_id,
-            member_obj,
+            member_email,
             correlation_id=correlation_id,
         )
     except Exception as e:
