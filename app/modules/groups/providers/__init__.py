@@ -68,15 +68,16 @@ def activate_providers() -> str:
         RuntimeError: on duplicate prefix collisions, disabled primary provider,
             or when provider instantiation/validation fails.
     """
+    # pylint: disable=import-outside-toplevel
     from core.config import settings  # Import at function level to avoid circular deps
 
     try:
         provider_configs = settings.groups.providers or {}
-    except AttributeError:
+    except AttributeError as e:
         raise ValueError(
             "Groups configuration not found in settings. "
             "Ensure core.config has groups configured."
-        )
+        ) from e
 
     # Filter discovered providers based on config
     new_registry: Dict[str, GroupProvider] = {}
@@ -122,6 +123,12 @@ def activate_providers() -> str:
                 getattr(instance, "_set_domain_from_config")
             ):
                 instance._set_domain_from_config()
+                domain = getattr(instance, "domain", None)
+                logger.debug(
+                    "provider_domain_configured",
+                    provider=name,
+                    domain=domain,
+                )
 
             # Apply provider-provided defaults for prefix (activation-time
             # metadata). Prefer explicit `default_prefix` attribute, then the
