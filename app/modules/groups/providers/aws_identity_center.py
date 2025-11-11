@@ -1,11 +1,23 @@
+"""AWS Identity Center Provider"""
+
+# Standard library
+import re
 from typing import Any, Dict, List, Optional
 
+# Third party
 from botocore.exceptions import BotoCoreError, ClientError
+
+# Local application - core
+from core.config import settings
 from core.logging import get_module_logger
+
+# Local application - integrations
 from integrations.aws import identity_store_next as identity_store
 from integrations.aws.schemas import Group as AwsGroup
 from integrations.aws.schemas import GroupMembership as AwsGroupMembership
 from integrations.aws.schemas import User as AwsUser
+
+# Local application - modules
 from modules.groups.errors import IntegrationError
 from modules.groups.models import NormalizedGroup, NormalizedMember, as_canonical_dict
 from modules.groups.providers import register_provider
@@ -14,10 +26,14 @@ from modules.groups.providers.base import (
     OperationResult,
     OperationStatus,
     ProviderCapabilities,
+    HealthCheckResult,
     opresult_wrapper,
 )
 
 logger = get_module_logger()
+
+# AWS GroupId UUID pattern - used to distinguish GroupIds from display names
+AWS_GROUP_UUID_PATTERN = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
 
 @register_provider("aws")
@@ -42,6 +58,17 @@ class AwsIdentityCenterProvider(GroupProvider):
     def __init__(self):
         """Initialize the provider with circuit breaker support."""
         super().__init__()
+        self.identity_store_id = self._get_identity_store_id()
+
+    def _get_identity_store_id(self) -> Optional[str]:
+        """Get the AWS Identity Store ID from settings.
+
+        Returns:
+            Identity Store ID from settings, or None if not configured
+        """
+        if hasattr(settings, "aws") and hasattr(settings.aws, "INSTANCE_ID"):
+            return settings.aws.INSTANCE_ID
+        return None
 
     @property
     def capabilities(self) -> ProviderCapabilities:
@@ -126,29 +153,108 @@ class AwsIdentityCenterProvider(GroupProvider):
     # ------------------------------------------------------------------
     # Instance helpers (migrated from module-level into the provider)
     # ------------------------------------------------------------------
-    def _extract_id_from_resp(self, resp: Any, id_keys: List[str]) -> Optional[str]:
+    def _extract_id_from_resp(
+        self, resp: Any, id_keys: List[str], operation_name: str = "extract_id"
+    ) -> str:
+        """Extract an ID from an AWS integration response with explicit error handling.
+
+        Validates response structure at each step and raises explicit exceptions
+        rather than returning None silently.
+
+        Args:
+            resp: The integration response object
+            id_keys: List of keys to check for ID values, in priority order
+            operation_name: Name of the operation for error context
+
+        Returns:
+            The extracted ID string
+
+        Raises:
+            IntegrationError: If response is invalid or missing success attribute
+            ValueError: If ID cannot be extracted from response data
+        """
+        # Step 1: Validate response object exists
         if resp is None:
-            return None
+            raise ValueError(f"{operation_name}: Response is None")
+
+        # Step 2: Validate response has success attribute
         if not hasattr(resp, "success"):
             raise IntegrationError(
-                "aws identity_store returned unexpected type", response=resp
+                f"{operation_name}: AWS identity_store returned unexpected type",
+                response=resp,
             )
+
+        # Step 3: Check if operation succeeded
         if not resp.success:
-            return None
+            raise IntegrationError(
+                f"{operation_name}: AWS API call failed",
+                response=resp,
+            )
+
+        # Step 4: Extract data from response
         data = resp.data
+        if data is None:
+            raise ValueError(f"{operation_name}: Response data is None")
 
+        # Step 5: If data is string, return it directly
         if isinstance(data, str):
-            return data
+            if not data.strip():
+                raise ValueError(f"{operation_name}: ID string is empty")
+            return data.strip()
 
+        # Step 6: If data is dict, search for ID in priority order
         if isinstance(data, dict):
+            # Try primary id_keys first
             for k in id_keys:
-                if k in data and data[k]:
-                    return data[k]
+                if k in data:
+                    value = data[k]
+                    if value and isinstance(value, str):
+                        return value.strip()
+
+            # Try nested MemberId structure
             if "MemberId" in data and isinstance(data["MemberId"], dict):
-                return data["MemberId"].get("UserId") or data["MemberId"].get("Id")
+                user_id = data["MemberId"].get("UserId")
+                if user_id:
+                    return user_id
+
+            # Fallback to UserId key
             if "UserId" in data:
-                return data.get("UserId")
-        return None
+                user_id = data.get("UserId")
+                if user_id:
+                    return user_id
+
+            raise ValueError(
+                f"{operation_name}: Could not extract ID from response data. "
+                f"Expected one of {id_keys}, got keys: {list(data.keys())}"
+            )
+
+        # Step 7: Invalid data type
+        raise ValueError(
+            f"{operation_name}: Response data must be string or dict, "
+            f"got {type(data).__name__}"
+        )
+
+    def _validate_email(self, email: str) -> str:
+        """Validate and return email address.
+
+        Args:
+            email: Email address to validate
+
+        Returns:
+            The validated email address
+
+        Raises:
+            ValueError: If email is empty or doesn't contain @
+        """
+        if not email or not isinstance(email, str):
+            raise ValueError(
+                f"Email must be a non-empty string, got {type(email).__name__}"
+            )
+        if not email.strip():
+            raise ValueError("Email cannot be empty or whitespace")
+        if "@" not in email:
+            raise ValueError(f"Invalid email format: {email}")
+        return email.strip()
 
     def _ensure_user_id_from_email(self, email: str) -> str:
         if not hasattr(identity_store, "get_user_by_username"):
@@ -162,9 +268,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             )
         if not resp.success:
             raise IntegrationError("aws resolve user id failed", response=resp)
-        uid = self._extract_id_from_resp(resp, ["UserId", "Id"])
-        if not uid:
-            raise ValueError(f"could not resolve user id for email={email}")
+        uid = self._extract_id_from_resp(resp, ["UserId", "Id"], "get_user_by_username")
         return uid
 
     def _resolve_group_id(self, group_key: str) -> str:
@@ -186,12 +290,8 @@ class AwsIdentityCenterProvider(GroupProvider):
         Raises:
             IntegrationError: If group cannot be resolved
         """
-        import re
-
-        # AWS GroupId pattern: ([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}
-        # Simplified check: if it looks like a UUID, assume it's already a GroupId
-        uuid_pattern = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-        if re.match(uuid_pattern, group_key.strip()):
+        # Check if input is already a UUID (GroupId format)
+        if re.match(AWS_GROUP_UUID_PATTERN, group_key.strip()):
             return group_key.strip()
 
         # Not a UUID, treat as display name and resolve
@@ -212,10 +312,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             )
 
         # Extract GroupId from response
-        group_id = self._extract_id_from_resp(resp, ["GroupId", "Id"])
-        if not group_id:
-            raise ValueError(f"could not resolve group id for display name={group_key}")
-
+        group_id = self._extract_id_from_resp(resp, ["GroupId", "Id"], "get_group_by_name")
         return group_id
 
     def _resolve_membership_id(self, group_key: str, user_id: str) -> str:
@@ -237,11 +334,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             )
         if not resp.success:
             raise IntegrationError("aws resolve membership id failed", response=resp)
-        mid = self._extract_id_from_resp(resp, ["MembershipId", "MembershipId"])
-        if not mid:
-            raise ValueError(
-                f"could not resolve membership id for group={group_key} user={user_id}"
-            )
+        mid = self._extract_id_from_resp(resp, ["MembershipId", "MembershipId"], "get_group_membership_id")
         return mid
 
     def _fetch_user_details(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -364,66 +457,23 @@ class AwsIdentityCenterProvider(GroupProvider):
             raw=group if include_raw else None,
         )
 
-    def _resolve_member_identifier(self, member_data: dict | str) -> str:
-        """Convert member_data input to an AWS-compatible identifier.
-
-        This provider method handles the flexibility of accepting str or dict,
-        but validates and converts to what AWS expects.
-
-        Args:
-            member_data: Either a string email or a dict with email/id keys.
-
-        Returns:
-            An AWS member identifier (email string).
-
-        Raises:
-            ValueError: If the input cannot be resolved to a member identifier.
-        """
-        if isinstance(member_data, str):
-            if not member_data.strip():
-                raise ValueError("Member identifier string cannot be empty")
-            return member_data.strip()
-
-        if isinstance(member_data, dict):
-            email = member_data.get("email")
-            if not email:
-                raise ValueError("Member dict must contain 'email' field")
-            return email
-
-        raise TypeError(
-            f"member_data must be str or dict; got {type(member_data).__name__}"
-        )
-
     @opresult_wrapper(data_key="result")
-    def _add_member_impl(
-        self, group_key: str, member_data: NormalizedMember | dict | str
-    ) -> dict:
-        """Add a member to a group and return the normalized member dict.
+    def _add_member_impl(self, group_key: str, member_email: str) -> dict:
+        """Add a member to a group by email.
 
         Args:
             group_key: AWS group key (UUID or display name).
-            member_data: Member identifier (NormalizedMember, str email, or dict with email).
+            member_email: Email address of the member to add
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
-        # Handle NormalizedMember input (from orchestration propagation)
-        if isinstance(member_data, NormalizedMember):
-            email = getattr(member_data, "email", None)
-            if not email:
-                raise ValueError("NormalizedMember must include email")
-            member_data = {"email": email}
-
-        if not isinstance(member_data, dict):
-            raise ValueError("member_data must be a dict containing at least 'email'")
-        email = member_data.get("email")
-        if not email:
-            raise ValueError("member_data.email is required")
+        validated_email = self._validate_email(member_email)
 
         # Resolve group_key to UUID format
         resolved_group_id = self._resolve_group_id(group_key)
 
-        user_id = self._ensure_user_id_from_email(email)
+        user_id = self._ensure_user_id_from_email(validated_email)
         if not hasattr(identity_store, "create_group_membership"):
             raise IntegrationError(
                 "aws identity_store missing create_group_membership", response=None
@@ -439,41 +489,28 @@ class AwsIdentityCenterProvider(GroupProvider):
             user_data = self._fetch_user_details(user_id)
         except IntegrationError:
             user_data = None
-        member_payload = {"email": email, "id": user_id}
+        member_payload = {"email": validated_email, "id": user_id}
         if user_data:
             member_payload.update({"Name": user_data.get("Name") or {}})
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
     @opresult_wrapper(data_key="result")
-    def _remove_member_impl(
-        self, group_key: str, member_data: NormalizedMember | dict | str
-    ) -> dict:
-        """Remove a member from a group and return the normalized member dict.
+    def _remove_member_impl(self, group_key: str, member_email: str) -> dict:
+        """Remove a member from a group by email.
 
         Args:
             group_key: AWS group key (UUID or display name).
-            member_data: Member identifier (NormalizedMember, str email, or dict with email).
+            member_email: Email address of the member to remove
 
         Returns:
             A canonical member dict (normalized NormalizedMember).
         """
-        # Handle NormalizedMember input (from orchestration propagation)
-        if isinstance(member_data, NormalizedMember):
-            email = getattr(member_data, "email", None)
-            if not email:
-                raise ValueError("NormalizedMember must include email")
-            member_data = {"email": email}
-
-        if not isinstance(member_data, dict):
-            raise ValueError("member_data must be a dict containing at least 'email'")
-        email = member_data.get("email")
-        if not email:
-            raise ValueError("member_data.email is required")
+        validated_email = self._validate_email(member_email)
 
         # Resolve group_key to UUID format
         resolved_group_id = self._resolve_group_id(group_key)
 
-        user_id = self._ensure_user_id_from_email(email)
+        user_id = self._ensure_user_id_from_email(validated_email)
         membership_id = self._resolve_membership_id(resolved_group_id, user_id)
         if not hasattr(identity_store, "delete_group_membership"):
             raise IntegrationError(
@@ -490,14 +527,79 @@ class AwsIdentityCenterProvider(GroupProvider):
             user_data = self._fetch_user_details(user_id)
         except IntegrationError:
             user_data = None
-        member_payload = {"email": email, "id": user_id}
+        member_payload = {"email": validated_email, "id": user_id}
         if user_data:
             member_payload.update({"Name": user_data.get("Name") or {}})
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
+    def _extract_user_id_from_membership(self, membership: dict) -> Optional[str]:
+        """Extract user ID from a group membership object.
+
+        AWS GroupMembership may have MemberId as a dict with UserId field.
+
+        Args:
+            membership: Group membership dict from AWS
+
+        Returns:
+            User ID string, or None if not found
+
+        Raises:
+            ValueError: If membership structure is invalid
+        """
+        if not isinstance(membership, dict):
+            return None
+
+        if "MemberId" in membership and isinstance(membership["MemberId"], dict):
+            user_id = membership["MemberId"].get("UserId")
+            if user_id:
+                return user_id
+
+        return None
+
+    def _extract_email_from_user_data(self, user_data: dict) -> Optional[str]:
+        """Extract email from AWS user data.
+
+        AWS returns emails in various formats depending on the API call.
+        This method handles multiple formats.
+
+        Args:
+            user_data: User data dict from AWS
+
+        Returns:
+            Email string, or None if not found
+
+        Raises:
+            ValueError: If email structure is unexpected
+        """
+        if not isinstance(user_data, dict):
+            return None
+
+        # Try direct email field first
+        if "email" in user_data and user_data["email"]:
+            return user_data["email"]
+
+        # Try Emails list structure (AWS common format)
+        if isinstance(user_data.get("Emails"), list) and user_data["Emails"]:
+            first_email = user_data["Emails"][0]
+            if isinstance(first_email, dict) and first_email.get("Value"):
+                return first_email["Value"]
+
+        return None
+
     @opresult_wrapper(data_key="members")
     def _get_group_members_impl(self, group_key: str, **kwargs) -> list[dict]:
-        """AWS returns the list of canonical memberships, not the user details."""
+        """Fetch group members with proper error handling for missing emails.
+
+        Returns a list of normalized members. Members without email addresses
+        are skipped with explicit logging to avoid data quality issues.
+
+        Args:
+            group_key: AWS group key (UUID or display name).
+            **kwargs: Additional parameters (unused).
+
+        Returns:
+            List of canonical member dicts (normalized NormalizedMember).
+        """
         # Resolve group_key to UUID format for consistency
         resolved_group_id = self._resolve_group_id(group_key)
 
@@ -515,38 +617,70 @@ class AwsIdentityCenterProvider(GroupProvider):
         raw = resp.data or []
 
         members = []
-        for m in raw:
-            if not isinstance(m, dict):
+        for idx, membership in enumerate(raw):
+            if not isinstance(membership, dict):
+                logger.warning(
+                    "skipped_non_dict_membership",
+                    group_key=group_key,
+                    membership_index=idx,
+                    membership_type=type(membership).__name__,
+                )
                 continue
-            member_id = None
-            # TODO: FIX the AWS SDK does not return the UserId, a subsequent
-            # call to get_user_details will need to handle this case.
-            if "MemberId" in m and isinstance(m["MemberId"], dict):
-                member_id = m["MemberId"].get("UserId")
+
+            # Extract user ID from membership
+            user_id = self._extract_user_id_from_membership(membership)
+            if not user_id:
+                logger.warning(
+                    "skipped_membership_without_user_id",
+                    group_key=group_key,
+                    membership=membership,
+                )
+                continue
+
+            # Fetch user details
             user_data = None
-            if member_id:
-                try:
-                    user_data = self._fetch_user_details(member_id)
-                except IntegrationError:
-                    user_data = None
-            member_payload = {}
+            try:
+                user_data = self._fetch_user_details(user_id)
+            except IntegrationError as e:
+                logger.warning(
+                    "skipped_membership_fetch_user_failed",
+                    group_key=group_key,
+                    user_id=user_id,
+                    error=str(e),
+                )
+                continue
+
+            # Extract email from user data
+            email = self._extract_email_from_user_data(user_data)
+            if not email:
+                logger.warning(
+                    "skipped_member_without_email",
+                    group_key=group_key,
+                    user_id=user_id,
+                    user_data_keys=list(user_data.keys()) if user_data else [],
+                )
+                continue
+
+            # Build normalized member
+            member_payload = {
+                "email": email,
+                "id": user_id,
+            }
             if user_data:
                 member_payload.update(user_data)
-                member_payload["email"] = (
-                    member_payload.get("Emails", [{}])[0].get("Value")
-                    if isinstance(member_payload.get("Emails"), list)
-                    else member_payload.get("email")
-                )
-                member_payload["id"] = member_payload.get("UserId") or member_id
-                members.append(
-                    as_canonical_dict(self._normalize_member_from_aws(member_payload))
-                )
-                continue
-            member_payload["id"] = member_id
-            member_payload["email"] = None
+
             members.append(
                 as_canonical_dict(self._normalize_member_from_aws(member_payload))
             )
+
+        logger.info(
+            "get_group_members_completed",
+            group_key=group_key,
+            resolved_group_id=resolved_group_id,
+            total_memberships=len(raw),
+            valid_members=len(members),
+        )
+
         return members
 
     @opresult_wrapper(data_key="groups")
@@ -590,7 +724,7 @@ class AwsIdentityCenterProvider(GroupProvider):
         return groups
 
     @opresult_wrapper(data_key="health")
-    def _health_check_impl(self) -> dict:
+    def _health_check_impl(self) -> HealthCheckResult:
         """Lightweight health check for AWS Identity Center connectivity.
 
         This performs a minimal API call to verify authentication and basic
@@ -598,49 +732,70 @@ class AwsIdentityCenterProvider(GroupProvider):
         list operation with maxResults=1 to minimize impact.
 
         Returns:
-            Dictionary with 'status' and optional 'identity_store_id' field
+            HealthCheckResult with health status and optional details
         """
         try:
             # Get identity store ID if available (from instance attribute)
-            identity_store_id = getattr(self, "identity_store_id", None)
-            if not identity_store_id:
-                return {
-                    "status": "degraded",
-                    "message": "Identity store ID not configured",
-                }
+            if not self.identity_store_id:
+                return HealthCheckResult(
+                    healthy=False,
+                    status="degraded",
+                    details={
+                        "message": "Identity store ID not configured",
+                    },
+                )
 
             # Perform minimal API call: list groups with maxResults=1
             resp = identity_store.list_groups(maxResults=1)
 
             if not hasattr(resp, "success"):
-                return {
-                    "status": "unhealthy",
-                    "message": "AWS Identity Center API returned unexpected type",
-                }
+                return HealthCheckResult(
+                    healthy=False,
+                    status="unhealthy",
+                    details={
+                        "message": "AWS Identity Center API returned unexpected type",
+                    },
+                )
 
             if not resp.success:
-                return {
-                    "status": "unhealthy",
-                    "message": "AWS Identity Center API unreachable",
-                    "error": str(resp),
-                }
+                return HealthCheckResult(
+                    healthy=False,
+                    status="unhealthy",
+                    details={
+                        "message": "AWS Identity Center API unreachable",
+                        "error": str(resp),
+                    },
+                )
 
-            return {
-                "status": "healthy",
-                "identity_store_id": identity_store_id,
-                "message": "Provider is operational",
-            }
+            return HealthCheckResult(
+                healthy=True,
+                status="healthy",
+                details={
+                    "identity_store_id": self.identity_store_id,
+                    "message": "Provider is operational",
+                },
+            )
 
         except IntegrationError as e:
-            return {"status": "unhealthy", "message": str(e), "error_code": "API_ERROR"}
+            return HealthCheckResult(
+                healthy=False,
+                status="unhealthy",
+                details={
+                    "message": str(e),
+                    "error_code": "API_ERROR",
+                },
+            )
         except Exception as e:
             logger.error(
                 "aws_health_check_failed",
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return {
-                "status": "unhealthy",
-                "message": "Unexpected error during health check",
-                "error": str(e),
-            }
+            return HealthCheckResult(
+                healthy=False,
+                status="unhealthy",
+                details={
+                    "message": "Unexpected error during health check",
+                    "error": str(e),
+                },
+            )
