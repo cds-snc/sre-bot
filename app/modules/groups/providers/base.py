@@ -86,6 +86,44 @@ class OperationResult:
 
 
 @dataclass
+class HealthCheckResult:
+    """Result of a provider health check operation.
+
+    Attributes:
+        healthy: Whether the provider is healthy and operational
+        status: Human-readable status ("healthy", "unhealthy", "degraded")
+        details: Optional provider-specific details about the health state
+        timestamp: Optional ISO 8601 timestamp of the check
+    """
+
+    healthy: bool
+    status: str  # "healthy", "unhealthy", "degraded"
+    details: Optional[Dict[str, Any]] = None
+    timestamp: Optional[str] = None
+
+
+@dataclass
+class CircuitBreakerStats:
+    """Statistics and state information for a circuit breaker.
+
+    Attributes:
+        enabled: Whether the circuit breaker is enabled for this provider
+        state: Current state ("CLOSED", "OPEN", "HALF_OPEN")
+        failure_count: Number of consecutive failures
+        success_count: Number of consecutive successes
+        last_failure_time: Timestamp of the last failure, or None
+        message: Optional human-readable message about the circuit state
+    """
+
+    enabled: bool
+    state: str  # "CLOSED", "OPEN", "HALF_OPEN"
+    failure_count: int = 0
+    success_count: int = 0
+    last_failure_time: Optional[float] = None
+    message: Optional[str] = None
+
+
+@dataclass
 class ProviderCapabilities:
     supports_user_creation: bool = False
     supports_user_deletion: bool = False
@@ -308,9 +346,21 @@ class GroupProvider(ABC):
         return self.prefix
 
     def add_member(
-        self, group_key: str, member_data: NormalizedMember
+        self, group_key: str, member_email: str
     ) -> OperationResult:
-        """Add a member synchronously and return a canonical member dict.
+        """Add a member to a group by email.
+
+        The email address is the universal identifier for group members across
+        all providers. Each provider is responsible for resolving the email to
+        its internal user ID representation.
+
+        Args:
+            group_key: Provider-specific group identifier
+            member_email: Email address of the member to add
+
+        Returns:
+            OperationResult with status indicating success or failure.
+            For successful operations, data contains the added member details.
 
         This method is wrapped by circuit breaker. Subclasses should implement
         _add_member_impl instead of this method.
@@ -318,33 +368,57 @@ class GroupProvider(ABC):
         if self._circuit_breaker:
             try:
                 return self._circuit_breaker.call(
-                    self._add_member_impl, group_key, member_data
+                    self._add_member_impl, group_key, member_email
                 )
             except CircuitBreakerOpenError as e:
                 logger.warning(
                     "circuit_breaker_rejected_add_member",
                     provider=self.__class__.__name__,
                     group_key=group_key,
+                    member_email=member_email,
                 )
                 return OperationResult.transient_error(
                     message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
                 )
         else:
-            return self._add_member_impl(group_key, member_data)
+            return self._add_member_impl(group_key, member_email)
 
     @abstractmethod
     def _add_member_impl(
-        self, group_key: str, member_data: NormalizedMember
+        self, group_key: str, member_email: str
     ) -> OperationResult:
         """Implementation of add_member (no circuit breaker wrapper).
 
+        Args:
+            group_key: Provider-specific group identifier
+            member_email: Email address of the member to add
+
+        Returns:
+            OperationResult with operation outcome
+
         Subclasses should implement this method instead of add_member.
+        Each provider is responsible for:
+        1. Validating the email format
+        2. Resolving email to internal user ID
+        3. Performing the group membership operation
         """
 
     def remove_member(
-        self, group_key: str, member_data: NormalizedMember
+        self, group_key: str, member_email: str
     ) -> OperationResult:
-        """Remove a member synchronously and return canonical member dict.
+        """Remove a member from a group by email.
+
+        The email address is the universal identifier for group members across
+        all providers. Each provider is responsible for resolving the email to
+        its internal user ID representation.
+
+        Args:
+            group_key: Provider-specific group identifier
+            member_email: Email address of the member to remove
+
+        Returns:
+            OperationResult with status indicating success or failure.
+            For successful operations, data contains the removed member details.
 
         This method is wrapped by circuit breaker. Subclasses should implement
         _remove_member_impl instead of this method.
@@ -352,27 +426,39 @@ class GroupProvider(ABC):
         if self._circuit_breaker:
             try:
                 return self._circuit_breaker.call(
-                    self._remove_member_impl, group_key, member_data
+                    self._remove_member_impl, group_key, member_email
                 )
             except CircuitBreakerOpenError as e:
                 logger.warning(
                     "circuit_breaker_rejected_remove_member",
                     provider=self.__class__.__name__,
                     group_key=group_key,
+                    member_email=member_email,
                 )
                 return OperationResult.transient_error(
                     message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
                 )
         else:
-            return self._remove_member_impl(group_key, member_data)
+            return self._remove_member_impl(group_key, member_email)
 
     @abstractmethod
     def _remove_member_impl(
-        self, group_key: str, member_data: NormalizedMember
+        self, group_key: str, member_email: str
     ) -> OperationResult:
         """Implementation of remove_member (no circuit breaker wrapper).
 
+        Args:
+            group_key: Provider-specific group identifier
+            member_email: Email address of the member to remove
+
+        Returns:
+            OperationResult with operation outcome
+
         Subclasses should implement this method instead of remove_member.
+        Each provider is responsible for:
+        1. Validating the email format
+        2. Resolving email to internal user ID
+        3. Performing the group membership operation
         """
 
     def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
@@ -461,18 +547,6 @@ class GroupProvider(ABC):
         Subclasses should implement this method instead of list_groups_with_members.
         """
 
-    def create_group(self, *args, **kwargs) -> OperationResult:
-        """Group creation is disabled; managed via IaC."""
-        return OperationResult.permanent_error(
-            "Group creation disabled - managed via IaC", error_code="NOT_IMPLEMENTED"
-        )
-
-    def delete_group(self, *args, **kwargs) -> OperationResult:
-        """Group deletion is disabled; managed via IaC."""
-        return OperationResult.permanent_error(
-            "Group deletion disabled - managed via IaC", error_code="NOT_IMPLEMENTED"
-        )
-
     def create_user(self, user_data: NormalizedMember) -> OperationResult:
         """Create a user and return the result."""
         raise NotImplementedError("User creation not implemented in this provider.")
@@ -481,15 +555,28 @@ class GroupProvider(ABC):
         """Delete a user and return the result."""
         raise NotImplementedError("User deletion not implemented in this provider.")
 
-    def get_circuit_breaker_stats(self) -> dict:
+    def get_circuit_breaker_stats(self) -> CircuitBreakerStats:
         """Get circuit breaker statistics for this provider.
 
         Returns:
-            Dictionary with circuit breaker state and statistics, or empty dict if disabled.
+            CircuitBreakerStats with current state and statistics.
+            If disabled, returns a stats object with enabled=False.
         """
         if self._circuit_breaker:
-            return self._circuit_breaker.get_stats()
-        return {"enabled": False, "message": "Circuit breaker disabled"}
+            stats_dict = self._circuit_breaker.get_stats()
+            return CircuitBreakerStats(
+                enabled=True,
+                state=stats_dict.get("state", "UNKNOWN"),
+                failure_count=stats_dict.get("failure_count", 0),
+                success_count=stats_dict.get("success_count", 0),
+                last_failure_time=stats_dict.get("last_failure_time"),
+                message=stats_dict.get("message"),
+            )
+        return CircuitBreakerStats(
+            enabled=False,
+            state="CLOSED",
+            message="Circuit breaker disabled"
+        )
 
     def reset_circuit_breaker(self) -> None:
         """Manually reset circuit breaker to CLOSED state.
@@ -504,7 +591,7 @@ class GroupProvider(ABC):
                 provider=self.__class__.__name__,
             )
 
-    def health_check(self) -> OperationResult:
+    def health_check(self) -> HealthCheckResult:
         """Perform a lightweight health check with circuit breaker protection.
 
         Health checks should be minimal API calls (e.g., authenticate or get
@@ -515,7 +602,7 @@ class GroupProvider(ABC):
         _health_check_impl instead of this method.
 
         Returns:
-            OperationResult with status and optional health details
+            HealthCheckResult with health status and optional provider-specific details
         """
         if self._circuit_breaker:
             try:
@@ -525,31 +612,55 @@ class GroupProvider(ABC):
                     "circuit_breaker_rejected_health_check",
                     provider=self.__class__.__name__,
                 )
-                return OperationResult.transient_error(
-                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                return HealthCheckResult(
+                    healthy=False,
+                    status="unhealthy",
+                    details={"error": str(e), "error_code": "CIRCUIT_BREAKER_OPEN"}
                 )
         else:
             return self._health_check_impl()
 
     @abstractmethod
-    def _health_check_impl(self) -> OperationResult:
+    def _health_check_impl(self) -> HealthCheckResult:
         """Implementation of health_check (no circuit breaker wrapper).
 
-        Subclasses should implement this method instead of health_check.
-
-        This should be a lightweight operation that verifies the provider
-        is accessible and functional, such as:
+        Each provider should implement a minimal health check that verifies
+        connectivity and basic functionality without consuming significant
+        resources or quota. This should be a lightweight operation such as:
         - Authenticating with the provider API
         - Retrieving a simple piece of information (e.g., org domain)
         - Testing connectivity without listing large datasets
 
         Returns:
-            OperationResult.success() if healthy, error result otherwise
+            HealthCheckResult indicating provider health status
+
+        Subclasses should implement this method instead of health_check.
         """
 
 
 class PrimaryGroupProvider(GroupProvider):
-    """Abstract subclass for primary/canonical providers."""
+    """Abstract subclass for primary/canonical group providers.
+
+    The primary provider (typically Google Workspace) is the authoritative source
+    of truth for group membership and metadata. It provides additional methods
+    beyond the base GroupProvider contract:
+
+    Additional Methods:
+        validate_permissions(): Check if a user has permission to perform an action
+        is_manager(): Check if a user is a manager of a group
+        list_groups_for_user(): Get all groups a specific user belongs to
+
+    Source of Truth Role:
+        - All group membership data is read from and verified against the primary provider
+        - Secondary providers synchronize their state from the primary provider
+        - Email addresses are the universal identifier across all providers
+        - Primary provider is consulted for canonical group and user information
+
+    Subclasses should implement:
+        - Standard GroupProvider abstract methods (add_member, remove_member, etc.)
+        - Permission validation methods (validate_permissions, is_manager)
+        - Any primary-provider-specific operations
+    """
 
     def validate_permissions(
         self, user_key: str, group_key: str, action: str
