@@ -163,6 +163,43 @@ def opresult_wrapper(data_key=None):
     return decorator
 
 
+def provider_operation(data_key=None):
+    """Decorator for provider operations with error classification.
+
+    Handles:
+    - OperationResult pass-through (avoid double-wrapping)
+    - Success data wrapping via data_key
+    - Exception classification via provider's classify_error() method
+    - Graceful fallback to generic transient error
+
+    Args:
+        data_key: Optional key to wrap result data under (e.g., "members" wraps as {"members": [...]})
+
+    Returns:
+        Decorated function that returns OperationResult
+    """
+
+    def decorator(func):
+        def wrapper(self, *args, **kwargs):
+            try:
+                result = func(self, *args, **kwargs)
+                # If the provider already returned an OperationResult, pass it
+                # through unchanged (avoid double-wrapping).
+                if isinstance(result, OperationResult):
+                    return result
+                data = {data_key: result} if data_key else result
+                return OperationResult(
+                    status=OperationStatus.SUCCESS, message="ok", data=data
+                )
+            except Exception as e:
+                # Use provider's error classification method
+                return self.classify_error(e)
+
+        return wrapper
+
+    return decorator
+
+
 class GroupProvider(ABC):
     """Abstract Base Class for group providers."""
 
@@ -221,6 +258,54 @@ class GroupProvider(ABC):
         """
         override = getattr(self, "_capability_override", None)
         return override if override is not None else self.capabilities
+
+    def classify_error(self, exc: Exception) -> OperationResult:
+        """Classify provider-specific exceptions into OperationResult.
+
+        Providers should override to classify:
+        - Rate limit errors (with retry_after)
+        - Transient errors (network, timeout)
+        - Permanent errors (auth, not found, invalid input)
+        - Circuit breaker state
+
+        Args:
+            exc: Exception raised by provider operation
+
+        Returns:
+            OperationResult with appropriate status, error_code, and retry_after
+
+        Default implementation: treat all as transient errors.
+        """
+        return OperationResult.transient_error(str(exc))
+
+    def get_mapping_prefix(self) -> Optional[str]:
+        """Return the prefix used for this provider in cross-provider mapping.
+
+        This prefix is prepended to canonical group names when mapping FROM
+        this secondary provider TO the primary provider.
+
+        Primary providers return None (no prefix in mappings).
+        Secondary providers return their configured prefix.
+
+        Examples:
+            Google provider (primary): None
+            AWS provider (secondary): "aws"
+            Custom provider (secondary): "custom"
+
+        Returns:
+            Prefix string for secondary providers, None for primary provider
+        """
+        # Primary providers don't use prefixes in mappings
+        if self.get_capabilities().is_primary:
+            return None
+
+        # Use configured prefix (set during activation)
+        configured = getattr(self, "_prefix", None)
+        if configured:
+            return configured
+
+        # Fallback to prefix property or class name
+        return self.prefix
 
     def add_member(
         self, group_key: str, member_data: NormalizedMember
@@ -396,12 +481,6 @@ class GroupProvider(ABC):
         """Delete a user and return the result."""
         raise NotImplementedError("User deletion not implemented in this provider.")
 
-    def list_groups_for_user(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> OperationResult:
-        """Return a list of canonical group dicts the user can manage."""
-        raise NotImplementedError()
-
     def get_circuit_breaker_stats(self) -> dict:
         """Get circuit breaker statistics for this provider.
 
@@ -425,16 +504,188 @@ class GroupProvider(ABC):
                 provider=self.__class__.__name__,
             )
 
+    def health_check(self) -> OperationResult:
+        """Perform a lightweight health check with circuit breaker protection.
+
+        Health checks should be minimal API calls (e.g., authenticate or get
+        basic provider info) to verify the provider is working. They should
+        not consume significant quota or resources.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _health_check_impl instead of this method.
+
+        Returns:
+            OperationResult with status and optional health details
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(self._health_check_impl)
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_health_check",
+                    provider=self.__class__.__name__,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._health_check_impl()
+
+    @abstractmethod
+    def _health_check_impl(self) -> OperationResult:
+        """Implementation of health_check (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of health_check.
+
+        This should be a lightweight operation that verifies the provider
+        is accessible and functional, such as:
+        - Authenticating with the provider API
+        - Retrieving a simple piece of information (e.g., org domain)
+        - Testing connectivity without listing large datasets
+
+        Returns:
+            OperationResult.success() if healthy, error result otherwise
+        """
+
 
 class PrimaryGroupProvider(GroupProvider):
     """Abstract subclass for primary/canonical providers."""
 
-    @abstractmethod
     def validate_permissions(
         self, user_key: str, group_key: str, action: str
     ) -> OperationResult:
-        """Validate permissions for a user on a group."""
+        """Validate permissions for a user on a group with circuit breaker protection.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _validate_permissions_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._validate_permissions_impl, user_key, group_key, action
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_validate_permissions",
+                    provider=self.__class__.__name__,
+                    user_key=user_key,
+                    group_key=group_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._validate_permissions_impl(user_key, group_key, action)
 
     @abstractmethod
+    def _validate_permissions_impl(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        """Implementation of validate_permissions (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of validate_permissions.
+        """
+
     def is_manager(self, user_key: str, group_key: str) -> OperationResult:
-        """Direct role-check for whether the user is manager for the group."""
+        """Check if user is manager with circuit breaker protection.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _is_manager_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._is_manager_impl, user_key, group_key
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_is_manager",
+                    provider=self.__class__.__name__,
+                    user_key=user_key,
+                    group_key=group_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._is_manager_impl(user_key, group_key)
+
+    @abstractmethod
+    def _is_manager_impl(self, user_key: str, group_key: str) -> OperationResult:
+        """Implementation of is_manager (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of is_manager.
+        """
+
+    def list_groups_for_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
+        """Return a list of canonical group dicts the user is a member of with circuit breaker protection.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _list_groups_for_user_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._list_groups_for_user_impl, user_key, provider_name, **kwargs
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_list_groups_for_user",
+                    provider=self.__class__.__name__,
+                    user_key=user_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._list_groups_for_user_impl(user_key, provider_name, **kwargs)
+
+    @abstractmethod
+    def _list_groups_for_user_impl(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
+        """Implementation of list_groups_for_user (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of list_groups_for_user.
+        """
+
+    def list_groups_managed_by_user(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
+        """Return a list of canonical group dicts the user manages with circuit breaker protection.
+
+        This method is wrapped by circuit breaker. Subclasses should implement
+        _list_groups_managed_by_user_impl instead of this method.
+        """
+        if self._circuit_breaker:
+            try:
+                return self._circuit_breaker.call(
+                    self._list_groups_managed_by_user_impl,
+                    user_key,
+                    provider_name,
+                    **kwargs,
+                )
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "circuit_breaker_rejected_list_groups_managed_by_user",
+                    provider=self.__class__.__name__,
+                    user_key=user_key,
+                )
+                return OperationResult.transient_error(
+                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
+                )
+        else:
+            return self._list_groups_managed_by_user_impl(
+                user_key, provider_name, **kwargs
+            )
+
+    @abstractmethod
+    def _list_groups_managed_by_user_impl(
+        self, user_key: str, provider_name: Optional[str], **kwargs
+    ) -> OperationResult:
+        """Implementation of list_groups_managed_by_user (no circuit breaker wrapper).
+
+        Subclasses should implement this method instead of list_groups_managed_by_user.
+        """
