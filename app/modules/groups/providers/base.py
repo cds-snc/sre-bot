@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from email_validator import validate_email, EmailNotValidError
 from core.config import settings
 from core.logging import get_module_logger
 from modules.groups.models import NormalizedMember
@@ -16,6 +17,35 @@ from modules.groups.circuit_breaker import (
 )
 
 logger = get_module_logger()
+
+
+def validate_member_email(email: str) -> str:
+    """Validate and normalize an email address for group membership operations.
+
+    Uses RFC 5321/5322 compliant validation via email-validator library.
+    Normalization includes case folding and standardization of the address format.
+
+    Args:
+        email: Email address to validate
+
+    Returns:
+        Validated and normalized email address (lowercase)
+
+    Raises:
+        ValueError: If email is invalid or not a string
+    """
+    if not email or not isinstance(email, str):
+        raise ValueError(
+            f"Email must be a non-empty string, got {type(email).__name__}"
+        )
+
+    try:
+        # email-validator with check_deliverability=False avoids DNS lookups
+        # while still providing RFC-compliant validation
+        validated = validate_email(email, check_deliverability=False)
+        return validated.normalized
+    except EmailNotValidError as e:
+        raise ValueError(f"Invalid email format: {str(e)}") from e
 
 
 class OperationStatus(Enum):
@@ -345,9 +375,7 @@ class GroupProvider(ABC):
         # Fallback to prefix property or class name
         return self.prefix
 
-    def add_member(
-        self, group_key: str, member_email: str
-    ) -> OperationResult:
+    def add_member(self, group_key: str, member_email: str) -> OperationResult:
         """Add a member to a group by email.
 
         The email address is the universal identifier for group members across
@@ -384,9 +412,7 @@ class GroupProvider(ABC):
             return self._add_member_impl(group_key, member_email)
 
     @abstractmethod
-    def _add_member_impl(
-        self, group_key: str, member_email: str
-    ) -> OperationResult:
+    def _add_member_impl(self, group_key: str, member_email: str) -> OperationResult:
         """Implementation of add_member (no circuit breaker wrapper).
 
         Args:
@@ -403,9 +429,7 @@ class GroupProvider(ABC):
         3. Performing the group membership operation
         """
 
-    def remove_member(
-        self, group_key: str, member_email: str
-    ) -> OperationResult:
+    def remove_member(self, group_key: str, member_email: str) -> OperationResult:
         """Remove a member from a group by email.
 
         The email address is the universal identifier for group members across
@@ -442,9 +466,7 @@ class GroupProvider(ABC):
             return self._remove_member_impl(group_key, member_email)
 
     @abstractmethod
-    def _remove_member_impl(
-        self, group_key: str, member_email: str
-    ) -> OperationResult:
+    def _remove_member_impl(self, group_key: str, member_email: str) -> OperationResult:
         """Implementation of remove_member (no circuit breaker wrapper).
 
         Args:
@@ -573,9 +595,7 @@ class GroupProvider(ABC):
                 message=stats_dict.get("message"),
             )
         return CircuitBreakerStats(
-            enabled=False,
-            state="CLOSED",
-            message="Circuit breaker disabled"
+            enabled=False, state="CLOSED", message="Circuit breaker disabled"
         )
 
     def reset_circuit_breaker(self) -> None:
@@ -615,7 +635,7 @@ class GroupProvider(ABC):
                 return HealthCheckResult(
                     healthy=False,
                     status="unhealthy",
-                    details={"error": str(e), "error_code": "CIRCUIT_BREAKER_OPEN"}
+                    details={"error": str(e), "error_code": "CIRCUIT_BREAKER_OPEN"},
                 )
         else:
             return self._health_check_impl()
