@@ -1,26 +1,33 @@
 """Google Workspace Provider"""
 
-import os
+# Standard library
 from typing import Dict, List, Optional
 
+# Local application - core
+from core.config import settings
 from core.logging import get_module_logger
+
+# Local application - integrations
 from integrations.google_workspace import google_directory_next as google_directory
 from integrations.google_workspace.schemas import (
     Member as GoogleMember,
     Group as GoogleGroup,
 )
-from modules.groups.providers import register_provider
+
+# Local application - modules
 from modules.groups.errors import IntegrationError
 from modules.groups.models import (
     as_canonical_dict,
     NormalizedMember,
     NormalizedGroup,
 )
+from modules.groups.providers import register_provider
 from modules.groups.providers.base import (
     PrimaryGroupProvider,
     ProviderCapabilities,
     OperationResult,
     OperationStatus,
+    HealthCheckResult,
     provider_operation,
 )
 
@@ -41,31 +48,31 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         """Initialize the provider with circuit breaker support."""
         super().__init__()
         self.requires_email_format = True
-        self.domain = None
+        self.domain = self._get_domain_from_settings()
 
-    def _set_domain_from_config(self) -> None:
-        """Extract domain from config or SRE_BOT_EMAIL environment variable.
+    def _get_domain_from_settings(self) -> Optional[str]:
+        """Get configured domain for email formatting.
 
         Priority:
         1. groups.group_domain from config if set
-        2. Domain extracted from SRE_BOT_EMAIL if available
-        3. Remain None if neither is available
-        """
-        from core.config import settings
+        2. Domain extracted from sre_email setting if available
+        3. Return None if neither is available
 
+        Returns:
+            Domain string (e.g., "example.com") or None
+        """
         # Try configured domain first
         if hasattr(settings, "groups") and hasattr(settings.groups, "group_domain"):
             configured_domain = settings.groups.group_domain
             if configured_domain:
-                self.domain = configured_domain
-                return
+                return configured_domain
 
-        # Fall back to extracting domain from SRE_BOT_EMAIL
-        sre_email = getattr(settings, "sre_email", None) or os.environ.get(
-            "SRE_BOT_EMAIL"
-        )
+        # Fall back to extracting domain from SRE_BOT_EMAIL setting
+        sre_email = getattr(settings, "sre_email", None)
         if sre_email and "@" in sre_email:
-            self.domain = sre_email.split("@", 1)[1]
+            return sre_email.split("@", 1)[1]
+
+        return None
 
     @property
     def capabilities(self) -> ProviderCapabilities:
@@ -151,11 +158,24 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         # Default: treat as transient error
         return OperationResult.transient_error(str(exc))
 
-    def _get_local_part(self, email: Optional[str]) -> Optional[str]:
-        """Extract the local part of an email address."""
-        if email and "@" in email:
-            return email.split("@", 1)[0]
-        return email
+    def _extract_local_part(self, email_or_identifier: Optional[str]) -> Optional[str]:
+        """Extract the local part from an email-formatted identifier.
+
+        Examples:
+            "user@example.com" → "user"
+            "user" → "user" (no @ found)
+            None → None
+
+        Args:
+            email_or_identifier: Email address or identifier string
+
+        Returns:
+            Local part (before @) or the original string if no @ found,
+            or None if input is None
+        """
+        if email_or_identifier and "@" in email_or_identifier:
+            return email_or_identifier.split("@", 1)[0]
+        return email_or_identifier
 
     def _normalize_group_from_google(
         self,
@@ -170,7 +190,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             raise IntegrationError("google group validation failed") from exc
 
         email = getattr(g, "email", None)
-        gid = self._get_local_part(email)  # Use local part as ID
+        gid = self._extract_local_part(email)  # Use local part as ID
         name = getattr(g, "name", None) or email or gid
         description = getattr(g, "description", None)
         raw_members = members or group.get("members", [])
@@ -222,48 +242,27 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             raw=member if include_raw else None,
         )
 
-    def _resolve_member_identifier(
-        self, member_data: dict | str | NormalizedMember
-    ) -> str:
-        """Convert member_data input to a Google-compatible identifier.
-
-        This provider method handles the flexibility of accepting str or dict,
-        but validates and converts to what Google expects.
+    def _validate_email(self, email: str) -> str:
+        """Validate and return email address.
 
         Args:
-            member_data: Either a string email or a dict with email/id keys.
+            email: Email address to validate
 
         Returns:
-            A Google member key (email or ID string).
+            The validated email address
 
         Raises:
-            ValueError: If the input cannot be resolved to a member identifier.
+            ValueError: If email is empty or doesn't contain @
         """
-        # Accept NormalizedMember instances, dicts, or raw string identifiers
-        if isinstance(member_data, NormalizedMember):
-            email = getattr(member_data, "email", None)
-            member_id = getattr(member_data, "id", None)
-            identifier = email or member_id
-            if not identifier:
-                raise ValueError("NormalizedMember must include email or id")
-            return identifier
-
-        if isinstance(member_data, str):
-            if not member_data.strip():
-                raise ValueError("Member identifier string cannot be empty")
-            return member_data.strip()
-
-        if isinstance(member_data, dict):
-            email = member_data.get("email") or member_data.get("primaryEmail")
-            member_id = member_data.get("id")
-            identifier = email or member_id
-            if not identifier:
-                raise ValueError("Member dict must contain 'email' or 'id' field")
-            return identifier
-
-        raise TypeError(
-            f"member_data must be str or dict; got {type(member_data).__name__}"
-        )
+        if not email or not isinstance(email, str):
+            raise ValueError(
+                f"Email must be a non-empty string, got {type(email).__name__}"
+            )
+        if not email.strip():
+            raise ValueError("Email cannot be empty or whitespace")
+        if "@" not in email:
+            raise ValueError(f"Invalid email format: {email}")
+        return email.strip()
 
     def _list_groups_with_members_for_user(
         self, user_key: str, provider_name: Optional[str], **kwargs
@@ -298,18 +297,18 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @provider_operation(data_key="result")
-    def _add_member_impl(self, group_key: str, member_data: NormalizedMember) -> Dict:
-        """Add a member to a group and return the normalized member dict.
+    def _add_member_impl(self, group_key: str, member_email: str) -> Dict:
+        """Add a member to a group by email.
 
         Args:
-            group_key: Google group key.
-            member_data: Member identifier (str email) or dict with email/id.
+            group_key: Google group key
+            member_email: Email address of the member to add
 
         Returns:
-            A canonical member dict (normalized NormalizedMember).
+            A canonical member dict (normalized NormalizedMember)
         """
-        member_key = self._resolve_member_identifier(member_data)
-        resp = google_directory.insert_member(group_key, member_key)
+        validated_email = self._validate_email(member_email)
+        resp = google_directory.insert_member(group_key, validated_email)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google insert_member failed", response=resp)
         if resp.data and isinstance(resp.data, dict):
@@ -317,20 +316,18 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return {}
 
     @provider_operation(data_key="result")
-    def _remove_member_impl(
-        self, group_key: str, member_data: NormalizedMember
-    ) -> Dict:
-        """Remove a member from a group.
+    def _remove_member_impl(self, group_key: str, member_email: str) -> Dict:
+        """Remove a member from a group by email.
 
         Args:
-            group_key: Google group key.
-            member_data: Member identifier (str email) or dict with email/id.
+            group_key: Google group key
+            member_email: Email address of the member to remove
 
         Returns:
-            A status dict confirming removal.
+            A status dict confirming removal
         """
-        member_key = self._resolve_member_identifier(member_data)
-        resp = google_directory.delete_member(group_key, member_key)
+        validated_email = self._validate_email(member_email)
+        resp = google_directory.delete_member(group_key, validated_email)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google delete_member failed", response=resp)
         return {"status": "removed"}
@@ -400,26 +397,29 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     def _validate_permissions_impl(
         self, user_key: str, group_key: str, action: str
     ) -> bool:
-        """Return True if user is a MANAGER of the group, else False.
+        """Validate that user has permission to perform action on group.
+
+        Checks if the user is a manager of the group. The action parameter
+        is provided for future extensibility but currently only manager
+        status is checked.
 
         Args:
-            user_key: Google member key to validate.
-            group_key: Google group key.
-            action: Action type (currently unused but part of the contract).
+            user_key: Google member key to validate
+            group_key: Google group key
+            action: Action type (e.g., "add_member", "remove_member")
+                   Currently unused - all actions require manager role
 
         Returns:
-            True if user is a manager, False otherwise.
+            True if user is a manager and can perform the action, False otherwise
+
+        Implementation Note:
+            Delegates to _is_manager_impl for efficient manager check rather than
+            listing all managers. This is more performant and achieves the same result.
         """
-        resp = google_directory.list_members(group_key, roles="MANAGER")
-        if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError("google list_members failed", response=resp)
-        members = resp.data if hasattr(resp, "data") else resp
-        for m in members or []:
-            if isinstance(m, dict):
-                normalized = self._normalize_member_from_google(m)
-                if normalized.email == user_key or normalized.id == user_key:
-                    return True
-        return False
+        # For all actions, we require manager role
+        # Delegate to _is_manager_impl which efficiently checks a single member
+        result = self._is_manager_impl(user_key, group_key)
+        return result.data if isinstance(result, OperationResult) else result
 
     @provider_operation(data_key="groups")
     def _list_groups_for_user_impl(
@@ -507,7 +507,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         return False
 
     @provider_operation(data_key="health")
-    def _health_check_impl(self) -> Dict:
+    def _health_check_impl(self) -> HealthCheckResult:
         """Lightweight health check for Google Workspace connectivity.
 
         This performs a minimal API call to verify authentication and basic
@@ -515,7 +515,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         operation with maxResults=1 to minimize impact.
 
         Returns:
-            Dictionary with 'status' field
+            HealthCheckResult with health status and optional details
         """
         try:
             # Perform minimal API call: list groups with maxResults=1
@@ -523,28 +523,44 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             resp = google_directory.list_groups(maxResults=1)
 
             if hasattr(resp, "success") and not resp.success:
-                return {
-                    "status": "unhealthy",
-                    "message": "Google Workspace API unreachable",
-                    "error": str(resp),
-                }
+                return HealthCheckResult(
+                    healthy=False,
+                    status="unhealthy",
+                    details={
+                        "message": "Google Workspace API unreachable",
+                        "error": str(resp),
+                    },
+                )
 
-            return {
-                "status": "healthy",
-                "domain": self.domain,
-                "message": "Provider is operational",
-            }
+            return HealthCheckResult(
+                healthy=True,
+                status="healthy",
+                details={
+                    "domain": self.domain,
+                    "message": "Provider is operational",
+                },
+            )
 
         except IntegrationError as e:
-            return {"status": "unhealthy", "message": str(e), "error_code": "API_ERROR"}
+            return HealthCheckResult(
+                healthy=False,
+                status="unhealthy",
+                details={
+                    "message": str(e),
+                    "error_code": "API_ERROR",
+                },
+            )
         except Exception as e:
             logger.error(
                 "google_health_check_failed",
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return {
-                "status": "unhealthy",
-                "message": "Unexpected error during health check",
-                "error": str(e),
-            }
+            return HealthCheckResult(
+                healthy=False,
+                status="unhealthy",
+                details={
+                    "message": "Unexpected error during health check",
+                    "error": str(e),
+                },
+            )
