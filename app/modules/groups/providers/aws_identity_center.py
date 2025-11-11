@@ -1,23 +1,23 @@
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
+from botocore.exceptions import BotoCoreError, ClientError
+from core.logging import get_module_logger
 from integrations.aws import identity_store_next as identity_store
-from integrations.aws.schemas import (
-    User as AwsUser,
-    Group as AwsGroup,
-    GroupMembership as AwsGroupMembership,
-)
+from integrations.aws.schemas import Group as AwsGroup
+from integrations.aws.schemas import GroupMembership as AwsGroupMembership
+from integrations.aws.schemas import User as AwsUser
 from modules.groups.errors import IntegrationError
+from modules.groups.models import NormalizedGroup, NormalizedMember, as_canonical_dict
 from modules.groups.providers import register_provider
-from modules.groups.models import (
-    as_canonical_dict,
-    NormalizedMember,
-    NormalizedGroup,
-)
 from modules.groups.providers.base import (
     GroupProvider,
+    OperationResult,
+    OperationStatus,
     ProviderCapabilities,
     opresult_wrapper,
 )
+
+logger = get_module_logger()
 
 
 @register_provider("aws")
@@ -47,6 +47,81 @@ class AwsIdentityCenterProvider(GroupProvider):
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities."""
         return ProviderCapabilities(supports_member_management=True)
+
+    def classify_error(self, exc: Exception) -> "OperationResult":
+        """Classify AWS Identity Center API errors into OperationResult.
+
+        Handles:
+        - ThrottlingException (rate limiting) with retry_after
+        - AccessDeniedException (permission denied) as permanent
+        - ResourceNotFoundException (not found) as permanent
+        - Validation errors as permanent
+        - Connection/timeout errors as transient
+        - Other errors as transient by default
+
+        Args:
+            exc: Exception raised by AWS API
+
+        Returns:
+            OperationResult with appropriate status and error code
+        """
+
+        if isinstance(exc, ClientError):
+            error_code = exc.response.get("Error", {}).get("Code", "Unknown")
+
+            # Rate limiting: ThrottlingException
+            if error_code == "ThrottlingException":
+                retry_after = 60  # Default retry after 60 seconds
+                return OperationResult.error(
+                    OperationStatus.TRANSIENT_ERROR,
+                    "AWS API throttled",
+                    error_code="RATE_LIMITED",
+                    retry_after=retry_after,
+                )
+
+            # Permission denied: AccessDeniedException
+            if error_code == "AccessDeniedException":
+                return OperationResult.permanent_error(
+                    "AWS API access denied",
+                    error_code="FORBIDDEN",
+                )
+
+            # Resource not found: ResourceNotFoundException
+            if error_code == "ResourceNotFoundException":
+                return OperationResult.error(
+                    OperationStatus.NOT_FOUND,
+                    "AWS resource not found",
+                    error_code="NOT_FOUND",
+                )
+
+            # Validation errors (bad input)
+            if error_code in (
+                "ValidationException",
+                "InvalidParameterException",
+                "BadRequestException",
+            ):
+                return OperationResult.permanent_error(
+                    f"AWS validation error: {error_code}",
+                    error_code="INVALID_REQUEST",
+                )
+
+            # Other client errors: treat as transient by default
+            return OperationResult.transient_error(
+                f"AWS error ({error_code}): {str(exc)}"
+            )
+
+        # BotoCoreError: connection, timeout, parsing errors
+        if isinstance(exc, BotoCoreError):
+            return OperationResult.transient_error(f"AWS connection error: {str(exc)}")
+
+        # Connection/timeout errors
+        if isinstance(exc, (TimeoutError, ConnectionError)):
+            return OperationResult.transient_error(
+                f"AWS connection timeout: {str(exc)}"
+            )
+
+        # Default: treat as transient error
+        return OperationResult.transient_error(str(exc))
 
     # ------------------------------------------------------------------
     # Instance helpers (migrated from module-level into the provider)
@@ -246,11 +321,11 @@ class AwsIdentityCenterProvider(GroupProvider):
         """Convert an AWS group response to a NormalizedGroup.
 
         This is AWS's responsibility: take its schema and produce the canonical
-        normalized group contract with normalized members.
+        normalized group contract.
 
         Args:
             group: A dict response from AWS Identity Store API.
-            members: Optional pre-fetched member list to include in the group.
+            memberships: Optional pre-fetched member list to include in the group.
 
         Returns:
             A NormalizedGroup instance.
@@ -274,11 +349,11 @@ class AwsIdentityCenterProvider(GroupProvider):
             else:
                 raw_memberships = None
 
-        normalized_members = []
-        if isinstance(raw_memberships, list):
-            for m in raw_memberships:
-                if isinstance(m, dict):
-                    normalized_members.append(self._normalize_member_from_aws(m))
+        normalized_members = [
+            self._normalize_member_from_aws(m)
+            for m in (raw_memberships or [])
+            if isinstance(m, dict)
+        ]
 
         return NormalizedGroup(
             id=gid,
@@ -513,3 +588,59 @@ class AwsIdentityCenterProvider(GroupProvider):
                 # Normalize using the provider normalizer
                 groups.append(as_canonical_dict(self._normalize_group_from_aws(g)))
         return groups
+
+    @opresult_wrapper(data_key="health")
+    def _health_check_impl(self) -> dict:
+        """Lightweight health check for AWS Identity Center connectivity.
+
+        This performs a minimal API call to verify authentication and basic
+        connectivity without consuming significant resources. Uses a simple
+        list operation with maxResults=1 to minimize impact.
+
+        Returns:
+            Dictionary with 'status' and optional 'identity_store_id' field
+        """
+        try:
+            # Get identity store ID if available (from instance attribute)
+            identity_store_id = getattr(self, "identity_store_id", None)
+            if not identity_store_id:
+                return {
+                    "status": "degraded",
+                    "message": "Identity store ID not configured",
+                }
+
+            # Perform minimal API call: list groups with maxResults=1
+            resp = identity_store.list_groups(maxResults=1)
+
+            if not hasattr(resp, "success"):
+                return {
+                    "status": "unhealthy",
+                    "message": "AWS Identity Center API returned unexpected type",
+                }
+
+            if not resp.success:
+                return {
+                    "status": "unhealthy",
+                    "message": "AWS Identity Center API unreachable",
+                    "error": str(resp),
+                }
+
+            return {
+                "status": "healthy",
+                "identity_store_id": identity_store_id,
+                "message": "Provider is operational",
+            }
+
+        except IntegrationError as e:
+            return {"status": "unhealthy", "message": str(e), "error_code": "API_ERROR"}
+        except Exception as e:
+            logger.error(
+                "aws_health_check_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return {
+                "status": "unhealthy",
+                "message": "Unexpected error during health check",
+                "error": str(e),
+            }
