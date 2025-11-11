@@ -3,6 +3,7 @@
 import os
 from typing import Dict, List, Optional
 
+from core.logging import get_module_logger
 from integrations.google_workspace import google_directory_next as google_directory
 from integrations.google_workspace.schemas import (
     Member as GoogleMember,
@@ -18,8 +19,12 @@ from modules.groups.models import (
 from modules.groups.providers.base import (
     PrimaryGroupProvider,
     ProviderCapabilities,
-    opresult_wrapper,
+    OperationResult,
+    OperationStatus,
+    provider_operation,
 )
+
+logger = get_module_logger()
 
 
 @register_provider("google")
@@ -70,6 +75,81 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             supports_member_management=True,
             provides_role_info=True,
         )
+
+    def classify_error(self, exc: Exception) -> "OperationResult":
+        """Classify Google Workspace API errors into OperationResult.
+
+        Handles:
+        - 429 (rate limit) with retry_after from headers
+        - 401/403 (auth errors) as permanent
+        - 404 (not found) as permanent
+        - 5xx (server errors) as transient
+        - Connection/timeout errors as transient
+
+        Args:
+            exc: Exception raised by Google API
+
+        Returns:
+            OperationResult with appropriate status and error code
+        """
+        from googleapiclient.errors import HttpError
+
+        if isinstance(exc, HttpError):
+            status_code = exc.resp.status if hasattr(exc, "resp") else None
+
+            # Rate limiting: 429 Too Many Requests
+            if status_code == 429:
+                retry_after = None
+                if hasattr(exc, "resp") and hasattr(exc.resp, "get"):
+                    retry_after = int(exc.resp.get("retry-after", 60))
+                return OperationResult.error(
+                    OperationStatus.TRANSIENT_ERROR,
+                    "Google API rate limited",
+                    error_code="RATE_LIMITED",
+                    retry_after=retry_after,
+                )
+
+            # Authentication errors: 401 Unauthorized
+            if status_code == 401:
+                return OperationResult.permanent_error(
+                    "Google API authentication failed",
+                    error_code="UNAUTHORIZED",
+                )
+
+            # Authorization errors: 403 Forbidden
+            if status_code == 403:
+                return OperationResult.permanent_error(
+                    "Google API authorization denied",
+                    error_code="FORBIDDEN",
+                )
+
+            # Not found: 404
+            if status_code == 404:
+                return OperationResult.error(
+                    OperationStatus.NOT_FOUND,
+                    "Google resource not found",
+                    error_code="NOT_FOUND",
+                )
+
+            # Server errors: 5xx
+            if status_code and 500 <= status_code < 600:
+                return OperationResult.transient_error(
+                    f"Google API server error ({status_code})"
+                )
+
+            # Other HTTP errors
+            return OperationResult.transient_error(
+                f"Google API error ({status_code}): {str(exc)}"
+            )
+
+        # Connection/timeout errors: treat as transient
+        if isinstance(exc, (TimeoutError, ConnectionError)):
+            return OperationResult.transient_error(
+                f"Google API connection error: {str(exc)}"
+            )
+
+        # Default: treat as transient error
+        return OperationResult.transient_error(str(exc))
 
     def _get_local_part(self, email: Optional[str]) -> Optional[str]:
         """Extract the local part of an email address."""
@@ -217,7 +297,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(g, dict)
         ]
 
-    @opresult_wrapper(data_key="result")
+    @provider_operation(data_key="result")
     def _add_member_impl(self, group_key: str, member_data: NormalizedMember) -> Dict:
         """Add a member to a group and return the normalized member dict.
 
@@ -236,7 +316,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             return as_canonical_dict(self._normalize_member_from_google(resp.data))
         return {}
 
-    @opresult_wrapper(data_key="result")
+    @provider_operation(data_key="result")
     def _remove_member_impl(
         self, group_key: str, member_data: NormalizedMember
     ) -> Dict:
@@ -255,7 +335,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             raise IntegrationError("google delete_member failed", response=resp)
         return {"status": "removed"}
 
-    @opresult_wrapper(data_key="members")
+    @provider_operation(data_key="members")
     def _get_group_members_impl(self, group_key: str, **kwargs) -> List[Dict]:
         """Return normalized members of a group.
 
@@ -276,7 +356,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(m, dict)
         ]
 
-    @opresult_wrapper(data_key="groups")
+    @provider_operation(data_key="groups")
     def _list_groups_impl(self, **kwargs) -> List[Dict]:
         """Return normalized groups from Google Workspace.
 
@@ -294,7 +374,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(g, dict)
         ]
 
-    @opresult_wrapper(data_key="groups")
+    @provider_operation(data_key="groups")
     def _list_groups_with_members_impl(self, **kwargs) -> List[Dict]:
         """Return normalized groups with members from Google Workspace.
 
@@ -316,8 +396,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(g, dict)
         ]
 
-    @opresult_wrapper(data_key="allowed")
-    def validate_permissions(self, user_key: str, group_key: str, action: str) -> bool:
+    @provider_operation(data_key="allowed")
+    def _validate_permissions_impl(
+        self, user_key: str, group_key: str, action: str
+    ) -> bool:
         """Return True if user is a MANAGER of the group, else False.
 
         Args:
@@ -339,8 +421,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
                     return True
         return False
 
-    @opresult_wrapper(data_key="groups")
-    def list_groups_for_user(
+    @provider_operation(data_key="groups")
+    def _list_groups_for_user_impl(
         self, user_key: str, provider_name: Optional[str], **kwargs
     ) -> List[Dict]:
         """Return canonical groups for which `user_key` is a member.
@@ -380,8 +462,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if isinstance(g, dict)
         ]
 
-    @opresult_wrapper(data_key="groups")
-    def list_groups_managed_by_user(
+    @provider_operation(data_key="groups")
+    def _list_groups_managed_by_user_impl(
         self, user_key: str, provider_name: Optional[str], **kwargs
     ) -> List[Dict]:
         """Return groups keys where the user is a MANAGER or OWNER.
@@ -407,8 +489,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
 
         return managed_groups
 
-    @opresult_wrapper(data_key="is_manager")
-    def is_manager(self, user_key: str, group_key: str) -> bool:
+    @provider_operation(data_key="is_manager")
+    def _is_manager_impl(self, user_key: str, group_key: str) -> bool:
         """Efficiently determine whether `user_key` is a manager of `group_key`.
 
         Honor runtime configuration: if the provider is not expected to expose
@@ -423,3 +505,46 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         if isinstance(member, dict) and "role" in member:
             return member.get("role") in ["MANAGER", "OWNER"]
         return False
+
+    @provider_operation(data_key="health")
+    def _health_check_impl(self) -> Dict:
+        """Lightweight health check for Google Workspace connectivity.
+
+        This performs a minimal API call to verify authentication and basic
+        connectivity without consuming significant quota. Uses a simple list
+        operation with maxResults=1 to minimize impact.
+
+        Returns:
+            Dictionary with 'status' field
+        """
+        try:
+            # Perform minimal API call: list groups with maxResults=1
+            # Uses default customer ID from configuration
+            resp = google_directory.list_groups(maxResults=1)
+
+            if hasattr(resp, "success") and not resp.success:
+                return {
+                    "status": "unhealthy",
+                    "message": "Google Workspace API unreachable",
+                    "error": str(resp),
+                }
+
+            return {
+                "status": "healthy",
+                "domain": self.domain,
+                "message": "Provider is operational",
+            }
+
+        except IntegrationError as e:
+            return {"status": "unhealthy", "message": str(e), "error_code": "API_ERROR"}
+        except Exception as e:
+            logger.error(
+                "google_health_check_failed",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            return {
+                "status": "unhealthy",
+                "message": "Unexpected error during health check",
+                "error": str(e),
+            }
