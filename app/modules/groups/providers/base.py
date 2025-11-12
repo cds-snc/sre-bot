@@ -1,10 +1,18 @@
-"""Provider contracts and capability logic for group providers."""
+"""Provider abstract classes and operation decorators.
+
+This module defines the GroupProvider and PrimaryGroupProvider abstract base
+classes, operation decorators, and helper functions for provider lifecycle
+management.
+
+Key separation of concerns:
+  - contracts.py: Pure data structures (OperationResult, HealthCheckResult, etc.)
+  - capabilities.py: Capability loading from config
+  - base.py: Abstract classes and operation decorators
+"""
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Optional, Dict, Any
-from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from email_validator import validate_email, EmailNotValidError
 from core.config import settings
@@ -14,6 +22,18 @@ from modules.groups.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     register_circuit_breaker,
+)
+from modules.groups.providers.contracts import (
+    OperationResult,
+    OperationStatus,
+    HealthCheckResult,
+    CircuitBreakerStats,
+    ProviderCapabilities,
+)
+from modules.groups.providers.capabilities import (
+    load_capabilities,
+    provider_supports,
+    provider_provides_role_info,
 )
 
 logger = get_module_logger()
@@ -46,189 +66,6 @@ def validate_member_email(email: str) -> str:
         return validated.normalized
     except EmailNotValidError as e:
         raise ValueError(f"Invalid email format: {str(e)}") from e
-
-
-class OperationStatus(Enum):
-    SUCCESS = "success"
-    TRANSIENT_ERROR = "transient_error"  # Retryable
-    PERMANENT_ERROR = "permanent_error"  # Do not retry
-    UNAUTHORIZED = "unauthorized"
-    NOT_FOUND = "not_found"
-
-
-@dataclass
-class OperationResult:
-    """Uniform result returned from provider operations.
-
-    status: OperationStatus -- high-level outcome
-    message: str -- human-friendly message (for logs/troubleshooting)
-    data: Optional[Dict[str, Any]] -- optional payload
-    error_code: Optional[str] -- optional machine error code
-    retry_after: Optional[int] -- seconds until retry when rate-limited
-    """
-
-    status: OperationStatus
-    message: str
-    data: Optional[Dict[str, Any]] = None
-    error_code: Optional[str] = None
-    retry_after: Optional[int] = None  # Seconds for rate limiting
-
-    @classmethod
-    def success(
-        cls, data: Optional[Dict[str, Any]] = None, message: str = "ok"
-    ) -> "OperationResult":
-        """Create a SUCCESS OperationResult with optional data."""
-        return cls(status=OperationStatus.SUCCESS, message=message, data=data)
-
-    @classmethod
-    def error(
-        cls,
-        status: OperationStatus,
-        message: str,
-        error_code: Optional[str] = None,
-        retry_after: Optional[int] = None,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> "OperationResult":
-        """Create an error OperationResult with optional metadata."""
-        return cls(
-            status=status,
-            message=message,
-            data=data,
-            error_code=error_code,
-            retry_after=retry_after,
-        )
-
-    @classmethod
-    def transient_error(
-        cls, message: str, error_code: Optional[str] = None
-    ) -> "OperationResult":
-        return cls.error(
-            OperationStatus.TRANSIENT_ERROR, message, error_code=error_code
-        )
-
-    @classmethod
-    def permanent_error(
-        cls, message: str, error_code: Optional[str] = None
-    ) -> "OperationResult":
-        return cls.error(
-            OperationStatus.PERMANENT_ERROR, message, error_code=error_code
-        )
-
-
-@dataclass
-class HealthCheckResult:
-    """Result of a provider health check operation.
-
-    Attributes:
-        healthy: Whether the provider is healthy and operational
-        status: Human-readable status ("healthy", "unhealthy", "degraded")
-        details: Optional provider-specific details about the health state
-        timestamp: Optional ISO 8601 timestamp of the check
-    """
-
-    healthy: bool
-    status: str  # "healthy", "unhealthy", "degraded"
-    details: Optional[Dict[str, Any]] = None
-    timestamp: Optional[str] = None
-
-
-@dataclass
-class CircuitBreakerStats:
-    """Statistics and state information for a circuit breaker.
-
-    Attributes:
-        enabled: Whether the circuit breaker is enabled for this provider
-        state: Current state ("CLOSED", "OPEN", "HALF_OPEN")
-        failure_count: Number of consecutive failures
-        success_count: Number of consecutive successes
-        last_failure_time: Timestamp of the last failure, or None
-        message: Optional human-readable message about the circuit state
-    """
-
-    enabled: bool
-    state: str  # "CLOSED", "OPEN", "HALF_OPEN"
-    failure_count: int = 0
-    success_count: int = 0
-    last_failure_time: Optional[float] = None
-    message: Optional[str] = None
-
-
-@dataclass
-class ProviderCapabilities:
-    supports_user_creation: bool = False
-    supports_user_deletion: bool = False
-    supports_group_creation: bool = False  # Should always be False
-    supports_group_deletion: bool = False  # Should always be False
-    supports_member_management: bool = True
-    is_primary: bool = False
-    provides_role_info: bool = False
-    supports_batch_operations: bool = False
-    max_batch_size: int = 1
-
-    @classmethod
-    def from_config(cls, provider_name: str) -> "ProviderCapabilities":
-        cfg = getattr(settings, "groups", None)
-        if not cfg:
-            return cls()
-        provider_cfg = (
-            cfg.providers.get(provider_name, {})
-            if isinstance(cfg.providers, dict)
-            else {}
-        )
-        caps = (
-            provider_cfg.get("capabilities", {})
-            if isinstance(provider_cfg, dict)
-            else {}
-        )
-        return cls(
-            supports_user_creation=caps.get("supports_user_creation", False),
-            supports_user_deletion=caps.get("supports_user_deletion", False),
-            supports_group_creation=caps.get("supports_group_creation", False),
-            supports_group_deletion=caps.get("supports_group_deletion", False),
-            supports_member_management=caps.get("supports_member_management", True),
-            provides_role_info=caps.get("provides_role_info", False),
-            supports_batch_operations=caps.get("supports_batch_operations", False),
-            max_batch_size=caps.get("max_batch_size", 1),
-        )
-
-
-def provider_supports(provider_name: str, capability: str) -> bool:
-    """Return whether the named provider advertises a given capability."""
-    try:
-        caps = ProviderCapabilities.from_config(provider_name)
-        return bool(getattr(caps, capability, False))
-    except Exception:
-        return False
-
-
-def provider_provides_role_info(provider_name: str) -> bool:
-    """Convenience wrapper for the common 'provides_role_info' check."""
-    return provider_supports(provider_name, "provides_role_info")
-
-
-def opresult_wrapper(data_key=None):
-    """Decorator to wrap a method call in an OperationResult."""
-
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            try:
-                result = func(*args, **kwargs)
-                # If the provider already returned an OperationResult, pass it
-                # through unchanged (avoid double-wrapping).
-                if isinstance(result, OperationResult):
-                    return result
-                data = {data_key: result} if data_key else result
-                return OperationResult(
-                    status=OperationStatus.SUCCESS, message="ok", data=data
-                )
-            except Exception as e:
-                return OperationResult(
-                    status=OperationStatus.TRANSIENT_ERROR, message=str(e)
-                )
-
-        return wrapper
-
-    return decorator
 
 
 def provider_operation(data_key=None):
