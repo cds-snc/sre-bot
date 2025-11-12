@@ -18,7 +18,7 @@ from modules.groups.reconciliation import (
     InMemoryReconciliationStore,
     FailedPropagation,
 )
-from modules.groups import reconciliation_integration as ri
+from modules.groups.reconciliation import integration as ri
 
 
 pytestmark = [
@@ -101,7 +101,7 @@ class TestReconciliationStoreBasics:
             op_status="retryable_error",
             attempts=0,
         )
-        record_id = store.save_failed_propagation(record)
+        store.save_failed_propagation(record)
 
         # Act - fetch immediately (within 60s backoff for attempt 0)
         due = store.fetch_due()
@@ -389,12 +389,12 @@ class TestReconciliationIntegration:
         """enqueue_failed_propagation creates and stores failed propagation record."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
             MagicMock(return_value=True),
         )
         store = InMemoryReconciliationStore()
         monkeypatch.setattr(
-            "modules.groups.reconciliation_integration.get_reconciliation_store",
+            "modules.groups.reconciliation.reconciliation_integration.get_reconciliation_store",
             MagicMock(return_value=store),
         )
 
@@ -402,7 +402,7 @@ class TestReconciliationIntegration:
         record_id = ri.enqueue_failed_propagation(
             correlation_id="cid-123",
             provider="aws",
-            group_id="grp-123",
+            group_email="aws-admins@example.com",
             member_email="user@example.com",
             action="add_member",
             error_message="AWS service unavailable",
@@ -414,14 +414,15 @@ class TestReconciliationIntegration:
             assert record_id in store._store
             stored = store._store[record_id]
             assert stored.provider == "aws"
-            assert stored.group_id == "grp-123"
+            assert stored.group_id == "aws-admins@example.com"
             assert stored.payload_raw["member_email"] == "user@example.com"
+            assert stored.payload_raw["group_email"] == "aws-admins@example.com"
 
     def test_enqueue_failed_propagation_disabled_returns_none(self, monkeypatch):
         """When reconciliation disabled, enqueue returns None."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
             MagicMock(return_value=False),
         )
 
@@ -429,7 +430,7 @@ class TestReconciliationIntegration:
         record_id = ri.enqueue_failed_propagation(
             correlation_id="cid-123",
             provider="aws",
-            group_id="grp-123",
+            group_email="aws-admins@example.com",
             member_email="user@example.com",
             action="add_member",
             error_message="AWS service unavailable",
@@ -444,11 +445,11 @@ class TestReconciliationIntegration:
         """When store unavailable, enqueue returns None."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
             MagicMock(return_value=True),
         )
         monkeypatch.setattr(
-            "modules.groups.reconciliation_integration.get_reconciliation_store",
+            "modules.groups.reconciliation.reconciliation_integration.get_reconciliation_store",
             MagicMock(return_value=None),
         )
 
@@ -456,7 +457,7 @@ class TestReconciliationIntegration:
         record_id = ri.enqueue_failed_propagation(
             correlation_id="cid-123",
             provider="aws",
-            group_id="grp-123",
+            group_email="aws-admins@example.com",
             member_email="user@example.com",
             action="add_member",
             error_message="AWS service unavailable",

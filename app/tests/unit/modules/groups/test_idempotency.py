@@ -4,13 +4,12 @@ Tests in-memory cache with TTL, expiration handling, thread safety,
 and cache statistics.
 """
 
-import pytest
 import threading
-from unittest.mock import patch, MagicMock
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from modules.groups import idempotency, schemas
-
+import pytest
+from modules.groups.infrastructure import idempotency
+from modules.groups.api import schemas
 
 pytestmark = pytest.mark.unit
 
@@ -87,7 +86,7 @@ class TestCacheExpiration:
         key = "test-ttl-default"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response)
 
@@ -100,7 +99,7 @@ class TestCacheExpiration:
         key = "test-ttl-custom"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response, ttl_seconds=600)
 
@@ -112,7 +111,7 @@ class TestCacheExpiration:
         key = "test-expiry"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             # Store at time 1000, expiry at 1100
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response, ttl_seconds=100)
@@ -128,7 +127,7 @@ class TestCacheExpiration:
         key = "test-remove-expired"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response, ttl_seconds=100)
 
@@ -147,7 +146,7 @@ class TestCacheExpiration:
         key = "test-valid"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response, ttl_seconds=100)
 
@@ -185,7 +184,7 @@ class TestCacheStatistics:
 
     def test_get_cache_stats_counts_active_entries(self):
         """get_cache_stats counts active (non-expired) entries."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             # Cache 3 entries with 100s TTL (expire at 1100)
@@ -203,7 +202,7 @@ class TestCacheStatistics:
 
     def test_get_cache_stats_counts_expired_entries(self):
         """get_cache_stats counts expired entries."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             # Cache 3 entries with different TTLs
@@ -226,7 +225,7 @@ class TestCacheStatistics:
 
     def test_get_cache_stats_all_expired(self):
         """get_cache_stats correctly shows all entries expired."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             for i in range(3):
@@ -251,7 +250,7 @@ class TestCleanupExpiredEntries:
 
     def test_cleanup_removes_expired_entries(self):
         """cleanup_expired_entries removes expired entries."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             # Add expired and valid entries
@@ -281,7 +280,7 @@ class TestCleanupExpiredEntries:
 
     def test_cleanup_all_valid_entries(self):
         """cleanup_expired_entries keeps valid entries."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             for i in range(3):
@@ -297,7 +296,7 @@ class TestCleanupExpiredEntries:
 
     def test_cleanup_all_expired_entries(self):
         """cleanup_expired_entries removes all when all expired."""
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             mock_time.return_value = 1000.0
 
             for i in range(3):
@@ -313,7 +312,9 @@ class TestCleanupExpiredEntries:
 
     def test_cleanup_handles_exception_gracefully(self):
         """cleanup_expired_entries handles exceptions."""
-        with patch("modules.groups.idempotency._CACHE_LOCK") as mock_lock:
+        with patch(
+            "modules.groups.infrastructure.idempotency._CACHE_LOCK"
+        ) as mock_lock:
             mock_lock.__enter__.side_effect = Exception("lock error")
             # Should not raise, just log error
             idempotency.cleanup_expired_entries()
@@ -481,7 +482,7 @@ class TestRealWorldScenarios:
         key = "boundary-test"
         response = MagicMock(spec=schemas.ActionResponse)
 
-        with patch("modules.groups.idempotency.time.time") as mock_time:
+        with patch("modules.groups.infrastructure.idempotency.time.time") as mock_time:
             # Store at 1000, expires at 1100
             mock_time.return_value = 1000.0
             idempotency.cache_response(key, response, ttl_seconds=100)

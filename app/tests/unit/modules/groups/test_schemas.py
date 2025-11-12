@@ -12,7 +12,7 @@ import pytest
 from datetime import datetime
 from uuid import uuid4
 from pydantic import ValidationError
-from modules.groups import schemas
+from modules.groups.api import schemas
 
 
 @pytest.mark.unit

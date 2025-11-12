@@ -13,7 +13,7 @@ All tests use pure state machine logic with time mocking where needed.
 
 import pytest
 import time
-from modules.groups.circuit_breaker import (
+from modules.groups.infrastructure.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitState,

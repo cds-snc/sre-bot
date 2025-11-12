@@ -2,7 +2,7 @@
 
 import pytest
 import types
-from modules.groups.providers.base import (
+from modules.groups.providers.contracts import (
     ProviderCapabilities,
     OperationResult,
     OperationStatus,

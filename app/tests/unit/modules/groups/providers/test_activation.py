@@ -12,8 +12,8 @@ from modules.groups.providers import (
     PROVIDER_REGISTRY,
     DISCOVERED_PROVIDER_CLASSES,
 )
-from modules.groups.providers.base import (
-    GroupProvider,
+from modules.groups.providers.base import GroupProvider
+from modules.groups.providers.contracts import (
     ProviderCapabilities,
     OperationResult,
     OperationStatus,
@@ -61,6 +61,9 @@ class MockPrimaryProvider(GroupProvider):
     def _list_groups_with_members_impl(self, **kwargs):
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
 
+    def _health_check_impl(self):
+        return {"status": "healthy"}
+
 
 class MockSecondaryProvider(GroupProvider):
     """Mock secondary provider without is_primary capability."""
@@ -99,6 +102,9 @@ class MockSecondaryProvider(GroupProvider):
 
     def _list_groups_with_members_impl(self, **kwargs):
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+    def _health_check_impl(self):
+        return {"status": "healthy"}
 
 
 class TestEnabledDisabledFiltering:
@@ -533,3 +539,82 @@ class TestMultiProviderActivation:
         assert getattr(provider, "_prefix") == "custom"
         assert provider.get_capabilities().is_primary is True
         assert provider.get_capabilities().provides_role_info is True
+
+
+class TestDomainConfiguration:
+    """Test domain configuration during provider activation."""
+
+    def setup_method(self):
+        """Clear registries before each test."""
+        DISCOVERED_PROVIDER_CLASSES.clear()
+        PROVIDER_REGISTRY.clear()
+
+    def test_domain_configuration_called_during_activation(
+        self, groups_providers, monkeypatch
+    ):
+        """Domain configuration method is called during activation."""
+
+        domain_config_called = []
+
+        @register_provider("test")
+        class TestProviderWithDomain(MockPrimaryProvider):
+            def __init__(self):
+                super().__init__()
+                self.domain = None
+
+            def _set_domain_from_config(self, config):
+                """Mock domain configuration."""
+                domain_config_called.append(True)
+                self.domain = "example.com"
+
+        groups_providers.set_providers({"test": {"enabled": True}})
+        activate_providers()
+
+        assert len(domain_config_called) == 1
+        provider = PROVIDER_REGISTRY["test"]
+        assert provider.domain == "example.com"
+
+    def test_domain_extracted_from_environment(self, groups_providers, monkeypatch):
+        """Domain can be extracted from SRE_BOT_EMAIL environment variable."""
+
+        @register_provider("test")
+        class TestProviderWithEnvDomain(MockPrimaryProvider):
+            def __init__(self):
+                super().__init__()
+                self.domain = None
+
+            def _set_domain_from_config(self, config):
+                """Extract domain from SRE_BOT_EMAIL."""
+                import os
+
+                sre_email = os.environ.get("SRE_BOT_EMAIL")
+                if sre_email and "@" in sre_email:
+                    self.domain = sre_email.split("@", 1)[1]
+
+        # Set environment variable
+        monkeypatch.setenv("SRE_BOT_EMAIL", "bot@example.org")
+
+        groups_providers.set_providers({"test": {"enabled": True}})
+        activate_providers()
+
+        provider = PROVIDER_REGISTRY["test"]
+        assert provider.domain == "example.org"
+
+    def test_domain_remains_none_when_not_configured(self, groups_providers):
+        """Domain remains None when not configured."""
+
+        @register_provider("test")
+        class TestProviderNoDomain(MockPrimaryProvider):
+            def __init__(self):
+                super().__init__()
+                self.domain = None
+
+            def _set_domain_from_config(self, config):
+                """No-op domain configuration."""
+                pass
+
+        groups_providers.set_providers({"test": {"enabled": True}})
+        activate_providers()
+
+        provider = PROVIDER_REGISTRY["test"]
+        assert provider.domain is None

@@ -9,21 +9,21 @@ Tests verify that:
 """
 
 from unittest.mock import patch
-from modules.groups import schemas
-from modules.groups.audit import AuditEntry
+from modules.groups.api import schemas
+from modules.groups.infrastructure.audit import AuditEntry
 
 
 class TestAddMemberAuditLogging:
     """Integration tests for add_member audit logging."""
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.add_member_to_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.add_member_to_group")
     def test_add_member_writes_audit_entry_on_success(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """add_member writes audit entry to log on successful operation."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         # Mock orchestration response
         mock_orch.return_value = {
@@ -67,14 +67,14 @@ class TestAddMemberAuditLogging:
         assert audit_entry.justification == "Adding new hire to the engineering team"
         assert audit_entry.error_message is None
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.add_member_to_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.add_member_to_group")
     def test_add_member_writes_audit_entry_on_failure(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """add_member writes failure audit entry when orchestration fails."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         # Mock orchestration to raise exception
         error_msg = "Permission denied"
@@ -106,14 +106,14 @@ class TestAddMemberAuditLogging:
         assert audit_entry.error_message == error_msg
         assert "ValueError" in audit_entry.metadata.get("exception_type", "")
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.add_member_to_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.add_member_to_group")
     def test_add_member_correlation_id_unique_per_request(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """add_member generates unique correlation_id for each request."""
-        from modules.groups import service
+        from modules.groups.core import service
         from uuid import uuid4
 
         mock_orch.return_value = {
@@ -156,14 +156,14 @@ class TestAddMemberAuditLogging:
 class TestRemoveMemberAuditLogging:
     """Integration tests for remove_member audit logging."""
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.remove_member_from_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.remove_member_from_group")
     def test_remove_member_writes_audit_entry_on_success(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """remove_member writes audit entry to log on successful operation."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         # Mock orchestration response
         mock_orch.return_value = {
@@ -205,14 +205,14 @@ class TestRemoveMemberAuditLogging:
         assert audit_entry.requestor == "admin@example.com"
         assert audit_entry.justification == "Access revoked"
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.remove_member_from_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.remove_member_from_group")
     def test_remove_member_writes_audit_entry_on_failure(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """remove_member writes failure audit entry when orchestration fails."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         # Mock orchestration to raise exception
         error_msg = "User not in group"
@@ -245,14 +245,14 @@ class TestRemoveMemberAuditLogging:
 class TestAuditLoggingEventDispatch:
     """Integration tests verifying audit logging works alongside event dispatch."""
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.add_member_to_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.add_member_to_group")
     def test_audit_written_before_event_dispatched(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """Audit entry is written before event dispatch (guarantee audit trail)."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         mock_orch.return_value = {
             "success": True,
@@ -278,14 +278,14 @@ class TestAuditLoggingEventDispatch:
         # Event dispatch happens for notifications
         assert mock_dispatch.call_args[0][0] == "group.member.added"
 
-    @patch("modules.groups.service.audit.write_audit_entry")
-    @patch("modules.groups.service.event_system.dispatch_background")
-    @patch("modules.groups.service.orchestration.remove_member_from_group")
+    @patch("modules.groups.core.service.write_audit_entry")
+    @patch("modules.groups.events.event_system.dispatch_background")
+    @patch("modules.groups.core.orchestration.remove_member_from_group")
     def test_remove_member_dispatches_correct_event(
         self, mock_orch, mock_dispatch, mock_audit_write
     ):
         """remove_member dispatches correct event type."""
-        from modules.groups import service
+        from modules.groups.core import service
 
         mock_orch.return_value = {
             "success": True,

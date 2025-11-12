@@ -9,7 +9,7 @@ Tests cover:
 """
 
 import pytest
-from modules.groups.models import (
+from modules.groups.domain.models import (
     NormalizedMember,
     NormalizedGroup,
     member_from_dict,

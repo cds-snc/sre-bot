@@ -8,7 +8,7 @@ Tests verify pure functionality of:
 """
 
 from unittest.mock import patch
-from modules.groups.audit import (
+from modules.groups.infrastructure.audit import (
     AuditEntry,
     write_audit_entry,
     create_audit_entry_from_operation,
@@ -232,7 +232,7 @@ class TestCreateAuditEntryFactory:
 class TestWriteAuditEntry:
     """Unit tests for write_audit_entry function."""
 
-    @patch("modules.groups.audit.logger")
+    @patch("modules.groups.infrastructure.audit.logger")
     def test_write_audit_entry_logs_all_fields(self, mock_logger):
         """write_audit_entry logs entry with all fields to structured logger."""
         entry = AuditEntry(
@@ -270,7 +270,7 @@ class TestWriteAuditEntry:
         assert kwargs["justification"] == "New hire"
         assert kwargs["metadata"] == {"ticket": "JIRA-123"}
 
-    @patch("modules.groups.audit.logger")
+    @patch("modules.groups.infrastructure.audit.logger")
     def test_write_audit_entry_logs_failure(self, mock_logger):
         """write_audit_entry logs failure case with error message."""
         entry = AuditEntry(
@@ -296,7 +296,7 @@ class TestWriteAuditEntry:
         assert kwargs["success"] is False
         assert kwargs["error_message"] == "User already exists in group"
 
-    @patch("modules.groups.audit.logger")
+    @patch("modules.groups.infrastructure.audit.logger")
     def test_write_audit_entry_with_empty_metadata(self, mock_logger):
         """write_audit_entry logs with empty metadata correctly."""
         entry = AuditEntry(
@@ -315,7 +315,7 @@ class TestWriteAuditEntry:
         kwargs = call_args[1]
         assert kwargs["metadata"] == {}
 
-    @patch("modules.groups.audit.logger")
+    @patch("modules.groups.infrastructure.audit.logger")
     def test_write_audit_entry_logs_sync_not_async(self, mock_logger):
         """write_audit_entry is synchronous - blocks until logged."""
         entry = AuditEntry(

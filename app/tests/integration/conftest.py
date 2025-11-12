@@ -40,7 +40,7 @@ def mock_orchestration_success(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "modules.groups.orchestration.add_member_to_group",
+        "modules.groups.core.orchestration.add_member_to_group",
         mock,
         raising=False,
     )
@@ -66,7 +66,7 @@ def mock_orchestration_failure(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "modules.groups.orchestration.add_member_to_group",
+        "modules.groups.core.orchestration.add_member_to_group",
         mock,
         raising=False,
     )
@@ -105,7 +105,7 @@ def mock_orchestration_partial_failure(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "modules.groups.orchestration.add_member_to_group",
+        "modules.groups.core.orchestration.add_member_to_group",
         mock,
         raising=False,
     )
@@ -129,7 +129,7 @@ def mock_orchestration_remove_member(monkeypatch):
     }
 
     monkeypatch.setattr(
-        "modules.groups.orchestration.remove_member_from_group",
+        "modules.groups.core.orchestration.remove_member_from_group",
         mock,
         raising=False,
     )
@@ -168,7 +168,7 @@ def mock_event_dispatch(monkeypatch):
     mock.clear_dispatched = lambda: dispatched_events.clear()
 
     monkeypatch.setattr(
-        "modules.groups.event_system.dispatch_background",
+        "modules.groups.events.system.dispatch_background",
         mock,
         raising=False,
     )
@@ -275,7 +275,7 @@ def isolated_group_service():
     Returns:
         module: Mocked group service module
     """
-    from modules.groups import service
+    from modules.groups.core import service
 
     return service
 

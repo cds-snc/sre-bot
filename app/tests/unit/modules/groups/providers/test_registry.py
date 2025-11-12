@@ -16,6 +16,8 @@ from modules.groups.providers import (
 )
 from modules.groups.providers.base import (
     GroupProvider,
+)
+from modules.groups.providers.contracts import (
     ProviderCapabilities,
     OperationResult,
     OperationStatus,
@@ -62,6 +64,9 @@ class MockProvider(GroupProvider):
 
     def _list_groups_with_members_impl(self, **kwargs):
         return OperationResult(status=OperationStatus.SUCCESS, message="ok", data={})
+
+    def _health_check_impl(self):
+        return {"status": "healthy"}
 
 
 class TestProviderRegistration:
@@ -540,6 +545,9 @@ class TestProviderCapabilities:
                 raise NotImplementedError()
 
             def _list_groups_with_members_impl(self, **kwargs):
+                raise NotImplementedError()
+
+            def _health_check_impl(self):
                 raise NotImplementedError()
 
         register_provider("none_cap")(NoneCapProvider)

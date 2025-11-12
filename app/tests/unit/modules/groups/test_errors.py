@@ -10,7 +10,7 @@ Tests cover the IntegrationError exception class and error handling:
 
 import types
 import pytest
-from modules.groups.errors import IntegrationError
+from modules.groups.domain.errors import IntegrationError
 
 
 @pytest.mark.unit

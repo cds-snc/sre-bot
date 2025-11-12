@@ -11,7 +11,7 @@ Tests cover all validation functions in modules.groups.validation:
 """
 
 import pytest
-from modules.groups.validation import (
+from modules.groups.infrastructure.validation import (
     validate_email,
     validate_group_id,
     validate_justification,

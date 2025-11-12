@@ -27,7 +27,7 @@ def groups_module():
     Returns:
         module: Loaded groups module
     """
-    from modules.groups import service
+    from modules.groups.core import service
 
     return service
 
@@ -39,7 +39,7 @@ def groups_orchestration():
     Returns:
         module: Loaded orchestration module
     """
-    from modules.groups import orchestration
+    from modules.groups.core import orchestration
 
     return orchestration
 
@@ -51,7 +51,7 @@ def groups_validation():
     Returns:
         module: Loaded validation module
     """
-    from modules.groups import validation
+    from modules.groups.domain import validation
 
     return validation
 
@@ -454,23 +454,6 @@ def activate_test_providers(monkeypatch):
     # Also patch mappings module's imported helpers so functions that
     # performed `from modules.groups.providers import get_active_providers`
     # will see the mocked registry during tests.
-    try:
-        from modules.groups import mappings as mappings_module
-
-        monkeypatch.setattr(
-            mappings_module,
-            "get_active_providers",
-            lambda: mock_registry,
-        )
-        monkeypatch.setattr(
-            mappings_module,
-            "get_primary_provider_name",
-            lambda: "google",
-        )
-    except Exception:
-        # If mappings isn't importable in some contexts, ignore - primary
-        # functions are patched on the providers module which covers most uses.
-        pass
 
     return {
         "google": mock_google,

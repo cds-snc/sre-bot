@@ -4,16 +4,15 @@ Tests in-memory reconciliation store with retry logic, exponential backoff,
 claim semantics, DLQ behavior, and thread safety.
 """
 
-import pytest
 import threading
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from modules.groups.reconciliation import (
-    InMemoryReconciliationStore,
+import pytest
+from modules.groups.reconciliation.store import (
     FailedPropagation,
+    InMemoryReconciliationStore,
 )
-
 
 pytestmark = pytest.mark.unit
 
@@ -277,7 +276,7 @@ class TestClaimSemantics:
         )
         record_id = store.save_failed_propagation(record)
 
-        with patch("modules.groups.reconciliation.datetime") as mock_datetime:
+        with patch("modules.groups.reconciliation.store.datetime") as mock_datetime:
             # Claim at 1000
             mock_datetime.now.return_value.timestamp.return_value = 1000.0
             assert store.claim_record(record_id, "worker-1", lease_seconds=10) is True

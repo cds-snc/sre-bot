@@ -8,7 +8,7 @@ import pytest
 from threading import Event
 from unittest.mock import patch
 
-from modules.groups import event_system
+from modules.groups.events import system as event_system
 
 
 pytestmark = pytest.mark.unit
@@ -187,7 +187,7 @@ class TestSynchronousDispatch:
         def failing_handler(payload):
             raise RuntimeError("test error")
 
-        with patch("modules.groups.event_system.logger") as mock_logger:
+        with patch("modules.groups.events.system.logger") as mock_logger:
             event_system.dispatch_event("test.log_exc", {})
             mock_logger.error.assert_called()
 
@@ -340,7 +340,7 @@ class TestBackgroundDispatch:
 
         event_system.start_event_executor(max_workers=1)
 
-        with patch("modules.groups.event_system.logger") as mock_logger:
+        with patch("modules.groups.events.system.logger") as mock_logger:
             event_system.dispatch_background("test.bg_exc", {})
             evt.wait(2)
             # Error should be logged

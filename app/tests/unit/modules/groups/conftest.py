@@ -117,38 +117,25 @@ def _reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
-def _patch_mappings_helpers(monkeypatch, mock_providers_registry):
-    """Patch mapping module helpers to use the test provider registry.
+def _patch_providers_helpers(monkeypatch, mock_providers_registry):
+    """Patch provider helpers to use the test provider registry.
 
-    Many unit tests call mapping helpers without passing an explicit
-    `provider_registry`. Patch `modules.groups.mappings.get_active_providers`
-    and `get_primary_provider_name` to return the controlled test registry so
-    mapping logic is deterministic and isolated from global activation state.
+    Unit tests call provider helpers without passing an explicit
+    `provider_registry`. Patch the provider helpers to return the controlled
+    test registry so provider logic is deterministic and isolated from global
+    activation state.
     """
-    # Accept arbitrary args/kwargs to match real function signature which may
-    # accept a provider_filter parameter in some call sites.
-    monkeypatch.setattr(
-        "modules.groups.mappings.get_active_providers",
-        lambda *a, **kw: mock_providers_registry,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        "modules.groups.mappings.get_primary_provider_name",
-        lambda: "google",
-        raising=False,
-    )
-
-    # Also patch the service-facing provider helpers so that code which calls
-    # `modules.groups.service._providers.get_active_providers` or
-    # `modules.groups.service._providers.get_primary_provider_name` sees the
+    # Patch the service-facing provider helpers so that code which calls
+    # `modules.groups.core.service._providers.get_active_providers` or
+    # `modules.groups.core.service._providers.get_primary_provider_name` sees the
     # same deterministic test registry and primary provider name.
     monkeypatch.setattr(
-        "modules.groups.service._providers.get_active_providers",
+        "modules.groups.core.service._providers.get_active_providers",
         lambda *a, **kw: mock_providers_registry,
         raising=False,
     )
     monkeypatch.setattr(
-        "modules.groups.service._providers.get_primary_provider_name",
+        "modules.groups.core.service._providers.get_primary_provider_name",
         lambda: "google",
         raising=False,
     )
@@ -165,7 +152,7 @@ def normalized_member_factory():
             role="member"
         )
     """
-    from modules.groups.models import NormalizedMember
+    from modules.groups.domain.models import NormalizedMember
 
     def _factory(
         email: str = "test@example.com",
@@ -199,7 +186,7 @@ def normalized_group_factory():
             name="Test Group"
         )
     """
-    from modules.groups.models import NormalizedGroup
+    from modules.groups.domain.models import NormalizedGroup
 
     def _factory(
         id: str = "group-1",

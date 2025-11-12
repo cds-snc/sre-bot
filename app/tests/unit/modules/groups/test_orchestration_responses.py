@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pytest
 
-from modules.groups import orchestration_responses as orch
+from modules.groups.core import orchestration_responses as orch
 
 
 @pytest.mark.unit
