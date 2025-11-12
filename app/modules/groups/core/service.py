@@ -21,14 +21,14 @@ from modules.groups.core import orchestration
 from modules.groups.core import orchestration_responses as orr
 from modules.groups.events import event_system
 from modules.groups.domain import schemas
-from modules.groups.domain.validation import (
+from modules.groups.infrastructure.validation import (
+    validate_email,
     validate_group_id,
-    validate_provider_type,
-    validate_justification,
-    ValidationError,
+    validate_group_membership_payload,
+    validate_bulk_operations,
 )
-from modules.groups.core.idempotency import get_cached_response, cache_response
-from modules.groups.core.audit import (
+from modules.groups.infrastructure.idempotency import get_cached_response, cache_response
+from modules.groups.infrastructure.audit import (
     create_audit_entry_from_operation,
     write_audit_entry,
 )

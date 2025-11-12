@@ -9,10 +9,10 @@ removed to enforce the new architecture.
 
 from typing import Dict, Any
 
-from modules.groups.events.event_system import register_event_handler
+from modules.groups.events.system import register_event_handler
 from core.logging import get_module_logger
-from modules.groups.core import audit
-from modules.groups.events import notifications
+from modules.groups.infrastructure import audit
+from modules.groups.infrastructure import notifications
 
 logger = get_module_logger()
 

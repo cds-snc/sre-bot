@@ -1,6 +1,6 @@
 """Reconciliation module - retry queue and failed propagation handling."""
 
-from modules.groups.reconciliation.reconciliation import (
+from modules.groups.reconciliation.store import (
     FailedPropagation,
     ReconciliationStore,
     InMemoryReconciliationStore,

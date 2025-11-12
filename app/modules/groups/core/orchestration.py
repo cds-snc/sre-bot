@@ -8,7 +8,7 @@ inside functions to avoid import-time failures during incremental rollout.
 from uuid import uuid4
 from typing import Dict, List, TYPE_CHECKING
 from core.logging import get_module_logger
-from modules.groups.reconciliation import reconciliation_integration as ri
+from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
     get_active_providers,
     get_primary_provider,
