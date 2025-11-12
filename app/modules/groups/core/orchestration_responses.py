@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from core.logging import get_module_logger
 
-from modules.groups.types import (
+from modules.groups.domain.types import (
     PrimaryDataTypedDict,
     ReadResponseTypedDict,
     OrchestrationResponseTypedDict,

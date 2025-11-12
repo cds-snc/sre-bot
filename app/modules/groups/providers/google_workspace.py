@@ -15,8 +15,8 @@ from integrations.google_workspace.schemas import (
 )
 
 # Local application - modules
-from modules.groups.errors import IntegrationError
-from modules.groups.models import (
+from modules.groups.domain.errors import IntegrationError
+from modules.groups.domain.models import (
     as_canonical_dict,
     NormalizedMember,
     NormalizedGroup,

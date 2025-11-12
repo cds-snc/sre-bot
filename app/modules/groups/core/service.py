@@ -17,14 +17,21 @@ from datetime import datetime, timezone
 from typing import Any, List
 from uuid import uuid4
 from core.logging import get_module_logger
-from modules.groups import orchestration
-from modules.groups import orchestration_responses as orr
-from modules.groups import event_system
-from modules.groups import schemas
-from modules.groups import validation
-from modules.groups import mappings
-from modules.groups import idempotency
-from modules.groups import audit
+from modules.groups.core import orchestration
+from modules.groups.core import orchestration_responses as orr
+from modules.groups.events import event_system
+from modules.groups.domain import schemas
+from modules.groups.domain.validation import (
+    validate_group_id,
+    validate_provider_type,
+    validate_justification,
+    ValidationError,
+)
+from modules.groups.core.idempotency import get_cached_response, cache_response
+from modules.groups.core.audit import (
+    create_audit_entry_from_operation,
+    write_audit_entry,
+)
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
     OperationStatus,
@@ -48,13 +55,7 @@ __all__ = [
     "remove_member",
     "list_groups",
     "bulk_operations",
-    "map_provider_group_id",
-    "parse_primary_group_name",
-    "primary_group_to_canonical",
-    "normalize_member_for_provider",
-    "map_normalized_groups_to_providers",
-    "filter_groups_for_user_roles",
-    "map_primary_to_secondary_group",
+    "validate_group_in_provider",
     "OperationResult",
 ]
 
@@ -69,9 +70,8 @@ def _check_user_is_manager(
 
     Args:
         user_email: Email of user to check
-        group_id: Group ID (may be from secondary provider, will be mapped to primary format)
-        provider_type: Optional provider type. If secondary provider, group_id will be
-                      mapped to primary format first.
+        group_id: Group email or ID to check (e.g., "aws-admins@example.com")
+        provider_type: Ignored (kept for backward compatibility)
 
     Returns:
         True if user is a manager, False otherwise
@@ -83,31 +83,13 @@ def _check_user_is_manager(
         try:
             # Use registry helper to obtain the primary provider instance
             primary_provider = _providers.get_primary_provider()
-            primary_name = _providers.get_primary_provider_name()
         except Exception as e:
             # Normalize registry errors to ValueError for callers
             raise ValueError(f"Primary provider not available: {e}") from e
 
-        # If provider_type is secondary, map group_id to primary format
-        mapped_group_id = group_id
-        if provider_type and primary_name and provider_type != primary_name:
-            try:
-                mapped_group_id = mappings.map_provider_group_id(
-                    from_provider=provider_type,
-                    from_group_id=group_id,
-                    to_provider=primary_name,
-                )
-            except Exception as e:
-                logger.warning(
-                    "failed_to_map_group_id_for_permission_check",
-                    error=str(e),
-                    from_provider=provider_type,
-                    to_provider=primary_name,
-                )
-                raise ValueError(f"Failed to map group ID: {e}") from e
-
-        # Call is_manager on primary provider
-        result = primary_provider.is_manager(user_email, mapped_group_id)
+        # Use group_id directly (now in email format from primary provider)
+        # Secondary providers handle their own identifier resolution
+        result = primary_provider.is_manager(user_email, group_id)
 
         # Handle OperationResult wrapper if returned
         if isinstance(result, OperationResult):
@@ -115,7 +97,7 @@ def _check_user_is_manager(
                 logger.warning(
                     "is_manager_operation_failed",
                     user_email=user_email,
-                    group_id=mapped_group_id,
+                    group_id=group_id,
                     status=result.status,
                     message=result.message,
                 )
@@ -168,7 +150,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     correlation_id = str(uuid4())
 
     # Check idempotency cache first
-    cached_response = idempotency.get_cached_response(request.idempotency_key)
+    cached_response = get_cached_response(request.idempotency_key)
     if cached_response is not None:
         logger.info(
             "idempotent_request_detected",
@@ -184,15 +166,15 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
     try:
         # Validate provider type
-        if provider_type and not validation.validate_provider_type(provider_type):
-            raise validation.ValidationError(f"Invalid provider: {provider_type}")
+        if provider_type and not validate_provider_type(provider_type):
+            raise ValidationError(f"Invalid provider: {provider_type}")
 
         # Validate group ID format
-        validation.validate_group_id(request.group_id, provider_type or "")
+        validate_group_id(request.group_id, provider_type or "")
 
         # Validate justification (required by default per config)
-        validation.validate_justification(request.justification, required=True)
-    except validation.ValidationError as e:
+        validate_justification(request.justification, required=True)
+    except ValidationError as e:
         logger.warning(
             "validation_error_add_member",
             error=str(e),
@@ -209,10 +191,10 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             group_id=request.group_id,
             provider_type=provider_type,
         ):
-            raise validation.ValidationError(
+            raise ValidationError(
                 f"User {request.requestor} is not a manager of group {request.group_id}"
             )
-    except validation.ValidationError:
+    except ValidationError:
         raise
     except Exception as e:
         logger.warning(
@@ -221,31 +203,13 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             requestor=request.requestor,
             group_id=request.group_id,
         )
-        raise validation.ValidationError(f"Permission check failed: {e}") from e
+        raise ValidationError(f"Permission check failed: {e}") from e
 
-    # If caller supplied a non-primary provider group id, map it to the
-    # primary provider format before calling orchestration. This keeps
-    # orchestration focused on provider coordination and reduces mapping
-    # responsibilities there.
-    primary_group_id = request.group_id
-    try:
-        primary_name = _providers.get_primary_provider_name()
-    except Exception:
-        primary_name = None
-
-    if provider_type and primary_name and provider_type != primary_name:
-        try:
-            primary_group_id = mappings.map_provider_group_id(
-                from_provider=provider_type,
-                from_group_id=request.group_id,
-                to_provider=primary_name,
-            )
-        except Exception as e:
-            raise ValueError(f"failed_to_map_group_id: {e}")
-
+    # Use group_id directly (now in email format)
+    # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.add_member_to_group(
-            primary_group_id=primary_group_id,
+            primary_group_id=request.group_id,
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
@@ -278,7 +242,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         )
 
         # Write audit entry (synchronous, before returning)
-        audit_entry = audit.create_audit_entry_from_operation(
+        audit_entry = create_audit_entry_from_operation(
             correlation_id=correlation_id,
             action="add_member",
             group_id=request.group_id,
@@ -289,7 +253,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             justification=request.justification,
             metadata={"orchestration": formatted},
         )
-        audit.write_audit_entry(audit_entry)
+        write_audit_entry(audit_entry)
 
         # Fire-and-forget event for downstream handlers (audit, notifications)
         try:
@@ -324,13 +288,13 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
         # Cache successful responses only
         if response.success:
-            idempotency.cache_response(request.idempotency_key, response)
+            cache_response(request.idempotency_key, response)
 
         return response
 
     except Exception as e:
         # Write failure audit entry
-        audit_entry = audit.create_audit_entry_from_operation(
+        audit_entry = create_audit_entry_from_operation(
             correlation_id=correlation_id,
             action="add_member",
             group_id=request.group_id,
@@ -342,11 +306,13 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             error_message=str(e),
             metadata={"exception_type": type(e).__name__},
         )
-        audit.write_audit_entry(audit_entry)
+        write_audit_entry(audit_entry)
         raise
 
 
-def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionResponse:
+def remove_member(
+    request: schemas.RemoveMemberRequest,
+) -> schemas.ActionResponse:  # noqa: C901
     """Remove a member from a group using orchestration.
 
     Schedules `group.member.remove_requested` as a background event and returns
@@ -362,7 +328,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
     correlation_id = str(uuid4())
 
     # Check cache for idempotent request
-    cached_response = idempotency.get_cached_response(request.idempotency_key)
+    cached_response = get_cached_response(request.idempotency_key)
     if cached_response:
         logger.info(
             "idempotent_request_detected",
@@ -378,15 +344,15 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
 
     try:
         # Validate provider type
-        if provider_type and not validation.validate_provider_type(provider_type):
-            raise validation.ValidationError(f"Invalid provider: {provider_type}")
+        if provider_type and not validate_provider_type(provider_type):
+            raise ValidationError(f"Invalid provider: {provider_type}")
 
         # Validate group ID format
-        validation.validate_group_id(request.group_id, provider_type or "")
+        validate_group_id(request.group_id, provider_type or "")
 
         # Validate justification (required by default per config)
-        validation.validate_justification(request.justification, required=True)
-    except validation.ValidationError as e:
+        validate_justification(request.justification, required=True)
+    except ValidationError as e:
         logger.warning(
             "validation_error_remove_member",
             error=str(e),
@@ -403,10 +369,10 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             group_id=request.group_id,
             provider_type=provider_type,
         ):
-            raise validation.ValidationError(
+            raise ValidationError(
                 f"User {request.requestor} is not a manager of group {request.group_id}"
             )
-    except validation.ValidationError:
+    except ValidationError:
         raise
     except Exception as e:
         logger.warning(
@@ -415,27 +381,13 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             requestor=request.requestor,
             group_id=request.group_id,
         )
-        raise validation.ValidationError(f"Permission check failed: {e}") from e
+        raise ValidationError(f"Permission check failed: {e}") from e
 
-    primary_group_id = request.group_id
-    try:
-        primary_name = _providers.get_primary_provider_name()
-    except Exception:
-        primary_name = None
-
-    if provider_type and primary_name and provider_type != primary_name:
-        try:
-            primary_group_id = mappings.map_provider_group_id(
-                from_provider=provider_type,
-                from_group_id=request.group_id,
-                to_provider=primary_name,
-            )
-        except Exception as e:
-            raise ValueError(f"failed_to_map_group_id: {e}")
-
+    # Use group_id directly (now in email format)
+    # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.remove_member_from_group(
-            primary_group_id=primary_group_id,
+            primary_group_id=request.group_id,
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
@@ -466,7 +418,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
         )
 
         # Write audit entry (synchronous, before returning)
-        audit_entry = audit.create_audit_entry_from_operation(
+        audit_entry = create_audit_entry_from_operation(
             correlation_id=correlation_id,
             action="remove_member",
             group_id=request.group_id,
@@ -477,7 +429,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             justification=request.justification,
             metadata={"orchestration": formatted},
         )
-        audit.write_audit_entry(audit_entry)
+        write_audit_entry(audit_entry)
 
         try:
             event_system.dispatch_background(
@@ -511,13 +463,13 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
 
         # Cache successful responses for idempotency
         if response.success:
-            idempotency.cache_response(request.idempotency_key, response)
+            cache_response(request.idempotency_key, response)
 
         return response
 
     except Exception as e:
         # Write failure audit entry
-        audit_entry = audit.create_audit_entry_from_operation(
+        audit_entry = create_audit_entry_from_operation(
             correlation_id=correlation_id,
             action="remove_member",
             group_id=request.group_id,
@@ -529,7 +481,7 @@ def remove_member(request: schemas.RemoveMemberRequest) -> schemas.ActionRespons
             error_message=str(e),
             metadata={"exception_type": type(e).__name__},
         )
-        audit.write_audit_entry(audit_entry)
+        write_audit_entry(audit_entry)
         raise
 
 
@@ -590,101 +542,6 @@ def bulk_operations(
     }
 
     return schemas.BulkOperationResponse(results=results, summary=summary)
-
-
-def primary_group_to_canonical(
-    primary_group_name: str, prefixes: list | None = None
-) -> str:
-    """Return canonical group name for a primary provider identifier.
-
-    Use this service wrapper instead of importing the mapping helper directly.
-    The implementation lives in `modules.groups.mappings`; this wrapper is the
-    supported public boundary so mapping internals can change without
-    impacting callers.
-    """
-    return mappings.primary_group_to_canonical(primary_group_name, prefixes)
-
-
-def parse_primary_group_name(
-    primary_group_name: str, *, provider_registry: dict | None = None
-) -> dict:
-    """Parse a primary provider group identifier into prefix + canonical.
-
-    Public wrapper around the mapping implementation. Callers should use this
-    function rather than `mappings.parse_primary_group_name` so the service
-    boundary remains stable.
-    """
-    # Delegate to mappings implementation. Keep signature compatible with
-    # existing callers (accept `provider_registry` for deterministic tests).
-    return mappings.parse_primary_group_name(
-        primary_group_name, provider_registry=provider_registry
-    )
-
-
-def map_provider_group_id(
-    from_provider: str,
-    from_group_id: str,
-    to_provider: str,
-    *,
-    provider_registry: dict | None = None,
-) -> str:
-    """Map a group id from one provider to another.
-
-    Public wrapper. Use this function as the canonical mapping API; the heavy
-    implementation lives in `modules.groups.mappings` and may change over
-    time. Keeping callers pointed at the service reduces coupling.
-    """
-    return mappings.map_provider_group_id(
-        from_provider=from_provider,
-        from_group_id=from_group_id,
-        to_provider=to_provider,
-        provider_registry=provider_registry,
-    )
-
-
-def map_primary_to_secondary_group(
-    primary_group_id: str, secondary_provider: str
-) -> str:
-    """Map a primary provider group id to a secondary provider's id.
-
-    Public wrapper around `mappings.map_primary_to_secondary_group` so
-    callers can rely on the service boundary rather than importing mapping
-    helpers directly from `mappings`.
-    """
-    return mappings.map_primary_to_secondary_group(primary_group_id, secondary_provider)
-
-
-def normalize_member_for_provider(member_email: str, provider_type: str):
-    """Normalize a member identifier for a specific provider.
-
-    Public wrapper around the mapping implementation. Callers should import
-    and use this service function so provider-specific normalization logic is
-    encapsulated and can evolve without changing call sites.
-    """
-    return mappings.normalize_member_for_provider(member_email, provider_type)
-
-
-def map_normalized_groups_to_providers(
-    groups, *, associate: bool = False, provider_registry: dict | None = None
-) -> dict:
-    """Group a list of normalized groups by provider (optionally associate by prefix).
-
-    Public wrapper that delegates to the mapping implementation. Use this
-    wrapper as the maintained public API for grouping behavior.
-    """
-    return mappings.map_normalized_groups_to_providers(
-        groups, associate=associate, provider_registry=provider_registry
-    )
-
-
-def filter_groups_for_user_roles(groups, user_email: str, user_roles: list):
-    """Filter a groups map to only include groups the user holds the given roles in.
-
-    Public wrapper. Callers should use this service function to keep
-    role-filtering logic behind the service boundary instead of relying on
-    internal mapping helpers.
-    """
-    return mappings.filter_groups_for_user_roles(groups, user_email, user_roles)
 
 
 def validate_group_in_provider(

@@ -10,7 +10,7 @@ Separation of concerns:
 """
 
 import dataclasses
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from core.config import settings
 from core.logging import get_module_logger
@@ -72,9 +72,7 @@ def load_capabilities(provider_name: str) -> ProviderCapabilities:
     return ProviderCapabilities(**merged_dict)
 
 
-def apply_capability_overrides(
-    instance: Any, config: Dict[str, Any]
-) -> None:
+def apply_capability_overrides(instance: Any, config: Dict[str, Any]) -> None:
     """Apply config-driven capability overrides to a provider instance.
 
     Mutates the instance by setting _capability_override attribute with

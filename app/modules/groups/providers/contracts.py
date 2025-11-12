@@ -71,10 +71,15 @@ class OperationResult:
 
     @classmethod
     def transient_error(
-        cls, message: str, error_code: Optional[str] = None, retry_after: Optional[int] = None
+        cls,
+        message: str,
+        error_code: Optional[str] = None,
+        retry_after: Optional[int] = None,
     ) -> "OperationResult":
         """Create a transient (retryable) error result."""
-        return cls.error(OperationStatus.TRANSIENT_ERROR, message, error_code, retry_after)
+        return cls.error(
+            OperationStatus.TRANSIENT_ERROR, message, error_code, retry_after
+        )
 
     @classmethod
     def permanent_error(

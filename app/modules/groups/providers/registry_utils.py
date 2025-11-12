@@ -9,10 +9,9 @@ Usage:
   the activation orchestration phase.
 """
 
-from typing import Dict, Type, Any, Optional
+from typing import Dict, Type, Any
 
 from core.logging import get_module_logger
-from modules.groups.providers.contracts import ProviderCapabilities
 
 logger = get_module_logger()
 
@@ -70,9 +69,7 @@ def instantiate_provider(provider_cls: Type, name: str) -> Any:
         try:
             return provider_cls.from_config()
         except Exception as e:
-            raise RuntimeError(
-                f"Provider {name} from_config() failed: {str(e)}"
-            ) from e
+            raise RuntimeError(f"Provider {name} from_config() failed: {str(e)}") from e
 
     # No construction strategy worked
     raise RuntimeError(
@@ -81,9 +78,7 @@ def instantiate_provider(provider_cls: Type, name: str) -> Any:
     )
 
 
-def resolve_prefix(
-    instance: Any, config: Dict[str, Any], provider_name: str
-) -> str:
+def resolve_prefix(instance: Any, config: Dict[str, Any], provider_name: str) -> str:
     """Resolve a provider's prefix with config override support.
 
     Priority:
@@ -120,7 +115,9 @@ def resolve_prefix(
         default_prefix = provider_name
 
     if not isinstance(default_prefix, str):
-        raise ValueError(f"Prefix for {provider_name} must be string, got {type(default_prefix)}")
+        raise ValueError(
+            f"Prefix for {provider_name} must be string, got {type(default_prefix)}"
+        )
 
     # Step 4: Apply config override if provided
     config_prefix = config.get("prefix")

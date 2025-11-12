@@ -8,7 +8,7 @@ inside functions to avoid import-time failures during incremental rollout.
 from uuid import uuid4
 from typing import Dict, List, TYPE_CHECKING
 from core.logging import get_module_logger
-from modules.groups import reconciliation_integration as ri
+from modules.groups.reconciliation import reconciliation_integration as ri
 from modules.groups.providers import (
     get_active_providers,
     get_primary_provider,
@@ -19,14 +19,10 @@ from modules.groups.providers.base import (
     OperationResult,
     GroupProvider,
 )
-from modules.groups.models import NormalizedGroup
-
-# prefer using the service boundary for mapping helpers to reduce coupling
-# and allow mappings implementation to evolve without impacting callers.
-from modules.groups import service as service_layer
+from modules.groups.domain.models import NormalizedGroup
 
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
-    from modules.groups.types import OrchestrationResponseTypedDict, OperationResultLike
+    from modules.groups.domain.types import OrchestrationResponseTypedDict, OperationResultLike
 
 logger = get_module_logger()
 
@@ -62,15 +58,22 @@ def validate_group_in_provider(group_id: str, provider: GroupProvider) -> bool:
     Returns:
         True if group exists and is accessible, False otherwise
     """
-    # Delegate to the service boundary so the small helper lives on the
-    # public service surface. Pass through the local OperationStatus so
-    # tests that patch `orchestration.OperationStatus` observe the same
-    # enum values when the service evaluates success.
-    # Use the OperationStatus exposed on the service boundary so tests that
-    # patch `modules.groups.service.OperationStatus` control evaluation.
-    return service_layer.validate_group_in_provider(
-        group_id, provider, op_status=service_layer.OperationStatus
-    )
+    # Validate by attempting to read group members from the provider
+    try:
+        result = provider.get_group_members(group_id)
+        # If OperationResult-like, check the status attribute
+        if hasattr(result, "status"):
+            return result.status == OperationStatus.SUCCESS
+        # otherwise assume success when no exception raised
+        return True
+    except Exception as e:
+        logger.warning(
+            "group_validation_failed",
+            group_id=group_id,
+            provider=provider.__class__.__name__,
+            error=str(e),
+        )
+        return False
 
 
 def _unwrap_opresult_data(op):
@@ -135,7 +138,20 @@ def _propagate_to_secondaries(
 ) -> Dict[str, "OperationResultLike"]:
     """Propagate an operation to all secondary providers.
 
-    Returns a dict mapping provider name -> OperationResult.
+    Passes the full group email (from primary provider) directly to secondary providers.
+    Each secondary provider is responsible for decomposing the email and resolving it
+    to its own identifier format.
+    The secondary provider is identified by the prefix of the email passed.
+
+    Args:
+        primary_group_id: Full group email from primary provider (e.g., "aws-admins@example.com")
+        member_email: Member email address
+        op_name: Provider method name (add_member, remove_member)
+        action: Action label for logging/queuing
+        correlation_id: Correlation ID for tracing
+
+    Returns:
+        Dict mapping provider name -> OperationResult.
     """
     results: Dict[str, OperationResult] = {}
     secondaries = get_active_providers()
@@ -148,16 +164,14 @@ def _propagate_to_secondaries(
         if name == primary_name:
             continue
         try:
-            # Use service layer mapping which is the canonical API for group ID
-            # mapping across providers. Tests should patch
-            # `modules.groups.service.map_primary_to_secondary_group` not orchestration.
-            sec_group = service_layer.map_primary_to_secondary_group(
-                primary_group_id, name
-            )
-            # Phase 1: Provider methods now accept member_email directly (string)
-            # Email validation happens at the provider layer via validate_member_email()
+            # Pass full group email directly to secondary provider
+            # Secondary provider is responsible for email decomposition and identifier resolution
             sec_op = _call_provider_method(
-                prov, op_name, sec_group, member_email, correlation_id=correlation_id
+                prov,
+                op_name,
+                primary_group_id,
+                member_email,
+                correlation_id=correlation_id,
             )
             results[name] = sec_op
 
@@ -167,7 +181,7 @@ def _propagate_to_secondaries(
                     ri.enqueue_failed_propagation(
                         correlation_id=correlation_id,
                         provider=name,
-                        group_id=sec_group,
+                        group_email=primary_group_id,
                         member_email=member_email,
                         action=action,
                         error_message=err_msg,
@@ -178,7 +192,7 @@ def _propagate_to_secondaries(
         except Exception as e:
             results[name] = OperationResult.transient_error(str(e))
             logger.error(
-                "propagation_mapping_or_call_failed",
+                "propagation_failed",
                 correlation_id=correlation_id,
                 provider=name,
                 error=str(e),

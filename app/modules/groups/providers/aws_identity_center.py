@@ -18,8 +18,12 @@ from integrations.aws.schemas import GroupMembership as AwsGroupMembership
 from integrations.aws.schemas import User as AwsUser
 
 # Local application - modules
-from modules.groups.errors import IntegrationError
-from modules.groups.models import NormalizedGroup, NormalizedMember, as_canonical_dict
+from modules.groups.domain.errors import IntegrationError
+from modules.groups.domain.models import (
+    NormalizedGroup,
+    NormalizedMember,
+    as_canonical_dict,
+)
 from modules.groups.providers import register_provider
 from modules.groups.providers.base import (
     GroupProvider,
@@ -171,6 +175,36 @@ class AwsIdentityCenterProvider(GroupProvider):
         # Default: treat as transient error
         return OperationResult.transient_error(str(exc))
 
+    def _strip_provider_prefix(self, group_identifier: str) -> str:
+        """Remove AWS prefix from group identifier to get canonical name.
+
+        Handles email format from primary provider:
+        - "aws-admins@example.com" -> "admins@example.com"
+        - "aws-developers@example.com" -> "developers@example.com"
+        - "developers@example.com" (no prefix) -> "developers@example.com"
+
+        Also handles direct display names:
+        - "aws-development-team" -> "development-team"
+        - "development-team" (no prefix) -> "development-team"
+
+        Args:
+            group_identifier: Email, UUID, or display name with optional "aws-" prefix
+
+        Returns:
+            Identifier with "aws-" prefix removed (if present)
+        """
+        normalized = group_identifier.strip()
+
+        # Known AWS prefix patterns
+        prefixes = ["aws-", "aws_"]
+
+        for prefix in prefixes:
+            if normalized.lower().startswith(prefix):
+                # Remove prefix, preserving case of remainder
+                return normalized[len(prefix) :]
+
+        return normalized
+
     # ------------------------------------------------------------------
     # Instance helpers (migrated from module-level into the provider)
     # ------------------------------------------------------------------
@@ -276,12 +310,15 @@ class AwsIdentityCenterProvider(GroupProvider):
         AWS Identity Center APIs accept either:
         - GroupId: UUID format (e.g., 906abc12-d3e4-5678-90ab-cdef12345678)
         - DisplayName: canonical name (e.g., digitaltransformationoffice-ai-staging-admin)
+        - Email format: from primary provider (e.g., "aws-admins@example.com")
 
-        This method checks if the input is already a UUID. If not, it calls
-        get_group_by_name to resolve the display name to a GroupId.
+        Email handling:
+        1. Strips provider prefix (aws-, google-, etc.) if present
+        2. Extracts local part (before @) to get canonical name
+        3. Uses canonical name to resolve UUID via get_group_by_name
 
         Args:
-            group_key: Either a UUID GroupId or a display name
+            group_key: UUID GroupId, display name, or email format
 
         Returns:
             AWS GroupId in UUID format
@@ -289,24 +326,34 @@ class AwsIdentityCenterProvider(GroupProvider):
         Raises:
             IntegrationError: If group cannot be resolved
         """
-        # Check if input is already a UUID (GroupId format)
-        if AWS_UUID_REGEX.match(group_key.strip()):
-            return group_key.strip()
+        normalized = group_key.strip()
 
-        # Not a UUID, treat as display name and resolve
+        # Check if input is already a UUID (GroupId format)
+        if AWS_UUID_REGEX.match(normalized):
+            return normalized
+
+        # Handle email format: extract local part and strip provider prefix
+        if "@" in normalized:
+            # Extract local part (before @)
+            local_part = normalized.split("@")[0]
+            # Strip any provider prefix
+            normalized = self._strip_provider_prefix(local_part)
+
+        # At this point, normalized is a canonical display name
+        # Resolve it to AWS GroupId using get_group_by_name
         if not hasattr(identity_store, "get_group_by_name"):
             raise IntegrationError(
                 "aws identity_store missing get_group_by_name", response=None
             )
 
-        resp = identity_store.get_group_by_name(group_key)
+        resp = identity_store.get_group_by_name(normalized)
         if not hasattr(resp, "success"):
             raise IntegrationError(
                 "aws get_group_by_name returned unexpected type", response=resp
             )
         if not resp.success:
             raise IntegrationError(
-                f"aws resolve group id failed for display name: {group_key}",
+                f"aws resolve group id failed for display name: {normalized}",
                 response=resp,
             )
 

@@ -62,7 +62,7 @@ def is_reconciliation_enabled() -> bool:
 def enqueue_failed_propagation(
     correlation_id: str,
     provider: str,
-    group_id: str,
+    group_email: str,
     member_email: str,
     action: str,
     error_message: str,
@@ -76,7 +76,7 @@ def enqueue_failed_propagation(
     Args:
         correlation_id: Correlation ID for tracing
         provider: Provider name that failed
-        group_id: Group ID for the operation
+        group_email: Full group email (e.g., "aws-admins@example.com") for the operation
         member_email: Member email for the operation
         action: Action that failed ("add_member" or "remove_member")
         error_message: Error message from the failed operation
@@ -103,10 +103,11 @@ def enqueue_failed_propagation(
     try:
         # Create failed propagation record
         record = FailedPropagation(
-            group_id=group_id,
+            group_id=group_email,
             provider=provider,
             payload_raw={
                 "correlation_id": correlation_id,
+                "group_email": group_email,
                 "member_email": member_email,
                 "action": action,
             },
@@ -122,7 +123,7 @@ def enqueue_failed_propagation(
             correlation_id=correlation_id,
             record_id=record_id,
             provider=provider,
-            group_id=group_id,
+            group_email=group_email,
             action=action,
         )
         return record_id

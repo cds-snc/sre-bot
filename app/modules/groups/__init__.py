@@ -12,20 +12,20 @@ Features:
 - Comprehensive audit logging
 """
 
-from modules.groups.event_system import register_event_handler, dispatch_event
-from modules.groups.orchestration import (
+from modules.groups.events.event_system import register_event_handler, dispatch_event
+from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,
     list_groups_for_user,
 )
-from modules.groups.commands import handle_groups_command, register_groups_commands
-from modules.groups.validation import (
+from modules.groups.api.commands import handle_groups_command, register_groups_commands
+from modules.groups.domain.validation import (
     validate_email,
     validate_group_id,
     validate_provider_type,
     validate_group_membership_payload,
 )
-from modules.groups.responses import (
+from modules.groups.api.responses import (
     format_success_response,
     format_error_response,
     format_slack_response,

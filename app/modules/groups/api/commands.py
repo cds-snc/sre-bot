@@ -1,4 +1,4 @@
-# modules/groups/commands.py
+# modules/groups/api/commands.py
 """Command handlers for Slack integration."""
 
 import uuid
@@ -7,9 +7,11 @@ from slack_sdk import WebClient
 from slack_bolt import Ack, Respond
 
 from core.logging import get_module_logger
-from modules.groups import service, responses, schemas
+from modules.groups.core import service
+from modules.groups.api import responses
+from modules.groups.domain import schemas
 from modules.groups.providers import get_active_providers
-from modules.groups.validation import validate_email, validate_provider_type
+from modules.groups.domain.validation import validate_email, validate_provider_type
 from integrations.slack import users as slack_users
 
 

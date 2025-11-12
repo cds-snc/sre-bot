@@ -6,7 +6,7 @@ exponential backoff, and dead letter queue handling.
 
 from core.logging import get_module_logger
 from modules.groups import reconciliation_integration as ri
-from modules.groups.models import NormalizedMember
+from modules.groups.domain.models import NormalizedMember
 from modules.groups.providers import get_provider
 
 logger = get_module_logger()

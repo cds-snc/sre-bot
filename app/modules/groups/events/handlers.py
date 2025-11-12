@@ -9,10 +9,10 @@ removed to enforce the new architecture.
 
 from typing import Dict, Any
 
-from modules.groups.event_system import register_event_handler
+from modules.groups.events.event_system import register_event_handler
 from core.logging import get_module_logger
-from modules.groups import audit
-from modules.groups.notifications import send_group_notifications
+from modules.groups.core import audit
+from modules.groups.events import notifications
 
 logger = get_module_logger()
 
@@ -59,7 +59,7 @@ def handle_member_added(payload: Dict[str, Any]) -> None:
     _log_group_action_to_audit(payload)
 
     # Send notifications
-    send_group_notifications(payload)
+    notifications.send_group_notifications(payload)
 
 
 @register_event_handler("group.member.removed")
@@ -70,4 +70,4 @@ def handle_member_removed(payload: Dict[str, Any]) -> None:
     _log_group_action_to_audit(payload)
 
     # Send notifications
-    send_group_notifications(payload)
+    notifications.send_group_notifications(payload)

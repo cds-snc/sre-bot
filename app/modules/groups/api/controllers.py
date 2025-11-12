@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.logging import get_module_logger
-from modules.groups import service, schemas, models
+from modules.groups.core import service
+from modules.groups.domain import schemas, models
 from modules.groups.providers import get_active_providers
-from modules.groups.circuit_breaker import get_open_circuit_breakers
+from modules.groups.infrastructure import circuit_breaker
 
 logger = get_module_logger()
 
@@ -167,7 +168,7 @@ def circuit_breaker_health():
     """
     try:
         providers = get_active_providers()
-        open_circuits = get_open_circuit_breakers()
+        open_circuits = circuit_breaker.get_open_circuit_breakers()
         all_stats = {}
 
         for provider_name, provider in providers.items():

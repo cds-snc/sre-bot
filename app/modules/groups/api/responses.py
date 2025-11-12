@@ -1,11 +1,11 @@
-# modules/groups/responses.py
+# modules/groups/api/responses.py
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 from core.logging import get_module_logger
-from modules.groups.models import GroupsMap
-from modules.groups.errors import IntegrationError
-from modules.groups import service
+from modules.groups.domain.models import GroupsMap
+from modules.groups.domain.errors import IntegrationError
+from modules.groups.core import service
 
 logger = get_module_logger()
 

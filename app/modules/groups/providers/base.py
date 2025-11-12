@@ -12,13 +12,13 @@ Key separation of concerns:
 
 from __future__ import annotations
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from abc import ABC, abstractmethod
 from email_validator import validate_email, EmailNotValidError
 from core.config import settings
 from core.logging import get_module_logger
-from modules.groups.models import NormalizedMember
-from modules.groups.circuit_breaker import (
+from modules.groups.domain.models import NormalizedMember
+from modules.groups.infrastructure.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     register_circuit_breaker,
@@ -29,11 +29,6 @@ from modules.groups.providers.contracts import (
     HealthCheckResult,
     CircuitBreakerStats,
     ProviderCapabilities,
-)
-from modules.groups.providers.capabilities import (
-    load_capabilities,
-    provider_supports,
-    provider_provides_role_info,
 )
 
 logger = get_module_logger()
