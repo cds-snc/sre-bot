@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Dict, Optional
 from core.logging import get_module_logger
-from modules.groups.domain import schemas
+from modules.groups.api import schemas
 
 logger = get_module_logger()
 

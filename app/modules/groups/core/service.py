@@ -19,15 +19,18 @@ from uuid import uuid4
 from core.logging import get_module_logger
 from modules.groups.core import orchestration
 from modules.groups.core import orchestration_responses as orr
-from modules.groups.events import event_system
-from modules.groups.domain import schemas
+from modules.groups.events import system as event_system
+from modules.groups.api import schemas
 from modules.groups.infrastructure.validation import (
-    validate_email,
     validate_group_id,
-    validate_group_membership_payload,
-    validate_bulk_operations,
+    validate_provider_type,
+    validate_justification,
+    ValidationError,
 )
-from modules.groups.infrastructure.idempotency import get_cached_response, cache_response
+from modules.groups.infrastructure.idempotency import (
+    get_cached_response,
+    cache_response,
+)
 from modules.groups.infrastructure.audit import (
     create_audit_entry_from_operation,
     write_audit_entry,

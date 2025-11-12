@@ -22,7 +22,10 @@ from modules.groups.providers.base import (
 from modules.groups.domain.models import NormalizedGroup
 
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
-    from modules.groups.domain.types import OrchestrationResponseTypedDict, OperationResultLike
+    from modules.groups.domain.types import (
+        OrchestrationResponseTypedDict,
+        OperationResultLike,
+    )
 
 logger = get_module_logger()
 
