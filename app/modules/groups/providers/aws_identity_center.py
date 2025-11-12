@@ -33,8 +33,8 @@ from modules.groups.providers.base import (
 
 logger = get_module_logger()
 
-# AWS GroupId UUID pattern - used to distinguish GroupIds from display names
-AWS_GROUP_UUID_PATTERN = (
+# AWS UUID pattern - used to distinguish Ids from display names
+AWS_UUID_PATTERN = (
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 
@@ -272,7 +272,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             IntegrationError: If group cannot be resolved
         """
         # Check if input is already a UUID (GroupId format)
-        if re.match(AWS_GROUP_UUID_PATTERN, group_key.strip()):
+        if re.match(AWS_UUID_PATTERN, group_key.strip()):
             return group_key.strip()
 
         # Not a UUID, treat as display name and resolve
