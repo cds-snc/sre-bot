@@ -27,14 +27,14 @@ from modules.groups.providers.base import (
     OperationStatus,
     ProviderCapabilities,
     HealthCheckResult,
-    opresult_wrapper,
+    provider_operation,
     validate_member_email,
 )
 
 logger = get_module_logger()
 
-# AWS UUID pattern - used to distinguish Ids from display names
-AWS_UUID_PATTERN = (
+# AWS Identity Center resource IDs (GroupId, UserId, MembershipId) use UUID format
+AWS_UUID_REGEX = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 
@@ -45,12 +45,30 @@ class AwsIdentityCenterProvider(GroupProvider):
 
     Third party provider: AWS Identity Center (successor to AWS SSO)
 
-    Supports:
+    Provider Type: SECONDARY (not authoritative)
+    This provider is a secondary provider that synchronizes group membership from
+    the primary provider (Google Workspace). It is NOT the source of truth for
+    group data. All operations use email addresses as the universal identifier.
+
+    Supported Operations:
     - User creation
     - User deletion
     - Membership creation
     - Membership deletion
     - Fetching groups
+    - Listing group members
+
+    Data Model:
+    - Group IDs: AWS UUID format (e.g., 906abc12-d3e4-5678-90ab-cdef12345678)
+    - User IDs: AWS UUID format
+    - Membership IDs: AWS UUID format
+    - Universal Identifier: Email address (used for cross-provider mapping)
+
+    Note on Role Information:
+    This provider returns role=None for all members because AWS Identity Center
+    does not expose role information in its API. Role-based access control should
+    be resolved through the primary provider (Google Workspace) which provides
+    the provides_role_info capability.
 
     IMPORTANT: This provider is responsible for converting all AWS-specific
     schemas (AwsUser, AwsGroup) to canonical NormalizedMember and NormalizedGroup
@@ -272,7 +290,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             IntegrationError: If group cannot be resolved
         """
         # Check if input is already a UUID (GroupId format)
-        if re.match(AWS_UUID_PATTERN, group_key.strip()):
+        if AWS_UUID_REGEX.match(group_key.strip()):
             return group_key.strip()
 
         # Not a UUID, treat as display name and resolve
@@ -442,7 +460,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raw=group if include_raw else None,
         )
 
-    @opresult_wrapper(data_key="result")
+    @provider_operation(data_key="result")
     def _add_member_impl(self, group_key: str, member_email: str) -> dict:
         """Add a member to a group by email.
 
@@ -479,7 +497,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             member_payload.update({"Name": user_data.get("Name") or {}})
         return as_canonical_dict(self._normalize_member_from_aws(member_payload))
 
-    @opresult_wrapper(data_key="result")
+    @provider_operation(data_key="result")
     def _remove_member_impl(self, group_key: str, member_email: str) -> dict:
         """Remove a member from a group by email.
 
@@ -571,7 +589,7 @@ class AwsIdentityCenterProvider(GroupProvider):
 
         return None
 
-    @opresult_wrapper(data_key="members")
+    @provider_operation(data_key="members")
     def _get_group_members_impl(self, group_key: str, **kwargs) -> list[dict]:
         """Fetch group members with proper error handling for missing emails.
 
@@ -668,7 +686,7 @@ class AwsIdentityCenterProvider(GroupProvider):
 
         return members
 
-    @opresult_wrapper(data_key="groups")
+    @provider_operation(data_key="groups")
     def _list_groups_impl(self, **kwargs) -> list[dict]:
         if not hasattr(identity_store, "list_groups"):
             raise IntegrationError(
@@ -690,7 +708,7 @@ class AwsIdentityCenterProvider(GroupProvider):
                 groups.append(as_canonical_dict(self._normalize_group_from_aws(g)))
         return groups
 
-    @opresult_wrapper(data_key="groups")
+    @provider_operation(data_key="groups")
     def _list_groups_with_members_impl(self, **kwargs):
         resp = identity_store.list_groups_with_memberships(**kwargs)
         if not hasattr(resp, "success"):
@@ -708,7 +726,7 @@ class AwsIdentityCenterProvider(GroupProvider):
                 groups.append(as_canonical_dict(self._normalize_group_from_aws(g)))
         return groups
 
-    @opresult_wrapper(data_key="health")
+    @provider_operation(data_key="health")
     def _health_check_impl(self) -> HealthCheckResult:
         """Lightweight health check for AWS Identity Center connectivity.
 
