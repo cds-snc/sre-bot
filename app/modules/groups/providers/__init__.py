@@ -11,8 +11,10 @@ Config overrides applied ONLY during activate_providers(), then discarded.
 import importlib
 import pkgutil
 from typing import Dict, Optional, Type
+
 from core.logging import get_module_logger
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
+from modules.groups.providers import registry_utils
 
 logger = get_module_logger()
 
@@ -80,133 +82,53 @@ def activate_providers() -> str:
         ) from e
 
     # Filter discovered providers based on config
+    enabled_providers = registry_utils.filter_disabled_providers(
+        DISCOVERED_PROVIDER_CLASSES, provider_configs
+    )
+
+    # Instantiate and configure each provider
     new_registry: Dict[str, GroupProvider] = {}
-    for name, provider_cls in DISCOVERED_PROVIDER_CLASSES.items():
-        # Check if provider is explicitly disabled
-        provider_cfg = provider_configs.get(name, {})
-        if not provider_cfg.get("enabled", True):  # Default to enabled if not specified
-            logger.info("provider_disabled_by_config", provider=name)
-            continue
+    for name, provider_cls in enabled_providers.items():
         try:
-            # Prefer parameterless construction so providers supply sensible
-            # defaults. If the provider requires custom construction, it may
-            # provide a no-arg `from_config()` classmethod to be invoked here.
-            try:
-                instance = provider_cls()
-            except TypeError as e:
-                # Provider's __init__ requires args. Try explicit, no-arg
-                # fallback constructors.
-                if hasattr(provider_cls, "from_config") and callable(
-                    getattr(provider_cls, "from_config")
-                ):
-                    # Call from_config with no args (explicit opt-in)
-                    instance = provider_cls.from_config()
-                elif hasattr(provider_cls, "from_empty_config") and callable(
-                    getattr(provider_cls, "from_empty_config")
-                ):
-                    instance = provider_cls.from_empty_config()
-                else:
-                    raise RuntimeError(
-                        f"Provider '{name}' cannot be constructed without "
-                        "activation config. Implement a no-arg __init__ or "
-                        "a no-arg classmethod 'from_config'/'from_empty_config'."
-                    ) from e
+            # Instantiate provider with fallback strategies
+            instance = registry_utils.instantiate_provider(provider_cls, name)
 
             if not isinstance(instance, GroupProvider):
                 raise TypeError(f"Provider must be a GroupProvider instance: {name}")
 
-            # Attach registration name to the instance for clarity
+            # Attach registration name to instance
             setattr(instance, "name", name)
 
-            # Call provider's domain configuration if available
-            if hasattr(instance, "_set_domain_from_config") and callable(
-                getattr(instance, "_set_domain_from_config")
-            ):
-                instance._set_domain_from_config()
-                domain = getattr(instance, "domain", None)
-                logger.debug(
-                    "provider_domain_configured",
-                    provider=name,
-                    domain=domain,
-                )
+            # Apply domain configuration if available
+            provider_cfg = provider_configs.get(name, {})
+            registry_utils.apply_domain_config(instance, provider_cfg)
 
-            # Apply provider-provided defaults for prefix (activation-time
-            # metadata). Prefer explicit `default_prefix` attribute, then the
-            # provider's `prefix` property, and finally the registration name.
-            default_prefix = None
-            if hasattr(instance, "default_prefix"):
-                default_prefix = getattr(instance, "default_prefix")
-            elif getattr(instance, "prefix", None) is not None:
-                default_prefix = getattr(instance, "prefix")
+            # Resolve and set prefix
+            prefix = registry_utils.resolve_prefix(instance, provider_cfg, name)
+            setattr(instance, "_prefix", prefix)
 
-            if isinstance(default_prefix, str):
-                default_prefix = default_prefix.strip() or None
-
-            if default_prefix is None:
-                default_prefix = name
-
-            # Apply prefix from config if provided
-            config_prefix = provider_cfg.get("prefix")
-            if config_prefix and isinstance(config_prefix, str):
-                setattr(instance, "_prefix", config_prefix.strip())
-                logger.debug(
-                    "provider_prefix_overridden", provider=name, prefix=config_prefix
-                )
-            else:
-                setattr(instance, "_prefix", default_prefix)
-
-            # Apply capability overrides from config if provided
-            config_capabilities = provider_cfg.get("capabilities")
-            if config_capabilities and isinstance(config_capabilities, dict):
-                # Get current capabilities from provider
-                original_capabilities = instance.capabilities
-
-                # Create a new ProviderCapabilities instance with merged values
-                # Config overrides take precedence over provider defaults
-                from dataclasses import asdict
-
-                caps_dict = asdict(original_capabilities)
-                caps_dict.update(config_capabilities)
-
-                # Create merged capabilities and store on instance
-                merged_caps = type(original_capabilities)(**caps_dict)
-
-                # Store override on the instance - the instance will check this
-                # in its capabilities property getter
-                setattr(instance, "_capability_override", merged_caps)
-
-                logger.debug(
-                    "provider_capabilities_overridden",
-                    provider=name,
-                    overrides=config_capabilities,
-                )
+            # Apply capability overrides
+            registry_utils.apply_capability_overrides(instance, provider_cfg)
 
             new_registry[name] = instance
             logger.info(
                 "provider_activated",
                 provider=name,
                 type=type(instance).__name__,
-                prefix=getattr(instance, "_prefix"),
+                prefix=prefix,
             )
+
         except Exception as e:  # noqa: B902 - log and re-raise activation errors
             logger.error("provider_activation_failed", provider=name, error=str(e))
             raise
 
-    # Validate uniqueness of non-empty prefixes (fail fast on collisions)
-    prefixes: Dict[str, list] = {}
-    for n, inst in new_registry.items():
-        p = getattr(inst, "_prefix", None)
-        if p:
-            prefixes.setdefault(p, []).append(n)
-    dupes = {p: names for p, names in prefixes.items() if len(names) > 1}
-    if dupes:
-        logger.error("duplicate_provider_prefixes", duplicates=dupes)
-        raise RuntimeError(f"Duplicate provider prefixes detected: {dupes}")
+    # Validate uniqueness of non-empty prefixes
+    prefix_map = registry_utils.collect_prefixes(new_registry)
+    registry_utils.validate_prefix_uniqueness(prefix_map)
 
-    # Determine primary provider based on the freshly-built registry.
+    # Determine primary provider and atomically swap registry
     provider_name = _determine_primary(registry=new_registry)
 
-    # Atomically swap the active provider registry and record primary
     PROVIDER_REGISTRY.clear()
     PROVIDER_REGISTRY.update(new_registry)
     global _PRIMARY_PROVIDER_NAME
@@ -262,6 +184,14 @@ def _determine_primary(registry: Optional[Dict[str, GroupProvider]] = None) -> s
         "none declare `is_primary=True`. Mark one provider's capabilities "
         "with is_primary=True or reduce to a single provider."
     )
+
+
+def reset_registry() -> None:
+    """Reset provider registry and primary name. Used for testing."""
+    global _PRIMARY_PROVIDER_NAME
+    PROVIDER_REGISTRY.clear()
+    _PRIMARY_PROVIDER_NAME = None
+    logger.debug("provider_registry_reset")
 
 
 def get_primary_provider() -> PrimaryGroupProvider:
