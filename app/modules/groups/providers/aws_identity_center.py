@@ -290,10 +290,6 @@ class AwsIdentityCenterProvider(GroupProvider):
         )
 
     def _ensure_user_id_from_email(self, email: str) -> str:
-        if not hasattr(identity_store, "get_user_by_username"):
-            raise IntegrationError(
-                "aws identity_store missing get_user_by_username", response=None
-            )
         resp = identity_store.get_user_by_username(email)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -341,11 +337,6 @@ class AwsIdentityCenterProvider(GroupProvider):
 
         # At this point, normalized is a canonical display name
         # Resolve it to AWS GroupId using get_group_by_name
-        if not hasattr(identity_store, "get_group_by_name"):
-            raise IntegrationError(
-                "aws identity_store missing get_group_by_name", response=None
-            )
-
         resp = identity_store.get_group_by_name(normalized)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -371,10 +362,6 @@ class AwsIdentityCenterProvider(GroupProvider):
             group_key: AWS group key (UUID or display name).
             user_id: AWS user ID.
         """
-        if not hasattr(identity_store, "get_group_membership_id"):
-            raise IntegrationError(
-                "aws identity_store missing get_group_membership_id", response=None
-            )
         resp = identity_store.get_group_membership_id(group_key, user_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -388,8 +375,6 @@ class AwsIdentityCenterProvider(GroupProvider):
         return mid
 
     def _fetch_user_details(self, user_id: str) -> Optional[Dict[str, Any]]:
-        if not hasattr(identity_store, "get_user"):
-            raise IntegrationError("aws identity_store missing get_user", response=None)
         resp = identity_store.get_user(user_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -524,10 +509,6 @@ class AwsIdentityCenterProvider(GroupProvider):
         resolved_group_id = self._resolve_group_id(group_key)
 
         user_id = self._ensure_user_id_from_email(validated_email)
-        if not hasattr(identity_store, "create_group_membership"):
-            raise IntegrationError(
-                "aws identity_store missing create_group_membership", response=None
-            )
         resp = identity_store.create_group_membership(resolved_group_id, user_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -562,10 +543,6 @@ class AwsIdentityCenterProvider(GroupProvider):
 
         user_id = self._ensure_user_id_from_email(validated_email)
         membership_id = self._resolve_membership_id(resolved_group_id, user_id)
-        if not hasattr(identity_store, "delete_group_membership"):
-            raise IntegrationError(
-                "aws identity_store missing delete_group_membership", response=None
-            )
         resp = identity_store.delete_group_membership(membership_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -653,10 +630,6 @@ class AwsIdentityCenterProvider(GroupProvider):
         # Resolve group_key to UUID format for consistency
         resolved_group_id = self._resolve_group_id(group_key)
 
-        if not hasattr(identity_store, "list_group_memberships"):
-            raise IntegrationError(
-                "aws identity_store missing list_group_memberships", response=None
-            )
         resp = identity_store.list_group_memberships(resolved_group_id)
         if not hasattr(resp, "success"):
             raise IntegrationError(
@@ -735,10 +708,6 @@ class AwsIdentityCenterProvider(GroupProvider):
 
     @provider_operation(data_key="groups")
     def _list_groups_impl(self, **kwargs) -> list[dict]:
-        if not hasattr(identity_store, "list_groups"):
-            raise IntegrationError(
-                "aws identity_store missing list_groups", response=None
-            )
         resp = identity_store.list_groups(**kwargs)
         if not hasattr(resp, "success"):
             raise IntegrationError(
