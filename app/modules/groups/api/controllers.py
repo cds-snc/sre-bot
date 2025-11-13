@@ -15,7 +15,7 @@ logger = get_module_logger()
 # Controllers are thin adapters: they accept Pydantic request models, call the
 # service boundary, and return Pydantic response models. We intentionally do
 # NOT keep any legacy compatibility shims.
-router = APIRouter(prefix="/api/v1/groups", tags=["groups"])
+router = APIRouter(prefix="/groups", tags=["groups"])
 
 
 @router.post("/add", response_model=schemas.ActionResponse)
