@@ -5,8 +5,9 @@ All heavy imports (provider registry, mapping helpers) are performed lazily
 inside functions to avoid import-time failures during incremental rollout.
 """
 
+from datetime import datetime, timezone
 from uuid import uuid4
-from typing import Dict, List, TYPE_CHECKING
+from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast, Mapping
 from core.logging import get_module_logger
 from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
@@ -28,72 +29,6 @@ if TYPE_CHECKING:  # avoid runtime import cycles for typing
     )
 
 logger = get_module_logger()
-
-
-def get_enabled_secondary_providers() -> Dict[str, GroupProvider]:
-    """Return all active providers EXCEPT primary.
-
-    Returns:
-        Dict mapping provider name → provider instance for non-primary providers
-
-    Example:
-        If primary is 'google', returns {'aws': AwsProvider, 'azure': AzureProvider}
-    """
-    primary_name = get_primary_provider_name()
-    all_providers = get_active_providers()
-
-    return {
-        name: provider
-        for name, provider in all_providers.items()
-        if name != primary_name
-    }
-
-
-def validate_group_in_provider(group_id: str, provider: GroupProvider) -> bool:
-    """Check if group exists and is accessible in provider.
-
-    Attempts a read operation (get_group_members) to verify group accessibility.
-
-    Args:
-        group_id: Group ID to validate
-        provider: GroupProvider instance
-
-    Returns:
-        True if group exists and is accessible, False otherwise
-    """
-    # Validate by attempting to read group members from the provider
-    try:
-        result = provider.get_group_members(group_id)
-        # If OperationResult-like, check the status attribute
-        if hasattr(result, "status"):
-            return result.status == OperationStatus.SUCCESS
-        # otherwise assume success when no exception raised
-        return True
-    except Exception as e:
-        logger.warning(
-            "group_validation_failed",
-            group_id=group_id,
-            provider=provider.__class__.__name__,
-            error=str(e),
-        )
-        return False
-
-
-def _unwrap_opresult_data(op):
-    """Return the inner data payload from an OperationResult-like object.
-
-    Providers wrap returned payloads as OperationResult.data with a single
-    key (e.g., {'result': {...}} or {'members': [...]}) depending on the
-    operation. This helper returns the underlying value when possible.
-    """
-    try:
-        data = getattr(op, "data", None)
-        if not isinstance(data, dict) or len(data) == 0:
-            return data
-        # return the first value - convention is a single data_key
-        return next(iter(data.values()))
-    except Exception:
-        return None
 
 
 def _call_provider_method(
@@ -158,10 +93,7 @@ def _propagate_to_secondaries(
     """
     results: Dict[str, OperationResult] = {}
     secondaries = get_active_providers()
-    try:
-        primary_name = get_primary_provider_name()
-    except Exception:
-        primary_name = None
+    primary_name = get_primary_provider_name()
 
     for name, prov in secondaries.items():
         if name == primary_name:
@@ -242,6 +174,80 @@ def _perform_read_operation(
     return result
 
 
+def _format_orchestration_response(
+    primary: "OperationResultLike",
+    propagation: Dict[str, "OperationResultLike"],
+    partial_failures: bool,
+    correlation_id: str,
+    action: str = "operation",
+    group_id: Optional[str] = None,
+    member_email: Optional[str] = None,
+) -> "OrchestrationResponseTypedDict":
+    """Format orchestration response with primary and propagation results.
+
+    `primary` is expected to be an OperationResult-like object. We avoid
+    importing OperationResult at module import time to keep this module
+    lightweight.
+    """
+    try:
+        overall_success = getattr(primary, "status").name == "SUCCESS"
+    except Exception:
+        overall_success = False
+
+    primary_data = {
+        "status": (
+            getattr(primary, "status").name
+            if hasattr(primary, "status") and getattr(primary, "status") is not None
+            else None
+        ),
+        "message": getattr(primary, "message", ""),
+    }
+    if getattr(primary, "data", None):
+        primary_data["data"] = getattr(primary, "data")
+    if getattr(primary, "error_code", None):
+        primary_data["error_code"] = getattr(primary, "error_code")
+    if getattr(primary, "retry_after", None):
+        primary_data["retry_after"] = getattr(primary, "retry_after")
+
+    propagation_data: Dict[str, Any] = {}
+    for provider_name, result in (propagation or {}).items():
+        propagation_data[provider_name] = {
+            "status": (
+                getattr(result, "status").name
+                if hasattr(result, "status") and getattr(result, "status") is not None
+                else None
+            ),
+            "message": getattr(result, "message", ""),
+        }
+        if getattr(result, "data", None):
+            propagation_data[provider_name]["data"] = getattr(result, "data")
+        if getattr(result, "error_code", None):
+            propagation_data[provider_name]["error_code"] = getattr(
+                result, "error_code"
+            )
+        if getattr(result, "retry_after", None):
+            propagation_data[provider_name]["retry_after"] = getattr(
+                result, "retry_after"
+            )
+
+    response = {
+        "success": overall_success,
+        "correlation_id": correlation_id,
+        "action": action,
+        "primary": primary_data,
+        "propagation": propagation_data,
+        "partial_failures": partial_failures,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if group_id:
+        response["group_id"] = group_id
+    if member_email:
+        response["member_email"] = member_email
+
+    return cast("OrchestrationResponseTypedDict", response)
+
+
 def _orchestrate_write_operation(
     primary_group_id: str,
     member_email: str,
@@ -272,8 +278,6 @@ def _orchestrate_write_operation(
         correlation_id = str(uuid4())
 
     primary = get_primary_provider()
-    # Phase 1: Provider methods now accept member_email directly (string)
-    # Email validation happens at the provider layer via validate_member_email()
 
     logger.info(
         "orchestration_member_operation_start",
@@ -300,24 +304,22 @@ def _orchestrate_write_operation(
         )
         primary_result = OperationResult.transient_error(str(e))
 
-    # If primary failed, do not propagate. Return raw result objects and
-    # leave formatting to the service boundary so the orchestration layer
-    # focuses on provider coordination only.
+    # If primary failed, do not propagate.
     if getattr(primary_result, "status", None) != OperationStatus.SUCCESS:
         logger.warning(
             "orchestration_primary_failed",
             correlation_id=correlation_id,
             primary_status=getattr(primary_result, "status", None),
         )
-        return {
-            "primary": primary_result,
-            "propagation": {},
-            "partial_failures": False,
-            "correlation_id": correlation_id,
-            "action": action,
-            "group_id": primary_group_id,
-            "member_email": member_email,
-        }
+        return _format_orchestration_response(
+            primary=primary_result,
+            propagation={},
+            partial_failures=False,
+            correlation_id=correlation_id,
+            action=action,
+            group_id=primary_group_id,
+            member_email=member_email,
+        )
 
     # TODO: record justification for audit
     logger.warning(
@@ -337,15 +339,15 @@ def _orchestrate_write_operation(
     # Return raw results; formatting (to dicts/timestamps) lives on the
     # service boundary so controllers and consumers receive stable
     # serializable payloads from the service layer.
-    return {
-        "primary": primary_result,
-        "propagation": propagation_results,
-        "partial_failures": has_partial,
-        "correlation_id": correlation_id,
-        "action": action,
-        "group_id": primary_group_id,
-        "member_email": member_email,
-    }
+    return _format_orchestration_response(
+        primary=primary_result,
+        propagation=propagation_results,
+        partial_failures=has_partial,
+        correlation_id=correlation_id,
+        action=action,
+        group_id=primary_group_id,
+        member_email=member_email,
+    )
 
 
 def add_member_to_group(
