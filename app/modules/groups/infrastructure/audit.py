@@ -1,7 +1,7 @@
 """Audit logging for group operations.
 
 Provides structured audit logging with support for:
-- Stage 1: Synchronous writes to Sentinel structured logs
+- Stage 1: Synchronous writes to Sentinel and structured logs
 - Stage 2: Synchronous writes to DynamoDB with TTL (future implementation)
 
 All group operations should generate audit entries for compliance.
@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 from core.logging import get_module_logger
+from integrations.sentinel import client as sentinel_client
 
 logger = get_module_logger()
 
@@ -67,9 +68,9 @@ class AuditEntry(BaseModel):
 
 
 def write_audit_entry(entry: AuditEntry) -> None:
-    """Write audit entry (Stage 1: Sentinel only).
+    """Write audit entry to Sentinel and structured logs.
 
-    Stage 1: Writes structured log to Sentinel/structlog
+    Stage 1: Writes to both Sentinel (via integration client) and structlog
     Stage 2: Will also write to DynamoDB
 
     This function is synchronous and blocks until audit is written.
@@ -77,21 +78,38 @@ def write_audit_entry(entry: AuditEntry) -> None:
     Args:
         entry: AuditEntry to write
     """
-    # Stage 1: Write to structured logs
-    logger.info(
-        "audit_entry",
-        correlation_id=entry.correlation_id,
-        timestamp=entry.timestamp,
-        action=entry.action,
-        group_id=entry.group_id,
-        member_email=entry.member_email,
-        provider=entry.provider,
-        success=entry.success,
-        requestor=entry.requestor,
-        justification=entry.justification,
-        error_message=entry.error_message,
-        metadata=entry.metadata,
-    )
+    # Prepare audit data for logging
+    audit_data = {
+        "correlation_id": entry.correlation_id,
+        "timestamp": entry.timestamp,
+        "action": entry.action,
+        "group_id": entry.group_id,
+        "member_email": entry.member_email,
+        "provider": entry.provider,
+        "success": entry.success,
+        "requestor": entry.requestor,
+        "justification": entry.justification,
+        "error_message": entry.error_message,
+        "metadata": entry.metadata,
+    }
+
+    # Stage 1a: Write to structured logs (local logging)
+    logger.info("audit_entry", **audit_data)
+
+    # Stage 1b: Send to Sentinel (external audit trail)
+    try:
+        sentinel_client.log_to_sentinel(
+            event="group_membership_audit", message=audit_data
+        )
+    except Exception as e:
+        # Don't fail the operation if Sentinel is unavailable
+        # Log the error but continue (audit is already in structlog)
+        logger.error(
+            "sentinel_audit_write_failed",
+            error=str(e),
+            correlation_id=entry.correlation_id,
+            action=entry.action,
+        )
 
     # Stage 2: Will add DynamoDB write here
     # _write_to_dynamodb(entry)
