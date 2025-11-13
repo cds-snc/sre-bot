@@ -1,7 +1,8 @@
 import types
 
-from modules.groups import service, schemas
-from modules.groups.errors import IntegrationError
+from modules.groups.core import service
+from modules.groups.api import schemas
+from modules.groups.domain.errors import IntegrationError
 
 
 class FakeProvider:

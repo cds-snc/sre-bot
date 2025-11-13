@@ -154,7 +154,7 @@ def mock_event_dispatch(monkeypatch):
     """
     dispatched_events: List[Dict[str, Any]] = []
 
-    def capture_event(event_type: str, **data):
+    def capture_event(event_type: str, data: Dict[str, Any]):
         """Capture event dispatch call"""
         dispatched_events.append(
             {

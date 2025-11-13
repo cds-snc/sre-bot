@@ -8,9 +8,8 @@ not load tests or end-to-end integration performance.
 """
 
 import time
-from datetime import datetime
 from statistics import mean
-from modules.groups.schemas import (
+from modules.groups.api.schemas import (
     AddMemberRequest,
     RemoveMemberRequest,
     ActionResponse,

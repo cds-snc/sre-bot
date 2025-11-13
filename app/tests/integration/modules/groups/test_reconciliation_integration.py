@@ -389,12 +389,12 @@ class TestReconciliationIntegration:
         """enqueue_failed_propagation creates and stores failed propagation record."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.integration.is_reconciliation_enabled",
             MagicMock(return_value=True),
         )
         store = InMemoryReconciliationStore()
         monkeypatch.setattr(
-            "modules.groups.reconciliation.reconciliation_integration.get_reconciliation_store",
+            "modules.groups.reconciliation.integration.get_reconciliation_store",
             MagicMock(return_value=store),
         )
 
@@ -422,7 +422,7 @@ class TestReconciliationIntegration:
         """When reconciliation disabled, enqueue returns None."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.integration.is_reconciliation_enabled",
             MagicMock(return_value=False),
         )
 
@@ -445,11 +445,11 @@ class TestReconciliationIntegration:
         """When store unavailable, enqueue returns None."""
         # Arrange
         monkeypatch.setattr(
-            "modules.groups.reconciliation.reconciliation_integration.is_reconciliation_enabled",
+            "modules.groups.reconciliation.integration.is_reconciliation_enabled",
             MagicMock(return_value=True),
         )
         monkeypatch.setattr(
-            "modules.groups.reconciliation.reconciliation_integration.get_reconciliation_store",
+            "modules.groups.reconciliation.integration.get_reconciliation_store",
             MagicMock(return_value=None),
         )
 

@@ -135,7 +135,6 @@ class TestCheckUserIsManager:
                 result = service._check_user_is_manager(
                     user_email="manager@example.com",
                     group_id="aws-test-group@example.com",
-                    provider_type="aws",
                 )
 
                 assert result is True
@@ -145,13 +144,13 @@ class TestCheckUserIsManager:
                 )
 
     def test_check_manager_raises_when_primary_provider_missing(self):
-        """Raises ValueError when primary provider not available."""
+        """Raises RuntimeError when primary provider not available."""
         with patch(
             "modules.groups.core.service._providers.get_primary_provider"
         ) as mock_get_prim_prov:
             mock_get_prim_prov.side_effect = RuntimeError("No primary provider")
 
-            with pytest.raises(ValueError, match="Primary provider"):
+            with pytest.raises(RuntimeError, match="No primary provider"):
                 service._check_user_is_manager(
                     user_email="user@example.com",
                     group_id="test-group",

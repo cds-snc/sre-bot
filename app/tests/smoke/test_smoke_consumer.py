@@ -1,6 +1,8 @@
-from modules.groups import event_system, service, schemas
-from modules.groups.providers.base import OperationResult
-from modules.groups.models import group_from_dict
+from modules.groups.events import event_system
+from modules.groups.core import service
+from modules.groups.api import schemas
+from modules.groups.providers.contracts import OperationResult
+from modules.groups.domain.models import group_from_dict
 
 
 class SmokeProvider:

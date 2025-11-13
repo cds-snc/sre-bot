@@ -5,12 +5,18 @@ from importlib import util
 from pathlib import Path
 from types import ModuleType
 import pytest
-from tests.factories.google import (
+
+# Ensure project root is on path BEFORE importing test factories.
+project_root = "/workspace/app"
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from tests.factories.google import (  # noqa: E402
     make_google_groups,
     make_google_members,
     make_google_users,
 )
-from tests.factories.aws import (
+from tests.factories.aws import (  # noqa: E402
     make_aws_users,
     make_aws_groups,
     make_aws_groups_memberships,
@@ -22,11 +28,8 @@ from tests.factories.aws import (
 # modules (e.g. `core.config`) works during pytest collection. Pytest may
 # import `conftest` before the project root is on sys.path depending on
 # invocation; add it explicitly here before importing application modules.
-project_root = "/workspace/app"
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-import core.config as core_config
+# pylint: disable=wrong-import-position
+import core.config as core_config  # noqa: E402
 
 
 @pytest.fixture
