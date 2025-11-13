@@ -11,7 +11,7 @@ Key purpose:
 
 Key distinctions:
   - models.py: Internal normalized structures (dataclasses, no validation)
-  - schemas.py: API contracts with Pydantic (full validation)
+  - schemas.py: API contracts with Pydantic (full validation, located in api/schemas.py)
   - types.py: Internal protocol hints (TypedDict, no validation)
 
 Relationships:
