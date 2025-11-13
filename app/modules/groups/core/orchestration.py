@@ -7,7 +7,7 @@ inside functions to avoid import-time failures during incremental rollout.
 
 from datetime import datetime, timezone
 from uuid import uuid4
-from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast, Mapping
+from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast
 from core.logging import get_module_logger
 from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
@@ -23,14 +23,12 @@ from modules.groups.providers.base import (
 from modules.groups.domain.models import NormalizedGroup
 
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
-    from modules.groups.domain.types import (
-        OrchestrationResponseTypedDict,
-        OperationResultLike,
-    )
+    from modules.groups.domain.types import OrchestrationResponseTypedDict
 
 logger = get_module_logger()
 
 
+# TODO: clarify if providers shouldn't be responsible to raise an error instead.
 def _call_provider_method(
     provider: GroupProvider,
     method_name: str,
@@ -38,42 +36,82 @@ def _call_provider_method(
     correlation_id: str | None = None,
     **p_kwargs,
 ) -> OperationResult:
-    """Call a provider method safely and return an OperationResult.
+    """Call a provider method and return an OperationResult.
 
-    Handles missing methods and exceptions, returning a transient error
-    OperationResult on failure.
+    Provider methods are defined by GroupProvider protocol. If a provider
+    doesn't implement a required method, it's a programming error that should
+    fail fast, not be caught.
+
+    Args:
+        provider: GroupProvider instance
+        method_name: Name of method to call on provider
+        *p_args: Positional arguments to pass to method
+        correlation_id: Optional correlation ID for logging
+        **p_kwargs: Keyword arguments to pass to method
+
+    Returns:
+        OperationResult from the provider method call
+
+    Raises:
+        AttributeError: If provider is missing the required method (programming error)
+
+    Transient errors returned:
+        - If method returns non-OperationResult type (type contract violation)
+        - If method raises any exception during execution
     """
-    method = getattr(provider, method_name, None)
-    if not callable(method):
+    try:
+        method = getattr(provider, method_name)
+        result = method(*p_args, **p_kwargs)
+
+        # Validate return type - must be OperationResult
+        if not isinstance(result, OperationResult):
+            logger.error(
+                "provider_invalid_return_type",
+                correlation_id=correlation_id,
+                provider=provider.__class__.__name__,
+                method=method_name,
+                expected_type="OperationResult",
+                actual_type=type(result).__name__,
+            )
+            return OperationResult.transient_error(
+                f"Provider {provider.__class__.__name__}.{method_name}() "
+                f"returned {type(result).__name__}, expected OperationResult"
+            )
+
+        return result
+
+    except AttributeError as e:
+        # Provider missing required method - this is a programming error, fail fast
         logger.error(
             "provider_missing_method",
             correlation_id=correlation_id,
             provider=provider.__class__.__name__,
             method=method_name,
+            error=str(e),
         )
-        return OperationResult.transient_error(
-            f"Provider {provider.__class__.__name__} missing method {method_name}"
-        )
-    try:
-        return method(*p_args, **p_kwargs)
-    except Exception as e:
+        raise  # Re-raise to fail fast
+
+    except Exception as e:  # pylint: disable=broad-except
+        # Provider method raised an exception during execution
         logger.warning(
-            "provider_method_exception",
+            "provider_method_failed",
             correlation_id=correlation_id,
             provider=provider.__class__.__name__,
             method=method_name,
             error=str(e),
+            exc_info=True,
         )
         return OperationResult.transient_error(str(e))
 
 
+# TODO: Tighten propagation to only specific secondaries based on provider type
 def _propagate_to_secondaries(
     primary_group_id: str,
     member_email: str,
     op_name: str,
     action: str,
     correlation_id: str,
-) -> Dict[str, "OperationResultLike"]:
+) -> Dict[str, OperationResult]:
     """Propagate an operation to all secondary providers.
 
     Passes the full group email (from primary provider) directly to secondary providers.
@@ -98,41 +136,36 @@ def _propagate_to_secondaries(
     for name, prov in secondaries.items():
         if name == primary_name:
             continue
-        try:
-            # Pass full group email directly to secondary provider
-            # Secondary provider is responsible for email decomposition and identifier resolution
-            sec_op = _call_provider_method(
-                prov,
-                op_name,
-                primary_group_id,
-                member_email,
-                correlation_id=correlation_id,
-            )
-            results[name] = sec_op
 
-            if getattr(sec_op, "status", None) != OperationStatus.SUCCESS:
-                err_msg = getattr(sec_op, "message", "")
-                try:
-                    ri.enqueue_failed_propagation(
-                        correlation_id=correlation_id,
-                        provider=name,
-                        group_email=primary_group_id,
-                        member_email=member_email,
-                        action=action,
-                        error_message=err_msg,
-                    )
-                except Exception:
-                    logger.exception("enqueue_failed_propagation_failed", provider=name)
+        # Pass full group email directly to secondary provider
+        # Secondary provider is responsible for email decomposition and identifier resolution
+        sec_op = _call_provider_method(
+            prov,
+            op_name,
+            primary_group_id,
+            member_email,
+            correlation_id=correlation_id,
+        )
+        results[name] = sec_op
 
-        except Exception as e:
-            results[name] = OperationResult.transient_error(str(e))
-            logger.error(
-                "propagation_failed",
-                correlation_id=correlation_id,
-                provider=name,
-                error=str(e),
-            )
-
+        # Check if operation succeeded using explicit attribute access
+        # _call_provider_method guarantees OperationResult type
+        if sec_op.status != OperationStatus.SUCCESS:
+            try:
+                ri.enqueue_failed_propagation(
+                    correlation_id=correlation_id,
+                    provider=name,
+                    group_email=primary_group_id,
+                    member_email=member_email,
+                    action=action,
+                    error_message=sec_op.message,
+                )
+            except Exception:
+                logger.exception(
+                    "enqueue_failed_propagation_failed",
+                    provider=name,
+                    correlation_id=correlation_id,
+                )
     return results
 
 
@@ -142,10 +175,10 @@ def _perform_read_operation(
     *p_args,
     **p_kwargs,
 ) -> OperationResult:
-    """Call a read-only provider method safely and return an OperationResult.
+    """Call a read-only provider method and return an OperationResult.
 
-    Handles missing methods and exceptions, returning a transient error
-    OperationResult on failure.
+    Delegates exception handling to _call_provider_method(), which guarantees
+    a valid OperationResult on return (or raises AttributeError for missing methods).
     """
 
     primary = get_primary_provider()
@@ -157,80 +190,60 @@ def _perform_read_operation(
         action=action,
     )
 
-    try:
-        result = _call_provider_method(primary, op_name, *p_args, **p_kwargs)
-    except Exception as e:
-        logger.error(
-            "primary_read_op_exception",
-            error=str(e),
-            exc_info=True,
-        )
-        result = OperationResult.transient_error(str(e))
-    if getattr(result, "status", None) != OperationStatus.SUCCESS:
+    result = _call_provider_method(primary, op_name, *p_args, **p_kwargs)
+
+    if result.status != OperationStatus.SUCCESS:
         logger.warning(
             "perform_read_op_failed",
-            primary_status=getattr(result, "status", None),
+            primary_status=result.status,
         )
     return result
 
 
 def _format_orchestration_response(
-    primary: "OperationResultLike",
-    propagation: Dict[str, "OperationResultLike"],
+    primary: OperationResult,
+    propagation: Dict[str, OperationResult],
     partial_failures: bool,
     correlation_id: str,
     action: str = "operation",
     group_id: Optional[str] = None,
     member_email: Optional[str] = None,
 ) -> "OrchestrationResponseTypedDict":
-    """Format orchestration response with primary and propagation results.
+    """Format orchestration response from concrete OperationResult instances.
 
-    `primary` is expected to be an OperationResult-like object. We avoid
-    importing OperationResult at module import time to keep this module
-    lightweight.
+    This narrowed version assumes all result objects are the standard
+    OperationResult produced by providers or orchestration helpers.
     """
-    try:
-        overall_success = getattr(primary, "status").name == "SUCCESS"
-    except Exception:
-        overall_success = False
+    overall_success = primary.status == OperationStatus.SUCCESS
 
-    primary_data = {
-        "status": (
-            getattr(primary, "status").name
-            if hasattr(primary, "status") and getattr(primary, "status") is not None
-            else None
-        ),
-        "message": getattr(primary, "message", ""),
+    # Build primary result data (include optional fields only if present)
+    primary_data: Dict[str, Any] = {
+        "status": primary.status.name,
+        "message": primary.message,
     }
-    if getattr(primary, "data", None):
-        primary_data["data"] = getattr(primary, "data")
-    if getattr(primary, "error_code", None):
-        primary_data["error_code"] = getattr(primary, "error_code")
-    if getattr(primary, "retry_after", None):
-        primary_data["retry_after"] = getattr(primary, "retry_after")
+    if primary.data is not None:
+        primary_data["data"] = primary.data
+    if primary.error_code is not None:
+        primary_data["error_code"] = primary.error_code
+    if primary.retry_after is not None:
+        primary_data["retry_after"] = primary.retry_after
 
+    # Build propagation results
     propagation_data: Dict[str, Any] = {}
-    for provider_name, result in (propagation or {}).items():
-        propagation_data[provider_name] = {
-            "status": (
-                getattr(result, "status").name
-                if hasattr(result, "status") and getattr(result, "status") is not None
-                else None
-            ),
-            "message": getattr(result, "message", ""),
+    for provider_name, result in propagation.items():
+        item: Dict[str, Any] = {
+            "status": result.status.name,
+            "message": result.message,
         }
-        if getattr(result, "data", None):
-            propagation_data[provider_name]["data"] = getattr(result, "data")
-        if getattr(result, "error_code", None):
-            propagation_data[provider_name]["error_code"] = getattr(
-                result, "error_code"
-            )
-        if getattr(result, "retry_after", None):
-            propagation_data[provider_name]["retry_after"] = getattr(
-                result, "retry_after"
-            )
+        if result.data is not None:
+            item["data"] = result.data
+        if result.error_code is not None:
+            item["error_code"] = result.error_code
+        if result.retry_after is not None:
+            item["retry_after"] = result.retry_after
+        propagation_data[provider_name] = item
 
-    response = {
+    response: Dict[str, Any] = {
         "success": overall_success,
         "correlation_id": correlation_id,
         "action": action,
@@ -239,12 +252,10 @@ def _format_orchestration_response(
         "partial_failures": partial_failures,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-
-    if group_id:
+    if group_id is not None:
         response["group_id"] = group_id
-    if member_email:
+    if member_email is not None:
         response["member_email"] = member_email
-
     return cast("OrchestrationResponseTypedDict", response)
 
 
@@ -269,7 +280,7 @@ def _orchestrate_write_operation(
         correlation_id: Optional correlation id; generated if omitted.
 
     Returns:
-        Orchestration response dict from orchestration_responses.format_orchestration_response.
+        Orchestration response dict from _format_orchestration_response.
 
     TODO: Justification handling/enforcement to audit logs.
         Providers do not handle the justification, they provide wrappers around the API calls only.
@@ -287,29 +298,20 @@ def _orchestrate_write_operation(
         action=action,
     )
 
-    try:
-        primary_result = _call_provider_method(
-            primary,
-            op_name,
-            primary_group_id,
-            member_email,
-            correlation_id=correlation_id,
-        )
-    except Exception as e:
-        logger.error(
-            "primary_op_exception",
-            correlation_id=correlation_id,
-            error=str(e),
-            exc_info=True,
-        )
-        primary_result = OperationResult.transient_error(str(e))
+    primary_result = _call_provider_method(
+        primary,
+        op_name,
+        primary_group_id,
+        member_email,
+        correlation_id=correlation_id,
+    )
 
     # If primary failed, do not propagate.
-    if getattr(primary_result, "status", None) != OperationStatus.SUCCESS:
+    if primary_result.status != OperationStatus.SUCCESS:
         logger.warning(
             "orchestration_primary_failed",
             correlation_id=correlation_id,
-            primary_status=getattr(primary_result, "status", None),
+            primary_status=primary_result.status,
         )
         return _format_orchestration_response(
             primary=primary_result,
@@ -332,8 +334,7 @@ def _orchestrate_write_operation(
     )
 
     has_partial = any(
-        getattr(r, "status", None) != OperationStatus.SUCCESS
-        for r in propagation_results.values()
+        r.status != OperationStatus.SUCCESS for r in propagation_results.values()
     )
 
     # Return raw results; formatting (to dicts/timestamps) lives on the
@@ -359,8 +360,7 @@ def add_member_to_group(
 ) -> "OrchestrationResponseTypedDict":
     """Orchestrate adding a member: primary-first then propagate to secondaries.
 
-    Returns an orchestration response dict as produced by
-    `orchestration_responses.format_orchestration_response`.
+    Returns an orchestration response dict produced internally.
     """
     return _orchestrate_write_operation(
         primary_group_id=primary_group_id,
@@ -382,7 +382,7 @@ def remove_member_from_group(
 ) -> "OrchestrationResponseTypedDict":
     """Orchestrate removing a member: primary-first then propagate to secondaries.
 
-    Returns an orchestration response dict.
+    Returns an orchestration response dict produced internally.
     """
     return _orchestrate_write_operation(
         primary_group_id=primary_group_id,
@@ -401,9 +401,7 @@ def list_groups_for_user(
 ) -> List[NormalizedGroup]:
     """Get groups for a user from the primary provider.
 
-    Args:
-        user_email: Email of the user to look up.
-        provider_type: Optional provider type hint.
+    Returns an empty list on failure or malformed data.
     """
     op = _perform_read_operation(
         op_name="list_groups_for_user",
@@ -411,13 +409,11 @@ def list_groups_for_user(
         user_key=user_email,
         provider_name=provider_type,
     )
-
-    # On failure, return an empty list rather than an OperationResult
-    if getattr(op, "status", None) != OperationStatus.SUCCESS:
+    if op.status != OperationStatus.SUCCESS:
         return []
     if op.data is None or not isinstance(op.data, dict):
         return []
-    return op.data.get("groups", [])
+    return cast(List[NormalizedGroup], op.data.get("groups", []))
 
 
 def list_groups_managed_by_user(
@@ -426,9 +422,7 @@ def list_groups_managed_by_user(
 ) -> List[NormalizedGroup]:
     """Get groups manageable by a user from the primary provider.
 
-    Args:
-        user_email: Email of the user to look up.
-        provider_type: Optional provider type hint.
+    Returns an empty list on failure or malformed data.
     """
     op = _perform_read_operation(
         op_name="list_groups_managed_by_user",
@@ -436,10 +430,8 @@ def list_groups_managed_by_user(
         user_key=user_email,
         provider_name=provider_type,
     )
-
-    # On failure, return an empty list rather than an OperationResult
-    if getattr(op, "status", None) != OperationStatus.SUCCESS:
+    if op.status != OperationStatus.SUCCESS:
         return []
     if op.data is None or not isinstance(op.data, dict):
         return []
-    return op.data.get("groups", [])
+    return cast(List[NormalizedGroup], op.data.get("groups", []))
