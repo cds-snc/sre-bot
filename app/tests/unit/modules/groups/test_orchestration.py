@@ -12,16 +12,17 @@ Scenarios covered:
  - Early exit when primary write operation fails (no propagation)
 """
 
+from typing import Any, Dict, List
+
 import pytest
-from typing import Dict, Any, List
 from modules.groups.core import orchestration
+from modules.groups.domain.models import NormalizedGroup
+from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers.contracts import (
     OperationResult,
     OperationStatus,
     ProviderCapabilities,
 )
-from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
-from modules.groups.domain.models import NormalizedGroup
 
 
 class FakePrimaryProvider(PrimaryGroupProvider):
