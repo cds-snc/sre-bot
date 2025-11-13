@@ -67,6 +67,11 @@ def list_groups_endpoint(request: schemas.ListGroupsRequest = Depends()):
 
 @router.post("/bulk", response_model=schemas.BulkOperationResponse)
 def bulk_operations_endpoint(request: schemas.BulkOperationsRequest):
+    """Perform bulk add/remove operations.
+
+    Delegates to the `service.bulk_operations` function and returns the
+    Pydantic `BulkOperationResponse` model directly.
+    """
     return service.bulk_operations(request)
 
 
@@ -99,7 +104,7 @@ def get_circuit_breaker_status():
         logger.error("circuit_breaker_status_error", error=str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to get circuit breaker status: {str(e)}"
-        )
+        ) from e
 
 
 @router.post("/admin/circuit-breakers/{provider_name}/reset", tags=["admin"])
