@@ -10,8 +10,8 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from modules.groups import idempotency
-from modules.groups import reconciliation_worker
+from modules.groups.infrastructure import idempotency
+from modules.groups.reconciliation import worker as reconciliation_worker
 
 from core.logging import get_module_logger
 
