@@ -120,13 +120,13 @@ class AddMemberRequest(BaseModel):
         ),
     ]
     requestor: Annotated[
-        Optional[EmailStr],
+        EmailStr,
         Field(
             default=None,
             description="Email of requestor",
             json_schema_extra={"example": "admin@example.com"},
         ),
-    ] = None
+    ]
     metadata: Annotated[
         Optional[Dict[str, Any]],
         Field(
@@ -188,13 +188,13 @@ class RemoveMemberRequest(BaseModel):
         ),
     ]
     requestor: Annotated[
-        Optional[EmailStr],
+        EmailStr,
         Field(
             default=None,
             description="Email of requestor",
             json_schema_extra={"example": "admin@example.com"},
         ),
-    ] = None
+    ]
     metadata: Annotated[
         Optional[Dict[str, Any]],
         Field(
