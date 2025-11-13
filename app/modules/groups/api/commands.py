@@ -72,10 +72,16 @@ def _handle_list_command(
         groups = service.list_groups(req)
         # Simple user-friendly Slack message
         group_stringified = []
+        if len(groups) > 0:
+            logger.debug("logging_single_group_for_list_command", group=groups[0])
         for group in groups:
             if isinstance(group, dict):
+                user = next(
+                    (u for u in group.get("members", []) if u.get("email") == user_email),
+                    None,
+                )
                 group_stringified.append(
-                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')})"
+                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')}) - {user.get('role', 'N/A') if user else 'N/A'}"
                 )
         respond(f"✅ Retrieved {len(groups)} groups:\n" + "\n".join(group_stringified))
     except Exception as e:
