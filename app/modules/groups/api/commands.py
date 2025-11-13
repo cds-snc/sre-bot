@@ -77,7 +77,11 @@ def _handle_list_command(
         for group in groups:
             if isinstance(group, dict):
                 user = next(
-                    (u for u in group.get("members", []) if u.get("email") == user_email),
+                    (
+                        u
+                        for u in group.get("members", [])
+                        if u.get("email") == user_email
+                    ),
                     None,
                 )
                 group_stringified.append(
