@@ -8,8 +8,7 @@ from slack_bolt import Ack, Respond
 
 from core.logging import get_module_logger
 from modules.groups.core import service
-from modules.groups.api import responses
-from modules.groups.api import schemas
+from modules.groups.api import responses, schemas
 from modules.groups.providers import get_active_providers
 from modules.groups.infrastructure.validation import (
     validate_email,
@@ -62,7 +61,7 @@ def _handle_list_command(
 
     provider_type = None
     if args and args[0] in ["aws", "google", "azure"]:
-        provider_type = args[0]
+        provider_type = schemas.ProviderType(args[0])
 
     try:
         req = (
@@ -211,7 +210,7 @@ def _handle_manage_command(
 
     provider_type = None
     if args and args[0] in ["aws", "google", "azure"]:
-        provider_type = args[0]
+        provider_type = schemas.ProviderType(args[0])
 
     try:
         req = (
