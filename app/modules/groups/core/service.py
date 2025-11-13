@@ -14,17 +14,13 @@ will move the dispatcher into `event_system` itself.
 """
 
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import TYPE_CHECKING, Any, List, Optional
 from uuid import uuid4
 from core.logging import get_module_logger
 from modules.groups.core import orchestration
-from modules.groups.core import orchestration_responses as orr
 from modules.groups.events import system as event_system
 from modules.groups.api import schemas
 from modules.groups.infrastructure.validation import (
-    validate_group_id,
-    validate_provider_type,
-    validate_justification,
     ValidationError,
 )
 from modules.groups.infrastructure.idempotency import (
@@ -38,9 +34,13 @@ from modules.groups.infrastructure.audit import (
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
     OperationStatus,
-    GroupProvider,
     OperationResult,
 )
+
+if TYPE_CHECKING:  # avoid runtime import cycles for typing
+    from modules.groups.domain.types import (
+        OrchestrationResponseTypedDict,
+    )
 
 logger = get_module_logger()
 
@@ -58,13 +58,13 @@ __all__ = [
     "remove_member",
     "list_groups",
     "bulk_operations",
-    "validate_group_in_provider",
     "OperationResult",
 ]
 
 
 def _check_user_is_manager(
-    user_email: str, group_id: str, provider_type: str | None = None
+    user_email: str,
+    group_id: str,
 ) -> bool:
     """Check if user is a manager of the group using primary provider's is_manager().
 
@@ -74,50 +74,32 @@ def _check_user_is_manager(
     Args:
         user_email: Email of user to check
         group_id: Group email or ID to check (e.g., "aws-admins@example.com")
-        provider_type: Ignored (kept for backward compatibility)
 
     Returns:
         True if user is a manager, False otherwise
-
-    Raises:
-        ValueError: If primary provider not available or group lookup fails
     """
-    try:
-        try:
-            # Use registry helper to obtain the primary provider instance
-            primary_provider = _providers.get_primary_provider()
-        except Exception as e:
-            # Normalize registry errors to ValueError for callers
-            raise ValueError(f"Primary provider not available: {e}") from e
+    # Primary provider is guaranteed to be available - app startup fails if not
+    primary_provider = _providers.get_primary_provider()
 
-        # Use group_id directly (now in email format from primary provider)
-        # Secondary providers handle their own identifier resolution
-        result = primary_provider.is_manager(user_email, group_id)
+    # Use group_id directly (now in email format from primary provider)
+    # Secondary providers handle their own identifier resolution
+    result = primary_provider.is_manager(user_email, group_id)
 
-        # Handle OperationResult wrapper if returned
-        if isinstance(result, OperationResult):
-            if result.status != OperationStatus.SUCCESS:
-                logger.warning(
-                    "is_manager_operation_failed",
-                    user_email=user_email,
-                    group_id=group_id,
-                    status=result.status,
-                    message=result.message,
-                )
-                return False
-            return bool(result.data.get("is_manager", False)) if result.data else False
+    # Handle OperationResult wrapper if returned
+    if isinstance(result, OperationResult):
+        if result.status != OperationStatus.SUCCESS:
+            logger.warning(
+                "is_manager_operation_failed",
+                user_email=user_email,
+                group_id=group_id,
+                status=result.status,
+                message=result.message,
+            )
+            return False
+        return bool(result.data.get("is_manager", False)) if result.data else False
 
-        # Direct boolean return
-        return bool(result)
-
-    except Exception as e:
-        logger.warning(
-            "permission_check_failed",
-            error=str(e),
-            user_email=user_email,
-            group_id=group_id,
-        )
-        raise
+    # Direct boolean return
+    return bool(result)
 
 
 def _parse_timestamp(ts: str | None) -> datetime:
@@ -132,9 +114,87 @@ def _parse_timestamp(ts: str | None) -> datetime:
         if ts.endswith("Z"):
             ts = ts[:-1] + "+00:00"
         return datetime.fromisoformat(ts)
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         logger.warning("failed_to_parse_timestamp", timestamp=ts)
         return datetime.now(timezone.utc)
+
+
+def _record_operation_audit(
+    correlation_id: str,
+    action: str,
+    request: schemas.AddMemberRequest | schemas.RemoveMemberRequest,
+    orchestration_result: "OrchestrationResponseTypedDict",
+    success: bool,
+    error_message: Optional[str] = None,
+) -> None:
+    """Record audit entry for group operation.
+
+    Synchronously writes audit entry before returning response to caller.
+    All operations (success or failure) are audited for compliance.
+
+    Args:
+        correlation_id: Correlation ID for tracing
+        action: Operation name ("add_member" or "remove_member")
+        request: Original Pydantic request model
+        orchestration_result: Result from orchestration layer
+        success: Whether operation succeeded
+        error_message: Error message if operation failed
+    """
+    audit_entry = create_audit_entry_from_operation(
+        correlation_id=correlation_id,
+        action=action,
+        group_id=request.group_id,
+        provider=request.provider.value if request.provider else "unknown",
+        success=success,
+        requestor=request.requestor,
+        member_email=request.member_email,
+        justification=request.justification,
+        metadata=(
+            {"orchestration": orchestration_result}
+            if success
+            else {
+                "exception_type": (
+                    type(error_message).__name__ if error_message else "unknown"
+                )
+            }
+        ),
+        error_message=error_message if not success else None,
+    )
+    write_audit_entry(audit_entry)
+
+
+def _build_action_response(
+    orchestration_result: "OrchestrationResponseTypedDict",
+    operation_type: schemas.OperationType,
+    provider: Optional[schemas.ProviderType],
+    correlation_id: str,
+) -> schemas.ActionResponse:
+    """Build ActionResponse from orchestration result.
+
+    Args:
+        orchestration_result: Dict returned by orchestration layer
+        operation_type: Type of operation (ADD_MEMBER or REMOVE_MEMBER)
+        provider: Provider type from request
+        correlation_id: Correlation ID for tracing
+
+    Returns:
+        schemas.ActionResponse with all fields populated
+    """
+    success = orchestration_result.get("success", False)
+    timestamp = _parse_timestamp(orchestration_result.get("timestamp"))
+
+    return schemas.ActionResponse(
+        success=success,
+        action=operation_type,
+        group_id=orchestration_result.get("group_id"),
+        member_email=orchestration_result.get("member_email"),
+        provider=provider,
+        details={
+            "orchestration": orchestration_result,
+            "correlation_id": correlation_id,
+        },
+        timestamp=timestamp,
+    )
 
 
 def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
@@ -164,51 +224,15 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         )
         return cached_response
 
-    # Semantic validation: move input validation responsibility to the service
-    provider_type = request.provider.value if request.provider else None
-
-    try:
-        # Validate provider type
-        if provider_type and not validate_provider_type(provider_type):
-            raise ValidationError(f"Invalid provider: {provider_type}")
-
-        # Validate group ID format
-        validate_group_id(request.group_id, provider_type or "")
-
-        # Validate justification (required by default per config)
-        validate_justification(request.justification, required=True)
-    except ValidationError as e:
-        logger.warning(
-            "validation_error_add_member",
-            error=str(e),
-            group_id=request.group_id,
-            member_email=request.member_email,
-            provider=provider_type,
-        )
-        raise
-
     # Check if requestor is a manager of the group (permission enforcement)
-    try:
-        if not _check_user_is_manager(
-            user_email=request.requestor,
-            group_id=request.group_id,
-            provider_type=provider_type,
-        ):
-            raise ValidationError(
-                f"User {request.requestor} is not a manager of group {request.group_id}"
-            )
-    except ValidationError:
-        raise
-    except Exception as e:
-        logger.warning(
-            "permission_check_error_add_member",
-            error=str(e),
-            requestor=request.requestor,
-            group_id=request.group_id,
+    if not _check_user_is_manager(
+        user_email=request.requestor,
+        group_id=request.group_id,
+    ):
+        raise ValidationError(
+            f"User {request.requestor} is not a manager of group {request.group_id}"
         )
-        raise ValidationError(f"Permission check failed: {e}") from e
 
-    # Use group_id directly (now in email format)
     # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.add_member_to_group(
@@ -216,100 +240,46 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
+            correlation_id=correlation_id,
         )
-        # If orchestration returns OperationResult objects (raw), map them to
-        # the existing orchestration response dict shape using the formatter.
-        if (
-            isinstance(orch, dict)
-            and "primary" in orch
-            and not isinstance(orch.get("primary"), dict)
-        ):
-            try:
-                formatted = orr.format_orchestration_response(
-                    orch["primary"],
-                    orch.get("propagation", {}),
-                    orch.get("partial_failures", False),
-                    orch.get("correlation_id"),
-                    action=orch.get("action", "add_member"),
-                    group_id=orch.get("group_id"),
-                    member_email=orch.get("member_email"),
-                )
-            except Exception:
-                # Fallback to original raw form if formatting fails
-                formatted = orch
-        else:
-            formatted = orch
-
-        success = bool(
-            formatted.get("success", False) if isinstance(formatted, dict) else False
+        response = _build_action_response(
+            orchestration_result=orch,
+            operation_type=schemas.OperationType.ADD_MEMBER,
+            provider=request.provider,
+            correlation_id=correlation_id,
         )
 
-        # Write audit entry (synchronous, before returning)
-        audit_entry = create_audit_entry_from_operation(
+        _record_operation_audit(
             correlation_id=correlation_id,
             action="add_member",
-            group_id=request.group_id,
-            provider=request.provider.value if request.provider else "unknown",
-            success=success,
-            requestor=request.requestor,
-            member_email=request.member_email,
-            justification=request.justification,
-            metadata={"orchestration": formatted},
+            request=request,
+            orchestration_result=orch,
+            success=response.success,
         )
-        write_audit_entry(audit_entry)
 
-        # Fire-and-forget event for downstream handlers (audit, notifications)
-        try:
+        if response.success:
             event_system.dispatch_background(
                 "group.member.added",
-                (
-                    {"orchestration": formatted, "request": request.model_dump()}
-                    if hasattr(request, "model_dump")
-                    else {"orchestration": formatted, "request": request.dict()}
-                ),
+                {
+                    "orchestration": orch,
+                    "request": (
+                        request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict()
+                    ),
+                },
             )
-        except Exception:  # pragma: no cover - defensive
-            logger.exception("failed_to_schedule_add_member_event")
-
-        ts = _parse_timestamp(
-            formatted.get("timestamp") if isinstance(formatted, dict) else None
-        )
-
-        response = schemas.ActionResponse(
-            success=success,
-            action=schemas.OperationType.ADD_MEMBER,
-            group_id=(
-                formatted.get("group_id") if isinstance(formatted, dict) else None
-            ),
-            member_email=(
-                formatted.get("member_email") if isinstance(formatted, dict) else None
-            ),
-            provider=request.provider,
-            details={"orchestration": formatted, "correlation_id": correlation_id},
-            timestamp=ts,
-        )
-
-        # Cache successful responses only
-        if response.success:
             cache_response(request.idempotency_key, response)
-
         return response
-
     except Exception as e:
-        # Write failure audit entry
-        audit_entry = create_audit_entry_from_operation(
+        _record_operation_audit(
             correlation_id=correlation_id,
             action="add_member",
-            group_id=request.group_id,
-            provider=request.provider.value if request.provider else "unknown",
-            success=False,
-            requestor=request.requestor,
-            member_email=request.member_email,
-            justification=request.justification,
+            request=request,
+            orchestration_result=orch,
+            success=response.success,
             error_message=str(e),
-            metadata={"exception_type": type(e).__name__},
         )
-        write_audit_entry(audit_entry)
         raise
 
 
@@ -342,51 +312,15 @@ def remove_member(
         )
         return cached_response
 
-    # Semantic validation performed at service boundary
-    provider_type = request.provider.value if request.provider else None
-
-    try:
-        # Validate provider type
-        if provider_type and not validate_provider_type(provider_type):
-            raise ValidationError(f"Invalid provider: {provider_type}")
-
-        # Validate group ID format
-        validate_group_id(request.group_id, provider_type or "")
-
-        # Validate justification (required by default per config)
-        validate_justification(request.justification, required=True)
-    except ValidationError as e:
-        logger.warning(
-            "validation_error_remove_member",
-            error=str(e),
-            group_id=request.group_id,
-            member_email=request.member_email,
-            provider=provider_type,
-        )
-        raise
-
     # Check if requestor is a manager of the group (permission enforcement)
-    try:
-        if not _check_user_is_manager(
-            user_email=request.requestor,
-            group_id=request.group_id,
-            provider_type=provider_type,
-        ):
-            raise ValidationError(
-                f"User {request.requestor} is not a manager of group {request.group_id}"
-            )
-    except ValidationError:
-        raise
-    except Exception as e:
-        logger.warning(
-            "permission_check_error_remove_member",
-            error=str(e),
-            requestor=request.requestor,
-            group_id=request.group_id,
+    if not _check_user_is_manager(
+        user_email=request.requestor,
+        group_id=request.group_id,
+    ):
+        raise ValidationError(
+            f"User {request.requestor} is not a manager of group {request.group_id}"
         )
-        raise ValidationError(f"Permission check failed: {e}") from e
 
-    # Use group_id directly (now in email format)
     # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.remove_member_from_group(
@@ -394,97 +328,47 @@ def remove_member(
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
-        )
-        # Format orchestration response when orchestration returns raw OperationResult objects
-        if (
-            isinstance(orch, dict)
-            and "primary" in orch
-            and not isinstance(orch.get("primary"), dict)
-        ):
-            try:
-                formatted = orr.format_orchestration_response(
-                    orch["primary"],
-                    orch.get("propagation", {}),
-                    orch.get("partial_failures", False),
-                    orch.get("correlation_id"),
-                    action=orch.get("action", "remove_member"),
-                    group_id=orch.get("group_id"),
-                    member_email=orch.get("member_email"),
-                )
-            except Exception:
-                formatted = orch
-        else:
-            formatted = orch
-
-        success = bool(
-            formatted.get("success", False) if isinstance(formatted, dict) else False
+            correlation_id=correlation_id,
         )
 
-        # Write audit entry (synchronous, before returning)
-        audit_entry = create_audit_entry_from_operation(
+        response = _build_action_response(
+            orchestration_result=orch,
+            operation_type=schemas.OperationType.REMOVE_MEMBER,
+            provider=request.provider,
+            correlation_id=correlation_id,
+        )
+
+        _record_operation_audit(
             correlation_id=correlation_id,
             action="remove_member",
-            group_id=request.group_id,
-            provider=request.provider.value if request.provider else "unknown",
-            success=success,
-            requestor=request.requestor,
-            member_email=request.member_email,
-            justification=request.justification,
-            metadata={"orchestration": formatted},
+            request=request,
+            orchestration_result=orch,
+            success=response.success,
         )
-        write_audit_entry(audit_entry)
 
-        try:
+        if response.success:
             event_system.dispatch_background(
                 "group.member.removed",
-                (
-                    {"orchestration": formatted, "request": request.model_dump()}
-                    if hasattr(request, "model_dump")
-                    else {"orchestration": formatted, "request": request.dict()}
-                ),
+                {
+                    "orchestration": orch,
+                    "request": (
+                        request.model_dump()
+                        if hasattr(request, "model_dump")
+                        else request.dict()
+                    ),
+                },
             )
-        except Exception:  # pragma: no cover - defensive
-            logger.exception("failed_to_schedule_remove_member_event")
-
-        ts = _parse_timestamp(
-            formatted.get("timestamp") if isinstance(formatted, dict) else None
-        )
-
-        response = schemas.ActionResponse(
-            success=success,
-            action=schemas.OperationType.REMOVE_MEMBER,
-            group_id=(
-                formatted.get("group_id") if isinstance(formatted, dict) else None
-            ),
-            member_email=(
-                formatted.get("member_email") if isinstance(formatted, dict) else None
-            ),
-            provider=request.provider,
-            details={"orchestration": formatted, "correlation_id": correlation_id},
-            timestamp=ts,
-        )
-
-        # Cache successful responses for idempotency
-        if response.success:
             cache_response(request.idempotency_key, response)
-
         return response
-
     except Exception as e:
-        # Write failure audit entry
-        audit_entry = create_audit_entry_from_operation(
+        _record_operation_audit(
             correlation_id=correlation_id,
             action="remove_member",
-            group_id=request.group_id,
-            provider=request.provider.value if request.provider else "unknown",
-            success=False,
-            requestor=request.requestor,
-            member_email=request.member_email,
-            justification=request.justification,
+            request=request,
+            orchestration_result=orch,
+            success=response.success,
             error_message=str(e),
-            metadata={"exception_type": type(e).__name__},
         )
-        write_audit_entry(audit_entry)
         raise
 
 
@@ -515,11 +399,11 @@ def bulk_operations(
         payload = item.payload
         try:
             if op == schemas.OperationType.ADD_MEMBER:
-                req = schemas.AddMemberRequest(**payload)
-                res = add_member(req)
+                add_req = schemas.AddMemberRequest(**payload)
+                res = add_member(add_req)
             elif op == schemas.OperationType.REMOVE_MEMBER:
-                req = schemas.RemoveMemberRequest(**payload)
-                res = remove_member(req)
+                remove_req = schemas.RemoveMemberRequest(**payload)
+                res = remove_member(remove_req)
             else:
                 # Unknown operation - return failure ActionResponse
                 res = schemas.ActionResponse(
@@ -545,34 +429,3 @@ def bulk_operations(
     }
 
     return schemas.BulkOperationResponse(results=results, summary=summary)
-
-
-def validate_group_in_provider(
-    group_id: str, provider: GroupProvider, op_status: object | None = None
-) -> bool:
-    """Check if group exists and is accessible in provider.
-
-    This function used to live in `orchestration.py`. It is a small,
-    provider-aware helper that verifies accessibility by attempting a
-    read operation (calls `get_group_members`). Moving it into the
-    service boundary keeps orchestration focused on flow control while
-    keeping caller-facing helpers discoverable on `service`.
-
-    Returns True when the provider indicates success, False otherwise.
-    """
-    try:
-        result = provider.get_group_members(group_id)
-        # If OperationResult-like, check the status attribute
-        if hasattr(result, "status"):
-            status_enum = op_status if op_status is not None else OperationStatus
-            return result.status == getattr(status_enum, "SUCCESS", "SUCCESS")
-        # otherwise assume success when no exception raised
-        return True
-    except Exception as e:
-        logger.warning(
-            "group_validation_failed",
-            group_id=group_id,
-            provider=provider.__class__.__name__,
-            error=str(e),
-        )
-        return False
