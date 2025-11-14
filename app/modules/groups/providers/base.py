@@ -500,7 +500,6 @@ class PrimaryGroupProvider(GroupProvider):
     Additional Methods:
         validate_permissions(): Check if a user has permission to perform an action
         is_manager(): Check if a user is a manager of a group
-        list_groups_for_user(): Get all groups a specific user belongs to
 
     Source of Truth Role:
         - All group membership data is read from and verified against the primary provider
@@ -578,77 +577,4 @@ class PrimaryGroupProvider(GroupProvider):
         """Implementation of is_manager (no circuit breaker wrapper).
 
         Subclasses should implement this method instead of is_manager.
-        """
-
-    def list_groups_for_user(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> OperationResult:
-        """Return a list of canonical group dicts the user is a member of with circuit breaker protection.
-
-        This method is wrapped by circuit breaker. Subclasses should implement
-        _list_groups_for_user_impl instead of this method.
-        """
-        if self._circuit_breaker:
-            try:
-                return self._circuit_breaker.call(
-                    self._list_groups_for_user_impl, user_key, provider_name, **kwargs
-                )
-            except CircuitBreakerOpenError as e:
-                logger.warning(
-                    "circuit_breaker_rejected_list_groups_for_user",
-                    provider=self.__class__.__name__,
-                    user_key=user_key,
-                )
-                return OperationResult.transient_error(
-                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
-                )
-        else:
-            return self._list_groups_for_user_impl(user_key, provider_name, **kwargs)
-
-    @abstractmethod
-    def _list_groups_for_user_impl(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> OperationResult:
-        """Implementation of list_groups_for_user (no circuit breaker wrapper).
-
-        Subclasses should implement this method instead of list_groups_for_user.
-        """
-
-    def list_groups_managed_by_user(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> OperationResult:
-        """Return a list of canonical group dicts the user manages with circuit breaker protection.
-
-        This method is wrapped by circuit breaker. Subclasses should implement
-        _list_groups_managed_by_user_impl instead of this method.
-        """
-        if self._circuit_breaker:
-            try:
-                return self._circuit_breaker.call(
-                    self._list_groups_managed_by_user_impl,
-                    user_key,
-                    provider_name,
-                    **kwargs,
-                )
-            except CircuitBreakerOpenError as e:
-                logger.warning(
-                    "circuit_breaker_rejected_list_groups_managed_by_user",
-                    provider=self.__class__.__name__,
-                    user_key=user_key,
-                )
-                return OperationResult.transient_error(
-                    message=str(e), error_code="CIRCUIT_BREAKER_OPEN"
-                )
-        else:
-            return self._list_groups_managed_by_user_impl(
-                user_key, provider_name, **kwargs
-            )
-
-    @abstractmethod
-    def _list_groups_managed_by_user_impl(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> OperationResult:
-        """Implementation of list_groups_managed_by_user (no circuit breaker wrapper).
-
-        Subclasses should implement this method instead of list_groups_managed_by_user.
         """
