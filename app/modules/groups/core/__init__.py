@@ -8,7 +8,8 @@ from modules.groups.core.service import (
 from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,
-    list_groups_for_user,
+    list_groups_simple,
+    list_groups_with_members_and_filters,
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "bulk_operations",
     "add_member_to_group",
     "remove_member_from_group",
-    "list_groups_for_user",
+    "list_groups_simple",
+    "list_groups_with_members_and_filters",
 ]
