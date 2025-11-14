@@ -16,7 +16,8 @@ from modules.groups.events.system import register_event_handler, dispatch_event
 from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,
-    list_groups_for_user,
+    list_groups_simple,
+    list_groups_with_members_and_filters,
 )
 from modules.groups.api.commands import handle_groups_command, register_groups_commands
 from modules.groups.infrastructure.validation import (
@@ -40,7 +41,8 @@ __all__ = [
     # Orchestration
     "add_member_to_group",
     "remove_member_from_group",
-    "list_groups_for_user",
+    "list_groups_simple",
+    "list_groups_with_members_and_filters",
     # Slack interfaces
     "handle_groups_command",
     "register_groups_commands",
