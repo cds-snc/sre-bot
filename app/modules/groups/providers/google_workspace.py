@@ -9,6 +9,9 @@ from core.logging import get_module_logger
 
 # Local application - integrations
 from integrations.google_workspace import google_directory_next as google_directory
+from integrations.google_workspace.google_directory_next import (
+    ListGroupsWithMembersRequest,
+)
 from integrations.google_workspace.schemas import (
     Member as GoogleMember,
     Group as GoogleGroup,
@@ -243,38 +246,6 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             raw=member if include_raw else None,
         )
 
-    def _list_groups_with_members_for_user(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> List[Dict]:
-        """List groups with members for a user (not implemented for Google)."""
-        users_kwargs = {"fields": "primaryEmail,name"}
-        groups_kwargs = {"query": "memberKey=" + user_key}
-        if provider_name and provider_name != "google":
-            groups_filters = [
-                lambda g: isinstance(g, dict)
-                and g.get("email", "").lower().startswith(provider_name.lower())
-            ]
-            resp = google_directory.list_groups_with_members(
-                groups_filters=groups_filters,
-                groups_kwargs=groups_kwargs,
-                users_kwargs=users_kwargs,
-                **kwargs,
-            )
-        else:
-            resp = google_directory.list_groups_with_members(
-                groups_kwargs=groups_kwargs, users_kwargs=users_kwargs, **kwargs
-            )
-        if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError(
-                "google list_groups_with_members failed", response=resp
-            )
-        raw = resp.data if hasattr(resp, "data") else resp
-        return [
-            as_canonical_dict(self._normalize_group_from_google(g))
-            for g in (raw or [])
-            if isinstance(g, dict)
-        ]
-
     @provider_operation(data_key="result")
     def _add_member_impl(self, group_key: str, member_email: str) -> Dict:
         """Add a member to a group by email.
@@ -340,6 +311,10 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         GroupProvider/PrimaryGroupProvider so provider classes can be
         instantiated safely at decoration/import time in tests and runtime.
         """
+        provider_name = kwargs.pop("provider_name", None)
+        if provider_name:
+            if provider_name != "google":
+                kwargs["query"] = f"email:{provider_name}*"
         resp = google_directory.list_groups(**kwargs)
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError("google list_groups failed", response=resp)
@@ -351,20 +326,76 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         ]
 
     @provider_operation(data_key="groups")
-    def _list_groups_with_members_impl(self, **kwargs) -> List[Dict]:
-        """Return normalized groups with members from Google Workspace.
+    def _list_groups_with_members_impl(
+        self,
+        member_email: Optional[str] = None,
+        member_role_filters: Optional[List[str]] = None,
+        include_users_details: bool = False,
+        provider_name: Optional[str] = None,
+        exclude_empty_groups: bool = False,
+        **kwargs,
+    ) -> List[Dict]:
+        """Return groups with members, optionally filtered by member criteria.
 
-        This method is not implemented for Google Workspace as it would
-        require excessive API calls to fetch members for each group.
+        Unified method handling all complex use cases:
+        - Use case 2: member_email=john@example.ca → all groups where user is member
+        - Use case 3: member_role_filters=['MANAGER','OWNER'] → groups where user is manager
+        - Use case 4: include_users_details=True → enrich with full user details
+
+        Args:
+            member_email: Optional email to filter groups (include groups where this member exists).
+                         If None, include all groups with members.
+            member_role_filters: Optional list of roles (e.g., ['MANAGER', 'OWNER']).
+                                Group is included if member has ANY of these roles.
+            include_users_details: Whether to enrich members with full user details.
+            provider_name: Optional provider name filter for group emails.
+            exclude_empty_groups: Whether to exclude groups with no members (default False).
+            **kwargs: Additional Google API parameters.
+
+        Returns:
+            List of normalized group dicts with members assembled and optionally filtered.
         """
-        users_kwargs = {"fields": "primaryEmail,name"}
-        resp = google_directory.list_groups_with_members(
-            users_kwargs=users_kwargs, **kwargs
+        # Groups kwargs
+        groups_kwargs = kwargs.pop("groups_kwargs", {})
+        if provider_name:
+            groups_kwargs["query"] = f"email:{provider_name}*"
+        groups_kwargs["fields"] = "email,name,description"
+        groups_filters = kwargs.pop("groups_filters", [])
+        members_kwargs = kwargs.pop("members_kwargs", {})
+        # Build member filters from parameters
+        member_filters = []
+
+        # If member_email is provided, add filter for that email
+        if member_email:
+            member_filters.append(lambda m: m.get("email") == member_email)
+
+        # If member_role_filters provided, add filter for those roles
+        if member_role_filters:
+            member_filters.append(lambda m: m.get("role") in member_role_filters)
+
+        # Prepare kwargs for integration layer
+        users_kwargs = {"fields": "primaryEmail,name"} if include_users_details else {}
+
+        # Build request for integration layer
+
+        request = ListGroupsWithMembersRequest(
+            groups_filters=groups_filters if groups_filters else None,
+            member_filters=member_filters if member_filters else None,
+            groups_kwargs=groups_kwargs if groups_kwargs else None,
+            members_kwargs=members_kwargs if members_kwargs else None,
+            users_kwargs=users_kwargs if users_kwargs else None,
+            include_users_details=include_users_details,
+            exclude_empty_groups=exclude_empty_groups,
         )
+
+        # Call integration layer with unified request
+        resp = google_directory.list_groups_with_members(request)
+
         if hasattr(resp, "success") and not resp.success:
             raise IntegrationError(
                 "google list_groups_with_members failed", response=resp
             )
+
         raw = resp.data if hasattr(resp, "data") else resp
         return [
             as_canonical_dict(self._normalize_group_from_google(g))
@@ -397,76 +428,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         """
         # For all actions, we require manager role
         # Delegate to _is_manager_impl which efficiently checks a single member
-        result = self._is_manager_impl(user_key, group_key)
-        return result.data if isinstance(result, OperationResult) else result
-
-    @provider_operation(data_key="groups")
-    def _list_groups_for_user_impl(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> List[Dict]:
-        """Return canonical groups for which `user_key` is a member.
-
-        Args:
-            user_key: A Google member key (email or ID).
-            provider_name: Optional provider name filter.
-
-        Returns:
-            A list of canonical group dicts (normalized NormalizedGroup).
-        """
-        users_kwargs = {"fields": "primaryEmail,name"}
-        groups_kwargs = {"query": "memberKey=" + user_key}
-        if provider_name and provider_name != "google":
-            groups_filters = [
-                lambda g: isinstance(g, dict)
-                and g.get("email", "").lower().startswith(provider_name.lower())
-            ]
-            resp = google_directory.list_groups_with_members(
-                groups_filters=groups_filters,
-                groups_kwargs=groups_kwargs,
-                users_kwargs=users_kwargs,
-                **kwargs,
-            )
-        else:
-            resp = google_directory.list_groups_with_members(
-                groups_kwargs=groups_kwargs, users_kwargs=users_kwargs, **kwargs
-            )
-        if hasattr(resp, "success") and not resp.success:
-            raise IntegrationError(
-                "google list_groups_with_members failed", response=resp
-            )
-        raw = resp.data if hasattr(resp, "data") else resp
-        return [
-            as_canonical_dict(self._normalize_group_from_google(g))
-            for g in (raw or [])
-            if isinstance(g, dict)
-        ]
-
-    @provider_operation(data_key="groups")
-    def _list_groups_managed_by_user_impl(
-        self, user_key: str, provider_name: Optional[str], **kwargs
-    ) -> List[Dict]:
-        """Return groups keys where the user is a MANAGER or OWNER.
-
-        Args:
-            user_key: A Google member key (email or ID).
-
-        Returns:
-            A list of group keys (emails) where the user is a MANAGER or OWNER.
-        """
-        groups_list = self._list_groups_with_members_for_user(
-            user_key, provider_name=provider_name, **kwargs
-        )
-        managed_groups: List[Dict] = []
-        if isinstance(groups_list, list):
-            for group in groups_list:
-                if not group or not isinstance(group, dict):
-                    continue
-                if isinstance(group, dict):
-                    role = group.get("role")
-                    if role in ("MANAGER", "OWNER"):
-                        managed_groups.append(group)
-
-        return managed_groups
+        return self._is_manager_impl(user_key, group_key)
 
     @provider_operation(data_key="is_manager")
     def _is_manager_impl(self, user_key: str, group_key: str) -> bool:
