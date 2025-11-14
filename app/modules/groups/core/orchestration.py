@@ -395,19 +395,21 @@ def remove_member_from_group(
     )
 
 
-def list_groups_for_user(
-    user_email: str,
-    provider_type: str | None = None,
+def list_groups_simple(
+    provider_name: Optional[str] = None,
 ) -> List[NormalizedGroup]:
-    """Get groups for a user from the primary provider.
+    """List all groups (no members, minimal data).
 
-    Returns an empty list on failure or malformed data.
+    Args:
+        provider_name: Optional provider filter
+
+    Returns:
+        List of normalized groups (no members)
     """
     op = _perform_read_operation(
-        op_name="list_groups_for_user",
-        action="list_groups_for_user",
-        user_key=user_email,
-        provider_name=provider_type,
+        op_name="list_groups",
+        action="list_groups",
+        provider_name=provider_name,
     )
     if op.status != OperationStatus.SUCCESS:
         return []
@@ -416,19 +418,34 @@ def list_groups_for_user(
     return cast(List[NormalizedGroup], op.data.get("groups", []))
 
 
-def list_groups_managed_by_user(
-    user_email: str,
-    provider_type: str | None = None,
+def list_groups_with_members_and_filters(
+    provider_name: Optional[str] = None,
+    member_email: Optional[str] = None,
+    member_role_filters: Optional[List[str]] = None,
+    include_users_details: bool = False,
+    exclude_empty_groups: bool = True,
 ) -> List[NormalizedGroup]:
-    """Get groups manageable by a user from the primary provider.
+    """List groups with members, optionally filtered.
 
-    Returns an empty list on failure or malformed data.
+    Args:
+        user_email: Email of user making request
+        provider_hint: Optional provider filter
+        member_email: Filter groups by this member's email
+        member_role_filters: Filter groups by member role(s)
+        include_users_details: Whether to enrich with full user details
+        include_empty_groups: Whether to include groups with no members
+
+    Returns:
+        List of normalized groups with members assembled and filtered
     """
     op = _perform_read_operation(
-        op_name="list_groups_managed_by_user",
-        action="list_groups_managed_by_user",
-        user_key=user_email,
-        provider_name=provider_type,
+        op_name="list_groups_with_members",
+        action="list_groups_with_members",
+        member_email=member_email,
+        member_role_filters=member_role_filters,
+        include_users_details=include_users_details,
+        provider_name=provider_name,
+        exclude_empty_groups=exclude_empty_groups,
     )
     if op.status != OperationStatus.SUCCESS:
         return []
