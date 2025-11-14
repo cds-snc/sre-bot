@@ -54,20 +54,19 @@ def _handle_list_command(
     client, body: Dict[str, Any], respond: Respond, args: List[str]
 ) -> None:
     """Handle groups list command."""
-    user_email = slack_users.get_user_email_from_body(client, body)
-    if not user_email:
+    requestor = slack_users.get_user_email_from_body(client, body)
+    if not requestor:
         respond("❌ Could not determine your email address.")
         return
 
     provider_type = None
     if args and args[0] in ["aws", "google", "azure"]:
         provider_type = schemas.ProviderType(args[0])
-
     try:
         req = (
-            schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+            schemas.ListGroupsRequest(requestor=requestor, provider=provider_type)
             if provider_type
-            else schemas.ListGroupsRequest(user_email=user_email)
+            else schemas.ListGroupsRequest(requestor=requestor)
         )
         groups = service.list_groups(req)
         # Simple user-friendly Slack message
@@ -80,7 +79,7 @@ def _handle_list_command(
                     (
                         u
                         for u in group.get("members", [])
-                        if u.get("email") == user_email
+                        if u.get("email") == requestor
                     ),
                     None,
                 )
