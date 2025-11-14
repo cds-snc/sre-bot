@@ -259,16 +259,31 @@ class BulkOperationsRequest(BaseModel):
 
 
 class ListGroupsRequest(BaseModel):
-    """Schema for listing groups."""
+    """Schema for listing groups with flexible filtering options.
 
-    user_email: Annotated[
+    This unified schema handles all four use cases:
+    1. Simple list: target_member_email only (optional)
+    2. User's groups: target_member_email + include_members=True
+    3. Managed groups: target_member_email + include_members=True + filter_by_member_role with MANAGER/OWNER
+    4. System sync: target_member_email + include_members=True + include_users_details=False
+    """
+
+    requestor: Annotated[
         EmailStr,
         Field(
             ...,
-            description="User email",
-            json_schema_extra={"example": "user@example.com"},
+            description="Requestor email",
+            json_schema_extra={"example": "requestor@example.com"},
         ),
     ]
+    target_member_email: Annotated[
+        Optional[EmailStr],
+        Field(
+            default=None,
+            description="Email of the member whose groups are being queried",
+            json_schema_extra={"example": "member@example.com"},
+        ),
+    ] = None
     provider: Annotated[
         Optional[ProviderType],
         Field(
@@ -277,6 +292,72 @@ class ListGroupsRequest(BaseModel):
             json_schema_extra={"example": "google"},
         ),
     ] = None
+
+    include_members: Annotated[
+        bool,
+        Field(
+            default=False,
+            description="Whether to include group members in response",
+            json_schema_extra={"example": True},
+        ),
+    ] = False
+
+    include_users_details: Annotated[
+        bool,
+        Field(
+            default=False,
+            description="Whether to enrich members with full user details (requires include_members=True)",
+            json_schema_extra={"example": True},
+        ),
+    ] = False
+
+    filter_by_member_email: Annotated[
+        Optional[EmailStr],
+        Field(
+            default=None,
+            description="Filter groups by member email (group included if member exists; requires include_members=True)",
+            json_schema_extra={"example": "john@example.com"},
+        ),
+    ] = None
+
+    filter_by_member_role: Annotated[
+        Optional[List[str]],
+        Field(
+            default=None,
+            description="Filter groups by member role (e.g., ['MANAGER', 'OWNER']; requires include_members=True)",
+            json_schema_extra={"example": ["MANAGER", "OWNER"]},
+        ),
+    ] = None
+
+    exclude_empty_groups: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Whether to exclude groups with no members (requires include_members=True)",
+            json_schema_extra={"example": True},
+        ),
+    ] = True
+
+    @model_validator(mode="after")
+    def validate_filter_dependencies(self):
+        """Ensure filter parameters are only used with include_members=True."""
+        if self.target_member_email is None:
+            self.target_member_email = self.requestor
+
+        if not self.include_members:
+            if self.filter_by_member_email is not None:
+                raise ValueError("filter_by_member_email requires include_members=True")
+            if self.filter_by_member_role is not None:
+                raise ValueError("filter_by_member_role requires include_members=True")
+            if not self.exclude_empty_groups:
+                raise ValueError(
+                    "include_empty_groups filtering requires include_members=True"
+                )
+
+        if not self.include_members and self.include_users_details:
+            raise ValueError("include_users_details requires include_members=True")
+
+        return self
 
 
 class CheckPermissionsRequest(BaseModel):
