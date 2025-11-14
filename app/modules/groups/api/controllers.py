@@ -51,7 +51,7 @@ def remove_member_endpoint(request: schemas.RemoveMemberRequest):
 
 
 @router.get("/", response_model=List[schemas.GroupResponse])
-def list_groups_endpoint(request: schemas.ListGroupsRequest = Depends()):
+def list_groups_endpoint(request: schemas.ListGroupsRequest):
     """List groups for a user.
 
     Accepts query parameters that map to `schemas.ListGroupsRequest` so OpenAPI
