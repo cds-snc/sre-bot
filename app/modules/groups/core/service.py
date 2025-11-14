@@ -373,14 +373,31 @@ def remove_member(
 
 
 def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
-    """List groups for a user via orchestration read helpers.
+    """List groups for a user via orchestration.
 
-    Returns a list of `NormalizedGroup` dataclasses as produced by the
-    orchestration layer. Controllers may convert these to serializable dicts
-    using `modules.groups.models.as_canonical_dict`.
+    Now routes based on include_members flag to appropriate orchestration function.
+
+    Args:
+        request: ListGroupsRequest with all parameters for filtering/enrichment
+
+    Returns:
+        List of NormalizedGroup dataclasses (or dicts after normalization)
     """
-    provider_hint = request.provider.value if request.provider else None
-    return orchestration.list_groups_for_user(request.user_email, provider_hint)
+    provider = request.provider.value if request.provider else None
+
+    # Route to appropriate orchestration function based on include_members flag
+    if request.include_members:
+        return orchestration.list_groups_with_members_and_filters(
+            member_email=request.target_member_email,
+            member_role_filters=request.filter_by_member_role,
+            include_users_details=request.include_users_details,
+            provider_name=provider,
+            exclude_empty_groups=request.exclude_empty_groups,
+        )
+    else:
+        return orchestration.list_groups_simple(
+            provider_name=request.provider.value if request.provider else None,
+        )
 
 
 def bulk_operations(
