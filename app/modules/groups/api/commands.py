@@ -60,11 +60,13 @@ def _handle_list_command(
         return
 
     provider_type = None
-    if args and args[0] in ["aws", "google", "azure"]:
+    if args and args[0] in schemas.ProviderType.__members__:
         provider_type = schemas.ProviderType(args[0])
     try:
         req = (
-            schemas.ListGroupsRequest(requestor=requestor, provider=provider_type)
+            schemas.ListGroupsRequest(
+                requestor=requestor, provider=provider_type, include_members=True
+            )
             if provider_type
             else schemas.ListGroupsRequest(requestor=requestor)
         )
@@ -84,7 +86,7 @@ def _handle_list_command(
                     None,
                 )
                 group_stringified.append(
-                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')}) - {user.get('role', 'N/A') if user else 'N/A'}"
+                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')}) - {user.get('role', 'N/A') if user and req.include_members else 'N/A'}"
                 )
         respond(f"✅ Retrieved {len(groups)} groups:\n" + "\n".join(group_stringified))
     except Exception as e:
@@ -220,12 +222,17 @@ def _handle_manage_command(
     provider_type = None
     if args and args[0] in ["aws", "google", "azure"]:
         provider_type = schemas.ProviderType(args[0])
-
+    logger.debug("provider_type_in_manage_command", provider_type=provider_type)
     try:
         req = (
-            schemas.ListGroupsRequest(user_email=user_email, provider=provider_type)
+            schemas.ListGroupsRequest(
+                requestor=user_email,
+                include_members=True,
+                target_member_email=user_email,
+                provider=provider_type,
+            )
             if provider_type
-            else schemas.ListGroupsRequest(user_email=user_email)
+            else schemas.ListGroupsRequest(requestor=user_email)
         )
         groups = service.list_groups(req)
         respond(f"✅ Retrieved {len(groups)} manageable groups")
