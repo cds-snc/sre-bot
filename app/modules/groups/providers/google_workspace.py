@@ -359,7 +359,6 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         groups_kwargs = kwargs.pop("groups_kwargs", {})
         if provider_name:
             groups_kwargs["query"] = f"email:{provider_name}*"
-        groups_kwargs["fields"] = "email,name,description"
         groups_filters = kwargs.pop("groups_filters", [])
         members_kwargs = kwargs.pop("members_kwargs", {})
         # Build member filters from parameters
@@ -387,6 +386,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             include_users_details=include_users_details,
             exclude_empty_groups=exclude_empty_groups,
         )
+        logger.debug("google_list_groups_with_members_request", request=request)
 
         # Call integration layer with unified request
         resp = google_directory.list_groups_with_members(request)
