@@ -1,27 +1,27 @@
 from functools import partial
-from slack_bolt.adapter.socket_mode import SocketModeHandler
-from slack_bolt import App
-from dotenv import load_dotenv
-from modules import (
-    secret,
-    atip,
-    aws,
-    sre,
-    webhook_helper,
-    role,
-    incident,
-    incident_helper,
-)
+
 from core.config import settings
 from core.logging import get_module_logger
+from dotenv import load_dotenv
+from jobs import scheduled_tasks
+from modules import (
+    atip,
+    aws,
+    incident,
+    incident_helper,
+    role,
+    secret,
+    sre,
+    webhook_helper,
+)
 from modules.groups.providers import (
-    activate_providers,
+    load_providers,
     get_active_providers,
     get_primary_provider_name,
 )
 from server import bot_middleware, server
-
-from jobs import scheduled_tasks
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 server_app = server.handler
 logger = get_module_logger()
@@ -76,7 +76,7 @@ def main(bot):
 # Ensure providers are activated once per FastAPI process at startup.
 def providers_startup():
     try:
-        primary = activate_providers()
+        primary = load_providers()
         # store for app-wide access
         server_app.state.providers = get_active_providers()
         server_app.state.primary_provider_name = get_primary_provider_name()
