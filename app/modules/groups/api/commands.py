@@ -42,8 +42,6 @@ def handle_groups_command(
         _handle_remove_command(client, body, respond, args[1:])
     elif action == "manage":
         _handle_manage_command(client, body, respond, args[1:])
-    elif action == "providers":
-        _handle_list_active_providers_command(client, body, respond, args[1:])
     else:
         respond(
             f"Unknown command: {action}. Use `/sre groups help` for available commands."
@@ -375,17 +373,10 @@ def _handle_manage_command(
         respond("❌ Error retrieving your groups. Please try again later.")
 
 
-def _handle_list_active_providers_command(
-    client, body: Dict[str, Any], respond: Respond, args: List[str]
-):
-    """Handle groups providers command."""
-    active_providers = get_active_providers().keys()
-    respond(f"✅ Active group providers: {', '.join(active_providers)}")
-
-
 def _get_help_text() -> str:
     """Get help text for groups commands."""
-    return """
+    active_providers = get_active_providers().keys()
+    return f"""
 🔐 *Groups Membership Management*
 
 Available commands:
@@ -395,7 +386,7 @@ Available commands:
 • `/sre groups remove <email> <group_id> <provider> [justification]` - Remove member from group
 • `/sre groups help` - Show this help
 
-*Providers:* aws, google
+*Active Providers:* {', '.join(active_providers)}
 
 *Examples:*
 • `/sre groups list aws`
