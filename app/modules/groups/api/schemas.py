@@ -80,7 +80,7 @@ class PermissionAction(str, Enum):
 class AddMemberRequest(BaseModel):
     """Schema for adding a member to a group.
 
-    All fields are required except requestor and metadata. Justification is
+    All fields are required except metadata. Justification is
     required for audit and compliance purposes.
     """
 
@@ -148,7 +148,7 @@ class AddMemberRequest(BaseModel):
 class RemoveMemberRequest(BaseModel):
     """Schema for removing a member from a group.
 
-    All fields are required except requestor and metadata. Justification is
+    All fields are required except metadata. Justification is
     required for audit and compliance purposes.
     """
 
@@ -261,8 +261,8 @@ class BulkOperationsRequest(BaseModel):
 class ListGroupsRequest(BaseModel):
     """Schema for listing groups with flexible filtering options.
 
-    This unified schema handles all four use cases:
-    1. Simple list: target_member_email only (optional)
+    This unified schema handles four use cases:
+    1. Simple list: target_member_email only (optional, if not provided defaults to requestor)
     2. User's groups: target_member_email + include_members=True
     3. Managed groups: target_member_email + include_members=True + filter_by_member_role with MANAGER/OWNER
     4. System sync: target_member_email + include_members=True + include_users_details=False
