@@ -12,7 +12,6 @@ dev-setup: # Requires to be signed in to AWS
 debug:
 	PREFIX="dev-" LOG_LEVEL=DEBUG python3 -m uvicorn main:server_app --reload
 
-
 fmt:
 	black . $(ARGS) --target-version py311
 
