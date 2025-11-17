@@ -1,7 +1,7 @@
 from typing import List
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 
 from core.logging import get_module_logger
 from modules.groups.core import service
