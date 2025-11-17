@@ -634,6 +634,7 @@ def list_groups_with_members(
     # Filter groups based on member criteria
     if request.member_filters:
         results = _filter_groups_by_members(results, request.member_filters)
+
     # Fetch users details if requested
     if request.include_users_details and results:
         member_emails = {
