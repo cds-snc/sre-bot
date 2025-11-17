@@ -420,7 +420,7 @@ def list_groups_simple(
 
 def list_groups_with_members_and_filters(
     provider_name: Optional[str] = None,
-    member_email: Optional[str] = None,
+    member_email_filter: Optional[str] = None,
     member_role_filters: Optional[List[str]] = None,
     include_users_details: bool = False,
     exclude_empty_groups: bool = True,
@@ -441,7 +441,7 @@ def list_groups_with_members_and_filters(
     op = _perform_read_operation(
         op_name="list_groups_with_members",
         action="list_groups_with_members",
-        member_email=member_email,
+        member_email_filter=member_email_filter,
         member_role_filters=member_role_filters,
         include_users_details=include_users_details,
         provider_name=provider_name,
