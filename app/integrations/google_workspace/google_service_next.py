@@ -492,7 +492,6 @@ def paginate_all_results(
         else:
             error_info = resp.error
     """
-    logger.warning("paginate_all_results_initiated")
 
     def paginate_call():
         all_results = []
