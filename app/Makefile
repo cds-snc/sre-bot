@@ -1,13 +1,17 @@
 .PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
 
 dev:
-	PREFIX="dev-" LOG_LEVEL=DEBUG python3 -m uvicorn main:server_app --reload
+	PREFIX="dev-" python3 -m uvicorn main:server_app --reload
 
 dev-setup: # Requires to be signed in to AWS
 	pip3 install --user -r requirements_dev.txt
 	pip3 install --user -r requirements.txt
 	sh ../.devcontainer/maxmind-create.sh
 	sh ../.devcontainer/dynamodb-create.sh
+
+debug:
+	PREFIX="dev-" LOG_LEVEL=DEBUG python3 -m uvicorn main:server_app --reload
+
 
 fmt:
 	black . $(ARGS) --target-version py311
