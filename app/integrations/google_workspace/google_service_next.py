@@ -530,7 +530,11 @@ def paginate_all_results(
                     all_results.extend(response)
 
                 # Get next page if available
-                next_page_token = response.get("nextPageToken") if isinstance(response, dict) else None
+                next_page_token = (
+                    response.get("nextPageToken")
+                    if isinstance(response, dict)
+                    else None
+                )
 
                 logger.debug(
                     "pagination_page_processed",
