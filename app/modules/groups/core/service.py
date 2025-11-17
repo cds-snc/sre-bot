@@ -388,7 +388,7 @@ def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
     # Route to appropriate orchestration function based on include_members flag
     if request.include_members:
         return orchestration.list_groups_with_members_and_filters(
-            member_email=request.target_member_email,
+            member_email_filter=request.filter_by_member_email,
             member_role_filters=request.filter_by_member_role,
             include_users_details=request.include_users_details,
             provider_name=provider,
