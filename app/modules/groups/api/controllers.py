@@ -200,6 +200,6 @@ def circuit_breaker_health():
         logger.error("circuit_breaker_health_check_error", error=str(e))
         return {
             "status": "unknown",
-            "error": str(e),
+            "error": "An internal error has occurred.",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
