@@ -386,22 +386,23 @@ def _handle_list_active_providers_command(
 def _get_help_text() -> str:
     """Get help text for groups commands."""
     return """
-🔐 **Groups Membership Management**
+🔐 *Groups Membership Management*
 
 Available commands:
+
 • `/sre groups list [provider]` - List groups you can manage
 • `/sre groups add <email> <group_id> <provider> [justification]` - Add member to group
 • `/sre groups remove <email> <group_id> <provider> [justification]` - Remove member from group
 • `/sre groups help` - Show this help
 
-**Providers:** aws, google, azure
+*Providers:* aws, google
 
-**Examples:**
+*Examples:*
 • `/sre groups list aws`
 • `/sre groups add user@example.com my-group aws "Adding for project access"`
 • `/sre groups remove user@example.com my-group aws "No longer needed"`
 
-**Note:** You can only manage groups where you have admin/manager permissions.
+*Note:* You can only manage groups where you have admin/manager permissions.
 """.strip()
 
 
