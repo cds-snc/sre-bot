@@ -328,7 +328,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     @provider_operation(data_key="groups")
     def _list_groups_with_members_impl(
         self,
-        member_email: Optional[str] = None,
+        member_email_filter: Optional[str] = None,
         member_role_filters: Optional[List[str]] = None,
         include_users_details: bool = False,
         provider_name: Optional[str] = None,
@@ -365,8 +365,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         member_filters = []
 
         # If member_email is provided, add filter for that email
-        if member_email:
-            member_filters.append(lambda m: m.get("email") == member_email)
+        if member_email_filter:
+            member_filters.append(lambda m: m.get("email") == member_email_filter)
 
         # If member_role_filters provided, add filter for those roles
         if member_role_filters:
