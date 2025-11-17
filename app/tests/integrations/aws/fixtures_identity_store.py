@@ -24,7 +24,6 @@ def fake_user_client(user: Dict[str, Any]) -> FakeClient:
 
 
 def fake_group_client(groups: List[Dict[str, Any]]) -> FakeClient:
-    """Return a FakeClient that pages groups via paginator or returns describe_group."""
     """
     Return a FakeClient that pages groups via paginator or returns describe_group.
 
