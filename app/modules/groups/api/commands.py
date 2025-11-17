@@ -2,20 +2,20 @@
 """Command handlers for Slack integration."""
 
 import uuid
-from typing import Dict, Any, List
-from slack_sdk import WebClient
-from slack_bolt import Ack, Respond
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from core.logging import get_module_logger
-from modules.groups.core import service
+from integrations.slack import users as slack_users
 from modules.groups.api import responses, schemas
-from modules.groups.providers import get_active_providers
+from modules.groups.core import service
 from modules.groups.infrastructure.validation import (
     validate_email,
     validate_provider_type,
 )
-from integrations.slack import users as slack_users
-
+from modules.groups.providers import get_active_providers
+from slack_bolt import Ack, Respond
+from slack_sdk import WebClient
 
 logger = get_module_logger()
 
@@ -50,45 +50,179 @@ def handle_groups_command(
         )
 
 
+@dataclass
+class ListCommandArgs:
+    """Parsed arguments for the list command."""
+
+    provider: Optional[schemas.ProviderType] = None
+    target_user_email: Optional[str] = None
+    include_details: bool = False
+    managed_only: bool = False
+    filter_by_roles: Optional[List[str]] = None
+    include_empty: bool = False
+
+
+def _parse_list_args(args: List[str]) -> tuple[ListCommandArgs, Optional[str]]:
+    """Parse list command arguments and flags.
+
+    Supports:
+    - [provider] - Optional positional provider (aws, google, azure)
+    - --user <email> - Target user email (defaults to requestor)
+    - --managed - Show only groups where user is MANAGER/OWNER
+    - --role <role1,role2> - Filter by member roles
+    - --details - Include full user details
+    - --include-empty - Include groups with no members
+
+    Returns:
+        Tuple of (parsed_args, error_message)
+        error_message is None if parsing succeeded
+    """
+    parsed = ListCommandArgs()
+    i = 0
+
+    while i < len(args):
+        arg = args[i]
+
+        # Check if it's a provider (positional, no flag)
+        if not arg.startswith("--") and not parsed.provider:
+            if arg in schemas.ProviderType.__members__.values():
+                parsed.provider = schemas.ProviderType(arg)
+                i += 1
+                continue
+            else:
+                return (
+                    parsed,
+                    f"❌ Unknown provider: {arg}. Must be one of: {', '.join(schemas.ProviderType.__members__.values())}",
+                )
+
+        # Parse flags
+        if arg == "--user":
+            if i + 1 >= len(args):
+                return parsed, "❌ --user flag requires an email argument"
+            parsed.target_user_email = args[i + 1]
+            if not validate_email(parsed.target_user_email):
+                return parsed, f"❌ Invalid email format: {parsed.target_user_email}"
+            i += 2
+
+        elif arg == "--details":
+            parsed.include_details = True
+            i += 1
+
+        elif arg == "--managed":
+            parsed.managed_only = True
+            i += 1
+
+        elif arg == "--role":
+            if i + 1 >= len(args):
+                return parsed, "❌ --role flag requires role argument (comma-separated)"
+            role_str = args[i + 1]
+            parsed.filter_by_roles = [r.strip().upper() for r in role_str.split(",")]
+            i += 2
+
+        elif arg == "--include-empty":
+            parsed.include_empty = True
+            i += 1
+
+        else:
+            return parsed, f"❌ Unknown flag: {arg}"
+
+    return parsed, None
+
+
 def _handle_list_command(
     client, body: Dict[str, Any], respond: Respond, args: List[str]
 ) -> None:
-    """Handle groups list command."""
+    """Handle groups list command with rich flag support.
+
+    Usage:
+        /sre groups list [provider] [--user <email>] [--managed] [--role <roles>] [--details]
+
+    Examples:
+        /sre groups list                           # Your groups
+        /sre groups list google                    # Your Google groups
+        /sre groups list --managed                 # Groups you manage
+        /sre groups list --role MANAGER,OWNER      # Groups where you're manager/owner
+        /sre groups list --user other@example.com  # Other user's groups
+    """
+    logger.debug("groups_list_command_args", args=args)
+
     requestor = slack_users.get_user_email_from_body(client, body)
     if not requestor:
         respond("❌ Could not determine your email address.")
         return
 
-    provider_type = None
-    if args and args[0] in schemas.ProviderType.__members__:
-        provider_type = schemas.ProviderType(args[0])
+    # Parse arguments
+    parsed_args, parse_error = _parse_list_args(args)
+    if parse_error:
+        respond(parse_error)
+        return
+
+    # Determine target user (defaults to requestor)
+    target_user_email = parsed_args.target_user_email or requestor
+
     try:
-        req = (
-            schemas.ListGroupsRequest(
-                requestor=requestor, provider=provider_type, include_members=True
-            )
-            if provider_type
-            else schemas.ListGroupsRequest(requestor=requestor)
-        )
+        # Build ListGroupsRequest - always include members and filter by target user
+        request_kwargs = {
+            "requestor": requestor,
+            "target_member_email": target_user_email,
+            "provider": parsed_args.provider,
+            "include_members": True,
+            "filter_by_member_email": target_user_email,
+            "include_users_details": parsed_args.include_details,
+        }
+
+        # Handle --managed flag (filter by MANAGER/OWNER roles)
+        if parsed_args.managed_only:
+            request_kwargs["filter_by_member_role"] = ["MANAGER", "OWNER"]
+
+        # Handle --role flag (filter by specific roles)
+        if parsed_args.filter_by_roles:
+            request_kwargs["filter_by_member_role"] = parsed_args.filter_by_roles
+
+        # Handle --include-empty flag
+        if parsed_args.include_empty:
+            request_kwargs["exclude_empty_groups"] = False
+
+        req = schemas.ListGroupsRequest(**request_kwargs)
+
+        logger.debug("groups_list_command_request", req=req)
         groups = service.list_groups(req)
-        # Simple user-friendly Slack message
+
+        if not groups:
+            respond("✅ No groups found matching your criteria.")
+            return
+
+        # Format response
         group_stringified = []
-        if len(groups) > 0:
-            logger.debug("logging_single_group_for_list_command", group=groups[0])
         for group in groups:
             if isinstance(group, dict):
+                group_name = group.get("name", "Unnamed Group")
+                group_id = group.get("id", "N/A")
+                members = group.get("members", [])
+
+                # Show target user's role in the group
                 user = next(
-                    (
-                        u
-                        for u in group.get("members", [])
-                        if u.get("email") == requestor
-                    ),
+                    (u for u in members if u.get("email") == target_user_email),
                     None,
                 )
-                group_stringified.append(
-                    f"\n- {group.get('name', 'Unnamed Group')} (ID: {group.get('id', 'N/A')}) - {user.get('role', 'N/A') if user and req.include_members else 'N/A'}"
-                )
-        respond(f"✅ Retrieved {len(groups)} groups:\n" + "\n".join(group_stringified))
+                role = user.get("role", "MEMBER") if user else "N/A"
+
+                group_stringified.append(f"• {group_name} (ID: {group_id}) - {role}")
+
+        # Build summary line
+        summary = f"✅ Retrieved {len(groups)} group{'s' if len(groups) != 1 else ''}"
+        if parsed_args.managed_only:
+            summary += " (managed)"
+        if parsed_args.filter_by_roles and not parsed_args.managed_only:
+            summary += f" (roles: {', '.join(parsed_args.filter_by_roles)})"
+        if target_user_email != requestor:
+            summary += f" for {target_user_email}"
+
+        respond(f"{summary}:\n" + "\n".join(group_stringified))
+
+    except ValueError as e:
+        logger.error(f"Validation error in groups list command: {e}")
+        respond(f"❌ Invalid input: {str(e)}")
     except Exception as e:
         logger.error(f"Error in groups list command: {e}")
         respond("❌ Error retrieving your groups. Please try again later.")
