@@ -285,16 +285,16 @@ class TestListGroupsRequest:
     def test_list_groups_request_with_email_only(self):
         """ListGroupsRequest accepts email address."""
         request = schemas.ListGroupsRequest(
-            user_email="user@example.com",
+            requestor="user@example.com",
         )
 
-        assert request.user_email == "user@example.com"
+        assert request.requestor == "user@example.com"
         assert request.provider is None
 
     def test_list_groups_request_with_provider(self):
         """ListGroupsRequest accepts optional provider."""
         request = schemas.ListGroupsRequest(
-            user_email="user@example.com",
+            requestor="user@example.com",
             provider=schemas.ProviderType.GOOGLE,
         )
 

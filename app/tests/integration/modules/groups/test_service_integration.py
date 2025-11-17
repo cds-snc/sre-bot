@@ -264,58 +264,6 @@ class TestRemoveMemberService:
 # ============================================================================
 
 
-@pytest.mark.integration
-@pytest.mark.integration_service
-class TestListGroupsService:
-    """Test service layer for list_groups operations."""
-
-    def test_list_groups_returns_list(
-        self,
-        monkeypatch,
-        test_groups_list,
-    ):
-        """Service returns list of groups."""
-        # ARRANGE
-        request = schemas.ListGroupsRequest(user_email="user@example.com")
-
-        # Mock orchestration
-        monkeypatch.setattr(
-            "modules.groups.core.orchestration.list_groups_for_user",
-            MagicMock(return_value=test_groups_list),
-        )
-
-        # ACT
-        result = service.list_groups(request)
-
-        # ASSERT
-        assert isinstance(result, list)
-        assert len(result) == 3
-
-    def test_list_groups_filters_by_provider(
-        self,
-        monkeypatch,
-        test_groups_list,
-    ):
-        """Service accepts provider filter."""
-        # ARRANGE
-        request = schemas.ListGroupsRequest(
-            user_email="user@example.com",
-            provider="google",
-        )
-
-        # Mock orchestration
-        monkeypatch.setattr(
-            "modules.groups.core.orchestration.list_groups_for_user",
-            MagicMock(return_value=[test_groups_list[0], test_groups_list[1]]),
-        )
-
-        # ACT
-        result = service.list_groups(request)
-
-        # ASSERT
-        assert len(result) == 2
-
-
 # ============================================================================
 # TestBulkOperationsService: bulk_operations workflow integration tests
 # ============================================================================

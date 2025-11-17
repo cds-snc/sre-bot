@@ -12,6 +12,8 @@ Scenarios covered:
  - Early exit when primary write operation fails (no propagation)
 """
 
+# pylint: disable=missing-function-docstring,missing-class-docstring,private-method-access
+
 from typing import Any, Dict, List
 
 import pytest
@@ -317,53 +319,3 @@ def test_format_orchestration_response_optional_fields(monkeypatch, providers):
     assert response["propagation"]["aws"]["error_code"] == "P1"
     assert response["group_id"] == "group-primary@example.com"
     assert response["member_email"] == "user@example.com"
-
-
-@pytest.mark.unit
-def test_list_groups_for_user_success(monkeypatch, providers):
-    _patch_provider_functions(monkeypatch, providers)
-    groups = orchestration.list_groups_for_user("alice@example.com")
-    assert len(groups) == 2
-    assert groups[0].name == "group-one"
-
-
-@pytest.mark.unit
-def test_list_groups_for_user_failure(monkeypatch, providers):
-    # Patch primary provider list_groups_for_user to return error
-    def fail_impl(user_key: str, provider_name, **kwargs):
-        return OperationResult.transient_error("list failed")
-
-    providers["primary"]._list_groups_for_user_impl = fail_impl  # type: ignore
-    _patch_provider_functions(monkeypatch, providers)
-    groups = orchestration.list_groups_for_user("alice@example.com")
-    assert groups == []
-
-
-@pytest.mark.unit
-def test_list_groups_for_user_malformed(monkeypatch, providers):
-    def malformed_impl(user_key: str, provider_name, **kwargs):
-        return OperationResult.success(data=None)  # data None triggers empty
-
-    providers["primary"]._list_groups_for_user_impl = malformed_impl  # type: ignore
-    _patch_provider_functions(monkeypatch, providers)
-    groups = orchestration.list_groups_for_user("alice@example.com")
-    assert groups == []
-
-
-@pytest.mark.unit
-def test_list_groups_managed_by_user_success(monkeypatch, providers):
-    _patch_provider_functions(monkeypatch, providers)
-    groups = orchestration.list_groups_managed_by_user("alice@example.com")
-    assert len(groups) == 1
-    assert groups[0].name == "managed-one"
-
-
-@pytest.mark.unit
-def test_list_groups_managed_by_user_failure(monkeypatch, providers):
-    def fail_impl(user_key: str, provider_name, **kwargs):
-        return OperationResult.permanent_error("managed list failed")
-
-    providers["primary"]._list_groups_managed_by_user_impl = fail_impl  # type: ignore
-    _patch_provider_functions(monkeypatch, providers)
-    groups = orchestration.list_groups_managed_by_user("alice@example.com")
-    assert groups == []
