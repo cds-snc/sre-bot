@@ -538,7 +538,8 @@ class TestListGroupsWithMembers:
 
         # Filter for AWS groups only
         filters = [lambda g: g["email"].startswith("aws-")]
-        result = gdn.list_groups_with_members(groups_filters=filters)
+        request = gdn.ListGroupsWithMembersRequest(groups_filters=filters)
+        result = gdn.list_groups_with_members(request=request)
         assert isinstance(result, IntegrationResponse)
         if result.success:
             validated = [GroupWithMembers.model_validate(g) for g in result.data]

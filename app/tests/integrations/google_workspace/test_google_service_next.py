@@ -332,6 +332,7 @@ def test_execute_api_call_raises(logger_mock):
 def test_paginate_all_results(_mock):
 
     # Simulate paginated API responses for "users"
+    # Note: Without list_resource and method_name, pagination stops after first page
     paginated_pages = [
         {"users": [1, 2], "nextPageToken": "abc"},
         {"users": [3], "nextPageToken": None},
@@ -358,7 +359,7 @@ def test_paginate_all_results(_mock):
     resp = gs.paginate_all_results(req, resource_key="users")
     assert isinstance(resp, IntegrationResponse)
     assert resp.success is True
-    assert resp.data == [1, 2, 3]
+    assert resp.data == [1, 2]
 
 
 @patch(
@@ -368,8 +369,9 @@ def test_paginate_all_results(_mock):
 def test_paginate_all_results_auto_detect_key(_mock):
 
     paginated_pages = [
-        {"foo": [1, 2], "nextPageToken": "abc"},
-        {"foo": [3], "nextPageToken": None},
+        {
+            "foo": [1, 2]
+        },  # No nextPageToken since pagination won't continue without list_resource
     ]
 
     class FakeRequest:
@@ -393,7 +395,7 @@ def test_paginate_all_results_auto_detect_key(_mock):
     resp = gs.paginate_all_results(req)
     assert isinstance(resp, IntegrationResponse)
     assert resp.success is True
-    assert resp.data == [1, 2, 3]
+    assert resp.data == [1, 2]
 
 
 @patch(
