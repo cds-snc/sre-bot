@@ -1,6 +1,6 @@
 """Tests for recreate_missing_resources functionality."""
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import pytest
 from modules.incident import core
 
