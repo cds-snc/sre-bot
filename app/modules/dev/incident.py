@@ -4,7 +4,7 @@ from modules.incident import incident_folder, incident_conversation, db_operatio
 
 from core.config import settings
 
-INCIDENT_LIST = settings.google_workspace.INCIDENT_LIST
+INCIDENT_LIST = settings.google_resources.incident_list_id
 
 
 def list_incidents(ack, logger, respond, client: WebClient, body):

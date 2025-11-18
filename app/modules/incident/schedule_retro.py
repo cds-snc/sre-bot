@@ -14,7 +14,7 @@ from modules.incident import incident_conversation
 from core.logging import get_module_logger
 from core.config import settings
 
-CALENDAR_ID = settings.google_workspace.GOOGLE_SRE_CALENDAR_ID
+CALENDAR_ID = settings.google_resources.sre_calendar_id
 
 logger = get_module_logger()
 

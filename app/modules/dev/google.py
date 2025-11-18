@@ -11,11 +11,9 @@ from integrations.google_workspace import (
 )
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
-GOOGLE_SRE_CALENDAR_ID = settings.google_workspace.GOOGLE_SRE_CALENDAR_ID
+GOOGLE_SRE_CALENDAR_ID = settings.google_resources.sre_calendar_id
 SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
-SRE_DRIVE_ID = settings.google_workspace.SRE_DRIVE_ID
-SRE_INCIDENT_FOLDER = settings.google_workspace.SRE_INCIDENT_FOLDER
-INCIDENT_TEMPLATE = settings.google_workspace.INCIDENT_TEMPLATE
+INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
 logger = get_module_logger()
 
 
