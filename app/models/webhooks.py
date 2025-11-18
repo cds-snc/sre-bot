@@ -58,5 +58,15 @@ class AccessRequest(BaseModel):
     endDate: datetime
 
 
-class UpptimePayload(BaseModel):
-    text: str | None = None
+class SimpleTextPayload(BaseModel):
+    text: str
+
+
+class WebhookResult(BaseModel):
+    status: str
+    action: str | None = None
+    payload: WebhookPayload | None = None
+    message: str | None = None
+
+    class Config:
+        extra = "forbid"

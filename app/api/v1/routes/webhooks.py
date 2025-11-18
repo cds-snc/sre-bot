@@ -1,15 +1,16 @@
-import requests  # type: ignore
 import json
-from fastapi import APIRouter, Request, HTTPException
-from models.webhooks import AwsSnsPayload, WebhookPayload
-from core.logging import get_module_logger
+from typing import Union, Dict, Any
+
 from api.dependencies.rate_limits import get_limiter
+from core.logging import get_module_logger
+from fastapi import APIRouter, HTTPException, Request, Body
 from integrations.sentinel import log_to_sentinel
-from modules.slack import webhooks
-from server.event_handlers import aws
-from server.utils import (
-    log_ops_message,
+from models.webhooks import (
+    WebhookPayload,
 )
+from modules.slack import webhooks
+from modules.webhooks.base import handle_webhook_payload
+from modules.webhooks.slack import map_emails_to_slack_users
 
 
 logger = get_module_logger()
@@ -17,156 +18,91 @@ router = APIRouter(tags=["Access"])
 limiter = get_limiter()
 
 
-@router.post("/hook/{id}")
+@router.post("/hook/{webhook_id}")
 @limiter.limit(
     "30/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
 def handle_webhook(
-    id: str,
-    payload: WebhookPayload | str,
+    webhook_id: str,
     request: Request,
+    payload: Union[Dict[Any, Any], str] = Body(...),
 ):
-    webhook = webhooks.get_webhook(id)
-    webhook_payload = WebhookPayload()
-    if webhook:
-        hook_type: str = webhook.get("hook_type", {"S": "alert"})["S"]
-        # if the webhook is active, then send forward the response to the webhook
-        if webhooks.is_active(id):
-            webhooks.increment_invocation_count(id)
-            if isinstance(payload, str):
-                processed_payload = handle_string_payload(payload, request)
-                if isinstance(processed_payload, dict):
-                    return processed_payload
-                else:
-                    logger.info(
-                        "payload_processed",
-                        payload=processed_payload,
-                        webhook_id=id,
-                    )
-                    webhook_payload = processed_payload
-            else:
-                webhook_payload = payload
-            webhook_payload.channel = webhook["channel"]["S"]
-            if hook_type == "alert":
-                webhook_payload = append_incident_buttons(webhook_payload, id)
-            try:
-                webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
-                request.state.bot.client.api_call(
-                    "chat.postMessage", json=webhook_payload_parsed
-                )
-                log_to_sentinel(
-                    "webhook_sent",
-                    {"webhook": webhook, "payload": webhook_payload_parsed},
-                )
-                return {"ok": True}
-            except Exception as e:
-                logger.exception(
-                    "webhook_posting_error",
-                    webhook_id=id,
-                    webhook_payload=webhook_payload,
-                    error=str(e),
-                )
-                body = webhook_payload.model_dump(exclude_none=True)
-                log_ops_message(
-                    request.state.bot.client, f"Error posting message: ```{body}```"
-                )
-                raise HTTPException(
-                    status_code=500, detail="Failed to send message"
-                ) from e
-        else:
-            logger.info(
-                "webhook_not_active",
-                webhook_id=id,
-                webhook_payload=webhook_payload,
-                error="Webhook is not active",
-            )
-            raise HTTPException(status_code=404, detail="Webhook not active")
+    """Handle incoming webhook requests and post to Slack channel.
+
+    Args:
+        webhook_id (str): The ID of the webhook to handle.
+        request (Request): The incoming HTTP request.
+        payload (Union[Dict[Any, Any], str]): The incoming webhook payload, either as
+            a JSON string or a dictionary.
+
+    Raises:
+        HTTPException: If the webhook is not found, not active, or if there are issues
+            with payload validation or posting to Slack.
+    Returns:
+        dict: A dictionary indicating success if the message was posted successfully.
+    """
+    if isinstance(payload, dict):
+        payload_dict = payload
     else:
+        try:
+            payload_dict = json.loads(payload)
+        except json.JSONDecodeError as e:
+            logger.error("payload_validation_error", error=str(e), payload=str(payload))
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    webhook = webhooks.get_webhook(webhook_id)
+    if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
+    if not webhook.get("active", {}).get("BOOL", False):
+        logger.info(
+            "webhook_not_active",
+            webhook_id=webhook_id,
+            error="Webhook is not active",
+        )
+        raise HTTPException(status_code=404, detail="Webhook not active")
+    webhooks.increment_invocation_count(webhook_id)
 
-def handle_string_payload(
-    payload: str,
-    request: Request,
-) -> WebhookPayload | dict:
+    webhook_result = handle_webhook_payload(payload_dict, request)
 
-    string_payload_type, validated_payload = webhooks.validate_string_payload_type(
-        payload
-    )
-    logger.info(
-        "string_payload_type",
-        payload=payload,
-        string_payload_type=string_payload_type,
-        validated_payload=validated_payload,
-    )
-    match string_payload_type:
-        case "WebhookPayload":
-            webhook_payload = WebhookPayload(**validated_payload)
-        case "AwsSnsPayload":
-            awsSnsPayload = aws.validate_sns_payload(
-                AwsSnsPayload(**validated_payload),
-                request.state.bot.client,
+    if webhook_result.status == "error":
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    if webhook_result.action == "post" and isinstance(
+        webhook_result.payload, WebhookPayload
+    ):
+        webhook_payload = webhook_result.payload
+        webhook_payload = map_emails_to_slack_users(webhook_payload)
+        webhook_payload.channel = webhook["channel"]["S"]
+        hook_type = webhook.get("hook_type", {}).get(
+            "S", "alert"
+        )  # Default to "alert" if hook_type is missing
+        if hook_type == "alert":
+            webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
+
+        webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
+
+        try:
+            request.state.bot.client.api_call(
+                "chat.postMessage", json=webhook_payload_parsed
             )
-            if awsSnsPayload.Type == "SubscriptionConfirmation":
-                requests.get(awsSnsPayload.SubscribeURL, timeout=60)
-                logger.info(
-                    "subscribed_webhook_to_topic",
-                    webhook_id=awsSnsPayload.TopicArn,
-                    subscribed_topic=awsSnsPayload.TopicArn,
-                )
-                log_ops_message(
-                    request.state.bot.client,
-                    f"Subscribed webhook {id} to topic {awsSnsPayload.TopicArn}",
-                )
-                return {"ok": True}
-            if awsSnsPayload.Type == "UnsubscribeConfirmation":
-                log_ops_message(
-                    request.state.bot.client,
-                    f"{awsSnsPayload.TopicArn} unsubscribed from webhook {id}",
-                )
-                return {"ok": True}
-            if awsSnsPayload.Type == "Notification":
-                blocks = aws.parse(awsSnsPayload, request.state.bot.client)
-                # if we have an empty message, log that we have an empty
-                # message and return without posting to slack
-                if not blocks:
-                    logger.info(
-                        "payload_empty_message",
-                    )
-                    return {"ok": True}
-                webhook_payload = WebhookPayload(blocks=blocks)
-        case "AccessRequest":
-            # Temporary fix for the Access Request payloads
-            message = json.dumps(validated_payload)
-            webhook_payload = WebhookPayload(text=message)
-        case "UpptimePayload":
-            # Temporary fix for Upptime payloads
-            text = validated_payload.get("text", "")
-            header_text = "📈 Web Application Status Changed!"
-            blocks = [
-                {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
-                {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": f"{header_text}"},
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"{text}",
-                    },
-                },
-            ]
-            webhook_payload = WebhookPayload(blocks=blocks)
-        case _:
-            raise HTTPException(
-                status_code=500,
-                detail="Invalid payload type. Must be a WebhookPayload object or a recognized string payload type.",
+            log_to_sentinel(
+                "webhook_sent",
+                {"webhook": webhook, "payload": webhook_payload_parsed},
             )
-    return WebhookPayload(**webhook_payload.model_dump(exclude_none=True))
+
+        except Exception as e:
+            logger.exception(
+                "webhook_posting_error",
+                webhook_id=webhook_id,
+                error=str(e),
+            )
+            raise HTTPException(status_code=500, detail="Failed to send message") from e
+
+    return {"ok": True}
 
 
-def append_incident_buttons(payload: WebhookPayload, webhook_id):
+def append_incident_buttons(payload: WebhookPayload, webhook_id) -> WebhookPayload:
     if payload.attachments is None:
         payload.attachments = []
     elif isinstance(payload.attachments, str):

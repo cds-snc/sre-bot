@@ -32,3 +32,19 @@ class Incident(BaseModel):
 
     class Config:  # noqa
         extra = "forbid"
+
+
+class IncidentPayload(BaseModel):
+    """IncidentPayload represents the payload received from the Slack modal."""
+
+    name: str
+    folder: str
+    product: str
+    security_incident: str
+    user_id: str
+    channel_id: str
+    channel_name: str
+    slug: str
+
+    class Config:  # noqa
+        extra = "forbid"

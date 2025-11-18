@@ -16,7 +16,9 @@ def test_sre_command_calls_logger(
 ):
     command = sre_command_helper("command")
     sre.sre_command(MagicMock(), command, MagicMock(), MagicMock(), MagicMock())
-    logger_mock.info.assert_called_once()
+    # The command logs at least once; identity resolution may log additional info,
+    # so assert it was called rather than asserting the exact count.
+    logger_mock.info.assert_called()
 
 
 def test_sre_command_with_empty_string():

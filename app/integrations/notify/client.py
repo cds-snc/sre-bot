@@ -98,6 +98,10 @@ def post_event(url, payload):
 def revoke_api_key(api_key, api_type, github_repo, source):
     """Function to revoke an api key by calling Notify's revoke api endpoint"""
     # get the url and jwt_token
+
+    if not settings.is_production:
+        logger.info("revoke_api_key_skipped", api_key=api_key)
+        return False
     url = NOTIFY_API_URL
 
     if url is None:

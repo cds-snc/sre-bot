@@ -291,3 +291,215 @@ def test_get_user_email_from_handle(mock_get_all_users):
         == "user_email2@test.com"
     )
     assert users.get_user_email_from_handle(client, "@unknown_name") is None
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_success(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_client.users_lookupByEmail.return_value = {"user": {"id": "U12345"}}
+
+    text = "Please contact john.doe@example.com for more information."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "Please contact <@U12345> for more information."
+    mock_client.users_lookupByEmail.assert_called_once_with(
+        email="john.doe@example.com"
+    )
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_multiple_emails(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+
+    def mock_lookup_by_email(email):
+        if email == "john.doe@example.com":
+            return {"user": {"id": "U12345"}}
+        elif email == "jane.smith@example.com":
+            return {"user": {"id": "U67890"}}
+        return None
+
+    mock_client.users_lookupByEmail.side_effect = mock_lookup_by_email
+
+    text = "Contact john.doe@example.com or jane.smith@example.com for help."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "Contact <@U12345> or <@U67890> for help."
+    assert mock_client.users_lookupByEmail.call_count == 2
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_no_user_found(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_client.users_lookupByEmail.return_value = None
+
+    text = "Please contact unknown@example.com for more information."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "Please contact unknown@example.com for more information."
+    mock_client.users_lookupByEmail.assert_called_once_with(email="unknown@example.com")
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_no_user_id(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_client.users_lookupByEmail.return_value = {"user": {}}
+
+    text = "Please contact john.doe@example.com for more information."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "Please contact john.doe@example.com for more information."
+    mock_client.users_lookupByEmail.assert_called_once_with(
+        email="john.doe@example.com"
+    )
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_no_client(mock_slack_client_manager):
+    mock_slack_client_manager.get_client.return_value = None
+
+    text = "Please contact john.doe@example.com for more information."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "Please contact john.doe@example.com for more information."
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_no_emails(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+
+    text = "This text has no email addresses in it."
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == "This text has no email addresses in it."
+    mock_client.users_lookupByEmail.assert_not_called()
+
+
+@patch("integrations.slack.users.SlackClientManager")
+def test_replace_users_emails_with_mention_empty_text(mock_slack_client_manager):
+    mock_client = MagicMock()
+    mock_slack_client_manager.get_client.return_value = mock_client
+
+    text = ""
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == ""
+    mock_client.users_lookupByEmail.assert_not_called()
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_string_value(mock_replace_function):
+    mock_replace_function.return_value = "replaced text"
+
+    data = "john.doe@example.com"
+    result = users.replace_users_emails_in_dict(data)
+
+    assert result == "replaced text"
+    mock_replace_function.assert_called_once_with("john.doe@example.com")
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_simple_dict(mock_replace_function):
+    mock_replace_function.side_effect = lambda x: x.replace(
+        "john.doe@example.com", "<@U12345>"
+    )
+
+    data = {"message": "Contact john.doe@example.com", "title": "Important"}
+    result = users.replace_users_emails_in_dict(data)
+
+    expected = {"message": "Contact <@U12345>", "title": "Important"}
+    assert result == expected
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_nested_dict(mock_replace_function):
+    mock_replace_function.side_effect = lambda x: (
+        x.replace("jane@example.com", "<@U67890>") if "jane@example.com" in x else x
+    )
+
+    data = {
+        "user": {"contact": "jane@example.com", "name": "Jane"},
+        "metadata": {"created_by": "system"},
+    }
+    result = users.replace_users_emails_in_dict(data)
+
+    expected = {
+        "user": {"contact": "<@U67890>", "name": "Jane"},
+        "metadata": {"created_by": "system"},
+    }
+    assert result == expected
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_list_of_strings(mock_replace_function):
+    mock_replace_function.side_effect = lambda x: (
+        x.replace("test@example.com", "<@U11111>") if "test@example.com" in x else x
+    )
+
+    data = ["Contact test@example.com", "No email here", "Another message"]
+    result = users.replace_users_emails_in_dict(data)
+
+    expected = ["Contact <@U11111>", "No email here", "Another message"]
+    assert result == expected
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_list_of_dicts(mock_replace_function):
+    mock_replace_function.side_effect = lambda x: (
+        x.replace("admin@example.com", "<@U22222>") if "admin@example.com" in x else x
+    )
+
+    data = [
+        {"message": "Contact admin@example.com", "priority": "high"},
+        {"message": "No email", "priority": "low"},
+    ]
+    result = users.replace_users_emails_in_dict(data)
+
+    expected = [
+        {"message": "Contact <@U22222>", "priority": "high"},
+        {"message": "No email", "priority": "low"},
+    ]
+    assert result == expected
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_mixed_types(mock_replace_function):
+    def mock_replacement(x):
+        if "user@example.com" in x:
+            return x.replace("user@example.com", "<@U33333>")
+        return x
+
+    mock_replace_function.side_effect = mock_replacement
+
+    data = {
+        "text": "Contact user@example.com",
+        "number": 42,
+        "boolean": True,
+        "null_value": None,
+        "list": ["user@example.com", 123, False],
+    }
+    result = users.replace_users_emails_in_dict(data)
+
+    expected = {
+        "text": "Contact <@U33333>",
+        "number": 42,
+        "boolean": True,
+        "null_value": None,
+        "list": ["<@U33333>", 123, False],
+    }
+    assert result == expected
+
+
+@patch("integrations.slack.users.replace_users_emails_with_mention")
+def test_replace_users_emails_in_dict_non_string_non_dict_non_list(
+    mock_replace_function,
+):
+    data = 42
+    result = users.replace_users_emails_in_dict(data)
+
+    assert result == 42
+    mock_replace_function.assert_not_called()

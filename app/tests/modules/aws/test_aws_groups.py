@@ -63,6 +63,20 @@ def test_aws_groups_command_handles_list_command(mock_request_groups_list):
     logger.info.assert_not_called()
 
 
+@patch("modules.aws.groups.request_groups_ops")
+def test_aws_groups_command_handles_ops_command(mock_request_groups_ops):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = ["ops"]
+    logger = MagicMock()
+
+    groups.command_handler(client, body, respond, args, logger)
+
+    mock_request_groups_ops.assert_called_once_with(client, body, respond, args, logger)
+    logger.info.assert_not_called()
+
+
 @patch("modules.aws.groups.datetime")
 @patch("modules.aws.groups.slack_users")
 @patch("modules.aws.groups.permissions")
@@ -269,3 +283,139 @@ def test_request_groups_list_handles_user_without_permission(
 
     logger.info.assert_called_once()
     logger.warning.assert_called_once()
+
+
+@patch("modules.aws.groups.ops_group_assignment")
+@patch("modules.aws.groups.slack_users")
+@patch("modules.aws.groups.permissions")
+def test_request_groups_ops_handles_user_with_permission(
+    mock_permissions, mock_slack_users, mock_ops_group_assignment
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = []
+    logger = MagicMock()
+
+    mock_slack_users.get_user_email_from_body.return_value = "authorized.user@test.com"
+    mock_permissions.is_user_member_of_groups.return_value = True
+    mock_ops_group_assignment.execute.return_value = {
+        "status": "success",
+        "message": "Ops group assigned to account 123456789012.",
+    }
+    groups.request_groups_ops(client, body, respond, args, logger)
+    mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
+    mock_permissions.is_user_member_of_groups.assert_called_once_with(
+        "authorized.user@test.com", groups.AWS_ADMIN_GROUPS
+    )
+    respond_calls = [
+        call("AWS Ops Group Assignment request received."),
+        call("✅ *Success*: Ops group assigned to account 123456789012."),
+    ]
+    respond.assert_has_calls(respond_calls)
+    logger.info.assert_called()
+    logger.warning.assert_not_called()
+    mock_ops_group_assignment.execute.assert_called_once()
+
+
+@patch("modules.aws.groups.ops_group_assignment")
+@patch("modules.aws.groups.slack_users")
+@patch("modules.aws.groups.permissions")
+def test_request_groups_ops_handles_disabled_feature(
+    mock_permissions, mock_slack_users, mock_ops_group_assignment
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = []
+    logger = MagicMock()
+
+    mock_slack_users.get_user_email_from_body.return_value = "authorized.user@test.com"
+    mock_permissions.is_user_member_of_groups.return_value = True
+    mock_ops_group_assignment.execute.return_value = None
+    groups.request_groups_ops(client, body, respond, args, logger)
+    mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
+    mock_permissions.is_user_member_of_groups.assert_called_once_with(
+        "authorized.user@test.com", groups.AWS_ADMIN_GROUPS
+    )
+    mock_ops_group_assignment.execute.assert_called_once()
+    respond_calls = [
+        call("AWS Ops Group Assignment request received."),
+        call("⚠️ AWS Ops Group Assignment feature is disabled."),
+    ]
+    respond.assert_has_calls(respond_calls)
+    logger.info.assert_called()
+    logger.warning.assert_not_called()
+
+
+@patch("modules.aws.groups.ops_group_assignment")
+@patch("modules.aws.groups.slack_users")
+@patch("modules.aws.groups.permissions")
+def test_request_groups_ops_handles_status_messages(
+    mock_permissions, mock_slack_users, mock_ops_group_assignment
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = []
+    logger = MagicMock()
+
+    statuses = [
+        (
+            "success",
+            "Operation completed successfully.",
+            "✅ *Success*: Operation completed successfully.",
+        ),
+        (
+            "failed",
+            "Operation failed due to an error.",
+            "❌ *Error*: Operation failed due to an error.",
+        ),
+        ("ok", "No changes were necessary.", "ℹ️ *Info*: No changes were necessary."),
+        ("unknown", "This is an unknown status.", "⚠️ This is an unknown status."),
+    ]
+
+    for status, message, expected_response in statuses:
+        mock_slack_users.get_user_email_from_body.return_value = (
+            "authorized.user@test.com"
+        )
+        mock_permissions.is_user_member_of_groups.return_value = True
+        mock_ops_group_assignment.execute.return_value = {
+            "status": status,
+            "message": message,
+        }
+        respond.reset_mock()
+        groups.request_groups_ops(client, body, respond, args, logger)
+        respond_calls = [
+            call("AWS Ops Group Assignment request received."),
+            call(expected_response),
+        ]
+        respond.assert_has_calls(respond_calls)
+        respond.reset_mock()
+
+
+@patch("modules.aws.groups.ops_group_assignment")
+@patch("modules.aws.groups.slack_users")
+@patch("modules.aws.groups.permissions")
+def test_request_groups_ops_handles_user_without_permission(
+    mock_permissions, mock_slack_users, mock_ops_group_assignment
+):
+    client = MagicMock()
+    body = MagicMock()
+    respond = MagicMock()
+    args = []
+    logger = MagicMock()
+
+    mock_slack_users.get_user_email_from_body.return_value = (
+        "unauthorized.user@test.com"
+    )
+    mock_permissions.is_user_member_of_groups.return_value = False
+    groups.request_groups_ops(client, body, respond, args, logger)
+    mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
+    mock_permissions.is_user_member_of_groups.assert_called_once_with(
+        "unauthorized.user@test.com", groups.AWS_ADMIN_GROUPS
+    )
+    respond.assert_called_once_with("You do not have permission to assign Ops group.")
+    logger.info.assert_called_once()
+    logger.warning.assert_called_once()
+    mock_ops_group_assignment.execute.assert_not_called()

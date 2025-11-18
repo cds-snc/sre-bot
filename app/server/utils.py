@@ -18,13 +18,6 @@ logger = get_module_logger()
 oauth2_scheme = HTTPBearer(auto_error=False)
 
 
-def log_ops_message(client, message):
-    channel_id = "C0388M21LKZ"
-    logger.info("ops_message_logged", message=message)
-    client.conversations_join(channel=channel_id)
-    client.chat_postMessage(channel=channel_id, text=message, as_user=True)
-
-
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """
     Generates a JSON Web Token (JWT) for authentication purposes.

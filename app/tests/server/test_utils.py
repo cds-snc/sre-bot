@@ -30,15 +30,6 @@ def mock_datetime():
         yield mocked_datetime
 
 
-def test_log_ops_message():
-    client = MagicMock()
-    msg = "foo bar baz"
-    utils.log_ops_message(client, msg)
-    client.chat_postMessage.assert_called_with(
-        channel="C0388M21LKZ", text=msg, as_user=True
-    )
-
-
 def test_get_user_locale_supported_locale():
     client = MagicMock()
     user_id = MagicMock()

@@ -4,6 +4,7 @@ metadata:
   name: sre-bot
   annotations:
     github.com/project-slug: cds-snc/sre-bot
+    backstage.io/code-coverage: enabled
 spec:
   type: website
   lifecycle: production

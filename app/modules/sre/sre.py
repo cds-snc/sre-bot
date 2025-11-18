@@ -10,6 +10,8 @@ from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
 from modules.dev import core as dev_core
 from modules.reports import core as reports
+
+from modules.groups import handle_groups_command
 from integrations.slack import commands as slack_commands
 from core.config import settings
 from core.logging import get_module_logger
@@ -80,6 +82,8 @@ def sre_command(
             incident_helper.handle_incident_command(args, client, body, respond, ack)
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
+        case "groups":
+            handle_groups_command(client, body, respond, ack, args)
         case "test":
             dev_core.dev_command(ack, respond, client, body, args)
         case "version":

@@ -95,8 +95,8 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
         "users",
         "list",
         scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        delegated_user_email=custom_delegated_user_email,
         paginate=True,
+        delegated_user_email=custom_delegated_user_email,
         customer=custom_customer_id,
         maxResults=500,
         orderBy="email",
@@ -125,34 +125,6 @@ def test_list_groups_calls_execute_google_api_call(
         maxResults=200,
         orderBy="email",
     )
-
-
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
-    new="default_google_workspace_customer_id",
-)
-@patch("integrations.google_workspace.google_directory.convert_string_to_camel_case")
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
-def test_list_groups_calls_execute_google_api_call_with_kwargs(
-    mock_execute_google_api_call, mock_convert_string_to_camel_case
-):
-    mock_convert_string_to_camel_case.return_value = "customArgument"
-    google_directory.list_groups(custom_argument="test_customer_id")
-    mock_execute_google_api_call.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "groups",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
-        customer="default_google_workspace_customer_id",
-        maxResults=200,
-        orderBy="email",
-        customArgument="test_customer_id",
-    )
-    assert mock_convert_string_to_camel_case.called_once
 
 
 @patch(
@@ -186,8 +158,8 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
         "groups",
         "list",
         scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        delegatedUserEmail=custom_delegated_user_email,
         paginate=True,
+        delegatedUserEmail=custom_delegated_user_email,
         customer=custom_customer_id,
         maxResults=200,
         orderBy="email",

@@ -7,8 +7,13 @@ from datetime import datetime
 from pydantic import BaseModel
 from boto3.dynamodb.types import TypeDeserializer
 
-from models import model_utils
-from models.webhooks import WebhookPayload, AwsSnsPayload, AccessRequest, UpptimePayload
+from utils import models as model_utils
+from models.webhooks import (
+    WebhookPayload,
+    AwsSnsPayload,
+    AccessRequest,
+    SimpleTextPayload,
+)
 from integrations.aws import dynamodb
 from core.logging import get_module_logger
 
@@ -152,7 +157,7 @@ def validate_string_payload_type(payload: str) -> tuple:
     known_models: List[Type[BaseModel]] = [
         AwsSnsPayload,
         AccessRequest,
-        UpptimePayload,
+        SimpleTextPayload,
         WebhookPayload,
     ]
     model_params = model_utils.get_dict_of_parameters_from_models(known_models)

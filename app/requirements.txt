@@ -14,7 +14,7 @@ google-api-core==2.25.1
 google-auth==2.40.3
 httpx==0.28.1
 itsdangerous==2.2.0
-pandas==2.3.2
+pandas==2.3.3
 pydantic-settings==2.10.1
 PyJWT==2.10.1
 PyYAML!=6.0.0,!=5.4.0,!=5.4.1
@@ -29,3 +29,4 @@ slack-bolt==1.24.0
 structlog==25.4.0
 trello==0.9.7.3
 uvicorn==0.35.0
+email-validator==2.3.0

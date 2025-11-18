@@ -907,7 +907,7 @@ def test_sync_groups_with_matching_groups_defaults(
     mock_identity_store,
     mock_entities,
     mock_filters,
-    aws_groups_w_users,
+    aws_groups_w_users_with_legacy,
     aws_users,
     google_groups_w_users,
     provision_entities_side_effect_fixture,
@@ -921,7 +921,7 @@ def test_sync_groups_with_matching_groups_defaults(
     source_groups_formatted = format_source_groups_fixture(source_groups)
     mock_filters.preformat_items.return_value = source_groups_formatted
 
-    target_groups = aws_groups_w_users(3, 6)
+    target_groups = aws_groups_w_users_with_legacy(3, 6)
     target_groups.sort(key=lambda x: x["DisplayName"])
 
     # first time compare list is called returns formatted source groups and target groups
@@ -979,7 +979,7 @@ def test_sync_groups_with_matching_groups_delete_enable(
     mock_identity_store,
     mock_entities,
     mock_filters,
-    aws_groups_w_users,
+    aws_groups_w_users_with_legacy,
     aws_users,
     google_groups_w_users,
     provision_entities_side_effect_fixture,
@@ -993,7 +993,7 @@ def test_sync_groups_with_matching_groups_delete_enable(
     source_groups_formatted = format_source_groups_fixture(source_groups)
     mock_filters.preformat_items.return_value = source_groups_formatted
 
-    target_groups = aws_groups_w_users(3, 6)
+    target_groups = aws_groups_w_users_with_legacy(3, 6)
     target_groups.sort(key=lambda x: x["DisplayName"])
 
     # first time compare list is called returns formatted source groups and target groups
