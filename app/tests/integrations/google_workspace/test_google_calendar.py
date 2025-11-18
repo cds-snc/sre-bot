@@ -737,7 +737,8 @@ def test_get_federal_holidays_server_error(requests_mock):
     current_year = datetime.now().year
 
     # Mock a 500 server error response
-    requests_mock.get(
+    # Bandit skip security check for the requests_mock.get call
+    requests_mock.get(  # nosec
         f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={current_year}",
         status_code=500,
         text="Internal Server Error",
