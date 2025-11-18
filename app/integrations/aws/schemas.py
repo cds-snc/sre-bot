@@ -3,90 +3,91 @@ from pydantic import BaseModel
 
 
 class ExternalId(BaseModel):
-    Issuer: Optional[str]
-    Id: Optional[str]
+    Issuer: Optional[str] = None
+    Id: Optional[str] = None
 
 
 class Group(BaseModel):
-    GroupId: Optional[str]
-    DisplayName: Optional[str]
-    ExternalIds: Optional[List[ExternalId]] = []
-    Description: Optional[str]
-    IdentityStoreId: Optional[str]
+    GroupId: Optional[str] = None
+    DisplayName: Optional[str] = None
+    Description: Optional[str] = None
+    IdentityStoreId: Optional[str] = None
+    ExternalIds: Optional[List[ExternalId]] = None
 
 
 class GroupsListResponse(BaseModel):
     Groups: List[Group] = []
-    NextToken: Optional[str]
+    NextToken: Optional[str] = None
 
 
-class Name(BaseModel):
-    Formatted: Optional[str]
-    FamilyName: Optional[str]
-    GivenName: Optional[str]
-    MiddleName: Optional[str]
-    HonorificPrefix: Optional[str]
-    HonorificSuffix: Optional[str]
+class NameObject(BaseModel):
+    Formatted: Optional[str] = None
+    FamilyName: Optional[str] = None
+    GivenName: Optional[str] = None
+    MiddleName: Optional[str] = None
+    HonorificPrefix: Optional[str] = None
+    HonorificSuffix: Optional[str] = None
 
 
 class Email(BaseModel):
-    Value: Optional[str]
-    Type: Optional[str]
-    Primary: Optional[bool]
+    Value: Optional[str] = None
+    Type: Optional[str] = None
+    Primary: Optional[bool] = None
 
 
 class Address(BaseModel):
-    StreetAddress: Optional[str]
-    Locality: Optional[str]
-    Region: Optional[str]
-    PostalCode: Optional[str]
-    Country: Optional[str]
-    Formatted: Optional[str]
-    Type: Optional[str]
-    Primary: Optional[bool]
+    StreetAddress: Optional[str] = None
+    Locality: Optional[str] = None
+    Region: Optional[str] = None
+    PostalCode: Optional[str] = None
+    Country: Optional[str] = None
+    Formatted: Optional[str] = None
+    Type: Optional[str] = None
+    Primary: Optional[bool] = None
 
 
 class PhoneNumber(BaseModel):
-    Value: Optional[str]
-    Type: Optional[str]
-    Primary: Optional[bool]
+    Value: Optional[str] = None
+    Type: Optional[str] = None
+    Primary: Optional[bool] = None
 
 
 class User(BaseModel):
-    UserName: Optional[str]
-    UserId: Optional[str]
+    UserName: Optional[str] = None
+    UserId: Optional[str] = None
     ExternalIds: Optional[List[ExternalId]] = []
-    Name: Optional[Name]
-    DisplayName: Optional[str]
-    NickName: Optional[str]
-    ProfileUrl: Optional[str]
+    Name: Optional[NameObject] = None
+    DisplayName: Optional[str] = None
+    NickName: Optional[str] = None
+    ProfileUrl: Optional[str] = None
     Emails: Optional[List[Email]] = []
     Addresses: Optional[List[Address]] = []
     PhoneNumbers: Optional[List[PhoneNumber]] = []
-    UserType: Optional[str]
-    Title: Optional[str]
-    PreferredLanguage: Optional[str]
-    Locale: Optional[str]
-    Timezone: Optional[str]
-    IdentityStoreId: Optional[str]
+    UserType: Optional[str] = None
+    Title: Optional[str] = None
+    PreferredLanguage: Optional[str] = None
+    Locale: Optional[str] = None
+    Timezone: Optional[str] = None
+    IdentityStoreId: Optional[str] = None
 
 
 class UsersListResponse(BaseModel):
     Users: List[User] = []
-    NextToken: Optional[str]
+    NextToken: Optional[str] = None
 
 
-class MemberId(BaseModel):
-    UserId: Optional[str]
+class MemberIdObject(BaseModel):
+    UserId: Optional[str] = None
 
 
 class GroupMembership(BaseModel):
-    IdentityStoreId: Optional[str]
-    MembershipId: Optional[str]
-    GroupId: Optional[str]
-    MemberId: Optional[MemberId]
+    IdentityStoreId: Optional[str] = None
+    MembershipId: Optional[str] = None
+    GroupId: Optional[str] = None
+    MemberId: Optional[MemberIdObject] = None
+    UserDetails: Optional[User] = None
 
 
 class GroupMembershipsListResponse(BaseModel):
     GroupMemberships: List[GroupMembership] = []
-    NextToken: Optional[str]
+    NextToken: Optional[str] = None

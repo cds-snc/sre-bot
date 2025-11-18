@@ -1,0 +1,89 @@
+from modules.groups.events import event_system
+from modules.groups.core import service
+from modules.groups.api import schemas
+from modules.groups.providers.contracts import OperationResult
+from modules.groups.domain.models import group_from_dict
+
+
+class SmokeProvider:
+    def get_user_managed_groups(self, user_email):
+        return [{"id": "g-smoke-1", "name": "smoke-group"}]
+
+    def list_groups_for_user(self, user_key: str, provider_name: str, **kwargs):
+        # Return NormalizedGroup instances wrapped in an OperationResult so
+        # orchestration/list_groups_for_user returns dataclasses with .id
+        grp = group_from_dict({"id": "g-smoke-1", "name": "smoke-group"}, provider_name)
+        return OperationResult.success({"groups": [grp]})
+
+    def validate_permissions(self, user_email, group_id, action):
+        return True
+
+    def add_member(self, group_id, member_email, justification):
+        return OperationResult.success({"member": member_email, "status": "added"})
+
+
+def test_smoke_provider_and_event_dispatch(monkeypatch):
+    smoke_provider = SmokeProvider()
+
+    # Patch provider registry used by base (use valid provider key 'aws' so validation passes)
+    monkeypatch.setattr(
+        "modules.groups.providers.get_active_providers",
+        lambda provider_type=None: {"aws": smoke_provider},
+    )
+
+    # Patch get_primary_provider so orchestration will accept our smoke provider
+    monkeypatch.setattr(
+        "modules.groups.orchestration.get_primary_provider", lambda: smoke_provider
+    )
+    monkeypatch.setattr(
+        "modules.groups.orchestration.get_primary_provider_name", lambda: "aws"
+    )
+
+    # Verify service.list_groups returns provider groups
+    list_req = schemas.ListGroupsRequest(user_email="user@example.com")
+    list_res = service.list_groups(list_req)
+    # list_res is a list of NormalizedGroup dataclasses (from provider)
+    assert isinstance(list_res, list)
+    # At least one provider mapping should produce the expected group id when
+    # converted to canonical dicts by callers.
+    assert any(g.id == "g-smoke-1" for g in list_res)
+
+    # Register a temporary event handler to capture add events
+    captured = []
+
+    @event_system.register_event_handler("group.member.added")
+    def _capture(payload):
+        captured.append(payload)
+
+    # Make background dispatch synchronous for test determinism
+    monkeypatch.setattr(
+        event_system,
+        "dispatch_background",
+        lambda event_type, payload: event_system.dispatch_event(event_type, payload),
+    )
+
+    # Call add member API which should dispatch the event using the new
+    # service payload contract (request nested under 'request').
+    request_payload = {
+        "group_id": "arn:aws:iam::123456789012:group/smoke-group",
+        "member_email": "new@example.com",
+        "requestor": "admin@example.com",
+        "provider": "aws",
+        "justification": "smoke test",
+    }
+
+    add_req = schemas.AddMemberRequest(
+        group_id=request_payload["group_id"],
+        member_email=request_payload["member_email"],
+        provider=schemas.ProviderType(request_payload["provider"]),
+        justification=request_payload.get("justification"),
+        requestor=request_payload.get("requestor"),
+    )
+    add_res = service.add_member(add_req)
+    assert hasattr(add_res, "success")
+    # Ensure our handler received the event and it follows the new contract
+    assert len(captured) >= 1
+    received = captured[0]
+    assert isinstance(received, dict)
+    assert "request" in received and isinstance(received["request"], dict)
+    assert received["request"].get("member_email") == "new@example.com"

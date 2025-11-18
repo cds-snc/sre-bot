@@ -1,9 +1,344 @@
+import importlib
+import sys
+import types
+from importlib import util
+from pathlib import Path
+from types import ModuleType
 import pytest
-from tests.factory_helpers import (
+
+# Ensure project root is on path BEFORE importing test factories.
+project_root = "/workspace/app"
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from tests.factories.google import (  # noqa: E402
     make_google_groups,
-    make_google_users,
     make_google_members,
+    make_google_users,
 )
+from tests.factories.aws import (  # noqa: E402
+    make_aws_users,
+    make_aws_groups,
+    make_aws_groups_memberships,
+    make_aws_groups_w_users,
+    make_aws_groups_w_users_with_legacy,
+)
+
+# Ensure the application package root is on sys.path so importing application
+# modules (e.g. `core.config`) works during pytest collection. Pytest may
+# import `conftest` before the project root is on sys.path depending on
+# invocation; add it explicitly here before importing application modules.
+# pylint: disable=wrong-import-position
+import core.config as core_config  # noqa: E402
+
+
+@pytest.fixture
+def safe_providers_import(monkeypatch):
+    """Import `modules.groups.providers` safely for tests.
+
+    This fixture temporarily stubs `importlib.import_module` so that
+    submodule imports under `modules.groups.providers.*` are blocked
+    during the initial import. It also forces `core.config.settings.groups`
+    to be an empty mapping during import so module-level startup
+    validation is skipped. After the import the real import function is
+    restored.
+    """
+    original_import = importlib.import_module
+
+    def _stub_import(name, package=None):
+        if (
+            name.startswith("modules.groups.providers.")
+            and name != "modules.groups.providers"
+        ):
+            raise ImportError("submodule imports stubbed in tests")
+        return original_import(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", _stub_import)
+
+    # Ensure settings.groups includes circuit breaker config and empty providers during import
+    monkeypatch.setattr(
+        core_config.settings,
+        "groups",
+        types.SimpleNamespace(
+            providers={},
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+        ),
+        raising=False,
+    )
+
+    # Force a fresh import. Instead of using the normal import machinery
+    # which would execute `modules/__init__.py` (and by extension
+    # `modules.groups.__init__.py`, which now auto-initializes the
+    # groups module), load the providers package directly from its
+    # file. Create lightweight entries for `modules` and
+    # `modules.groups` in sys.modules so relative/absolute imports
+    # inside the providers package resolve without triggering the
+    # package initializers.
+    sys.modules.pop("modules.groups.providers", None)
+
+    project_root = Path(__file__).resolve().parents[1]
+    providers_init = project_root / "modules" / "groups" / "providers" / "__init__.py"
+
+    # Insert lightweight package modules to avoid executing real package __init__
+    if "modules" not in sys.modules:
+        pkg = ModuleType("modules")
+        pkg.__path__ = [str(project_root / "modules")]
+        sys.modules["modules"] = pkg
+
+    if "modules.groups" not in sys.modules:
+        grp_pkg = ModuleType("modules.groups")
+        grp_pkg.__path__ = [str(project_root / "modules" / "groups")]
+        sys.modules["modules.groups"] = grp_pkg
+
+    spec = util.spec_from_file_location("modules.groups.providers", str(providers_init))
+    mod = util.module_from_spec(spec)
+    # register before executing so imports inside the module can reference it
+    sys.modules["modules.groups.providers"] = mod
+    spec.loader.exec_module(mod)
+
+    # Defer provider registration: replace the real register_provider with
+    # a decorator that stores the decorated objects so tests can import
+    # provider submodules safely without causing instantiation/validation
+    # at import time. Tests can call `mod.register_deferred_providers()` to
+    # perform the real registration later (after setting up `settings`).
+    orig_register = getattr(mod, "register_provider")
+    mod._deferred_registry = {}
+
+    def _deferred_register(name: str):
+        def _decorator(obj):
+            # Attempt immediate registration (tests expect explicit
+            # calls to `register_provider` to register immediately).
+            # Keep a record in the deferred registry for debugging if
+            # needed.
+            mod._deferred_registry[name] = obj
+            try:
+                orig_register(name)(obj)
+            except Exception:
+                # If registration fails, keep the deferred entry and
+                # re-raise so tests see the original error.
+                raise
+            return obj
+
+        return _decorator
+
+    def _apply_deferred_registrations() -> None:
+        """Instantiate and register any previously-decorated providers.
+
+        This should be called by tests after they have configured
+        `core.config.settings.groups.providers` as needed.
+        """
+        # replay deferred registrations using the original register
+        for name, obj in list(mod._deferred_registry.items()):
+            # call the original register_provider to perform real
+            # instantiation/registration and remove from deferred map
+            try:
+                orig_register(name)(obj)
+            finally:
+                mod._deferred_registry.pop(name, None)
+
+    # replace the package-level decorator with the deferred variant
+    monkeypatch.setattr(mod, "register_provider", _deferred_register, raising=True)
+    # expose helper for tests
+    # create the attribute on the module if it doesn't exist
+    monkeypatch.setattr(
+        mod, "register_deferred_providers", _apply_deferred_registrations, raising=False
+    )
+
+    # restore importlib.import_module to avoid affecting other imports
+    monkeypatch.setattr(importlib, "import_module", original_import)
+
+    return mod
+
+
+@pytest.fixture
+def groups_providers(monkeypatch):
+    """Provide a test-controlled `settings.groups.providers` mapping.
+
+    Yields a small namespace with convenience helpers and a mutable
+    `providers` dict that tests can mutate. The original
+    `core.config.settings.groups` is restored after the test.
+    """
+    orig_has = hasattr(core_config.settings, "groups")
+    orig_groups = getattr(core_config.settings, "groups", None)
+
+    providers = {}
+
+    # Ensure settings.groups exists and exposes the providers mapping
+    monkeypatch.setattr(
+        core_config.settings,
+        "groups",
+        types.SimpleNamespace(providers=providers),
+        raising=False,
+    )
+
+    def set_providers(d: dict):
+        # Replace the providers mapping with the provided dict
+        monkeypatch.setattr(core_config.settings.groups, "providers", d, raising=False)
+
+    def clear_providers():
+        providers.clear()
+
+    def remove_groups():
+        # Remove the groups attribute to simulate missing config
+        try:
+            monkeypatch.delattr(core_config.settings, "groups", raising=False)
+        except Exception:
+            # best-effort removal
+            try:
+                delattr(core_config.settings, "groups")
+            except Exception:
+                pass
+
+    helper = types.SimpleNamespace(
+        providers=providers,
+        set_providers=set_providers,
+        clear_providers=clear_providers,
+        remove_groups=remove_groups,
+    )
+
+    try:
+        yield helper
+    finally:
+        # Restore original groups attribute
+        if orig_has:
+            monkeypatch.setattr(
+                core_config.settings, "groups", orig_groups, raising=False
+            )
+        else:
+            try:
+                monkeypatch.delattr(core_config.settings, "groups", raising=False)
+            except Exception:
+                try:
+                    delattr(core_config.settings, "groups")
+                except Exception:
+                    pass
+
+
+@pytest.fixture
+def set_provider_capability(groups_providers):
+    """Return a helper to set the `provides_role_info` capability for a
+    provider in `settings.groups.providers` using the `groups_providers`
+    test helper.
+    """
+
+    def _setter(provider_name: str, provides_role: bool):
+        gp = groups_providers
+        gp.providers.setdefault(provider_name, {})
+        gp.providers[provider_name].setdefault("capabilities", {})
+        gp.providers[provider_name]["capabilities"][
+            "provides_role_info"
+        ] = provides_role
+
+    return _setter
+
+
+@pytest.fixture
+def mock_provider_config():
+    """Factory for creating provider configuration dictionaries.
+
+    Returns a function that generates provider config dicts with
+    sensible defaults for testing configuration-driven activation.
+
+    Usage:
+        config = mock_provider_config(
+            provider_name="google",
+            enabled=True,
+            primary=True,
+            prefix="g",
+            capabilities={"supports_member_management": True}
+        )
+    """
+
+    def _factory(
+        provider_name: str,
+        enabled: bool = True,
+        primary: bool = False,
+        prefix: str = None,
+        capabilities: dict = None,
+    ) -> dict:
+        config = {"enabled": enabled}
+
+        if primary:
+            config["primary"] = True
+
+        if prefix:
+            config["prefix"] = prefix
+
+        if capabilities:
+            config["capabilities"] = capabilities
+
+        return {provider_name: config}
+
+    return _factory
+
+
+@pytest.fixture
+def single_provider_config(mock_provider_config):
+    """Provider configuration with single enabled primary provider.
+
+    Returns:
+        dict: Configuration for a single Google Workspace provider
+    """
+    return mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        capabilities={"supports_member_management": True, "provides_role_info": True},
+    )
+
+
+@pytest.fixture
+def multi_provider_config(mock_provider_config):
+    """Provider configuration with multiple enabled providers.
+
+    Returns:
+        dict: Configuration for Google (primary) and AWS (secondary) providers
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        capabilities={"supports_member_management": True, "provides_role_info": True},
+    )
+
+    aws_cfg = mock_provider_config(
+        provider_name="aws",
+        enabled=True,
+        primary=False,
+        prefix="aws",
+        capabilities={
+            "supports_member_management": True,
+            "supports_batch_operations": True,
+            "max_batch_size": 100,
+        },
+    )
+
+    # Merge both configs
+    config = {**google_cfg, **aws_cfg}
+    return config
+
+
+@pytest.fixture
+def disabled_provider_config(mock_provider_config):
+    """Provider configuration with one enabled and one disabled provider.
+
+    Returns:
+        dict: Configuration with Google enabled (primary) and AWS disabled
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google", enabled=True, primary=True
+    )
+
+    aws_cfg = mock_provider_config(
+        provider_name="aws", enabled=False, prefix="aws"  # Explicitly disabled
+    )
+
+    config = {**google_cfg, **aws_cfg}
+    return config
+
 
 # Google API Python Client
 
@@ -222,71 +557,34 @@ def google_batch_response_factory():
 
 @pytest.fixture
 def aws_users():
-    def _aws_users(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
-        users = []
-        for i in range(n):
-            user = {
-                "UserName": f"{prefix}user-email{i+1}@{domain}",
-                "UserId": f"{prefix}user_id{i+1}",
-                "Name": {
-                    "FamilyName": f"Family_name_{i+1}",
-                    "GivenName": f"Given_name_{i+1}",
-                },
-                "DisplayName": f"Given_name_{i+1} Family_name_{i+1}",
-                "Emails": [
-                    {
-                        "Value": f"{prefix}user-email{i+1}@{domain}",
-                        "Type": "work",
-                        "Primary": True,
-                    }
-                ],
-                "IdentityStoreId": f"{store_id}",
-            }
-            users.append(user)
-        return users
+    # Delegate to factory implementation
+    def _wrapper(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
+        return make_aws_users(n=n, prefix=prefix, domain=domain, store_id=store_id)
 
-    return _aws_users
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups():
-    def _aws_groups(n=3, prefix="", store_id="d-123412341234"):
-        return [
-            {
-                "GroupId": f"{prefix}aws-group_id{i+1}",
-                "DisplayName": f"{prefix}group-name{i+1}",
-                "Description": f"A group to test resolving AWS-group{i+1} memberships",
-                "IdentityStoreId": f"{store_id}",
-            }
-            for i in range(n)
-        ]
+    def _wrapper(n=3, prefix="", store_id="d-123412341234"):
+        return make_aws_groups(n=n, prefix=prefix, store_id=store_id)
 
-    return _aws_groups
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups_memberships():
-    def _aws_groups_memberships(n=3, prefix="", group_id=1, store_id="d-123412341234"):
-        return {
-            "GroupMemberships": [
-                {
-                    "IdentityStoreId": f"{store_id}",
-                    "MembershipId": f"{prefix}membership_id_{i+1}",
-                    "GroupId": f"{prefix}aws-group_id{group_id}",
-                    "MemberId": {
-                        "UserId": f"{prefix}user_id{i+1}",
-                    },
-                }
-                for i in range(n)
-            ]
-        }
+    def _wrapper(n=3, prefix="", group_id=1, store_id="d-123412341234"):
+        return make_aws_groups_memberships(
+            n=n, prefix=prefix, group_id=group_id, store_id=store_id
+        )
 
-    return _aws_groups_memberships
+    return _wrapper
 
 
 @pytest.fixture
 def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
-    def _aws_groups_w_users(
+    def _wrapper(
         n_groups=1,
         n_users=3,
         group_prefix="",
@@ -294,16 +592,35 @@ def aws_groups_w_users(aws_groups, aws_users, aws_groups_memberships):
         domain="test.com",
         store_id="d-123412341234",
     ):
-        groups = aws_groups(n_groups, group_prefix, store_id)
-        users = aws_users(n_users, user_prefix, domain, store_id)
-        for i, group in enumerate(groups):
-            memberships = aws_groups_memberships(
-                n_users, group_prefix, i + 1, store_id
-            )["GroupMemberships"]
-            group["GroupMemberships"] = [
-                {**membership, "MemberId": user}
-                for user, membership in zip(users, memberships)
-            ]
-        return groups
+        return make_aws_groups_w_users(
+            n_groups=n_groups,
+            n_users=n_users,
+            group_prefix=group_prefix,
+            user_prefix=user_prefix,
+            domain=domain,
+            store_id=store_id,
+        )
 
-    return _aws_groups_w_users
+    return _wrapper
+
+
+@pytest.fixture
+def aws_groups_w_users_with_legacy():
+    def _wrapper(
+        n_groups=1,
+        n_users=3,
+        group_prefix="",
+        user_prefix="",
+        domain="test.com",
+        store_id="d-123412341234",
+    ):
+        return make_aws_groups_w_users_with_legacy(
+            n_groups=n_groups,
+            n_users=n_users,
+            group_prefix=group_prefix,
+            user_prefix=user_prefix,
+            domain=domain,
+            store_id=store_id,
+        )
+
+    return _wrapper

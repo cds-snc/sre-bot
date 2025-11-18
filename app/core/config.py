@@ -249,6 +249,237 @@ class SreOpsSettings(BaseSettings):
     )
 
 
+class GroupsFeatureSettings(BaseSettings):
+    """Configuration for the groups feature and provider management.
+
+    Providers Configuration (GROUP_PROVIDERS):
+    -----------------------------------------
+    Configure per-provider behavior including enable/disable, primary provider
+    selection, prefix overrides, and capability overrides.
+
+    Schema:
+        providers: Dict[str, Dict[str, Any]]
+            Key: Provider name (e.g., "google", "aws")
+            Value: Provider configuration dict with the following fields:
+
+            - enabled (bool, optional): Whether to activate this provider.
+              Default: True. Set to False to disable a provider without
+              removing configuration.
+
+            - primary (bool, optional): Whether this provider is the primary.
+              Exactly one provider must have primary=True. The primary provider
+              is used for group creation and as the canonical source of truth.
+              Default: False
+
+            - prefix (str, optional): Override the provider's default prefix
+              used for group key mapping. Non-primary providers should have
+              a prefix to enable proper group name mapping.
+              Example: "aws" for AWS Identity Center groups
+
+            - capabilities (dict, optional): Override provider capabilities.
+              Merged with provider defaults (config takes precedence).
+              Available capability fields:
+                * supports_user_creation (bool): Can create users
+                * supports_user_deletion (bool): Can delete users
+                * supports_group_creation (bool): Can create groups (always False)
+                * supports_group_deletion (bool): Can delete groups (always False)
+                * supports_member_management (bool): Can add/remove members
+                * is_primary (bool): Mark as primary via capability
+                * provides_role_info (bool): Provides role/membership type info
+                * supports_batch_operations (bool): Supports batch operations
+                * max_batch_size (int): Maximum batch operation size
+
+    Example Configuration:
+        GROUP_PROVIDERS = {
+            "google": {
+                "enabled": True,
+                "primary": True,
+                "capabilities": {
+                    "provides_role_info": True,
+                    "supports_member_management": True
+                }
+            },
+            "aws": {
+                "enabled": True,
+                "prefix": "aws",
+                "capabilities": {
+                    "supports_member_management": True,
+                    "supports_batch_operations": True,
+                    "max_batch_size": 100
+                }
+            }
+        }
+
+    Validation:
+        - Exactly one provider must have primary=True
+        - Disabled providers (enabled=False) are excluded from activation
+        - Non-primary providers should have a prefix for proper mapping
+    """
+
+    # Per-provider configuration. Each key is a provider name with a dict value
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        alias="GROUP_PROVIDERS",
+        description="Per-provider configuration for enable/disable, primary selection, prefix, and capabilities",
+    )
+
+    @field_validator("providers", mode="after")
+    @classmethod
+    def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
+        """Validation for GROUP_PROVIDERS configuration.
+
+        Rules:
+        - Filter to only enabled providers (enabled != False)
+        - Ensure exactly one enabled provider has primary=True
+        - Warn if non-primary enabled providers are missing prefix
+
+        Disabled providers (enabled=False) are excluded from all validation
+        checks since they won't be activated.
+        """
+        try:
+            if not v or not isinstance(v, dict):
+                return {}
+
+            # Filter to only enabled providers
+            enabled_providers = {
+                pname: cfg
+                for pname, cfg in v.items()
+                if isinstance(cfg, dict) and cfg.get("enabled", True)
+            }
+
+            if not enabled_providers:
+                logger.warning("no_enabled_providers_configured")
+                return v
+
+            # Count primary providers among enabled providers only
+            primary_count = sum(
+                1
+                for cfg in enabled_providers.values()
+                if isinstance(cfg, dict) and cfg.get("primary")
+            )
+
+            if primary_count != 1:
+                # Fail-fast: require exactly one enabled primary provider
+                raise ValueError(
+                    f"GROUP_PROVIDERS configuration must contain exactly one enabled provider "
+                    f"with 'primary': True. Found {primary_count} enabled primary provider(s)."
+                )
+
+            # Warn about enabled non-primary providers missing prefix
+            for pname, cfg in enabled_providers.items():
+                if not cfg.get("primary") and not cfg.get("prefix"):
+                    logger.warning(
+                        "provider_missing_prefix",
+                        provider=pname,
+                        msg=(
+                            "Enabled non-primary provider has no 'prefix' configured; "
+                            "mapping to primary provider may fail"
+                        ),
+                    )
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            logger.warning(f"Could not validate providers configuration: {e}")
+        return v
+
+    # Reconciliation configuration
+    reconciliation_enabled: bool = Field(
+        default=True,
+        alias="RECONCILIATION_ENABLED",
+        description="Enable reconciliation for failed propagations",
+    )
+
+    reconciliation_backend: str = Field(
+        default="memory",
+        alias="RECONCILIATION_BACKEND",
+        description="Reconciliation backend: 'memory', 'dynamodb', or 'sqs'",
+    )
+
+    reconciliation_max_attempts: int = Field(
+        default=5,
+        alias="RECONCILIATION_MAX_ATTEMPTS",
+        description="Maximum retry attempts before moving to DLQ",
+    )
+
+    reconciliation_base_delay_seconds: int = Field(
+        default=60,
+        alias="RECONCILIATION_BASE_DELAY_SECONDS",
+        description="Base delay for exponential backoff (seconds)",
+    )
+
+    reconciliation_max_delay_seconds: int = Field(
+        default=3600,
+        alias="RECONCILIATION_MAX_DELAY_SECONDS",
+        description="Maximum delay for exponential backoff (seconds)",
+    )
+
+    # Circuit breaker configuration
+    circuit_breaker_enabled: bool = Field(
+        default=True,
+        alias="CIRCUIT_BREAKER_ENABLED",
+        description="Enable circuit breaker for providers to prevent cascading failures",
+    )
+
+    circuit_breaker_failure_threshold: int = Field(
+        default=5,
+        alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+        description="Number of consecutive failures before opening circuit",
+    )
+
+    circuit_breaker_timeout_seconds: int = Field(
+        default=60,
+        alias="CIRCUIT_BREAKER_TIMEOUT_SECONDS",
+        description="Seconds to wait before attempting recovery (HALF_OPEN state)",
+    )
+
+    circuit_breaker_half_open_max_calls: int = Field(
+        default=3,
+        alias="CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS",
+        description="Maximum concurrent requests allowed in HALF_OPEN state",
+    )
+
+    # Justification enforcement configuration
+    require_justification: bool = Field(
+        default=True,
+        alias="REQUIRE_JUSTIFICATION",
+        description="Require justification for group operations",
+    )
+
+    min_justification_length: int = Field(
+        default=10,
+        alias="MIN_JUSTIFICATION_LENGTH",
+        description="Minimum length for justification text",
+    )
+
+    # Group domain configuration for email-based providers
+    group_domain: str = Field(
+        default="",
+        alias="GROUP_DOMAIN",
+        description="Domain suffix for group email addresses (e.g., 'cds-snc.ca'). "
+        "Used by primary provider when full email format is required.",
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    def __init__(self, **kwargs):
+        """Allow programmatic construction using the `providers` keyword.
+
+        The field uses the alias `GROUP_PROVIDERS` for environment loading.
+        When callers pass `providers=` directly (common in unit tests), map
+        that to the alias so the normal BaseSettings initialization and
+        validators (including the primary-provider check) run as expected.
+        """
+        if "providers" in kwargs and "GROUP_PROVIDERS" not in kwargs:
+            # Move the programmatic `providers` into the alias key so
+            # Pydantic/Settings machinery and field validators run.
+            kwargs["GROUP_PROVIDERS"] = kwargs.pop("providers")
+        super().__init__(**kwargs)
+
+
 class ServerSettings(BaseSettings):
     """Server configuration settings."""
 
@@ -335,6 +566,7 @@ class Settings(BaseSettings):
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
     sre_ops: SreOpsSettings
+    groups: GroupsFeatureSettings
 
     # Development settings
     dev: DevSettings
@@ -363,6 +595,7 @@ class Settings(BaseSettings):
             "feat_incident": IncidentFeatureSettings,
             "sre_ops": SreOpsSettings,
             "dev": DevSettings,
+            "groups": GroupsFeatureSettings,
         }
 
         for setting_name, setting_class in settings_map.items():
