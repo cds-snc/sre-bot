@@ -21,6 +21,7 @@ from modules.incident import (
     db_operations,
     information_display,
     information_update,
+    core,
 )
 from core.config import settings
 from core.logging import get_module_logger
@@ -250,13 +251,13 @@ def handle_close(client, body, respond, ack, _args, _flags):
     close_incident(client, body, ack, respond)
 
 
-def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
+def handle_create(client, body, respond, ack, args: list[str], _flags: dict):
     """Handle create command."""
     create_help_text = """`/sre incident create [resource] [options]`
 
 *Resources:*
 • `new [<incident_name>]` — create a new incident (upcoming feature)
-• `resources` — create resources for an existing incident (document, meet links, etc.) (upcoming feature)"""
+• `resources` — create resources for an existing incident (document, meet links, etc.)"""
     try:
         resource = args.pop(0)
     except IndexError:
@@ -266,9 +267,7 @@ def handle_create(_client, _body, respond, _ack, args: list[str], _flags: dict):
             respond("Upcoming feature: create a new incident.")
             return
         case "resources":
-            respond(
-                "Upcoming feature: create resources for an incident (e.g., document, meet links, etc.)."
-            )
+            recreate_missing_incident_resources(client, body, respond, ack)
             return
         case _:
             respond(create_help_text)
@@ -733,3 +732,105 @@ def display_current_updates(client: WebClient, body, respond: Respond, ack: Ack)
         )
     else:
         respond("No updates found for this incident.")
+
+
+def recreate_missing_incident_resources(
+    client: WebClient, body: dict, respond: Respond, ack: Ack
+):
+    """
+    Recreate missing resources for an existing incident channel.
+
+    This command should be run from within an incident channel to detect
+    and recreate any missing resources (bookmarks, documents, DB records, etc.).
+    """
+    ack()
+
+    channel_id = body["channel_id"]
+    channel_name = body["channel_name"]
+    user_id = slack_users.get_user_id_from_request(body)
+
+    # Verify this is an incident channel
+    if not channel_name.startswith("incident-"):
+        respond(
+            "❌ This command can only be used in incident channels (channels starting with `incident-`)."
+        )
+        return
+
+    # Show initial message
+    respond("🔍 Checking for missing incident resources... This may take a moment.")
+
+    try:
+        # Call the core function to recreate missing resources
+        results = core.recreate_missing_resources(
+            client, channel_id, channel_name, user_id
+        )
+
+        # Build response message
+        response_blocks = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Incident Resource Check Complete* ✅",
+                },
+            }
+        ]
+
+        # Add success messages
+        if results["success"]:
+            success_text = "*Successfully Created/Updated:*\n" + "\n".join(
+                [f"• {item}" for item in results["success"]]
+            )
+            response_blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": success_text},
+                }
+            )
+
+        # Add skipped messages
+        if results["skipped"]:
+            skipped_text = "*Already Exists (Skipped):*\n" + "\n".join(
+                [f"• {item}" for item in results["skipped"]]
+            )
+            response_blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": skipped_text},
+                }
+            )
+
+        # Add error messages
+        if results["errors"]:
+            error_text = "*Errors Encountered:*\n" + "\n".join(
+                [f"• {item}" for item in results["errors"]]
+            )
+            response_blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": error_text},
+                }
+            )
+
+        # Post summary to channel
+        client.chat_postMessage(
+            channel=channel_id,
+            text="Incident resource check complete",
+            blocks=response_blocks,
+        )
+
+        logger.info(
+            "recreate_missing_resources_complete",
+            channel_id=channel_id,
+            success_count=len(results["success"]),
+            skipped_count=len(results["skipped"]),
+            error_count=len(results["errors"]),
+        )
+
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        respond(f"❌ Failed to recreate resources: {str(e)}")
