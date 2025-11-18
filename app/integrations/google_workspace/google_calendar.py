@@ -4,7 +4,9 @@ import pytz
 
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
+from core.logging import get_module_logger
 
+logger = get_module_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
@@ -206,18 +208,25 @@ def find_first_available_slot(
 def get_federal_holidays():
     # Get the public holidays for the current year
     # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api)
+    holidays = []
 
     # get today's year
     year = datetime.now().year
 
     # call the api to get the public holidays
     url = f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={year}"
-    response = requests.get(url, timeout=10)
 
-    # Store the observed dates of the holidays and return the list
-    holidays = []
-    for holiday in response.json()["holidays"]:
-        holidays.append(holiday["observedDate"])
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        for holiday in response.json().get("holidays", []):
+            holidays.append(holiday["observedDate"])
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            "federal_holidays_request_failed",
+            error=str(e),
+            year=year,
+        )
     return holidays
 
 

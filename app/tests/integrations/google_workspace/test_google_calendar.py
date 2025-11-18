@@ -728,6 +728,29 @@ def test_api_returns_empty_list(requests_mock):
     assert holidays == [], "Expected an empty list when there are no holidays"
 
 
+def test_get_federal_holidays_server_error(requests_mock):
+    """Test that server errors are handled gracefully and return empty list."""
+    # set the timeout to 10s
+    requests_mock.DEFAULT_TIMEOUT = 10
+
+    # get the current year
+    current_year = datetime.now().year
+
+    # Mock a 500 server error response
+    # Bandit skip security check for the requests_mock.get call
+    requests_mock.get(  # nosec
+        f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={current_year}",
+        status_code=500,
+        text="Internal Server Error",
+    )
+
+    # Call the function
+    holidays = google_calendar.get_federal_holidays()
+
+    # Assert that an empty list is returned
+    assert holidays == [], "Expected an empty list when server returns error"
+
+
 def test_leap_year_handling(requests_mock):
     # Set the timeout to 10s
     requests_mock.DEFAULT_TIMEOUT = 10
