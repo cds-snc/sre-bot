@@ -4,7 +4,7 @@ from slack_sdk import WebClient
 
 from core.config import settings
 from core.logging import get_module_logger
-from integrations.google_workspace import meet
+from integrations.google_workspace import meet, google_drive
 from models.incidents import IncidentPayload
 from modules.incident import (
     incident_document,
@@ -19,6 +19,402 @@ SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_
 INCIDENT_HANDBOOK_URL = settings.feat_incident.INCIDENT_HANDBOOK_URL
 
 logger = get_module_logger()
+
+
+def _get_channel_info_and_topic(client: WebClient, channel_id: str) -> tuple:
+    """Extract channel information and parse incident details from topic.
+
+    Returns:
+        tuple: (channel_info, incident_name, product) or (None, "", "Unknown") on error
+    """
+    try:
+        channel_info = client.conversations_info(channel=channel_id)
+        if not channel_info.get("ok"):
+            return None, "", "Unknown"
+
+        channel = channel_info["channel"]
+        topic = channel.get("topic", {}).get(
+            "value", "Placeholder / Site reliability engineering"
+        )
+
+        # Parse incident name and product from topic
+        # Expected format: "Incident: {name} / {product}"
+        incident_name = ""
+        product = ""
+        if topic and " / " in topic:
+            parts = topic.split(" / ")
+            if len(parts) >= 2:
+                incident_name = parts[0].replace("Incident: ", "").strip()
+                product = parts[1].strip()
+
+        return channel_info, incident_name, product
+
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_channel_info_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        return None, "", "Unknown"
+
+
+def _get_existing_bookmarks(client: WebClient, channel_id: str) -> dict:
+    """Retrieve existing bookmarks in the channel.
+
+    Returns:
+        dict: Mapping of bookmark titles to links
+    """
+    existing_bookmarks = {}
+    try:
+        bookmark_response = client.bookmarks_list(channel_id=channel_id)
+        if bookmark_response.get("ok"):
+            for bookmark in bookmark_response.get("bookmarks", []):
+                existing_bookmarks[bookmark["title"]] = bookmark["link"]
+    except Exception as e:
+        logger.warning(
+            "recreate_missing_resources_bookmark_check_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+    return existing_bookmarks
+
+
+def _find_product_folder(product: str) -> str:
+    """Find the folder ID for a given product.
+
+    Returns:
+        str: Folder ID or None if not found
+    """
+    if product == "Unknown":
+        return None
+
+    try:
+        folders = incident_folder.list_incident_folders()
+        for folder in folders:
+            if folder["name"].lower() == product.lower():
+                return folder["id"]
+    except Exception as e:
+        logger.warning(
+            "recreate_missing_resources_folder_lookup_failed",
+            product=product,
+            error=str(e),
+        )
+    return None
+
+
+def _create_meet_link_bookmark(
+    client: WebClient, channel_id: str, existing_bookmarks: dict, results: dict
+) -> str:
+    """Create Meet link bookmark if it doesn't exist.
+
+    Returns:
+        str: The Meet URI or empty string if creation failed
+    """
+    if "Meet link" in existing_bookmarks:
+        results["skipped"].append("Meet link bookmark already exists")
+        return existing_bookmarks["Meet link"]
+
+    try:
+        meet_link = meet.create_space()
+        client.bookmarks_add(
+            channel_id=channel_id,
+            title="Meet link",
+            type="link",
+            link=meet_link["meetingUri"],
+        )
+        results["success"].append(f"Created Meet link: {meet_link['meetingUri']}")
+        logger.info(
+            "recreate_missing_resources_meet_created",
+            channel_id=channel_id,
+            meet_url=meet_link["meetingUri"],
+        )
+        return meet_link["meetingUri"]
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_meet_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        results["errors"].append(f"Failed to create Meet link: {str(e)}")
+        return ""
+
+
+def _create_document_bookmark(
+    client: WebClient,
+    channel_id: str,
+    channel_name: str,
+    existing_bookmarks: dict,
+    folder_id: str,
+    incident_name: str,
+    product: str,
+    results: dict,
+) -> str:
+    """Create incident document and bookmark if they don't exist.
+
+    Returns:
+        str: The document link or empty string if creation failed
+    """
+    if "Incident report" in existing_bookmarks:
+        results["skipped"].append("Incident report bookmark already exists")
+        return existing_bookmarks["Incident report"]
+
+    if not folder_id:
+        results["errors"].append(
+            "Cannot create incident document: product folder not found"
+        )
+        return ""
+
+    try:
+        slug = channel_name.replace("incident-", "")
+        document_id = None
+        document_link = None
+
+        # Search for document by name in the folder
+        files = google_drive.list_files_in_folder(folder_id)
+        for file in files:
+            if slug in file.get("name", ""):
+                document_id = file["id"]
+                document_link = f"https://docs.google.com/document/d/{document_id}/edit"
+                break
+
+        # If no existing document found, create one
+        if not document_id:
+            document_id = incident_document.create_incident_document(slug, folder_id)
+            document_link = f"https://docs.google.com/document/d/{document_id}/edit"
+
+            # Update boilerplate if we have the necessary info
+            channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
+            oncall = on_call.get_on_call_users_from_folder(client, folder_id)
+            oncall_names = ", ".join(
+                [user["profile"]["display_name_normalized"] for user in oncall]
+            )
+
+            incident_document.update_boilerplate_text(
+                document_id,
+                incident_name,
+                product,
+                channel_url,
+                oncall_names,
+            )
+            results["success"].append(f"Created incident document: {document_link}")
+        else:
+            results["success"].append(f"Found existing document: {document_link}")
+
+        # Add bookmark
+        client.bookmarks_add(
+            channel_id=channel_id,
+            title="Incident report",
+            type="link",
+            link=document_link,
+        )
+        results["success"].append("Added Incident report bookmark")
+
+        logger.info(
+            "recreate_missing_resources_document_bookmarked",
+            channel_id=channel_id,
+            document_id=document_id,
+        )
+
+        return document_link
+
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_document_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        results["errors"].append(
+            f"Failed to create/bookmark incident document: {str(e)}"
+        )
+        return ""
+
+
+def _add_incident_to_sheet(
+    client: WebClient,
+    channel_id: str,
+    channel_name: str,
+    document_link: str,
+    incident_name: str,
+    product: str,
+    results: dict,
+) -> None:
+    """Add incident to Google Sheets list if not already present."""
+    if not document_link:
+        return
+
+    try:
+        # Check if incident already exists in the list
+        incidents_in_sheet = incident_folder.get_incidents_from_sheet()
+        slug = channel_name.replace("incident-", "")
+
+        already_in_sheet = False
+        for inc in incidents_in_sheet:
+            if inc.get("channel_id") == channel_id or slug in inc.get(
+                "channel_name", ""
+            ):
+                already_in_sheet = True
+                break
+
+        if not already_in_sheet:
+            channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
+            incident_folder.add_new_incident_to_list(
+                document_link,
+                incident_name,
+                slug,
+                product,
+                channel_url,
+            )
+            results["success"].append("Added incident to Google Sheets list")
+            logger.info(
+                "recreate_missing_resources_sheet_updated",
+                channel_id=channel_id,
+                incident_name=incident_name,
+            )
+        else:
+            results["skipped"].append("Incident already exists in Google Sheets list")
+
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_sheet_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        results["errors"].append(f"Failed to add incident to Google Sheets: {str(e)}")
+
+
+def _create_database_record(
+    channel_id: str,
+    channel_name: str,
+    incident_name: str,
+    product: str,
+    user_id: str,
+    document_link: str,
+    meet_url: str,
+    results: dict,
+) -> None:
+    """Create database record for incident if it doesn't exist."""
+    try:
+        environment = "dev" if PREFIX == "dev-" else "prod"
+
+        incident_data = {
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "name": incident_name,
+            "user_id": user_id,
+            "teams": [product],
+            "report_url": document_link or "",
+            "meet_url": meet_url,
+            "environment": environment,
+        }
+
+        incident_id = db_operations.create_incident(incident_data)
+        if incident_id:
+            results["success"].append(f"Created database record: {incident_id}")
+            logger.info(
+                "recreate_missing_resources_db_created",
+                channel_id=channel_id,
+                incident_id=incident_id,
+            )
+        else:
+            results["errors"].append("Failed to create database record")
+
+    except Exception as e:
+        logger.error(
+            "recreate_missing_resources_db_failed",
+            channel_id=channel_id,
+            error=str(e),
+        )
+        results["errors"].append(f"Failed to create database record: {str(e)}")
+
+
+def recreate_missing_resources(
+    client: WebClient,
+    channel_id: str,
+    channel_name: str,
+    user_id: str,
+):
+    """
+    Detect and recreate missing incident resources for an existing incident channel.
+
+    This function checks for missing resources (bookmarks, incident list entry, DB record)
+    and attempts to create only what's missing.
+
+    Args:
+        client: Slack WebClient instance
+        channel_id: The incident channel ID
+        channel_name: The incident channel name (e.g., 'incident-2024-001')
+        user_id: The user requesting the resource recreation
+
+    Returns:
+        dict: Summary of actions taken and any errors encountered
+    """
+    results = {
+        "success": [],
+        "errors": [],
+        "skipped": [],
+    }
+
+    # Get basic channel info
+    channel_info, incident_name, product = _get_channel_info_and_topic(
+        client, channel_id
+    )
+    if not channel_info:
+        results["errors"].append("Failed to fetch channel information")
+        return results
+
+    # Set defaults if parsing failed
+    if not incident_name:
+        incident_name = channel_name.replace("incident-", "").replace("dev-", "")
+    if not product:
+        product = "Unknown"
+
+    # Get existing resources
+    existing_bookmarks = _get_existing_bookmarks(client, channel_id)
+    incident_record = db_operations.get_incident_by_channel_id(channel_id)
+    folder_id = _find_product_folder(product)
+
+    # Create resources in sequence
+    meet_url = _create_meet_link_bookmark(
+        client, channel_id, existing_bookmarks, results
+    )
+
+    document_link = _create_document_bookmark(
+        client,
+        channel_id,
+        channel_name,
+        existing_bookmarks,
+        folder_id,
+        incident_name,
+        product,
+        results,
+    )
+
+    _add_incident_to_sheet(
+        client,
+        channel_id,
+        channel_name,
+        document_link,
+        incident_name,
+        product,
+        results,
+    )
+
+    # Create database record if it doesn't exist
+    if not incident_record:
+        _create_database_record(
+            channel_id,
+            channel_name,
+            incident_name,
+            product,
+            user_id,
+            document_link,
+            meet_url,
+            results,
+        )
+    else:
+        results["skipped"].append("Database record already exists")
+
+    return results
 
 
 def initiate_resources_creation(

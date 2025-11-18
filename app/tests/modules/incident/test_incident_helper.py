@@ -251,19 +251,19 @@ def test_handle_create_with_new():
     respond.assert_called_once_with("Upcoming feature: create a new incident.")
 
 
-def test_handle_create_with_resources():
+@patch("modules.incident.incident_helper.recreate_missing_incident_resources")
+def test_handle_create_with_resources(mock_recreate_resources):
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
     body = MagicMock()
 
     incident_helper.handle_create(client, body, respond, ack, ["resources"], {})
-    respond.assert_called_once_with(
-        "Upcoming feature: create resources for an incident (e.g., document, meet links, etc.)."
-    )
+    mock_recreate_resources.assert_called_once_with(client, body, respond, ack)
 
 
-def test_handle_create_without_resource():
+@patch("modules.incident.incident_helper.recreate_missing_incident_resources")
+def test_handle_create_without_resource(mock_recreate_resources):
     respond = MagicMock()
     ack = MagicMock()
     client = MagicMock()
@@ -272,7 +272,7 @@ def test_handle_create_without_resource():
 
 *Resources:*
 • `new [<incident_name>]` — create a new incident (upcoming feature)
-• `resources` — create resources for an existing incident (document, meet links, etc.) (upcoming feature)"""
+• `resources` — create resources for an existing incident (document, meet links, etc.)"""
     incident_helper.handle_create(client, body, respond, ack, [], {})
     respond.assert_called_once_with(create_help_text)
 
