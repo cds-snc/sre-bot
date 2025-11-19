@@ -9,7 +9,7 @@ from integrations.aws import organizations, cost_explorer
 from integrations.google_workspace import sheets
 from core.config import settings
 
-SPENDING_SHEET_ID = settings.aws_feature.SPENDING_SHEET_ID
+SPENDING_SHEET_ID = settings.google_resources.spending_sheet_id
 
 rates = {
     "2025-03-01": {"rate": 1.4591369, "confirmed": False},

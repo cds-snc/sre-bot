@@ -17,8 +17,8 @@ from modules.incident import db_operations
 from core.config import settings
 from core.logging import get_module_logger
 
-SRE_INCIDENT_FOLDER = settings.feat_incident.SRE_INCIDENT_FOLDER
-INCIDENT_LIST = settings.feat_incident.INCIDENT_LIST
+SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
+INCIDENT_LIST = settings.google_resources.incident_list_id
 
 logger = get_module_logger()
 

@@ -12,20 +12,22 @@ from core.logging import get_module_logger
 PREFIX = settings.PREFIX
 BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 
-SCORING_GUIDE_TEMPLATE = settings.talent_role.SCORING_GUIDE_TEMPLATE
+SCORING_GUIDE_TEMPLATE = settings.google_resources.scoring_guide_template_id
 CORE_VALUES_INTERVIEW_NOTES_TEMPLATE = (
-    settings.talent_role.CORE_VALUES_INTERVIEW_NOTES_TEMPLATE
+    settings.google_resources.core_values_interview_notes_id
 )
 TECHNICAL_INTERVIEW_NOTES_TEMPLATE = (
-    settings.talent_role.TECHNICAL_INTERVIEW_NOTES_TEMPLATE
+    settings.google_resources.technical_interview_notes_id
 )
-INTAKE_FORM_TEMPLATE = settings.talent_role.INTAKE_FORM_TEMPLATE
-PHONE_SCREEN_TEMPLATE = settings.talent_role.PHONE_SCREEN_TEMPLATE
-RECRUITMENT_FEEDBACK_TEMPLATE = settings.talent_role.RECRUITMENT_FEEDBACK_TEMPLATE
-PANELIST_GUIDEBOOK_TEMPLATE = settings.talent_role.PANELIST_GUIDEBOOK_TEMPLATE
+INTAKE_FORM_TEMPLATE = settings.google_resources.intake_form_template_id
+PHONE_SCREEN_TEMPLATE = settings.google_resources.phone_screen_template_id
+RECRUITMENT_FEEDBACK_TEMPLATE = (
+    settings.google_resources.recruitment_feedback_template_id
+)
+PANELIST_GUIDEBOOK_TEMPLATE = settings.google_resources.panelist_guidebook_template_id
 
-TEMPLATES_FOLDER = settings.talent_role.TEMPLATES_FOLDER
-INTERNAL_TALENT_FOLDER = settings.talent_role.INTERNAL_TALENT_FOLDER
+TEMPLATES_FOLDER = settings.google_resources.templates_folder_id
+INTERNAL_TALENT_FOLDER = settings.google_resources.internal_talent_folder_id
 
 ROLE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 

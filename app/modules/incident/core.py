@@ -16,7 +16,6 @@ from modules.incident import (
 PREFIX = settings.PREFIX
 INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
-INCIDENT_HANDBOOK_URL = settings.feat_incident.INCIDENT_HANDBOOK_URL
 
 logger = get_module_logger()
 

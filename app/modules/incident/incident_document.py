@@ -6,7 +6,7 @@ from integrations.google_workspace import google_docs, google_drive
 from core.config import settings
 from core.logging import get_module_logger
 
-INCIDENT_TEMPLATE = settings.feat_incident.INCIDENT_TEMPLATE
+INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
