@@ -27,10 +27,6 @@
     ],
     "secrets": [
       {
-        "name": "PICKLE_STRING",
-        "valueFrom": "${PICKLE_STRING}"
-      },
-      {
         "name": "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
         "valueFrom": "${GCP_SRE_SERVICE_ACCOUNT_KEY_FILE}"
       }
