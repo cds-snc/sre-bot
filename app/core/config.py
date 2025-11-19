@@ -656,15 +656,6 @@ class DevSettings(BaseSettings):
     )
 
 
-class FrontEndSettings(BaseSettings):
-    FRONTEND_URL: str = Field(default="http://127.0.0.1:3000", alias="FRONTEND_URL")
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
-
-
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -674,7 +665,6 @@ class Settings(BaseSettings):
 
     # Server settings
     server: ServerSettings
-    frontend: FrontEndSettings
 
     # Integration settings
     slack: SlackSettings
@@ -705,7 +695,6 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         settings_map = {
             "server": ServerSettings,
-            "frontend": FrontEndSettings,
             "slack": SlackSettings,
             "aws": AwsSettings,
             "google_workspace": GoogleWorkspaceSettings,
