@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from modules.groups.core import orchestration as orch
-from modules.groups.providers.contracts import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 
 pytestmark = [
     pytest.mark.integration,
