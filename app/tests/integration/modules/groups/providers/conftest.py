@@ -171,9 +171,9 @@ def mock_identity_store_next():
     """Mock integrations.aws.identity_store_next module.
 
     Provides mocked responses for AWS Identity Store API calls.
-    Responses follow SimpleNamespace with success/data structure.
+    Responses follow OperationResult with status/data structure.
     """
-    from types import SimpleNamespace
+    from infrastructure.operations.result import OperationResult
 
     mock = MagicMock()
 
@@ -188,11 +188,12 @@ def mock_identity_store_next():
         }
         group_id = group_map.get(display_name)
         if group_id:
-            return SimpleNamespace(
-                success=True,
-                data={"GroupId": group_id, "DisplayName": display_name},
+            return OperationResult.success(
+                data={"GroupId": group_id, "DisplayName": display_name}
             )
-        return SimpleNamespace(success=False, data=None)
+        return OperationResult.permanent_error(
+            message=f"Group not found: {display_name}", error_code="NOT_FOUND"
+        )
 
     # get_user_by_username: resolve email to UserId
     def get_user_by_username(email):
@@ -204,11 +205,10 @@ def mock_identity_store_next():
         }
         user_id = user_map.get(email)
         if user_id:
-            return SimpleNamespace(
-                success=True,
-                data={"UserId": user_id, "UserName": email},
-            )
-        return SimpleNamespace(success=False, data=None)
+            return OperationResult.success(data={"UserId": user_id, "UserName": email})
+        return OperationResult.permanent_error(
+            message=f"User not found: {email}", error_code="NOT_FOUND"
+        )
 
     # get_user: fetch full user details
     def get_user(user_id):
@@ -235,28 +235,28 @@ def mock_identity_store_next():
         }
         user_data = user_map.get(user_id)
         if user_data:
-            return SimpleNamespace(success=True, data=user_data)
-        return SimpleNamespace(success=False, data=None)
+            return OperationResult.success(data=user_data)
+        return OperationResult.permanent_error(
+            message=f"User not found: {user_id}", error_code="NOT_FOUND"
+        )
 
     # create_group_membership: add user to group
     def create_group_membership(group_id, user_id):
         """Mock create_group_membership."""
-        return SimpleNamespace(
-            success=True,
-            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"},
+        return OperationResult.success(
+            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"}
         )
 
     # delete_group_membership: remove user from group
     def delete_group_membership(membership_id):
         """Mock delete_group_membership."""
-        return SimpleNamespace(success=True, data=None)
+        return OperationResult.success(data=None)
 
     # get_group_membership_id: lookup membership for user in group
     def get_group_membership_id(group_id, user_id):
         """Mock get_group_membership_id."""
-        return SimpleNamespace(
-            success=True,
-            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"},
+        return OperationResult.success(
+            data={"MembershipId": f"membership-{group_id[:8]}-{user_id}"}
         )
 
     # list_group_memberships: list members of a group
@@ -269,7 +269,7 @@ def mock_identity_store_next():
                 "MemberId": {"UserId": "user-111"},
             },
         ]
-        return SimpleNamespace(success=True, data=memberships)
+        return OperationResult.success(data=memberships)
 
     mock.get_group_by_name = get_group_by_name
     mock.get_user_by_username = get_user_by_username
