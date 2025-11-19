@@ -405,6 +405,12 @@ class ActionResponse(BaseModel):
             json_schema_extra={"example": True},
         ),
     ]
+
+    @property
+    def is_success(self) -> bool:
+        """Alias for success field for consistency with OperationResult.is_success."""
+        return self.success
+
     action: Annotated[
         OperationType,
         Field(
