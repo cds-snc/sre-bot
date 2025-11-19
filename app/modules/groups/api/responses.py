@@ -15,16 +15,16 @@ def _map_integration_error_to_response(err: IntegrationError) -> Dict:
     """Convert IntegrationError to a minimal API error dict using format_error_response.
 
     Keep the mapping small: include the integration error message and, when present,
-    surface a compact diagnostic in `details` from the wrapped IntegrationResponse.
+    surface a compact diagnostic in `details` from the wrapped OperationResult.
     """
     resp = getattr(err, "response", None)
     details = None
     if resp is not None:
         # Keep only small, useful metadata for API responses
         details = {
-            "integration_success": getattr(resp, "success", None),
-            "integration_error": getattr(resp, "error", None),
-            "integration_meta": getattr(resp, "meta", None),
+            "integration_success": getattr(resp, "is_success", None),
+            "integration_error": getattr(resp, "message", None),
+            "integration_error_code": getattr(resp, "error_code", None),
         }
 
     return format_error_response(
