@@ -264,8 +264,10 @@ def _activate_primary(primary_config: Dict[str, dict]) -> str:
     provider_cfg = enabled[primary_name]
 
     try:
-        # Instantiate with full config
-        instance = registry_utils.instantiate_provider(primary_class, primary_name)
+        # Single-stage activation: pass config to __init__
+        instance = registry_utils.instantiate_provider(
+            primary_class, primary_name, config=provider_cfg
+        )
 
         if not isinstance(instance, PrimaryGroupProvider):
             raise TypeError(
@@ -275,14 +277,11 @@ def _activate_primary(primary_config: Dict[str, dict]) -> str:
         # Attach registration name
         setattr(instance, "name", primary_name)
 
-        # Apply domain configuration
-        registry_utils.apply_domain_config(instance, provider_cfg)
-
         # Resolve and set prefix
         prefix = registry_utils.resolve_prefix(instance, provider_cfg, primary_name)
         setattr(instance, "_prefix", prefix)
 
-        # Apply capability overrides
+        # Apply capability overrides (if not already handled in __init__)
         registry_utils.apply_capability_overrides(instance, provider_cfg)
 
         # Validate primary capabilities
@@ -333,8 +332,10 @@ def _activate_secondaries(secondary_config: Dict[str, dict]) -> None:
         provider_class = _secondary_discovered[name]
 
         try:
-            # Instantiate secondary provider
-            instance = registry_utils.instantiate_provider(provider_class, name)
+            # Single-stage activation: pass config to __init__
+            instance = registry_utils.instantiate_provider(
+                provider_class, name, config=provider_cfg
+            )
 
             if not isinstance(instance, GroupProvider):
                 raise TypeError(f"Secondary provider must be GroupProvider: {name}")
@@ -342,14 +343,11 @@ def _activate_secondaries(secondary_config: Dict[str, dict]) -> None:
             # Attach registration name
             setattr(instance, "name", name)
 
-            # Apply domain configuration
-            registry_utils.apply_domain_config(instance, provider_cfg)
-
             # Resolve and set prefix
             prefix = registry_utils.resolve_prefix(instance, provider_cfg, name)
             setattr(instance, "_prefix", prefix)
 
-            # Apply capability overrides
+            # Apply capability overrides (if not already handled in __init__)
             registry_utils.apply_capability_overrides(instance, provider_cfg)
 
             new_active[name] = instance

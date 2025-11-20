@@ -91,7 +91,7 @@ def provider_operation(data_key=None):
                 return OperationResult(
                     status=OperationStatus.SUCCESS, message="ok", data=data
                 )
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 # Use provider's error classification method
                 return self.classify_error(e)
 
@@ -103,8 +103,17 @@ def provider_operation(data_key=None):
 class GroupProvider(ABC):
     """Abstract Base Class for group providers."""
 
-    def __init__(self):
-        """Initialize provider with circuit breaker."""
+    _circuit_breaker: Optional[CircuitBreaker]
+
+    def __init__(self, config: Optional[dict] = None):
+        """Initialize provider with circuit breaker and config.
+
+        Args:
+            config: Optional provider configuration dict (from settings.groups.providers[name]).
+                    Subclasses can override to handle domain-specific configuration.
+        """
+        self._config = config or {}
+
         # Create circuit breaker for this provider
         provider_name = self.__class__.__name__
 
