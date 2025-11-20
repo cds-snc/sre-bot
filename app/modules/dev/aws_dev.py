@@ -4,7 +4,7 @@ import json
 import time
 from core.logging import get_module_logger
 from integrations.aws import identity_store, identity_store_next
-from models.integrations import IntegrationResponse
+from infrastructure import OperationResult
 
 logger = get_module_logger()
 
@@ -99,8 +99,8 @@ def performance_comparison_example(
     # Next-gen
     if next_func:
         start_time = time.time()
-        response: IntegrationResponse = next_func()
-        if response.success:
+        response: OperationResult = next_func()
+        if response.is_success:
             next_result = response.data
         else:
             next_result = None

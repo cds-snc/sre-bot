@@ -54,7 +54,7 @@ class TestAddMemberService:
 
         # ASSERT
         assert mock_orchestration_success.called
-        assert response.success is True
+        assert response.is_success is True
         assert response.action == schemas.OperationType.ADD_MEMBER
 
     def test_add_member_dispatches_event_after_orchestration(
@@ -72,7 +72,7 @@ class TestAddMemberService:
 
         # ASSERT
         assert mock_event_dispatch.called
-        assert response.success is True
+        assert response.is_success is True
 
     def test_add_member_formats_response_from_orchestration(
         self,
@@ -91,7 +91,7 @@ class TestAddMemberService:
 
         # ASSERT
         assert isinstance(response, schemas.ActionResponse)
-        assert response.success is True
+        assert response.is_success is True
         assert response.member_email == add_member_request["member_email"]
         assert response.group_id == add_member_request["group_id"]
 
@@ -150,7 +150,7 @@ class TestAddMemberService:
         response = service.add_member(request)
 
         # ASSERT
-        assert response.success is True
+        assert response.is_success is True
         assert response.provider == "google"
 
     def test_add_member_with_aws_provider(
@@ -172,7 +172,7 @@ class TestAddMemberService:
         response = service.add_member(request)
 
         # ASSERT
-        assert response.success is True
+        assert response.is_success is True
         assert response.provider == "aws"
 
 
@@ -201,7 +201,7 @@ class TestRemoveMemberService:
 
         # ASSERT
         assert mock_orchestration_remove_member.called
-        assert response.success is True
+        assert response.is_success is True
 
     def test_remove_member_dispatches_event(
         self,
@@ -256,7 +256,7 @@ class TestRemoveMemberService:
 
         # ASSERT
         assert isinstance(response, schemas.ActionResponse)
-        assert response.success is True
+        assert response.is_success is True
 
 
 # ============================================================================
@@ -397,7 +397,7 @@ class TestServiceEventDispatching:
 
         # ASSERT
         assert mock_event_dispatch.called
-        assert result.success is True
+        assert result.is_success is True
 
     def test_remove_member_dispatches_member_removed_event(
         self,
@@ -414,7 +414,7 @@ class TestServiceEventDispatching:
 
         # ASSERT
         assert mock_event_dispatch.called
-        assert response.success is True
+        assert response.is_success is True
 
     def test_event_includes_orchestration_response(
         self,
@@ -478,7 +478,7 @@ class TestServiceErrorHandling:
         response = service.add_member(request)
 
         # ASSERT
-        assert response.success is False
+        assert response.is_success is False
 
     def test_add_member_response_includes_error_info_on_failure(
         self,
@@ -494,7 +494,7 @@ class TestServiceErrorHandling:
         response = service.add_member(request)
 
         # ASSERT
-        assert response.success is False
+        assert response.is_success is False
 
     def test_invalid_group_id_raises_error(
         self,
@@ -662,7 +662,7 @@ class TestServiceIdempotency:
         response = service.add_member(request)
 
         # ASSERT
-        if response.success:
+        if response.is_success:
             # Successful response should be cached
             assert cache_mock.called
 
@@ -692,7 +692,7 @@ class TestServiceIdempotency:
         response = service.add_member(request)
 
         # ASSERT
-        if not response.success:
+        if not response.is_success:
             # Failed response should not be cached
             assert not cache_mock.called
 

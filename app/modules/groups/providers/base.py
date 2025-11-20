@@ -12,22 +12,22 @@ Key separation of concerns:
 
 from __future__ import annotations
 
-from typing import Optional
 from abc import ABC, abstractmethod
-from email_validator import validate_email, EmailNotValidError
+from typing import Optional
+
 from core.config import settings
 from core.logging import get_module_logger
-from modules.groups.domain.models import NormalizedMember
-from modules.groups.infrastructure.circuit_breaker import (
+from email_validator import EmailNotValidError, validate_email
+from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     register_circuit_breaker,
 )
+from modules.groups.domain.models import NormalizedMember
 from modules.groups.providers.contracts import (
-    OperationResult,
-    OperationStatus,
-    HealthCheckResult,
     CircuitBreakerStats,
+    HealthCheckResult,
     ProviderCapabilities,
 )
 

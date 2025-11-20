@@ -1,4 +1,4 @@
-from models.integrations import IntegrationResponse
+from infrastructure.operations import OperationResult
 import pytest
 from unittest.mock import MagicMock, patch
 from googleapiclient.errors import HttpError
@@ -99,32 +99,28 @@ def test_get_retry_codes_invalid_type():
 def test_handle_final_error_non_critical_config():
     error = Exception("not found")
     resp = gs._handle_final_error(error, "get_user")
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert "not found" in resp.error["message"]
-    assert resp.function_name == "get_user"
-    assert resp.integration_name == "google"
+    assert "not found" in resp.message
 
 
 def test_handle_final_error_return_none_on_error():
     error = Exception("fail")
     resp = gs._handle_final_error(error, "func")
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert resp.function_name == "func"
-    assert resp.integration_name == "google"
+    assert "fail" in resp.message
 
 
 def test_handle_final_error_non_critical_with_response_metadata():
     error = Exception("not found")
     resp = gs._handle_final_error(error, "get_user")
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert resp.function_name == "get_user"
-    assert resp.integration_name == "google"
+    assert "not found" in resp.message
 
 
 # --- execute_api_call ---
@@ -133,12 +129,11 @@ def test_execute_api_call_success():
         return 42
 
     resp = gs.execute_api_call("func", api)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == 42
-    assert resp.error is None
-    assert resp.function_name == "func"
-    assert resp.integration_name == "google"
+    assert resp.error_code is None
+    assert "Google API call func succeeded" in resp.message
 
 
 def test_execute_api_call_exhausts_retries_and_returns_error():
@@ -159,11 +154,11 @@ def test_execute_api_call_exhausts_retries_and_returns_error():
 
     gs.ERROR_CONFIG["default_backoff_factor"] = 1.0
     resp = gs.execute_api_call("func", api, max_retries=2)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.data is None
     assert resp.error is not None
-    assert "Service Unavailable" in str(resp.error["message"])
+    assert "Service Unavailable" in str(resp.message)
 
 
 def test_execute_api_call_non_retryable_error_returns_error():
@@ -184,11 +179,11 @@ def test_execute_api_call_non_retryable_error_returns_error():
 
     gs.ERROR_CONFIG["default_backoff_factor"] = 1.0
     resp = gs.execute_api_call("func", api, max_retries=2)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.data is None
     assert resp.error is not None
-    assert "Bad Request" in str(resp.error["message"])
+    assert "Bad Request" in str(resp.message)
 
 
 def test_execute_api_call_error_response():
@@ -196,13 +191,11 @@ def test_execute_api_call_error_response():
         raise ValueError("not found")
 
     resp = gs.execute_api_call("get_user", api_call)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.data is None
     assert resp.error is not None
-    assert "not found" in resp.error["message"]
-    assert resp.function_name == "get_user"
-    assert resp.integration_name == "google"
+    assert "not found" in resp.message
 
 
 def test_execute_api_call_retry_logic():
@@ -226,8 +219,8 @@ def test_execute_api_call_retry_logic():
         return "ok"
 
     resp = gs.execute_api_call("func", api, max_retries=3)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == "ok"
     assert len(calls) == 3
 
@@ -270,8 +263,8 @@ def test_execute_api_call_http_error_retry(_sleep_mock, logger_mock):
         return "ok"
 
     result = gs.execute_api_call("func", api)
-    assert isinstance(result, IntegrationResponse)
-    assert result.success is True
+    assert isinstance(result, OperationResult)
+    assert result.is_success
     assert result.data == "ok"
     assert len(calls) == 2
     logger_mock.warning.assert_any_call(
@@ -299,10 +292,10 @@ def test_execute_api_call_non_retryable_http_error(logger_mock):
         raise err
 
     resp = gs.execute_api_call("func", api)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert resp.error["error_code"] == "404"
+    assert resp.error_code == "GOOGLE_API_ERROR_404"
     logger_mock.error.assert_any_call(
         "google_api_error_final", function="func", error=str(err), status_code=404
     )
@@ -314,9 +307,9 @@ def test_execute_api_call_raises(logger_mock):
         raise ValueError("fail")
 
     result = gs.execute_api_call("func", api)
-    assert isinstance(result, IntegrationResponse)
-    assert result.success is False
-    assert result.error["message"] == "fail"
+    assert isinstance(result, OperationResult)
+    assert not result.is_success
+    assert result.message == "fail"
     logger_mock.error.assert_any_call(
         "google_api_error_final", function="func", error="fail", status_code=None
     )
@@ -357,8 +350,8 @@ def test_paginate_all_results(_mock):
 
     req = FakeRequest()
     resp = gs.paginate_all_results(req, resource_key="users")
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == [1, 2]
 
 
@@ -393,8 +386,8 @@ def test_paginate_all_results_auto_detect_key(_mock):
 
     req = FakeRequest()
     resp = gs.paginate_all_results(req)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == [1, 2]
 
 
@@ -419,8 +412,8 @@ def test_paginate_all_results_response_list(_mock):
 
     req = FakeRequest()
     resp = gs.paginate_all_results(req)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == [1, 2]
 
 
@@ -445,8 +438,8 @@ def test_paginate_all_results_no_execute_next_chunk(_mock):
 
     req = FakeRequest()
     resp = gs.paginate_all_results(req, resource_key="foo")
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success
     assert resp.data == [1]
 
 
@@ -583,9 +576,10 @@ def test_execute_batch_request_success():
 
     fake_batch._results = {"id1": {"foo": 1}, "id2": {"bar": 2}}
     result = gs.execute_batch_request(fake_service, requests)
-    assert isinstance(result, IntegrationResponse)
+    assert isinstance(result, OperationResult)
     assert set(result.data["results"]) == {"id1", "id2"}
-    assert result.error is None or result.error.get("errors", {}) == {}
+    # No errors expected for this successful batch
+    assert "errors" not in result.data or result.data.get("errors", {}) == {}
     assert result.data["summary"]["successful"] == 2
 
 
@@ -609,12 +603,12 @@ def test_execute_batch_request_error():
 
     service.new_batch_http_request.side_effect = new_batch_http_request
     resp = gs.execute_batch_request(service, requests)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
-    assert resp.data == {}
-    assert resp.error is not None
-    assert resp.function_name == "execute_batch_request"
-    assert resp.integration_name == "google"
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
+    # When errors occur we expect data to contain 'errors' and 'results' keys
+    assert isinstance(resp.data, dict)
+    assert "errors" in resp.data
+    assert "get_user" in resp.data["errors"]
 
 
 def test_execute_batch_request_with_errors():
@@ -697,11 +691,16 @@ def test_execute_batch_request_mixed_success_and_non_critical_error():
     fake_service.new_batch_http_request.side_effect = new_batch_http_request
 
     result = gs.execute_batch_request(fake_service, requests)
-    assert isinstance(result, IntegrationResponse)
-    assert result.success is False  # Non-critical error should still mark as failed
+    assert isinstance(result, OperationResult)
+    assert not result.is_success  # Non-critical error should still mark as failed
     assert "id1" in result.data.get("results", {}) or "id1" in result.data
-    assert result.error is not None
-    assert "not found" in str(result.error)
+    # Error details are embedded in result.data['errors']
+    assert "errors" in result.data
+    # Ensure the non-critical error message appears in the aggregated data
+    assert any(
+        "not found" in str(v.get("message") or v)
+        for v in result.data.get("errors", {}).values()
+    )
 
 
 def test_execute_batch_request_missing_request_id():
@@ -754,7 +753,7 @@ def test_execute_batch_request_unexpected_callback_result():
 
     result = gs.execute_batch_request(fake_service, requests)
     # Should handle gracefully, likely empty result
-    assert result.success is True or result.success is False
+    assert result.is_success or not result.is_success
 
 
 def test_execute_batch_request_callback_with_data_and_error():
@@ -781,7 +780,7 @@ def test_execute_batch_request_callback_with_data_and_error():
 
     result = gs.execute_batch_request(fake_service, requests)
     # Should prefer error
-    assert result.success is False
+    assert not result.is_success
     assert result.error is not None
 
 
@@ -806,7 +805,7 @@ def test_execute_batch_request_callback_never_called():
 
     result = gs.execute_batch_request(fake_service, requests)
     # Should handle gracefully, likely empty result
-    assert isinstance(result, IntegrationResponse)
+    assert isinstance(result, OperationResult)
 
 
 # --- execute_google_api_call edge case tests ---
@@ -830,10 +829,10 @@ def test_execute_google_api_call_invalid_resource_path():
         resource_path="invalid_resource",
         method="list",
     )
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert "No such resource" in resp.error["message"]
+    assert "No such resource" in resp.message
 
 
 def test_execute_google_api_call_unsupported_method():
@@ -856,10 +855,10 @@ def test_execute_google_api_call_unsupported_method():
         resource_path="files",
         method="not_a_method",
     )
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert "No such method" in resp.error["message"]
+    assert "No such method" in resp.message
 
 
 def test_execute_google_api_call_api_error():
@@ -887,11 +886,10 @@ def test_execute_google_api_call_api_error():
         resource_path="files",
         method="list",
     )
-    assert isinstance(resp, IntegrationResponse)
-    assert not isinstance(resp.data, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert not resp.is_success
     assert resp.error is not None
-    assert "generator" in str(resp.error["message"])
+    assert "generator" in str(resp.message)
 
 
 @patch(

@@ -20,12 +20,8 @@ from typing import Any, Dict, List, Optional, Mapping
 from core.config import settings
 from core.logging import get_module_logger
 from integrations.aws.client_next import execute_aws_api_call
-from models.integrations import (
-    IntegrationResponse,
-    build_success_response,
-    build_error_response,
-    build_integration_response,
-)
+from infrastructure.operations.result import OperationResult
+from infrastructure.operations.status import OperationStatus
 
 # Configuration from settings
 AWS_IDENTITY_STORE_ID = settings.aws.INSTANCE_ID
@@ -40,7 +36,7 @@ logger = get_module_logger()
 def get_user(
     user_id: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Get a user from AWS Identity Store by user ID.
 
@@ -49,7 +45,7 @@ def get_user(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -65,7 +61,7 @@ def get_user(
 def get_user_by_username(
     username: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Get a user ID by username (email).
 
@@ -74,7 +70,7 @@ def get_user_by_username(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -94,7 +90,7 @@ def get_user_by_username(
 
 def list_users(
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     List all users from AWS Identity Store.
 
@@ -102,7 +98,7 @@ def list_users(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -122,7 +118,7 @@ def create_user(
     first_name: str,
     family_name: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Create a new user in AWS Identity Store.
 
@@ -133,7 +129,7 @@ def create_user(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -149,7 +145,7 @@ def create_user(
     )
 
 
-def delete_user(user_id: str, **kwargs) -> IntegrationResponse:
+def delete_user(user_id: str, **kwargs) -> OperationResult:
     """
     Delete a user from AWS Identity Store.
 
@@ -177,7 +173,7 @@ def delete_user(user_id: str, **kwargs) -> IntegrationResponse:
 def get_group(
     group_id: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Get a group from AWS Identity Store by group ID.
 
@@ -186,7 +182,7 @@ def get_group(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -202,7 +198,7 @@ def get_group(
 def get_group_by_name(
     group_name: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Get a group ID by group name (display name).
 
@@ -211,7 +207,7 @@ def get_group_by_name(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -231,7 +227,7 @@ def get_group_by_name(
 
 def list_groups(
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     List all groups from AWS Identity Store.
 
@@ -239,12 +235,12 @@ def list_groups(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
 
     Example:
         ```
         result = list_groups()
-        if result.success:
+        if result.is_success:
             groups = result.data  # List of groups
         else:
             logger.error("Failed to list groups", error=result.error)
@@ -274,9 +270,7 @@ def list_groups(
 # Group Membership Management Functions
 
 
-def create_group_membership(
-    group_id: str, user_id: str, **kwargs
-) -> IntegrationResponse:
+def create_group_membership(group_id: str, user_id: str, **kwargs) -> OperationResult:
     """
     Create a group membership in AWS Identity Store.
 
@@ -286,7 +280,7 @@ def create_group_membership(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -300,7 +294,7 @@ def create_group_membership(
     )
 
 
-def delete_group_membership(membership_id: str, **kwargs) -> IntegrationResponse:
+def delete_group_membership(membership_id: str, **kwargs) -> OperationResult:
     """
     Delete a group membership from AWS Identity Store.
 
@@ -309,7 +303,7 @@ def delete_group_membership(membership_id: str, **kwargs) -> IntegrationResponse
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -326,7 +320,7 @@ def get_group_membership_id(
     group_id: str,
     user_id: str,
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Get the membership ID for a user in a group.
 
@@ -336,7 +330,7 @@ def get_group_membership_id(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -350,7 +344,7 @@ def get_group_membership_id(
     )
 
 
-def list_group_memberships(group_id: str, **kwargs) -> IntegrationResponse:
+def list_group_memberships(group_id: str, **kwargs) -> OperationResult:
     """
     List all memberships for a specific group.
 
@@ -359,7 +353,7 @@ def list_group_memberships(group_id: str, **kwargs) -> IntegrationResponse:
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -374,7 +368,7 @@ def list_group_memberships(group_id: str, **kwargs) -> IntegrationResponse:
     )
 
 
-def list_group_memberships_for_member(user_id: str, **kwargs) -> IntegrationResponse:
+def list_group_memberships_for_member(user_id: str, **kwargs) -> OperationResult:
     """
     List all group memberships for a specific user.
 
@@ -383,7 +377,7 @@ def list_group_memberships_for_member(user_id: str, **kwargs) -> IntegrationResp
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -402,7 +396,7 @@ def is_member_in_groups(
     user_id: str,
     group_ids: List[str],
     **kwargs,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     Check if a user is a member of specific groups.
 
@@ -412,7 +406,7 @@ def is_member_in_groups(
         **kwargs: Additional parameters for the API call
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API integrations.
     """
 
     return execute_aws_api_call(
@@ -438,12 +432,12 @@ def healthcheck() -> bool:
     """
     try:
         # Simple test: try to list users (should work if credentials/config are correct)
-        result: IntegrationResponse = list_users()
+        result: OperationResult = list_users()
         logger.info(
             "identity_store_healthcheck",
-            status="healthy" if result.success else "unhealthy",
+            status="healthy" if result.is_success else "unhealthy",
         )
-        return result.success
+        return result.is_success
     except Exception as error:  # pylint: disable=broad-except
         logger.exception("identity_store_healthcheck_failed", error=str(error))
         return False
@@ -452,7 +446,7 @@ def healthcheck() -> bool:
 # Batch Operations (leveraging the enhanced error handling)
 
 
-def get_batch_users(user_ids: List[str], **kwargs) -> IntegrationResponse:
+def get_batch_users(user_ids: List[str], **kwargs) -> OperationResult:
     """
     Get multiple users by their IDs using individual API calls with enhanced error handling.
 
@@ -461,29 +455,32 @@ def get_batch_users(user_ids: List[str], **kwargs) -> IntegrationResponse:
         **kwargs: Additional parameters for the API calls
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API operations.
     """
     results = {}
     errors = []
     for user_id in user_ids:
         response = get_user(user_id, **kwargs)
-        if response.success:
+        if response.is_success:
             results[user_id] = response.data
         else:
             results[user_id] = None
-            errors.append({"user_id": user_id, "error": response.error})
+            errors.append(
+                {"user_id": user_id, "error": response.message or response.error_code}
+            )
     if errors:
-        return build_integration_response(
-            success=False,
+        return OperationResult.error(
+            status=OperationStatus.PERMANENT_ERROR,
+            message=f"Failed to fetch {len(errors)} user(s)",
+            error_code="batch_user_fetch_failed",
             data=results,
-            error_info={"failed_users": errors},
-            function_name="get_batch_users",
-            integration_name="aws",
         )
-    return build_success_response(results, "get_batch_users", "aws")
+    return OperationResult.success(
+        data=results, message="All users fetched successfully"
+    )
 
 
-def get_batch_groups(group_ids: List[str], **kwargs) -> IntegrationResponse:
+def get_batch_groups(group_ids: List[str], **kwargs) -> OperationResult:
     """
     Get multiple groups by their IDs using individual API calls with enhanced error handling.
 
@@ -492,27 +489,30 @@ def get_batch_groups(group_ids: List[str], **kwargs) -> IntegrationResponse:
         **kwargs: Additional parameters for the API calls
 
     Returns:
-        IntegrationResponse: Standardized response model for external API integrations.
+        OperationResult: Standardized response model for external API operations.
     """
     results = {}
     errors = []
     for group_id in group_ids:
         response = get_group(group_id, **kwargs)
-        if response.success:
+        if response.is_success:
             results[group_id] = response.data
         else:
             results[group_id] = None
-            errors.append({"group_id": group_id, "error": response.error})
+            errors.append(
+                {"group_id": group_id, "error": response.message or response.error_code}
+            )
     if errors:
-        return build_integration_response(
-            success=False,
+        return OperationResult.error(
+            status=OperationStatus.PERMANENT_ERROR,
+            message=f"Failed to fetch {len(errors)} group(s)",
+            error_code="batch_group_fetch_failed",
             data=results,
-            error_info={"failed_groups": errors},
-            function_name="get_batch_groups",
-            integration_name="aws",
         )
 
-    return build_success_response(results, "get_batch_groups", "aws")
+    return OperationResult.success(
+        data=results, message="All groups fetched successfully"
+    )
 
 
 def _fetch_group_memberships_parallel(
@@ -532,14 +532,14 @@ def _fetch_group_memberships_parallel(
             gid = future_to_gid[future]
             try:
                 response = future.result()
-                if isinstance(response, IntegrationResponse):
-                    if response.success and isinstance(response.data, list):
+                if isinstance(response, OperationResult):
+                    if response.is_success and isinstance(response.data, list):
                         memberships_by_group[gid] = response.data
                     else:
                         logger.warning(
                             "group_memberships_fetch_error",
                             group_id=gid,
-                            error=response.error,
+                            error=response.message or response.error_code,
                         )
                         memberships_by_group[gid] = []
                 else:
@@ -619,7 +619,7 @@ def list_groups_with_memberships(
     memberships_kwargs: Optional[Dict[str, Any]] = None,
     users_kwargs: Optional[Dict[str, Any]] = None,
     tolerate_errors: bool = False,
-) -> IntegrationResponse:
+) -> OperationResult:
     """
     List all groups in the AWS Identity Store with their memberships
 
@@ -643,14 +643,13 @@ def list_groups_with_memberships(
     )
 
     # 1. Fetch all groups
-    response: IntegrationResponse = list_groups(**(groups_kwargs or {}))
-    if response.success and isinstance(response.data, list):
+    response: OperationResult = list_groups(**(groups_kwargs or {}))
+    if response.is_success and isinstance(response.data, list):
         groups: List[Dict[str, Any]] = response.data
     else:
-        return build_error_response(
-            error=Exception("Failed to list groups"),
-            function_name="list_groups_with_memberships",
-            integration_name="aws_identity_store",
+        return OperationResult.permanent_error(
+            message="Failed to list groups",
+            error_code="list_groups_failed",
         )
 
     logger.info("groups_listed", count=len(groups))
@@ -669,11 +668,10 @@ def list_groups_with_memberships(
 
     # 5. Batch fetch all user details using our utility function
     response = list_users(**(users_kwargs or {}))
-    if not response.success:
-        return build_error_response(
-            error=Exception("Failed to list users"),
-            function_name="list_groups_with_memberships",
-            integration_name="aws_identity_store",
+    if not response.is_success:
+        return OperationResult.permanent_error(
+            message="Failed to list users",
+            error_code="list_users_failed",
         )
     if isinstance(response.data, list):
         users: List[Dict[str, Any]] = response.data
@@ -686,8 +684,7 @@ def list_groups_with_memberships(
     )
 
     logger.info("groups_with_memberships_listed", count=len(groups_with_memberships))
-    return build_success_response(
+    return OperationResult.success(
         data=groups_with_memberships,
-        function_name="list_groups_with_memberships",
-        integration_name="aws_identity_store",
+        message="Groups with memberships listed successfully",
     )

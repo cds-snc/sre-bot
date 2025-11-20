@@ -1,19 +1,11 @@
-"""Unit tests for groups module circuit breaker functionality.
+"""Unit tests for infrastructure circuit breaker functionality.
 
-Tests cover:
-- CircuitBreaker state machine (CLOSED, OPEN, HALF_OPEN)
-- State transitions and timeout handling
-- Failure threshold and success tracking
-- Statistics collection
-- Manual reset functionality
-- Exception handling and propagation
-
-All tests use pure state machine logic with time mocking where needed.
+Moved from tests/unit/modules/groups/test_circuit_breaker.py.
 """
 
 import pytest
 import time
-from modules.groups.infrastructure.circuit_breaker import (
+from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitState,
@@ -25,19 +17,16 @@ class TestCircuitBreakerInitialization:
     """Tests for CircuitBreaker initialization."""
 
     def test_starts_in_closed_state(self):
-        """CircuitBreaker starts in CLOSED state."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
         assert cb.state == CircuitState.CLOSED
 
     def test_initializes_with_zero_stats(self):
-        """CircuitBreaker initializes with zero failure and success counts."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
         stats = cb.get_stats()
         assert stats["failure_count"] == 0
         assert stats["success_count"] == 0
 
     def test_stores_configuration(self):
-        """CircuitBreaker stores configuration parameters."""
         cb = CircuitBreaker(
             "my-provider",
             failure_threshold=5,
@@ -50,7 +39,6 @@ class TestCircuitBreakerInitialization:
         assert cb.half_open_max_calls == 2
 
     def test_default_configuration(self):
-        """CircuitBreaker accepts defaults."""
         cb = CircuitBreaker("test")
         assert cb.failure_threshold == 5
         assert cb.timeout_seconds == 60
@@ -62,7 +50,6 @@ class TestCircuitBreakerClosedState:
     """Tests for CircuitBreaker CLOSED state behavior."""
 
     def test_allows_successful_calls(self):
-        """CircuitBreaker allows calls to succeed when CLOSED."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def success_func():
@@ -73,32 +60,25 @@ class TestCircuitBreakerClosedState:
         assert cb.state == CircuitState.CLOSED
 
     def test_tracks_successful_calls(self):
-        """CircuitBreaker recovers to CLOSED after successful HALF_OPEN call."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
             raise Exception("fail")
 
-        # Trip the circuit
         with pytest.raises(Exception):
             cb.call(failing_func)
         assert cb.state.value == "open"
 
-        # Wait for recovery timeout
         time.sleep(1.2)
 
-        # Successful call in HALF_OPEN should close circuit
         def success_func():
             return "ok"
 
         result = cb.call(success_func)
         assert result == "ok"
-
-        # Circuit should be back to CLOSED after successful recovery
         assert cb.state.value == "closed"
 
     def test_propagates_function_exceptions(self):
-        """CircuitBreaker propagates exceptions from called functions."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -109,7 +89,6 @@ class TestCircuitBreakerClosedState:
         assert "test error" in str(exc_info.value)
 
     def test_tracks_failures_in_closed_state(self):
-        """CircuitBreaker tracks failures when CLOSED."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -123,7 +102,6 @@ class TestCircuitBreakerClosedState:
         assert stats["failure_count"] == 2
 
     def test_resets_failure_count_on_success(self):
-        """CircuitBreaker resets failure count after success."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -132,14 +110,12 @@ class TestCircuitBreakerClosedState:
         def success_func():
             return "ok"
 
-        # Accumulate failures
         for _ in range(2):
             with pytest.raises(Exception):
                 cb.call(failing_func)
 
         assert cb.get_stats()["failure_count"] == 2
 
-        # Success resets the count
         cb.call(success_func)
         assert cb.get_stats()["failure_count"] == 0
 
@@ -149,7 +125,6 @@ class TestCircuitBreakerOpenState:
     """Tests for CircuitBreaker OPEN state behavior."""
 
     def test_opens_after_failure_threshold(self):
-        """CircuitBreaker opens after threshold failures."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -162,18 +137,15 @@ class TestCircuitBreakerOpenState:
         assert cb.state == CircuitState.OPEN
 
     def test_rejects_calls_when_open(self):
-        """CircuitBreaker rejects calls with CircuitBreakerOpenError when OPEN."""
         cb = CircuitBreaker("test", failure_threshold=2, timeout_seconds=60)
 
         def failing_func():
             raise Exception("fail")
 
-        # Trip the circuit
         for _ in range(2):
             with pytest.raises(Exception):
                 cb.call(failing_func)
 
-        # Should reject new calls
         def success_func():
             return "ok"
 
@@ -181,7 +153,6 @@ class TestCircuitBreakerOpenState:
             cb.call(success_func)
 
     def test_open_error_includes_circuit_name(self):
-        """CircuitBreakerOpenError message includes circuit name."""
         cb = CircuitBreaker("test-provider", failure_threshold=1, timeout_seconds=60)
 
         def failing_func():
@@ -200,7 +171,6 @@ class TestCircuitBreakerOpenState:
         assert "test-provider" in str(exc_info.value)
 
     def test_open_error_states_circuit_is_open(self):
-        """CircuitBreakerOpenError message states circuit is OPEN."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=60)
 
         def failing_func():
@@ -224,22 +194,18 @@ class TestCircuitBreakerHalfOpenState:
     """Tests for CircuitBreaker HALF_OPEN state behavior."""
 
     def test_transitions_to_half_open_after_timeout(self):
-        """CircuitBreaker transitions to HALF_OPEN after timeout expires."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
             raise Exception("fail")
 
-        # Trip the circuit
         with pytest.raises(Exception):
             cb.call(failing_func)
 
         assert cb.state == CircuitState.OPEN
 
-        # Wait for timeout
         time.sleep(1.5)
 
-        # Next call should attempt recovery (HALF_OPEN)
         def success_func():
             return "ok"
 
@@ -247,7 +213,6 @@ class TestCircuitBreakerHalfOpenState:
         assert result == "ok"
 
     def test_closes_after_successful_half_open_call(self):
-        """CircuitBreaker closes after successful call in HALF_OPEN."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
@@ -265,7 +230,6 @@ class TestCircuitBreakerHalfOpenState:
         assert cb.state == CircuitState.CLOSED
 
     def test_reopens_after_failed_half_open_call(self):
-        """CircuitBreaker reopens if call fails in HALF_OPEN."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
@@ -276,14 +240,12 @@ class TestCircuitBreakerHalfOpenState:
 
         time.sleep(1.5)
 
-        # Fail during recovery attempt
         with pytest.raises(Exception):
             cb.call(failing_func)
 
         assert cb.state == CircuitState.OPEN
 
     def test_respects_half_open_max_calls(self):
-        """CircuitBreaker respects half_open_max_calls limit."""
         cb = CircuitBreaker(
             "test",
             failure_threshold=1,
@@ -299,7 +261,6 @@ class TestCircuitBreakerHalfOpenState:
 
         time.sleep(1.5)
 
-        # First call in HALF_OPEN succeeds
         def success_func():
             return "ok"
 
@@ -313,13 +274,11 @@ class TestCircuitBreakerReset:
     """Tests for CircuitBreaker manual reset functionality."""
 
     def test_reset_clears_state(self):
-        """CircuitBreaker.reset() returns to CLOSED state."""
         cb = CircuitBreaker("test", failure_threshold=2, timeout_seconds=60)
 
         def failing_func():
             raise Exception("fail")
 
-        # Trip the circuit
         for _ in range(2):
             with pytest.raises(Exception):
                 cb.call(failing_func)
@@ -330,7 +289,6 @@ class TestCircuitBreakerReset:
         assert cb.state == CircuitState.CLOSED
 
     def test_reset_clears_failure_count(self):
-        """CircuitBreaker.reset() clears failure count."""
         cb = CircuitBreaker("test", failure_threshold=2, timeout_seconds=60)
 
         def failing_func():
@@ -345,7 +303,6 @@ class TestCircuitBreakerReset:
         assert stats["failure_count"] == 0
 
     def test_allows_calls_after_reset(self):
-        """CircuitBreaker allows calls after reset."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=60)
 
         def failing_func():
@@ -368,26 +325,22 @@ class TestCircuitBreakerStatistics:
     """Tests for CircuitBreaker statistics tracking."""
 
     def test_get_stats_returns_dict(self):
-        """CircuitBreaker.get_stats() returns dictionary."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
         stats = cb.get_stats()
         assert isinstance(stats, dict)
 
     def test_stats_includes_name(self):
-        """Circuit breaker stats include circuit name."""
         cb = CircuitBreaker("my-circuit", failure_threshold=3, timeout_seconds=60)
         stats = cb.get_stats()
         assert stats["name"] == "my-circuit"
 
     def test_stats_includes_state(self):
-        """Circuit breaker stats include current state."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
         stats = cb.get_stats()
         assert "state" in stats
         assert stats["state"] == "closed"
 
     def test_stats_includes_failure_count(self):
-        """Circuit breaker stats include failure count."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -401,34 +354,27 @@ class TestCircuitBreakerStatistics:
         assert stats["failure_count"] == 2
 
     def test_stats_includes_success_count(self):
-        """Circuit breaker stats include success_count field."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
             raise Exception("fail")
 
-        # Trip the circuit
         with pytest.raises(Exception):
             cb.call(failing_func)
 
-        # Wait for recovery timeout
         time.sleep(1.2)
 
         def success_func():
             return "ok"
 
-        # Make HALF_OPEN call
         result = cb.call(success_func)
         assert result == "ok"
 
-        # After recovery, success_count resets but field should exist in stats
         stats = cb.get_stats()
         assert "success_count" in stats
-        # Stats after recovery shows success_count was reset to 0 on CLOSED transition
         assert stats["success_count"] == 0
 
     def test_stats_includes_last_error_time(self):
-        """Circuit breaker stats include last failure time."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=60)
 
         def failing_func():
@@ -447,7 +393,6 @@ class TestCircuitBreakerExceptionHandling:
     """Tests for CircuitBreaker exception handling."""
 
     def test_propagates_custom_exceptions(self):
-        """CircuitBreaker propagates custom exception types."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         class CustomError(Exception):
@@ -460,7 +405,6 @@ class TestCircuitBreakerExceptionHandling:
             cb.call(failing_func)
 
     def test_propagates_exception_messages(self):
-        """CircuitBreaker preserves exception messages."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def failing_func():
@@ -472,7 +416,6 @@ class TestCircuitBreakerExceptionHandling:
         assert "detailed error message" in str(exc_info.value)
 
     def test_handles_function_with_args(self):
-        """CircuitBreaker passes arguments to wrapped function."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def add(a, b):
@@ -482,7 +425,6 @@ class TestCircuitBreakerExceptionHandling:
         assert result == 5
 
     def test_handles_function_with_kwargs(self):
-        """CircuitBreaker passes keyword arguments to wrapped function."""
         cb = CircuitBreaker("test", failure_threshold=3, timeout_seconds=60)
 
         def greet(name, greeting="Hello"):
@@ -497,27 +439,23 @@ class TestCircuitBreakerConfiguration:
     """Tests for CircuitBreaker configuration options."""
 
     def test_custom_failure_threshold_respected(self):
-        """CircuitBreaker respects custom failure_threshold."""
         cb = CircuitBreaker("test", failure_threshold=5, timeout_seconds=60)
 
         def failing_func():
             raise Exception("fail")
 
-        # Should tolerate 4 failures
         for _ in range(4):
             with pytest.raises(Exception):
                 cb.call(failing_func)
 
         assert cb.state == CircuitState.CLOSED
 
-        # 5th failure opens it
         with pytest.raises(Exception):
             cb.call(failing_func)
 
         assert cb.state == CircuitState.OPEN
 
     def test_custom_timeout_respected(self):
-        """CircuitBreaker respects custom timeout_seconds."""
         cb = CircuitBreaker("test", failure_threshold=1, timeout_seconds=1)
 
         def failing_func():
@@ -526,7 +464,6 @@ class TestCircuitBreakerConfiguration:
         with pytest.raises(Exception):
             cb.call(failing_func)
 
-        # Should be open immediately
         with pytest.raises(CircuitBreakerOpenError):
 
             def success_func():
@@ -534,15 +471,12 @@ class TestCircuitBreakerConfiguration:
 
             cb.call(success_func)
 
-        # Wait for timeout
         time.sleep(1.5)
 
-        # Should allow recovery
         result = cb.call(success_func)
         assert result == "ok"
 
     def test_custom_half_open_max_calls_respected(self):
-        """CircuitBreaker respects custom half_open_max_calls."""
         cb = CircuitBreaker(
             "test",
             failure_threshold=1,
@@ -561,7 +495,6 @@ class TestCircuitBreakerConfiguration:
         def success_func():
             return "ok"
 
-        # Should allow multiple calls in HALF_OPEN
         cb.call(success_func)
         result = cb.call(success_func)
         assert result == "ok"

@@ -8,7 +8,7 @@ class IntegrationError(Exception):
 
     Attributes:
         message: human-friendly message
-        response: the original IntegrationResponse object returned by the integration
+        response: the original OperationResult object returned by the integration
     """
 
     def __init__(self, message: str, response: Any = None):

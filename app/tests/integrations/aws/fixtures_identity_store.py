@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from models.integrations import IntegrationResponse
+from infrastructure.operations import OperationResult
 from tests.fixtures.aws_clients import FakeClient
 
 
@@ -141,22 +141,22 @@ def fake_sts_and_session(
     return created
 
 
-def assert_integration_success(resp: IntegrationResponse, expected_data=None):
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+def assert_integration_success(resp: OperationResult, expected_data=None):
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is True
     if expected_data is not None:
         assert resp.data == expected_data
 
 
-def assert_integration_error(resp: IntegrationResponse):
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+def assert_integration_error(resp: OperationResult):
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is False
 
 
 # Example builder usage:
 # build_success_response({"UserId": "u-1"}, "get_user", "aws")
 # build_error_response(Exception("Not found"), "get_user", "aws")
 #
-# IntegrationResponse contract:
-#   build_success_response(data, operation, provider) -> IntegrationResponse(success=True, data=data, ...)
-#   build_error_response(error, operation, provider) -> IntegrationResponse(success=False, error=error, ...)
+# OperationResult contract:
+#   build_success_response(data, operation, provider) -> OperationResult(success=True, data=data, ...)
+#   build_error_response(error, operation, provider) -> OperationResult(success=False, error=error, ...)

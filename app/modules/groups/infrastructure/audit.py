@@ -50,6 +50,11 @@ class AuditEntry(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     ttl_seconds: int = Field(default=7776000)  # 90 days
 
+    @property
+    def is_success(self) -> bool:
+        """Alias for success field for consistency with OperationResult.is_success."""
+        return self.success
+
     class Config:
         json_schema_extra = {
             "example": {
