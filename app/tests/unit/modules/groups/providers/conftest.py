@@ -2,16 +2,17 @@
 
 # pylint: disable=unused-argument
 
-import pytest
 import types
 from typing import Optional
 
+import pytest
+from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers.contracts import (
-    ProviderCapabilities,
+    HealthCheckResult,
     OperationResult,
     OperationStatus,
+    ProviderCapabilities,
 )
-from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 
 
 @pytest.fixture
@@ -329,7 +330,7 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             data={"removed": True},
         )
 
-    def list_groups(self) -> OperationResult:
+    def list_groups(self, **kwargs) -> OperationResult:
         """Mock list groups."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -337,7 +338,7 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             data={"groups": []},
         )
 
-    def get_group_members(self, group_key: str) -> OperationResult:
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
         """Mock get group members."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -355,16 +356,12 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             data={"allowed": True},
         )
 
-    def health_check(self) -> OperationResult:
+    def health_check(self) -> HealthCheckResult:
         """Mock health check."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"healthy": True},
-        )
+        return HealthCheckResult(healthy=True, status="healthy")
 
     # Implement required abstract methods from GroupProvider/PrimaryGroupProvider
-    def _list_groups_impl(self, user_key: str) -> OperationResult:
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
         """Mock list groups implementation."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -372,7 +369,7 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             data={"groups": []},
         )
 
-    def _list_groups_with_members_impl(self, user_key: str) -> OperationResult:
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
         """Mock list groups with members implementation."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -414,13 +411,9 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             data={"allowed": True},
         )
 
-    def _health_check_impl(self) -> OperationResult:
+    def _health_check_impl(self) -> HealthCheckResult:
         """Mock health check implementation."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"healthy": True},
-        )
+        return HealthCheckResult(healthy=True, status="healthy")
 
     def _is_manager_impl(self, user_key: str, group_key: str) -> OperationResult:
         """Mock is manager implementation."""
@@ -483,7 +476,7 @@ class MockGroupProvider(GroupProvider):
             data={"removed": True},
         )
 
-    def list_groups(self) -> OperationResult:
+    def list_groups(self, **kwargs) -> OperationResult:
         """Mock list groups."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -491,7 +484,7 @@ class MockGroupProvider(GroupProvider):
             data={"groups": []},
         )
 
-    def get_group_members(self, group_key: str) -> OperationResult:
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
         """Mock get group members."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -499,16 +492,12 @@ class MockGroupProvider(GroupProvider):
             data={"members": []},
         )
 
-    def health_check(self) -> OperationResult:
+    def health_check(self) -> HealthCheckResult:
         """Mock health check."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"healthy": True},
-        )
+        return HealthCheckResult(healthy=True, status="healthy")
 
     # Implement required abstract methods from GroupProvider
-    def _list_groups_impl(self, user_key: str) -> OperationResult:
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
         """Mock list groups implementation."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -516,7 +505,7 @@ class MockGroupProvider(GroupProvider):
             data={"groups": []},
         )
 
-    def _list_groups_with_members_impl(self, user_key: str) -> OperationResult:
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
         """Mock list groups with members implementation."""
         return OperationResult(
             status=OperationStatus.SUCCESS,
@@ -558,13 +547,9 @@ class MockGroupProvider(GroupProvider):
             data={"allowed": True},
         )
 
-    def _health_check_impl(self) -> OperationResult:
+    def _health_check_impl(self) -> HealthCheckResult:
         """Mock health check implementation."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"healthy": True},
-        )
+        return HealthCheckResult(healthy=True, status="healthy")
 
     def _is_manager_impl(self, user_key: str, group_key: str) -> OperationResult:
         """Mock is manager implementation."""
