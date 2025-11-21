@@ -454,6 +454,39 @@ class GroupsFeatureSettings(BaseSettings):
         description="Per-provider configuration for enable/disable, primary selection, prefix, and capabilities",
     )
 
+    @field_validator("providers", mode="before")
+    @classmethod
+    def _parse_providers(cls, v: Optional[Any]) -> Any:
+        """Parse GROUP_PROVIDERS from JSON string (environment variable) or dict.
+
+        Handles JSON string input from environment variables, with or without
+        surrounding quotes.
+        """
+        if v is None:
+            return {}
+
+        # If already a dict, return as-is
+        if isinstance(v, dict):
+            return v
+
+        # If a string, try to strip surrounding quotes and parse JSON
+        if isinstance(v, str):
+            s = v.strip()
+            if (s.startswith("'") and s.endswith("'")) or (
+                s.startswith('"') and s.endswith('"')
+            ):
+                s = s[1:-1]
+            try:
+                parsed = json.loads(s) if s else {}
+                return parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid GROUP_PROVIDERS JSON: {e} (value: {s[:80]}...)"
+                ) from e
+
+        # Fallback: invalid type
+        raise ValueError("GROUP_PROVIDERS must be a JSON string or a mapping")
+
     @field_validator("providers", mode="after")
     @classmethod
     def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
