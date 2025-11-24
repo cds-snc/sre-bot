@@ -9,7 +9,7 @@ Usage:
   the activation orchestration phase.
 """
 
-from typing import Dict, Type, Any
+from typing import Dict, Type, Any, Optional
 
 from core.logging import get_module_logger
 
@@ -38,17 +38,21 @@ def filter_disabled_providers(
     return enabled
 
 
-def instantiate_provider(provider_cls: Type, name: str) -> Any:
-    """Instantiate a provider class with fallback construction strategies.
+def instantiate_provider(
+    provider_cls: Type, name: str, config: Optional[Dict[str, Any]] = None
+) -> Any:
+    """Instantiate a provider class with single-stage config passing.
 
     Priority:
-    1. Parameterless __init__
-    2. from_config() classmethod if available
-    3. Explicit error if neither works
+    1. Try passing config dict to __init__
+    2. Try parameterless __init__
+    3. Try from_config() classmethod if available
+    4. Explicit error if none work
 
     Args:
         provider_cls: The provider class to instantiate
         name: Provider name (for logging/errors)
+        config: Provider config dict (from settings.groups.providers[name])
 
     Returns:
         Instantiated provider instance
@@ -56,7 +60,16 @@ def instantiate_provider(provider_cls: Type, name: str) -> Any:
     Raises:
         RuntimeError: If provider cannot be instantiated
     """
-    # Try parameterless construction first
+    if config is None:
+        config = {}
+
+    # Try with config dict first (single-stage activation)
+    try:
+        return provider_cls(config=config)
+    except TypeError:
+        pass
+
+    # Try parameterless construction
     try:
         return provider_cls()
     except TypeError:
@@ -74,7 +87,7 @@ def instantiate_provider(provider_cls: Type, name: str) -> Any:
     # No construction strategy worked
     raise RuntimeError(
         f"Provider {name} cannot be instantiated: "
-        "no parameterless __init__ or from_config() classmethod"
+        "no __init__(config=...), parameterless __init__, or from_config() classmethod"
     )
 
 
@@ -147,6 +160,9 @@ def apply_capability_overrides(instance: Any, config: Dict[str, Any]) -> None:
 def apply_domain_config(instance: Any, config: Dict[str, Any]) -> None:
     """Call provider's _set_domain_from_config hook if available.
 
+    Note: This is for backwards compatibility. With single-stage activation,
+    providers should handle domain config in their __init__ method.
+
     Args:
         instance: The provider instance
         config: Provider config dict
@@ -154,6 +170,7 @@ def apply_domain_config(instance: Any, config: Dict[str, Any]) -> None:
     if hasattr(instance, "_set_domain_from_config") and callable(
         getattr(instance, "_set_domain_from_config")
     ):
+        # pylint: disable=protected-access
         instance._set_domain_from_config(config)
         logger.debug(
             "provider_domain_configured",

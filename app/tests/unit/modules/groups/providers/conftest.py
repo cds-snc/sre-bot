@@ -1,11 +1,17 @@
 """Unit test fixtures for groups providers."""
 
-import pytest
+# pylint: disable=unused-argument
+
 import types
+from typing import Optional
+
+import pytest
+from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers.contracts import (
-    ProviderCapabilities,
+    HealthCheckResult,
     OperationResult,
     OperationStatus,
+    ProviderCapabilities,
 )
 
 
@@ -149,3 +155,418 @@ def operation_result_factory():
         )
 
     return _factory
+
+
+# ============================================================================
+# DUAL-REGISTRY TESTING FIXTURES (Feature-Level Pattern)
+# ============================================================================
+
+
+@pytest.fixture
+def mock_settings_groups():
+    """Mock core.config.settings with groups configuration.
+
+    Returns a SimpleNamespace mimicking settings structure with groups attribute
+    containing circuit breaker config and empty providers dict.
+    """
+    return types.SimpleNamespace(
+        groups=types.SimpleNamespace(
+            circuit_breaker_enabled=True,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+            providers={},
+        )
+    )
+
+
+@pytest.fixture
+def mock_settings_groups_disabled_cb():
+    """Mock settings with circuit breaker disabled."""
+    return types.SimpleNamespace(
+        groups=types.SimpleNamespace(
+            circuit_breaker_enabled=False,
+            circuit_breaker_failure_threshold=5,
+            circuit_breaker_timeout_seconds=60,
+            circuit_breaker_half_open_max_calls=3,
+            providers={},
+        )
+    )
+
+
+@pytest.fixture
+def patch_provider_base_settings(
+    monkeypatch, mock_settings_groups
+):  # pylint: disable=redefined-outer-name
+    """Patch settings import in provider base module.
+
+    Simplifies provider instantiation in tests by avoiding circuit breaker setup.
+    """
+    monkeypatch.setattr(
+        "modules.groups.providers.base.settings",
+        mock_settings_groups,
+        raising=False,
+    )
+
+
+@pytest.fixture
+def mock_provider_config():
+    """Factory for creating provider configuration dicts."""
+
+    def _factory(
+        provider_name: str,
+        enabled: bool = True,
+        is_primary: bool = False,
+        prefix: Optional[str] = None,
+        capabilities: Optional[dict] = None,
+    ) -> dict:
+        config: dict = {"enabled": enabled}
+
+        if is_primary:
+            config["is_primary"] = True
+
+        if prefix:
+            config["prefix"] = prefix
+
+        if capabilities:
+            config["capabilities"] = capabilities
+
+        return {provider_name: config}
+
+    return _factory
+
+
+@pytest.fixture
+def single_primary_config(mock_provider_config):  # pylint: disable=redefined-outer-name
+    """Provider configuration with single enabled primary provider."""
+    return mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        is_primary=True,
+        capabilities={
+            "supports_member_management": True,
+            "provides_role_info": True,
+        },
+    )
+
+
+@pytest.fixture
+def multi_provider_config(mock_provider_config):  # pylint: disable=redefined-outer-name
+    """Provider configuration with primary and secondary providers."""
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        is_primary=True,
+        capabilities={
+            "supports_member_management": True,
+            "provides_role_info": True,
+        },
+    )
+
+    aws_cfg = mock_provider_config(
+        provider_name="aws",
+        enabled=True,
+        is_primary=False,
+        prefix="aws",
+        capabilities={
+            "supports_member_management": True,
+            "supports_batch_operations": True,
+            "max_batch_size": 100,
+        },
+    )
+
+    return {**google_cfg, **aws_cfg}
+
+
+class MockPrimaryGroupProvider(PrimaryGroupProvider):
+    """Mock PrimaryGroupProvider for testing registry patterns."""
+
+    def __init__(self, config: Optional[dict] = None):
+        """Initialize with optional config."""
+        self._config = config or {}
+        self.name = None
+        self._prefix = None
+        self._circuit_breaker = None
+        self._capability_override = None
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Return mock capabilities."""
+        return ProviderCapabilities(
+            is_primary=True,
+            provides_role_info=True,
+            supports_member_management=True,
+        )
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Get effective capabilities."""
+        override = getattr(self, "_capability_override", None)
+        return override if override is not None else self.capabilities
+
+    @property
+    def prefix(self) -> str:
+        """Return provider prefix."""
+        override = getattr(self, "_prefix", None)
+        if override:
+            return str(override)
+        name = getattr(self, "name", None)
+        if name:
+            return str(name)
+        return self.__class__.__name__.lower()
+
+    def add_member(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock add member."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"added": True},
+        )
+
+    def remove_member(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock remove member."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"removed": True},
+        )
+
+    def list_groups(self, **kwargs) -> OperationResult:
+        """Mock list groups."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        """Mock get group members."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"members": []},
+        )
+
+    def validate_permissions(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        """Mock validate permissions."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"allowed": True},
+        )
+
+    def health_check(self) -> HealthCheckResult:
+        """Mock health check."""
+        return HealthCheckResult(healthy=True, status="healthy")
+
+    # Implement required abstract methods from GroupProvider/PrimaryGroupProvider
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
+        """Mock list groups implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
+        """Mock list groups with members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
+        """Mock get group members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"members": []},
+        )
+
+    def _add_member_impl(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock add member implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"added": True},
+        )
+
+    def _remove_member_impl(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock remove member implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"removed": True},
+        )
+
+    def _validate_permissions_impl(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        """Mock validate permissions implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"allowed": True},
+        )
+
+    def _health_check_impl(self) -> HealthCheckResult:
+        """Mock health check implementation."""
+        return HealthCheckResult(healthy=True, status="healthy")
+
+    def _is_manager_impl(self, user_key: str, group_key: str) -> OperationResult:
+        """Mock is manager implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"is_manager": False},
+        )
+
+
+class MockGroupProvider(GroupProvider):
+    """Mock GroupProvider (secondary) for testing registry patterns."""
+
+    def __init__(self, config: Optional[dict] = None):
+        """Initialize with optional config."""
+        self._config = config or {}
+        self.name = None
+        self._prefix = None
+        self._circuit_breaker = None
+        self._capability_override = None
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Return mock capabilities."""
+        return ProviderCapabilities(
+            is_primary=False,
+            provides_role_info=False,
+            supports_member_management=True,
+        )
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Get effective capabilities."""
+        override = getattr(self, "_capability_override", None)
+        return override if override is not None else self.capabilities
+
+    @property
+    def prefix(self) -> str:
+        """Return provider prefix."""
+        override = getattr(self, "_prefix", None)
+        if override:
+            return str(override)
+        name = getattr(self, "name", None)
+        if name:
+            return str(name)
+        return self.__class__.__name__.lower()
+
+    def add_member(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock add member."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"added": True},
+        )
+
+    def remove_member(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock remove member."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"removed": True},
+        )
+
+    def list_groups(self, **kwargs) -> OperationResult:
+        """Mock list groups."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
+        """Mock get group members."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"members": []},
+        )
+
+    def health_check(self) -> HealthCheckResult:
+        """Mock health check."""
+        return HealthCheckResult(healthy=True, status="healthy")
+
+    # Implement required abstract methods from GroupProvider
+    def _list_groups_impl(self, **kwargs) -> OperationResult:
+        """Mock list groups implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def _list_groups_with_members_impl(self, **kwargs) -> OperationResult:
+        """Mock list groups with members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"groups": []},
+        )
+
+    def _get_group_members_impl(self, group_key: str, **kwargs) -> OperationResult:
+        """Mock get group members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"members": []},
+        )
+
+    def _add_member_impl(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock add member implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"added": True},
+        )
+
+    def _remove_member_impl(self, group_key: str, member_email: str) -> OperationResult:
+        """Mock remove member implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"removed": True},
+        )
+
+    def _validate_permissions_impl(
+        self, user_key: str, group_key: str, action: str
+    ) -> OperationResult:
+        """Mock validate permissions implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"allowed": True},
+        )
+
+    def _health_check_impl(self) -> HealthCheckResult:
+        """Mock health check implementation."""
+        return HealthCheckResult(healthy=True, status="healthy")
+
+    def _is_manager_impl(self, user_key: str, group_key: str) -> OperationResult:
+        """Mock is manager implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS,
+            message="ok",
+            data={"is_manager": False},
+        )
+
+
+@pytest.fixture
+def mock_primary_class():
+    """Mock PrimaryGroupProvider class for provider registration."""
+    return MockPrimaryGroupProvider
+
+
+@pytest.fixture
+def mock_secondary_class():
+    """Mock GroupProvider class for secondary provider registration."""
+    return MockGroupProvider

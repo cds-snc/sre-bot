@@ -181,13 +181,10 @@ def providers(primary_provider):
 
 
 def _patch_provider_functions(monkeypatch, providers, primary_name="primary"):
-    monkeypatch.setattr(orchestration, "get_active_providers", lambda: providers)
-    monkeypatch.setattr(
-        orchestration, "get_primary_provider", lambda: providers[primary_name]
-    )
-    monkeypatch.setattr(
-        orchestration, "get_primary_provider_name", lambda: primary_name
-    )
+    primary = providers[primary_name]
+    secondaries = {k: v for k, v in providers.items() if k != primary_name}
+    monkeypatch.setattr(orchestration, "get_primary_provider", lambda: primary)
+    monkeypatch.setattr(orchestration, "get_secondary_providers", lambda: secondaries)
 
 
 @pytest.mark.unit
