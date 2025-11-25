@@ -218,13 +218,13 @@ class TestCommandProviderIntegration:
 
         with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load once
-            providers1 = load_providers()
+            load_providers()
             prov1 = get_provider("test")
 
             # Reset and load again
             reset_registry()
 
-            providers2 = load_providers()
+            load_providers()
             prov2 = get_provider("test")
 
             # Both should work
