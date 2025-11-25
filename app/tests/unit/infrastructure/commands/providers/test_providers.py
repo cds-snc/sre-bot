@@ -105,7 +105,7 @@ class TestCommandProviderActivation:
         # Mock settings with no providers
         mock_settings = MagicMock()
         mock_settings.commands.providers = {}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -120,7 +120,7 @@ class TestCommandProviderActivation:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert len(result) == 1
@@ -137,7 +137,7 @@ class TestCommandProviderActivation:
         # Mock settings with disabled provider
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": False}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -147,7 +147,7 @@ class TestCommandProviderActivation:
         # Mock settings with unknown provider
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"unknown": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -163,7 +163,7 @@ class TestCommandProviderActivation:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         with pytest.raises(ValueError, match="Initialization failed"):
             activate_providers()
@@ -185,7 +185,7 @@ class TestCommandProviderActivation:
             "test1": {"enabled": True},
             "test2": {"enabled": True},
         }
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert len(result) == 2
@@ -202,7 +202,7 @@ class TestCommandProviderActivation:
         # Mock settings without commands attribute
         mock_settings = MagicMock()
         del mock_settings.commands
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -221,7 +221,7 @@ class TestGetProvider:
         # Mock settings and activate
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
         provider = get_provider("test")
@@ -250,7 +250,7 @@ class TestGetProvider:
             "test1": {"enabled": True},
             "test2": {"enabled": True},
         }
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
 
@@ -280,7 +280,7 @@ class TestGetActiveProviders:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
         result = get_active_providers()
@@ -308,7 +308,7 @@ class TestGetActiveProviders:
             "test1": {"enabled": True},
             "test2": {"enabled": True},
         }
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
         result = get_active_providers()
@@ -331,7 +331,7 @@ class TestResetRegistry:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
         assert len(get_active_providers()) == 1
@@ -349,7 +349,7 @@ class TestAPIOnyMode:
         mock_settings = MagicMock()
         mock_settings.commands = MagicMock()
         del mock_settings.commands.providers
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -359,7 +359,7 @@ class TestAPIOnyMode:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         result = activate_providers()
         assert result == {}
@@ -369,7 +369,7 @@ class TestAPIOnyMode:
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.commands.providers = {}
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr("infrastructure.commands.providers.settings", mock_settings)
 
         activate_providers()
 
