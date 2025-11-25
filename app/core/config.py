@@ -640,6 +640,91 @@ class GroupsFeatureSettings(BaseSettings):
         super().__init__(**kwargs)
 
 
+class CommandsSettings(BaseSettings):
+    """Configuration for command adapters and platform integrations.
+
+    Command Providers Configuration (COMMAND_PROVIDERS):
+    ---------------------------------------------------
+    Configure per-provider behavior including enable/disable and platform-specific
+    settings for command adapters (Slack, Teams, Discord, etc.).
+
+    Schema:
+        providers: Dict[str, Dict[str, Any]]
+            Key: Provider name (e.g., "slack", "teams", "discord")
+            Value: Provider configuration dict with the following fields:
+
+            - enabled (bool, optional): Whether to activate this command provider.
+              Default: True. Set to False to disable without removing config.
+
+            - Additional provider-specific fields as needed
+
+    Example Configuration:
+        COMMAND_PROVIDERS = {
+            "slack": {
+                "enabled": True
+            },
+            "teams": {
+                "enabled": False
+            }
+        }
+
+    Scenarios:
+        1. No providers enabled -> API-only mode (commands disabled)
+        2. One provider enabled -> Single platform mode
+        3. Multiple providers enabled -> Multi-platform mode
+
+    Validation:
+        - At least zero providers enabled (API-only is valid)
+        - Enabled providers must have required configuration
+    """
+
+    # Per-provider configuration. Each key is a provider name with a dict value
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        alias="COMMAND_PROVIDERS",
+        description="Per-provider configuration for command adapters",
+    )
+
+    @field_validator("providers", mode="before")
+    @classmethod
+    def _parse_providers(cls, v: Optional[Any]) -> Any:
+        """Parse COMMAND_PROVIDERS from JSON string (environment variable) or dict.
+
+        Handles JSON string input from environment variables, with or without
+        surrounding quotes.
+        """
+        if v is None:
+            return {}
+
+        # If already a dict, return as-is
+        if isinstance(v, dict):
+            return v
+
+        # If a string, try to strip surrounding quotes and parse JSON
+        if isinstance(v, str):
+            s = v.strip()
+            if (s.startswith("'") and s.endswith("'")) or (
+                s.startswith('"') and s.endswith('"')
+            ):
+                s = s[1:-1]
+            try:
+                parsed = json.loads(s) if s else {}
+                return parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid COMMAND_PROVIDERS JSON: {e} (value: {s[:80]}...)"
+                ) from e
+
+        # Fallback: invalid type
+        raise ValueError("COMMAND_PROVIDERS must be a JSON string or a mapping")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class ServerSettings(BaseSettings):
     """Server configuration settings."""
 
@@ -716,6 +801,7 @@ class Settings(BaseSettings):
     sre_ops: SreOpsSettings
     groups: GroupsFeatureSettings
     google_resources: GoogleResourcesConfig
+    commands: CommandsSettings
 
     # Development settings
     dev: DevSettings
@@ -743,6 +829,7 @@ class Settings(BaseSettings):
             "dev": DevSettings,
             "groups": GroupsFeatureSettings,
             "google_resources": GoogleResourcesConfig,
+            "commands": CommandsSettings,
         }
 
         for setting_name, setting_class in settings_map.items():
