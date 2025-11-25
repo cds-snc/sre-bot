@@ -4,6 +4,7 @@ import types
 from importlib import util
 from pathlib import Path
 from types import ModuleType
+from typing import Any, Optional
 import pytest
 
 # Ensure project root is on path BEFORE importing test factories.
@@ -261,10 +262,10 @@ def mock_provider_config():
         provider_name: str,
         enabled: bool = True,
         primary: bool = False,
-        prefix: str = None,
-        capabilities: dict = None,
+        prefix: Optional[str] = None,
+        capabilities: Optional[dict] = None,
     ) -> dict:
-        config = {"enabled": enabled}
+        config: dict[str, Any] = {"enabled": enabled}
 
         if primary:
             config["primary"] = True

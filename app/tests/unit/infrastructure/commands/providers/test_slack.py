@@ -1,10 +1,10 @@
-"""Unit tests for SlackCommandAdapter."""
+"""Unit tests for SlackCommandProvider."""
 
 import pytest
 from unittest.mock import MagicMock
 
-from infrastructure.commands.adapters.slack import (
-    SlackCommandAdapter,
+from infrastructure.commands.providers.slack import (
+    SlackCommandProvider,
     SlackResponseChannel,
 )
 from infrastructure.commands.registry import CommandRegistry
@@ -67,8 +67,8 @@ class TestSlackResponseChannel:
         )
 
 
-class TestSlackCommandAdapter:
-    """Tests for SlackCommandAdapter."""
+class TestSlackCommandProvider:
+    """Tests for SlackCommandProvider."""
 
     @pytest.fixture
     def registry(self):
@@ -99,13 +99,30 @@ class TestSlackCommandAdapter:
         return resolver
 
     @pytest.fixture
-    def adapter(self, registry, mock_translator, mock_locale_resolver):
-        """Create SlackCommandAdapter instance."""
-        return SlackCommandAdapter(
-            registry=registry,
-            translator=mock_translator,
-            locale_resolver=mock_locale_resolver,
-        )
+    def adapter(self, monkeypatch, mock_locale_resolver, mock_translator):
+        """Create SlackCommandProvider instance with mocked settings.
+
+        The new adapter signature takes config dict from settings,
+        not registry/translator/resolver directly.
+        """
+        # Mock settings.slack.SLACK_TOKEN
+        mock_settings = MagicMock()
+        mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
+        monkeypatch.setattr("core.config.settings", mock_settings)
+
+        # Create adapter with config
+        adapter = SlackCommandProvider(config={"enabled": True})
+
+        # Attach mock registry, translator, and locale_resolver for testing
+        adapter.registry = CommandRegistry("test")
+        adapter.translator = mock_translator
+        adapter.locale_resolver = mock_locale_resolver
+
+        @adapter.registry.command(name="hello")
+        def hello_cmd(ctx):
+            ctx.respond("Hello!")
+
+        return adapter
 
     @pytest.fixture
     def slack_payload(self):
@@ -192,13 +209,18 @@ class TestSlackCommandAdapter:
         adapter.locale_resolver.from_slack.assert_called_once()
 
     def test_create_context_handles_locale_resolution_failure(
-        self, registry, slack_payload
+        self, monkeypatch, slack_payload
     ):
         """create_context handles locale resolution failure."""
-        resolver = MagicMock()
-        resolver.from_slack.side_effect = Exception("Locale error")
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
+        monkeypatch.setattr("core.config.settings", mock_settings)
 
-        adapter = SlackCommandAdapter(registry=registry, locale_resolver=resolver)
+        # Create adapter with mocked locale resolver
+        adapter = SlackCommandProvider(config={"enabled": True})
+        adapter.locale_resolver = MagicMock()
+        adapter.locale_resolver.from_slack.side_effect = Exception("Locale error")
 
         ctx = adapter.create_context(slack_payload)
 
@@ -281,16 +303,28 @@ class TestSlackCommandAdapter:
 
         assert len(handler_called) == 1
 
-    def test_adapter_initialization_without_translator(self, registry):
-        """Adapter can initialize without translator."""
-        adapter = SlackCommandAdapter(registry=registry)
+    def test_adapter_initialization_without_translator(self, monkeypatch):
+        """Adapter can initialize without translator (set to None initially)."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
+        monkeypatch.setattr("core.config.settings", mock_settings)
 
+        adapter = SlackCommandProvider(config={})
+
+        # Adapter starts with translator=None, will be set by create_context
         assert adapter.translator is None
 
-    def test_adapter_initialization_without_locale_resolver(self, registry):
-        """Adapter can initialize without locale resolver."""
-        adapter = SlackCommandAdapter(registry=registry)
+    def test_adapter_initialization_without_locale_resolver(self, monkeypatch):
+        """Adapter can initialize without locale_resolver (set to None initially)."""
+        # Mock settings
+        mock_settings = MagicMock()
+        mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
+        monkeypatch.setattr("core.config.settings", mock_settings)
 
+        adapter = SlackCommandProvider(config={})
+
+        # Adapter starts with locale_resolver=None, will be set by create_context
         assert adapter.locale_resolver is None
 
     def test_create_context_handles_missing_client(self, adapter, slack_payload):

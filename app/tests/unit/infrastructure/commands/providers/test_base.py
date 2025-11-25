@@ -1,14 +1,14 @@
-"""Unit tests for base CommandAdapter."""
+"""Unit tests for base CommandProvider."""
 
 import pytest
 from unittest.mock import MagicMock
 
-from infrastructure.commands.adapters.base import CommandAdapter
+from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.context import CommandContext
 
 
-class FakeAdapter(CommandAdapter):
+class FakeAdapter(CommandProvider):
     """Fake adapter for testing base class."""
 
     def __init__(self, *args, **kwargs):
@@ -45,7 +45,7 @@ class FakeAdapter(CommandAdapter):
 
 
 class TestCommandAdapterBase:
-    """Tests for CommandAdapter base class."""
+    """Tests for CommandProvider base class."""
 
     @pytest.fixture
     def registry(self):
