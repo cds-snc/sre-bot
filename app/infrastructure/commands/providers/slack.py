@@ -6,6 +6,7 @@ from core.logging import get_module_logger
 from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.commands.context import CommandContext, ResponseChannel
 from infrastructure.commands.providers import register_command_provider
+from infrastructure.commands.responses.slack_formatter import SlackResponseFormatter
 
 logger = get_module_logger()
 
@@ -32,6 +33,7 @@ class SlackResponseChannel(ResponseChannel):
         self.client = client
         self.channel_id = channel_id
         self.user_id = user_id
+        self.formatter = SlackResponseFormatter()
 
     def send_message(self, text: str, **kwargs) -> None:
         """Send public message visible to all in channel."""
@@ -45,6 +47,36 @@ class SlackResponseChannel(ResponseChannel):
             text=text,
             **kwargs,
         )
+
+    def send_card(self, card: Any, **kwargs) -> None:
+        """Send rich card message.
+
+        Args:
+            card: Card object from infrastructure.commands.responses.models
+            **kwargs: Additional Slack-specific options
+        """
+        formatted = self.formatter.format_card(card)
+        self.respond(**formatted, **kwargs)
+
+    def send_error(self, error: Any, **kwargs) -> None:
+        """Send error message.
+
+        Args:
+            error: ErrorMessage object from infrastructure.commands.responses.models
+            **kwargs: Additional Slack-specific options
+        """
+        formatted = self.formatter.format_error(error)
+        self.respond(**formatted, **kwargs)
+
+    def send_success(self, success: Any, **kwargs) -> None:
+        """Send success message.
+
+        Args:
+            success: SuccessMessage object from infrastructure.commands.responses.models
+            **kwargs: Additional Slack-specific options
+        """
+        formatted = self.formatter.format_success(success)
+        self.respond(**formatted, **kwargs)
 
 
 @register_command_provider("slack")
