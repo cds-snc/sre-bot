@@ -23,6 +23,11 @@ from tests.factories.aws import (  # noqa: E402
     make_aws_groups_w_users,
     make_aws_groups_w_users_with_legacy,
 )
+from tests.factories.commands import (  # noqa: E402
+    make_argument,
+    make_command,
+    make_command_context,
+)
 
 # Ensure the application package root is on sys.path so importing application
 # modules (e.g. `core.config`) works during pytest collection. Pytest may
@@ -624,3 +629,35 @@ def aws_groups_w_users_with_legacy():
         )
 
     return _wrapper
+
+
+# --- Command Framework Factories (Level 1 fixtures) ---
+
+
+@pytest.fixture
+def argument_factory():
+    """Factory for creating Argument instances."""
+    return make_argument
+
+
+@pytest.fixture
+def command_factory():
+    """Factory for creating Command instances."""
+    return make_command
+
+
+@pytest.fixture
+def command_context_factory():
+    """Factory for creating CommandContext instances."""
+    return make_command_context
+
+
+@pytest.fixture
+def command_registry_factory():
+    """Factory for creating CommandRegistry instances."""
+    from infrastructure.commands.registry import CommandRegistry
+
+    def _factory(namespace: str = "test") -> CommandRegistry:
+        return CommandRegistry(namespace=namespace)
+
+    return _factory
