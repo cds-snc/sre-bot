@@ -3,8 +3,9 @@
 from typing import Any, Callable, Dict
 
 from core.logging import get_module_logger
-from infrastructure.commands.adapters.base import CommandAdapter
+from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.commands.context import CommandContext, ResponseChannel
+from infrastructure.commands.providers import register_command_provider
 
 logger = get_module_logger()
 
@@ -46,28 +47,47 @@ class SlackResponseChannel(ResponseChannel):
         )
 
 
-class SlackCommandAdapter(CommandAdapter):
+@register_command_provider("slack")
+class SlackCommandProvider(CommandProvider):
     """Adapter for Slack Bolt SDK.
 
     Bridges Slack-specific command handling to platform-agnostic framework.
+    Registered as 'slack' command provider.
 
     Example::
 
-        from infrastructure.commands import CommandRegistry, SlackCommandAdapter
-        from infrastructure.i18n import Translator, LocaleResolver
+        from infrastructure.commands.providers import get_provider
 
-        registry = CommandRegistry("groups")
-        translator = Translator()
-        locale_resolver = LocaleResolver()
-
-        adapter = SlackCommandAdapter(
-            registry=registry,
-            translator=translator,
-            locale_resolver=locale_resolver,
-        )
-
+        adapter = get_provider('slack')
+        adapter.registry = my_registry
         bot.command("/sre groups")(adapter.handle)
     """
+
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize Slack adapter.
+
+        Args:
+            config: Provider configuration dict from settings.commands.providers['slack']
+
+        Raises:
+            ValueError: If SLACK_TOKEN is not configured
+        """
+        # pylint: disable=import-outside-toplevel
+        from core.config import settings
+
+        # Validate Slack is configured
+        if not settings.slack.SLACK_TOKEN:
+            raise ValueError("SLACK_TOKEN required for Slack command provider")
+
+        # NOTE: Registry, translator, and locale_resolver are set later by modules
+        # This allows each module to attach its own command registry and i18n context
+        super().__init__(
+            registry=None,  # Will be set by modules
+            translator=None,  # Will be set in create_context from LocaleResolver
+            locale_resolver=None,  # Will be set in create_context
+        )
+
+        self.config = config
 
     def extract_command_text(self, platform_payload: Dict[str, Any]) -> str:
         """Extract command text from Slack command payload.

@@ -4,7 +4,7 @@ This framework provides:
 - CommandRegistry: Register and discover commands
 - CommandContext: Platform-agnostic execution context
 - CommandParser: Parse and validate command arguments
-- SlackCommandAdapter: Slack Bolt SDK integration
+- SlackCommandProvider: Slack Bolt SDK integration (in providers)
 
 Example:
     from infrastructure.commands import (
@@ -22,9 +22,9 @@ Example:
         ctx.respond(f"Hello, {name}!")
 
     # In Slack bot registration:
-    from infrastructure.commands import SlackCommandAdapter
+    from infrastructure.commands.providers.slack import SlackCommandProvider
 
-    adapter = SlackCommandAdapter(registry)
+    adapter = SlackCommandProvider(config={})
     bot.command("/sre mymodule")(adapter.handle)
 """
 
@@ -37,11 +37,11 @@ from infrastructure.commands.models import (
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext, ResponseChannel
-from infrastructure.commands.adapters import (
-    CommandAdapter,
-    SlackCommandAdapter,
-    SlackResponseChannel,
-)
+from infrastructure.commands.providers.base import CommandProvider
+
+# Provider imports are available but not exported by default
+# to avoid circular dependencies. Import directly from providers:
+# from infrastructure.commands.providers.slack import SlackCommandProvider
 
 __all__ = [
     # Models
@@ -56,7 +56,5 @@ __all__ = [
     "CommandContext",
     "ResponseChannel",
     # Adapters
-    "CommandAdapter",
-    "SlackCommandAdapter",
-    "SlackResponseChannel",
+    "CommandProvider",
 ]

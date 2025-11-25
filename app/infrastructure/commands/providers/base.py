@@ -1,4 +1,21 @@
-"""Base adapter for platform-agnostic command handling."""
+"""Base provider for platform-agnostic command handling.
+
+IMPORTANT: Modules MUST attach their registry before any commands are handled.
+
+Example:
+    # App startup (main.py or initialization code)
+    from infrastructure.commands.providers import activate_providers
+    providers = activate_providers()  # SlackCommandProvider instantiated, registry=None
+    slack = providers["slack"]
+
+    # Module initialization (modules/groups/groups.py or similar)
+    from infrastructure.commands import CommandRegistry
+    registry = CommandRegistry("groups")
+    slack.registry = registry  # Attach registry
+
+    # Command handling (when user sends /sre groups list)
+    slack.handle(payload)  # Uses attached groups registry
+"""
 
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional
@@ -11,14 +28,14 @@ from infrastructure.commands.context import CommandContext
 logger = get_module_logger()
 
 
-class CommandAdapter(ABC):
-    """Base class for platform-specific command adapters.
+class CommandProvider(ABC):
+    """Base class for platform-specific command providers.
 
     Implements generic command routing, parsing, and execution flow.
     Subclasses provide platform-specific context creation and acknowledgment.
 
     Example:
-        class SlackCommandAdapter(CommandAdapter):
+        class SlackCommandProvider(CommandProvider):
             def extract_command_text(self, platform_payload):
                 return platform_payload["command"].get("text", "")
 
@@ -29,14 +46,14 @@ class CommandAdapter(ABC):
 
     def __init__(
         self,
-        registry: CommandRegistry,
+        registry: Optional[CommandRegistry] = None,
         translator: Optional[Any] = None,
         locale_resolver: Optional[Any] = None,
     ):
-        """Initialize adapter with command registry.
+        """Initialize provider with command registry.
 
         Args:
-            registry: CommandRegistry with commands to dispatch
+            registry: Optional CommandRegistry with commands to dispatch
             translator: Optional Translator instance for i18n
             locale_resolver: Optional LocaleResolver instance
         """
@@ -44,6 +61,22 @@ class CommandAdapter(ABC):
         self.translator = translator
         self.locale_resolver = locale_resolver
         self.parser = CommandParser()
+
+    def _ensure_registry(self) -> CommandRegistry:
+        """Ensure registry is set, raise clear error if not.
+
+        Returns:
+            CommandRegistry instance
+
+        Raises:
+            RuntimeError: If registry not attached
+        """
+        if self.registry is None:
+            raise RuntimeError(
+                f"{self.__class__.__name__} registry not attached. "
+                "Modules must call provider.registry = CommandRegistry(...) during startup."
+            )
+        return self.registry
 
     @abstractmethod
     def extract_command_text(self, platform_payload: Any) -> str:
@@ -139,6 +172,12 @@ class CommandAdapter(ABC):
 
             # Step 4: Parse command
             cmd_name = tokens[0]
+            if self.registry is None:
+                self.send_error(
+                    platform_payload,
+                    "Command registry not initialized.",
+                )
+                return
             cmd = self.registry.get_command(cmd_name)
 
             if cmd is None:
@@ -166,7 +205,7 @@ class CommandAdapter(ABC):
             logger.warning(
                 "command_parse_error",
                 error=str(e),
-                namespace=self.registry.namespace,
+                namespace=self.registry.namespace if self.registry else "unknown",
             )
         except Exception as e:  # pylint: disable=broad-except
             self.send_error(
@@ -175,7 +214,7 @@ class CommandAdapter(ABC):
             logger.exception(
                 "unhandled_command_error",
                 error=str(e),
-                namespace=self.registry.namespace,
+                namespace=self.registry.namespace if self.registry else "unknown",
             )
 
     def _tokenize(self, text: str) -> List[str]:
@@ -216,6 +255,8 @@ class CommandAdapter(ABC):
         Returns:
             Formatted help text
         """
+        if self.registry is None:
+            return "No command registry available."
         lines = [f"*{self.registry.namespace.upper()} Commands*"]
 
         for cmd in self.registry.list_commands():
