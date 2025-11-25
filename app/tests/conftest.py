@@ -1,6 +1,7 @@
 import importlib
 import sys
 import types
+import logging
 from importlib import util
 from pathlib import Path
 from types import ModuleType
@@ -36,6 +37,21 @@ from tests.factories.commands import (  # noqa: E402
 # invocation; add it explicitly here before importing application modules.
 # pylint: disable=wrong-import-position
 import core.config as core_config  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def suppress_structlog_output():
+    """Suppress structlog output during tests.
+
+    structlog writes JSON logs through Python's logging system. This fixture
+    suppresses all application logging so test output remains clean and readable.
+    """
+    # Suppress all application logging to keep test output clean
+    logging.getLogger("structlog").setLevel(logging.CRITICAL + 1)
+    logging.getLogger("modules.groups").setLevel(logging.CRITICAL + 1)
+    logging.getLogger("infrastructure").setLevel(logging.CRITICAL + 1)
+    logging.getLogger("integrations").setLevel(logging.CRITICAL + 1)
+    yield
 
 
 @pytest.fixture
