@@ -37,7 +37,11 @@ from infrastructure.commands.models import (
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext, ResponseChannel
-from infrastructure.commands.adapters import SlackCommandAdapter, SlackResponseChannel
+from infrastructure.commands.adapters import (
+    CommandAdapter,
+    SlackCommandAdapter,
+    SlackResponseChannel,
+)
 
 __all__ = [
     # Models
@@ -52,6 +56,7 @@ __all__ = [
     "CommandContext",
     "ResponseChannel",
     # Adapters
+    "CommandAdapter",
     "SlackCommandAdapter",
     "SlackResponseChannel",
 ]
