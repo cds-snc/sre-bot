@@ -21,6 +21,33 @@ class ResponseChannel(Protocol):
         """Send ephemeral message (visible only to user)."""
         ...  # pylint: disable=unnecessary-ellipsis
 
+    def send_card(self, card: Any, **kwargs) -> None:
+        """Send rich card/embed message.
+
+        Args:
+            card: Card object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        ...  # pylint: disable=unnecessary-ellipsis
+
+    def send_error(self, error: Any, **kwargs) -> None:
+        """Send error message.
+
+        Args:
+            error: ErrorMessage object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        ...  # pylint: disable=unnecessary-ellipsis
+
+    def send_success(self, success: Any, **kwargs) -> None:
+        """Send success message.
+
+        Args:
+            success: SuccessMessage object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        ...  # pylint: disable=unnecessary-ellipsis
+
 
 @dataclass
 class CommandContext:
@@ -113,6 +140,42 @@ class CommandContext:
             logger.warning("respond_ephemeral called without responder set", text=text)
             return
         self._responder.send_ephemeral(text, **kwargs)
+
+    def respond_card(self, card: Any, **kwargs) -> None:
+        """Send rich card response.
+
+        Args:
+            card: Card object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        if self._responder is None:
+            logger.warning("respond_card called without responder set")
+            return
+        self._responder.send_card(card, **kwargs)
+
+    def respond_error(self, error: Any, **kwargs) -> None:
+        """Send error response.
+
+        Args:
+            error: ErrorMessage object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        if self._responder is None:
+            logger.warning("respond_error called without responder set")
+            return
+        self._responder.send_error(error, **kwargs)
+
+    def respond_success(self, success: Any, **kwargs) -> None:
+        """Send success response.
+
+        Args:
+            success: SuccessMessage object from infrastructure.commands.responses.models
+            **kwargs: Platform-specific options
+        """
+        if self._responder is None:
+            logger.warning("respond_success called without responder set")
+            return
+        self._responder.send_success(success, **kwargs)
 
     def get_logger(self) -> structlog.BoundLogger:
         """Get structured logger with context."""
