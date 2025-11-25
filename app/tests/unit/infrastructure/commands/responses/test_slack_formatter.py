@@ -108,7 +108,9 @@ class TestSlackResponseFormatterCard:
         result = formatter.format_card(card)
 
         blocks = result["blocks"]
-        field_block = next((b for b in blocks if b["type"] == "section" and "fields" in b), None)
+        field_block = next(
+            (b for b in blocks if b["type"] == "section" and "fields" in b), None
+        )
 
         assert field_block is not None
         assert len(field_block["fields"]) == 2
@@ -120,7 +122,9 @@ class TestSlackResponseFormatterCard:
         result = formatter.format_card(card)
 
         blocks = result["blocks"]
-        field_block = next((b for b in blocks if b["type"] == "section" and "fields" in b), None)
+        field_block = next(
+            (b for b in blocks if b["type"] == "section" and "fields" in b), None
+        )
 
         field_text = field_block["fields"][0]["text"]
         assert "*Key*" in field_text
@@ -132,7 +136,9 @@ class TestSlackResponseFormatterCard:
         result = formatter.format_card(card)
 
         blocks = result["blocks"]
-        field_block = next((b for b in blocks if b["type"] == "section" and "fields" in b), None)
+        field_block = next(
+            (b for b in blocks if b["type"] == "section" and "fields" in b), None
+        )
 
         assert field_block is None
 
@@ -301,7 +307,9 @@ class TestSlackResponseFormatterError:
         result = formatter.format_error(error)
 
         blocks = result["blocks"]
-        details_block = next((b for b in blocks if "Detailed error information" in str(b)), None)
+        details_block = next(
+            (b for b in blocks if "Detailed error information" in str(b)), None
+        )
 
         assert details_block is not None
 

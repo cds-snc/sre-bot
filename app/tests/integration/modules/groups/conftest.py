@@ -409,7 +409,7 @@ def mock_sentinel_and_activate_providers(monkeypatch, mock_sentinel_client):
     Sets up:
     - Sentinel client mock to prevent external API calls
     - Google (primary) and AWS (secondary) mock providers
-    
+
     This fixture runs automatically (autouse=True) for all integration tests.
     """
     from unittest.mock import MagicMock
