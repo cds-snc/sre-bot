@@ -62,7 +62,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers (discover + activate)
             providers = load_providers()
 
@@ -94,7 +94,7 @@ class TestCommandProviderIntegration:
             "test2": {"enabled": True},
         }
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             providers = load_providers()
 
@@ -120,7 +120,7 @@ class TestCommandProviderIntegration:
             "disabled": {"enabled": False},
         }
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             providers = load_providers()
 
@@ -135,7 +135,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             providers = load_providers()
 
@@ -159,7 +159,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": test_config}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             load_providers()
 
@@ -178,7 +178,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"failing": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers should raise
             with pytest.raises(RuntimeError, match="Provider initialization failed"):
                 load_providers()
@@ -194,7 +194,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             load_providers()
 
@@ -216,7 +216,7 @@ class TestCommandProviderIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load once
             providers1 = load_providers()
             prov1 = get_provider("test")
@@ -246,7 +246,7 @@ class TestModuleIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"test": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             load_providers()
 
@@ -268,7 +268,7 @@ class TestModuleIntegration:
         mock_settings = MagicMock()
         mock_settings.commands.providers = {"slack": {"enabled": True}}
 
-        with patch("core.config.settings", mock_settings):
+        with patch("infrastructure.commands.providers.settings", mock_settings):
             # Load providers
             load_providers()
 
