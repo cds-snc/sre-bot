@@ -19,7 +19,7 @@ from modules.groups.core.orchestration import (
     list_groups_simple,
     list_groups_with_members_and_filters,
 )
-from modules.groups.api.commands import handle_groups_command, register_groups_commands
+from modules.groups.commands.registry import registry as command_registry
 from modules.groups.infrastructure.validation import (
     validate_email,
     validate_group_id,
@@ -43,9 +43,8 @@ __all__ = [
     "remove_member_from_group",
     "list_groups_simple",
     "list_groups_with_members_and_filters",
-    # Slack interfaces
-    "handle_groups_command",
-    "register_groups_commands",
+    # Command framework (new)
+    "command_registry",
     # Validation
     "validate_email",
     "validate_group_id",
