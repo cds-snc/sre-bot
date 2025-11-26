@@ -403,11 +403,14 @@ def mock_logger(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def activate_test_providers(monkeypatch):
-    """Activate mock providers for integration testing.
+def mock_sentinel_and_activate_providers(monkeypatch, mock_sentinel_client):
+    """Mock Sentinel client and activate test providers for integration testing.
 
-    Sets up google (primary) and aws (secondary) providers with
-    proper configuration and mocked methods.
+    Sets up:
+    - Sentinel client mock to prevent external API calls
+    - Google (primary) and AWS (secondary) mock providers
+
+    This fixture runs automatically (autouse=True) for all integration tests.
     """
     from unittest.mock import MagicMock
     from modules.groups import providers as providers_module
@@ -451,14 +454,12 @@ def activate_test_providers(monkeypatch):
         "get_primary_provider_name",
         lambda: "google",
     )
-    # Also patch mappings module's imported helpers so functions that
-    # performed `from modules.groups.providers import get_active_providers`
-    # will see the mocked registry during tests.
 
     return {
         "google": mock_google,
         "aws": mock_aws,
         "registry": mock_registry,
+        "sentinel": mock_sentinel_client,
     }
 
 

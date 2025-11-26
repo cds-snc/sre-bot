@@ -177,6 +177,28 @@ def mock_event_dispatch(monkeypatch):
 
 
 @pytest.fixture
+def mock_sentinel_client(monkeypatch):
+    """Mock Sentinel client to prevent actual external calls.
+
+    Integration tests should not make real calls to external systems.
+    This fixture mocks the Sentinel client at the system boundary.
+
+    Returns:
+        MagicMock: Mock Sentinel client
+    """
+    mock = MagicMock()
+    mock.return_value = True
+
+    monkeypatch.setattr(
+        "integrations.sentinel.client.log_to_sentinel",
+        mock,
+        raising=False,
+    )
+
+    return mock
+
+
+@pytest.fixture
 def mock_event_system(monkeypatch):
     """Mock entire event system for integration tests.
 
