@@ -2,6 +2,10 @@
 
 This document contains the new testing strategy and structure to implement within the `app/tests/` directory. It outlines the organization of test files, fixture hierarchy, factory patterns, and fake client implementations to ensure maintainable, efficient, and reliable tests.
 
+## Environment Variables
+
+All the environment variables loading have been migrated to a centralized location in `core.config.settings`. Tests should not rely on loading `.env` files directly or trying to mock those. Instead, use the settings module to access configuration values. If specific environment variables are needed for tests, they should be mocked or set within the test setup using fixtures.
+
 ## Directory Structure
 
 The recommended test directory structure separates concerns clearly and provides predictable organization:
