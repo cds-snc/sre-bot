@@ -3,23 +3,59 @@
 This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
 """
 
-from slack_sdk import WebClient
-from slack_bolt import Ack, Respond, App
+from pathlib import Path
 
-from modules.incident import incident_helper
-from modules.sre import geolocate_helper, webhook_helper
-from modules.dev import core as dev_core
-from modules.reports import core as reports
-
-from modules.groups import handle_groups_command
-from integrations.slack import commands as slack_commands
 from core.config import settings
 from core.logging import get_module_logger
+from infrastructure.commands.providers.slack import SlackCommandProvider
+from infrastructure.i18n import LocaleResolver, Translator, YAMLTranslationLoader
+from integrations.slack import commands as slack_commands
+from modules.dev import core as dev_core
+from modules.groups.commands.registry import registry as groups_registry
+from modules.incident import incident_helper
+from modules.reports import core as reports
+from modules.sre import geolocate_helper, webhook_helper
+from slack_bolt import Ack, App, Respond
+from slack_sdk import WebClient
 
 PREFIX = settings.PREFIX
 GIT_SHA = settings.GIT_SHA
 
 logger = get_module_logger()
+
+
+# Initialize groups command adapter with i18n support
+def _init_groups_adapter():
+    """Initialize groups command adapter (lazy load to avoid circular dependencies)."""
+
+    # Create translator instance
+    loader = YAMLTranslationLoader(translations_dir=Path("locales"))
+    translator = Translator(loader=loader)
+    translator.load_all()
+
+    # Create locale resolver
+    locale_resolver = LocaleResolver()
+
+    # Create and configure adapter
+    adapter = SlackCommandProvider(config={"enabled": True})
+    adapter.registry = groups_registry
+    adapter.translator = translator
+    adapter.locale_resolver = locale_resolver
+
+    return adapter
+
+
+# Lazy-loaded adapter (initialized on first use)
+_groups_adapter = None
+
+
+def get_groups_adapter():
+    """Get or initialize groups command adapter."""
+    global _groups_adapter  # pylint: disable=global-statement
+    if _groups_adapter is None:
+        _groups_adapter = _init_groups_adapter()
+    return _groups_adapter
+
 
 help_text = """
 \n `/sre help | aide`
@@ -83,7 +119,23 @@ def sre_command(
         case "webhooks":
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "groups":
-            handle_groups_command(client, body, respond, ack, args)
+            adapter = get_groups_adapter()
+            # The sre command receives the full text (e.g. "groups help").
+            # The SlackCommandProvider expects the command text to be the
+            # subcommand only (e.g. "help"), because registries are
+            # namespace-scoped. Strip the leading namespace token before
+            # forwarding to the adapter.
+            cmd_copy = dict(command)
+            # args already contains the tokens after the namespace
+            cmd_copy["text"] = " ".join(args) if args else ""
+
+            adapter.handle(
+                ack=ack,
+                command=cmd_copy,
+                client=client,
+                respond=respond,
+                body=body,
+            )
         case "test":
             dev_core.dev_command(ack, respond, client, body, args)
         case "version":
