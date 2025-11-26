@@ -92,10 +92,10 @@ class TestSlackCommandProvider:
     def mock_locale_resolver(self):
         """Mock locale resolver."""
         resolver = MagicMock()
-        # Create a mock locale context
-        locale_ctx = MagicMock()
-        locale_ctx.locale.value = "en-US"
-        resolver.from_slack.return_value = locale_ctx
+        # New behavior: just use default_locale
+        locale_enum = MagicMock()
+        locale_enum.value = "en-US"
+        resolver.default_locale = locale_enum
         return resolver
 
     @pytest.fixture
@@ -206,25 +206,23 @@ class TestSlackCommandProvider:
         ctx = adapter.create_context(slack_payload)
 
         assert ctx.locale == "en-US"
-        adapter.locale_resolver.from_slack.assert_called_once()
 
     def test_create_context_handles_locale_resolution_failure(
         self, monkeypatch, slack_payload
     ):
-        """create_context handles locale resolution failure."""
+        """create_context handles locale resolution failure gracefully."""
         # Mock settings
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
         monkeypatch.setattr("core.config.settings", mock_settings)
 
-        # Create adapter with mocked locale resolver
+        # Create adapter with None locale resolver (simulates missing resolver)
         adapter = SlackCommandProvider(config={"enabled": True})
-        adapter.locale_resolver = MagicMock()
-        adapter.locale_resolver.from_slack.side_effect = Exception("Locale error")
+        adapter.locale_resolver = None
 
         ctx = adapter.create_context(slack_payload)
 
-        assert ctx.locale == "en-US"  # Falls back to default
+        assert ctx.locale == "en-US"  # Falls back to default when resolver is None
 
     def test_create_context_sets_metadata(self, adapter, slack_payload):
         """create_context sets metadata dict."""
@@ -245,10 +243,11 @@ class TestSlackCommandProvider:
         )  # pylint: disable=protected-access
 
     def test_create_context_sets_translator(self, adapter, slack_payload):
-        """create_context sets translator."""
+        """create_context sets translator to a callable wrapper."""
         ctx = adapter.create_context(slack_payload)
 
-        assert ctx._translator == adapter.translator  # pylint: disable=protected-access
+        # _translator should be callable (a wrapper function)
+        assert callable(ctx._translator)  # pylint: disable=protected-access
 
     def test_acknowledge_calls_ack_function(self, adapter, slack_payload):
         """acknowledge calls Slack ack function."""
