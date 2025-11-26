@@ -1,0 +1,38 @@
+groups:
+  commands.list.description: "Lister les groupes que vous pouvez gérer"
+  commands.list.help: |
+    🔐 *Gestion de l'Adhésion aux Groupes*
+
+    Commandes disponibles:
+    • `/sre groups list [provider]` - Lister les groupes que vous pouvez gérer
+    • `/sre groups add <email> <group_id> <provider> [justification]` - Ajouter un membre au groupe
+    • `/sre groups remove <email> <group_id> <provider> [justification]` - Supprimer un membre du groupe
+    • `/sre groups manage [provider]` - Lister tous les groupes gérables
+    • `/sre groups help` - Afficher cette aide
+
+    *Exemples:*
+    • `/sre groups list aws`
+    • `/sre groups add user@example.com my-group aws "Ajout pour accès au projet"`
+    • `/sre groups remove user@example.com my-group aws "N'est plus nécessaire"`
+  commands.add.description: "Ajouter un membre au groupe"
+  commands.add.usage: "Utilisation: `/sre groups add <member_email> <group_id> <provider> [justification]`"
+  commands.remove.description: "Supprimer un membre du groupe"
+  commands.remove.usage: "Utilisation: `/sre groups remove <member_email> <group_id> <provider> [justification]`"
+  commands.manage.description: "Lister tous les groupes gérables"
+  errors.no_email: "❌ Impossible de déterminer votre adresse e-mail."
+  errors.invalid_email: "❌ Format d'e-mail invalide: {email}"
+  errors.invalid_provider: "❌ Fournisseur invalide. Doit être l'un de: {providers}"
+  errors.unknown_flag: "❌ Drapeau inconnu: {flag}"
+  errors.missing_user_arg: "❌ Le drapeau --user nécessite un argument e-mail"
+  errors.missing_role_arg: "❌ Le drapeau --role nécessite un argument rôle (séparé par des virgules)"
+  errors.slack_handle_not_found: "❌ Impossible de résoudre le handle Slack {handle} en e-mail."
+  errors.add_failed: "❌ Erreur lors de l'ajout d'un membre au groupe. Veuillez réessayer plus tard."
+  errors.remove_failed: "❌ Erreur lors de la suppression d'un membre du groupe. Veuillez réessayer plus tard."
+  errors.list_failed: "❌ Erreur lors de la récupération de vos groupes. Veuillez réessayer plus tard."
+  success.list_summary: "✅ {count} groupe{plural} récupéré{plural}"
+  success.list_managed: "✅ {count} groupe{plural} récupéré{plural} (géré)"
+  success.list_filtered: "✅ {count} groupe{plural} récupéré{plural} (rôles: {roles})"
+  success.list_for_user: "✅ {count} groupe{plural} récupéré{plural} pour {email}"
+  success.no_groups: "✅ Aucun groupe trouvé correspondant à vos critères."
+  success.member_added: "✅ Ajout réussi de {member_email} au {group_id}"
+  success.member_removed: "✅ Suppression réussie de {member_email} du {group_id}"

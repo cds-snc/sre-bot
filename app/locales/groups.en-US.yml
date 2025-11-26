@@ -1,0 +1,38 @@
+groups:
+  commands.list.description: "List groups you can manage"
+  commands.list.help: |
+    🔐 *Groups Membership Management*
+
+    Available commands:
+    • `/sre groups list [provider]` - List groups you can manage
+    • `/sre groups add <email> <group_id> <provider> [justification]` - Add member to group
+    • `/sre groups remove <email> <group_id> <provider> [justification]` - Remove member from group
+    • `/sre groups manage [provider]` - List all manageable groups
+    • `/sre groups help` - Show this help
+
+    *Examples:*
+    • `/sre groups list aws`
+    • `/sre groups add user@example.com my-group aws "Adding for project access"`
+    • `/sre groups remove user@example.com my-group aws "No longer needed"`
+  commands.add.description: "Add member to group"
+  commands.add.usage: "Usage: `/sre groups add <member_email> <group_id> <provider> [justification]`"
+  commands.remove.description: "Remove member from group"
+  commands.remove.usage: "Usage: `/sre groups remove <member_email> <group_id> <provider> [justification]`"
+  commands.manage.description: "List all manageable groups"
+  errors.no_email: "❌ Could not determine your email address."
+  errors.invalid_email: "❌ Invalid email format: {email}"
+  errors.invalid_provider: "❌ Invalid provider. Must be one of: {providers}"
+  errors.unknown_flag: "❌ Unknown flag: {flag}"
+  errors.missing_user_arg: "❌ --user flag requires an email argument"
+  errors.missing_role_arg: "❌ --role flag requires role argument (comma-separated)"
+  errors.slack_handle_not_found: "❌ Could not resolve Slack handle {handle} to an email."
+  errors.add_failed: "❌ Error adding member to group. Please try again later."
+  errors.remove_failed: "❌ Error removing member from group. Please try again later."
+  errors.list_failed: "❌ Error retrieving your groups. Please try again later."
+  success.list_summary: "✅ Retrieved {count} group{plural}"
+  success.list_managed: "✅ Retrieved {count} group{plural} (managed)"
+  success.list_filtered: "✅ Retrieved {count} group{plural} (roles: {roles})"
+  success.list_for_user: "✅ Retrieved {count} group{plural} for {email}"
+  success.no_groups: "✅ No groups found matching your criteria."
+  success.member_added: "✅ Successfully added {member_email} to {group_id}"
+  success.member_removed: "✅ Successfully removed {member_email} from {group_id}"
