@@ -26,6 +26,7 @@ from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext
 from infrastructure.i18n.translator import Translator
 from infrastructure.i18n.resolvers import LocaleResolver
+from infrastructure.i18n.models import TranslationKey, Locale
 
 logger = get_module_logger()
 
@@ -143,6 +144,82 @@ class CommandProvider(ABC):
         """
         ...  # pylint: disable=unnecessary-ellipsis
 
+    def _translate_or_fallback(
+        self, translation_key: Optional[str], fallback: str, locale: str
+    ) -> str:
+        """Translate a message key or fall back to default text.
+
+        Args:
+            translation_key: Translation key (e.g., "commands.errors.unknown_command")
+            fallback: Fallback text if translation not available
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Translated message or fallback text
+        """
+        if not translation_key or not self.translator:
+            return fallback
+
+        try:
+            key = TranslationKey.from_string(translation_key)
+            locale_enum = Locale.from_string(locale)
+            return self.translator.translate_message(key, locale_enum)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug(
+                "translation_fallback",
+                key=translation_key,
+                error=str(e),
+            )
+            return fallback
+
+    def _translate_error(
+        self, error_key: str, locale: str, fallback: str, **variables: Any
+    ) -> str:
+        """Translate an error message with variable interpolation.
+
+        Args:
+            error_key: Error translation key (e.g., "commands.errors.unknown_command")
+            locale: Locale string
+            fallback: Fallback text if translation not available
+            **variables: Variables for interpolation
+
+        Returns:
+            Translated error message or fallback
+        """
+        if not self.translator:
+            return fallback
+
+        try:
+            key = TranslationKey.from_string(error_key)
+            locale_enum = Locale.from_string(locale)
+            return self.translator.translate_message(
+                key, locale_enum, variables=variables
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug(
+                "error_translation_fallback",
+                key=error_key,
+                error=str(e),
+            )
+            return fallback
+
+    @abstractmethod
+    def _resolve_framework_locale(self, platform_payload: Any) -> str:
+        """Resolve locale for framework operations (help, errors).
+
+        Framework-level locale resolution without creating full context.
+        Subclasses should implement platform-specific quick resolution.
+
+        Args:
+            platform_payload: Platform-specific command data structure
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR")
+
+        Default implementation: returns "en-US"
+        """
+        return "en-US"
+
     def handle(self, platform_payload: Any) -> None:
         """Handle command execution (generic flow).
 
@@ -166,27 +243,35 @@ class CommandProvider(ABC):
             text = self.extract_command_text(platform_payload)
             tokens = self._tokenize(text) if text else []
 
+            # Resolve locale for framework operations (help, errors)
+            framework_locale = self._resolve_framework_locale(platform_payload)
+
             # Step 3: Handle help requests
             if not tokens or tokens[0] in ("help", "aide", "--help", "-h"):
-                help_text = self._generate_help()
+                help_text = self._generate_help(framework_locale)
                 self.send_help(platform_payload, help_text)
                 return
 
             # Step 4: Parse command
             cmd_name = tokens[0]
             if self.registry is None:
-                self.send_error(
-                    platform_payload,
+                error_msg = self._translate_error(
+                    "commands.errors.registry_not_initialized",
+                    framework_locale,
                     "Command registry not initialized.",
                 )
+                self.send_error(platform_payload, error_msg)
                 return
             cmd = self.registry.get_command(cmd_name)
 
             if cmd is None:
-                self.send_error(
-                    platform_payload,
+                error_msg = self._translate_error(
+                    "commands.errors.unknown_command",
+                    framework_locale,
                     f"Unknown command: `{cmd_name}`. Type `help` for usage.",
+                    command=cmd_name,
                 )
+                self.send_error(platform_payload, error_msg)
                 return
 
             # Step 5: Create context (platform-specific)
@@ -203,16 +288,27 @@ class CommandProvider(ABC):
                 cmd.handler(ctx, **parsed.args)
 
         except CommandParseError as e:
-            self.send_error(platform_payload, str(e))
+            framework_locale = self._resolve_framework_locale(platform_payload)
+            error_msg = self._translate_error(
+                "commands.errors.parse_error",
+                framework_locale,
+                str(e),
+                error=str(e),
+            )
+            self.send_error(platform_payload, error_msg)
             logger.warning(
                 "command_parse_error",
                 error=str(e),
                 namespace=self.registry.namespace if self.registry else "unknown",
             )
         except Exception as e:  # pylint: disable=broad-except
-            self.send_error(
-                platform_payload, "An error occurred processing your command."
+            framework_locale = self._resolve_framework_locale(platform_payload)
+            error_msg = self._translate_error(
+                "commands.errors.internal_error",
+                framework_locale,
+                "An error occurred processing your command.",
             )
+            self.send_error(platform_payload, error_msg)
             logger.exception(
                 "unhandled_command_error",
                 error=str(e),
@@ -251,11 +347,14 @@ class CommandProvider(ABC):
 
         return tokens
 
-    def _generate_help(self) -> str:
-        """Generate help text from registry.
+    def _generate_help(self, locale: str = "en-US") -> str:
+        """Generate help text from registry with i18n support.
+
+        Args:
+            locale: Locale string (e.g., "en-US", "fr-FR")
 
         Returns:
-            Formatted help text
+            Formatted help text with translated descriptions and examples
         """
         if self.registry is None:
             return "No command registry available."
@@ -264,16 +363,32 @@ class CommandProvider(ABC):
         for cmd in self.registry.list_commands():
             lines.append(f"\n*/{self.registry.namespace} {cmd.name}*")
 
-            if cmd.description:
-                lines.append(f"  {cmd.description}")
+            # Translate command description
+            desc = self._translate_or_fallback(
+                cmd.description_key, cmd.description, locale
+            )
+            if desc:
+                lines.append(f"  {desc}")
 
             if cmd.args:
                 for arg in cmd.args:
+                    # Translate argument description if key available
+                    arg_desc = self._translate_or_fallback(
+                        arg.description_key, arg.description, locale
+                    )
                     if arg.flag:
-                        lines.append(f"  `{arg.name}` - {arg.description}")
+                        lines.append(f"  `{arg.name}` - {arg_desc}")
                     else:
-                        req = "required" if arg.required else "optional"
-                        lines.append(f"  `{arg.name}` ({req}) - {arg.description}")
+                        # Translate required/optional terms
+                        req_key = (
+                            "commands.terms.required"
+                            if arg.required
+                            else "commands.terms.optional"
+                        )
+                        req_term = self._translate_or_fallback(
+                            req_key, "required" if arg.required else "optional", locale
+                        )
+                        lines.append(f"  `{arg.name}` ({req_term}) - {arg_desc}")
 
             if cmd.examples:
                 lines.append("  Examples:")
