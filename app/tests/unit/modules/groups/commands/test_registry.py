@@ -1,7 +1,6 @@
 """Unit tests for groups command registry."""
 
-import pytest
-from infrastructure.commands.models import ArgumentType, Argument
+from infrastructure.commands.models import ArgumentType
 from modules.groups.commands.registry import registry
 
 

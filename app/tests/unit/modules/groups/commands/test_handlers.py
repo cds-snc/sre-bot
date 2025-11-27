@@ -1,7 +1,6 @@
 """Unit tests for groups command handlers."""
 
-import pytest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 from modules.groups.commands import handlers
 from modules.groups.api import schemas
 from tests.factories.groups_commands import (
