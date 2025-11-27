@@ -24,6 +24,8 @@ from core.logging import get_module_logger
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext
+from infrastructure.i18n.translator import Translator
+from infrastructure.i18n.resolvers import LocaleResolver
 
 logger = get_module_logger()
 
@@ -47,8 +49,8 @@ class CommandProvider(ABC):
     def __init__(
         self,
         registry: Optional[CommandRegistry] = None,
-        translator: Optional[Any] = None,
-        locale_resolver: Optional[Any] = None,
+        translator: Optional[Translator] = None,
+        locale_resolver: Optional[LocaleResolver] = None,
     ):
         """Initialize provider with command registry.
 
