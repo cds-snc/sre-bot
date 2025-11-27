@@ -17,6 +17,7 @@ registry = CommandRegistry(namespace="groups")
             required=False,
             choices=["aws", "google", "azure"],
             description="Cloud provider (aws, google, azure)",
+            description_key="groups.args.provider.description",
         ),
         Argument(
             name="--user",
@@ -24,6 +25,7 @@ registry = CommandRegistry(namespace="groups")
             required=False,
             flag=True,
             description="Target user email (defaults to requestor)",
+            description_key="groups.args.user.description",
         ),
         Argument(
             name="--managed",
@@ -32,6 +34,7 @@ registry = CommandRegistry(namespace="groups")
             flag=True,
             default=False,
             description="Show only groups where you are manager/owner",
+            description_key="groups.args.managed.description",
         ),
         Argument(
             name="--role",
@@ -39,6 +42,7 @@ registry = CommandRegistry(namespace="groups")
             required=False,
             flag=True,
             description="Filter by member roles (comma-separated)",
+            description_key="groups.args.role.description",
         ),
         Argument(
             name="--details",
@@ -47,6 +51,7 @@ registry = CommandRegistry(namespace="groups")
             flag=True,
             default=False,
             description="Include full user details",
+            description_key="groups.args.details.description",
         ),
         Argument(
             name="--include-empty",
@@ -55,6 +60,7 @@ registry = CommandRegistry(namespace="groups")
             flag=True,
             default=False,
             description="Include groups with no members",
+            description_key="groups.args.include_empty.description",
         ),
     ],
 )
@@ -91,12 +97,14 @@ def list_groups_command(
             type=ArgumentType.EMAIL,
             required=True,
             description="Email of member to add (or @slackhandle)",
+            description_key="groups.args.member_email.description",
         ),
         Argument(
             name="group_id",
             type=ArgumentType.STRING,
             required=True,
             description="Group identifier",
+            description_key="groups.args.group_id.description",
         ),
         Argument(
             name="provider",
@@ -104,12 +112,14 @@ def list_groups_command(
             required=True,
             choices=["aws", "google", "azure"],
             description="Cloud provider",
+            description_key="groups.args.provider_required.description",
         ),
         Argument(
             name="justification",
             type=ArgumentType.STRING,
             required=False,
             description="Justification for adding member",
+            description_key="groups.args.justification_add.description",
         ),
     ],
 )
@@ -133,12 +143,14 @@ def add_member_command(ctx, member_email, group_id, provider, justification=None
             type=ArgumentType.EMAIL,
             required=True,
             description="Email of member to remove (or @slackhandle)",
+            description_key="groups.args.member_email_remove.description",
         ),
         Argument(
             name="group_id",
             type=ArgumentType.STRING,
             required=True,
             description="Group identifier",
+            description_key="groups.args.group_id.description",
         ),
         Argument(
             name="provider",
@@ -146,12 +158,14 @@ def add_member_command(ctx, member_email, group_id, provider, justification=None
             required=True,
             choices=["aws", "google", "azure"],
             description="Cloud provider",
+            description_key="groups.args.provider_required.description",
         ),
         Argument(
             name="justification",
             type=ArgumentType.STRING,
             required=False,
             description="Justification for removing member",
+            description_key="groups.args.justification_remove.description",
         ),
     ],
 )
@@ -176,18 +190,10 @@ def remove_member_command(ctx, member_email, group_id, provider, justification=N
             required=False,
             choices=["aws", "google", "azure"],
             description="Cloud provider filter",
+            description_key="groups.args.provider_filter.description",
         ),
     ],
 )
 def manage_groups_command(ctx, provider=None):
     """List all manageable groups."""
     return handlers.handle_manage(ctx, provider=provider)
-
-
-@registry.command(
-    name="help",
-    description_key="groups.commands.list.help",
-)
-def help_command(ctx):
-    """Show help for groups commands."""
-    return handlers.handle_help(ctx)
