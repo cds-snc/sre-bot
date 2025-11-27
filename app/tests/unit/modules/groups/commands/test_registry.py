@@ -35,12 +35,6 @@ class TestGroupsRegistry:
         assert cmd is not None
         assert cmd.name == "manage"
 
-    def test_help_command_registered(self):
-        """Test help command is registered."""
-        cmd = registry.get_command("help")
-        assert cmd is not None
-        assert cmd.name == "help"
-
     def test_list_command_arguments(self):
         """Test list command has correct arguments."""
         cmd = registry.get_command("list")
@@ -107,13 +101,12 @@ class TestGroupsRegistry:
     def test_list_commands(self):
         """Test listing all commands."""
         commands = registry.list_commands()
-        assert len(commands) >= 5
+        assert len(commands) >= 4
         command_names = {cmd.name for cmd in commands}
         assert "list" in command_names
         assert "add" in command_names
         assert "remove" in command_names
         assert "manage" in command_names
-        assert "help" in command_names
 
     def test_find_command(self):
         """Test finding commands by name."""

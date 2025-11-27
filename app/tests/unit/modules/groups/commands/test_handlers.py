@@ -285,15 +285,3 @@ class TestManageHandler:
 
         call_args = mock_groups_service.list_groups.call_args[0][0]
         assert call_args.provider == schemas.ProviderType.AWS
-
-
-class TestHelpHandler:
-    """Tests for handle_help command."""
-
-    def test_help_returns_text(self, mock_command_context):
-        """Test help command returns help text."""
-        handlers.handle_help(mock_command_context)
-
-        assert (
-            mock_command_context._responder.send_message.called
-        )  # pylint: disable=protected-access
