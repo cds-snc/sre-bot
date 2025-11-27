@@ -184,6 +184,39 @@ class SlackCommandProvider(CommandProvider):
             )
         return Locale.EN_US
 
+    def _resolve_framework_locale(self, platform_payload: Dict[str, Any]) -> str:
+        """Resolve locale for framework operations (help, errors).
+
+        Quick locale resolution using Slack user profile without full context creation.
+
+        Args:
+            platform_payload: Slack command payload
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR")
+        """
+        try:
+            command = platform_payload.get("command", {})
+            client: WebClient | None = platform_payload.get("client")
+            user_id = command.get("user_id", "")
+
+            if client and user_id:
+                # Use Slack-specific locale resolution
+                locale_str = slack_users.get_user_locale(client, user_id)
+                logger.debug(
+                    "resolved_framework_locale_from_slack",
+                    user_id=user_id,
+                    locale=locale_str,
+                )
+                return locale_str
+            elif self.locale_resolver:
+                return self.locale_resolver.default_locale.value
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug(
+                "failed_to_resolve_framework_locale", error=str(e), fallback="en-US"
+            )
+        return "en-US"
+
     def extract_command_text(self, platform_payload: Dict[str, Any]) -> str:
         """Extract command text from Slack command payload.
 
