@@ -127,6 +127,7 @@ class TestBulkOperationPerformance:
                         "provider": "google",
                         "group_id": "group-123",
                         "member_email": f"user{i}@example.com",
+                        "justification": f"Bulk operation {i} for performance testing",
                     },
                 }
                 for i in range(10)

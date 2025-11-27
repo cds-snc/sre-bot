@@ -4,7 +4,7 @@ These tests validate error handling, retry logic, circuit breaker patterns,
 and graceful degradation capabilities.
 """
 
-from modules.groups.schemas import AddMemberRequest
+from modules.groups.api.schemas import AddMemberRequest
 
 
 class TestErrorRecovery:
@@ -73,6 +73,7 @@ class TestGracefulDegradation:
                     provider="google",
                     group_id="group-123",
                     member_email=invalid_email,
+                    justification="Testing schema validation",
                 )
                 # If validation passes somehow, that's still ok
             except Exception:
@@ -100,13 +101,12 @@ class TestGracefulDegradation:
             provider="google",
             group_id="group-123",
             member_email="user@example.com",
-            justification=None,
+            justification="Testing null optional fields",
             requestor=None,
             metadata=None,
         )
 
-        # Should succeed with None values
-        assert request.justification is None
+        # Should succeed with None values for optional fields
         assert request.requestor is None
         assert request.metadata is None
 
@@ -139,12 +139,14 @@ class TestRetryLogic:
             provider="google",
             group_id="group-123",
             member_email="user@example.com",
+            justification="Testing schema validation",
         )
 
         request2 = AddMemberRequest(
             provider="google",
             group_id="group-123",
             member_email="user@example.com",
+            justification="Testing schema validation",
         )
 
         # Different requests should have different idempotency keys
@@ -159,6 +161,7 @@ class TestRetryLogic:
             group_id="group-123",
             member_email="user@example.com",
             idempotency_key=idempotency_key,
+            justification="Testing schema validation",
         )
 
         request2 = AddMemberRequest(
@@ -166,6 +169,7 @@ class TestRetryLogic:
             group_id="group-123",
             member_email="user@example.com",
             idempotency_key=idempotency_key,
+            justification="Testing schema validation",
         )
 
         # Same idempotency key should be preserved
@@ -230,6 +234,7 @@ class TestDataConsistency:
             provider="google",
             group_id="group-123",
             member_email="user@example.com",
+            justification="Testing schema validation",
         )
 
         original_group_id = valid_request.group_id
@@ -240,6 +245,7 @@ class TestDataConsistency:
                 provider="invalid",
                 group_id="group-456",
                 member_email="other@example.com",
+                justification="Testing schema validation",
             )
         except Exception:
             pass

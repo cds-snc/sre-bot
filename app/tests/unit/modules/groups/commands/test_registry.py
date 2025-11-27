@@ -29,12 +29,6 @@ class TestGroupsRegistry:
         assert cmd is not None
         assert cmd.name == "remove"
 
-    def test_manage_command_registered(self):
-        """Test manage command is registered."""
-        cmd = registry.get_command("manage")
-        assert cmd is not None
-        assert cmd.name == "manage"
-
     def test_list_command_arguments(self):
         """Test list command has correct arguments."""
         cmd = registry.get_command("list")
@@ -90,23 +84,14 @@ class TestGroupsRegistry:
         required_args = [a for a in cmd.args if a.required and not a.flag]
         assert len(required_args) >= 3
 
-    def test_manage_command_arguments(self):
-        """Test manage command has correct arguments."""
-        cmd = registry.get_command("manage")
-        # Optional provider filter
-        provider_arg = next((a for a in cmd.args if a.name == "provider"), None)
-        assert provider_arg is not None
-        assert provider_arg.required is False
-
     def test_list_commands(self):
         """Test listing all commands."""
         commands = registry.list_commands()
-        assert len(commands) >= 4
+        assert len(commands) >= 3
         command_names = {cmd.name for cmd in commands}
         assert "list" in command_names
         assert "add" in command_names
         assert "remove" in command_names
-        assert "manage" in command_names
 
     def test_find_command(self):
         """Test finding commands by name."""
