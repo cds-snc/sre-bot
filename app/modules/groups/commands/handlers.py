@@ -266,9 +266,3 @@ def handle_manage(ctx: CommandContext, provider: Optional[str] = None) -> None:
     except Exception as e:
         logger.error("groups_manage_error", error=str(e))
         ctx.respond(ctx.translate("groups.errors.list_failed"))
-
-
-def handle_help(ctx: CommandContext) -> None:
-    """Handle help command."""
-    help_text = ctx.translate("groups.commands.list.help")
-    ctx.respond(help_text)
