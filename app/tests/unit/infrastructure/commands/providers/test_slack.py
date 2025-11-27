@@ -105,10 +105,12 @@ class TestSlackCommandProvider:
         The new adapter signature takes config dict from settings,
         not registry/translator/resolver directly.
         """
-        # Mock settings.slack.SLACK_TOKEN
+        # Mock settings.slack.SLACK_TOKEN in the slack module
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         # Create adapter with config
         adapter = SlackCommandProvider(config={"enabled": True})
@@ -183,23 +185,29 @@ class TestSlackCommandProvider:
 
     def test_create_context_fetches_user_email(self, adapter, slack_payload):
         """create_context fetches user email from Slack."""
-        slack_payload["client"].users_info.return_value = {
-            "ok": True,
-            "user": {"profile": {"email": "test@example.com"}},
-        }
+        from unittest.mock import patch
 
-        ctx = adapter.create_context(slack_payload)
+        with patch(
+            "infrastructure.commands.providers.slack.slack_users.get_user_email_from_body"
+        ) as mock_get_email:
+            mock_get_email.return_value = "test@example.com"
 
-        assert ctx.user_email == "test@example.com"
-        slack_payload["client"].users_info.assert_called_once_with(user="U123")
+            ctx = adapter.create_context(slack_payload)
+
+            assert ctx.user_email == "test@example.com"
 
     def test_create_context_handles_email_fetch_failure(self, adapter, slack_payload):
         """create_context handles failure to fetch email."""
-        slack_payload["client"].users_info.side_effect = Exception("API error")
+        from unittest.mock import patch
 
-        ctx = adapter.create_context(slack_payload)
+        with patch(
+            "infrastructure.commands.providers.slack.slack_users.get_user_email_from_body"
+        ) as mock_get_email:
+            mock_get_email.side_effect = Exception("API error")
 
-        assert ctx.user_email == ""
+            ctx = adapter.create_context(slack_payload)
+
+            assert ctx.user_email == ""
 
     def test_create_context_resolves_locale(self, adapter, slack_payload):
         """create_context resolves user locale."""
@@ -211,10 +219,12 @@ class TestSlackCommandProvider:
         self, monkeypatch, slack_payload
     ):
         """create_context handles locale resolution failure gracefully."""
-        # Mock settings
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         # Create adapter with None locale resolver (simulates missing resolver)
         adapter = SlackCommandProvider(config={"enabled": True})
@@ -267,8 +277,8 @@ class TestSlackCommandProvider:
 
         slack_payload["respond"].assert_called_once_with(text="help text")
 
-    def test_handle_supports_legacy_signature(self, adapter):
-        """handle supports legacy positional arguments."""
+    def test_handle_supports_payload_dict_format(self, adapter):
+        """handle accepts payload dict with required keys."""
         ack = MagicMock()
         command = {"text": "hello", "user_id": "U123", "channel_id": "C123"}
         client = MagicMock()
@@ -276,7 +286,15 @@ class TestSlackCommandProvider:
         respond = MagicMock()
         body = {}
 
-        adapter.handle(ack, command, client, respond, body)
+        payload = {
+            "ack": ack,
+            "command": command,
+            "client": client,
+            "respond": respond,
+            "body": body,
+        }
+
+        adapter.handle(payload)
 
         ack.assert_called_once()
         respond.assert_called()
@@ -304,10 +322,12 @@ class TestSlackCommandProvider:
 
     def test_adapter_initialization_without_translator(self, monkeypatch):
         """Adapter can initialize without translator (set to None initially)."""
-        # Mock settings
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         adapter = SlackCommandProvider(config={})
 
@@ -316,23 +336,24 @@ class TestSlackCommandProvider:
 
     def test_adapter_initialization_without_locale_resolver(self, monkeypatch):
         """Adapter can initialize without locale_resolver (set to None initially)."""
-        # Mock settings
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         adapter = SlackCommandProvider(config={})
 
         # Adapter starts with locale_resolver=None, will be set by create_context
         assert adapter.locale_resolver is None
 
-    def test_create_context_handles_missing_client(self, adapter, slack_payload):
-        """create_context handles missing client gracefully."""
+    def test_create_context_requires_client(self, adapter, slack_payload):
+        """create_context requires Slack client."""
         slack_payload["client"] = None
 
-        ctx = adapter.create_context(slack_payload)
-
-        assert ctx.user_email == ""
+        with pytest.raises(ValueError, match="Slack client required"):
+            adapter.create_context(slack_payload)
 
     def test_create_context_handles_missing_command_dict(self, adapter):
         """create_context handles missing command dict."""
