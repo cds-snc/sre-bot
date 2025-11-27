@@ -47,9 +47,9 @@ class CommandRegistry:
         name: str,
         description: str = "",
         description_key: Optional[str] = None,
-        args: List[Argument] = None,
-        examples: List[str] = None,
-        example_keys: List[str] = None,
+        args: Optional[List[Argument]] = None,
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
     ) -> Callable:
         """Decorator to register a command with handler.
 
@@ -87,9 +87,9 @@ class CommandRegistry:
         name: str,
         description: str = "",
         description_key: Optional[str] = None,
-        args: List[Argument] = None,
-        examples: List[str] = None,
-        example_keys: List[str] = None,
+        args: Optional[List[Argument]] = None,
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
     ) -> Callable:
         """Decorator to register a subcommand.
 
