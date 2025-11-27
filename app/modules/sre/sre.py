@@ -120,22 +120,17 @@ def sre_command(
             webhook_helper.handle_webhook_command(args, client, body, respond)
         case "groups":
             adapter = get_groups_adapter()
-            # The sre command receives the full text (e.g. "groups help").
-            # The SlackCommandProvider expects the command text to be the
-            # subcommand only (e.g. "help"), because registries are
-            # namespace-scoped. Strip the leading namespace token before
-            # forwarding to the adapter.
             cmd_copy = dict(command)
             # args already contains the tokens after the namespace
             cmd_copy["text"] = " ".join(args) if args else ""
-
-            adapter.handle(
-                ack=ack,
-                command=cmd_copy,
-                client=client,
-                respond=respond,
-                body=body,
-            )
+            payload = {
+                "ack": ack,
+                "command": cmd_copy,
+                "client": client,
+                "respond": respond,
+                "body": body,
+            }
+            adapter.handle(payload)
         case "test":
             dev_core.dev_command(ack, respond, client, body, args)
         case "version":
