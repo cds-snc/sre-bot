@@ -43,6 +43,10 @@ class FakeAdapter(CommandProvider):
     def send_help(self, platform_payload, help_text):
         self.help_text = help_text
 
+    def _resolve_framework_locale(self, platform_payload):
+        """Resolve locale for framework operations."""
+        return "en-US"
+
 
 class TestCommandAdapterBase:
     """Tests for CommandProvider base class."""
