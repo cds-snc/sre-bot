@@ -1,0 +1,7 @@
+commands:
+  terms.required: "obligatoire"
+  terms.optional: "optionnel"
+  errors.registry_not_initialized: "Le registre des commandes n'est pas initialisé."
+  errors.unknown_command: "Commande inconnue: `{command}`. Tapez `help` pour l'utilisation."
+  errors.parse_error: "Syntaxe de commande invalide: {error}"
+  errors.internal_error: "Une erreur s'est produite lors du traitement de votre commande."
