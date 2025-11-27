@@ -6,9 +6,8 @@ from typing import List, Optional
 from core.logging import get_module_logger
 from infrastructure.commands import CommandContext
 from integrations.slack import users as slack_users
-from modules.groups.api import schemas
+from modules.groups.api import schemas, responses
 from modules.groups.core import service
-from modules.groups.providers import get_active_providers
 
 logger = get_module_logger()
 
@@ -24,41 +23,38 @@ def handle_list(
 ) -> None:
     """Handle groups list command."""
     # Get requestor email from context
-    requestor = ctx.metadata.get("user_email")
+    requestor = ctx.user_email
     if not requestor:
         ctx.respond(ctx.translate("groups.errors.no_email"))
         return
 
     # Determine target user (defaults to requestor)
-    target_user_email = user_email or requestor
+    target_user_email = user_email if user_email else requestor
 
     try:
-        # Build request
-        request_kwargs = {
-            "requestor": requestor,
-            "target_member_email": target_user_email,
-            "include_members": True,
-            "filter_by_member_email": target_user_email,
-            "include_users_details": include_details,
-        }
+        # Build request with explicit typed arguments to satisfy static typing
+        provider_type = schemas.ProviderType(provider) if provider else None
 
-        # Convert provider string to enum if provided
-        if provider:
-            request_kwargs["provider"] = schemas.ProviderType(provider)
-
-        # Handle --managed flag
+        # Determine role filters
         if managed_only:
-            request_kwargs["filter_by_member_role"] = ["MANAGER", "OWNER"]
+            filter_roles = ["MANAGER", "OWNER"]
+        elif filter_by_roles:
+            filter_roles = filter_by_roles
+        else:
+            filter_roles = None
 
-        # Handle --role flag
-        if filter_by_roles:
-            request_kwargs["filter_by_member_role"] = filter_by_roles
+        exclude_empty_groups = not include_empty
 
-        # Handle --include-empty flag
-        if include_empty:
-            request_kwargs["exclude_empty_groups"] = False
-
-        req = schemas.ListGroupsRequest(**request_kwargs)
+        req = schemas.ListGroupsRequest(
+            requestor=requestor,
+            target_member_email=target_user_email,
+            include_members=True,
+            filter_by_member_email=target_user_email,
+            include_users_details=include_details,
+            provider=provider_type,
+            filter_by_member_role=filter_roles,
+            exclude_empty_groups=exclude_empty_groups,
+        )
         groups = service.list_groups(req)
 
         if not groups:
@@ -166,9 +162,6 @@ def handle_add(
         )
         result = service.add_member(add_req)
 
-        # Format response
-        from modules.groups.api import responses
-
         ctx.respond(
             responses.format_slack_response(
                 result.model_dump() if hasattr(result, "model_dump") else result.dict()
@@ -219,8 +212,6 @@ def handle_remove(
             idempotency_key=str(uuid.uuid4()),
         )
         result = service.remove_member(remove_req)
-
-        from modules.groups.api import responses
 
         ctx.respond(
             responses.format_slack_response(
