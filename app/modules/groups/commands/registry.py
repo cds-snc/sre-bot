@@ -178,22 +178,3 @@ def remove_member_command(ctx, member_email, group_id, provider, justification=N
         provider=provider,
         justification=justification or "Removed via Slack command",
     )
-
-
-@registry.command(
-    name="manage",
-    description_key="groups.commands.manage.description",
-    args=[
-        Argument(
-            name="provider",
-            type=ArgumentType.STRING,
-            required=False,
-            choices=["aws", "google", "azure"],
-            description="Cloud provider filter",
-            description_key="groups.args.provider_filter.description",
-        ),
-    ],
-)
-def manage_groups_command(ctx, provider=None):
-    """List all manageable groups."""
-    return handlers.handle_manage(ctx, provider=provider)
