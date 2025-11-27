@@ -18,7 +18,6 @@ groups:
   commands.add.usage: "Usage: `/sre groups add <member_email> <group_id> <provider> [justification]`"
   commands.remove.description: "Remove member from group"
   commands.remove.usage: "Usage: `/sre groups remove <member_email> <group_id> <provider> [justification]`"
-  commands.manage.description: "List all manageable groups"
   args.provider.description: "Cloud provider (aws, google, azure)"
   args.provider_required.description: "Cloud provider"
   args.provider_filter.description: "Cloud provider filter"
