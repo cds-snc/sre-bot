@@ -36,6 +36,10 @@ class MockCommandProvider(CommandProvider):
     def send_help(self, payload, help_text):
         pass
 
+    def _resolve_framework_locale(self, platform_payload):
+        """Resolve locale for framework operations."""
+        return "en-US"
+
 
 @pytest.fixture(autouse=True)
 def cleanup_registry():
