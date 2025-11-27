@@ -145,7 +145,7 @@ def handle_add(
             member_email = resolved_email
 
     # Get requestor email
-    requestor_email = ctx.metadata.get("user_email")
+    requestor_email = ctx.user_email
     if not requestor_email:
         ctx.respond(ctx.translate("groups.errors.no_email"))
         return
@@ -197,7 +197,7 @@ def handle_remove(
             member_email = resolved_email
 
     # Get requestor email
-    requestor_email = ctx.metadata.get("user_email")
+    requestor_email = ctx.user_email
     if not requestor_email:
         ctx.respond(ctx.translate("groups.errors.no_email"))
         return
@@ -221,48 +221,3 @@ def handle_remove(
     except Exception as e:
         logger.error("groups_remove_error", error=str(e))
         ctx.respond(ctx.translate("groups.errors.remove_failed"))
-
-
-def handle_manage(ctx: CommandContext, provider: Optional[str] = None) -> None:
-    """Handle groups manage command."""
-    user_email = ctx.metadata.get("user_email")
-    if not user_email:
-        ctx.respond(ctx.translate("groups.errors.no_email"))
-        return
-
-    provider_type = None
-    if provider:
-        provider_type = schemas.ProviderType(provider)
-
-    try:
-        req = schemas.ListGroupsRequest(
-            requestor=user_email,
-            include_members=True,
-            target_member_email=user_email,
-            provider=provider_type,
-        )
-        groups = service.list_groups(req)
-
-        if not groups:
-            ctx.respond(ctx.translate("groups.success.no_groups"))
-            return
-
-        # Format response
-        group_lines = []
-        for group in groups:
-            if isinstance(group, dict):
-                group_name = group.get("name", "Unnamed Group")
-                group_id = group.get("id", "N/A")
-                group_lines.append(f"• {group_name} (ID: {group_id})")
-
-        count = len(groups)
-        plural = "s" if count != 1 else ""
-        summary = ctx.translate(
-            "groups.success.list_managed",
-            count=count,
-            plural=plural,
-        )
-        ctx.respond(f"{summary}:\n" + "\n".join(group_lines))
-    except Exception as e:
-        logger.error("groups_manage_error", error=str(e))
-        ctx.respond(ctx.translate("groups.errors.list_failed"))
