@@ -26,11 +26,6 @@ from modules.groups.infrastructure.validation import (
     validate_provider_type,
     validate_group_membership_payload,
 )
-from modules.groups.api.responses import (
-    format_success_response,
-    format_error_response,
-    format_slack_response,
-)
 from modules.groups.providers import get_provider, get_active_providers
 
 # Import event handlers to register them
@@ -50,10 +45,6 @@ __all__ = [
     "validate_group_id",
     "validate_provider_type",
     "validate_group_membership_payload",
-    # Response formatting
-    "format_success_response",
-    "format_error_response",
-    "format_slack_response",
     # Provider management
     "get_provider",
     "get_active_providers",
