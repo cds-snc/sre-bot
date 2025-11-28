@@ -75,7 +75,7 @@ class CommandParser:
             )
         except CommandParseError as e:
             logger.warning(
-                "command parse error",
+                "command_parse_error",
                 command=command.name,
                 raw_text=raw_text,
                 error=str(e),
