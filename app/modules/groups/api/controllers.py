@@ -157,7 +157,7 @@ def reset_circuit_breaker(provider_name: str):
         )
         raise HTTPException(
             status_code=500, detail=f"Failed to reset circuit breaker: {str(e)}"
-        )
+        ) from e
 
 
 # Health check endpoints
