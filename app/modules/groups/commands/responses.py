@@ -49,7 +49,7 @@ def format_action_response(
 
     try:
         return ctx.translate(translation_key, **metadata)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         logger.warning("translation_failed", key=translation_key, error=str(e))
         return "✅ Operation completed successfully"
 
