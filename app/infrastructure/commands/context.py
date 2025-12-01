@@ -57,11 +57,11 @@ class CommandContext:
 
     Attributes:
         platform: Platform name (slack, teams, api)
-        user_id: Platform-specific user identifier
-        user_email: User's email address (considered universal ID across platforms)
+        user_id: Platform-specific requestor user identifier
+        user_email: User's email address of the requestor (considered universal ID across platforms)
         channel_id: Platform-specific channel identifier
         locale: User's preferred locale (e.g., en-US, fr-FR)
-        metadata: Platform-specific metadata
+        metadata: Platform-specific metadata (e.g., Slack command payload)
         translator: Translation function (injected by adapter)
         responder: Response channel (injected by adapter)
 
