@@ -5,3 +5,5 @@ commands:
   errors.unknown_command: "Commande inconnue: `{command}`. Tapez `help` pour l'utilisation."
   errors.parse_error: "Syntaxe de commande invalide: {error}"
   errors.internal_error: "Une erreur s'est produite lors du traitement de votre commande."
+  errors.invalid_payload: "Charge utile invalide fournie."
+  
