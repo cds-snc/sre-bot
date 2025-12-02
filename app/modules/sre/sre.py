@@ -64,7 +64,7 @@ class LegacyIncidentProvider(SlackCommandProvider):
         args = text.split() if text else []
 
         incident_helper.handle_incident_command(
-            args, client, platform_payload, respond, ack
+            args, client, platform_payload["command"], respond, ack
         )
 
 
@@ -86,7 +86,9 @@ class LegacyWebhooksProvider(SlackCommandProvider):
         text = command.get("text", "")
         args = text.split() if text else []
 
-        webhook_helper.handle_webhook_command(args, client, platform_payload, respond)
+        webhook_helper.handle_webhook_command(
+            args, client, platform_payload["command"], respond
+        )
 
 
 class GeolocateProvider(SlackCommandProvider):
