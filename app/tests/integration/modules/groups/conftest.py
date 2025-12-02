@@ -57,141 +57,235 @@ def groups_validation():
 
 
 # ============================================================================
-# Test Data Fixtures
+# Test Data Factories - Factory functions for dynamic test data
+# ============================================================================
+
+
+def test_group_factory(
+    group_id="test-group-123",
+    email="test-group@example.com",
+    name="Test Group",
+    description="Integration test group",
+    provider="google",
+    canonical_id="canonical-test-group-123",
+):
+    """Factory function to create test group data with customizable fields.
+
+    Args:
+        group_id (str): Group ID. Defaults to "test-group-123".
+        email (str): Group email. Defaults to "test-group@example.com".
+        name (str): Group name. Defaults to "Test Group".
+        description (str): Group description. Defaults to "Integration test group".
+        provider (str): Provider name. Defaults to "google".
+        canonical_id (str): Canonical ID. Defaults to "canonical-test-group-123".
+
+    Returns:
+        Dict: Test group data with specified parameters
+    """
+    return {
+        "id": group_id,
+        "email": email,
+        "name": name,
+        "description": description,
+        "provider": provider,
+        "canonical_id": canonical_id,
+    }
+
+
+def test_member_factory(
+    email="testuser@example.com",
+    first_name="Test",
+    last_name="User",
+    role="member",
+):
+    """Factory function to create test member data with customizable fields.
+
+    Args:
+        email (str): Member email. Defaults to "testuser@example.com".
+        first_name (str): First name. Defaults to "Test".
+        last_name (str): Last name. Defaults to "User".
+        role (str): Member role. Defaults to "member".
+
+    Returns:
+        Dict: Test member data with specified parameters
+    """
+    return {
+        "email": email,
+        "first_name": first_name,
+        "last_name": last_name,
+        "role": role,
+    }
+
+
+def test_members_list_factory(count=3):
+    """Factory function to create a list of test members with unique emails.
+
+    Args:
+        count (int): Number of members to create. Defaults to 3.
+
+    Returns:
+        List[Dict]: List of test member objects with unique emails
+    """
+    roles = ["member", "manager", "member"]
+    return [
+        test_member_factory(
+            email=f"user{i+1}@example.com",
+            first_name="User",
+            last_name=chr(64 + i + 1),  # A, B, C, ...
+            role=roles[i % len(roles)],
+        )
+        for i in range(count)
+    ]
+
+
+def test_groups_list_factory(count=3):
+    """Factory function to create a list of test groups with unique IDs.
+
+    Args:
+        count (int): Number of groups to create. Defaults to 3.
+
+    Returns:
+        List[Dict]: List of test group objects with unique IDs
+    """
+    providers = ["google", "google", "aws"]
+    teams = ["A", "B", "C", "D", "E"]
+    return [
+        test_group_factory(
+            group_id=f"group-{i+1}",
+            email=f"team-{teams[i].lower()}@example.com",
+            name=f"Team {teams[i]}",
+            provider=providers[i % len(providers)],
+            canonical_id=f"canonical-{i+1}",
+        )
+        for i in range(count)
+    ]
+
+
+# ============================================================================
+# Test Data Fixtures - Fixture wrappers for factory functions
 # ============================================================================
 
 
 @pytest.fixture
 def test_group():
-    """Provide a test group object.
+    """Provide a test group object (uses factory).
 
     Returns:
         Dict: Test group data
     """
-    return {
-        "id": "test-group-123",
-        "email": "test-group@example.com",
-        "name": "Test Group",
-        "description": "Integration test group",
-        "provider": "google",
-        "canonical_id": "canonical-test-group-123",
-    }
+    return test_group_factory()
 
 
 @pytest.fixture
 def test_member():
-    """Provide a test member object.
+    """Provide a test member object (uses factory).
 
     Returns:
         Dict: Test member data
     """
-    return {
-        "email": "testuser@example.com",
-        "first_name": "Test",
-        "last_name": "User",
-        "role": "member",
-    }
+    return test_member_factory()
 
 
 @pytest.fixture
 def test_members_list():
-    """Provide a list of test members.
+    """Provide a list of test members (uses factory).
 
     Returns:
         List[Dict]: Multiple test member objects
     """
-    return [
-        {
-            "email": "user1@example.com",
-            "first_name": "User",
-            "last_name": "One",
-            "role": "member",
-        },
-        {
-            "email": "user2@example.com",
-            "first_name": "User",
-            "last_name": "Two",
-            "role": "manager",
-        },
-        {
-            "email": "user3@example.com",
-            "first_name": "User",
-            "last_name": "Three",
-            "role": "member",
-        },
-    ]
+    return test_members_list_factory(count=3)
 
 
 @pytest.fixture
 def test_groups_list():
-    """Provide a list of test groups.
+    """Provide a list of test groups (uses factory).
 
     Returns:
         List[Dict]: Multiple test group objects
     """
-    return [
-        {
-            "id": "group-1",
-            "email": "team-a@example.com",
-            "name": "Team A",
-            "provider": "google",
-            "canonical_id": "canonical-1",
-        },
-        {
-            "id": "group-2",
-            "email": "team-b@example.com",
-            "name": "Team B",
-            "provider": "google",
-            "canonical_id": "canonical-2",
-        },
-        {
-            "id": "group-3",
-            "email": "team-c@example.com",
-            "name": "Team C",
-            "provider": "aws",
-            "canonical_id": "canonical-3",
-        },
-    ]
+    return test_groups_list_factory(count=3)
 
 
 # ============================================================================
-# Multi-Provider Test Data
+# Multi-Provider Test Data Factories
 # ============================================================================
 
 
-@pytest.fixture
-def google_test_group():
-    """Google-specific test group.
+def google_test_group_factory(
+    group_id="google-group-123",
+    email="google-team@example.com",
+    name="Google Team",
+    description="Integration test group on Google",
+    members_count=5,
+):
+    """Factory for Google-specific test group.
+
+    Args:
+        group_id (str): Group ID. Defaults to "google-group-123".
+        email (str): Group email. Defaults to "google-team@example.com".
+        name (str): Group name. Defaults to "Google Team".
+        description (str): Description. Defaults to "Integration test group on Google".
+        members_count (int): Member count. Defaults to 5.
 
     Returns:
         Dict: Google group data
     """
     return {
-        "id": "google-group-123",
-        "email": "google-team@example.com",
-        "name": "Google Team",
-        "description": "Integration test group on Google",
+        "id": group_id,
+        "email": email,
+        "name": name,
+        "description": description,
         "provider": "google",
-        "canonical_id": "canonical-google-123",
-        "members_count": 5,
+        "canonical_id": f"canonical-{group_id}",
+        "members_count": members_count,
     }
 
 
-@pytest.fixture
-def aws_test_group():
-    """AWS-specific test group.
+def aws_test_group_factory(
+    group_id="aws-group-456",
+    name="aws-team",
+    description="Integration test group on AWS",
+    members_count=3,
+):
+    """Factory for AWS-specific test group.
+
+    Args:
+        group_id (str): Group ID. Defaults to "aws-group-456".
+        name (str): Group name. Defaults to "aws-team".
+        description (str): Description. Defaults to "Integration test group on AWS".
+        members_count (int): Member count. Defaults to 3.
 
     Returns:
         Dict: AWS group data
     """
     return {
-        "id": "aws-group-456",
-        "name": "aws-team",
-        "description": "Integration test group on AWS",
+        "id": group_id,
+        "name": name,
+        "description": description,
         "provider": "aws",
-        "canonical_id": "canonical-aws-456",
-        "members_count": 3,
+        "canonical_id": f"canonical-{group_id}",
+        "members_count": members_count,
     }
+
+
+@pytest.fixture
+def google_test_group():
+    """Google-specific test group (uses factory).
+
+    Returns:
+        Dict: Google group data
+    """
+    return google_test_group_factory()
+
+
+@pytest.fixture
+def aws_test_group():
+    """AWS-specific test group (uses factory).
+
+    Returns:
+        Dict: AWS group data
+    """
+    return aws_test_group_factory()
 
 
 @pytest.fixture

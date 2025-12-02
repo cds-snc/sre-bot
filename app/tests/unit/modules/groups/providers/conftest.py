@@ -279,7 +279,7 @@ def multi_provider_config(mock_provider_config):  # pylint: disable=redefined-ou
 
 
 class MockPrimaryGroupProvider(PrimaryGroupProvider):
-    """Mock PrimaryGroupProvider for testing registry patterns."""
+    """Minimal mock PrimaryGroupProvider for testing registry patterns."""
 
     def __init__(self, config: Optional[dict] = None):
         """Initialize with optional config."""
@@ -314,53 +314,6 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
             return str(name)
         return self.__class__.__name__.lower()
 
-    def add_member(self, group_key: str, member_email: str) -> OperationResult:
-        """Mock add member."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"added": True},
-        )
-
-    def remove_member(self, group_key: str, member_email: str) -> OperationResult:
-        """Mock remove member."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"removed": True},
-        )
-
-    def list_groups(self, **kwargs) -> OperationResult:
-        """Mock list groups."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"groups": []},
-        )
-
-    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
-        """Mock get group members."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"members": []},
-        )
-
-    def validate_permissions(
-        self, user_key: str, group_key: str, action: str
-    ) -> OperationResult:
-        """Mock validate permissions."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"allowed": True},
-        )
-
-    def health_check(self) -> HealthCheckResult:
-        """Mock health check."""
-        return HealthCheckResult(healthy=True, status="healthy")
-
-    # Implement required abstract methods from GroupProvider/PrimaryGroupProvider
     def _list_groups_impl(self, **kwargs) -> OperationResult:
         """Mock list groups implementation."""
         return OperationResult(
@@ -425,7 +378,7 @@ class MockPrimaryGroupProvider(PrimaryGroupProvider):
 
 
 class MockGroupProvider(GroupProvider):
-    """Mock GroupProvider (secondary) for testing registry patterns."""
+    """Minimal mock GroupProvider (secondary) for testing registry patterns."""
 
     def __init__(self, config: Optional[dict] = None):
         """Initialize with optional config."""
@@ -460,43 +413,6 @@ class MockGroupProvider(GroupProvider):
             return str(name)
         return self.__class__.__name__.lower()
 
-    def add_member(self, group_key: str, member_email: str) -> OperationResult:
-        """Mock add member."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"added": True},
-        )
-
-    def remove_member(self, group_key: str, member_email: str) -> OperationResult:
-        """Mock remove member."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"removed": True},
-        )
-
-    def list_groups(self, **kwargs) -> OperationResult:
-        """Mock list groups."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"groups": []},
-        )
-
-    def get_group_members(self, group_key: str, **kwargs) -> OperationResult:
-        """Mock get group members."""
-        return OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data={"members": []},
-        )
-
-    def health_check(self) -> HealthCheckResult:
-        """Mock health check."""
-        return HealthCheckResult(healthy=True, status="healthy")
-
-    # Implement required abstract methods from GroupProvider
     def _list_groups_impl(self, **kwargs) -> OperationResult:
         """Mock list groups implementation."""
         return OperationResult(
