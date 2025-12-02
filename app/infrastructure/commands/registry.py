@@ -19,6 +19,7 @@ from pydantic import BaseModel, ValidationError, EmailStr
 from core.logging import get_module_logger
 from infrastructure.commands.models import Command, Argument, ArgumentType
 
+
 if TYPE_CHECKING:
     from infrastructure.commands import CommandContext
 
@@ -254,14 +255,9 @@ class CommandRegistry:
                 if mapper:
                     parsed_kwargs = mapper(parsed_kwargs)
 
-                # Resolve Slack handles (@mentions) to emails for EmailStr fields
-                resolved_kwargs = self._resolve_slack_handles(
-                    ctx, schema, parsed_kwargs
-                )
-                if resolved_kwargs is None:
-                    # Error already responded to user by _resolve_slack_handles
-                    return
-                parsed_kwargs = resolved_kwargs
+                # Note: Platform-specific preprocessing (e.g., Slack @mention resolution)
+                # is now handled by CommandProvider._preprocess_arguments() before this
+                # wrapper is called. This keeps the registry platform-agnostic.
 
                 # Inject context fields
                 parsed_kwargs["requestor"] = ctx.user_email
@@ -379,60 +375,3 @@ class CommandRegistry:
         }
 
         return type_mapping.get(pydantic_type, ArgumentType.STRING)
-
-    @staticmethod
-    def _resolve_slack_handles(
-        ctx: "CommandContext", schema: Type[BaseModel], kwargs: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """Resolve Slack @handles to email addresses for EmailStr fields.
-
-        Args:
-            ctx: Command context with Slack client and translator
-            schema: Pydantic schema to check for EmailStr fields
-            kwargs: Parsed command arguments
-
-        Returns:
-            Updated kwargs with resolved emails, or None if resolution failed
-            (error is already sent to user in this case)
-        """
-        from integrations.slack import users as slack_users
-
-        slack_client = ctx.metadata.get("slack_client")
-        if not slack_client:
-            return kwargs
-
-        # Find all EmailStr fields in schema
-        for field_name, field_info in schema.model_fields.items():
-            if field_name not in kwargs or kwargs[field_name] is None:
-                continue
-
-            # Check if this is an EmailStr field
-            field_type = field_info.annotation
-            # Handle Optional[EmailStr]
-            origin = get_origin(field_type)
-            if origin is Union:
-                args = get_args(field_type)
-                for arg in args:
-                    if arg is EmailStr:
-                        field_type = EmailStr
-                        break
-
-            if field_type is not EmailStr:
-                continue
-
-            # If value is a Slack handle, resolve it
-            value = kwargs[field_name]
-            if isinstance(value, str) and value.startswith("@"):
-                resolved_email = slack_users.get_user_email_from_handle(
-                    slack_client, value
-                )
-                if not resolved_email:
-                    ctx.respond(
-                        ctx.translate(
-                            "groups.errors.slack_handle_not_found", handle=value
-                        )
-                    )
-                    return None
-                kwargs[field_name] = resolved_email
-
-        return kwargs
