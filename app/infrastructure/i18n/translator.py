@@ -151,11 +151,22 @@ class Translator:
         Raises:
             ValueError: If variable not found in variables dict.
         """
-        # Find all {{variable}} patterns
-        pattern = r"\{\{(\w+)\}\}"
-        matches = re.findall(pattern, message)
+        # Support both double-brace ({{var}}) and single-brace ({var}) placeholders.
+        # Collect unique variable names from both patterns in order to validate
+        # required variables exist before performing replacements.
+        double_pattern = r"\{\{(\w+)\}\}"
+        single_pattern = r"\{(\w+)\}"
 
-        for var_name in matches:
+        double_matches = re.findall(double_pattern, message)
+        single_matches = re.findall(single_pattern, message)
+
+        # We avoid double-counting variables that appear in both patterns
+        all_vars = []
+        for m in double_matches + single_matches:
+            if m not in all_vars:
+                all_vars.append(m)
+
+        for var_name in all_vars:
             if var_name not in variables:
                 logger.error(
                     "missing_interpolation_variable",
@@ -164,9 +175,15 @@ class Translator:
                 )
                 raise ValueError(f"Missing interpolation variable: {var_name}")
 
+        # Perform replacements. Replace double-brace patterns first to preserve
+        # any intention where both syntaxes might be present.
+        for var_name in double_matches:
             value = variables[var_name]
-            # Replace {{variable}} with value (convert to string)
             message = message.replace(f"{{{{{var_name}}}}}", str(value))
+
+        for var_name in single_matches:
+            value = variables[var_name]
+            message = message.replace(f"{{{var_name}}}", str(value))
 
         return message
 

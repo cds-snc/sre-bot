@@ -1,9 +1,27 @@
 """Command registry for registration and discovery."""
 
-from typing import Callable, Dict, List, Optional
+from typing import (
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Any,
+    Type,
+    Union,
+    get_origin,
+    get_args,
+    TYPE_CHECKING,
+)
+from uuid import uuid4
+from enum import Enum
 
+from pydantic import BaseModel, ValidationError, EmailStr
 from core.logging import get_module_logger
-from infrastructure.commands.models import Command, Argument
+from infrastructure.commands.models import Command, Argument, ArgumentType
+
+
+if TYPE_CHECKING:
+    from infrastructure.commands import CommandContext
 
 logger = get_module_logger()
 
@@ -47,9 +65,9 @@ class CommandRegistry:
         name: str,
         description: str = "",
         description_key: Optional[str] = None,
-        args: List[Argument] = None,
-        examples: List[str] = None,
-        example_keys: List[str] = None,
+        args: Optional[List[Argument]] = None,
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
     ) -> Callable:
         """Decorator to register a command with handler.
 
@@ -87,9 +105,9 @@ class CommandRegistry:
         name: str,
         description: str = "",
         description_key: Optional[str] = None,
-        args: List[Argument] = None,
-        examples: List[str] = None,
-        example_keys: List[str] = None,
+        args: Optional[List[Argument]] = None,
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
     ) -> Callable:
         """Decorator to register a subcommand.
 
@@ -182,3 +200,178 @@ class CommandRegistry:
             cmd = cmd.subcommands[part]
 
         return cmd
+
+    def schema_command(
+        self,
+        name: str,
+        schema: Type[BaseModel],
+        description: str = "",
+        description_key: Optional[str] = None,
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
+        mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        args: Optional[List[Argument]] = None,
+    ) -> Callable:
+        """Register a command using a Pydantic schema for validation.
+
+        The schema should have all required fields except 'requestor' and
+        'idempotency_key', which are injected automatically from context.
+
+        Args:
+            name: Command name
+            schema: Pydantic BaseModel schema (e.g., AddMemberRequest)
+            description: Human-readable description
+            description_key: Translation key for description
+            examples: List of usage examples
+            example_keys: List of translation keys for examples
+            mapper: Optional function to transform parsed kwargs before validation
+            args: Optional explicit Argument definitions (if not provided, auto-generated)
+
+        Returns:
+            Decorator that wraps handler to accept (ctx, request) signature
+
+        Example:
+            @registry.schema_command(
+                name="add",
+                schema=schemas.AddMemberRequest,
+                description_key="groups.commands.add.description",
+                args=[
+                    Argument("member_email", type=ArgumentType.EMAIL, required=True),
+                    Argument("group_id", type=ArgumentType.STRING, required=True),
+                    Argument("provider", type=ArgumentType.STRING, required=True),
+                    Argument("justification", type=ArgumentType.STRING, required=False),
+                ]
+            )
+            def add_member_command(ctx: CommandContext, request: schemas.AddMemberRequest):
+                return service.add_member(request)
+        """
+
+        def decorator(handler: Callable) -> Callable:
+            # Use provided arguments or auto-generate from schema
+            schema_args = args or self._schema_to_arguments(schema)
+
+            def wrapper(ctx: "CommandContext", **parsed_kwargs) -> Any:
+                # Apply optional mapper for complex transformations
+                if mapper:
+                    parsed_kwargs = mapper(parsed_kwargs)
+
+                # Note: Platform-specific preprocessing (e.g., Slack @mention resolution)
+                # is now handled by CommandProvider._preprocess_arguments() before this
+                # wrapper is called. This keeps the registry platform-agnostic.
+
+                # Inject context fields
+                parsed_kwargs["requestor"] = ctx.user_email
+                if "idempotency_key" not in parsed_kwargs:
+                    parsed_kwargs["idempotency_key"] = str(uuid4())
+
+                # Validate using Pydantic
+                try:
+                    validated_request = schema(**parsed_kwargs)
+                except ValidationError as e:
+                    # Convert Pydantic errors to user-friendly messages
+                    error_details = []
+                    for error in e.errors():
+                        field = error.get("loc", ("unknown",))[0]
+                        msg = error.get("msg", "Validation failed")
+                        error_details.append(f"{field}: {msg}")
+
+                    error_msg = ctx.translate(
+                        "commands.errors.validation_failed",
+                        errors="; ".join(error_details),
+                    )
+                    ctx.respond(error_msg)
+                    return
+
+                # Call actual handler with validated request
+                return handler(ctx, validated_request)
+
+            # Register with existing command infrastructure
+            cmd = Command(
+                name=name,
+                handler=wrapper,
+                description=description,
+                description_key=description_key,
+                args=schema_args,
+                examples=examples or [],
+                example_keys=example_keys or [],
+            )
+            self._commands[name] = cmd
+            logger.debug(
+                "registered schema command", namespace=self.namespace, name=name
+            )
+            return handler
+
+        return decorator
+
+    def _schema_to_arguments(self, schema: Type[BaseModel]) -> List[Argument]:
+        """Convert Pydantic schema fields to Argument definitions.
+
+        Introspects schema fields to generate matching Argument objects.
+        Skips 'requestor', 'idempotency_key', and 'metadata' (auto-injected).
+
+        Args:
+            schema: Pydantic BaseModel class
+
+        Returns:
+            List of Argument definitions
+        """
+        args = []
+        for field_name, field_info in schema.model_fields.items():
+            # Skip auto-injected fields
+            if field_name in ("requestor", "idempotency_key", "metadata"):
+                continue
+
+            # Map Pydantic types to ArgumentType
+            arg_type = self._pydantic_type_to_argument_type(field_info.annotation)
+
+            # Extract constraints and metadata
+            required = field_info.is_required()
+            description = field_info.description or ""
+
+            # Handle Enum choices
+            choices = None
+            origin_type = field_info.annotation
+            if isinstance(origin_type, type) and issubclass(origin_type, Enum):
+                choices = [e.value for e in origin_type]
+
+            args.append(
+                Argument(
+                    name=field_name,
+                    type=arg_type,
+                    required=required,
+                    choices=choices,
+                    description=description,
+                )
+            )
+
+        return args
+
+    @staticmethod
+    def _pydantic_type_to_argument_type(pydantic_type) -> ArgumentType:
+        """Map Pydantic field types to ArgumentType enum.
+
+        Args:
+            pydantic_type: Pydantic field type annotation
+
+        Returns:
+            Corresponding ArgumentType
+        """
+        # Handle Optional[T] and other generic types
+        origin = get_origin(pydantic_type)
+        if origin is Union:
+            # Get first non-None type from Union (e.g., Optional[str] -> str)
+            args = get_args(pydantic_type)
+            for arg in args:
+                if arg is not type(None):
+                    return CommandRegistry._pydantic_type_to_argument_type(arg)
+
+        # Direct type mapping
+        type_mapping = {
+            str: ArgumentType.STRING,
+            int: ArgumentType.INTEGER,
+            float: ArgumentType.FLOAT,
+            bool: ArgumentType.BOOLEAN,
+            EmailStr: ArgumentType.EMAIL,
+        }
+
+        return type_mapping.get(pydantic_type, ArgumentType.STRING)
