@@ -65,6 +65,7 @@ class CommandProvider(ABC):
         self.translator = translator
         self.locale_resolver = locale_resolver
         self.parser = CommandParser()
+        self.parent_command: Optional[str] = None
 
     def _ensure_registry(self) -> CommandRegistry:
         """Ensure registry is set, raise clear error if not.
@@ -307,10 +308,16 @@ class CommandProvider(ABC):
         """
         if self.registry is None:
             return "No command registry available."
-        lines = [f"*{self.registry.namespace.upper()} Commands*"]
+
+        command_prefix = (
+            f"{self.parent_command} {self.registry.namespace}"
+            if self.parent_command
+            else self.registry.namespace
+        )
+        lines = [f"*{command_prefix.upper()} Commands*"]
 
         for cmd in self.registry.list_commands():
-            lines.append(f"\n*/{self.registry.namespace} {cmd.name}*")
+            lines.append(f"\n*/{command_prefix} {cmd.name}*")
 
             # Translate command description
             desc = self._translate_or_fallback(
@@ -393,28 +400,10 @@ class CommandProvider(ABC):
                 )
                 return
             # Step 3-5: Extract command text (platform-specific) and tokenize
-            logger.warning(
-                "extracting_command_text",
-                namespace=self.registry.namespace if self.registry else "unknown",
-            )
             text = self.extract_command_text(platform_payload)
-            logger.warning(
-                "preprocessing_command_text",
-                text=text,
-                namespace=self.registry.namespace if self.registry else "unknown",
-            )
             preprocessed_text = self.preprocess_command_text(platform_payload, text)
-            logger.warning(
-                "tokenizing_command_text",
-                text=preprocessed_text,
-                namespace=self.registry.namespace if self.registry else "unknown",
-            )
             tokens = self._tokenize(preprocessed_text) if preprocessed_text else []
-            logger.warning(
-                "command_tokens",
-                tokens=tokens,
-                namespace=self.registry.namespace if self.registry else "unknown",
-            )
+
             # Step 6: Resolve locale for framework operations (help, errors)
             framework_locale = self._resolve_framework_locale(platform_payload)
 
