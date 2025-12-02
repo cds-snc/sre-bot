@@ -69,8 +69,9 @@ def _list_command_mapper(parsed_kwargs: Dict[str, Any]) -> Dict[str, Any]:
 @registry.schema_command(
     name="list",
     schema=schemas.ListGroupsRequest,
+    description="List groups.",
     description_key="groups.commands.list.description",
-    mapper=_list_command_mapper,
+    mapper=_list_command_mapper,  # Keep this - complex field mapping logic
     args=[
         Argument(
             name="--managed",
@@ -126,6 +127,7 @@ def list_groups_command(
     ctx: CommandContext, request: schemas.ListGroupsRequest
 ) -> None:
     """List groups you can manage."""
+    logger.warning("groups_list_command_invoked", request=request, ctx=ctx)
     try:
         groups = service.list_groups(request)
 
@@ -204,6 +206,7 @@ def list_groups_command(
     name="add",
     schema=schemas.AddMemberRequest,
     description_key="groups.commands.add.description",
+    # No mapper needed - preprocessing handled by SlackCommandProvider
     args=[
         Argument(
             name="member_email",
