@@ -78,7 +78,7 @@ def format_groups_list(
 
         if show_details:
             members = group.get("members", [])
-            roles = {}
+            roles: dict[str, int] = {}
             for member in members:
                 role = member.get("role", "MEMBER")
                 roles[role] = roles.get(role, 0) + 1
