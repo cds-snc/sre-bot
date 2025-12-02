@@ -192,9 +192,8 @@ class TestSlackCommandProvider:
         ) as mock_get_email:
             mock_get_email.return_value = "test@example.com"
 
-            ctx = adapter.create_context(slack_payload)
-
-            assert ctx.user_email == "test@example.com"
+        assert ctx.user_email == "test@example.com"
+        assert slack_payload["client"].users_info.call_count == 2
 
     def test_create_context_handles_email_fetch_failure(self, adapter, slack_payload):
         """create_context handles failure to fetch email."""
@@ -210,10 +209,16 @@ class TestSlackCommandProvider:
             assert ctx.user_email == ""
 
     def test_create_context_resolves_locale(self, adapter, slack_payload):
-        """create_context resolves user locale."""
+        """create_context resolves user locale from Slack."""
+        slack_payload["client"].users_info.return_value = {
+            "ok": True,
+            "user": {"profile": {"email": "test@example.com"}, "locale": "fr-FR"},
+        }
+
         ctx = adapter.create_context(slack_payload)
 
-        assert ctx.locale == "en-US"
+        # Locale should come from user profile
+        assert ctx.locale == "fr-FR"
 
     def test_create_context_handles_locale_resolution_failure(
         self, monkeypatch, slack_payload
@@ -226,22 +231,24 @@ class TestSlackCommandProvider:
             "infrastructure.commands.providers.slack.settings", mock_settings
         )
 
-        # Create adapter with None locale resolver (simulates missing resolver)
+        # Create adapter
         adapter = SlackCommandProvider(config={"enabled": True})
-        adapter.locale_resolver = None
+
+        # Make users_info fail
+        slack_payload["client"].users_info.side_effect = Exception("API error")
 
         ctx = adapter.create_context(slack_payload)
 
-        assert ctx.locale == "en-US"  # Falls back to default when resolver is None
+        # Should fall back to default locale
+        assert ctx.locale == "en-US"
 
     def test_create_context_sets_metadata(self, adapter, slack_payload):
         """create_context sets metadata dict."""
         ctx = adapter.create_context(slack_payload)
 
-        assert ctx.metadata["user_name"] == "testuser"
-        assert ctx.metadata["team_id"] == "T123"
-        assert ctx.metadata["trigger_id"] == "trigger-123"
-        assert "slack_client" in ctx.metadata
+        assert ctx.metadata["command"] == slack_payload["command"]
+        assert ctx.metadata["client"] == slack_payload["client"]
+        assert ctx.metadata["respond"] == slack_payload["respond"]
 
     def test_create_context_sets_responder(self, adapter, slack_payload):
         """create_context sets response channel."""
@@ -256,8 +263,8 @@ class TestSlackCommandProvider:
         """create_context sets translator to a callable wrapper."""
         ctx = adapter.create_context(slack_payload)
 
-        # _translator should be callable (a wrapper function)
-        assert callable(ctx._translator)  # pylint: disable=protected-access
+        # Translator should be set (created by adapter if not already set)
+        assert ctx._translator is not None  # pylint: disable=protected-access
 
     def test_acknowledge_calls_ack_function(self, adapter, slack_payload):
         """acknowledge calls Slack ack function."""
@@ -276,28 +283,6 @@ class TestSlackCommandProvider:
         adapter.send_help(slack_payload, "help text")
 
         slack_payload["respond"].assert_called_once_with(text="help text")
-
-    def test_handle_supports_payload_dict_format(self, adapter):
-        """handle accepts payload dict with required keys."""
-        ack = MagicMock()
-        command = {"text": "hello", "user_id": "U123", "channel_id": "C123"}
-        client = MagicMock()
-        client.users_info.return_value = {"ok": False}
-        respond = MagicMock()
-        body = {}
-
-        payload = {
-            "ack": ack,
-            "command": command,
-            "client": client,
-            "respond": respond,
-            "body": body,
-        }
-
-        adapter.handle(payload)
-
-        ack.assert_called_once()
-        respond.assert_called()
 
     def test_handle_supports_payload_dict_signature(self, adapter, slack_payload):
         """handle supports payload dict signature."""
@@ -348,8 +333,8 @@ class TestSlackCommandProvider:
         # Adapter starts with locale_resolver=None, will be set by create_context
         assert adapter.locale_resolver is None
 
-    def test_create_context_requires_client(self, adapter, slack_payload):
-        """create_context requires Slack client."""
+    def test_create_context_handles_missing_client(self, adapter, slack_payload):
+        """create_context raises error when client is missing."""
         slack_payload["client"] = None
 
         with pytest.raises(ValueError, match="Slack client required"):

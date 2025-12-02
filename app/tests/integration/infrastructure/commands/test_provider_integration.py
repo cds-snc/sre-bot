@@ -37,8 +37,13 @@ class MockCommandProvider(CommandProvider):
     def send_help(self, payload, help_text):
         pass
 
-    def _resolve_framework_locale(self, platform_payload):
-        """Resolve locale for framework operations."""
+    def _validate_payload(self, payload):
+        pass
+
+    def preprocess_command_text(self, payload, text):
+        return text
+
+    def _resolve_framework_locale(self, payload):
         return "en-US"
 
 

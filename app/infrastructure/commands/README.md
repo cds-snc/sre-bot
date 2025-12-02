@@ -2,75 +2,140 @@
 
 ## Overview
 
-This package implements a small, framework-agnostic command system used by the SRE bot to parse, register, and dispatch text-based commands (for example: Slack slash-commands). The framework separates responsibilities into: registry, parser, context, providers, and response formatting.
+This package implements a small, platform-agnostic command framework used by the SRE bot
+to register, parse, validate, and dispatch text-based commands (e.g. Slack slash commands
+or HTTP/API based invocations). The implementation is deliberately modular and split
+into responsibilities: registration, parsing, execution context, platform adapters (providers),
+and response formatting.
 
-## Components
+This README documents the current behavior and developer-facing integration points.
 
-- `registry`:
-  - Holds namespaced `Command` objects and their handlers.
-  - Commands are registered with a namespace (for example `groups`) so providers can mount the registry and dispatch commands scoped to that namespace.
+## Core Concepts
 
-- `parser`:
-  - Parses raw command text into a command name, positional arguments, and flags/options.
-  - Produces a representation used by the registry to validate and route to handlers.
+- Registry: `CommandRegistry` holds namespaced `Command` objects. Commands may have
+  positional arguments, flags, examples and nested subcommands. A registry exposes
+  `command`, `subcommand`, and `schema_command` decorators for registering handlers.
 
-- `context`:
-  - `CommandContext` provides the handler with platform-agnostic utilities such as `respond()` and `translate()`.
-  - Context instances are created by providers and contain request-scoped data (user, channel, locale, responder callback).
+- Parser: `CommandParser` tokenizes input (POSIX/shlex semantics), supports quoted
+  strings, flags (`--flag` and `--key=value`), type coercion and validation against
+  `Argument` definitions. Parsing errors raise `CommandParseError` and are handled
+  by providers/router.
 
-- `providers`:
-  - Adapter layer between platform (Slack, CLI, HTTP) and the command framework.
-  - Providers extract text from platform payloads, create a `CommandContext`, and call the registry/parser to dispatch the command.
-  - The Slack provider implements Slack-specific behavior: acknowledges incoming requests, resolves locale, and formats responses for Slack.
+- Context: `CommandContext` is a platform-agnostic container created by providers to
+  give handlers access to the requestor (`user_id`, `user_email`), `locale`, a
+  translator callable, and a response channel (`responder`) with methods like
+  `send_message`, `send_ephemeral`, `send_card`, `send_error`, and `send_success`.
 
-- `responses`:
-  - Response models and formatters encapsulate how handler results or errors are rendered for a platform.
-  - Formatters convert logical response objects into platform payloads (e.g., Slack blocks or text).
+- Providers: Platform adapters subclass `CommandProvider` to map platform payloads
+  into framework operations. Providers implement text extraction, preprocessing
+  (e.g., resolving Slack mentions to emails), context creation (`create_context`),
+  acknowledgement models (`acknowledge`) and platform-specific send helpers
+  (`send_error`, `send_help`, `send_*`). The Slack adapter `SlackCommandProvider`
+  includes helpers to resolve user/channel mentions and wraps Slack SDK clients into
+  a `SlackResponseChannel` and `SlackResponseFormatter`.
 
-## Usage
+- Router: `CommandRouter` is a higher-level router that registers named subcommands
+  to platform providers and routes incoming payloads to the correct provider based
+  on a detected platform and the first token in the command text. Router-level
+  help and platform detection live here.
 
-## Registering a command handler
+- Responses: Platform-agnostic response models (cards, success, error) are rendered
+  by `ResponseFormatter` implementations. `SlackResponseFormatter` implements Block
+  Kit formatting used by the Slack response channel.
 
-1. Define a `Command` and handler and register it in a namespaced registry (example namespace: `groups`).
-2. The handler receives a `CommandContext` and should use `ctx.respond()` to send results and `ctx.translate()` for localized strings.
+## Developer Integration Guide
 
-Example (conceptual):
+1. Initialize a `CommandRegistry` for your module and register commands:
 
 ```python
-from infrastructure.commands.registry import Command, registry
+from infrastructure.commands.registry import CommandRegistry, Argument, ArgumentType
 
-@registry.register("groups")
-def my_handler(ctx, args):
-    ctx.respond("Handled")
+registry = CommandRegistry("groups")
+
+@registry.command(
+    name="list",
+    description_key="groups.commands.list.description",
+    args=[Argument("provider", type=ArgumentType.STRING, required=False)],
+)
+def list_groups(ctx, provider: str = None):
+    ctx.respond("TODO: list groups")
+
+@registry.subcommand("list", name="managed")
+def list_managed(ctx):
+    ctx.respond("TODO: list managed groups")
+
+@registry.schema_command(
+    name="add",
+    schema=...,  # Pydantic model
+)
+def add_member(ctx, request):
+    # request is a validated Pydantic model
+    pass
 ```
 
-## Mounting a registry in a provider
+Notes:
+- Use `schema_command` when you want Pydantic validation and automatic argument
+  generation from a schema. The framework injects `requestor` and `idempotency_key`.
+- Keep providers platform-agnostic: platform-specific preprocessing (mention/channel
+  resolution) should be implemented in the provider's `preprocess_command_text`.
 
-Providers attach a `registry` attribute and expose a `handle()` method that accepts platform payloads. For Slack, the SRE router initializes a `SlackCommandProvider`, assigns `provider.registry = groups_registry`, then calls `provider.handle(...)` with the unpacked Slack payload.
+2. Attach your registry to a provider instance during application initialization:
 
-## Provider responsibilities
+```python
+from infrastructure.commands.providers import get_provider
 
-- Extract the raw command text from the incoming payload.
-- Create a `CommandContext` populated with responder callback and locale.
-- Call the parser and registry to dispatch the command.
-- Format and send responses using the configured response formatter.
+slack_provider = get_provider("slack")
+slack_provider.registry = registry
+```
+
+3. Providers handle the command flow when `handle(platform_payload)` is called:
+- acknowledge
+- extract + preprocess text
+- tokenize
+- validate/parse arguments
+- build `CommandContext`
+- execute handler with parsed args (or validated Pydantic request)
+
+4. Translation and locale:
+- Providers may attach a translator callable to `CommandContext` (via
+  `ctx.set_translator`). The registry and router use translation keys where provided
+  and providers expose helper methods to translate or fall back to English.
+
+5. Help text and errors:
+- The provider and router generate help text from command metadata (descriptions,
+  args, examples) and will attempt to resolve translation keys when a translator is
+  available. Parsing or validation errors are converted to user-facing messages by
+  providers using `_translate_error`.
 
 ## Testing
 
-Integration tests simulate platform payloads by creating a provider instance, attaching a registry, and invoking `provider.handle(...)` with a mocked `ack`, `respond`, `client`, and `command` payload. Unit tests exercise handlers using a mocked `CommandContext`.
-
-## Notes
-
-- Registries are namespaced: providers or callers are expected to supply only the subcommand text for dispatch when a higher-level router already consumed the namespace token.
-- Context `translate()` calls expect translation keys provided by the centralized i18n system; providers are responsible for creating/attaching translators or translation wrappers into the context.
+- Unit test handlers by creating a `CommandContext` with a mock responder and
+  translator. Inject the registry into a `CommandProvider` and call `provider.handle`
+  with a mocked platform payload (`ack`, `command`, `client`, `respond`) for Slack.
+- Integration tests can simulate Slack payloads including a `client` that responds
+  to `users_info`/`conversations_list` calls if mention/channel resolution is
+  necessary to exercise preprocessing.
 
 ## Files of interest
 
-- `registry.py` — namespaced command registration and lookup
-- `parser.py` — parsing command text into name/args/flags
-- `context.py` — `CommandContext` model used by handlers
-- `providers/base.py` — base provider contract
-- `providers/slack.py` — Slack-specific provider implementation
-- `responses/formatters.py` and `responses/slack_formatter.py` — response formatting for platforms
+- `registry.py` — registration decorators and Pydantic `schema_command` support
+- `parser.py` — tokenization, flags, and type coercion
+- `context.py` — `CommandContext` and `ResponseChannel` protocol
+- `providers/base.py` — provider contract and generic execution flow
+- `providers/slack.py` — Slack adapter, mention/channel resolution, responder
+- `responses/formatters.py` & `responses/slack_formatter.py` — response rendering
 
-If you need examples, inspect the `modules/*/commands` registries and the Slack provider tests which show end-to-end usage patterns.
+## Troubleshooting
+
+- If you see `RuntimeError: <Provider> registry not attached` ensure the module
+  initialization attaches its `CommandRegistry` to the provider before handlers
+  are invoked.
+- If translation keys are returned instead of user text, confirm a translator was
+  attached to the provider and that the translator's `translate_message` supports
+  the requested keys and locale.
+
+## Contact
+
+If behavior is unclear or you need an example wiring for your module, see other
+modules under `app/modules/*/commands` for reference implementations or ask a
+maintainer for an initialization example.
