@@ -286,6 +286,7 @@ class TestListGroupsRequest:
         """ListGroupsRequest accepts email address."""
         request = schemas.ListGroupsRequest(
             requestor="user@example.com",
+            include_members=True,
         )
 
         assert request.requestor == "user@example.com"
@@ -296,6 +297,7 @@ class TestListGroupsRequest:
         request = schemas.ListGroupsRequest(
             requestor="user@example.com",
             provider=schemas.ProviderType.GOOGLE,
+            include_members=True,
         )
 
         assert request.provider == schemas.ProviderType.GOOGLE

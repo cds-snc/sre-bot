@@ -1,7 +1,8 @@
 """Unit tests for SlackCommandProvider."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
 
 from infrastructure.commands.providers.slack import (
     SlackCommandProvider,
@@ -185,28 +186,23 @@ class TestSlackCommandProvider:
 
     def test_create_context_fetches_user_email(self, adapter, slack_payload):
         """create_context fetches user email from Slack."""
-        from unittest.mock import patch
+        slack_payload["client"].users_info.return_value = {
+            "ok": True,
+            "user": {"profile": {"email": "test@example.com"}, "locale": "en-US"},
+        }
 
-        with patch(
-            "infrastructure.commands.providers.slack.slack_users.get_user_email_from_body"
-        ) as mock_get_email:
-            mock_get_email.return_value = "test@example.com"
+        ctx = adapter.create_context(slack_payload)
 
         assert ctx.user_email == "test@example.com"
         assert slack_payload["client"].users_info.call_count == 2
 
     def test_create_context_handles_email_fetch_failure(self, adapter, slack_payload):
         """create_context handles failure to fetch email."""
-        from unittest.mock import patch
+        slack_payload["client"].users_info.side_effect = Exception("API error")
 
-        with patch(
-            "infrastructure.commands.providers.slack.slack_users.get_user_email_from_body"
-        ) as mock_get_email:
-            mock_get_email.side_effect = Exception("API error")
+        ctx = adapter.create_context(slack_payload)
 
-            ctx = adapter.create_context(slack_payload)
-
-            assert ctx.user_email == ""
+        assert ctx.user_email == ""
 
     def test_create_context_resolves_locale(self, adapter, slack_payload):
         """create_context resolves user locale from Slack."""
@@ -374,3 +370,28 @@ class TestSlackCommandProvider:
         adapter.handle(slack_payload)
 
         assert captured_args.get("name") == "Alice"
+
+    def test_validate_payload_missing_slack_token(self, adapter, slack_payload):
+        """_validate_payload raises error when SLACK_TOKEN is missing."""
+        # Mock settings to have empty SLACK_TOKEN
+        with patch(
+            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN", ""
+        ):
+            with pytest.raises(ValueError, match="SLACK_TOKEN required"):
+                adapter._validate_payload(slack_payload)
+
+    def test_handle_missing_slack_token_sends_error(self, adapter, slack_payload):
+        """handle sends error response when SLACK_TOKEN is missing."""
+        # Mock settings to have empty SLACK_TOKEN
+        with patch(
+            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN", ""
+        ):
+            adapter.handle(slack_payload)
+
+            # Verify error was sent
+            respond = slack_payload["respond"]
+            assert respond.called
+            call_args = respond.call_args
+            assert (
+                "error" in str(call_args).lower() or "token" in str(call_args).lower()
+            )
