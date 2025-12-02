@@ -135,26 +135,6 @@ class TestCommandContextResponding:
         )
 
 
-class TestCommandContextLogging:
-    """Tests for logging integration."""
-
-    def test_get_logger_returns_bound_logger(self, command_context_factory):
-        """get_logger returns logger with context bound."""
-        ctx = command_context_factory(
-            platform="slack",
-            user_id="U123",
-            channel_id="C456",
-            correlation_id="corr-789",
-        )
-
-        logger = ctx.get_logger()
-
-        assert logger is not None
-        # Check that context was bound (via the bound attributes)
-        # Note: This is a bit tricky to test without internal access to structlog
-        # but we can at least verify the method returns something
-
-
 class TestCommandContextIntegration:
     """Integration tests for CommandContext."""
 

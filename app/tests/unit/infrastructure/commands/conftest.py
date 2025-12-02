@@ -4,6 +4,44 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.commands.parser import CommandParser
+from infrastructure.commands.context import CommandContext
+
+
+@pytest.fixture
+def command_context_factory():
+    """Factory for creating CommandContext instances for testing.
+
+    Returns:
+        Callable that creates CommandContext with default or custom values
+    """
+
+    def _factory(
+        platform: str = "slack",
+        user_id: str = "U12345",
+        user_email: str = "test@example.com",
+        channel_id: str = "C12345",
+        locale: str = "en-US",
+        metadata: dict = None,
+        correlation_id: str = None,
+        translator=None,
+        responder=None,
+    ):
+        ctx = CommandContext(
+            platform=platform,
+            user_id=user_id,
+            user_email=user_email,
+            channel_id=channel_id,
+            locale=locale,
+            metadata=metadata or {},
+            correlation_id=correlation_id,
+        )
+        if translator is not None:
+            ctx._translator = translator
+        if responder is not None:
+            ctx._responder = responder
+        return ctx
+
+    return _factory
 
 
 @pytest.fixture

@@ -19,11 +19,15 @@ Example:
 
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional
+import shlex
 
 from core.logging import get_module_logger
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext
+from infrastructure.i18n.translator import Translator
+from infrastructure.i18n.resolvers import LocaleResolver
+from infrastructure.i18n.models import TranslationKey, Locale
 
 logger = get_module_logger()
 
@@ -47,8 +51,8 @@ class CommandProvider(ABC):
     def __init__(
         self,
         registry: Optional[CommandRegistry] = None,
-        translator: Optional[Any] = None,
-        locale_resolver: Optional[Any] = None,
+        translator: Optional[Translator] = None,
+        locale_resolver: Optional[LocaleResolver] = None,
     ):
         """Initialize provider with command registry.
 
@@ -61,6 +65,7 @@ class CommandProvider(ABC):
         self.translator = translator
         self.locale_resolver = locale_resolver
         self.parser = CommandParser()
+        self.parent_command: Optional[str] = None
 
     def _ensure_registry(self) -> CommandRegistry:
         """Ensure registry is set, raise clear error if not.
@@ -95,7 +100,7 @@ class CommandProvider(ABC):
         """Create CommandContext from platform-specific payload.
 
         Must set up:
-        - User identification (user_id, user_email)
+        - Requestor User identification (user_id, user_email)
         - Locale for i18n
         - Platform-specific metadata
         - Response channel (ctx._responder)
@@ -141,137 +146,205 @@ class CommandProvider(ABC):
         """
         ...  # pylint: disable=unnecessary-ellipsis
 
-    def handle(self, platform_payload: Any) -> None:
-        """Handle command execution (generic flow).
+    @abstractmethod
+    def _validate_payload(self, platform_payload: Any) -> None:
+        """Optional: Validate platform payload structure.
 
-        This method implements the common command handling logic:
-        1. Acknowledge command
-        2. Extract and tokenize command text
-        3. Handle help requests
-        4. Parse command and arguments
-        5. Create execution context
-        6. Execute handler
-        7. Handle errors
+        Subclasses can override to perform platform-specific validation
+        before processing the command.
 
         Args:
             platform_payload: Platform-specific command data structure
+
+        Raises:
+            ValueError: If validation fails
         """
-        # Step 1: Acknowledge immediately (platform-specific)
-        self.acknowledge(platform_payload)
+        ...
+
+    @abstractmethod
+    def preprocess_command_text(self, platform_payload: Any, text: str) -> str:
+        """Preprocess command text before tokenization.
+
+        Platform-specific transformations on raw text:
+        - Slack: Resolve @mentions and #channels to emails/IDs
+        - Teams: Resolve mentions to UPNs, etc.
+
+        Args:
+            platform_payload: Platform-specific payload for context (client, etc.)
+            text: Raw command text from extract_command_text()
+
+        Returns:
+            Preprocessed text with platform identifiers resolved
+        """
+        return text
+
+    @abstractmethod
+    def _resolve_framework_locale(self, platform_payload: Any) -> str:
+        """Resolve locale for framework operations (help, errors).
+
+        Framework-level locale resolution without creating full context.
+        Subclasses should implement platform-specific quick resolution.
+
+        Args:
+            platform_payload: Platform-specific command data structure
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR")
+
+        Default implementation: returns "en-US"
+        """
+        return "en-US"
+
+    def _translate_or_fallback(
+        self, translation_key: Optional[str], fallback: str, locale: str
+    ) -> str:
+        """Translate a message key or fall back to default text.
+
+        Args:
+            translation_key: Translation key (e.g., "commands.errors.unknown_command")
+            fallback: Fallback text if translation not available
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Translated message or fallback text
+        """
+        if not translation_key or not self.translator:
+            return fallback
 
         try:
-            # Step 2: Extract command text (platform-specific)
-            text = self.extract_command_text(platform_payload)
-            tokens = self._tokenize(text) if text else []
-
-            # Step 3: Handle help requests
-            if not tokens or tokens[0] in ("help", "aide", "--help", "-h"):
-                help_text = self._generate_help()
-                self.send_help(platform_payload, help_text)
-                return
-
-            # Step 4: Parse command
-            cmd_name = tokens[0]
-            if self.registry is None:
-                self.send_error(
-                    platform_payload,
-                    "Command registry not initialized.",
-                )
-                return
-            cmd = self.registry.get_command(cmd_name)
-
-            if cmd is None:
-                self.send_error(
-                    platform_payload,
-                    f"Unknown command: `{cmd_name}`. Type `help` for usage.",
-                )
-                return
-
-            # Step 5: Create context (platform-specific)
-            ctx = self.create_context(platform_payload)
-
-            # Step 6: Parse arguments
-            arg_tokens = tokens[1:]
-            parsed = self.parser.parse(cmd, arg_tokens)
-
-            # Step 7: Execute handler
-            if parsed.subcommand:
-                parsed.subcommand.command.handler(ctx, **parsed.subcommand.args)
-            else:
-                cmd.handler(ctx, **parsed.args)
-
-        except CommandParseError as e:
-            self.send_error(platform_payload, str(e))
-            logger.warning(
-                "command_parse_error",
+            key = TranslationKey.from_string(translation_key)
+            locale_enum = Locale.from_string(locale)
+            return self.translator.translate_message(key, locale_enum)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug(
+                "translation_fallback",
+                key=translation_key,
                 error=str(e),
-                namespace=self.registry.namespace if self.registry else "unknown",
+            )
+            return fallback
+
+    def _translate_error(
+        self, error_key: str, locale: str, fallback: str, **variables: Any
+    ) -> str:
+        """Translate an error message with variable interpolation.
+
+        Args:
+            error_key: Error translation key (e.g., "commands.errors.unknown_command")
+            locale: Locale string
+            fallback: Fallback text if translation not available
+            **variables: Variables for interpolation
+
+        Returns:
+            Translated error message or fallback
+        """
+        if not self.translator:
+            return fallback
+
+        try:
+            key = TranslationKey.from_string(error_key)
+            locale_enum = Locale.from_string(locale)
+            return self.translator.translate_message(
+                key, locale_enum, variables=variables
             )
         except Exception as e:  # pylint: disable=broad-except
-            self.send_error(
-                platform_payload, "An error occurred processing your command."
-            )
-            logger.exception(
-                "unhandled_command_error",
+            logger.debug(
+                "error_translation_fallback",
+                key=error_key,
                 error=str(e),
-                namespace=self.registry.namespace if self.registry else "unknown",
             )
+            return fallback
 
     def _tokenize(self, text: str) -> List[str]:
-        """Tokenize command text (respects quotes).
+        """Tokenize command text using POSIX shell parsing rules.
+
+        Uses Python's shlex module for robust parsing of quoted strings,
+        escaped characters, and complex argument patterns.
 
         Args:
             text: Command text from user
 
         Returns:
-            List of tokens, respecting quoted strings
+            List of tokens with quotes removed and escapes processed
+
+        Examples:
+            >>> self._tokenize('list --user=@alice')
+            ['list', '--user=@alice']
+
+            >>> self._tokenize('add user "test new command" google')
+            ['add', 'user', 'test new command', 'google']
+
+            >>> self._tokenize('add user "value with \\"quotes\\"" google')
+            ['add', 'user', 'value with "quotes"', 'google']
+
+        Raises:
+            ValueError: If text has unclosed quotes or invalid syntax
         """
-        tokens: List[str] = []
-        current: List[str] = []
-        in_quote = None
+        if not text:
+            return []
 
-        for char in text:
-            if char in ('"', "'") and in_quote is None:
-                in_quote = char
-            elif char == in_quote:
-                in_quote = None
-                tokens.append("".join(current))
-                current = []
-            elif char == " " and in_quote is None:
-                if current:
-                    tokens.append("".join(current))
-                    current = []
-            else:
-                current.append(char)
+        try:
+            # Use POSIX mode for predictable behavior across platforms
+            return shlex.split(text, posix=True)
+        except ValueError as e:
+            # Unclosed quotes, invalid escapes, etc.
+            logger.error(
+                "tokenization_error",
+                text=text,
+                error=str(e),
+                namespace=self.registry.namespace if self.registry else "unknown",
+            )
+            # Graceful fallback: basic split (better than crashing)
+            # This allows malformed commands to still attempt execution
+            return text.split()
 
-        if current:
-            tokens.append("".join(current))
+    def _generate_help(self, locale: str = "en-US") -> str:
+        """Generate help text from registry with i18n support.
 
-        return tokens
-
-    def _generate_help(self) -> str:
-        """Generate help text from registry.
+        Args:
+            locale: Locale string (e.g., "en-US", "fr-FR")
 
         Returns:
-            Formatted help text
+            Formatted help text with translated descriptions and examples
         """
         if self.registry is None:
             return "No command registry available."
-        lines = [f"*{self.registry.namespace.upper()} Commands*"]
+
+        command_prefix = (
+            f"{self.parent_command} {self.registry.namespace}"
+            if self.parent_command
+            else self.registry.namespace
+        )
+        lines = [f"*{command_prefix.upper()} Commands*"]
 
         for cmd in self.registry.list_commands():
-            lines.append(f"\n*/{self.registry.namespace} {cmd.name}*")
+            lines.append(f"\n*/{command_prefix} {cmd.name}*")
 
-            if cmd.description:
-                lines.append(f"  {cmd.description}")
+            # Translate command description
+            desc = self._translate_or_fallback(
+                cmd.description_key, cmd.description, locale
+            )
+            if desc:
+                lines.append(f"  {desc}")
 
             if cmd.args:
                 for arg in cmd.args:
+                    # Translate argument description if key available
+                    arg_desc = self._translate_or_fallback(
+                        arg.description_key, arg.description, locale
+                    )
                     if arg.flag:
-                        lines.append(f"  `{arg.name}` - {arg.description}")
+                        lines.append(f"  `{arg.name}` - {arg_desc}")
                     else:
-                        req = "required" if arg.required else "optional"
-                        lines.append(f"  `{arg.name}` ({req}) - {arg.description}")
+                        # Translate required/optional terms
+                        req_key = (
+                            "commands.terms.required"
+                            if arg.required
+                            else "commands.terms.optional"
+                        )
+                        req_term = self._translate_or_fallback(
+                            req_key, "required" if arg.required else "optional", locale
+                        )
+                        lines.append(f"  `{arg.name}` ({req_term}) - {arg_desc}")
 
             if cmd.examples:
                 lines.append("  Examples:")
@@ -284,3 +357,122 @@ class CommandProvider(ABC):
                     lines.append(f"    `{subcmd.name}` - {subcmd.description}")
 
         return "\n".join(lines)
+
+    def handle(self, platform_payload: Any) -> None:
+        """Handle command execution (generic flow).
+
+        Command flow:
+        1. Acknowledge command receipt
+        2. Validate payload
+        3. Extract command text
+        4. Preprocess command text
+        5. Tokenize command text
+        6. Resolve framework locale
+        7. Handle help requests
+        8. Ensure registry is available
+        9. Look up command by name
+        10. Parse and preprocess arguments
+        11. Create context with finalized data
+        12. Execute handler with parsed arguments
+
+        Args:
+            platform_payload: Platform-specific command data structure
+        """
+        # Step 1: Acknowledge command receipt
+        self.acknowledge(platform_payload)
+        try:
+            try:
+                # Step 2: Validate payload structure
+                self._validate_payload(platform_payload)
+            except ValueError as ve:
+                framework_locale = self._resolve_framework_locale(platform_payload)
+                error_msg = self._translate_error(
+                    "commands.errors.invalid_payload",
+                    framework_locale,
+                    str(ve),
+                    error=str(ve),
+                )
+                self.send_error(platform_payload, error_msg)
+                logger.warning(
+                    "invalid_command_payload",
+                    error=str(ve),
+                    namespace=self.registry.namespace if self.registry else "unknown",
+                )
+                return
+            # Step 3-5: Extract command text (platform-specific) and tokenize
+            text = self.extract_command_text(platform_payload)
+            preprocessed_text = self.preprocess_command_text(platform_payload, text)
+            tokens = self._tokenize(preprocessed_text) if preprocessed_text else []
+
+            # Step 6: Resolve locale for framework operations (help, errors)
+            framework_locale = self._resolve_framework_locale(platform_payload)
+
+            # Step 7: Handle help requests
+            if not tokens or tokens[0] in ("help", "aide", "--help", "-h"):
+                help_text = self._generate_help(framework_locale)
+                self.send_help(platform_payload, help_text)
+                return
+
+            # Step 8: Ensure registry is available
+            if self.registry is None:
+                error_msg = self._translate_error(
+                    "commands.errors.registry_not_initialized",
+                    framework_locale,
+                    "Command registry not initialized.",
+                )
+                self.send_error(platform_payload, error_msg)
+                return
+
+            # Step 9: Look up command by name
+            cmd_name = tokens[0]
+            cmd = self.registry.get_command(cmd_name)
+
+            if cmd is None:
+                error_msg = self._translate_error(
+                    "commands.errors.unknown_command",
+                    framework_locale,
+                    f"Unknown command: `{cmd_name}`. Type `help` for usage.",
+                    command=cmd_name,
+                )
+                self.send_error(platform_payload, error_msg)
+                return
+
+            # Step 10: Parse and preprocess arguments
+            arg_tokens = tokens[1:]
+            parsed = self.parser.parse(cmd, arg_tokens)
+
+            # Step 11: Create context with finalized data
+            ctx = self.create_context(platform_payload)
+
+            # Step 12: Execute handler with parsed arguments
+            if parsed.subcommand:
+                parsed.subcommand.command.handler(ctx, **parsed.args)
+            else:
+                cmd.handler(ctx, **parsed.args)
+        except CommandParseError as e:
+            framework_locale = self._resolve_framework_locale(platform_payload)
+            error_msg = self._translate_error(
+                "commands.errors.parse_error",
+                framework_locale,
+                str(e),
+                error=str(e),
+            )
+            self.send_error(platform_payload, error_msg)
+            logger.warning(
+                "command_parse_error",
+                error=str(e),
+                namespace=self.registry.namespace if self.registry else "unknown",
+            )
+        except Exception as e:  # pylint: disable=broad-except
+            framework_locale = self._resolve_framework_locale(platform_payload)
+            error_msg = self._translate_error(
+                "commands.errors.internal_error",
+                framework_locale,
+                "An error occurred processing your command.",
+            )
+            self.send_error(platform_payload, error_msg)
+            logger.exception(
+                "unhandled_command_error",
+                error=str(e),
+                namespace=self.registry.namespace if self.registry else "unknown",
+            )

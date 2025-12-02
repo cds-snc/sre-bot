@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Protocol
 from uuid import uuid4
-import structlog
 
 from core.logging import get_module_logger
 
@@ -58,11 +57,11 @@ class CommandContext:
 
     Attributes:
         platform: Platform name (slack, teams, api)
-        user_id: Platform-specific user identifier
-        user_email: User's email address
+        user_id: Platform-specific requestor user identifier
+        user_email: User's email address of the requestor (considered universal ID across platforms)
         channel_id: Platform-specific channel identifier
         locale: User's preferred locale (e.g., en-US, fr-FR)
-        metadata: Platform-specific metadata
+        metadata: Platform-specific metadata (e.g., Slack command payload)
         translator: Translation function (injected by adapter)
         responder: Response channel (injected by adapter)
 
@@ -176,15 +175,6 @@ class CommandContext:
             logger.warning("respond_success called without responder set")
             return
         self._responder.send_success(success, **kwargs)
-
-    def get_logger(self) -> structlog.BoundLogger:
-        """Get structured logger with context."""
-        return logger.bind(
-            platform=self.platform,
-            user_id=self.user_id,
-            channel_id=self.channel_id,
-            correlation_id=self.correlation_id,
-        )
 
     def set_translator(self, translator: Callable) -> None:
         """Set the translator callable."""

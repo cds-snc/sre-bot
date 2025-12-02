@@ -1,12 +1,17 @@
-"""Slack-specific command adapter implementation."""
+"""Slack-specific command adapter implementation - simplified and DRY."""
 
-from typing import Any, Callable, Dict
+import re
+from typing import Any, Callable, Dict, Optional
+from slack_sdk import WebClient
 
+from core.config import settings
 from core.logging import get_module_logger
 from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.commands.context import CommandContext, ResponseChannel
 from infrastructure.commands.providers import register_command_provider
 from infrastructure.commands.responses.slack_formatter import SlackResponseFormatter
+from infrastructure.i18n.models import TranslationKey, Locale
+from integrations.slack.users import get_user_email_from_id, get_user_email_from_handle
 
 logger = get_module_logger()
 
@@ -17,7 +22,7 @@ class SlackResponseChannel(ResponseChannel):
     def __init__(
         self,
         respond: Callable,
-        client: Any,
+        client: WebClient,
         channel_id: str,
         user_id: str,
     ):
@@ -55,8 +60,7 @@ class SlackResponseChannel(ResponseChannel):
             card: Card object from infrastructure.commands.responses.models
             **kwargs: Additional Slack-specific options
         """
-        formatted = self.formatter.format_card(card)
-        self.respond(**formatted, **kwargs)
+        self.respond(**self.formatter.format_card(card), **kwargs)
 
     def send_error(self, error: Any, **kwargs) -> None:
         """Send error message.
@@ -65,8 +69,7 @@ class SlackResponseChannel(ResponseChannel):
             error: ErrorMessage object from infrastructure.commands.responses.models
             **kwargs: Additional Slack-specific options
         """
-        formatted = self.formatter.format_error(error)
-        self.respond(**formatted, **kwargs)
+        self.respond(**self.formatter.format_error(error), **kwargs)
 
     def send_success(self, success: Any, **kwargs) -> None:
         """Send success message.
@@ -75,8 +78,7 @@ class SlackResponseChannel(ResponseChannel):
             success: SuccessMessage object from infrastructure.commands.responses.models
             **kwargs: Additional Slack-specific options
         """
-        formatted = self.formatter.format_success(success)
-        self.respond(**formatted, **kwargs)
+        self.respond(**self.formatter.format_success(success), **kwargs)
 
 
 @register_command_provider("slack")
@@ -105,7 +107,6 @@ class SlackCommandProvider(CommandProvider):
             ValueError: If SLACK_TOKEN is not configured
         """
         # pylint: disable=import-outside-toplevel
-        from core.config import settings
 
         # Validate Slack is configured
         if not settings.slack.SLACK_TOKEN:
@@ -121,11 +122,39 @@ class SlackCommandProvider(CommandProvider):
 
         self.config = config
 
-    def extract_command_text(self, platform_payload: Dict[str, Any]) -> str:
+    def _resolve_framework_locale(self, platform_payload: Any) -> str:
+        """Resolve locale for framework operations (help, errors).
+
+        Quick locale resolution using Slack user profile.
+
+        Args:
+            platform_payload: Slack command payload
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR")
+        """
+        try:
+            command = platform_payload.get("command", {})
+            client: WebClient | None = platform_payload.get("client")
+            user_id = command.get("user_id", "")
+
+            if client and user_id:
+                user_info = client.users_info(user=user_id, include_locale=True)
+                if user_info.get("ok"):
+                    return user_info["user"].get("locale", "en-US")
+            elif self.locale_resolver:
+                return self.locale_resolver.default_locale.value
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug(
+                "failed_to_resolve_framework_locale", error=str(e), fallback="en-US"
+            )
+        return "en-US"
+
+    def extract_command_text(self, platform_payload: Any) -> str:
         """Extract command text from Slack command payload.
 
         Args:
-            platform_payload: Dict with keys: ack, command, client, respond, body
+            platform_payload: Dict with keys: ack, command, client, respond
 
         Returns:
             Command text without slash command prefix
@@ -133,19 +162,187 @@ class SlackCommandProvider(CommandProvider):
         command = platform_payload.get("command", {})
         return command.get("text", "").strip()
 
-    def create_context(self, platform_payload: Dict[str, Any]) -> CommandContext:
-        """Create CommandContext from Slack command payload.
+    def _preprocess_users(self, platform_payload: Any, text: str) -> str:
+        """Resolve Slack user mentions to email addresses in text.
+
+        Handles multiple mention formats:
+        - Escaped: <@U012ABCDEF> or <@U012ABCDEF|alice>
+        - Plain text: @alice
+        - In flags: --user=@alice or --user=<@U012ABCDEF>
 
         Args:
-            platform_payload: Dict with keys: ack, command, client, respond, body
+            platform_payload: Slack payload with client
+            text: Text potentially containing user mentions
+
+        Returns:
+            Text with mentions resolved to emails (or left unchanged if unresolvable)
+        """
+
+        client: WebClient | None = platform_payload.get("client")
+        if not client:
+            logger.warning("preprocess_users_no_client")
+            return text
+
+        # Pattern 1: Escaped mentions <@U12345> or <@U12345|name>
+        def resolve_escaped_mention(match):
+            user_id = match.group(1).split("|")[0]  # Extract ID before pipe if present
+            email = get_user_email_from_id(client, user_id)
+            if email:
+                logger.debug("resolved_escaped_mention", user_id=user_id, email=email)
+                return email
+            # Graceful fallback: leave unchanged
+            logger.debug("unresolved_escaped_mention", user_id=user_id)
+            return match.group(0)
+
+        text = re.sub(r"<@([A-Z0-9|]+)>", resolve_escaped_mention, text)
+
+        # Pattern 2: Plain text handles @alice (but not emails like alice@example.com)
+        def resolve_plain_mention(match):
+            handle = match.group(1)
+            email = get_user_email_from_handle(client, handle)
+            if email:
+                logger.debug("resolved_plain_mention", handle=handle, email=email)
+                return email
+            # Graceful fallback: leave unchanged (might be @my_awesome_word)
+            logger.debug("unresolved_plain_mention", handle=handle)
+            return match.group(0)
+
+        # Match @handle but NOT email addresses (negative lookbehind for alphanumeric before @)
+        # and NOT if already followed by domain pattern
+        text = re.sub(
+            r"(?<![a-zA-Z0-9])@([a-zA-Z0-9._-]+)(?!@|\.[a-zA-Z]{2,})",
+            resolve_plain_mention,
+            text,
+        )
+
+        return text
+
+    def _preprocess_channels(self, platform_payload: Any, text: str) -> str:
+        """Resolve Slack channel mentions to channel IDs in text.
+
+        Handles multiple mention formats:
+        - Escaped: <#C012ABCDEF|channel-name>
+        - Plain text: #channel-name
+        - In flags: --channel=#general or --channel=<#C012ABCDEF|general>
+
+        Args:
+            platform_payload: Slack payload with client
+            text: Text potentially containing channel mentions
+
+        Returns:
+            Text with mentions resolved to channel IDs (or left unchanged if unresolvable)
+        """
+        client: WebClient | None = platform_payload.get("client")
+        if not client:
+            logger.warning("preprocess_channels_no_client")
+            return text
+
+        # Pattern 1: Escaped mentions <#C12345|name> (already contains ID)
+        def resolve_escaped_channel(match):
+            channel_id = match.group(1).split("|")[0]  # Extract ID before pipe
+            logger.debug("resolved_escaped_channel", channel_id=channel_id)
+            return channel_id
+
+        text = re.sub(r"<#([A-Z0-9|]+)>", resolve_escaped_channel, text)
+
+        # Pattern 2: Plain text #channel-name
+        def resolve_plain_channel(match):
+            channel_name = match.group(1)
+            # Try to resolve via conversations.list
+            try:
+                channels = client.conversations_list(types="public_channel", limit=100)
+                if channels.get("ok"):
+                    for channel in channels.get("channels", []):
+                        if channel.get("name") == channel_name:
+                            channel_id = channel["id"]
+                            logger.debug(
+                                "resolved_plain_channel",
+                                channel_name=channel_name,
+                                channel_id=channel_id,
+                            )
+                            return channel_id
+            except Exception as e:  # pylint: disable=broad-except
+                logger.warning(
+                    "resolve_plain_channel_failed",
+                    channel_name=channel_name,
+                    error=str(e),
+                )
+
+            # Graceful fallback: leave unchanged
+            logger.debug("unresolved_plain_channel", channel_name=channel_name)
+            return match.group(0)
+
+        text = re.sub(r"#([a-z0-9_-]+)", resolve_plain_channel, text)
+
+        return text
+
+    def preprocess_command_text(self, platform_payload: Any, text: str) -> str:
+        """Preprocess Slack command text to resolve mentions and channels.
+
+        Transforms:
+        - @username → user@example.com (via Slack API)
+        - <@U12345> → user@example.com (via Slack API)
+        - #channel-name → C12345 (via Slack API)
+        - <#C12345|channel> → C12345 (extracted)
+        - Unresolvable mentions → left unchanged (graceful fallback)
+
+        Args:
+            platform_payload: Slack payload with client
+            text: Raw command text
+
+        Returns:
+            Text with Slack identifiers resolved where possible
+        """
+        text = self._preprocess_users(platform_payload, text)
+        text = self._preprocess_channels(platform_payload, text)
+        return text
+
+    def _make_translator_callable(self) -> Optional[Callable]:
+        """Create a callable wrapper for translator.translate_message.
+
+        Returns a function that accepts string keys and locale strings,
+        converting them to TranslationKey/Locale enums before calling translator.
+
+        Returns:
+            Translator callable or None if no translator is set
+        """
+        if self.translator is None:
+            return None
+
+        translator = self.translator
+
+        def translate_fn(key_str: str, locale_str: str, **variables) -> str:
+            """Translate a string key with variables."""
+            try:
+                translation_key = TranslationKey.from_string(key_str)
+                locale_enum = (
+                    Locale.from_string(locale_str)
+                    if isinstance(locale_str, str)
+                    else locale_str
+                )
+                return translator.translate_message(
+                    translation_key, locale_enum, variables=variables
+                )
+            except Exception:  # pylint: disable=broad-except
+                return key_str  # Fallback to key if translation fails
+
+        return translate_fn
+
+    def create_context(self, platform_payload: Any) -> CommandContext:
+        """Create CommandContext from Slack command payload.
+
+        Extracts Slack-specific fields (user, channel, locale, client) and populates
+        CommandContext with minimal Slack metadata (client, respond, command).
+
+        Args:
+            platform_payload: Dict with keys: ack, command, client, respond
 
         Returns:
             CommandContext with Slack-specific settings
         """
         command = platform_payload.get("command", {})
-        client = platform_payload.get("client")
+        client: WebClient | None = platform_payload.get("client")
         respond = platform_payload.get("respond")
-        body = platform_payload.get("body", {})
 
         user_id = command.get("user_id", "")
         channel_id = command.get("channel_id", "")
@@ -153,42 +350,24 @@ class SlackCommandProvider(CommandProvider):
         # Get user email
         user_email = ""
         try:
-            if client:
-                user_info = client.users_info(user=user_id)
-                if user_info.get("ok"):
-                    user_email = (
-                        user_info.get("user", {}).get("profile", {}).get("email", "")
-                    )
+            if client and user_id:
+                user_email = get_user_email_from_id(client, user_id) or ""
         except Exception as e:  # pylint: disable=broad-except
             logger.warning("failed_to_get_user_email", user_id=user_id, error=str(e))
 
         # Resolve locale
-        locale = "en-US"  # Default
-        if self.locale_resolver:
-            try:
-                locale_ctx = self.locale_resolver.from_slack(
-                    client, {"user_id": user_id}
-                )
-                locale = locale_ctx.locale.value
-            except Exception as e:  # pylint: disable=broad-except
-                logger.warning(
-                    "failed_to_resolve_locale", user_id=user_id, error=str(e)
-                )
+        locale = self._resolve_framework_locale(platform_payload)
+
+        # Validate required dependencies
+        if client is None:
+            raise ValueError("Slack client required for command execution")
+        if respond is None:
+            raise ValueError("Respond function required for command execution")
 
         # Create response channel
-        if respond is None or client is None:
-            # Fallback if critical data is missing - create no-op responder
-            def noop_respond(**kwargs):  # pylint: disable=unused-argument
-                pass
-
-            if respond is None:
-                respond = noop_respond
-            if client is None:
-                client = None  # type: ignore
-
         responder = SlackResponseChannel(respond, client, channel_id, user_id)
 
-        # Create context
+        # Create context with clean Slack metadata pattern
         ctx = CommandContext(
             platform="slack",
             user_id=user_id,
@@ -196,16 +375,38 @@ class SlackCommandProvider(CommandProvider):
             channel_id=channel_id,
             locale=locale,
             metadata={
-                "user_name": command.get("user_name", ""),
-                "team_id": command.get("team_id", ""),
-                "trigger_id": body.get("trigger_id", ""),
-                "slack_client": client,
+                "client": client,
+                "respond": respond,
+                "command": command,
             },
         )
-        ctx._responder = responder  # pylint: disable=protected-access
-        ctx._translator = self.translator  # pylint: disable=protected-access
-
+        ctx.set_responder(responder)
+        translator_fn = self._make_translator_callable()
+        if translator_fn:
+            ctx.set_translator(translator_fn)
         return ctx
+
+    def _validate_payload(self, platform_payload) -> None:
+        """Validate Slack command payload structure.
+        Args:
+            platform_payload: Payload to validate
+        Raises:
+            ValueError: If payload is invalid
+        """
+        if not isinstance(platform_payload, dict):
+            logger.error(
+                "invalid_slack_payload_type",
+                payload_type=type(platform_payload).__name__,
+            )
+            raise ValueError(
+                f"Expected dict payload, got {type(platform_payload).__name__}"
+            )
+
+        required_fields = {"ack", "command", "client", "respond"}
+        missing = required_fields - set(platform_payload.keys())
+        if missing:
+            logger.error("slack_payload_missing_fields", missing_fields=missing)
+            raise ValueError(f"Slack payload missing required fields: {missing}")
 
     def acknowledge(self, platform_payload: Dict[str, Any]) -> None:
         """Acknowledge Slack command immediately (< 3 seconds required).
@@ -228,7 +429,7 @@ class SlackCommandProvider(CommandProvider):
         if respond:
             respond(text=f":x: {message}")
 
-    def send_help(self, platform_payload: Dict[str, Any], help_text: str) -> None:
+    def send_help(self, platform_payload: Any, help_text: str) -> None:
         """Send help text to Slack channel.
 
         Args:
@@ -238,37 +439,3 @@ class SlackCommandProvider(CommandProvider):
         respond = platform_payload.get("respond")
         if respond:
             respond(text=help_text)
-
-    def handle(  # pylint: disable=arguments-differ
-        self, ack=None, command=None, client=None, respond=None, body=None
-    ):  # type: ignore
-        """Handle Slack command (supports both old and new signatures).
-
-        Supports legacy signature:
-            adapter.handle(ack, command, client, respond)
-
-        And new signature:
-            adapter.handle({"ack": ack, "command": command, ...})
-
-        Args:
-            ack: Slack acknowledgment function (legacy)
-            command: Slack command dict (legacy)
-            client: Slack client (legacy)
-            respond: Slack respond function (legacy)
-            body: Slack body dict (legacy)
-        """
-        # Support legacy signature
-        if ack is not None and not isinstance(ack, dict):
-            platform_payload = {
-                "ack": ack,
-                "command": command,
-                "client": client,
-                "respond": respond,
-                "body": body or {},
-            }
-        else:
-            # New signature: first arg is payload dict
-            platform_payload = ack if isinstance(ack, dict) else {}
-
-        # Call base class handle
-        super().handle(platform_payload)
