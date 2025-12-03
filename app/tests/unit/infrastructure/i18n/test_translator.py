@@ -148,6 +148,34 @@ class TestTranslator:
         # But same content
         assert old_catalog.messages == new_catalog.messages
 
+    def test_translate_message_single_brace_interpolates(self, translator):
+        """translate_message() interpolates single-brace placeholders."""
+        key = TranslationKey("groups", "summary")
+        # Inject a message that uses single-brace placeholders (common in YAML)
+        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})[
+            "summary"
+        ] = "✅ Retrieved {count} group{plural}"
+
+        message = translator.translate_message(
+            key,
+            Locale.EN_US,
+            variables={"count": 2, "plural": "s"},
+        )
+        assert "Retrieved" in message
+        assert "2" in message
+        assert "groups" in message
+
+    def test_translate_message_single_brace_missing_variable_raises(self, translator):
+        """translate_message() raises ValueError for missing single-brace vars."""
+        key = TranslationKey("groups", "summary")
+        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})[
+            "summary"
+        ] = "✅ Retrieved {count} group{plural}"
+
+        # Missing 'plural' should raise ValueError
+        with pytest.raises(ValueError):
+            translator.translate_message(key, Locale.EN_US, variables={"count": 1})
+
 
 class TestTranslatorInterpolation:
     """Tests for variable interpolation in Translator."""
@@ -200,3 +228,15 @@ class TestTranslatorInterpolation:
             {"id": "123", "extra": "ignored"},
         )
         assert result == "Incident 123"
+
+    def test_interpolate_single_brace(self, translator):
+        """_interpolate() replaces single-brace placeholders."""
+        message = "Retrieved {count} group{plural}"
+        result = translator._interpolate(message, {"count": 2, "plural": "s"})
+        assert result == "Retrieved 2 groups"
+
+    def test_interpolate_single_brace_missing_variable(self, translator):
+        """_interpolate() raises ValueError for missing single-brace variables."""
+        message = "Retrieved {count} group{plural}"
+        with pytest.raises(ValueError):
+            translator._interpolate(message, {"count": 1})
