@@ -135,10 +135,15 @@ def list_groups_command(*args, **kwargs):
     return handlers.list_groups_command(*args, **kwargs)
 
 
+def _add_member_mapper(parsed_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    return parsed_kwargs
+
+
 @registry.schema_command(
     name="add",
     schema=schemas.AddMemberRequest,
     description_key="groups.commands.add.description",
+    mapper=_add_member_mapper,
     # No mapper needed - preprocessing handled by SlackCommandProvider
     args=[
         Argument(
