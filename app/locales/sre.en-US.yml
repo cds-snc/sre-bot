@@ -1,0 +1,9 @@
+sre:
+  subcommands.groups.description: "Manage groups and memberships"
+  subcommands.incident.description: "Manage incidents"
+  subcommands.webhooks.description: "Manage webhooks"
+  subcommands.geolocate.description: "Geolocate an IP address"
+  subcommands.version.description: "Show SRE Bot version"
+  help.title: "SRE Commands"
+  help.section_header: "Available subcommands:"
+  help.footer: "Type `/sre <subcommand> help` for subcommand details."
