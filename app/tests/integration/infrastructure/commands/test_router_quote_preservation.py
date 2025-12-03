@@ -1,6 +1,5 @@
 """Integration tests for quote preservation through command router."""
 
-from unittest.mock import MagicMock
 import pytest
 import shlex
 
