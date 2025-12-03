@@ -39,6 +39,38 @@ from tests.factories.commands import (  # noqa: E402
 import core.config as core_config  # noqa: E402
 
 
+def pytest_configure(config):
+    """Hook called after command line options have been parsed.
+
+    Mock Slack App initialization BEFORE any modules are imported to prevent
+    auth errors during test collection when main.py is imported and tries to
+    instantiate the Slack App at module load time.
+    """
+    from unittest.mock import MagicMock
+
+    # Create a mock that allows all attribute access and method calls
+    def mock_app_init(self, *args, **kwargs):
+        """Mock App.__init__ to skip auth_test."""
+        # Initialize minimal required attributes without calling auth_test
+        self._token = kwargs.get("token")
+        self._client = MagicMock()
+        self._client.auth_test = MagicMock(
+            return_value={"ok": True, "user_id": "U12345"}
+        )
+        self.command = MagicMock()
+        self.view = MagicMock()
+        self.action = MagicMock()
+        self.event = MagicMock()
+        self.middleware = MagicMock()
+        self.add_middleware = MagicMock()
+        self.add_event_handler = MagicMock()
+
+    # Patch before any imports
+    import slack_bolt
+
+    slack_bolt.App.__init__ = mock_app_init
+
+
 @pytest.fixture(autouse=True)
 def suppress_structlog_output():
     """Suppress structlog output during tests.
