@@ -46,6 +46,16 @@ def format_action_response(
 
     # Extract relevant metadata for translation
     metadata = result_dict.get("metadata", {})
+    if not metadata:
+        metadata = {
+            "member_email": result_dict.get("member_email"),
+            "group_id": result_dict.get("group_id"),
+            "provider": (
+                result_dict.get("provider")
+                if isinstance(result_dict.get("provider"), str)
+                else getattr(result_dict.get("provider"), "value", None)
+            ),
+        }
 
     try:
         return ctx.translate(translation_key, **metadata)
