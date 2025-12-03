@@ -24,7 +24,7 @@ from modules.groups.providers.aws_identity_center import (
     AwsIdentityCenterProvider,
 )
 from modules.groups.providers.base import validate_member_email
-from modules.groups.providers.contracts import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 
 # ============================================================================
 # ID Extraction Tests
@@ -633,8 +633,9 @@ class TestAwsProviderIntegration:
     def test_extract_id_used_in_member_normalization(self):
         """Test that ID extraction logic applies to normalized members."""
         provider = AwsIdentityCenterProvider()
+        # Create a mock response that looks like OperationResult
         resp = types.SimpleNamespace(
-            success=True,
+            is_success=True,
             data={
                 "UserId": "user-123",
                 "UserName": "john.doe",

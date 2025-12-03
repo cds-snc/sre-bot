@@ -118,6 +118,48 @@ def get_user_email_from_handle(client: WebClient, user_handle: str) -> str | Non
     return None
 
 
+def get_user_email_from_id(client: WebClient, user_id: str) -> str | None:
+    """
+    Returns the user email from a Slack user ID, otherwise None.
+
+    Handles escaped user mentions from Slack's "Escape channels, users, and links" feature.
+    When escape is enabled, Slack sends mentions as <@USER_ID> format.
+
+    Args:
+        client (WebClient): The Slack client instance.
+        user_id (str): The Slack user ID (e.g., U012ABCDEF or from <@U012ABCDEF>).
+
+    Returns:
+        str | None: The user email or None if not found or error occurs.
+    """
+    try:
+        user_info = client.users_info(user=user_id)
+        if user_info.get("ok"):
+            user: dict = user_info.get("user", {})  # type: ignore
+            profile: dict = user.get("profile", {}) if isinstance(user, dict) else {}  # type: ignore
+            email = profile.get("email") if isinstance(profile, dict) else None
+            if email:
+                logger.debug(
+                    "resolved_user_email_from_id",
+                    user_id=user_id,
+                    email=email,
+                )
+                return email
+        else:
+            logger.warning(
+                "get_user_email_from_id_failed",
+                user_id=user_id,
+                error=user_info.get("error", "unknown"),
+            )
+    except Exception as e:  # pylint: disable=broad-except
+        logger.warning(
+            "get_user_email_from_id_exception",
+            user_id=user_id,
+            error=str(e),
+        )
+    return None
+
+
 def get_user_locale(client: WebClient, user_id=None):
     """
     Returns the user locale from a command's user_id if valid, "en-US" as default otherwise

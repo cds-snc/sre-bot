@@ -28,12 +28,11 @@ from modules.groups.providers import register_provider
 from modules.groups.providers.base import (
     PrimaryGroupProvider,
     ProviderCapabilities,
-    OperationResult,
-    OperationStatus,
     HealthCheckResult,
     provider_operation,
     validate_member_email,
 )
+from infrastructure.operations import OperationResult, OperationStatus
 
 logger = get_module_logger()
 
@@ -259,7 +258,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         """
         validated_email = validate_member_email(member_email)
         resp = google_directory.insert_member(group_key, validated_email)
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError("google insert_member failed", response=resp)
         if resp.data and isinstance(resp.data, dict):
             return as_canonical_dict(self._normalize_member_from_google(resp.data))
@@ -278,7 +277,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         """
         validated_email = validate_member_email(member_email)
         resp = google_directory.delete_member(group_key, validated_email)
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError("google delete_member failed", response=resp)
         return {"status": "removed"}
 
@@ -294,7 +293,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             A list of canonical member dicts (normalized NormalizedMember).
         """
         resp = google_directory.list_members(group_key, **kwargs)
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError("google list_members failed", response=resp)
         raw = resp.data if hasattr(resp, "data") else resp
         return [
@@ -316,7 +315,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             if provider_name != "google":
                 kwargs["query"] = f"email:{provider_name}*"
         resp = google_directory.list_groups(**kwargs)
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError("google list_groups failed", response=resp)
         raw = resp.data if hasattr(resp, "data") else resp
         return [
@@ -391,7 +390,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         # Call integration layer with unified request
         resp = google_directory.list_groups_with_members(request)
 
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError(
                 "google list_groups_with_members failed", response=resp
             )
@@ -440,7 +439,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         """
 
         resp = google_directory.get_member(group_key, user_key)
-        if hasattr(resp, "success") and not resp.success:
+        if hasattr(resp, "is_success") and not resp.is_success:
             raise IntegrationError("google get_member failed", response=resp)
         member = resp.data if hasattr(resp, "data") else resp
         if isinstance(member, dict) and "role" in member:
@@ -463,7 +462,7 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             # Uses default customer ID from configuration
             resp = google_directory.list_groups(maxResults=1)
 
-            if hasattr(resp, "success") and not resp.success:
+            if hasattr(resp, "is_success") and not resp.is_success:
                 return HealthCheckResult(
                     healthy=False,
                     status="unhealthy",

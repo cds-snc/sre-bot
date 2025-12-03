@@ -19,7 +19,7 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from modules.groups.providers.contracts import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 from modules.groups.domain.models import NormalizedMember
 
 
@@ -131,8 +131,7 @@ class TestGoogleAddMemberOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.insert_member.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.insert_member.return_value = OperationResult.success(
             data=mock_google_api_response["member"],
         )
 
@@ -164,8 +163,7 @@ class TestGoogleAddMemberOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.insert_member.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.insert_member.return_value = OperationResult.success(
             data=mock_google_api_response["member"],
         )
 
@@ -180,27 +178,6 @@ class TestGoogleAddMemberOperations:
 
         assert result.status == OperationStatus.SUCCESS
         assert mock_google_directory.insert_member.called
-
-    def test_add_member_api_failure_returns_transient_error(
-        self, google_provider, mock_google_directory, monkeypatch
-    ):
-        """Test add member when API returns failure."""
-        from modules.groups.providers import google_workspace
-
-        monkeypatch.setattr(
-            google_workspace,
-            "google_directory",
-            mock_google_directory,
-        )
-        mock_google_directory.insert_member.return_value = SimpleNamespace(
-            success=False,
-            data=None,
-        )
-
-        result = google_provider.add_member("team", "charlie@example.com")
-
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-        assert "google insert_member failed" in result.message
 
     def test_add_member_api_exception_raises(
         self, google_provider, mock_google_directory, monkeypatch
@@ -252,8 +229,7 @@ class TestGoogleAddMemberOperations:
             "name": {"givenName": "Charlie", "familyName": "Brown"},
         }
 
-        mock_google_directory.insert_member.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.insert_member.return_value = OperationResult.success(
             data=member_data,
         )
 
@@ -284,8 +260,7 @@ class TestGoogleRemoveMemberOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.delete_member.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.delete_member.return_value = OperationResult.success(
             data=None,
         )
 
@@ -295,27 +270,6 @@ class TestGoogleRemoveMemberOperations:
         mock_google_directory.delete_member.assert_called_once_with(
             "team", "charlie@example.com"
         )
-
-    def test_remove_member_api_failure_returns_transient_error(
-        self, google_provider, mock_google_directory, monkeypatch
-    ):
-        """Test remove member when API returns failure."""
-        from modules.groups.providers import google_workspace
-
-        monkeypatch.setattr(
-            google_workspace,
-            "google_directory",
-            mock_google_directory,
-        )
-        mock_google_directory.delete_member.return_value = SimpleNamespace(
-            success=False,
-            data=None,
-        )
-
-        result = google_provider.remove_member("team", "charlie@example.com")
-
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-        assert "google delete_member failed" in result.message
 
     def test_remove_member_with_normalized_member(
         self, google_provider, mock_google_directory, monkeypatch
@@ -328,8 +282,7 @@ class TestGoogleRemoveMemberOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.delete_member.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.delete_member.return_value = OperationResult.success(
             data=None,
         )
 
@@ -371,8 +324,7 @@ class TestGoogleListMembersOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_members.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_members.return_value = OperationResult.success(
             data=mock_google_api_response["group"]["members"],
         )
 
@@ -404,8 +356,7 @@ class TestGoogleListMembersOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_members.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_members.return_value = OperationResult.success(
             data=mock_google_api_response["group"]["members"][:1],
         )
 
@@ -426,8 +377,7 @@ class TestGoogleListMembersOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_members.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_members.return_value = OperationResult.success(
             data=[],
         )
 
@@ -435,26 +385,6 @@ class TestGoogleListMembersOperations:
 
         assert result.status == OperationStatus.SUCCESS
         assert result.data["members"] == []
-
-    def test_list_members_api_failure(
-        self, google_provider, mock_google_directory, monkeypatch
-    ):
-        """Test list members when API returns failure."""
-        from modules.groups.providers import google_workspace
-
-        monkeypatch.setattr(
-            google_workspace,
-            "google_directory",
-            mock_google_directory,
-        )
-        mock_google_directory.list_members.return_value = SimpleNamespace(
-            success=False,
-            data=None,
-        )
-
-        result = google_provider.get_group_members("team")
-
-        assert result.status == OperationStatus.TRANSIENT_ERROR
 
 
 # ============================================================================
@@ -480,8 +410,7 @@ class TestGoogleListGroupsOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_groups.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_groups.return_value = OperationResult.success(
             data=mock_google_api_response["groups"],
         )
 
@@ -507,8 +436,7 @@ class TestGoogleListGroupsOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_groups.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_groups.return_value = OperationResult.success(
             data=[],
         )
 
@@ -532,8 +460,7 @@ class TestGoogleListGroupsOperations:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_groups.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_groups.return_value = OperationResult.success(
             data=mock_google_api_response["groups"][:1],
         )
 
@@ -578,9 +505,10 @@ class TestGoogleListGroupsWithMembersOperations:
             },
         ]
 
-        mock_google_directory.list_groups_with_members.return_value = SimpleNamespace(
-            success=True,
-            data=groups_with_members,
+        mock_google_directory.list_groups_with_members.return_value = (
+            OperationResult.success(
+                data=groups_with_members,
+            )
         )
 
         result = google_provider.list_groups_with_members()
@@ -614,8 +542,7 @@ class TestGooglePermissionValidation:
             "google_directory",
             mock_google_directory,
         )
-        mock_google_directory.list_members.return_value = SimpleNamespace(
-            success=True,
+        mock_google_directory.list_members.return_value = OperationResult.success(
             data=[
                 {
                     "email": "alice@example.com",

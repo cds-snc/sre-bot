@@ -19,7 +19,8 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from modules.groups.providers.contracts import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations.result import OperationResult as OperationResultImpl
 
 
 # ============================================================================
@@ -154,7 +155,9 @@ class TestAwsCreateMembershipOperations:
         # Simulate API failure by patching to return failure
         original_create = mock_identity_store_next.create_group_membership
         mock_identity_store_next.create_group_membership = (
-            lambda *args, **kwargs: SimpleNamespace(success=False, data=None)
+            lambda *args, **kwargs: OperationResultImpl.permanent_error(
+                message="Test error", error_code="TEST"
+            )
         )
 
         result = aws_provider.add_member("group-456", {"email": "alice@example.com"})
@@ -252,7 +255,7 @@ class TestAwsListMembershipsOperations:
         # Patch the mock to return empty memberships for empty-group
         original_list = mock_identity_store_next.list_group_memberships
         mock_identity_store_next.list_group_memberships = (
-            lambda *args, **kwargs: SimpleNamespace(success=True, data=[])
+            lambda *args, **kwargs: OperationResultImpl.success(data=[])
         )
 
         result = aws_provider.get_group_members("empty-group")
@@ -275,9 +278,8 @@ class TestAwsListMembershipsOperations:
             mock_identity_store,
         )
 
-        mock_identity_store.list_group_memberships.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        mock_identity_store.list_group_memberships.return_value = (
+            OperationResultImpl.permanent_error(message="Test error", error_code="TEST")
         )
 
         result = aws_provider.get_group_members("group-456")
@@ -318,9 +320,8 @@ class TestAwsListGroupsOperations:
             },
         ]
 
-        mock_identity_store.list_groups.return_value = SimpleNamespace(
-            success=True,
-            data=groups,
+        mock_identity_store.list_groups.return_value = OperationResultImpl.success(
+            data=groups
         )
 
         result = aws_provider.list_groups()
@@ -344,9 +345,8 @@ class TestAwsListGroupsOperations:
             mock_identity_store,
         )
 
-        mock_identity_store.list_groups.return_value = SimpleNamespace(
-            success=True,
-            data=[],
+        mock_identity_store.list_groups.return_value = OperationResultImpl.success(
+            data=[]
         )
 
         result = aws_provider.list_groups()
@@ -479,9 +479,8 @@ class TestAwsUserResolution:
             mock_identity_store,
         )
 
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=True,
-            data={"UserId": "user-123"},
+        mock_identity_store.get_user_by_username.return_value = (
+            OperationResultImpl.success(data={"UserId": "user-123"})
         )
 
         result = aws_provider._ensure_user_id_from_email("alice@example.com")
@@ -503,9 +502,8 @@ class TestAwsUserResolution:
             mock_identity_store,
         )
 
-        mock_identity_store.get_user_by_username.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        mock_identity_store.get_user_by_username.return_value = (
+            OperationResultImpl.permanent_error(message="Test error", error_code="TEST")
         )
 
         from modules.groups.domain.errors import IntegrationError
@@ -534,9 +532,8 @@ class TestAwsMembershipIdResolution:
             mock_identity_store,
         )
 
-        mock_identity_store.get_group_membership_id.return_value = SimpleNamespace(
-            success=True,
-            data={"MembershipId": "membership-789"},
+        mock_identity_store.get_group_membership_id.return_value = (
+            OperationResultImpl.success(data={"MembershipId": "membership-789"})
         )
 
         result = aws_provider._resolve_membership_id("group-456", "user-123")
@@ -555,9 +552,8 @@ class TestAwsMembershipIdResolution:
             mock_identity_store,
         )
 
-        mock_identity_store.get_group_membership_id.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        mock_identity_store.get_group_membership_id.return_value = (
+            OperationResultImpl.permanent_error(message="Test error", error_code="TEST")
         )
 
         from modules.groups.domain.errors import IntegrationError
@@ -586,9 +582,8 @@ class TestAwsFetchUserDetails:
             mock_identity_store,
         )
 
-        mock_identity_store.get_user.return_value = SimpleNamespace(
-            success=True,
-            data=mock_aws_api_response["user"],
+        mock_identity_store.get_user.return_value = OperationResultImpl.success(
+            data=mock_aws_api_response["user"]
         )
 
         result = aws_provider._fetch_user_details("user-123")
@@ -608,9 +603,8 @@ class TestAwsFetchUserDetails:
             mock_identity_store,
         )
 
-        mock_identity_store.get_user.return_value = SimpleNamespace(
-            success=False,
-            data=None,
+        mock_identity_store.get_user.return_value = OperationResultImpl.permanent_error(
+            message="Test error", error_code="TEST"
         )
 
         from modules.groups.domain.errors import IntegrationError
@@ -650,7 +644,7 @@ class TestAwsExtractIdFromResponse:
 
     def test_extract_id_from_dict_response(self, aws_provider):
         """Test extracting ID from dict response."""
-        resp = SimpleNamespace(success=True, data={"UserId": "user-123"})
+        resp = OperationResultImpl.success(data={"UserId": "user-123"})
 
         result = aws_provider._extract_id_from_resp(resp, ["UserId", "Id"])
 
@@ -658,7 +652,7 @@ class TestAwsExtractIdFromResponse:
 
     def test_extract_id_from_string_response(self, aws_provider):
         """Test extracting ID when response is a string."""
-        resp = SimpleNamespace(success=True, data="user-123")
+        resp = OperationResultImpl.success(data="user-123")
 
         result = aws_provider._extract_id_from_resp(resp, ["UserId"])
 
@@ -666,7 +660,9 @@ class TestAwsExtractIdFromResponse:
 
     def test_extract_id_failed_response(self, aws_provider):
         """Test extracting ID from failed response."""
-        resp = SimpleNamespace(success=False, data=None)
+        resp = OperationResultImpl.permanent_error(
+            message="Test error", error_code="TEST"
+        )
 
         result = aws_provider._extract_id_from_resp(resp, ["UserId"])
 

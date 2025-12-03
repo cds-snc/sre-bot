@@ -1,16 +1,5 @@
 FROM python:3.11.5-slim@sha256:edaf703dce209d774af3ff768fc92b1e3b60261e7602126276f9ceb0e3a96874
 
-RUN  apt-get update \
-  && apt-get install -y wget \
-  && apt-get install -y nodejs \
-  npm \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR frontend/
-COPY frontend/ .
-
-RUN npm install
-RUN npm run build
 
 WORKDIR /app
 

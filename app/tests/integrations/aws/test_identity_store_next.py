@@ -1,7 +1,7 @@
 import logging
 from botocore.exceptions import ClientError
 from integrations.aws import identity_store_next as isn
-from models.integrations import build_success_response, build_error_response
+from infrastructure.operations import OperationResult
 from tests.fixtures.aws_clients import FakeClient
 from tests.integrations.aws.fixtures_identity_store import (
     assert_integration_success,
@@ -15,7 +15,7 @@ class TestGetUser:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(user, "get_user", "aws"),
+            lambda **kw: OperationResult.success(data=user),
         )
         resp = isn.get_user("u-1")
         assert_integration_success(resp, expected_data=user)
@@ -36,9 +36,7 @@ class TestGetUser:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Not found"), "get_user", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Not found"),
         )
         caplog.set_level(logging.WARNING)
         resp = isn.get_user("missing")
@@ -48,9 +46,7 @@ class TestGetUser:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"UserId": "u-10"}, "create_user", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"UserId": "u-10"}),
         )
         resp = isn.create_user(
             email="new@example.com", first_name="New", family_name="User"
@@ -66,8 +62,8 @@ class TestListUsers:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                [{"UserId": "u1"}, {"UserId": "u2"}], "list_users", "aws"
+            lambda **kw: OperationResult.success(
+                data=[{"UserId": "u1"}, {"UserId": "u2"}]
             ),
         )
         resp = isn.list_users()
@@ -78,8 +74,8 @@ class TestListUsers:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                [{"UserId": "u1"}, {"UserId": "u2"}], "list_users", "aws"
+            lambda **kw: OperationResult.success(
+                data=[{"UserId": "u1"}, {"UserId": "u2"}]
             ),
         )
 
@@ -94,7 +90,7 @@ class TestGetGroup:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(group, "get_group", "aws"),
+            lambda **kw: OperationResult.success(data=group),
         )
         resp = isn.get_group("g-1")
         assert_integration_success(resp, expected_data=group)
@@ -106,7 +102,7 @@ class TestListGroups:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(groups, "list_groups", "aws"),
+            lambda **kw: OperationResult.success(data=groups),
         )
         resp = isn.list_groups()
         assert_integration_success(resp)
@@ -120,9 +116,7 @@ class TestCreateUser:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"UserId": "u-10"}, "create_user", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"UserId": "u-10"}),
         )
 
         resp = isn.create_user(
@@ -137,9 +131,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"MembershipId": "m-1"}, "create_group_membership", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"MembershipId": "m-1"}),
         )
 
         resp = isn.create_group_membership("g-1", "u-1")
@@ -150,9 +142,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Conflict"), "create_group_membership", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Conflict"),
         )
 
         resp = isn.create_group_membership("g-1", "u-1")
@@ -162,7 +152,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response({}, "delete_group_membership", "aws"),
+            lambda **kw: OperationResult.success(data={}),
         )
 
         resp = isn.delete_group_membership("m-1")
@@ -172,9 +162,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Not found"), "delete_group_membership", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Not found"),
         )
 
         resp = isn.delete_group_membership("missing")
@@ -188,9 +176,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                memberships, "list_group_memberships", "aws"
-            ),
+            lambda **kw: OperationResult.success(data=memberships),
         )
 
         resp = isn.list_group_memberships("g-1")
@@ -202,9 +188,7 @@ class TestGroupMemberships:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"MembershipId": "m-1"}, "get_group_membership_id", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"MembershipId": "m-1"}),
         )
 
         resp = isn.get_group_membership_id("g-1", "u-1")
@@ -220,7 +204,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_groups",
-            lambda **kw: build_success_response(groups, "list_groups", "aws"),
+            lambda **kw: OperationResult.success(data=groups),
         )
         monkeypatch.setattr(
             isn,
@@ -230,7 +214,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_users",
-            lambda **kw: build_success_response(users, "list_users", "aws"),
+            lambda **kw: OperationResult.success(data=users),
         )
         resp = isn.list_groups_with_memberships()
         assert_integration_success(resp)
@@ -242,16 +226,10 @@ class TestListGroupsWithMemberships:
         # Simulate IntegrationResponse with success=False and non-list data
         def fake_list_group_memberships(group_id):
             if group_id == "g-error":
-                return build_error_response(
-                    Exception("fail"), "list_group_memberships", "aws"
-                )
+                return OperationResult.permanent_error(message="fail")
             if group_id == "g-nonlist":
-                return build_success_response(
-                    "not-a-list", "list_group_memberships", "aws"
-                )
-            return build_success_response(
-                [{"MemberId": {"UserId": "u1"}}], "list_group_memberships", "aws"
-            )
+                return OperationResult.success(data="not-a-list")
+            return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
         monkeypatch.setattr(isn, "list_group_memberships", fake_list_group_memberships)
         # Patch ThreadPoolExecutor to run synchronously for test
@@ -279,9 +257,7 @@ class TestListGroupsWithMemberships:
         def fake_list_group_memberships(group_id):
             if group_id == "g-exc":
                 raise Exception("boom")
-            return build_success_response(
-                [{"MemberId": {"UserId": "u1"}}], "list_group_memberships", "aws"
-            )
+            return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
         monkeypatch.setattr(isn, "list_group_memberships", fake_list_group_memberships)
         monkeypatch.setattr(
@@ -325,7 +301,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_groups",
-            lambda **kw: build_error_response(Exception("fail"), "list_groups", "aws"),
+            lambda **kw: OperationResult.permanent_error(message="fail"),
         )
         resp = isn.list_groups_with_memberships()
         assert_integration_error(resp)
@@ -333,9 +309,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_groups",
-            lambda **kw: build_success_response(
-                [{"GroupId": "g1"}], "list_groups", "aws"
-            ),
+            lambda **kw: OperationResult.success(data=[{"GroupId": "g1"}]),
         )
         monkeypatch.setattr(
             isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []}
@@ -343,7 +317,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_users",
-            lambda **kw: build_error_response(Exception("fail"), "list_users", "aws"),
+            lambda **kw: OperationResult.permanent_error(message="fail"),
         )
         resp2 = isn.list_groups_with_memberships()
         assert_integration_error(resp2)
@@ -353,13 +327,11 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_groups",
-            lambda **kw: build_success_response(
-                [
+            lambda **kw: OperationResult.success(
+                data=[
                     {"GroupId": "g1", "DisplayName": "Alpha"},
                     {"GroupId": "g2", "DisplayName": "Beta"},
-                ],
-                "list_groups",
-                "aws",
+                ]
             ),
         )
         monkeypatch.setattr(
@@ -370,7 +342,7 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             isn,
             "list_users",
-            lambda **kw: build_success_response([], "list_users", "aws"),
+            lambda **kw: OperationResult.success(data=[]),
         )
         filters = [lambda g: g["DisplayName"].startswith("A")]
         resp = isn.list_groups_with_memberships(
@@ -385,9 +357,7 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"UserId": "u-1"}, "get_user_id", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"UserId": "u-1"}),
         )
 
         resp = isn.get_user_by_username("u-1")
@@ -398,9 +368,7 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Not found"), "get_user_id", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Not found"),
         )
 
         resp = isn.get_user_by_username("missing")
@@ -410,9 +378,7 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"GroupId": "g-1"}, "get_group_id", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"GroupId": "g-1"}),
         )
 
         resp = isn.get_group_by_name("g-1")
@@ -423,9 +389,7 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Not found"), "get_group_membership_id", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Not found"),
         )
 
         resp = isn.get_group_membership_id("g-1", "u-1")
@@ -436,9 +400,7 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_success_response(
-                {"MembershipId": "m-1"}, "get_group_membership_id", "aws"
-            ),
+            lambda **kw: OperationResult.success(data={"MembershipId": "m-1"}),
         )
         resp = isn.is_member_in_groups("u-1", ["g-1", "g-2"])
         assert_integration_success(resp)
@@ -450,13 +412,11 @@ class TestHelperFunctions:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: build_error_response(
-                Exception("Not found"), "get_group_membership_id", "aws"
-            ),
+            lambda **kw: OperationResult.permanent_error(message="Not found"),
         )
         resp2 = isn.is_member_in_groups("u-1", ["g-1"])
-        # Accept either a proper IntegrationResponse error or a success with False
-        if resp2.success:
+        # Accept either a proper OperationResult error or a success with False
+        if resp2.is_success:
             assert resp2.data is False
         else:
             assert_integration_error(resp2)
@@ -468,9 +428,7 @@ class TestHealthcheck:
         monkeypatch.setattr(
             isn,
             "list_users",
-            lambda **kw: build_success_response(
-                [{"UserId": "u-1"}], "list_users", "aws"
-            ),
+            lambda **kw: OperationResult.success(data=[{"UserId": "u-1"}]),
         )
         assert isn.healthcheck() is True
 
@@ -490,9 +448,7 @@ class TestBatchOperations:
         monkeypatch.setattr(
             isn,
             "get_user",
-            lambda user_id, **kw: build_success_response(
-                {"UserId": user_id}, "get_user", "aws"
-            ),
+            lambda user_id, **kw: OperationResult.success(data={"UserId": user_id}),
         )
 
         resp = isn.get_batch_users(["u-1", "u-2"])
@@ -506,9 +462,7 @@ class TestBatchOperations:
         monkeypatch.setattr(
             isn,
             "get_group",
-            lambda group_id, **kw: build_success_response(
-                {"GroupId": group_id}, "get_group", "aws"
-            ),
+            lambda group_id, **kw: OperationResult.success(data={"GroupId": group_id}),
         )
 
         resp = isn.get_batch_groups(["g-1", "g-2"])
@@ -521,8 +475,8 @@ class TestBatchOperations:
         # Simulate one success and one failure
         def fake_get_user(user_id, **kw):
             if user_id == "u-fail":
-                return build_error_response(Exception("Not found"), "get_user", "aws")
-            return build_success_response({"UserId": user_id}, "get_user", "aws")
+                return OperationResult.permanent_error(message="Not found")
+            return OperationResult.success(data={"UserId": user_id})
 
         monkeypatch.setattr(isn, "get_user", fake_get_user)
 
@@ -537,8 +491,8 @@ class TestBatchOperations:
         # Simulate one success and one failure
         def fake_get_group(group_id, **kw):
             if group_id == "g-fail":
-                return build_error_response(Exception("Not found"), "get_group", "aws")
-            return build_success_response({"GroupId": group_id}, "get_group", "aws")
+                return OperationResult.permanent_error(message="Not found")
+            return OperationResult.success(data={"GroupId": group_id})
 
         monkeypatch.setattr(isn, "get_group", fake_get_group)
 
@@ -552,8 +506,8 @@ class TestBatchOperations:
         # get_user returns a non-dict (malformed) response for one user
         def fake_get_user(user_id, **kw):
             if user_id == "u-bad":
-                return build_success_response("not-a-dict", "get_user", "aws")
-            return build_success_response({"UserId": user_id}, "get_user", "aws")
+                return OperationResult.success(data="not-a-dict")
+            return OperationResult.success(data={"UserId": user_id})
 
         monkeypatch.setattr(isn, "get_user", fake_get_user)
 
@@ -566,16 +520,10 @@ class TestBatchOperations:
             # Simulate IntegrationResponse with success=False and non-list data
             def fake_list_group_memberships(group_id):
                 if group_id == "g-error":
-                    return build_error_response(
-                        Exception("fail"), "list_group_memberships", "aws"
-                    )
+                    return OperationResult.permanent_error(message="fail")
                 if group_id == "g-nonlist":
-                    return build_success_response(
-                        "not-a-list", "list_group_memberships", "aws"
-                    )
-                return build_success_response(
-                    [{"MemberId": {"UserId": "u1"}}], "list_group_memberships", "aws"
-                )
+                    return OperationResult.success(data="not-a-list")
+                return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
             monkeypatch.setattr(
                 isn, "list_group_memberships", fake_list_group_memberships
@@ -605,9 +553,7 @@ class TestBatchOperations:
             def fake_list_group_memberships(group_id):
                 if group_id == "g-exc":
                     raise Exception("boom")
-                return build_success_response(
-                    [{"MemberId": {"UserId": "u1"}}], "list_group_memberships", "aws"
-                )
+                return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
             monkeypatch.setattr(
                 isn, "list_group_memberships", fake_list_group_memberships
@@ -653,9 +599,7 @@ class TestBatchOperations:
             monkeypatch.setattr(
                 isn,
                 "list_groups",
-                lambda **kw: build_error_response(
-                    Exception("fail"), "list_groups", "aws"
-                ),
+                lambda **kw: OperationResult.permanent_error(message="fail"),
             )
             resp = isn.list_groups_with_memberships()
             assert_integration_error(resp)
@@ -663,9 +607,7 @@ class TestBatchOperations:
             monkeypatch.setattr(
                 isn,
                 "list_groups",
-                lambda **kw: build_success_response(
-                    [{"GroupId": "g1"}], "list_groups", "aws"
-                ),
+                lambda **kw: OperationResult.success(data=[{"GroupId": "g1"}]),
             )
             monkeypatch.setattr(
                 isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []}
@@ -673,9 +615,7 @@ class TestBatchOperations:
             monkeypatch.setattr(
                 isn,
                 "list_users",
-                lambda **kw: build_error_response(
-                    Exception("fail"), "list_users", "aws"
-                ),
+                lambda **kw: OperationResult.permanent_error(message="fail"),
             )
             resp2 = isn.list_groups_with_memberships()
             assert_integration_error(resp2)
@@ -685,13 +625,11 @@ class TestBatchOperations:
             monkeypatch.setattr(
                 isn,
                 "list_groups",
-                lambda **kw: build_success_response(
-                    [
+                lambda **kw: OperationResult.success(
+                    data=[
                         {"GroupId": "g1", "DisplayName": "Alpha"},
                         {"GroupId": "g2", "DisplayName": "Beta"},
-                    ],
-                    "list_groups",
-                    "aws",
+                    ]
                 ),
             )
             monkeypatch.setattr(
@@ -702,7 +640,7 @@ class TestBatchOperations:
             monkeypatch.setattr(
                 isn,
                 "list_users",
-                lambda **kw: build_success_response([], "list_users", "aws"),
+                lambda **kw: OperationResult.success(data=[]),
             )
             filters = [lambda g: g["DisplayName"].startswith("A")]
             resp = isn.list_groups_with_memberships(groups_filters=filters)
@@ -713,8 +651,8 @@ class TestBatchOperations:
         # get_group returns a non-dict (malformed) response for one group
         def fake_get_group(group_id, **kw):
             if group_id == "g-bad":
-                return build_success_response(["not-a-dict"], "get_group", "aws")
-            return build_success_response({"GroupId": group_id}, "get_group", "aws")
+                return OperationResult.success(data=["not-a-dict"])
+            return OperationResult.success(data={"GroupId": group_id})
 
         monkeypatch.setattr(isn, "get_group", fake_get_group)
 

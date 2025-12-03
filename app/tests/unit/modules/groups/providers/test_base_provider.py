@@ -1,601 +1,404 @@
-"""Unit tests for groups provider base classes and contracts.
+"""Unit tests for Phase 1 changes to base provider module.
 
 Tests cover:
-- OperationStatus enum
-- OperationResult class and factory methods
-- ProviderCapabilities dataclass
-- Provider capability checking functions
+- validate_member_email() shared function
+- Email-based method signatures (add_member, remove_member)
+- HealthCheckResult typed return
+- CircuitBreakerStats typed return
+- Circuit breaker integration with email-based operations
 """
 
 import pytest
-from modules.groups.providers.capabilities import (
-    provider_supports,
-    provider_provides_role_info,
+from unittest.mock import patch
+from modules.groups.providers.base import (
+    validate_member_email,
+    GroupProvider,
 )
 from modules.groups.providers.contracts import (
-    OperationStatus,
+    HealthCheckResult,
+    CircuitBreakerStats,
     OperationResult,
-    ProviderCapabilities,
+    OperationStatus,
 )
-from modules.groups.providers.base import GroupProvider
-import types
-from unittest.mock import MagicMock
-from modules.groups.infrastructure import circuit_breaker as cb_mod
 
 
 # ============================================================================
-# OperationStatus Tests
+# validate_member_email() Tests
 # ============================================================================
 
 
 @pytest.mark.unit
-class TestOperationStatus:
-    """Test OperationStatus enum."""
+class TestValidateMemberEmailFunction:
+    """Test the shared validate_member_email function."""
 
-    def test_operation_status_success(self):
-        """Test SUCCESS status value."""
-        assert OperationStatus.SUCCESS.value == "success"
+    def test_validate_email_valid_standard(self):
+        """Test validation of standard email address."""
+        result = validate_member_email("user@example.com")
+        assert result == "user@example.com"
 
-    def test_operation_status_transient_error(self):
-        """Test TRANSIENT_ERROR status value."""
-        assert OperationStatus.TRANSIENT_ERROR.value == "transient_error"
+    def test_validate_email_normalizes_domain_case(self):
+        """Test that domain is normalized to lowercase."""
+        result = validate_member_email("User@EXAMPLE.COM")
+        # email-validator preserves local part case but normalizes domain
+        assert result == "User@example.com"
 
-    def test_operation_status_permanent_error(self):
-        """Test PERMANENT_ERROR status value."""
-        assert OperationStatus.PERMANENT_ERROR.value == "permanent_error"
+    def test_validate_email_valid_with_dots_in_local(self):
+        """Test email with dots in local part."""
+        result = validate_member_email("john.doe@example.com")
+        assert result == "john.doe@example.com"
 
-    def test_operation_status_unauthorized(self):
-        """Test UNAUTHORIZED status value."""
-        assert OperationStatus.UNAUTHORIZED.value == "unauthorized"
+    def test_validate_email_valid_with_plus(self):
+        """Test email with plus sign in local part."""
+        result = validate_member_email("user+tag@example.com")
+        assert result == "user+tag@example.com"
 
-    def test_operation_status_not_found(self):
-        """Test NOT_FOUND status value."""
-        assert OperationStatus.NOT_FOUND.value == "not_found"
+    def test_validate_email_valid_subdomain(self):
+        """Test email with subdomain."""
+        result = validate_member_email("user@mail.example.co.uk")
+        assert result == "user@mail.example.co.uk"
 
-    def test_operation_status_enum_membership(self):
-        """Test all enum members are accessible."""
-        statuses = [
-            OperationStatus.SUCCESS,
-            OperationStatus.TRANSIENT_ERROR,
-            OperationStatus.PERMANENT_ERROR,
-            OperationStatus.UNAUTHORIZED,
-            OperationStatus.NOT_FOUND,
-        ]
-        assert len(statuses) == 5
+    def test_validate_email_empty_string_raises(self):
+        """Test that empty string raises ValueError."""
+        with pytest.raises(ValueError, match="Email must be a non-empty string"):
+            validate_member_email("")
 
+    def test_validate_email_whitespace_only_raises(self):
+        """Test that whitespace-only string raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid email format"):
+            validate_member_email("   ")
 
-# ============================================================================
-# OperationResult Tests
-# ============================================================================
+    def test_validate_email_none_raises(self):
+        """Test that None raises ValueError."""
+        with pytest.raises(ValueError, match="Email must be a non-empty string"):
+            validate_member_email(None)
 
+    def test_validate_email_missing_at_raises(self):
+        """Test that email without @ raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid email format"):
+            validate_member_email("invalidemail")
 
-@pytest.mark.unit
-class TestOperationResultBasics:
-    """Test OperationResult dataclass basics."""
+    def test_validate_email_multiple_at_raises(self):
+        """Test that email with multiple @ signs raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid email format"):
+            validate_member_email("user@domain@example.com")
 
-    def test_operation_result_construction(self):
-        """Test basic construction."""
-        result = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="Operation completed",
-        )
-        assert result.status == OperationStatus.SUCCESS
-        assert result.message == "Operation completed"
+    def test_validate_email_empty_local_raises(self):
+        """Test that email with empty local part raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid email format"):
+            validate_member_email("@example.com")
 
-    def test_operation_result_with_data(self):
-        """Test construction with data."""
-        data = {"key": "value"}
-        result = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-            data=data,
-        )
-        assert result.data == data
+    def test_validate_email_empty_domain_raises(self):
+        """Test that email with empty domain raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid email format"):
+            validate_member_email("user@")
 
-    def test_operation_result_with_error_code(self):
-        """Test construction with error code."""
-        result = OperationResult(
-            status=OperationStatus.PERMANENT_ERROR,
-            message="Error",
-            error_code="NOT_FOUND",
-        )
-        assert result.error_code == "NOT_FOUND"
+    def test_validate_email_not_string_raises(self):
+        """Test that non-string input raises ValueError."""
+        with pytest.raises(ValueError, match="Email must be a non-empty string"):
+            validate_member_email(123)
 
-    def test_operation_result_with_retry_after(self):
-        """Test construction with retry_after."""
-        result = OperationResult(
-            status=OperationStatus.TRANSIENT_ERROR,
-            message="Rate limited",
-            retry_after=60,
-        )
-        assert result.retry_after == 60
-
-    def test_operation_result_defaults(self):
-        """Test default values."""
-        result = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-        )
-        assert result.data is None
-        assert result.error_code is None
-        assert result.retry_after is None
-
-
-@pytest.mark.unit
-class TestOperationResultFactories:
-    """Test OperationResult factory methods."""
-
-    def test_success_factory_minimal(self):
-        """Test success factory with minimal parameters."""
-        result = OperationResult.success()
-        assert result.status == OperationStatus.SUCCESS
-        assert result.message == "ok"
-        assert result.data is None
-
-    def test_success_factory_with_data(self):
-        """Test success factory with data."""
-        data = {"id": "123"}
-        result = OperationResult.success(data=data, message="Created")
-        assert result.status == OperationStatus.SUCCESS
-        assert result.data == data
-        assert result.message == "Created"
-
-    def test_error_factory_minimal(self):
-        """Test error factory with minimal parameters."""
-        result = OperationResult.error(
-            OperationStatus.PERMANENT_ERROR,
-            "Not found",
-        )
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.message == "Not found"
-
-    def test_error_factory_with_error_code(self):
-        """Test error factory with error code."""
-        result = OperationResult.error(
-            OperationStatus.PERMANENT_ERROR,
-            "Not found",
-            error_code="404",
-        )
-        assert result.error_code == "404"
-
-    def test_error_factory_with_retry_after(self):
-        """Test error factory with retry_after."""
-        result = OperationResult.error(
-            OperationStatus.TRANSIENT_ERROR,
-            "Rate limited",
-            retry_after=30,
-        )
-        assert result.retry_after == 30
-
-    def test_transient_error_factory(self):
-        """Test transient_error convenience factory."""
-        result = OperationResult.transient_error("Timeout", error_code="TIMEOUT")
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-        assert result.message == "Timeout"
-        assert result.error_code == "TIMEOUT"
-
-    def test_permanent_error_factory(self):
-        """Test permanent_error convenience factory."""
-        result = OperationResult.permanent_error(
-            "Invalid input", error_code="VALIDATION_ERROR"
-        )
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.message == "Invalid input"
-        assert result.error_code == "VALIDATION_ERROR"
+    def test_validate_email_dict_raises(self):
+        """Test that dict input raises ValueError."""
+        with pytest.raises(ValueError, match="Email must be a non-empty string"):
+            validate_member_email({"email": "user@example.com"})
 
 
 # ============================================================================
-# ProviderCapabilities Tests
+# HealthCheckResult Tests
 # ============================================================================
 
 
-@pytest.mark.skip(
-    reason="Tests for_config() and provider_supports() functions that don't exist"
-)
 @pytest.mark.unit
-class TestProviderCapabilities:
-    """Test ProviderCapabilities dataclass."""
+class TestHealthCheckResult:
+    """Test HealthCheckResult dataclass."""
 
-    def test_capabilities_defaults(self):
-        """Test default capability values."""
-        caps = ProviderCapabilities()
-        assert caps.supports_user_creation is False
-        assert caps.supports_user_deletion is False
-        assert caps.supports_group_creation is False
-        assert caps.supports_group_deletion is False
-        assert caps.supports_member_management is True
-        assert caps.is_primary is False
-        assert caps.provides_role_info is False
-        assert caps.supports_batch_operations is False
-        assert caps.max_batch_size == 1
-
-    def test_capabilities_custom_values(self):
-        """Test capabilities with custom values."""
-        caps = ProviderCapabilities(
-            supports_user_creation=True,
-            is_primary=True,
-            supports_batch_operations=True,
-            max_batch_size=100,
+    def test_health_check_result_healthy(self):
+        """Test construction of healthy result."""
+        result = HealthCheckResult(
+            healthy=True,
+            status="healthy",
         )
-        assert caps.supports_user_creation is True
-        assert caps.is_primary is True
-        assert caps.supports_batch_operations is True
-        assert caps.max_batch_size == 100
+        assert result.healthy is True
+        assert result.status == "healthy"
+        assert result.details is None
+        assert result.timestamp is None
 
-    def test_capabilities_dataclass_fields(self):
-        """Test that capabilities has expected fields."""
-        caps = ProviderCapabilities()
-        assert hasattr(caps, "supports_user_creation")
-        assert hasattr(caps, "supports_user_deletion")
-        assert hasattr(caps, "supports_group_creation")
-        assert hasattr(caps, "supports_group_deletion")
-        assert hasattr(caps, "supports_member_management")
-        assert hasattr(caps, "is_primary")
-        assert hasattr(caps, "provides_role_info")
-        assert hasattr(caps, "supports_batch_operations")
-        assert hasattr(caps, "max_batch_size")
-
-    def test_capabilities_from_config_empty(self, monkeypatch):
-        """Test from_config with no settings."""
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            type("obj", (object,), {})(),
+    def test_health_check_result_unhealthy(self):
+        """Test construction of unhealthy result."""
+        result = HealthCheckResult(
+            healthy=False,
+            status="unhealthy",
+            details={"error": "Connection failed"},
         )
-        caps = ProviderCapabilities.from_config("test_provider")
-        assert caps.supports_member_management is True
-        assert caps.max_batch_size == 1
+        assert result.healthy is False
+        assert result.status == "unhealthy"
+        assert result.details == {"error": "Connection failed"}
 
-    def test_capabilities_from_config_with_mock_settings(self, monkeypatch):
-        """Test from_config with mocked settings."""
-        import types
-
-        mock_settings = types.SimpleNamespace(
-            groups=types.SimpleNamespace(
-                providers={
-                    "test": {
-                        "capabilities": {
-                            "supports_user_creation": True,
-                            "provides_role_info": True,
-                            "max_batch_size": 50,
-                        }
-                    }
-                }
-            )
+    def test_health_check_result_degraded(self):
+        """Test construction of degraded result."""
+        result = HealthCheckResult(
+            healthy=False,
+            status="degraded",
+            details={"latency_ms": 2000},
         )
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            mock_settings,
+        assert result.healthy is False
+        assert result.status == "degraded"
+
+    def test_health_check_result_with_timestamp(self):
+        """Test construction with timestamp."""
+        result = HealthCheckResult(
+            healthy=True,
+            status="healthy",
+            timestamp="2025-11-11T12:00:00Z",
         )
-        caps = ProviderCapabilities.from_config("test")
-        assert caps.supports_user_creation is True
-        assert caps.provides_role_info is True
-        assert caps.max_batch_size == 50
+        assert result.timestamp == "2025-11-11T12:00:00Z"
 
-    def test_capabilities_batch_size_configuration(self):
-        """Test batch size can be configured."""
-        caps = ProviderCapabilities(max_batch_size=250)
-        assert caps.max_batch_size == 250
-
-
-@pytest.mark.skip(
-    reason="Tests for provider_supports() and provider_provides_role_info() functions that don't exist"
-)
-@pytest.mark.unit
-class TestProviderSupportsFunctions:
-    """Test provider capability checking functions."""
-
-    def test_provider_supports_existing_capability(self, monkeypatch):
-        """Test checking for an existing capability."""
-        import types
-
-        mock_settings = types.SimpleNamespace(
-            groups=types.SimpleNamespace(
-                providers={
-                    "test": {
-                        "capabilities": {
-                            "supports_batch_operations": True,
-                        }
-                    }
-                }
-            )
+    def test_health_check_result_with_all_fields(self):
+        """Test construction with all fields."""
+        details = {"domain": "example.com", "authenticated": True}
+        result = HealthCheckResult(
+            healthy=True,
+            status="healthy",
+            details=details,
+            timestamp="2025-11-11T12:00:00Z",
         )
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            mock_settings,
-        )
-        assert provider_supports("test", "supports_batch_operations") is True
+        assert result.healthy is True
+        assert result.status == "healthy"
+        assert result.details == details
+        assert result.timestamp == "2025-11-11T12:00:00Z"
 
-    def test_provider_supports_missing_capability(self, monkeypatch):
-        """Test checking for a missing capability."""
-        import types
 
-        mock_settings = types.SimpleNamespace(
-            groups=types.SimpleNamespace(
-                providers={
-                    "test": {
-                        "capabilities": {
-                            "supports_batch_operations": False,
-                        }
-                    }
-                }
-            )
-        )
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            mock_settings,
-        )
-        assert provider_supports("test", "supports_user_creation") is False
-
-    def test_provider_provides_role_info(self, monkeypatch):
-        """Test role info checking function."""
-        import types
-
-        mock_settings = types.SimpleNamespace(
-            groups=types.SimpleNamespace(
-                providers={
-                    "test": {
-                        "capabilities": {
-                            "provides_role_info": True,
-                        }
-                    }
-                }
-            )
-        )
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            mock_settings,
-        )
-        assert provider_provides_role_info("test") is True
-
-    def test_provider_provides_role_info_false(self, monkeypatch):
-        """Test role info checking when false."""
-        import types
-
-        mock_settings = types.SimpleNamespace(
-            groups=types.SimpleNamespace(
-                providers={
-                    "test": {
-                        "capabilities": {
-                            "provides_role_info": False,
-                        }
-                    }
-                }
-            )
-        )
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            mock_settings,
-        )
-        assert provider_provides_role_info("test") is False
-
-    def test_provider_supports_with_exception(self, monkeypatch):
-        """Test provider_supports returns False on exception."""
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            type("obj", (object,), {})(),
-        )
-        result = provider_supports("unknown", "supports_user_creation")
-        assert result is False
+# ============================================================================
+# CircuitBreakerStats Tests
+# ============================================================================
 
 
 @pytest.mark.unit
-class TestOperationResultComparison:
-    """Test OperationResult comparison and equality."""
+class TestCircuitBreakerStats:
+    """Test CircuitBreakerStats dataclass."""
 
-    def test_operation_result_with_same_values(self):
-        """Test results with same values are equal."""
-        result1 = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
+    def test_circuit_breaker_stats_disabled(self):
+        """Test stats for disabled circuit breaker."""
+        stats = CircuitBreakerStats(
+            enabled=False,
+            state="CLOSED",
         )
-        result2 = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
-        )
-        # Dataclass equality
-        assert result1 == result2
+        assert stats.enabled is False
+        assert stats.state == "CLOSED"
+        assert stats.failure_count == 0
+        assert stats.success_count == 0
+        assert stats.last_failure_time is None
+        assert stats.message is None
 
-    def test_operation_result_with_different_status(self):
-        """Test results with different status are not equal."""
-        result1 = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
+    def test_circuit_breaker_stats_closed(self):
+        """Test stats for closed circuit breaker."""
+        stats = CircuitBreakerStats(
+            enabled=True,
+            state="CLOSED",
+            failure_count=0,
+            success_count=5,
         )
-        result2 = OperationResult(
-            status=OperationStatus.PERMANENT_ERROR,
-            message="ok",
-        )
-        assert result1 != result2
+        assert stats.enabled is True
+        assert stats.state == "CLOSED"
+        assert stats.failure_count == 0
+        assert stats.success_count == 5
 
-    def test_operation_result_with_different_message(self):
-        """Test results with different message are not equal."""
-        result1 = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="ok",
+    def test_circuit_breaker_stats_open(self):
+        """Test stats for open circuit breaker."""
+        stats = CircuitBreakerStats(
+            enabled=True,
+            state="OPEN",
+            failure_count=5,
+            success_count=0,
+            last_failure_time=1699701600.0,
+            message="Too many failures, circuit open",
         )
-        result2 = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="done",
+        assert stats.enabled is True
+        assert stats.state == "OPEN"
+        assert stats.failure_count == 5
+        assert stats.success_count == 0
+        assert stats.last_failure_time == 1699701600.0
+        assert stats.message == "Too many failures, circuit open"
+
+    def test_circuit_breaker_stats_half_open(self):
+        """Test stats for half-open circuit breaker."""
+        stats = CircuitBreakerStats(
+            enabled=True,
+            state="HALF_OPEN",
+            failure_count=5,
+            success_count=1,
+            message="Testing recovery",
         )
-        assert result1 != result2
+        assert stats.state == "HALF_OPEN"
+        assert stats.failure_count == 5
+        assert stats.success_count == 1
+
+
+# ============================================================================
+# Email-Based Method Signatures Tests
+# ============================================================================
 
 
 @pytest.mark.unit
-class TestOperationResultEdgeCases:
-    """Test OperationResult edge cases."""
+class TestEmailBasedMethodSignatures:
+    """Test that provider methods use email-based signatures."""
 
-    def test_operation_result_with_nested_data(self):
-        """Test result with nested data structures."""
-        data = {
-            "user": {
-                "id": "123",
-                "email": "user@example.com",
-                "groups": ["admin", "developers"],
-            }
-        }
-        result = OperationResult.success(data=data)
-        assert result.data["user"]["id"] == "123"
-        assert "admin" in result.data["user"]["groups"]
+    def test_add_member_accepts_email_string(self):
+        """Test that add_member method accepts member_email as string."""
 
-    def test_operation_result_with_empty_data(self):
-        """Test result with empty data dict."""
-        result = OperationResult.success(data={})
-        assert result.data == {}
-
-    def test_operation_result_with_large_retry_after(self):
-        """Test result with large retry_after value."""
-        result = OperationResult.transient_error(
-            "Rate limited",
-            error_code="RATE_LIMIT",
-        )
-        result.retry_after = 3600  # 1 hour
-        assert result.retry_after == 3600
-
-    def test_operation_result_with_none_values(self):
-        """Test result explicitly with None values."""
-        result = OperationResult(
-            status=OperationStatus.SUCCESS,
-            message="test",
-            data=None,
-            error_code=None,
-            retry_after=None,
-        )
-        assert result.data is None
-        assert result.error_code is None
-        assert result.retry_after is None
-
-
-@pytest.mark.skip(
-    reason="Tests circuit breaker stats which have different return type than test expects"
-)
-@pytest.mark.unit
-class TestGroupProviderCircuitBreaker:
-    """Tests for GroupProvider circuit breaker integration and behavior."""
-
-    def _make_mock_settings(self, enabled: bool = True):
-        st = types.SimpleNamespace()
-        st.groups = types.SimpleNamespace(
-            circuit_breaker_enabled=enabled,
-            circuit_breaker_failure_threshold=2,
-            circuit_breaker_timeout_seconds=1,
-            circuit_breaker_half_open_max_calls=1,
-            providers={},
-        )
-        return st
-
-    def test_provider_init_disables_circuit_breaker_when_config_off(self, monkeypatch):
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            self._make_mock_settings(enabled=False),
-        )
-
-        class DummyProvider(GroupProvider):
+        # Create a concrete implementation for testing
+        class TestProvider(GroupProvider):
             @property
             def capabilities(self):
+                from modules.groups.providers.contracts import ProviderCapabilities
+
                 return ProviderCapabilities()
 
-            def _add_member_impl(self, group_key, member_data):
+            def _add_member_impl(self, group_key: str, member_email: str):
                 return OperationResult.success()
 
-            def _remove_member_impl(self, group_key, member_data):
+            def _remove_member_impl(self, group_key: str, member_email: str):
                 return OperationResult.success()
 
-            def _get_group_members_impl(self, group_key, **kwargs):
-                return OperationResult.success(data=[])
+            def _get_group_members_impl(self, group_key: str, **kwargs):
+                return OperationResult.success()
 
             def _list_groups_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _list_groups_with_members_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _health_check_impl(self):
-                return {"status": "healthy"}
+                return HealthCheckResult(healthy=True, status="healthy")
 
-        p = DummyProvider()
-        # When circuit breaker disabled, internal attribute should be None
-        assert getattr(p, "_circuit_breaker") is None
-        stats = p.get_circuit_breaker_stats()
-        assert stats["enabled"] is False
+        provider = TestProvider()
+        result = provider.add_member("group-123", "user@example.com")
+        assert result.status == OperationStatus.SUCCESS
 
-    def test_provider_registers_circuit_breaker_and_stats_available(self, monkeypatch):
-        # enable circuit breaker in settings
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            self._make_mock_settings(enabled=True),
-        )
+    def test_remove_member_accepts_email_string(self):
+        """Test that remove_member method accepts member_email as string."""
 
-        class DummyProvider(GroupProvider):
+        class TestProvider(GroupProvider):
             @property
             def capabilities(self):
+                from modules.groups.providers.contracts import ProviderCapabilities
+
                 return ProviderCapabilities()
 
-            def _add_member_impl(self, group_key, member_data):
+            def _add_member_impl(self, group_key: str, member_email: str):
                 return OperationResult.success()
 
-            def _remove_member_impl(self, group_key, member_data):
+            def _remove_member_impl(self, group_key: str, member_email: str):
                 return OperationResult.success()
 
-            def _get_group_members_impl(self, group_key, **kwargs):
-                return OperationResult.success(data=[])
+            def _get_group_members_impl(self, group_key: str, **kwargs):
+                return OperationResult.success()
 
             def _list_groups_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _list_groups_with_members_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _health_check_impl(self):
-                return {"status": "healthy"}
+                return HealthCheckResult(healthy=True, status="healthy")
 
-        name = DummyProvider.__name__
-        p = DummyProvider()
-        # Ensure the circuit breaker is registered in the global registry
-        stats_all = cb_mod.get_all_circuit_breaker_stats()
-        assert name in stats_all
-        stats = p.get_circuit_breaker_stats()
-        assert isinstance(stats, dict)
+        provider = TestProvider()
+        result = provider.remove_member("group-123", "user@example.com")
+        assert result.status == OperationStatus.SUCCESS
 
-        # cleanup registry to avoid cross-test pollution
-        reg = getattr(cb_mod, "_circuit_breaker_registry", None)
-        if reg and name in reg:
-            reg.pop(name, None)
 
-    def test_add_member_returns_transient_when_circuit_open(self, monkeypatch):
-        monkeypatch.setattr(
-            "modules.groups.providers.base.settings",
-            self._make_mock_settings(enabled=True),
-        )
+# ============================================================================
+# Circuit Breaker Integration Tests
+# ============================================================================
 
-        class DummyProvider(GroupProvider):
+
+@pytest.mark.unit
+class TestCircuitBreakerIntegration:
+    """Test circuit breaker integration with email-based operations."""
+
+    @patch("modules.groups.providers.base.settings")
+    def test_circuit_breaker_wraps_add_member_with_email(self, mock_settings):
+        """Test circuit breaker wraps add_member correctly with email string."""
+        mock_settings.groups.circuit_breaker_enabled = True
+        mock_settings.groups.circuit_breaker_failure_threshold = 5
+        mock_settings.groups.circuit_breaker_timeout_seconds = 60
+        mock_settings.groups.circuit_breaker_half_open_max_calls = 1
+
+        class TestProvider(GroupProvider):
             @property
             def capabilities(self):
+                from modules.groups.providers.contracts import ProviderCapabilities
+
                 return ProviderCapabilities()
 
-            def _add_member_impl(self, group_key, member_data):
+            def _add_member_impl(self, group_key: str, member_email: str):
+                # Validate email is string
+                assert isinstance(member_email, str)
+                assert "@" in member_email
+                return OperationResult.success(data={"email": member_email})
+
+            def _remove_member_impl(self, group_key: str, member_email: str):
                 return OperationResult.success()
 
-            def _remove_member_impl(self, group_key, member_data):
+            def _get_group_members_impl(self, group_key: str, **kwargs):
                 return OperationResult.success()
-
-            def _get_group_members_impl(self, group_key, **kwargs):
-                return OperationResult.success(data=[])
 
             def _list_groups_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _list_groups_with_members_impl(self, **kwargs):
-                return OperationResult.success(data=[])
+                return OperationResult.success()
 
             def _health_check_impl(self):
-                return {"status": "healthy"}
+                return HealthCheckResult(healthy=True, status="healthy")
 
-        p = DummyProvider()
-        # Replace the real circuit breaker with a mock that raises open error
-        mock_cb = MagicMock()
-        mock_cb.call.side_effect = cb_mod.CircuitBreakerOpenError("open")
-        p._circuit_breaker = mock_cb
+        provider = TestProvider()
+        result = provider.add_member("group-123", "user@example.com")
+        assert result.status == OperationStatus.SUCCESS
+        assert result.data == {"email": "user@example.com"}
 
-        res = p.add_member("g", None)
-        assert res.status == OperationStatus.TRANSIENT_ERROR
-        assert res.error_code == "CIRCUIT_BREAKER_OPEN"
+    @patch("modules.groups.providers.base.settings")
+    def test_circuit_breaker_stats_available_with_email_operations(self, mock_settings):
+        """Test that circuit breaker stats are available after email operations."""
+        mock_settings.groups.circuit_breaker_enabled = True
+        mock_settings.groups.circuit_breaker_failure_threshold = 5
+        mock_settings.groups.circuit_breaker_timeout_seconds = 60
+        mock_settings.groups.circuit_breaker_half_open_max_calls = 1
+
+        class TestProvider(GroupProvider):
+            @property
+            def capabilities(self):
+                from modules.groups.providers.contracts import ProviderCapabilities
+
+                return ProviderCapabilities()
+
+            def _add_member_impl(self, group_key: str, member_email: str):
+                return OperationResult.success()
+
+            def _remove_member_impl(self, group_key: str, member_email: str):
+                return OperationResult.success()
+
+            def _get_group_members_impl(self, group_key: str, **kwargs):
+                return OperationResult.success()
+
+            def _list_groups_impl(self, **kwargs):
+                return OperationResult.success()
+
+            def _list_groups_with_members_impl(self, **kwargs):
+                return OperationResult.success()
+
+            def _health_check_impl(self):
+                return HealthCheckResult(healthy=True, status="healthy")
+
+        provider = TestProvider()
+
+        # Perform an operation
+        provider.add_member("group-123", "user@example.com")
+
+        # Check stats are available
+        stats = provider.get_circuit_breaker_stats()
+        assert isinstance(stats, CircuitBreakerStats)
+        assert stats.enabled is True
+        assert stats.state.lower() == "closed"  # Stats state may be lowercase

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from botocore.exceptions import ClientError
 
 from integrations.aws import client_next
-from models.integrations import IntegrationResponse
+from infrastructure.operations import OperationResult
 from tests.fixtures.aws_clients import FakeClient
 
 
@@ -94,8 +94,8 @@ def test_execute_aws_api_call_non_paginated_uses_api_method(monkeypatch):
 
     resp = client_next.execute_aws_api_call(service_name="svc", method="get_item")
 
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is True
     assert resp.data == {"item": 1}
 
 
@@ -105,8 +105,8 @@ def test_execute_api_call_success():
 
     resp = client_next.execute_api_call("test_service_method", api_call)
 
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is True
     assert resp.data == {"items": [1, 2, 3]}
 
 
@@ -140,8 +140,8 @@ def test_paginate_all_results_aggregates_pages():
     finally:
         monkeypatch.undo()
 
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is True
     assert resp.data == [{"id": 1}, {"id": 2}]
 
 
@@ -170,7 +170,7 @@ def test_execute_api_call_retries_on_retryable_error(monkeypatch, caplog):
     resp = client_next.execute_api_call("svc_method", api_call, max_retries=3)
 
     # Should succeed after retries
-    assert resp.success is True
+    assert resp.is_success is True
     assert resp.data == {"ok": True}
 
     # Ensure we retried (should have recorded sleeps for exponential backoff)
@@ -190,10 +190,10 @@ def test_execute_api_call_handles_non_retryable_error(monkeypatch, caplog):
 
     resp = client_next.execute_api_call("svc_fatal", api_call, max_retries=2)
 
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is False
     assert resp.error is not None
-    assert resp.error.get("function_name") == "svc_fatal"
+    assert resp.message == "fatal"
 
 
 def test_handle_final_error_logs_non_critical_and_critical(monkeypatch, caplog):
@@ -209,14 +209,14 @@ def test_handle_final_error_logs_non_critical_and_critical(monkeypatch, caplog):
 
     caplog.set_level(logging.WARNING)
     resp = client_next._handle_final_error(err, "svc_user")
-    assert resp.success is False
+    assert resp.is_success is False
     # Non-critical should warn (not error)
     assert any("aws_api_non_critical_error" in rec.message for rec in caplog.records)
 
     # Now check critical path
     caplog.clear()
     resp2 = client_next._handle_final_error(Exception("unexpected failure"), "svc_user")
-    assert resp2.success is False
+    assert resp2.is_success is False
     assert any("aws_api_error_final" in rec.message for rec in caplog.records)
 
 
@@ -237,8 +237,8 @@ def test_execute_aws_api_call_force_paginate_even_if_client_cant_paginate(monkey
         service_name="svc", method="list_items", keys=["Items"], force_paginate=True
     )
 
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is True
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is True
     assert resp.data == [{"id": 10}, {"id": 11}]
 
 
@@ -292,7 +292,7 @@ def test_default_max_retries_honored(monkeypatch):
     monkeypatch.setattr(_time, "sleep", fake_sleep)
 
     resp = client_next.execute_api_call("svc_retry_default", api_call)
-    assert resp.success is True
+    assert resp.is_success is True
     assert len(sleeps) == 1
 
 
@@ -317,8 +317,8 @@ def test_execute_aws_api_call_with_non_iterable_key_returns_error(monkeypatch):
     monkeypatch.setattr(client_next, "get_aws_client", fake_get_aws_client)
 
     resp = client_next.execute_aws_api_call(service_name="svc", method="list_items", keys=["Items"])  # type: ignore[arg-type]
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is False
     assert resp.error is not None
 
 
@@ -373,14 +373,11 @@ def test_execute_api_call_clienterror_non_retryable():
         raise err
 
     resp = client_next.execute_api_call("svc_method", api_call, max_retries=1)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is False
     # Error info should include the ClientError message/code
     assert resp.error is not None
-    assert (
-        "OtherError" in str(resp.error.get("error_code"))
-        or resp.error.get("error_code") == "OtherError"
-    )
+    assert "OtherError" in str(resp.error_code) or resp.error_code == "OtherError"
 
 
 def test_execute_api_call_empty_loop_unknown_error():
@@ -392,8 +389,8 @@ def test_execute_api_call_empty_loop_unknown_error():
 
     # max_retries = -1 will make range(max_retry_attempts + 1) empty and skip the loop
     resp = client_next.execute_api_call("svc_empty", api_call, max_retries=-1)
-    assert isinstance(resp, IntegrationResponse)
-    assert resp.success is False
-    assert "Unknown error after retries" in str(resp.error.get("message"))
+    assert isinstance(resp, OperationResult)
+    assert resp.is_success is False
+    assert "Unknown error after retries" in str(resp.message)
     # Ensure the api_call was not invoked
     assert called["val"] is False

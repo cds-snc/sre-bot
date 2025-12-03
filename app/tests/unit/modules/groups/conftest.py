@@ -4,10 +4,106 @@ import types
 from typing import Dict, Any
 from unittest.mock import MagicMock
 import pytest
+from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
+from modules.groups.providers.contracts import (
+    ProviderCapabilities,
+    HealthCheckResult,
+)
+from infrastructure.operations import OperationResult, OperationStatus
 
-# Import provider registry so we can reset it between tests to avoid
-# cross-test state pollution from provider activation tests.
-from modules.groups.providers import PROVIDER_REGISTRY as _PROV_REG
+
+class MockPrimaryGroupProvider(PrimaryGroupProvider):
+    """Mock primary group provider for testing.
+
+    Implements all required abstract methods from GroupProvider and PrimaryGroupProvider.
+    """
+
+    @property
+    def capabilities(self):
+        """Return mock capabilities for primary provider."""
+        return ProviderCapabilities(is_primary=True, provides_role_info=True)
+
+    def _add_member_impl(self, group_key: str, member_email: str):
+        """Mock add member implementation."""
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def _remove_member_impl(self, group_key: str, member_email: str):
+        """Mock remove member implementation."""
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def _get_group_members_impl(self, group_key: str, **kwargs):
+        """Mock get group members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"members": []}
+        )
+
+    def _list_groups_impl(self, **kwargs):
+        """Mock list groups implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"groups": []}
+        )
+
+    def _list_groups_with_members_impl(self, **kwargs):
+        """Mock list groups with members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"groups": []}
+        )
+
+    def _health_check_impl(self):
+        """Mock health check implementation."""
+        return HealthCheckResult(healthy=True, status="healthy")
+
+    def _validate_permissions_impl(self, user_key: str, group_key: str, action: str):
+        """Mock validate permissions implementation."""
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def _is_manager_impl(self, user_key: str, group_key: str):
+        """Mock is manager implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"is_manager": False}
+        )
+
+
+class MockGroupProvider(GroupProvider):
+    """Mock secondary group provider for testing.
+
+    Implements all required abstract methods from GroupProvider.
+    """
+
+    @property
+    def capabilities(self):
+        """Return mock capabilities for secondary provider."""
+        return ProviderCapabilities(is_primary=False)
+
+    def _add_member_impl(self, group_key: str, member_email: str):
+        """Mock add member implementation."""
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def _remove_member_impl(self, group_key: str, member_email: str):
+        """Mock remove member implementation."""
+        return OperationResult(status=OperationStatus.SUCCESS, message="ok")
+
+    def _get_group_members_impl(self, group_key: str, **kwargs):
+        """Mock get group members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"members": []}
+        )
+
+    def _list_groups_impl(self, **kwargs):
+        """Mock list groups implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"groups": []}
+        )
+
+    def _list_groups_with_members_impl(self, **kwargs):
+        """Mock list groups with members implementation."""
+        return OperationResult(
+            status=OperationStatus.SUCCESS, message="ok", data={"groups": []}
+        )
+
+    def _health_check_impl(self):
+        """Mock health check implementation."""
+        return HealthCheckResult(healthy=True, status="healthy")
 
 
 @pytest.fixture
@@ -90,30 +186,38 @@ def mock_providers_registry(mock_primary_provider, mock_secondary_provider):
     }
 
 
-# Ensure provider registry is reset to a stable baseline for each unit test
-# to avoid cross-test pollution when tests directly mutate the global
-# `PROVIDER_REGISTRY` in `modules.groups.providers`.
-_PROV_REG_BASELINE = dict(_PROV_REG)
-
-
 @pytest.fixture(autouse=True)
-def _reset_provider_registry():
-    """Reset `modules.groups.providers.PROVIDER_REGISTRY` to a known baseline
-    before and after each test to ensure tests don't leak state between them.
+def _reset_provider_registries(monkeypatch):
+    """Reset provider registries to clean state between tests.
 
-    Tests that intentionally manipulate the registry (provider activation
-    tests) may still run correctly because they explicitly set/clear the
-    registry; this fixture simply guarantees isolation between tests.
+    With the new dual-registry approach (_primary_discovered, _primary_active,
+    _secondary_discovered, _secondary_active), reset to ensure tests don't
+    leak state between them.
+
+    Tests that intentionally manipulate registries (provider activation tests)
+    explicitly control this; this fixture ensures isolation.
     """
-    # restore baseline before test
-    _PROV_REG.clear()
-    _PROV_REG.update(_PROV_REG_BASELINE)
+    import modules.groups.providers as providers
+
+    # Store baseline state
+    baseline_primary_discovered = dict(providers._primary_discovered)
+    baseline_primary_active = providers._primary_active
+    baseline_secondary_discovered = dict(providers._secondary_discovered)
+    baseline_secondary_active = dict(providers._secondary_active)
+    baseline_primary_name = providers._PRIMARY_PROVIDER_NAME
+
     try:
         yield
     finally:
-        # restore baseline after test
-        _PROV_REG.clear()
-        _PROV_REG.update(_PROV_REG_BASELINE)
+        # Restore baseline after test
+        providers._primary_discovered.clear()
+        providers._primary_discovered.update(baseline_primary_discovered)
+        providers._primary_active = baseline_primary_active
+        providers._secondary_discovered.clear()
+        providers._secondary_discovered.update(baseline_secondary_discovered)
+        providers._secondary_active.clear()
+        providers._secondary_active.update(baseline_secondary_active)
+        providers._PRIMARY_PROVIDER_NAME = baseline_primary_name
 
 
 @pytest.fixture(autouse=True)

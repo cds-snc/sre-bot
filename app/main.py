@@ -19,6 +19,9 @@ from modules.groups.providers import (
     get_active_providers,
     get_primary_provider_name,
 )
+from infrastructure.commands.providers import (
+    load_providers as load_command_providers,
+)
 from server import bot_middleware, server
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -75,19 +78,40 @@ def main(bot):
 
 # Ensure providers are activated once per FastAPI process at startup.
 def providers_startup():
+    """Activate group and command providers at startup."""
     try:
         primary = load_providers()
         # store for app-wide access
         server_app.state.providers = get_active_providers()
         server_app.state.primary_provider_name = get_primary_provider_name()
         logger.info(
-            "providers_activated",
+            "group_providers_activated",
             primary=primary,
             total=len(server_app.state.providers),
         )
     except Exception as e:
         # Fail fast on provider activation error
-        logger.error("providers_activation_failed", error=str(e))
+        logger.error("group_providers_activation_failed", error=str(e))
+        raise
+
+    # Activate command providers
+    try:
+        command_providers = load_command_providers()
+        server_app.state.command_providers = command_providers
+
+        if command_providers:
+            logger.info(
+                "command_providers_activated",
+                count=len(command_providers),
+                providers=list(command_providers.keys()),
+            )
+        else:
+            logger.info(
+                "api_only_mode",
+                message="No command providers enabled - API endpoints only",
+            )
+    except Exception as e:  # pylint: disable=broad-except
+        logger.error("command_providers_activation_failed", error=str(e))
         raise
 
 

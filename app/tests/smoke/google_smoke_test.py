@@ -45,10 +45,7 @@ if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
 from core.config import settings  # noqa: E402
 from integrations.google_workspace import google_directory_next as gdn  # noqa: E402
 from integrations.google_workspace.schemas import User  # noqa: E402
-from models.integrations import (
-    IntegrationResponse,
-    build_success_response,
-)  # noqa: E402
+from infrastructure.operations import OperationResult, OperationStatus  # noqa: E402
 from tests.factories.google import (
     make_google_groups,
     make_google_members,
@@ -57,11 +54,9 @@ from tests.factories.google import (
 
 
 def _validate_integration_response(resp, expected_model=None):
-    assert isinstance(
-        resp, IntegrationResponse
-    ), f"Not an IntegrationResponse: {type(resp)}"
-    if not resp.success:
-        raise RuntimeError(f"Integration call failed: {resp.error}")
+    assert isinstance(resp, OperationResult), f"Not an OperationResult: {type(resp)}"
+    if not resp.is_success:
+        raise RuntimeError(f"Integration call failed: {resp.message}")
     if expected_model is not None:
         # allow both single dict and list
         data = resp.data
@@ -78,7 +73,7 @@ def test_get_user(domain: str):
     # monkeypatch execute_google_api_call to return success
 
     def fake_execute(*args, **kwargs):
-        return build_success_response(users[0], "get_user", "google")
+        return OperationResult.success(data=users[0], message="get_user succeeded")
 
     # If live mode is enabled, do not patch execute_google_api_call
     if not _LIVE:
@@ -98,8 +93,8 @@ def test_get_user(domain: str):
         resp = gdn.get_user(live_user)
 
     # If live mode and 403 returned, print remediation steps and exit non-zero
-    if _LIVE and not resp.success:
-        err = resp.error or {}
+    if _LIVE and not resp.is_success:
+        err = resp.message or {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
         msg = err.get("message", "")
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():
@@ -158,21 +153,17 @@ def test_list_groups_with_members(domain: str):
     # Mock list_groups to return groups
     def fake_list_groups(**kwargs):
 
-        return build_success_response(groups, "list_groups", "google")
+        return OperationResult.success(data=groups, message="list_groups succeeded")
 
     # Mock get_batch_group_members to return mapping
     def fake_get_batch_group_members(group_keys, **kwargs):
 
-        return build_success_response(
-            {k: members for k in group_keys}, "get_batch_group_members", "google"
-        )
+        return OperationResult.success(data={k: members for k in group_keys})
 
     # Mock get_batch_users to return mapping
     def fake_get_batch_users(user_keys, **kwargs):
 
-        return build_success_response(
-            {u["primaryEmail"]: u for u in users}, "get_batch_users", "google"
-        )
+        return OperationResult.success(data={u["primaryEmail"]: u for u in users})
 
     if not _LIVE:
         gdn.list_groups = fake_list_groups
@@ -182,8 +173,8 @@ def test_list_groups_with_members(domain: str):
     resp = gdn.list_groups_with_members()
 
     # If live mode and 403 returned, give remediation guidance and exit non-zero
-    if _LIVE and not resp.success:
-        err = resp.error or {}
+    if _LIVE and not resp.is_success:
+        err = resp.message or {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
         msg = err.get("message", "")
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():

@@ -9,7 +9,7 @@ from integrations.google_workspace import (
     google_drive,
 )
 
-FOLDER_REPORTS_GOOGLE_GROUPS = settings.reports.FOLDER_REPORTS_GOOGLE_GROUPS
+FOLDER_REPORTS_GOOGLE_GROUPS = settings.google_resources.google_groups_reports_folder_id
 
 logger = get_module_logger()
 

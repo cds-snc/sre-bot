@@ -15,7 +15,7 @@ from unittest.mock import patch
 from modules.groups.core import service
 from modules.groups.api import schemas
 from modules.groups.infrastructure import validation
-from modules.groups.providers.contracts import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 
 
 class TestCheckUserIsManager:

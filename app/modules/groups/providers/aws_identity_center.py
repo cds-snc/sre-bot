@@ -27,13 +27,12 @@ from modules.groups.domain.models import (
 from modules.groups.providers import register_provider
 from modules.groups.providers.base import (
     GroupProvider,
-    OperationResult,
-    OperationStatus,
-    ProviderCapabilities,
     HealthCheckResult,
+    ProviderCapabilities,
     provider_operation,
     validate_member_email,
 )
+from infrastructure.operations import OperationResult, OperationStatus
 
 logger = get_module_logger()
 
@@ -232,15 +231,15 @@ class AwsIdentityCenterProvider(GroupProvider):
         if resp is None:
             raise ValueError(f"{operation_name}: Response is None")
 
-        # Step 2: Validate response has success attribute
-        if not hasattr(resp, "success"):
+        # Step 2: Validate response has is_success property
+        if not hasattr(resp, "is_success"):
             raise IntegrationError(
                 f"{operation_name}: AWS identity_store returned unexpected type",
                 response=resp,
             )
 
         # Step 3: Check if operation succeeded
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError(
                 f"{operation_name}: AWS API call failed",
                 response=resp,
@@ -295,7 +294,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws get_user_by_username returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws resolve user id failed", response=resp)
         uid = self._extract_id_from_resp(resp, ["UserId", "Id"], "get_user_by_username")
         return uid
@@ -342,7 +341,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws get_group_by_name returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError(
                 f"aws resolve group id failed for display name: {normalized}",
                 response=resp,
@@ -367,7 +366,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws resolve membership id returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws resolve membership id failed", response=resp)
         mid = self._extract_id_from_resp(
             resp, ["MembershipId", "MembershipId"], "get_group_membership_id"
@@ -380,7 +379,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws get_user returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws get_user failed", response=resp)
         return resp.data or {}
 
@@ -514,7 +513,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws create_group_membership returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws add_user_to_group failed", response=resp)
         try:
             user_data = self._fetch_user_details(user_id)
@@ -548,7 +547,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws delete_group_membership returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws remove_user_from_group failed", response=resp)
         try:
             user_data = self._fetch_user_details(user_id)
@@ -635,7 +634,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws list_group_memberships returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws get_group_members failed", response=resp)
         raw = resp.data or []
 
@@ -713,7 +712,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws list_groups returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws list_groups failed", response=resp)
         raw = resp.data or []
 
@@ -731,7 +730,7 @@ class AwsIdentityCenterProvider(GroupProvider):
             raise IntegrationError(
                 "aws list_groups_with_members returned unexpected type", response=resp
             )
-        if not resp.success:
+        if not resp.is_success:
             raise IntegrationError("aws list_groups_with_members failed", response=resp)
         raw = resp.data or []
 
@@ -776,7 +775,7 @@ class AwsIdentityCenterProvider(GroupProvider):
                     },
                 )
 
-            if not resp.success:
+            if not resp.is_success:
                 return HealthCheckResult(
                     healthy=False,
                     status="unhealthy",

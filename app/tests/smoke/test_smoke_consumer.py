@@ -1,7 +1,7 @@
 from modules.groups.events import event_system
 from modules.groups.core import service
 from modules.groups.api import schemas
-from modules.groups.providers.contracts import OperationResult
+from infrastructure.operations import OperationResult
 from modules.groups.domain.models import group_from_dict
 
 

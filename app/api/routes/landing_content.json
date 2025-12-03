@@ -1,0 +1,80 @@
+{
+  "en": {
+    "title": "SRE Bot",
+    "logo": "🤖 SRE Bot",
+    "heading": "Site Reliability Engineering",
+    "subtitle": "Our SRE Bot frontend has moved to Backstage",
+    "toggle_button": "Français",
+    "toggle_aria_label": "Toggle language: Français / English",
+    "sections": [
+      {
+        "heading": "What's Changed?",
+        "content": "We've migrated the SRE Bot user interface to our unified platform: <strong>Backstage</strong>. This consolidation provides a better user experience and centralized access to self-serve capabilities for your organization."
+      },
+      {
+        "heading": "Slack Integration",
+        "content": "Slack slash commands continue to work seamlessly. Simply use Slack to trigger SRE Bot workflows as before. For more complex tasks, visit Backstage."
+      },
+      {
+        "heading": "API Access",
+        "content": "The SRE Bot REST API remains available for programmatic access. See the documentation for authentication and endpoint details."
+      }
+    ],
+    "links": [
+      {
+        "href": "/docs",
+        "label": "View API Documentation",
+        "secondary": false
+      },
+      {
+        "href": "https://backstage.cdssandbox.xyz/",
+        "label": "Go to Backstage →",
+        "secondary": true,
+        "external": true
+      }
+    ],
+    "help_heading": "Need Help?",
+    "help_content": "For questions or issues, please reach out to the SRE team or consult our <a href=\"/docs\" style=\"color: var(--primary-color); text-decoration: underline;\">API documentation</a>.",
+    "footer": "SRE Bot API v1.0 • Powered by FastAPI",
+    "language_changed_announcement": "Language changed to English"
+  },
+  "fr": {
+    "title": "SRE Bot",
+    "logo": "🤖 SRE Bot",
+    "heading": "Ingénierie de fiabilité de site",
+    "subtitle": "Notre interface SRE Bot a été transférée vers Backstage",
+    "toggle_button": "English",
+    "toggle_aria_label": "Changer de langue: Français / English",
+    "sections": [
+      {
+        "heading": "Qu'est-ce qui a changé?",
+        "content": "Nous avons migré l'interface utilisateur du SRE Bot vers notre plateforme unifiée : <strong>Backstage</strong>. Cette consolidation offre une meilleure expérience utilisateur et un accès centralisé aux capacités d'auto-service de votre organisation."
+      },
+      {
+        "heading": "Intégration Slack",
+        "content": "Les commandes slash Slack continuent de fonctionner sans problème. Utilisez simplement Slack pour déclencher les flux de travail du SRE Bot comme avant. Pour les tâches plus complexes, visitez Backstage."
+      },
+      {
+        "heading": "Accès à l'API",
+        "content": "L'API REST du SRE Bot reste disponible pour l'accès par programmation. Consultez la documentation pour l'authentification et les détails des points de terminaison."
+      }
+    ],
+    "links": [
+      {
+        "href": "/docs",
+        "label": "Afficher la documentation de l'API",
+        "secondary": false
+      },
+      {
+        "href": "https://backstage.cdssandbox.xyz/",
+        "label": "Aller à Backstage →",
+        "secondary": true,
+        "external": true
+      }
+    ],
+    "help_heading": "Besoin d'aide?",
+    "help_content": "Pour toute question ou problème, veuillez contacter l'équipe SRE ou consulter notre <a href=\"/docs\" style=\"color: var(--primary-color); text-decoration: underline;\">documentation de l'API</a>.",
+    "footer": "API SRE Bot v1.0 • Propulsé par FastAPI",
+    "language_changed_announcement": "Langue changée en français"
+  }
+}

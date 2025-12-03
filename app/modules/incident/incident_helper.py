@@ -27,8 +27,7 @@ from core.config import settings
 from core.logging import get_module_logger
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
-SRE_DRIVE_ID = settings.feat_incident.SRE_DRIVE_ID
-SRE_INCIDENT_FOLDER = settings.feat_incident.SRE_INCIDENT_FOLDER
+SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
 VALID_STATUS = [
     "In Progress",
     "Open",

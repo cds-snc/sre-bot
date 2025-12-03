@@ -19,7 +19,7 @@ from core.config import settings
 PREFIX = settings.PREFIX
 INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
-INCIDENT_HANDBOOK_URL = settings.feat_incident.INCIDENT_HANDBOOK_URL
+INCIDENT_HANDBOOK_ID = settings.google_resources.incident_handbook_id
 
 logger = get_module_logger()
 
@@ -226,7 +226,7 @@ def generate_incident_modal_view(
         options = []
     if not private_metadata:
         private_metadata = ""
-    handbook_string = f"For more details on what constitutes a security incident, visit our <{INCIDENT_HANDBOOK_URL}|Incident Management Handbook>"
+    handbook_string = f"For more details on what constitutes a security incident, visit our <https://docs.google.com/document/d/{INCIDENT_HANDBOOK_ID}|Incident Management Handbook>"
     return {
         "type": "modal",
         "callback_id": "incident_view",

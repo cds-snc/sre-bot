@@ -11,9 +11,8 @@ from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast
 from core.logging import get_module_logger
 from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
-    get_active_providers,
     get_primary_provider,
-    get_primary_provider_name,
+    get_secondary_providers,
 )
 from modules.groups.providers.base import (
     OperationStatus,
@@ -117,7 +116,6 @@ def _propagate_to_secondaries(
     Passes the full group email (from primary provider) directly to secondary providers.
     Each secondary provider is responsible for decomposing the email and resolving it
     to its own identifier format.
-    The secondary provider is identified by the prefix of the email passed.
 
     Args:
         primary_group_id: Full group email from primary provider (e.g., "aws-admins@example.com")
@@ -130,13 +128,9 @@ def _propagate_to_secondaries(
         Dict mapping provider name -> OperationResult.
     """
     results: Dict[str, OperationResult] = {}
-    secondaries = get_active_providers()
-    primary_name = get_primary_provider_name()
+    secondaries = get_secondary_providers()
 
     for name, prov in secondaries.items():
-        if name == primary_name:
-            continue
-
         # Pass full group email directly to secondary provider
         # Secondary provider is responsible for email decomposition and identifier resolution
         sec_op = _call_provider_method(

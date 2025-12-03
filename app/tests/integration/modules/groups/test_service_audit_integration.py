@@ -47,7 +47,7 @@ class TestAddMemberAuditLogging:
         res = service.add_member(req)
 
         # Verify response contains correlation_id
-        assert res.success is True
+        assert res.is_success is True
         assert "correlation_id" in res.details
         correlation_id = res.details["correlation_id"]
         assert correlation_id is not None
@@ -63,7 +63,7 @@ class TestAddMemberAuditLogging:
         assert audit_entry.group_id == "team@example.com"
         assert audit_entry.member_email == "alice@example.com"
         assert audit_entry.provider == "google"
-        assert audit_entry.success is True
+        assert audit_entry.is_success is True
         assert audit_entry.requestor == "admin@example.com"
         assert audit_entry.justification == "Adding new hire to the engineering team"
         assert audit_entry.error_message is None
@@ -109,7 +109,7 @@ class TestAddMemberAuditLogging:
         # Verify failure audit entry
         assert isinstance(audit_entry, AuditEntry)
         assert audit_entry.action == "add_member"
-        assert audit_entry.success is False
+        assert audit_entry.is_success is False
         assert audit_entry.error_message == error_msg
         assert "ValueError" in audit_entry.metadata.get("exception_type", "")
 
@@ -193,7 +193,7 @@ class TestRemoveMemberAuditLogging:
         res = service.remove_member(req)
 
         # Verify response contains correlation_id
-        assert res.success is True
+        assert res.is_success is True
         assert "correlation_id" in res.details
         correlation_id = res.details["correlation_id"]
 
@@ -208,7 +208,7 @@ class TestRemoveMemberAuditLogging:
         assert audit_entry.group_id == "team@example.com"
         assert audit_entry.member_email == "bob@example.com"
         assert audit_entry.provider == "google"
-        assert audit_entry.success is True
+        assert audit_entry.is_success is True
         assert audit_entry.requestor == "admin@example.com"
         assert audit_entry.justification == "Access revoked"
 
@@ -250,7 +250,7 @@ class TestRemoveMemberAuditLogging:
         audit_entry = mock_audit_write.call_args[0][0]
 
         # Verify failure audit entry
-        assert audit_entry.success is False
+        assert audit_entry.is_success is False
         assert audit_entry.error_message == error_msg
         assert "RuntimeError" in audit_entry.metadata.get("exception_type", "")
 

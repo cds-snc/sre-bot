@@ -5,7 +5,8 @@ the contract between providers and orchestration layers. These are used as
 return envelopes and metadata containers.
 
 Key distinction:
-  - contracts.py: Pure DTOs and enums for operation results and metadata
+  - infrastructure/operations: Application-wide OperationResult and OperationStatus
+  - contracts.py: Provider-specific contracts (HealthCheckResult, CircuitBreakerStats, ProviderCapabilities)
   - base.py: Abstract classes and lifecycle management
   - models.py: Domain entities (NormalizedMember, NormalizedGroup)
   - schemas.py: API validation (Pydantic models)
@@ -13,80 +14,19 @@ Key distinction:
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
+# Import from infrastructure - single source of truth for OperationResult/OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 
-class OperationStatus(Enum):
-    """Status codes for provider operation results."""
-
-    SUCCESS = "success"
-    TRANSIENT_ERROR = "transient_error"  # Retryable
-    PERMANENT_ERROR = "permanent_error"  # Do not retry
-    UNAUTHORIZED = "unauthorized"
-    NOT_FOUND = "not_found"
-
-
-@dataclass
-class OperationResult:
-    """Uniform result returned from provider operations.
-
-    Attributes:
-        status: OperationStatus -- high-level outcome
-        message: str -- human-friendly message (for logs/troubleshooting)
-        data: Optional[Dict[str, Any]] -- optional payload
-        error_code: Optional[str] -- optional machine error code
-        retry_after: Optional[int] -- seconds until retry when rate-limited
-    """
-
-    status: OperationStatus
-    message: str
-    data: Optional[Dict[str, Any]] = None
-    error_code: Optional[str] = None
-    retry_after: Optional[int] = None  # Seconds for rate limiting
-
-    @classmethod
-    def success(
-        cls, data: Optional[Dict[str, Any]] = None, message: str = "ok"
-    ) -> "OperationResult":
-        """Create a SUCCESS OperationResult with optional data."""
-        return cls(status=OperationStatus.SUCCESS, message=message, data=data)
-
-    @classmethod
-    def error(
-        cls,
-        status: OperationStatus,
-        message: str,
-        error_code: Optional[str] = None,
-        retry_after: Optional[int] = None,
-    ) -> "OperationResult":
-        """Create an error OperationResult with status, message, and optional metadata."""
-        return cls(
-            status=status,
-            message=message,
-            error_code=error_code,
-            retry_after=retry_after,
-        )
-
-    @classmethod
-    def transient_error(
-        cls,
-        message: str,
-        error_code: Optional[str] = None,
-        retry_after: Optional[int] = None,
-    ) -> "OperationResult":
-        """Create a transient (retryable) error result."""
-        return cls.error(
-            OperationStatus.TRANSIENT_ERROR, message, error_code, retry_after
-        )
-
-    @classmethod
-    def permanent_error(
-        cls, message: str, error_code: Optional[str] = None
-    ) -> "OperationResult":
-        """Create a permanent (non-retryable) error result."""
-        return cls.error(OperationStatus.PERMANENT_ERROR, message, error_code)
+__all__ = [
+    "OperationResult",
+    "OperationStatus",
+    "HealthCheckResult",
+    "CircuitBreakerStats",
+    "ProviderCapabilities",
+]
 
 
 @dataclass

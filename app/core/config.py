@@ -1,6 +1,7 @@
 """SRE Bot configuration settings."""
 
 from typing import Any, Dict, Optional
+import json
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import structlog
@@ -64,16 +65,11 @@ class GoogleWorkspaceSettings(BaseSettings):
     GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
         default="", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
     )
-    GOOGLE_SRE_CALENDAR_ID: str = Field(default="", alias="GOOGLE_SRE_CALENDAR_ID")
 
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
         default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
     )
 
-    SRE_DRIVE_ID: str = Field(default="", alias="SRE_DRIVE_ID")
-    SRE_INCIDENT_FOLDER: str = Field(default="", alias="SRE_INCIDENT_FOLDER")
-    INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
-    INCIDENT_LIST: str = Field(default="", alias="INCIDENT_LIST")
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
@@ -161,25 +157,48 @@ class AtipSettings(BaseSettings):
     )
 
 
-class TalentRoleSettings(BaseSettings):
-    """Talent Role configuration settings."""
+class GoogleResourcesConfig(BaseSettings):
+    """Consolidated Google Drive/Document resources configuration.
 
-    INTERNAL_TALENT_FOLDER: str = Field(default="", alias="INTERNAL_TALENT_FOLDER")
-    SCORING_GUIDE_TEMPLATE: str = Field(default="", alias="SCORING_GUIDE_TEMPLATE")
-    TEMPLATES_FOLDER: str = Field(default="", alias="TEMPLATES_FOLDER")
-    CORE_VALUES_INTERVIEW_NOTES_TEMPLATE: str = Field(
-        default="", alias="CORE_VALUES_INTERVIEW_NOTES_TEMPLATE"
-    )
-    TECHNICAL_INTERVIEW_NOTES_TEMPLATE: str = Field(
-        default="", alias="TECHNICAL_INTERVIEW_NOTES_TEMPLATE"
-    )
-    INTAKE_FORM_TEMPLATE: str = Field(default="", alias="INTAKE_FORM_TEMPLATE")
-    PHONE_SCREEN_TEMPLATE: str = Field(default="", alias="PHONE_SCREEN_TEMPLATE")
-    RECRUITMENT_FEEDBACK_TEMPLATE: str = Field(
-        default="", alias="RECRUITMENT_FEEDBACK_TEMPLATE"
-    )
-    PANELIST_GUIDEBOOK_TEMPLATE: str = Field(
-        default="", alias="PANELIST_GUIDEBOOK_TEMPLATE"
+    Stores all Google resource IDs (folders, documents, sheets) in a
+    single compact JSON structure to reduce AWS Parameter Store footprint.
+
+    Structure:
+        {
+            "inc": {  # Incident resources
+                "d": <drive_id>,
+                "f": <folder_id>,
+                "t": <template_id>,
+                "l": <list_id>,
+                "h": <handbook_id>
+            },
+            "tal": {  # Talent role resources
+                "i": <internal_folder_id>,
+                "s": <scoring_guide_id>,
+                "t": <templates_folder_id>,
+                "c": <core_values_notes_id>,
+                "tech": <technical_notes_id>,
+                "int": <intake_form_id>,
+                "ph": <phone_screen_id>,
+                "rec": <recruitment_feedback_id>,
+                "pan": <panelist_guidebook_id>
+            },
+            "rep": {  # Reports resources
+                "g": <google_groups_folder_id>
+            },
+            "aws": {  # AWS resources
+                "s": <spending_sheet_id>
+            },
+            "cal": {  # Calendar resources
+                "sre": <sre_calendar_id>
+            },
+        }
+    """
+
+    resources: Any = Field(
+        default_factory=dict,
+        alias="GOOGLE_RESOURCES",
+        description="Consolidated Google resources in nested dict format",
     )
 
     model_config = SettingsConfigDict(
@@ -188,19 +207,137 @@ class TalentRoleSettings(BaseSettings):
         extra="ignore",
     )
 
+    @field_validator("resources", mode="before")
+    @classmethod
+    def _parse_resources(cls, v: Optional[Any]) -> Any:
+        """Allow `GOOGLE_RESOURCES` to be provided as a JSON string (possibly
+        wrapped in single or double quotes) or as a native dict.
 
-class ReportsSettings(BaseSettings):
-    """Reports configuration settings."""
+        This makes the settings more robust when the environment or parameter
+        store contains an extra layer of quoting.
+        """
+        if v is None:
+            return {}
 
-    FOLDER_REPORTS_GOOGLE_GROUPS: str = Field(
-        default="", alias="FOLDER_REPORTS_GOOGLE_GROUPS"
-    )
+        # If already a dict, return as-is
+        if isinstance(v, dict):
+            return v
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
+        # If a string, try to strip surrounding quotes and parse JSON
+        if isinstance(v, str):
+            s = v.strip()
+            if (s.startswith("'") and s.endswith("'")) or (
+                s.startswith('"') and s.endswith('"')
+            ):
+                s = s[1:-1]
+            try:
+                parsed = json.loads(s) if s else {}
+                return parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid GOOGLE_RESOURCES JSON: {e} (value: {s[:80]}...)"
+                ) from e
+
+        # Fallback: invalid type
+        raise ValueError("GOOGLE_RESOURCES must be a JSON string or a mapping")
+
+    def _get_resource(self, scope: str, key: str) -> str:
+        """Helper to safely retrieve a resource ID."""
+        raw = getattr(self, "resources", {}) or {}
+        if not isinstance(raw, dict):
+            return ""
+        scope_dict = raw.get(scope, {})
+        return scope_dict.get(key, "") if isinstance(scope_dict, dict) else ""
+
+    # --- Incident Resources ---
+    @property
+    def incident_drive_id(self) -> str:
+        """SRE Drive ID for incident management."""
+        return self._get_resource("inc", "d")
+
+    @property
+    def incident_folder_id(self) -> str:
+        """Incident folder ID in Google Drive."""
+        return self._get_resource("inc", "f")
+
+    @property
+    def incident_template_id(self) -> str:
+        """Incident document template ID."""
+        return self._get_resource("inc", "t")
+
+    @property
+    def incident_list_id(self) -> str:
+        """Incident tracking spreadsheet ID."""
+        return self._get_resource("inc", "l")
+
+    @property
+    def incident_handbook_id(self) -> str:
+        """Incident handbook document ID."""
+        return self._get_resource("inc", "h")
+
+    # --- Talent Role Resources ---
+    @property
+    def internal_talent_folder_id(self) -> str:
+        """Internal talent management folder."""
+        return self._get_resource("tal", "i")
+
+    @property
+    def scoring_guide_template_id(self) -> str:
+        """Scoring guide template document ID."""
+        return self._get_resource("tal", "s")
+
+    @property
+    def templates_folder_id(self) -> str:
+        """Talent templates folder ID."""
+        return self._get_resource("tal", "t")
+
+    @property
+    def core_values_interview_notes_id(self) -> str:
+        """Core values interview notes template ID."""
+        return self._get_resource("tal", "c")
+
+    @property
+    def technical_interview_notes_id(self) -> str:
+        """Technical interview notes template ID."""
+        return self._get_resource("tal", "tech")
+
+    @property
+    def intake_form_template_id(self) -> str:
+        """Intake form template ID."""
+        return self._get_resource("tal", "int")
+
+    @property
+    def phone_screen_template_id(self) -> str:
+        """Phone screen template ID."""
+        return self._get_resource("tal", "ph")
+
+    @property
+    def recruitment_feedback_template_id(self) -> str:
+        """Recruitment feedback template ID."""
+        return self._get_resource("tal", "rec")
+
+    @property
+    def panelist_guidebook_template_id(self) -> str:
+        """Panelist guidebook template ID."""
+        return self._get_resource("tal", "pan")
+
+    # --- Reports Resources ---
+    @property
+    def google_groups_reports_folder_id(self) -> str:
+        """Google Groups reports folder ID."""
+        return self._get_resource("rep", "g")
+
+    # --- AWS Resources ---
+    @property
+    def spending_sheet_id(self) -> str:
+        """AWS Spending Google Sheet ID."""
+        return self._get_resource("aws", "s")
+
+    # --- Calendar Resources ---
+    @property
+    def sre_calendar_id(self) -> str:
+        """SRE Calendar ID."""
+        return self._get_resource("cal", "sre")
 
 
 class AWSFeatureSettings(BaseSettings):
@@ -210,7 +347,6 @@ class AWSFeatureSettings(BaseSettings):
         default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
     )
     AWS_OPS_GROUP_NAME: str = Field(default="", alias="AWS_OPS_GROUP_NAME")
-    SPENDING_SHEET_ID: str = Field(default="", alias="SPENDING_SHEET_ID")
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
@@ -225,11 +361,6 @@ class IncidentFeatureSettings(BaseSettings):
     SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
         default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
     )
-    INCIDENT_HANDBOOK_URL: str = Field(default="", alias="INCIDENT_HANDBOOK_URL")
-    INCIDENT_TEMPLATE: str = Field(default="", alias="INCIDENT_TEMPLATE")
-    INCIDENT_LIST: str = Field(default="", alias="INCIDENT_LIST")
-    SRE_DRIVE_ID: str = Field(default="", alias="SRE_DRIVE_ID")
-    SRE_INCIDENT_FOLDER: str = Field(default="", alias="SRE_INCIDENT_FOLDER")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -323,6 +454,39 @@ class GroupsFeatureSettings(BaseSettings):
         description="Per-provider configuration for enable/disable, primary selection, prefix, and capabilities",
     )
 
+    @field_validator("providers", mode="before")
+    @classmethod
+    def _parse_providers(cls, v: Optional[Any]) -> Any:
+        """Parse GROUP_PROVIDERS from JSON string (environment variable) or dict.
+
+        Handles JSON string input from environment variables, with or without
+        surrounding quotes.
+        """
+        if v is None:
+            return {}
+
+        # If already a dict, return as-is
+        if isinstance(v, dict):
+            return v
+
+        # If a string, try to strip surrounding quotes and parse JSON
+        if isinstance(v, str):
+            s = v.strip()
+            if (s.startswith("'") and s.endswith("'")) or (
+                s.startswith('"') and s.endswith('"')
+            ):
+                s = s[1:-1]
+            try:
+                parsed = json.loads(s) if s else {}
+                return parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid GROUP_PROVIDERS JSON: {e} (value: {s[:80]}...)"
+                ) from e
+
+        # Fallback: invalid type
+        raise ValueError("GROUP_PROVIDERS must be a JSON string or a mapping")
+
     @field_validator("providers", mode="after")
     @classmethod
     def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
@@ -336,50 +500,46 @@ class GroupsFeatureSettings(BaseSettings):
         Disabled providers (enabled=False) are excluded from all validation
         checks since they won't be activated.
         """
-        try:
-            if not v or not isinstance(v, dict):
-                return {}
+        if not v or not isinstance(v, dict):
+            return {}
 
-            # Filter to only enabled providers
-            enabled_providers = {
-                pname: cfg
-                for pname, cfg in v.items()
-                if isinstance(cfg, dict) and cfg.get("enabled", True)
-            }
+        # Filter to only enabled providers
+        enabled_providers = {
+            pname: cfg
+            for pname, cfg in v.items()
+            if isinstance(cfg, dict) and cfg.get("enabled", True)
+        }
 
-            if not enabled_providers:
-                logger.warning("no_enabled_providers_configured")
-                return v
+        if not enabled_providers:
+            logger.warning("no_enabled_providers_configured")
+            return v
 
-            # Count primary providers among enabled providers only
-            primary_count = sum(
-                1
-                for cfg in enabled_providers.values()
-                if isinstance(cfg, dict) and cfg.get("primary")
+        # Count primary providers among enabled providers only
+        primary_count = sum(
+            1
+            for cfg in enabled_providers.values()
+            if isinstance(cfg, dict) and cfg.get("primary")
+        )
+
+        if primary_count != 1:
+            # Fail-fast: require exactly one enabled primary provider
+            raise ValueError(
+                f"GROUP_PROVIDERS configuration must contain exactly one enabled provider "
+                f"with 'primary': True. Found {primary_count} enabled primary provider(s)."
             )
 
-            if primary_count != 1:
-                # Fail-fast: require exactly one enabled primary provider
-                raise ValueError(
-                    f"GROUP_PROVIDERS configuration must contain exactly one enabled provider "
-                    f"with 'primary': True. Found {primary_count} enabled primary provider(s)."
+        # Warn about enabled non-primary providers missing prefix
+        for pname, cfg in enabled_providers.items():
+            if not cfg.get("primary") and not cfg.get("prefix"):
+                logger.warning(
+                    "provider_missing_prefix",
+                    provider=pname,
+                    msg=(
+                        "Enabled non-primary provider has no 'prefix' configured; "
+                        "mapping to primary provider may fail"
+                    ),
                 )
 
-            # Warn about enabled non-primary providers missing prefix
-            for pname, cfg in enabled_providers.items():
-                if not cfg.get("primary") and not cfg.get("prefix"):
-                    logger.warning(
-                        "provider_missing_prefix",
-                        provider=pname,
-                        msg=(
-                            "Enabled non-primary provider has no 'prefix' configured; "
-                            "mapping to primary provider may fail"
-                        ),
-                    )
-        except Exception as e:
-            if isinstance(e, ValueError):
-                raise
-            logger.warning(f"Could not validate providers configuration: {e}")
         return v
 
     # Reconciliation configuration
@@ -480,6 +640,91 @@ class GroupsFeatureSettings(BaseSettings):
         super().__init__(**kwargs)
 
 
+class CommandsSettings(BaseSettings):
+    """Configuration for command adapters and platform integrations.
+
+    Command Providers Configuration (COMMAND_PROVIDERS):
+    ---------------------------------------------------
+    Configure per-provider behavior including enable/disable and platform-specific
+    settings for command adapters (Slack, Teams, Discord, etc.).
+
+    Schema:
+        providers: Dict[str, Dict[str, Any]]
+            Key: Provider name (e.g., "slack", "teams", "discord")
+            Value: Provider configuration dict with the following fields:
+
+            - enabled (bool, optional): Whether to activate this command provider.
+              Default: True. Set to False to disable without removing config.
+
+            - Additional provider-specific fields as needed
+
+    Example Configuration:
+        COMMAND_PROVIDERS = {
+            "slack": {
+                "enabled": True
+            },
+            "teams": {
+                "enabled": False
+            }
+        }
+
+    Scenarios:
+        1. No providers enabled -> API-only mode (commands disabled)
+        2. One provider enabled -> Single platform mode
+        3. Multiple providers enabled -> Multi-platform mode
+
+    Validation:
+        - At least zero providers enabled (API-only is valid)
+        - Enabled providers must have required configuration
+    """
+
+    # Per-provider configuration. Each key is a provider name with a dict value
+    providers: dict[str, dict] = Field(
+        default_factory=dict,
+        alias="COMMAND_PROVIDERS",
+        description="Per-provider configuration for command adapters",
+    )
+
+    @field_validator("providers", mode="before")
+    @classmethod
+    def _parse_providers(cls, v: Optional[Any]) -> Any:
+        """Parse COMMAND_PROVIDERS from JSON string (environment variable) or dict.
+
+        Handles JSON string input from environment variables, with or without
+        surrounding quotes.
+        """
+        if v is None:
+            return {}
+
+        # If already a dict, return as-is
+        if isinstance(v, dict):
+            return v
+
+        # If a string, try to strip surrounding quotes and parse JSON
+        if isinstance(v, str):
+            s = v.strip()
+            if (s.startswith("'") and s.endswith("'")) or (
+                s.startswith('"') and s.endswith('"')
+            ):
+                s = s[1:-1]
+            try:
+                parsed = json.loads(s) if s else {}
+                return parsed
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(
+                    f"Invalid COMMAND_PROVIDERS JSON: {e} (value: {s[:80]}...)"
+                ) from e
+
+        # Fallback: invalid type
+        raise ValueError("COMMAND_PROVIDERS must be a JSON string or a mapping")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class ServerSettings(BaseSettings):
     """Server configuration settings."""
 
@@ -529,15 +774,6 @@ class DevSettings(BaseSettings):
     )
 
 
-class FrontEndSettings(BaseSettings):
-    FRONTEND_URL: str = Field(default="http://127.0.0.1:3000", alias="FRONTEND_URL")
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
-
-
 class Settings(BaseSettings):
     """SRE Bot configuration settings."""
 
@@ -547,7 +783,6 @@ class Settings(BaseSettings):
 
     # Server settings
     server: ServerSettings
-    frontend: FrontEndSettings
 
     # Integration settings
     slack: SlackSettings
@@ -561,12 +796,12 @@ class Settings(BaseSettings):
 
     # Functionality settings
     atip: AtipSettings
-    talent_role: TalentRoleSettings
-    reports: ReportsSettings
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
     sre_ops: SreOpsSettings
     groups: GroupsFeatureSettings
+    google_resources: GoogleResourcesConfig
+    commands: CommandsSettings
 
     # Development settings
     dev: DevSettings
@@ -579,7 +814,6 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         settings_map = {
             "server": ServerSettings,
-            "frontend": FrontEndSettings,
             "slack": SlackSettings,
             "aws": AwsSettings,
             "google_workspace": GoogleWorkspaceSettings,
@@ -589,13 +823,13 @@ class Settings(BaseSettings):
             "sentinel": SentinelSettings,
             "trello": TrelloSettings,
             "atip": AtipSettings,
-            "talent_role": TalentRoleSettings,
-            "reports": ReportsSettings,
             "aws_feature": AWSFeatureSettings,
             "feat_incident": IncidentFeatureSettings,
             "sre_ops": SreOpsSettings,
             "dev": DevSettings,
             "groups": GroupsFeatureSettings,
+            "google_resources": GoogleResourcesConfig,
+            "commands": CommandsSettings,
         }
 
         for setting_name, setting_class in settings_map.items():

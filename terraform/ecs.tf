@@ -18,7 +18,6 @@ data "template_file" "sre-bot" {
     fargate_cpu                      = var.fargate_cpu
     fargate_memory                   = var.fargate_memory
     aws_region                       = "ca-central-1"
-    PICKLE_STRING                    = aws_ssm_parameter.google_oauth_pickle_string.arn
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = aws_ssm_parameter.gcp_sre_service_account_key.arn
   }
 }

@@ -13,12 +13,6 @@ variable "fargate_memory" {
   default = 1024
 }
 
-variable "google_oauth_pickle_string" {
-  description = "(Required) The Google OAuth pickle string"
-  type        = string
-  sensitive   = true
-}
-
 variable "gcp_sre_service_account_key" {
   description = "(Required) The GCP SRE service account key"
   type        = string
@@ -51,9 +45,6 @@ variable "authorized_endpoints_with_constraints" {
   }))
   default = [
     { path = "/", positional_constraint = "EXACTLY" },
-    { path = "/auth/login", positional_constraint = "EXACTLY" },
-    { path = "/auth/logout", positional_constraint = "EXACTLY" },
-    { path = "/auth/callback", positional_constraint = "EXACTLY" },
     { path = "/auth/me", positional_constraint = "EXACTLY" },
     { path = "/request_access", positional_constraint = "EXACTLY" },
     { path = "/active_requests", positional_constraint = "EXACTLY" },
@@ -62,7 +53,6 @@ variable "authorized_endpoints_with_constraints" {
     { path = "/geolocate", positional_constraint = "STARTS_WITH" },
     { path = "/hook", positional_constraint = "STARTS_WITH" },
     { path = "/version", positional_constraint = "EXACTLY" },
-    { path = "/static", positional_constraint = "STARTS_WITH" },
     { path = "/access", positional_constraint = "STARTS_WITH" },
     { path = "/health", positional_constraint = "EXACTLY" }
   ]

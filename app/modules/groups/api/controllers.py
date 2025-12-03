@@ -8,7 +8,7 @@ from modules.groups.core import service
 from modules.groups.api import schemas
 from modules.groups.domain import models
 from modules.groups.providers import get_active_providers
-from modules.groups.infrastructure import circuit_breaker
+from infrastructure.resilience import circuit_breaker
 
 logger = get_module_logger()
 
