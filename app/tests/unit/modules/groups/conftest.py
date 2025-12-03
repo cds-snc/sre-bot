@@ -2,7 +2,7 @@
 
 import types
 from typing import Dict, Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers.contracts import (
@@ -310,3 +310,166 @@ def normalized_group_factory():
         )
 
     return _factory
+
+
+# ============================================================================
+# PROVIDER CONFIGURATION FIXTURES
+# ============================================================================
+
+
+@pytest.fixture
+def mock_provider_config():
+    """Factory for creating provider configuration dictionaries.
+
+    Returns a function that generates provider config dicts with
+    sensible defaults for testing configuration-driven provider activation.
+
+    Usage:
+        config = mock_provider_config(
+            provider_name="google",
+            enabled=True,
+            primary=True,
+            prefix="g",
+            capabilities={"supports_member_management": True}
+        )
+    """
+    from typing import Any, Optional
+
+    def _factory(
+        provider_name: str,
+        enabled: bool = True,
+        primary: bool = False,
+        prefix: Optional[str] = None,
+        capabilities: Optional[dict] = None,
+    ) -> dict:
+        config: dict[str, Any] = {"enabled": enabled}
+
+        if primary:
+            config["primary"] = True
+
+        if prefix:
+            config["prefix"] = prefix
+
+        if capabilities:
+            config["capabilities"] = capabilities
+
+        return config
+
+    return _factory
+
+
+@pytest.fixture
+def single_provider_config(mock_provider_config):
+    """Provider configuration with single enabled primary provider.
+
+    Used for testing behavior when only one provider is available.
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        prefix="g",
+    )
+    return {"google": google_cfg}
+
+
+@pytest.fixture
+def multi_provider_config(mock_provider_config):
+    """Provider configuration with multiple enabled providers.
+
+    Google as primary, AWS as secondary. Used for testing
+    multi-provider scenarios.
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=True,
+        primary=True,
+        prefix="g",
+    )
+    aws_cfg = mock_provider_config(
+        provider_name="aws",
+        enabled=True,
+        primary=False,
+        prefix="a",
+    )
+    return {**google_cfg, **aws_cfg}
+
+
+@pytest.fixture
+def disabled_provider_config(mock_provider_config):
+    """Provider configuration with providers disabled.
+
+    Used for testing behavior when no providers are available.
+    """
+    google_cfg = mock_provider_config(
+        provider_name="google",
+        enabled=False,
+    )
+    aws_cfg = mock_provider_config(
+        provider_name="aws",
+        enabled=False,
+    )
+    return {**google_cfg, **aws_cfg}
+
+
+# ============================================================================
+# GROUPS COMMANDS FIXTURES (from commands/conftest.py)
+# ============================================================================
+
+
+@pytest.fixture
+def mock_translator():
+    """Mock translator that returns input key with variable substitution."""
+
+    def _translate(key: str, locale: str = "en-US", **variables):
+        # Simple mock: replace {variable} with variable value
+        result = key
+        for var_name, var_value in variables.items():
+            result = result.replace(f"{{{var_name}}}", str(var_value))
+        return result
+
+    return _translate
+
+
+@pytest.fixture
+def mock_command_context(mock_translator):
+    """Create mock CommandContext for groups commands."""
+    from tests.factories.groups_commands import make_groups_list_context
+
+    ctx = make_groups_list_context()
+    ctx._translator = mock_translator  # pylint: disable=protected-access
+
+    # Mock responder
+    mock_responder = MagicMock()
+    mock_responder.send_message = MagicMock()
+    mock_responder.send_ephemeral = MagicMock()
+    ctx._responder = mock_responder  # pylint: disable=protected-access
+
+    return ctx
+
+
+@pytest.fixture
+def mock_groups_service():
+    """Mock groups service module for commands."""
+    with patch("modules.groups.commands.handlers.service") as mock:
+        yield mock
+
+
+@pytest.fixture
+def mock_slack_users():
+    """Mock Slack users integration for commands."""
+    with patch("modules.groups.commands.handlers.slack_users") as mock:
+        mock.get_user_email_from_handle.return_value = "resolved@example.com"
+        yield mock
+
+
+@pytest.fixture
+def mock_groups_provider():
+    """Mock groups provider for commands."""
+    with patch("modules.groups.commands.handlers.get_active_providers") as mock:
+        mock.return_value = {
+            "google": MagicMock(),
+            "aws": MagicMock(),
+            "azure": MagicMock(),
+        }
+        yield mock
