@@ -46,5 +46,5 @@ groups:
   success.list_filtered: "✅ {count} groupe{plural} récupéré{plural} (rôles: {roles})"
   success.list_for_user: "✅ {count} groupe{plural} récupéré{plural} pour {email}"
   success.no_groups: "✅ Aucun groupe trouvé correspondant à vos critères."
-  success.member_added: "✅ Ajout réussi de {member_email} au {group_id}"
-  success.member_removed: "✅ Suppression réussie de {member_email} du {group_id}"
+  success.add_member: "✅ Ajout réussi de {member_email} au groupe {group_id}"
+  success.remove_member: "✅ Suppression réussie de {member_email} du groupe {group_id}"
