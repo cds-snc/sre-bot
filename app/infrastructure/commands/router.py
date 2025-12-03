@@ -1,6 +1,7 @@
 """Multi-platform command router with explicit platform registry."""
 
-from typing import Dict, Any, Optional
+import shlex
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 
 from core.logging import get_module_logger
@@ -53,6 +54,41 @@ class CommandRouter:
         self.namespace = namespace
         # Two-level dict: routes[subcommand][platform] = ProviderRoute
         self.routes: Dict[str, Dict[str, ProviderRoute]] = {}
+
+    def _requote_tokens(self, tokens: List[str]) -> str:
+        """Re-quote tokens that contain spaces or special characters.
+
+        When joining tokens back into a string for re-tokenization (as happens when
+        the router extracts the subcommand and passes the rest to the provider),
+        we need to add quotes back for tokens that were originally quoted.
+        This preserves the semantic meaning through double tokenization.
+
+        The router tokenizes to extract the subcommand name (necessary), which causes
+        shlex.split() to consume quotes. When we reconstruct the text for the provider,
+        a simple join loses quote information. This method re-escapes tokens to preserve
+        their structure through the second tokenization in the provider.
+
+        Args:
+            tokens: List of tokens to join (typically tokens[1:] after subcommand extraction)
+
+        Returns:
+            String with tokens properly quoted and joined for re-tokenization
+
+        Example:
+            tokens = ['add', 'user@example.com', 'my group', 'provider', 'test new command']
+            result = _requote_tokens(tokens)
+            # Returns: 'add user@example.com "my group" provider "test new command"'
+            # When this is tokenized again, 'my group' stays as one token
+        """
+        quoted_tokens = []
+        for token in tokens:
+            # Token needs quoting if it contains spaces or special shell chars
+            # These are chars that have special meaning in POSIX shell
+            if " " in token or any(c in token for c in "|&;<>()$`\\\"'"):
+                quoted_tokens.append(shlex.quote(token))
+            else:
+                quoted_tokens.append(token)
+        return " ".join(quoted_tokens)
 
     def register_subcommand(
         self,
@@ -244,11 +280,11 @@ class CommandRouter:
         if "command" in modified_payload:
             # Slack-style payload
             modified_payload["command"] = dict(modified_payload["command"])
-            modified_payload["command"]["text"] = " ".join(tokens[1:])
+            modified_payload["command"]["text"] = self._requote_tokens(tokens[1:])
         elif "activity" in modified_payload:
             # Teams-style payload
             modified_payload["activity"] = dict(modified_payload["activity"])
-            modified_payload["activity"]["text"] = " ".join(tokens[1:])
+            modified_payload["activity"]["text"] = self._requote_tokens(tokens[1:])
 
         logger.info(
             "routing_to_provider",

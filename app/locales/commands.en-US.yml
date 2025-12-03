@@ -1,0 +1,8 @@
+commands:
+  terms.required: "required"
+  terms.optional: "optional"
+  errors.registry_not_initialized: "Command registry not initialized."
+  errors.unknown_command: "Unknown command: `{command}`. Type `help` for usage."
+  errors.parse_error: "Invalid command syntax: {error}"
+  errors.internal_error: "An error occurred processing your command."
+  errors.invalid_payload: "Invalid payload provided."
