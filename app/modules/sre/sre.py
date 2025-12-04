@@ -3,43 +3,167 @@
 This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
 """
 
-from slack_sdk import WebClient
-from slack_bolt import Ack, Respond, App
-
-from modules.incident import incident_helper
-from modules.sre import geolocate_helper, webhook_helper
-from modules.dev import core as dev_core
-from modules.reports import core as reports
-
-from modules.groups import handle_groups_command
-from integrations.slack import commands as slack_commands
 from core.config import settings
 from core.logging import get_module_logger
+from infrastructure.commands.router import CommandRouter
+from infrastructure.commands.providers.slack import SlackCommandProvider
+from modules.groups import create_slack_provider
+from modules.incident import incident_helper
+from modules.sre import geolocate_helper, webhook_helper
+from slack_bolt import Ack, App, Respond
+from slack_sdk import WebClient
 
 PREFIX = settings.PREFIX
 GIT_SHA = settings.GIT_SHA
 
 logger = get_module_logger()
 
-help_text = """
-\n `/sre help | aide`
-\n      - show this help text
-\n      - montre le texte d'aide
-\n `/sre geolocate <ip>`
-\n      - geolocate an IP address
-\n      - géolocaliser une adresse IP
-\n `/sre incident`
-\n      - lists incident commands
-\n      - lister les commandes d'incidents
-\n `/sre webhooks`
-\n      - lists webhook commands
-\n      - lister les commandes de liens de rappel HTTP
-\n `/sre version`
-\n      - show the version of the SRE Bot
-\n      - montre la version du bot SRE
-\n `/sre reports`
-\n      - lists reports commands
-\n      - lister les commandes de rapports"""
+
+# ============================================================
+# COMMAND ROUTER SETUP
+# ============================================================
+
+sre_router = CommandRouter(namespace="sre")
+
+# ============================================================
+# NEW ARCHITECTURE: groups subcommand
+# ============================================================
+
+groups_provider = create_slack_provider(parent_command="sre")
+sre_router.register_subcommand(
+    name="groups",
+    provider=groups_provider,
+    platform="slack",
+    description="Manage groups and memberships",
+    description_key="sre.subcommands.groups.description",
+)
+
+# ============================================================
+# LEGACY ARCHITECTURE: incident, webhooks, etc.
+# Wrapped in adapter providers for router compatibility
+# ============================================================
+
+
+class LegacyIncidentProvider(SlackCommandProvider):
+    """Adapter for legacy incident_helper."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = None  # Legacy handlers don't use registry
+
+    def handle(self, platform_payload):
+        """Delegate to legacy incident handler."""
+        self.acknowledge(platform_payload)
+
+        command = platform_payload["command"]
+        client = platform_payload["client"]
+        respond = platform_payload["respond"]
+        ack = platform_payload["ack"]
+
+        text = command.get("text", "")
+        args = text.split() if text else []
+
+        incident_helper.handle_incident_command(
+            args, client, platform_payload["command"], respond, ack
+        )
+
+
+class LegacyWebhooksProvider(SlackCommandProvider):
+    """Adapter for legacy webhook_helper."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = None
+
+    def handle(self, platform_payload):
+        """Delegate to legacy webhooks handler."""
+        self.acknowledge(platform_payload)
+
+        command = platform_payload["command"]
+        client = platform_payload["client"]
+        respond = platform_payload["respond"]
+
+        text = command.get("text", "")
+        args = text.split() if text else []
+
+        webhook_helper.handle_webhook_command(
+            args, client, platform_payload["command"], respond
+        )
+
+
+class GeolocateProvider(SlackCommandProvider):
+    """Adapter for geolocate helper."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = None
+
+    def handle(self, platform_payload):
+        """Handle geolocate command."""
+        self.acknowledge(platform_payload)
+
+        command = platform_payload["command"]
+        respond = platform_payload["respond"]
+
+        text = command.get("text", "")
+        args = text.split() if text else []
+
+        if not args:
+            respond("Please provide an IP address.\n" "SVP fournir une adresse IP")
+            return
+
+        geolocate_helper.geolocate(args, respond)
+
+
+class VersionProvider(SlackCommandProvider):
+    """Adapter for version command."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = None
+
+    def handle(self, platform_payload):
+        """Send version info."""
+        self.acknowledge(platform_payload)
+        respond = platform_payload["respond"]
+        respond(f"SRE Bot version: {GIT_SHA}")
+
+
+# ============================================================
+# REGISTER LEGACY PROVIDERS
+# ============================================================
+
+sre_router.register_subcommand(
+    name="incident",
+    provider=LegacyIncidentProvider(),
+    platform="slack",
+    description="Manage incidents",
+    description_key="sre.subcommands.incident.description",
+)
+
+sre_router.register_subcommand(
+    name="webhooks",
+    provider=LegacyWebhooksProvider(),
+    platform="slack",
+    description="Manage webhooks",
+    description_key="sre.subcommands.webhooks.description",
+)
+
+sre_router.register_subcommand(
+    name="geolocate",
+    provider=GeolocateProvider(),
+    platform="slack",
+    description="Geolocate an IP address",
+    description_key="sre.subcommands.geolocate.description",
+)
+
+sre_router.register_subcommand(
+    name="version",
+    provider=VersionProvider(),
+    platform="slack",
+    description="Show SRE Bot version",
+    description_key="sre.subcommands.version.description",
+)
 
 
 def register(bot: App):
@@ -51,8 +175,8 @@ def sre_command(
     command,
     respond: Respond,
     client: WebClient,
-    body,
 ):
+    """Main /sre command handler - delegates all subcommands to router."""
     ack()
     logger.info(
         "sre_command_received",
@@ -63,34 +187,14 @@ def sre_command(
         channel_name=command["channel_name"],
     )
 
-    if command["text"] == "":
-        respond(
-            "Type `/sre help` to see a list of commands.\nTapez `/sre aide` pour voir une liste de commandes"
-        )
-        return
+    # Build standard payload for router
+    payload = {
+        "command": dict(command),
+        "client": client,
+        "respond": respond,
+        "ack": ack,
+    }
 
-    action, *args = slack_commands.parse_command(command["text"])
-    match action:
-        case "help" | "aide":
-            respond(help_text)
-        case "geolocate":
-            if len(args) == 0:
-                respond("Please provide an IP address.\n" "SVP fournir une adresse IP")
-                return
-            geolocate_helper.geolocate(args, respond)
-        case "incident":
-            incident_helper.handle_incident_command(args, client, body, respond, ack)
-        case "webhooks":
-            webhook_helper.handle_webhook_command(args, client, body, respond)
-        case "groups":
-            handle_groups_command(client, body, respond, ack, args)
-        case "test":
-            dev_core.dev_command(ack, respond, client, body, args)
-        case "version":
-            respond(f"SRE Bot version: {GIT_SHA}")
-        case "reports":
-            reports.reports_command(args, ack, command, respond, client, body)
-        case _:
-            respond(
-                f"Unknown command: `{action}`. Type `/sre help` to see a list of commands. \nCommande inconnue: `{action}`. Entrez `/sre help` pour une liste des commandes valides"
-            )
+    # Router handles ALL subcommands (new + legacy)
+    # Router automatically generates help for empty commands or `/sre help`
+    sre_router.handle(payload)

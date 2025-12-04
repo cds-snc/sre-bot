@@ -6,43 +6,137 @@ This document contains the new testing strategy and structure to implement withi
 
 All the environment variables loading have been migrated to a centralized location in `core.config.settings`. Tests should not rely on loading `.env` files directly or trying to mock those. Instead, use the settings module to access configuration values. If specific environment variables are needed for tests, they should be mocked or set within the test setup using fixtures.
 
+## Pytest Configuration
+
+All pytest configuration is centralized in `/workspace/app/pytest.ini`. Key settings:
+
+**Test Discovery:**
+- `testpaths = tests` - Tests discovered under `/workspace/app/tests/`
+- `norecursedirs = tests/smoke` - Smoke tests not run by default (require explicit credentials)
+
+**Markers for Test Organization:**
+- `@pytest.mark.unit` - Pure unit tests with no external dependencies
+- `@pytest.mark.integration` - Integration tests combining multiple components
+- `@pytest.mark.legacy` - Legacy test structure maintained during transition
+
+**Environment:**
+- All environment variables pre-configured in pytest.ini
+- Tests can reference variables via `settings` object from `core.config`
+- No `.env` file loading required for tests
+
+**Run Tests:**
+```bash
+# All tests
+pytest
+
+# Unit tests only
+pytest -m unit
+
+# Integration tests only
+pytest -m integration
+
+# Specific module
+pytest tests/unit/modules/groups/
+
+# With coverage
+pytest --cov=modules.groups --cov-report=html
+```
+
 ## Directory Structure
 
-The recommended test directory structure separates concerns clearly and provides predictable organization:
+The current test directory structure separates concerns clearly with predictable organization:
 
 ```plaintext
 tests/
-├── conftest.py                      # Root-level shared fixtures
+├── conftest.py                      # Root-level shared fixtures (Level 1)
 ├── pytest.ini                       # Pytest configuration
 ├── factories/                       # Test data factories
 │   ├── __init__.py
 │   ├── aws.py                       # AWS test data builders
-│   └── google.py                    # Google test data builders
+│   ├── commands.py                  # Command framework data builders
+│   ├── google.py                    # Google test data builders
+│   ├── groups_commands.py           # Groups command data builders
+│   └── i18n.py                      # i18n test data builders
 ├── fixtures/                        # Reusable fake clients
 │   ├── __init__.py
 │   ├── aws_clients.py               # FakeClient for AWS SDK
 │   └── google_clients.py            # FakeGoogleService
-├── unit/                            # Pure unit tests (NEW)
+├── unit/                            # Pure unit tests
+│   ├── infrastructure/
+│   │   ├── conftest.py              # Infrastructure module-level fixtures
+│   │   ├── commands/
+│   │   │   ├── conftest.py          # Commands feature-level fixtures (Level 3)
+│   │   │   ├── providers/
+│   │   │   │   ├── conftest.py      # Slack provider fixtures (Level 4)
+│   │   │   │   ├── test_base.py
+│   │   │   │   ├── test_providers.py
+│   │   │   │   └── test_slack.py
+│   │   │   ├── responses/
+│   │   │   │   ├── test_models.py
+│   │   │   │   └── test_slack_formatter.py
+│   │   │   ├── test_context.py
+│   │   │   ├── test_models.py
+│   │   │   ├── test_parser.py
+│   │   │   └── test_registry.py
+│   │   ├── i18n/
+│   │   │   ├── conftest.py          # i18n module fixtures
+│   │   │   ├── test_loader.py
+│   │   │   ├── test_models.py
+│   │   │   ├── test_resolvers.py
+│   │   │   └── test_translator.py
+│   │   ├── plugins/
+│   │   ├── test_circuit_breaker.py
+│   │   └── test_operations_result.py
 │   └── modules/
-│       └── groups/
-│           ├── conftest.py          # Module-specific fixtures
-│           ├── test_models.py
-│           ├── test_schemas.py
-│           ├── test_validation.py
-│           └── providers/
-│               ├── conftest.py      # Provider-specific fixtures
-│               ├── test_base_provider.py
-│               └── test_google_provider.py
-├── integration/                     # Integration tests (NEW)
+│       ├── groups/
+│       │   ├── conftest.py          # Groups module-level fixtures (Level 2)
+│       │   ├── commands/
+│       │   │   └── test_registry.py
+│       │   ├── providers/
+│       │   │   ├── conftest.py      # Providers feature-level fixtures (Level 3)
+│       │   │   ├── test_aws_identity_center.py
+│       │   │   ├── test_base_provider.py
+│       │   │   ├── test_google_workspace_provider.py
+│       │   │   └── test_provider_registry.py
+│       │   ├── test_audit.py
+│       │   ├── test_errors.py
+│       │   ├── test_event_system.py
+│       │   ├── test_idempotency.py
+│       │   ├── test_models.py
+│       │   ├── test_orchestration.py
+│       │   ├── test_reconciliation.py
+│       │   ├── test_schemas.py
+│       │   ├── test_service_permissions.py
+│       │   └── test_validation.py
+│       └── sre/
+│           ├── conftest.py          # SRE module fixtures
+│           ├── test_geolocate_helper.py
+│           └── test_webhook_helper.py
+├── integration/                     # Integration tests
+│   ├── conftest.py                  # Root integration fixtures
+│   ├── infrastructure/
+│   │   └── commands/
+│   │       ├── test_provider_integration.py
+│   │       ├── test_response_integration.py
+│   │       └── test_router_quote_preservation.py
 │   └── modules/
-│       └── groups/
-│           ├── conftest.py
-│           ├── test_service_integration.py
-│           └── test_orchestration_integration.py
-└── modules/                         # Current mixed tests (MIGRATE)
-    └── groups/
-        ├── conftest.py
-        └── test_*.py
+│       ├── groups/
+│       │   ├── conftest.py          # Groups module fixtures
+│       │   ├── commands/
+│       │   │   └── test_command_integration.py
+│       │   ├── providers/
+│       │   │   ├── conftest.py      # Provider integration fixtures
+│       │   │   └── (provider integration tests)
+│       │   ├── test_controllers_integration.py
+│       │   ├── test_orchestration_integration.py
+│       │   ├── test_reconciliation_integration.py
+│       │   ├── test_service_audit_integration.py
+│       │   └── test_service_integration.py
+│       └── sre/
+│           ├── conftest.py          # SRE integration fixtures
+│           ├── test_sre_providers.py
+│           └── (other tests)
+└── (other test directories)
 ```
 
 ### Directory Purpose
@@ -87,132 +181,88 @@ Reusable fake client implementations:
 
 ## Fixture Hierarchy
 
-### Three-Level Fixture Strategy
+### Layered Fixture Architecture
+
+Fixtures are organized in a layered hierarchy to manage scope and dependencies:
 
 ```plaintext
-tests/conftest.py              # Level 1: Global fixtures
+tests/conftest.py                           # Level 1: Global fixtures
     ↓
-tests/unit/modules/groups/conftest.py    # Level 2: Module fixtures
+tests/unit/modules/<module>/conftest.py     # Level 2: Module-level fixtures
     ↓
-tests/unit/modules/groups/providers/conftest.py  # Level 3: Feature fixtures
+tests/unit/modules/<module>/<feature>/conftest.py  # Level 3: Feature-level fixtures
+    ↓
+tests/unit/infrastructure/<component>/conftest.py  # Level 3+: Component-level fixtures
 ```
 
-### Level 1: Root `tests/conftest.py`
-
-Global fixtures available to all tests:
-
-```python
-# tests/conftest.py
-import sys
-from pathlib import Path
-import pytest
-
-# Ensure app is importable
-project_root = "/workspace/app"
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-
-@pytest.fixture
-def google_group_factory():
-    """Factory for creating Google Group test data."""
-    from tests.factories.google import make_google_groups
-    
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        return make_google_groups(n=n, prefix=prefix, domain=domain, as_model=as_model)
-    
-    return _factory
-
-
-@pytest.fixture
-def google_user_factory():
-    """Factory for creating Google User test data."""
-    from tests.factories.google import make_google_users
-    
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        return make_google_users(n=n, prefix=prefix, domain=domain, as_model=as_model)
-    
-    return _factory
-
-
-@pytest.fixture
-def google_member_factory():
-    """Factory for creating Google Member test data."""
-    from tests.factories.google import make_google_members
-    
-    def _factory(n=3, prefix="", domain="test.com", as_model=False):
-        return make_google_members(n=n, prefix=prefix, domain=domain, as_model=as_model)
-    
-    return _factory
-
-
-@pytest.fixture
-def aws_user_factory():
-    """Factory for creating AWS Identity Store user test data."""
-    from tests.factories.aws import make_aws_users
-    
-    def _factory(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
-        return make_aws_users(n=n, prefix=prefix, domain=domain, store_id=store_id)
-    
-    return _factory
-
-
-@pytest.fixture
-def aws_group_factory():
-    """Factory for creating AWS Identity Store group test data."""
-    from tests.factories.aws import make_aws_groups
-    
-    def _factory(n=3, prefix="", store_id="d-123412341234"):
-        return make_aws_groups(n=n, prefix=prefix, store_id=store_id)
-    
-    return _factory
-
-
-@pytest.fixture
-def fake_aws_client():
-    """Factory for creating FakeClient instances for AWS SDK mocking."""
-    from tests.fixtures.aws_clients import FakeClient
-    
-    def _factory(paginated_pages=None, api_responses=None, can_paginate=None):
-        return FakeClient(
-            paginated_pages=paginated_pages,
-            api_responses=api_responses,
-            can_paginate=can_paginate
-        )
-    
-    return _factory
-
-
-@pytest.fixture
-def fake_google_service():
-    """Factory for creating FakeGoogleService instances."""
-    from tests.fixtures.google_clients import FakeGoogleService
-    
-    def _factory(api_responses=None, paginated_pages=None):
-        return FakeGoogleService(
-            api_responses=api_responses,
-            paginated_pages=paginated_pages
-        )
-    
-    return _factory
-
-
-@pytest.fixture(scope="session")
-def test_data_dir():
-    """Path to test data directory."""
-    return Path(__file__).parent / "testdata"
-```
-
-**Scope Guidelines:**
-
+**Fixture Scope Conventions:**
 - `function` (default): New instance per test - use for mutable state
-- `class`: Shared across test class - use for test class setup
-- `module`: Shared across test file - use for expensive immutable setup
-- `session`: Shared across test run - use for static data, config files
+- `module`: Shared across test file - use for expensive setup or immutable data
+- `session`: Shared across entire test run - use for static configuration only
+- `autouse`: Applied automatically to all tests in scope - use sparingly, document clearly
 
-### Level 2: Module `tests/unit/modules/groups/conftest.py`
+### Level 1: Global Fixtures - `tests/conftest.py`
 
-Module-specific fixtures for groups functionality:
+Root-level fixtures available to all tests (530 lines).
+
+**Session Setup & Mocking:**
+- `pytest_configure()` - Mocks Slack App before imports to prevent auth errors during collection
+- `suppress_structlog_output` (autouse) - Suppresses application logging during tests for clean output
+
+**Provider & Registry Management:**
+- `reset_provider_registries` - Resets provider registries between tests (non-autouse, use as needed)
+
+**Test Data Factories:**
+- `google_group_factory()`, `google_user_factory()`, `google_member_factory()` - Google Workspace test data
+- `aws_user_factory()`, `aws_group_factory()` - AWS Identity Center test data
+- `argument_factory()`, `command_factory()`, `command_context_factory()`, `command_registry_factory()` - Command framework test data
+
+**Provider Configuration:**
+- `mock_provider_config()` - Base factory for provider configuration dictionaries
+- `single_provider_config()` - Single primary provider configuration
+- `multi_provider_config()` - Multiple providers (Google primary, AWS secondary)
+- `disabled_provider_config()` - Mixed enabled/disabled provider setup
+
+**Legacy Fixtures (backward compatibility):**
+- `google_groups()`, `google_users()`, `google_group_members()`, `google_groups_w_users()`
+- `aws_users()`, `aws_groups()`, `aws_groups_w_users_with_legacy()`
+
+Use factories instead of legacy fixtures for new tests.
+
+### Level 2: Module Fixtures
+
+Each module has its own conftest at `tests/unit/modules/<module>/conftest.py` containing:
+
+**Module `groups` - `/tests/unit/modules/groups/conftest.py`**
+- Mock provider implementations: `MockPrimaryGroupProvider`, `MockGroupProvider`
+- Settings mocks: `mock_settings_groups`, `mock_settings_groups_disabled_cb`
+- Domain model factories: `normalized_member_factory()`, `normalized_group_factory()`, `operation_result_factory()`
+- Provider registry fixtures: `mock_providers_registry`, `mock_primary_provider()`, `mock_secondary_provider()`
+
+**Module `sre` - `tests/unit/modules/sre/conftest.py`**
+- Slack mocks: `mock_respond()`, `mock_client()`, `mock_body()`
+
+### Level 3: Feature/Component Fixtures
+
+Features within modules have their own conftest at `tests/unit/modules/<module>/<feature>/conftest.py` or `tests/unit/infrastructure/<component>/conftest.py`:
+
+**Providers Feature - `tests/unit/modules/groups/providers/conftest.py`**
+- Mock API clients: `mock_google_directory_client()`, `mock_identity_store_client()`
+- Sample test data: `sample_google_group_data()`, `sample_google_member_data()`, `sample_aws_group_data()`, `sample_aws_member_data()`
+- Capability/result factories: `provider_capabilities_factory()`, `operation_result_factory()`
+- Mock provider classes: `mock_primary_class()`, `mock_secondary_class()`
+
+**Commands - `tests/unit/infrastructure/commands/conftest.py`**
+- Context factory: `command_context_factory()`
+- Mock functions: `mock_translator()`, `mock_response_channel()`, `mock_slack_client()`, `mock_slack_respond()`, `mock_slack_ack()`
+- Parser: `command_parser`
+- Sample data: `slack_command_payload`
+
+**Slack Provider - `tests/unit/infrastructure/commands/providers/conftest.py`**
+- `mock_slack_settings` (autouse) - Enables SlackCommandProvider instantiation without credentials
+
+**i18n - `tests/unit/infrastructure/i18n/conftest.py`**
+- Internationalization-specific fixtures for loader, models, resolvers, and translator testing
 
 ```python
 # tests/unit/modules/groups/conftest.py
@@ -433,160 +483,6 @@ def multi_provider_config(mock_provider_config):
     return {**google_cfg, **aws_cfg}
 ```
 
-### Level 3: Feature `tests/unit/modules/groups/providers/conftest.py`
-
-Feature-specific fixtures for provider tests:
-
-```python
-# tests/unit/modules/groups/providers/conftest.py
-import importlib
-import types
-from unittest.mock import MagicMock
-import pytest
-
-
-@pytest.fixture
-def safe_providers_import(monkeypatch):
-    """Safely import modules.groups.providers for testing.
-    
-    Blocks submodule imports and provides empty settings during import
-    to avoid module-level registration and validation failures.
-    
-    Returns the imported providers module with deferred registration.
-    
-    Usage:
-        def test_provider(safe_providers_import):
-            providers = safe_providers_import
-            # Import provider submodules safely
-            import modules.groups.providers.google_workspace
-    """
-    import core.config as core_config
-    from pathlib import Path
-    from importlib import util
-    from types import ModuleType
-    import sys
-    
-    original_import = importlib.import_module
-    
-    def _stub_import(name, package=None):
-        if (
-            name.startswith("modules.groups.providers.")
-            and name != "modules.groups.providers"
-        ):
-            raise ImportError("submodule imports stubbed in tests")
-        return original_import(name, package)
-    
-    monkeypatch.setattr(importlib, "import_module", _stub_import)
-    
-    # Empty settings during import
-    monkeypatch.setattr(
-        core_config.settings,
-        "groups",
-        types.SimpleNamespace(
-            providers={},
-            circuit_breaker_enabled=True,
-            circuit_breaker_failure_threshold=5,
-            circuit_breaker_timeout_seconds=60,
-            circuit_breaker_half_open_max_calls=3,
-        ),
-        raising=False,
-    )
-    
-    # Clean import
-    sys.modules.pop("modules.groups.providers", None)
-    
-    project_root = Path(__file__).resolve().parents[4]
-    providers_init = project_root / "modules" / "groups" / "providers" / "__init__.py"
-    
-    # Lightweight package modules
-    if "modules" not in sys.modules:
-        pkg = ModuleType("modules")
-        pkg.__path__ = [str(project_root / "modules")]
-        sys.modules["modules"] = pkg
-    
-    if "modules.groups" not in sys.modules:
-        grp_pkg = ModuleType("modules.groups")
-        grp_pkg.__path__ = [str(project_root / "modules" / "groups")]
-        sys.modules["modules.groups"] = grp_pkg
-    
-    spec = util.spec_from_file_location("modules.groups.providers", str(providers_init))
-    mod = util.module_from_spec(spec)
-    sys.modules["modules.groups.providers"] = mod
-    spec.loader.exec_module(mod)
-    
-    # Deferred registration
-    orig_register = getattr(mod, "register_provider")
-    mod._deferred_registry = {}
-    
-    def _deferred_register(name: str):
-        def _decorator(obj):
-            mod._deferred_registry[name] = obj
-            try:
-                orig_register(name)(obj)
-            except Exception:
-                raise
-            return obj
-        return _decorator
-    
-    def _apply_deferred_registrations() -> None:
-        for name, obj in list(mod._deferred_registry.items()):
-            try:
-                orig_register(name)(obj)
-            finally:
-                mod._deferred_registry.pop(name, None)
-    
-    monkeypatch.setattr(mod, "register_provider", _deferred_register, raising=True)
-    monkeypatch.setattr(
-        mod, "register_deferred_providers", _apply_deferred_registrations, raising=False
-    )
-    
-    # Restore import
-    monkeypatch.setattr(importlib, "import_module", original_import)
-    
-    return mod
-
-
-@pytest.fixture
-def mock_integration_client():
-    """Mock integration client for provider tests.
-    
-    Pre-configured with common method stubs.
-    
-    Usage:
-        def test_provider(mock_integration_client):
-            provider.integration = mock_integration_client
-            mock_integration_client.list_groups.return_value = [...]
-    """
-    from modules.groups.providers.base import OperationResult
-    
-    client = MagicMock()
-    client.list_groups.return_value = OperationResult.success(data=[])
-    client.get_group.return_value = OperationResult.success(data={})
-    client.add_group_member.return_value = OperationResult.success(data={})
-    client.remove_group_member.return_value = OperationResult.success(data={})
-    client.list_group_members.return_value = OperationResult.success(data=[])
-    
-    return client
-
-
-@pytest.fixture
-def patch_provider_base_settings(monkeypatch, mock_settings_groups):
-    """Patch settings import in provider base module.
-    
-    Simplifies provider instantiation in tests by avoiding circuit breaker setup.
-    
-    Usage:
-        def test_provider(patch_provider_base_settings):
-            # Settings already patched
-            provider = GoogleWorkspaceProvider()
-    """
-    monkeypatch.setattr(
-        "modules.groups.providers.base.settings",
-        mock_settings_groups,
-        raising=False
-    )
-```
-
 ## Factory Pattern
 
 ### Factory Implementation
@@ -704,6 +600,41 @@ def make_google_members(n=3, prefix="", domain="test.com", as_model=False):
     
     return members if as_model else [m.model_dump() for m in members]
 ```
+
+## Integration Test Fixtures
+
+### Root Integration `tests/integration/conftest.py`
+
+Integration-level fixtures for system boundary mocking (332 lines). Location: `/workspace/app/tests/integration/conftest.py`
+
+**Orchestration Layer Mocks:**
+- `mock_orchestration` - Configurable mock orchestration layer for add/remove member operations with default success responses
+
+**Event System Mocks:**
+- `mock_event_dispatch` - Captures dispatched events for verification
+- `mock_event_system` - Complete event system mock
+- `captured_events` - Fixture for accessing captured events during tests
+
+**Sentinel Client Mocks:**
+- `mock_sentinel_client` - Mocks sentinel client to prevent external calls
+
+**Validation Layer Mocks:**
+- Mock validators for common validation scenarios
+
+### Module Integration `tests/integration/modules/groups/conftest.py`
+
+Module-level integration fixtures for groups (not examined, presumed to contain):
+- Group operation request/response data
+- Service-level mocks
+- Provider integration setup
+- Event capture for groups operations
+
+### Module Integration `tests/integration/modules/sre/conftest.py`
+
+Module-level integration fixtures for SRE:
+- `mock_respond` - Mock Slack respond function
+- `mock_ack` - Mock Slack ack function
+- `mock_client` - Mock Slack client
 
 ### Factory Usage Patterns
 
@@ -1238,8 +1169,43 @@ def test_map_provider_group_id(provider, group_id, expected):
 This testing strategy provides a foundation for maintainable, readable tests that follow industry best practices while being tailored to the SRE Bot codebase structure.
 
 
-## Migration Strategy
+## Testing Best Practices
 
-Legacy tests should be maintained during the transition to the new structure. New tests should adhere to the guidelines outlined above. Gradually refactor legacy tests to align with the new patterns as they are updated for new features or bug fixes.
+### When to Create New Tests
 
-First candidate for new tests is the groups module. All legacy tests are candidates for migration to the new structure and patterns without exception.
+- **Unit tests** (`@pytest.mark.unit`): When testing individual functions/classes in isolation with mocks
+- **Integration tests** (`@pytest.mark.integration`): When testing interactions between components or with stubbed services
+- Place tests in appropriate module under `tests/unit/` or `tests/integration/` following existing structure
+
+### Fixture Naming & Organization
+
+- Fixture names should be descriptive: `mock_primary_provider`, `google_groups_factory`, `command_context_factory`
+- Autouse fixtures should be minimal and well-documented; prefer explicit fixture injection
+- Group related fixtures at appropriate levels (root for global, module for domain-specific)
+- Avoid fixture duplication across levels; inherit from parent conftest when possible
+
+### Mocking Strategy
+
+- Mock at system boundaries (integration layers, external services)
+- Prefer explicit mocking via `monkeypatch` over import-time patching
+- Use `@unittest.mock.patch` for third-party library mocking
+- Create reusable mock factories for complex objects
+
+### Test Data & Factories
+
+- Use factories from `tests/factories/` for creating test data
+- Keep factory functions pure and deterministic
+- Parameterize factories for flexibility
+- Maintain test data in factories, not in conftest files
+
+### Assertion Patterns
+
+```python
+# Good: Descriptive with context
+assert result.success is True, f"Expected success, got: {result}"
+assert len(members) == expected_count, "Incorrect member count"
+
+# Less helpful
+assert result == True
+assert len(members) == 3
+```

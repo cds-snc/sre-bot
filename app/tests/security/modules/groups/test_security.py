@@ -6,7 +6,7 @@ the application is protected against common attack vectors.
 
 import pytest
 from pydantic import ValidationError
-from modules.groups.schemas import AddMemberRequest
+from modules.groups.api.schemas import AddMemberRequest
 
 
 class TestInputValidation:
@@ -30,6 +30,7 @@ class TestInputValidation:
                     provider="google",
                     group_id="group-123",
                     member_email=invalid_email,
+                    justification="Testing schema validation",
                 )
 
     def test_email_validation_accepts_valid_emails(self):
@@ -46,6 +47,7 @@ class TestInputValidation:
                 provider="google",
                 group_id="group-123",
                 member_email=valid_email,
+                justification="Test user joining the team for security testing",
             )
             assert request.member_email == valid_email
 
@@ -56,6 +58,7 @@ class TestInputValidation:
                 provider="google",
                 group_id="",
                 member_email="user@example.com",
+                justification="Test user joining the team for security testing",
             )
 
     def test_group_id_validation_requires_non_empty(self):
@@ -65,6 +68,7 @@ class TestInputValidation:
                 provider="google",
                 group_id=None,
                 member_email="user@example.com",
+                justification="Test user joining the team for security testing",
             )
 
     def test_provider_validation_rejects_invalid_providers(self):
@@ -84,6 +88,7 @@ class TestInputValidation:
                     provider=invalid_provider,
                     group_id="group-123",
                     member_email="user@example.com",
+                    justification="Testing schema validation",
                 )
 
     def test_provider_validation_accepts_valid_providers(self):
@@ -95,6 +100,7 @@ class TestInputValidation:
                 provider=valid_provider,
                 group_id="group-123",
                 member_email="user@example.com",
+                justification="Test user joining the team for security testing",
             )
             assert request.provider.value == valid_provider
 
@@ -140,6 +146,7 @@ class TestSQLInjectionPrevention:
                 provider="google",
                 group_id=payload,
                 member_email="user@example.com",
+                justification="Testing SQL injection prevention",
             )
             # Should be treated as literal value, not executed
             assert request.group_id == payload
@@ -153,6 +160,7 @@ class TestSQLInjectionPrevention:
                 provider="google",
                 group_id="group-123",
                 member_email=sql_injection_email,
+                justification="Testing SQL injection prevention",
             )
 
     def test_justification_with_sql_injection_payload(self):
@@ -186,6 +194,7 @@ class TestXSSPrevention:
                 provider="google",
                 group_id=payload,
                 member_email="user@example.com",
+                justification="Testing XSS prevention",
             )
             # Should be treated as literal value, not executed
             assert request.group_id == payload
@@ -200,6 +209,7 @@ class TestXSSPrevention:
                 group_id="group-123",
                 member_email="user@example.com",
                 requestor=xss_email,
+                justification="Testing schema validation",
             )
 
 
@@ -221,6 +231,7 @@ class TestCommandInjectionPrevention:
                 provider="google",
                 group_id=payload,
                 member_email="user@example.com",
+                justification="Testing schema validation",
             )
             # Should be treated as literal value, not executed
             assert request.group_id == payload
@@ -239,6 +250,7 @@ class TestTypeValidation:
                     provider=invalid_type,
                     group_id="group-123",
                     member_email="user@example.com",
+                    justification="Testing schema validation",
                 )
 
     def test_group_id_must_be_string(self):
@@ -251,6 +263,7 @@ class TestTypeValidation:
                     provider="google",
                     group_id=invalid_type,
                     member_email="user@example.com",
+                    justification="Testing schema validation",
                 )
 
     def test_member_email_must_be_string_or_emailstr(self):
@@ -263,6 +276,7 @@ class TestTypeValidation:
                     provider="google",
                     group_id="group-123",
                     member_email=invalid_type,
+                    justification="Testing schema validation",
                 )
 
 
@@ -277,6 +291,7 @@ class TestSchemaStrictness:
             member_email="user@example.com",
             extra_field="should_be_ignored",
             another_field="also_ignored",
+            justification="Testing schema validation",
         )
         # Should succeed without error
         assert request.group_id == "group-123"
@@ -305,8 +320,9 @@ class TestSchemaStrictness:
             provider="google",
             group_id="group-123",
             member_email="user@example.com",
+            justification="Testing schema validation",
         )
         # Optional fields should have default values
-        assert request.justification is None
+        assert request.metadata is None
         assert request.requestor is None
         assert request.metadata is None

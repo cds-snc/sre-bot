@@ -11,6 +11,7 @@ Integration tests mock at system boundaries to test component interaction
 without testing the mocked components themselves.
 """
 
+import types
 import pytest
 from unittest.mock import MagicMock
 from typing import Any, Dict, List
@@ -22,106 +23,31 @@ from typing import Any, Dict, List
 
 
 @pytest.fixture
-def mock_orchestration_success(monkeypatch):
-    """Mock orchestration layer to return success.
+def mock_orchestration(monkeypatch):
+    """Configurable mock orchestration layer for integration tests.
 
-    Mocks the orchestration module so integration tests can verify
-    service layer coordination without testing orchestration itself.
+    Can be configured for success, failure, or partial failure scenarios.
+    Tests can override behavior by setting return_value or side_effect.
+
+    Usage:
+        def test_something(mock_orchestration):
+            mock_orchestration.return_value = {"status": "success"}
 
     Returns:
-        MagicMock: Mock orchestration function with success responses
+        MagicMock: Configurable mock orchestration function
     """
-    mock = MagicMock()
-    mock.return_value = {
+    # Default: success response
+    add_mock = MagicMock()
+    add_mock.return_value = {
         "success": True,
         "status": "success",
         "provider": "google",
         "data": {"operation_id": "op-123", "timestamp": "2025-11-04T10:00:00Z"},
     }
 
-    monkeypatch.setattr(
-        "modules.groups.core.orchestration.add_member_to_group",
-        mock,
-        raising=False,
-    )
-
-    return mock
-
-
-@pytest.fixture
-def mock_orchestration_failure(monkeypatch):
-    """Mock orchestration layer to return failure.
-
-    Useful for testing error handling and retry logic in service layer.
-
-    Returns:
-        MagicMock: Mock orchestration function with failure responses
-    """
-    mock = MagicMock()
-    mock.return_value = {
-        "status": "error",
-        "provider": "google",
-        "error": "orchestration_failed",
-        "message": "Failed to add member to group",
-    }
-
-    monkeypatch.setattr(
-        "modules.groups.core.orchestration.add_member_to_group",
-        mock,
-        raising=False,
-    )
-
-    return mock
-
-
-@pytest.fixture
-def mock_orchestration_partial_failure(monkeypatch):
-    """Mock orchestration layer with side effects for partial success.
-
-    Used for testing bulk operations with some successes and some failures.
-
-    Returns:
-        MagicMock: Mock orchestration with configurable side effects
-    """
-    mock = MagicMock()
-
-    # Default: can be overridden with side_effect
-    mock.side_effect = [
-        {
-            "status": "success",
-            "provider": "google",
-            "data": {"operation_id": "op-1"},
-        },
-        {
-            "status": "error",
-            "provider": "google",
-            "error": "member_already_exists",
-        },
-        {
-            "status": "success",
-            "provider": "google",
-            "data": {"operation_id": "op-3"},
-        },
-    ]
-
-    monkeypatch.setattr(
-        "modules.groups.core.orchestration.add_member_to_group",
-        mock,
-        raising=False,
-    )
-
-    return mock
-
-
-@pytest.fixture
-def mock_orchestration_remove_member(monkeypatch):
-    """Mock orchestration for remove_member operations.
-
-    Returns:
-        MagicMock: Mock orchestration for removal operations
-    """
-    mock = MagicMock()
-    mock.return_value = {
+    # Remove member mock
+    remove_mock = MagicMock()
+    remove_mock.return_value = {
         "success": True,
         "status": "success",
         "provider": "google",
@@ -129,12 +55,21 @@ def mock_orchestration_remove_member(monkeypatch):
     }
 
     monkeypatch.setattr(
+        "modules.groups.core.orchestration.add_member_to_group",
+        add_mock,
+        raising=False,
+    )
+    monkeypatch.setattr(
         "modules.groups.core.orchestration.remove_member_from_group",
-        mock,
+        remove_mock,
         raising=False,
     )
 
-    return mock
+    # Return both mocks as a namespace for easy access
+    return types.SimpleNamespace(
+        add_member=add_mock,
+        remove_member=remove_mock,
+    )
 
 
 # ============================================================================
@@ -304,14 +239,14 @@ def isolated_group_service():
 
 @pytest.fixture
 def integration_test_context(
-    mock_orchestration_success,
+    mock_orchestration,
     mock_event_dispatch,
     mock_validation_success,
 ):
     """Integration test context with all standard mocks.
 
     Provides a complete context for integration testing with:
-    - Orchestration success
+    - Orchestration success (add_member and remove_member)
     - Event capture
     - Validation success
 
@@ -321,10 +256,70 @@ def integration_test_context(
         Dict: Contains all configured mocks
     """
     return {
-        "orchestration": mock_orchestration_success,
+        "orchestration": mock_orchestration.add_member,
         "events": mock_event_dispatch,
         "validation": mock_validation_success,
     }
+    return {
+        "orchestration": mock_orchestration.add_member,
+        "events": mock_event_dispatch,
+        "validation": mock_validation_success,
+    }
+
+
+# ============================================================================
+# Backward Compatibility: Old Fixture Names -> New Fixture
+# ============================================================================
+# These fixtures maintain backward compatibility with tests that use
+# the old fixture names. They delegate to the new mock_orchestration fixture.
+
+
+@pytest.fixture
+def mock_orchestration_success(mock_orchestration):
+    """Backward compatibility: old fixture name for add_member mock."""
+    return mock_orchestration.add_member
+
+
+@pytest.fixture
+def mock_orchestration_remove_member(mock_orchestration):
+    """Backward compatibility: old fixture name for remove_member mock."""
+    return mock_orchestration.remove_member
+
+
+@pytest.fixture
+def mock_orchestration_failure(mock_orchestration):
+    """Backward compatibility: old fixture name for failure scenario."""
+    failure_response = {
+        "status": "error",
+        "provider": "google",
+        "error": "orchestration_failed",
+        "message": "Failed to add member to group",
+    }
+    mock_orchestration.add_member.return_value = failure_response
+    return mock_orchestration.add_member
+
+
+@pytest.fixture
+def mock_orchestration_partial_failure(mock_orchestration):
+    """Backward compatibility: old fixture name for partial failure scenario."""
+    mock_orchestration.add_member.side_effect = [
+        {
+            "status": "success",
+            "provider": "google",
+            "data": {"operation_id": "op-1"},
+        },
+        {
+            "status": "error",
+            "provider": "google",
+            "error": "member_already_exists",
+        },
+        {
+            "status": "success",
+            "provider": "google",
+            "data": {"operation_id": "op-3"},
+        },
+    ]
+    return mock_orchestration.add_member
 
 
 # ============================================================================

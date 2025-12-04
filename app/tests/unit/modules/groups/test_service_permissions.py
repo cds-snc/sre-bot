@@ -9,13 +9,66 @@ Tests cover:
 - Exception handling and error cases
 """
 
+import uuid
 import pytest
 from unittest.mock import patch
 
 from modules.groups.core import service
 from modules.groups.api import schemas
 from modules.groups.infrastructure import validation
+from modules.groups.infrastructure import idempotency
 from infrastructure.operations import OperationResult, OperationStatus
+
+
+@pytest.fixture(autouse=True)
+def clear_idempotency_cache():
+    """Clear idempotency cache before each test to prevent interference.
+
+    The idempotency cache is global and can cause tests to reuse cached responses
+    from previous tests if they use the same idempotency key. This fixture ensures
+    a clean cache state for each test.
+    """
+    yield
+    idempotency._IDEMPOTENCY_CACHE.clear()
+
+
+@pytest.fixture
+def unique_request_factory():
+    """Factory for creating requests with unique idempotency keys.
+
+    Returns a dict with factory functions for creating AddMemberRequest and
+    RemoveMemberRequest instances with unique idempotency keys to prevent
+    cache collisions between tests.
+    """
+
+    def make_add_member_request():
+        """Create unique AddMemberRequest."""
+        unique_suffix = uuid.uuid4().hex[:8]
+        return schemas.AddMemberRequest(
+            group_id="test-group",
+            member_email="newmember@example.com",
+            provider=schemas.ProviderType.GOOGLE,
+            justification="Adding new hire",
+            requestor="manager@example.com",
+            idempotency_key=f"add_{unique_suffix}",
+        )
+
+    def make_remove_member_request():
+        """Create unique RemoveMemberRequest."""
+        unique_suffix = uuid.uuid4().hex[:8]
+        return schemas.RemoveMemberRequest(
+            group_id="test-group",
+            member_email="tomove@example.com",
+            provider=schemas.ProviderType.GOOGLE,
+            justification="Removing from team",
+            requestor="manager@example.com",
+            idempotency_key=f"remove_{unique_suffix}",
+        )
+
+    return {
+        "add_member": make_add_member_request,
+        "remove_member": make_remove_member_request,
+    }
 
 
 class TestCheckUserIsManager:
@@ -157,26 +210,14 @@ class TestCheckUserIsManager:
                 )
 
 
-@pytest.mark.skip(
-    reason="Idempotency cache interferes with test isolation - same key used across tests"
-)
 class TestAddMemberPermissionEnforcement:
     """Tests for permission enforcement in add_member."""
 
-    @pytest.fixture
-    def valid_request(self):
-        """Valid add_member request."""
-        return schemas.AddMemberRequest(
-            group_id="test-group",
-            member_email="newmember@example.com",
-            provider=schemas.ProviderType.GOOGLE,
-            justification="Adding new hire",
-            requestor="manager@example.com",
-            idempotency_key="key1",
-        )
-
-    def test_add_member_succeeds_when_manager(self, monkeypatch, valid_request):
+    def test_add_member_succeeds_when_manager(
+        self, monkeypatch, unique_request_factory
+    ):
         """add_member succeeds when requestor is manager."""
+        valid_request = unique_request_factory["add_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             return_value=True,
@@ -190,24 +231,25 @@ class TestAddMemberPermissionEnforcement:
                 },
             ):
                 with patch("modules.groups.core.service.write_audit_entry"):
-                    with patch(
-                        "modules.groups.events.event_system.dispatch_background"
-                    ):
+                    with patch("modules.groups.events.system.dispatch_background"):
                         with patch(
-                            "modules.groups.core.idempotency.get_cached_response",
+                            "modules.groups.infrastructure.idempotency.get_cached_response",
                             return_value=None,
                         ):
                             result = service.add_member(valid_request)
                             assert result.success is True
 
-    def test_add_member_fails_when_not_manager(self, monkeypatch, valid_request):
+    def test_add_member_fails_when_not_manager(
+        self, monkeypatch, unique_request_factory
+    ):
         """add_member raises ValidationError when requestor is not manager."""
+        valid_request = unique_request_factory["add_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             return_value=False,
         ):
             with patch(
-                "modules.groups.core.idempotency.get_cached_response",
+                "modules.groups.infrastructure.idempotency.get_cached_response",
                 return_value=None,
             ):
                 with pytest.raises(
@@ -217,24 +259,26 @@ class TestAddMemberPermissionEnforcement:
                     service.add_member(valid_request)
 
     def test_add_member_fails_on_permission_check_error(
-        self, monkeypatch, valid_request
+        self, monkeypatch, unique_request_factory
     ):
         """add_member raises when permission check encounters error."""
+        valid_request = unique_request_factory["add_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             side_effect=ValueError("Permission check error"),
         ):
             with patch(
-                "modules.groups.core.idempotency.get_cached_response",
+                "modules.groups.infrastructure.idempotency.get_cached_response",
                 return_value=None,
             ):
-                with pytest.raises(validation.ValidationError):
+                with pytest.raises(ValueError):
                     service.add_member(valid_request)
 
     def test_add_member_calls_permission_check_before_orchestration(
-        self, monkeypatch, valid_request
+        self, monkeypatch, unique_request_factory
     ):
         """Permission check is called before orchestration."""
+        valid_request = unique_request_factory["add_member"]()
         call_order = []
 
         def mock_check(*args, **kwargs):
@@ -258,40 +302,26 @@ class TestAddMemberPermissionEnforcement:
                 side_effect=mock_orchestration,
             ):
                 with patch("modules.groups.core.service.write_audit_entry"):
-                    with patch(
-                        "modules.groups.events.event_system.dispatch_background"
-                    ):
+                    with patch("modules.groups.events.system.dispatch_background"):
                         with patch(
-                            "modules.groups.core.idempotency.get_cached_response",
+                            "modules.groups.infrastructure.idempotency.get_cached_response",
                             return_value=None,
                         ):
                             with patch(
-                                "modules.groups.core.idempotency.cache_response"
+                                "modules.groups.infrastructure.idempotency.cache_response"
                             ):
                                 service.add_member(valid_request)
                                 assert call_order == ["check", "orchestration"]
 
 
-@pytest.mark.skip(
-    reason="Idempotency cache interferes with test isolation - same key used across tests"
-)
 class TestRemoveMemberPermissionEnforcement:
     """Tests for permission enforcement in remove_member."""
 
-    @pytest.fixture
-    def valid_request(self):
-        """Valid remove_member request."""
-        return schemas.RemoveMemberRequest(
-            group_id="test-group",
-            member_email="tomove@example.com",
-            provider=schemas.ProviderType.GOOGLE,
-            justification="Removing from team",
-            requestor="manager@example.com",
-            idempotency_key="key2",
-        )
-
-    def test_remove_member_succeeds_when_manager(self, monkeypatch, valid_request):
+    def test_remove_member_succeeds_when_manager(
+        self, monkeypatch, unique_request_factory
+    ):
         """remove_member succeeds when requestor is manager."""
+        valid_request = unique_request_factory["remove_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             return_value=True,
@@ -305,24 +335,25 @@ class TestRemoveMemberPermissionEnforcement:
                 },
             ):
                 with patch("modules.groups.core.service.write_audit_entry"):
-                    with patch(
-                        "modules.groups.events.event_system.dispatch_background"
-                    ):
+                    with patch("modules.groups.events.system.dispatch_background"):
                         with patch(
-                            "modules.groups.core.idempotency.get_cached_response",
+                            "modules.groups.infrastructure.idempotency.get_cached_response",
                             return_value=None,
                         ):
                             result = service.remove_member(valid_request)
                             assert result.success is True
 
-    def test_remove_member_fails_when_not_manager(self, monkeypatch, valid_request):
+    def test_remove_member_fails_when_not_manager(
+        self, monkeypatch, unique_request_factory
+    ):
         """remove_member raises ValidationError when requestor is not manager."""
+        valid_request = unique_request_factory["remove_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             return_value=False,
         ):
             with patch(
-                "modules.groups.core.idempotency.get_cached_response",
+                "modules.groups.infrastructure.idempotency.get_cached_response",
                 return_value=None,
             ):
                 with pytest.raises(
@@ -332,24 +363,26 @@ class TestRemoveMemberPermissionEnforcement:
                     service.remove_member(valid_request)
 
     def test_remove_member_fails_on_permission_check_error(
-        self, monkeypatch, valid_request
+        self, monkeypatch, unique_request_factory
     ):
         """remove_member raises when permission check encounters error."""
+        valid_request = unique_request_factory["remove_member"]()
         with patch(
             "modules.groups.core.service._check_user_is_manager",
             side_effect=ValueError("Permission check error"),
         ):
             with patch(
-                "modules.groups.core.idempotency.get_cached_response",
+                "modules.groups.infrastructure.idempotency.get_cached_response",
                 return_value=None,
             ):
-                with pytest.raises(validation.ValidationError):
+                with pytest.raises(ValueError):
                     service.remove_member(valid_request)
 
     def test_remove_member_calls_permission_check_before_orchestration(
-        self, monkeypatch, valid_request
+        self, monkeypatch, unique_request_factory
     ):
         """Permission check is called before orchestration."""
+        valid_request = unique_request_factory["remove_member"]()
         call_order = []
 
         def mock_check(*args, **kwargs):
@@ -373,15 +406,13 @@ class TestRemoveMemberPermissionEnforcement:
                 side_effect=mock_orchestration,
             ):
                 with patch("modules.groups.core.service.write_audit_entry"):
-                    with patch(
-                        "modules.groups.events.event_system.dispatch_background"
-                    ):
+                    with patch("modules.groups.events.system.dispatch_background"):
                         with patch(
-                            "modules.groups.core.idempotency.get_cached_response",
+                            "modules.groups.infrastructure.idempotency.get_cached_response",
                             return_value=None,
                         ):
                             with patch(
-                                "modules.groups.core.idempotency.cache_response"
+                                "modules.groups.infrastructure.idempotency.cache_response"
                             ):
                                 service.remove_member(valid_request)
                                 assert call_order == ["check", "orchestration"]

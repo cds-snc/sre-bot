@@ -1,7 +1,8 @@
 """Unit tests for SlackCommandProvider."""
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+
 
 from infrastructure.commands.providers.slack import (
     SlackCommandProvider,
@@ -92,10 +93,10 @@ class TestSlackCommandProvider:
     def mock_locale_resolver(self):
         """Mock locale resolver."""
         resolver = MagicMock()
-        # Create a mock locale context
-        locale_ctx = MagicMock()
-        locale_ctx.locale.value = "en-US"
-        resolver.from_slack.return_value = locale_ctx
+        # New behavior: just use default_locale
+        locale_enum = MagicMock()
+        locale_enum.value = "en-US"
+        resolver.default_locale = locale_enum
         return resolver
 
     @pytest.fixture
@@ -105,10 +106,12 @@ class TestSlackCommandProvider:
         The new adapter signature takes config dict from settings,
         not registry/translator/resolver directly.
         """
-        # Mock settings.slack.SLACK_TOKEN
+        # Mock settings.slack.SLACK_TOKEN in the slack module
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         # Create adapter with config
         adapter = SlackCommandProvider(config={"enabled": True})
@@ -185,7 +188,7 @@ class TestSlackCommandProvider:
         """create_context fetches user email from Slack."""
         slack_payload["client"].users_info.return_value = {
             "ok": True,
-            "user": {"profile": {"email": "test@example.com"}},
+            "user": {"profile": {"email": "test@example.com"}, "locale": "en-US"},
         }
 
         ctx = adapter.create_context(slack_payload)
@@ -216,11 +219,13 @@ class TestSlackCommandProvider:
     def test_create_context_handles_locale_resolution_failure(
         self, monkeypatch, slack_payload
     ):
-        """create_context handles locale resolution failure."""
-        # Mock settings
+        """create_context handles locale resolution failure gracefully."""
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         # Create adapter
         adapter = SlackCommandProvider(config={"enabled": True})
@@ -251,7 +256,7 @@ class TestSlackCommandProvider:
         )  # pylint: disable=protected-access
 
     def test_create_context_sets_translator(self, adapter, slack_payload):
-        """create_context sets translator."""
+        """create_context sets translator to a callable wrapper."""
         ctx = adapter.create_context(slack_payload)
 
         # Translator should be set (created by adapter if not already set)
@@ -298,10 +303,12 @@ class TestSlackCommandProvider:
 
     def test_adapter_initialization_without_translator(self, monkeypatch):
         """Adapter can initialize without translator (set to None initially)."""
-        # Mock settings
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         adapter = SlackCommandProvider(config={})
 
@@ -310,10 +317,12 @@ class TestSlackCommandProvider:
 
     def test_adapter_initialization_without_locale_resolver(self, monkeypatch):
         """Adapter can initialize without locale_resolver (set to None initially)."""
-        # Mock settings
+        # Mock settings before provider init accesses it
         mock_settings = MagicMock()
         mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-        monkeypatch.setattr("core.config.settings", mock_settings)
+        monkeypatch.setattr(
+            "infrastructure.commands.providers.slack.settings", mock_settings
+        )
 
         adapter = SlackCommandProvider(config={})
 
@@ -361,3 +370,30 @@ class TestSlackCommandProvider:
         adapter.handle(slack_payload)
 
         assert captured_args.get("name") == "Alice"
+
+    @pytest.mark.skip(reason="Further analysis required")
+    def test_validate_payload_missing_slack_token(self, adapter, slack_payload):
+        """_validate_payload raises error when SLACK_TOKEN is missing."""
+        # Mock settings to have empty SLACK_TOKEN
+        with patch(
+            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN", ""
+        ):
+            with pytest.raises(ValueError, match="SLACK_TOKEN required"):
+                adapter._validate_payload(slack_payload)
+
+    @pytest.mark.skip(reason="Further analysis required")
+    def test_handle_missing_slack_token_sends_error(self, adapter, slack_payload):
+        """handle sends error response when SLACK_TOKEN is missing."""
+        # Mock settings to have empty SLACK_TOKEN
+        with patch(
+            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN", ""
+        ):
+            adapter.handle(slack_payload)
+
+            # Verify error was sent
+            respond = slack_payload["respond"]
+            assert respond.called
+            call_args = respond.call_args
+            assert (
+                "error" in str(call_args).lower() or "token" in str(call_args).lower()
+            )

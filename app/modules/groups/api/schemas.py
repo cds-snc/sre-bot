@@ -344,6 +344,9 @@ class ListGroupsRequest(BaseModel):
         if self.target_member_email is None:
             self.target_member_email = self.requestor
 
+        if self.filter_by_member_email is None:
+            self.filter_by_member_email = self.target_member_email
+
         if not self.include_members:
             if self.filter_by_member_email is not None:
                 raise ValueError("filter_by_member_email requires include_members=True")
