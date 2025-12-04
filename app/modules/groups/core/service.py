@@ -6,19 +6,14 @@ controllers and in-process callers (for example Slack command handlers).
 This file provides small adapter functions that accept Pydantic request
 models (from `modules.groups.schemas`), call into the orchestration layer,
 and schedule event dispatch in the background so callers return quickly.
-
-Note: event dispatch is implemented here as a fire-and-forget submission to a
-ThreadPoolExecutor to avoid making changes to the existing synchronous
-`event_system` during this initial migration step. Step 4 of the migration
-will move the dispatcher into `event_system` itself.
 """
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, List, Optional
 from uuid import uuid4
 from core.logging import get_module_logger
+from infrastructure.events import dispatch_background, Event
 from modules.groups.core import orchestration
-from modules.groups.events import system as event_system
 from modules.groups.api import schemas
 from modules.groups.infrastructure.validation import (
     ValidationError,
@@ -258,9 +253,11 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
         )
 
         if response.success:
-            event_system.dispatch_background(
-                "group.member.added",
-                {
+            event = Event(
+                event_type="group.member.added",
+                correlation_id=correlation_id,
+                user_email=request.requestor,
+                metadata={
                     "orchestration": orch,
                     "request": (
                         request.model_dump()
@@ -269,6 +266,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
                     ),
                 },
             )
+            dispatch_background(event)
             cache_response(request.idempotency_key, response)
         return response
     except Exception as e:
@@ -347,9 +345,11 @@ def remove_member(
         )
 
         if response.success:
-            event_system.dispatch_background(
-                "group.member.removed",
-                {
+            event = Event(
+                event_type="group.member.removed",
+                correlation_id=correlation_id,
+                user_email=request.requestor,
+                metadata={
                     "orchestration": orch,
                     "request": (
                         request.model_dump()
@@ -358,6 +358,7 @@ def remove_member(
                     ),
                 },
             )
+            dispatch_background(event)
             cache_response(request.idempotency_key, response)
         return response
     except Exception as e:
@@ -383,11 +384,12 @@ def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
     Returns:
         List of NormalizedGroup dataclasses (or dicts after normalization)
     """
+    correlation_id = str(uuid4())
     provider = request.provider.value if request.provider else None
 
     # Route to appropriate orchestration function based on include_members flag
     if request.include_members:
-        return orchestration.list_groups_with_members_and_filters(
+        groups = orchestration.list_groups_with_members_and_filters(
             member_email_filter=request.filter_by_member_email,
             member_role_filters=request.filter_by_member_role,
             include_users_details=request.include_users_details,
@@ -395,9 +397,38 @@ def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
             exclude_empty_groups=request.exclude_empty_groups,
         )
     else:
-        return orchestration.list_groups_simple(
+        groups = orchestration.list_groups_simple(
             provider_name=request.provider.value if request.provider else None,
         )
+
+    # Emit event for audit and tracking
+    # Use the same nested structure as add_member/remove_member for consistency
+    event = Event(
+        event_type="group.listed",
+        correlation_id=correlation_id,
+        user_email=request.requestor,
+        metadata={
+            "request": {
+                "provider": provider,
+                "requestor": request.requestor,
+                "include_members": request.include_members,
+                "filter_by_member_email": request.filter_by_member_email,
+                "filter_by_member_role": request.filter_by_member_role,
+                "include_users_details": request.include_users_details,
+                "exclude_empty_groups": request.exclude_empty_groups,
+            },
+            "orchestration": {
+                "correlation_id": correlation_id,
+                "action": "list_groups",
+                "provider": provider or "unknown",
+                "success": True,
+                "group_count": len(groups) if groups else 0,
+            },
+        },
+    )
+    dispatch_background(event)
+
+    return groups
 
 
 def bulk_operations(

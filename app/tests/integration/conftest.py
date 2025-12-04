@@ -89,21 +89,27 @@ def mock_event_dispatch(monkeypatch):
     """
     dispatched_events: List[Dict[str, Any]] = []
 
-    def capture_event(event_type: str, data: Dict[str, Any]):
+    def capture_event(event: Any):
         """Capture event dispatch call"""
-        dispatched_events.append(
-            {
-                "event_type": event_type,
-                "data": data,
-            }
-        )
+        # Extract event data
+        event_data = None
+        if hasattr(event, "to_dict"):
+            event_data = event.to_dict()
+        elif hasattr(event, "model_dump"):
+            event_data = event.model_dump()
+        elif hasattr(event, "__dict__"):
+            event_data = event.__dict__
+        else:
+            event_data = event
+
+        dispatched_events.append(event_data)
 
     mock = MagicMock(side_effect=capture_event)
     mock.get_dispatched = lambda: dispatched_events
     mock.clear_dispatched = lambda: dispatched_events.clear()
 
     monkeypatch.setattr(
-        "modules.groups.events.system.dispatch_background",
+        "modules.groups.core.service.dispatch_background",
         mock,
         raising=False,
     )
