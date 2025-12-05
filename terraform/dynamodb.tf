@@ -59,6 +59,27 @@ resource "aws_dynamodb_table" "incidents_table" {
   }
 }
 
+# Dedicated table for idempotency cache
+# Stores cached API responses with automatic TTL-based expiration
+resource "aws_dynamodb_table" "sre_bot_idempotency" {
+  name           = "sre_bot_idempotency"
+  hash_key       = "idempotency_key"
+  read_capacity  = 5
+  write_capacity = 5
+
+  attribute {
+    name = "idempotency_key"
+    type = "S"
+  }
+
+  # Enable TTL for automatic expiration of cached responses (default 1 hour)
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+}
+
 # The following code adds a backup configuration to the DynamoDB table.
 
 # Define a KMS key to encrypt the backup.
