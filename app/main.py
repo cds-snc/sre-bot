@@ -3,6 +3,10 @@ from functools import partial
 from core.config import settings
 from core.logging import get_module_logger
 from dotenv import load_dotenv
+from infrastructure.events import (
+    discover_and_register_handlers,
+    log_registered_handlers,
+)
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -79,6 +83,17 @@ def main(bot):
 # Ensure providers are activated once per FastAPI process at startup.
 def providers_startup():
     """Activate group and command providers at startup."""
+    # Auto-discover and register event handlers before activating providers (non-blocking)
+    try:
+        discover_and_register_handlers(base_path="modules", package_root="modules")
+        log_registered_handlers()
+    except Exception as e:
+        logger.error(
+            "event_handlers_discovery_failed",
+            error=str(e),
+        )
+        pass
+
     try:
         primary = load_providers()
         # store for app-wide access

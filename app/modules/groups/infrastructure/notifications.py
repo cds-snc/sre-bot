@@ -2,22 +2,44 @@
 from typing import Dict, Any
 
 from core.logging import get_module_logger
+from infrastructure.events import Event
 
 logger = get_module_logger()
 
 
-def send_group_notifications(payload: Dict[str, Any]) -> None:
+def send_group_notifications(payload: Event) -> None:
     """Send notifications for group membership changes."""
 
-    # New nested event contract: original request under 'request' and
-    # orchestration details under 'orchestration'. Use those fields for
-    # notification content. Tests will be updated to send the new shape.
-    req = payload.get("request", {})
-    orch = payload.get("orchestration") or {}
+    # Extract metadata which contains request and orchestration details
+    event_dict = payload.to_dict()
+    metadata = event_dict.get("metadata", {})
+    req: dict = metadata.get("request", {})
+    orch: dict = metadata.get("orchestration") or {}
 
-    action = (
-        "added to" if "added" in str(payload.get("event_type", "")) else "removed from"
-    )
+    # Get action from orchestration
+    action_type = orch.get("action", "")
+
+    # Skip notifications for read-only operations like list_groups
+    if action_type in ["list_groups", "get_details", "list_members"]:
+        logger.debug(
+            "skipping_notification_for_read_operation",
+            action=action_type,
+            event_type=event_dict.get("event_type"),
+        )
+        return
+
+    # Determine notification message based on event type
+    if "added" in str(event_dict.get("event_type", "")):
+        action = "added to"
+    elif "removed" in str(event_dict.get("event_type", "")):
+        action = "removed from"
+    else:
+        # Unknown operation, skip notification
+        logger.debug(
+            "skipping_notification_for_unknown_operation",
+            event_type=event_dict.get("event_type"),
+        )
+        return
 
     try:
         # Send notification to requester
@@ -49,10 +71,11 @@ def _send_slack_notification(user_email: str, message: str, provider: str) -> No
     try:
         # For now, we'll implement a simplified version that logs the notification
         # In a full implementation, you'd need to get the Slack client and send the message
+        provider_display = provider.upper() if provider else "UNKNOWN"
         logger.info(
             "slack_notification_queued",
             user_email=user_email,
-            message=f"🔐 **{provider.upper()} Group Membership Update**\n\n{message}",
+            message=f"🔐 **{provider_display} Group Membership Update**\n\n{message}",
             provider=provider,
         )
 

@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Optional
 
 from infrastructure.commands.providers.slack import SlackCommandProvider
+from infrastructure.events import register_event_handler, dispatch_event
 from infrastructure.i18n import Translator, LocaleResolver, YAMLTranslationLoader
-from modules.groups.events.system import register_event_handler, dispatch_event
 from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,

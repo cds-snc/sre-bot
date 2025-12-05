@@ -1,5 +1,5 @@
 import base64
-import datetime
+from datetime import datetime, timezone
 import hmac
 import hashlib
 import json
@@ -55,7 +55,7 @@ def post_data(customer_id, shared_key, body, log_type):
     method = "POST"
     content_type = "application/json"
     resource = "/api/logs"
-    rfc1123date = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    rfc1123date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
     content_length = len(body)
     signature = build_signature(
         customer_id,
