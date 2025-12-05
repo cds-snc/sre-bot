@@ -157,6 +157,17 @@ class AtipSettings(BaseSettings):
     )
 
 
+class IdempotencySettings(BaseSettings):
+    """Idempotency cache configuration settings."""
+
+    IDEMPOTENCY_TTL_SECONDS: int = Field(default=3600, alias="IDEMPOTENCY_TTL_SECONDS")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class GoogleResourcesConfig(BaseSettings):
     """Consolidated Google Drive/Document resources configuration.
 
@@ -795,6 +806,7 @@ class Settings(BaseSettings):
     trello: TrelloSettings
 
     # Functionality settings
+    idempotency: IdempotencySettings
     atip: AtipSettings
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
@@ -822,6 +834,7 @@ class Settings(BaseSettings):
             "opsgenie": OpsGenieSettings,
             "sentinel": SentinelSettings,
             "trello": TrelloSettings,
+            "idempotency": IdempotencySettings,
             "atip": AtipSettings,
             "aws_feature": AWSFeatureSettings,
             "feat_incident": IncidentFeatureSettings,
