@@ -2,13 +2,45 @@
 
 import logging
 import inspect
+import sys
 import structlog
 from structlog.stdlib import BoundLogger
 from .config import settings
 
 
+def _is_test_environment() -> bool:
+    """Detect if running in a test environment."""
+    return "pytest" in sys.modules
+
+
 def configure_logging():
     """Configure structured logging for the application."""
+    # Suppress all logging during tests
+    if _is_test_environment():
+        # Set root logger to suppress all output during tests
+        logging.root.setLevel(logging.CRITICAL + 1)
+
+        # Configure structlog with minimal processors for tests
+        # We need basic processors to avoid errors, but logs won't be emitted
+        # because the root logger level is set to CRITICAL + 1
+        structlog.configure(
+            processors=[
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+            ],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
+
+        # Configure standard logging with silent handler
+        logging.basicConfig(
+            format="%(message)s",
+            level=logging.CRITICAL + 1,
+            force=True,
+        )
+        return structlog.stdlib.get_logger()
+
     processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,

@@ -70,15 +70,22 @@ def pytest_configure(config):
 def suppress_structlog_output():
     """Suppress structlog output during tests.
 
-    structlog writes JSON logs through Python's logging system. This fixture
-    suppresses all application logging so test output remains clean and readable.
+    Note: Logging is now primarily suppressed in core.logging.configure_logging()
+    when pytest is detected. This fixture provides additional belt-and-suspenders
+    suppression and can be used for test-specific logging control if needed.
     """
-    # Suppress all application logging to keep test output clean
-    logging.getLogger("structlog").setLevel(logging.CRITICAL + 1)
-    logging.getLogger("modules.groups").setLevel(logging.CRITICAL + 1)
-    logging.getLogger("infrastructure").setLevel(logging.CRITICAL + 1)
-    logging.getLogger("integrations").setLevel(logging.CRITICAL + 1)
+    # Additional suppression as backup (core.logging already handles this)
+    root_logger = logging.getLogger()
+    original_level = root_logger.level
+
+    # Ensure root logger suppresses all output
+    if original_level < logging.CRITICAL + 1:
+        root_logger.setLevel(logging.CRITICAL + 1)
+
     yield
+
+    # Restore original level after test
+    root_logger.setLevel(original_level)
 
 
 @pytest.fixture
