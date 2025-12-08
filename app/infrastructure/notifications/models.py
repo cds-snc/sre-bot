@@ -2,11 +2,17 @@
 
 Platform-agnostic notification models for centralized dispatch.
 Features define message content, infrastructure handles delivery.
+
+Uses Pydantic BaseModel for:
+- RFC 5322 compliant email validation (EmailStr)
+- Runtime input validation
+- Type safety with proper error messages
+- Consistency with API layer (modules/groups/api/schemas.py)
 """
 
-from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 from enum import Enum
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class NotificationPriority(Enum):
@@ -34,16 +40,17 @@ class NotificationStatus(Enum):
     RETRYING = "retrying"
 
 
-@dataclass
-class Recipient:
+class Recipient(BaseModel):
     """Notification recipient information.
 
     Email is the universal identifier across platforms.
     Platform-specific IDs (slack_user_id, phone_number) are resolved
     by NotificationChannel implementations as needed.
 
+    Uses Pydantic for robust email validation (RFC 5322 compliant).
+
     Attributes:
-        email: User's email address (required, universal ID)
+        email: User's email address (required, validated with EmailStr)
         slack_user_id: Resolved Slack user ID (optional)
         phone_number: Phone number for SMS (optional, format: +1234567890)
         preferred_channels: List of preferred channel names (default: ["chat"])
@@ -55,101 +62,100 @@ class Recipient:
         )
     """
 
-    email: str
+    email: EmailStr
     slack_user_id: Optional[str] = None
     phone_number: Optional[str] = None
-    preferred_channels: List[str] = field(default_factory=lambda: ["chat"])
+    preferred_channels: List[str] = Field(default_factory=lambda: ["chat"])
 
-    def __post_init__(self):
-        """Validate recipient data."""
-        if not self.email:
-            raise ValueError("Recipient email is required")
-        if not isinstance(self.email, str) or "@" not in self.email:
-            raise ValueError(f"Invalid email format: {self.email}")
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_number(cls, v: Optional[str]) -> Optional[str]:
+        """Validate E.164 phone format if provided."""
+        if v is None:
+            return v
+        if not v.startswith("+") or not v[1:].isdigit():
+            raise ValueError(f"Phone number must be in E.164 format: {v}")
+        if len(v) < 8 or len(v) > 16:
+            raise ValueError(f"Phone number length invalid: {v}")
+        return v
 
 
-@dataclass
-class Notification:
+class Notification(BaseModel):
     """Platform-agnostic notification message.
 
     Features format message content. Infrastructure handles delivery
     through appropriate channels with fallback support.
 
+    Uses Pydantic for validation of required fields and types.
+
     Attributes:
         subject: Subject line (email), card title (chat), ignored (SMS)
         message: Plain text message body (required)
-        recipients: List of Recipient objects (required)
-        priority: Notification urgency level
-        html_body: HTML email body (optional, email channel only)
-        attachments: File attachments (optional, future feature)
-        metadata: Feature-specific context data
-        channels: Target channel names (default: ["chat"])
+        recipients: List of recipients (required, minimum 1)
+        priority: NotificationPriority level (default: NORMAL)
+        channels: List of channel names to use (default: ["chat"])
+        metadata: Additional context (e.g., incident_id, correlation_id)
+        html_body: Optional HTML version for email channel
+        attachments: File attachments (future feature)
         retry_on_failure: Enable automatic retry (default: True)
         idempotency_key: Prevent duplicate sends (recommended)
 
     Example:
         notification = Notification(
-            subject="Group Membership Update",
-            message="You were added to group-name",
+            subject="Access Granted",
+            message="You have been added to engineering-team",
             recipients=[Recipient(email="user@example.com")],
+            priority=NotificationPriority.HIGH,
             channels=["chat", "email"],
-            priority=NotificationPriority.NORMAL,
-            idempotency_key="group_added_12345_user@example.com"
+            metadata={"group_id": "12345", "requestor": "admin@example.com"}
         )
     """
 
     subject: str
     message: str
-    recipients: List[Recipient]
+    recipients: List[Recipient] = Field(..., min_length=1)
     priority: NotificationPriority = NotificationPriority.NORMAL
-
-    # Optional rich content
+    channels: List[str] = Field(default_factory=lambda: ["chat"])
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     html_body: Optional[str] = None
-    attachments: List[Dict[str, Any]] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    # Delivery options
-    channels: List[str] = field(default_factory=lambda: ["chat"])
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
     retry_on_failure: bool = True
     idempotency_key: Optional[str] = None
 
-    def __post_init__(self):
-        """Validate notification data."""
-        if not self.recipients:
-            raise ValueError("At least one recipient is required")
-        if not self.message:
-            raise ValueError("Message body is required")
-        if not isinstance(self.recipients, list):
-            raise ValueError("Recipients must be a list")
-        if not all(isinstance(r, Recipient) for r in self.recipients):
-            raise ValueError("All recipients must be Recipient objects")
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        """Ensure message is not empty."""
+        if not v or not v.strip():
+            raise ValueError("Notification message cannot be empty")
+        return v
 
 
-@dataclass
-class NotificationResult:
+class NotificationResult(BaseModel):
     """Result of notification delivery attempt.
 
-    Returned by NotificationChannel.send() for observability.
-    One result per recipient per channel.
+    Returned by NotificationChannel.send() to track success/failure
+    per recipient per channel.
+
+    Uses Pydantic for type safety and validation.
 
     Attributes:
-        notification: Original notification object
-        channel: Channel name used for delivery
-        status: Delivery outcome status
-        message: Success or error message
-        error_code: Optional error code for categorization
-        retry_after: Seconds to wait before retry (optional)
-        external_id: Platform-specific message ID (Slack ts, Gmail message_id, etc.)
-        platform_response: Raw platform API response (for debugging)
+        notification: Original notification sent
+        channel: Channel name used (e.g., "chat", "email", "sms")
+        status: Delivery status (SENT, FAILED, RETRYING)
+        message: Human-readable result message
+        error_code: Optional error code for failures
+        external_id: External platform ID (Slack ts, Gmail msg ID, etc.)
+        retry_after: Seconds to wait before retry (rate limits)
+        platform_response: Raw platform API response (debugging)
 
     Example:
         result = NotificationResult(
             notification=notification,
             channel="chat",
             status=NotificationStatus.SENT,
-            message="Sent to user@example.com",
-            external_id="1234567890.123456",
-            platform_response={"ts": "1234567890.123456"}
+            message="Sent to Slack user U12345",
+            external_id="1234567890.123456"
         )
     """
 
@@ -158,11 +164,13 @@ class NotificationResult:
     status: NotificationStatus
     message: str
     error_code: Optional[str] = None
-    retry_after: Optional[int] = None
     external_id: Optional[str] = None
+    retry_after: Optional[int] = None
     platform_response: Optional[Dict[str, Any]] = None
 
     @property
     def is_success(self) -> bool:
         """Check if delivery was successful."""
         return self.status == NotificationStatus.SENT
+
+    model_config = {"arbitrary_types_allowed": True}
