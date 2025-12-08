@@ -1,18 +1,15 @@
 """Unit tests for ChatChannel (Slack implementation)."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+from pydantic import ValidationError
 from slack_sdk.errors import SlackApiError
 
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.models import (
-    Notification,
-    NotificationResult,
     NotificationStatus,
-    NotificationPriority,
     Recipient,
 )
-from infrastructure.operations import OperationResult
 
 
 @pytest.mark.unit
@@ -165,17 +162,11 @@ class TestChatChannel:
         assert result.data["slack_user_id"] == "U12345TEST"
         mock_slack_client.users_lookupByEmail.assert_called_once()
 
-    def test_resolve_recipient_no_identifier(self, chat_channel, mock_slack_client):
-        """Returns error when no email or Slack user ID provided."""
-        # Create recipient without email (edge case)
-        recipient = Recipient.__new__(Recipient)
-        recipient.email = None
-        recipient.slack_user_id = None
-
-        result = chat_channel.resolve_recipient(recipient)
-
-        assert result.is_success is False
-        assert result.error_code == "MISSING_IDENTIFIER"
+    def test_resolve_recipient_no_identifier(self, chat_channel):
+        """Email is required by Pydantic at Recipient creation."""
+        # Pydantic requires email field
+        with pytest.raises(ValidationError, match="email"):
+            Recipient(email=None)
 
     def test_resolve_recipient_email_not_found(
         self, chat_channel, recipient_factory, mock_slack_client

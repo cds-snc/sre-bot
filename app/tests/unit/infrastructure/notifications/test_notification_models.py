@@ -1,6 +1,7 @@
 """Unit tests for notification models."""
 
 import pytest
+from pydantic import ValidationError
 
 from infrastructure.notifications.models import (
     Notification,
@@ -40,12 +41,12 @@ class TestRecipient:
 
     def test_recipient_requires_email(self):
         """Recipient creation fails without email."""
-        with pytest.raises(ValueError, match="email is required"):
+        with pytest.raises(ValidationError, match="email"):
             Recipient(email="")
 
     def test_recipient_validates_email_format(self):
         """Recipient validates email format."""
-        with pytest.raises(ValueError, match="Invalid email format"):
+        with pytest.raises(ValidationError, match="email"):
             Recipient(email="invalid-email")
 
     def test_recipient_default_preferred_channels(self):
@@ -104,7 +105,7 @@ class TestNotification:
 
     def test_notification_requires_recipients(self):
         """Notification creation fails without recipients."""
-        with pytest.raises(ValueError, match="At least one recipient is required"):
+        with pytest.raises(ValidationError, match="recipients"):
             Notification(
                 subject="Test",
                 message="Test",
@@ -113,7 +114,7 @@ class TestNotification:
 
     def test_notification_requires_message(self, recipient_factory):
         """Notification creation fails without message."""
-        with pytest.raises(ValueError, match="Message body is required"):
+        with pytest.raises(ValidationError, match="message"):
             Notification(
                 subject="Test",
                 message="",
@@ -122,7 +123,7 @@ class TestNotification:
 
     def test_notification_validates_recipients_list(self, recipient_factory):
         """Notification validates recipients is a list."""
-        with pytest.raises(ValueError, match="Recipients must be a list"):
+        with pytest.raises(ValidationError, match="recipients"):
             Notification(
                 subject="Test",
                 message="Test message",
@@ -131,9 +132,7 @@ class TestNotification:
 
     def test_notification_validates_recipient_types(self):
         """Notification validates all recipients are Recipient objects."""
-        with pytest.raises(
-            ValueError, match="All recipients must be Recipient objects"
-        ):
+        with pytest.raises(ValidationError, match="Recipient"):
             Notification(
                 subject="Test",
                 message="Test message",

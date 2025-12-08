@@ -2,16 +2,13 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, Mock
+from pydantic import ValidationError
 
 from infrastructure.notifications.channels.sms import SMSChannel
 from infrastructure.notifications.models import (
-    Notification,
-    NotificationResult,
     NotificationStatus,
     NotificationPriority,
-    Recipient,
 )
-from infrastructure.operations import OperationResult
 
 
 @pytest.mark.unit
@@ -178,41 +175,35 @@ class TestSMSChannel:
         assert "Phone number required" in result.message
 
     def test_resolve_recipient_invalid_format(self, sms_channel, recipient_factory):
-        """Returns error for invalid phone format (missing + prefix)."""
-        recipient = recipient_factory(
-            email="test@example.com",
-            phone_number="5555551234",  # Missing + prefix
-        )
-
-        result = sms_channel.resolve_recipient(recipient)
-
-        assert result.is_success is False
-        assert result.error_code == "INVALID_PHONE_FORMAT"
-        assert "E.164 format" in result.message
+        """Invalid phone format is rejected by Pydantic at Recipient creation."""
+        # Pydantic rejects invalid phone numbers at construction time
+        with pytest.raises(
+            ValidationError, match="Phone number must be in E.164 format"
+        ):
+            recipient_factory(
+                email="test@example.com",
+                phone_number="5555551234",  # Missing + prefix
+            )
 
     def test_resolve_recipient_invalid_length(self, sms_channel, recipient_factory):
-        """Returns error for invalid phone length."""
-        recipient = recipient_factory(
-            email="test@example.com",
-            phone_number="+1234567890123456",  # Too long (>15 digits)
-        )
-
-        result = sms_channel.resolve_recipient(recipient)
-
-        assert result.is_success is False
-        assert result.error_code == "INVALID_PHONE_LENGTH"
+        """Invalid phone length is rejected by Pydantic at Recipient creation."""
+        # Pydantic rejects invalid phone length at construction time
+        with pytest.raises(ValidationError, match="Phone number length invalid"):
+            recipient_factory(
+                email="test@example.com",
+                phone_number="+1234567890123456",  # Too long (>15 digits)
+            )
 
     def test_resolve_recipient_non_numeric(self, sms_channel, recipient_factory):
-        """Returns error for non-numeric characters."""
-        recipient = recipient_factory(
-            email="test@example.com",
-            phone_number="+1-555-555-1234",  # Contains dashes
-        )
-
-        result = sms_channel.resolve_recipient(recipient)
-
-        assert result.is_success is False
-        assert result.error_code == "INVALID_PHONE_LENGTH"
+        """Non-numeric characters are rejected by Pydantic at Recipient creation."""
+        # Pydantic rejects non-numeric phone numbers at construction time
+        with pytest.raises(
+            ValidationError, match="Phone number must be in E.164 format"
+        ):
+            recipient_factory(
+                email="test@example.com",
+                phone_number="+1-555-555-1234",  # Contains dashes
+            )
 
     @patch("infrastructure.notifications.channels.sms.create_authorization_header")
     def test_health_check_success(self, mock_create_auth, sms_channel):
