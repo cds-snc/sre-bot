@@ -118,6 +118,9 @@ class EmailChannel(NotificationChannel):
     def resolve_recipient(self, recipient: Recipient) -> OperationResult:
         """Validate recipient email address.
 
+        Email is already validated by Pydantic EmailStr in Recipient model.
+        This method primarily ensures email field is present.
+
         Args:
             recipient: Recipient to resolve.
 
@@ -130,13 +133,7 @@ class EmailChannel(NotificationChannel):
                 error_code="MISSING_EMAIL",
             )
 
-        # Basic email validation (already done by Pydantic, but double-check)
-        if "@" not in recipient.email:
-            return OperationResult.permanent_error(
-                message="Invalid email format",
-                error_code="INVALID_EMAIL",
-            )
-
+        # Email format already validated by Pydantic EmailStr (RFC 5322)
         return OperationResult.success(
             message="Email validated",
             data={"email": recipient.email},
