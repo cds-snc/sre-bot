@@ -1,5 +1,21 @@
 """Audit logging for group operations.
 
+.. deprecated::
+    This module is deprecated and will be removed. All audit logging
+    has been moved to the centralized infrastructure.events system with automatic
+    audit event generation and Sentinel integration.
+
+    **Migration Guide:**
+    - The central audit handler (infrastructure.events.handlers.audit) now handles
+      all audit events automatically when events are dispatched
+    - Remove calls to AuditEntry.create() and write_audit_entry()
+    - Update event handlers to only focus on business logic
+    - Events dispatched via infrastructure.events.dispatch_event() are
+      automatically audited
+
+    For backward compatibility, this module remains available but should not be
+    used for new code. All existing code will continue to work until Phase 4.
+
 Provides structured audit logging with support for:
 - Stage 1: Synchronous writes to Sentinel and structured logs
 - Stage 2: Synchronous writes to DynamoDB with TTL (future implementation)

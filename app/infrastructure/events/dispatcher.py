@@ -53,9 +53,9 @@ def register_event_handler(event_type: str):
 def dispatch_event(event: Event) -> List[Any]:
     """Dispatch event synchronously to all registered handlers.
 
-    All handlers for the event type are called in order. If a handler
-    raises an exception, it is caught and logged, but processing
-    continues with remaining handlers.
+    All handlers for the event type are called in order, followed by
+    wildcard handlers registered for "*". If a handler raises an exception,
+    it is caught and logged, but processing continues with remaining handlers.
 
     Args:
         event: The event to dispatch.
@@ -64,16 +64,20 @@ def dispatch_event(event: Event) -> List[Any]:
         List of return values from all handlers.
     """
     results = []
+    # Get type-specific handlers
     handlers = EVENT_HANDLERS.get(event.event_type, [])
+    # Also add wildcard handlers that handle all events
+    wildcard_handlers = EVENT_HANDLERS.get("*", [])
+    all_handlers = handlers + wildcard_handlers
 
     logger.info(
         "dispatching_event",
         event_type=event.event_type,
-        handler_count=len(handlers),
+        handler_count=len(all_handlers),
         correlation_id=str(event.correlation_id),
     )
 
-    for handler in handlers:
+    for handler in all_handlers:
         try:
             result = handler(event)
             results.append(result)
