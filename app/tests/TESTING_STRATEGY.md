@@ -1238,6 +1238,7 @@ This testing strategy provides a foundation for maintainable, readable tests tha
 - **Unit tests** (`@pytest.mark.unit`): When testing individual functions/classes in isolation with mocks
 - **Integration tests** (`@pytest.mark.integration`): When testing interactions between components or with stubbed services
 - Place tests in appropriate module under `tests/unit/` or `tests/integration/` following existing structure
+- Run `make fmt` and `make lint` (from `/workspace/app`) before committing test changes
 
 ### Fixture Naming & Organization
 
