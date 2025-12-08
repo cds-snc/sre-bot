@@ -295,11 +295,12 @@ class TestSentinelIntegration:
         """Audit handler logs errors but doesn't fail when Sentinel fails."""
         register_event_handler("*")(handle_audit_event)
 
-        with patch(
-            "infrastructure.events.handlers.audit.sentinel_client.log_audit_event"
-        ) as mock_log_audit, patch(
-            "infrastructure.events.handlers.audit.logger"
-        ) as mock_logger:
+        with (
+            patch(
+                "infrastructure.events.handlers.audit.sentinel_client.log_audit_event"
+            ) as mock_log_audit,
+            patch("infrastructure.events.handlers.audit.logger") as mock_logger,
+        ):
             # Make sentinel fail
             mock_log_audit.side_effect = Exception("Sentinel connection error")
 
