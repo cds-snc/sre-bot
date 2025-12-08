@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from infrastructure.events import (
     discover_and_register_handlers,
     log_registered_handlers,
+    register_infrastructure_handlers,
 )
 from jobs import scheduled_tasks
 from modules import (
@@ -83,6 +84,15 @@ def main(bot):
 # Ensure providers are activated once per FastAPI process at startup.
 def providers_startup():
     """Activate group and command providers at startup."""
+    # Register infrastructure handlers (audit, etc.) before any events
+    try:
+        register_infrastructure_handlers()
+    except Exception as e:
+        logger.error(
+            "infrastructure_handlers_registration_failed",
+            error=str(e),
+        )
+
     # Auto-discover and register event handlers before activating providers (non-blocking)
     try:
         discover_and_register_handlers(base_path="modules", package_root="modules")

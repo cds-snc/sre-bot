@@ -26,6 +26,7 @@ Usage:
     dispatch_background(event)
 """
 
+from infrastructure.events.bootstrap import register_infrastructure_handlers
 from infrastructure.events.dispatcher import (
     dispatch_background,
     dispatch_event,
@@ -34,6 +35,7 @@ from infrastructure.events.dispatcher import (
     register_event_handler,
     shutdown_event_executor,
     start_event_executor,
+    clear_handlers,
 )
 from infrastructure.events.discovery import (
     discover_and_register_handlers,
@@ -54,4 +56,6 @@ __all__ = [
     "discover_and_register_handlers",
     "get_registered_handlers_by_event_type",
     "log_registered_handlers",
+    "register_infrastructure_handlers",
+    "clear_handlers",
 ]
