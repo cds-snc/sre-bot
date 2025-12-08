@@ -1,6 +1,6 @@
 """Feature-level fixtures for notification channel tests (Level 4)."""
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 import pytest
 
 from infrastructure.notifications.models import (
