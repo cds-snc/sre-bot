@@ -32,7 +32,9 @@ from modules.groups.providers.base import (
     provider_operation,
     validate_member_email,
 )
-from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult
+from infrastructure.operations.classifiers import classify_http_error
+
 
 logger = get_module_logger()
 
@@ -89,12 +91,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
     def classify_error(self, exc: Exception) -> "OperationResult":
         """Classify Google Workspace API errors into OperationResult.
 
-        Handles:
-        - 429 (rate limit) with retry_after from headers
-        - 401/403 (auth errors) as permanent
-        - 404 (not found) as permanent
-        - 5xx (server errors) as transient
-        - Connection/timeout errors as transient
+        Uses infrastructure classifier to standardize error handling across
+        all Google API integrations.
 
         Args:
             exc: Exception raised by Google API
@@ -102,64 +100,8 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             OperationResult with appropriate status and error code
         """
-        from googleapiclient.errors import HttpError
 
-        if isinstance(exc, HttpError):
-            status_code = exc.resp.status if hasattr(exc, "resp") else None
-
-            # Rate limiting: 429 Too Many Requests
-            if status_code == 429:
-                retry_after = None
-                if hasattr(exc, "resp") and hasattr(exc.resp, "get"):
-                    retry_after = int(exc.resp.get("retry-after", 60))
-                return OperationResult.error(
-                    OperationStatus.TRANSIENT_ERROR,
-                    "Google API rate limited",
-                    error_code="RATE_LIMITED",
-                    retry_after=retry_after,
-                )
-
-            # Authentication errors: 401 Unauthorized
-            if status_code == 401:
-                return OperationResult.permanent_error(
-                    "Google API authentication failed",
-                    error_code="UNAUTHORIZED",
-                )
-
-            # Authorization errors: 403 Forbidden
-            if status_code == 403:
-                return OperationResult.permanent_error(
-                    "Google API authorization denied",
-                    error_code="FORBIDDEN",
-                )
-
-            # Not found: 404
-            if status_code == 404:
-                return OperationResult.error(
-                    OperationStatus.NOT_FOUND,
-                    "Google resource not found",
-                    error_code="NOT_FOUND",
-                )
-
-            # Server errors: 5xx
-            if status_code and 500 <= status_code < 600:
-                return OperationResult.transient_error(
-                    f"Google API server error ({status_code})"
-                )
-
-            # Other HTTP errors
-            return OperationResult.transient_error(
-                f"Google API error ({status_code}): {str(exc)}"
-            )
-
-        # Connection/timeout errors: treat as transient
-        if isinstance(exc, (TimeoutError, ConnectionError)):
-            return OperationResult.transient_error(
-                f"Google API connection error: {str(exc)}"
-            )
-
-        # Default: treat as transient error
-        return OperationResult.transient_error(str(exc))
+        return classify_http_error(exc)
 
     def _extract_local_part(self, email_or_identifier: Optional[str]) -> Optional[str]:
         """Extract the local part from an email-formatted identifier.
