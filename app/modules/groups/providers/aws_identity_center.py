@@ -4,9 +4,6 @@
 import re
 from typing import Any, Dict, List, Optional
 
-# Third party
-from botocore.exceptions import BotoCoreError, ClientError
-
 # Local application - core
 from core.config import settings
 from core.logging import get_module_logger
@@ -32,7 +29,7 @@ from modules.groups.providers.base import (
     provider_operation,
     validate_member_email,
 )
-from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult
 
 logger = get_module_logger()
 
@@ -102,13 +99,8 @@ class AwsIdentityCenterProvider(GroupProvider):
     def classify_error(self, exc: Exception) -> "OperationResult":
         """Classify AWS Identity Center API errors into OperationResult.
 
-        Handles:
-        - ThrottlingException (rate limiting) with retry_after
-        - AccessDeniedException (permission denied) as permanent
-        - ResourceNotFoundException (not found) as permanent
-        - Validation errors as permanent
-        - Connection/timeout errors as transient
-        - Other errors as transient by default
+        Uses infrastructure classifier to standardize error handling across
+        all AWS SDK integrations.
 
         Args:
             exc: Exception raised by AWS API
@@ -116,63 +108,9 @@ class AwsIdentityCenterProvider(GroupProvider):
         Returns:
             OperationResult with appropriate status and error code
         """
+        from infrastructure.operations.classifiers import classify_aws_error
 
-        if isinstance(exc, ClientError):
-            error_code = exc.response.get("Error", {}).get("Code", "Unknown")
-
-            # Rate limiting: ThrottlingException
-            if error_code == "ThrottlingException":
-                retry_after = 60  # Default retry after 60 seconds
-                return OperationResult.error(
-                    OperationStatus.TRANSIENT_ERROR,
-                    "AWS API throttled",
-                    error_code="RATE_LIMITED",
-                    retry_after=retry_after,
-                )
-
-            # Permission denied: AccessDeniedException
-            if error_code == "AccessDeniedException":
-                return OperationResult.permanent_error(
-                    "AWS API access denied",
-                    error_code="FORBIDDEN",
-                )
-
-            # Resource not found: ResourceNotFoundException
-            if error_code == "ResourceNotFoundException":
-                return OperationResult.error(
-                    OperationStatus.NOT_FOUND,
-                    "AWS resource not found",
-                    error_code="NOT_FOUND",
-                )
-
-            # Validation errors (bad input)
-            if error_code in (
-                "ValidationException",
-                "InvalidParameterException",
-                "BadRequestException",
-            ):
-                return OperationResult.permanent_error(
-                    f"AWS validation error: {error_code}",
-                    error_code="INVALID_REQUEST",
-                )
-
-            # Other client errors: treat as transient by default
-            return OperationResult.transient_error(
-                f"AWS error ({error_code}): {str(exc)}"
-            )
-
-        # BotoCoreError: connection, timeout, parsing errors
-        if isinstance(exc, BotoCoreError):
-            return OperationResult.transient_error(f"AWS connection error: {str(exc)}")
-
-        # Connection/timeout errors
-        if isinstance(exc, (TimeoutError, ConnectionError)):
-            return OperationResult.transient_error(
-                f"AWS connection timeout: {str(exc)}"
-            )
-
-        # Default: treat as transient error
-        return OperationResult.transient_error(str(exc))
+        return classify_aws_error(exc)
 
     def _strip_provider_prefix(self, group_identifier: str) -> str:
         """Remove AWS prefix from group identifier to get canonical name.
