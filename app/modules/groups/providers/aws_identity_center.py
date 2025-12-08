@@ -30,6 +30,8 @@ from modules.groups.providers.base import (
     validate_member_email,
 )
 from infrastructure.operations import OperationResult
+from infrastructure.operations.classifiers import classify_aws_error
+
 
 logger = get_module_logger()
 
@@ -108,7 +110,6 @@ class AwsIdentityCenterProvider(GroupProvider):
         Returns:
             OperationResult with appropriate status and error code
         """
-        from infrastructure.operations.classifiers import classify_aws_error
 
         return classify_aws_error(exc)
 

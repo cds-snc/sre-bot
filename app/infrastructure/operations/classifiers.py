@@ -20,7 +20,7 @@ Usage:
 from typing import Optional
 
 from googleapiclient.errors import HttpError
-from botocore.exceptions import BotoCoreError, ClientError
+from botocore.exceptions import ClientError
 
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus

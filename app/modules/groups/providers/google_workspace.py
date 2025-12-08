@@ -33,6 +33,8 @@ from modules.groups.providers.base import (
     validate_member_email,
 )
 from infrastructure.operations import OperationResult
+from infrastructure.operations.classifiers import classify_http_error
+
 
 logger = get_module_logger()
 
@@ -98,7 +100,6 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
         Returns:
             OperationResult with appropriate status and error code
         """
-        from infrastructure.operations.classifiers import classify_http_error
 
         return classify_http_error(exc)
 
