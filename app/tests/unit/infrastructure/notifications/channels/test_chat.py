@@ -27,12 +27,15 @@ class TestChatChannel:
         Returns:
             ChatChannel instance
         """
-        with patch(
-            "infrastructure.notifications.channels.chat.SlackClientManager",
-            return_value=mock_slack_client_manager,
-        ), patch(
-            "infrastructure.notifications.channels.chat.CircuitBreaker",
-            return_value=mock_circuit_breaker,
+        with (
+            patch(
+                "infrastructure.notifications.channels.chat.SlackClientManager",
+                return_value=mock_slack_client_manager,
+            ),
+            patch(
+                "infrastructure.notifications.channels.chat.CircuitBreaker",
+                return_value=mock_circuit_breaker,
+            ),
         ):
             return ChatChannel()
 
