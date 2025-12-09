@@ -43,6 +43,9 @@ from infrastructure.notifications.models import (
     NotificationStatus,
 )
 
+# Dispatcher
+from infrastructure.notifications.dispatcher import NotificationDispatcher
+
 # Channel interface
 from infrastructure.notifications.channels.base import NotificationChannel
 
@@ -59,6 +62,8 @@ __all__ = [
     "NotificationResult",
     "NotificationPriority",
     "NotificationStatus",
+    # Dispatcher
+    "NotificationDispatcher",
     # Channel interface
     "NotificationChannel",
     # Channel implementations
