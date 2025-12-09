@@ -48,3 +48,10 @@ groups:
   success.no_groups: "✅ No groups found matching your criteria."
   success.add_member: "✅ Successfully added {member_email} to group {group_id}"
   success.remove_member: "✅ Successfully removed {member_email} from group {group_id}"
+
+groups.notifications:
+  member_added_to_requester: "✅ Successfully added {member_email} to group {group_id}"
+  member_added_to_member: "📋 You have been added to group {group_id} by {requestor}"
+  member_removed_to_requester: "✅ Successfully removed {member_email} from group {group_id}"
+  member_removed_to_member: "📋 You have been removed from group {group_id} by {requestor}"
+  subject: "{provider} Group Membership Update"

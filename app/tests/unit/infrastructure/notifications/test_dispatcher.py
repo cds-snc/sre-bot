@@ -312,8 +312,9 @@ class TestNotificationDispatcherIdempotency:
         # Mock cache with existing result
         mock_cache = MagicMock()
         cached_result = notification_result_factory(status=NotificationStatus.SENT)
+        # Cache returns serialized dicts (as DynamoDB would), not Pydantic objects
         mock_cache.get.return_value = {
-            "results": [cached_result],
+            "results": [cached_result.model_dump(mode="json")],
             "sent_at": "2025-12-08T10:00:00Z",
         }
 
@@ -325,7 +326,10 @@ class TestNotificationDispatcherIdempotency:
 
         # Should return cached result without calling channel
         assert len(results) == 1
-        assert results[0] == cached_result
+        # Compare key fields since reconstructed object won't be identical
+        assert results[0].channel == cached_result.channel
+        assert results[0].status == cached_result.status
+        assert results[0].message == cached_result.message
         mock_notification_channel.send.assert_not_called()
         mock_cache.get.assert_called_once_with("test-key-123")
 

@@ -370,7 +370,8 @@ class NotificationDispatcher:
             key: Idempotency key
 
         Returns:
-            Cached results dict or None if not found
+            Cached results dict with reconstructed NotificationResult objects,
+            or None if not found
         """
         if not self.idempotency_cache:
             return None
@@ -382,6 +383,12 @@ class NotificationDispatcher:
                     "idempotency_cache_hit",
                     idempotency_key=key,
                 )
+                # Reconstruct NotificationResult objects from cached dicts
+                if "results" in cached and isinstance(cached["results"], list):
+                    cached["results"] = [
+                        NotificationResult(**result_dict)
+                        for result_dict in cached["results"]
+                    ]
                 return cached
         except Exception as e:
             logger.error(
@@ -404,9 +411,10 @@ class NotificationDispatcher:
             return
 
         try:
-            # Convert results to cacheable format
+            # Convert Pydantic models to JSON-serializable dicts
+            # Use mode="json" to serialize datetime/enum/etc properly
             cache_data = {
-                "results": results,
+                "results": [r.model_dump(mode="json") for r in results],
                 "sent_at": (
                     logger.get_timestamp() if hasattr(logger, "get_timestamp") else None
                 ),
