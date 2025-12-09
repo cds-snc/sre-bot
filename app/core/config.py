@@ -168,6 +168,31 @@ class IdempotencySettings(BaseSettings):
     )
 
 
+class ElastiCacheSettings(BaseSettings):
+    """AWS ElastiCache (Redis/Valkey) configuration settings."""
+
+    ELASTICACHE_ENDPOINT: str = Field(
+        default="localhost",
+        alias="ELASTICACHE_ENDPOINT",
+        description="ElastiCache cluster endpoint (without port)",
+    )
+    ELASTICACHE_PORT: int = Field(
+        default=6379,
+        alias="ELASTICACHE_PORT",
+        description="ElastiCache port (default: 6379 for Redis/Valkey)",
+    )
+    ELASTICACHE_ENABLED: bool = Field(
+        default=False,
+        alias="ELASTICACHE_ENABLED",
+        description="Enable ElastiCache for state persistence",
+    )
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+
 class GoogleResourcesConfig(BaseSettings):
     """Consolidated Google Drive/Document resources configuration.
 
@@ -807,6 +832,7 @@ class Settings(BaseSettings):
 
     # Functionality settings
     idempotency: IdempotencySettings
+    elasticache: ElastiCacheSettings
     atip: AtipSettings
     aws_feature: AWSFeatureSettings
     feat_incident: IncidentFeatureSettings
@@ -835,6 +861,7 @@ class Settings(BaseSettings):
             "sentinel": SentinelSettings,
             "trello": TrelloSettings,
             "idempotency": IdempotencySettings,
+            "elasticache": ElastiCacheSettings,
             "atip": AtipSettings,
             "aws_feature": AWSFeatureSettings,
             "feat_incident": IncidentFeatureSettings,

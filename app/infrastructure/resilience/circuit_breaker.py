@@ -44,6 +44,7 @@ class CircuitBreaker:
         failure_threshold: Number of consecutive failures before opening
         timeout_seconds: Seconds to wait before attempting recovery (HALF_OPEN)
         half_open_max_calls: Max requests to allow in HALF_OPEN state
+        state_store: Optional persistent state store (ElastiCache-backed)
     """
 
     def __init__(
@@ -52,11 +53,13 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         timeout_seconds: int = 60,
         half_open_max_calls: int = 3,
+        state_store: Optional[Any] = None,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.timeout_seconds = timeout_seconds
         self.half_open_max_calls = half_open_max_calls
+        self.state_store = state_store
 
         # State management
         self._state = CircuitState.CLOSED
@@ -67,6 +70,9 @@ class CircuitBreaker:
 
         # Thread safety
         self._lock = threading.Lock()
+
+        # Load persisted state if available
+        self._load_persisted_state()
 
     @property
     def state(self) -> CircuitState:
@@ -208,6 +214,7 @@ class CircuitBreaker:
         self._failure_count = 0
         self._success_count = 0
         self._half_open_calls = 0
+        self._persist_state()
 
     def _transition_to_open(self):
         """Transition to OPEN state."""
@@ -218,6 +225,7 @@ class CircuitBreaker:
         )
         self._state = CircuitState.OPEN
         self._half_open_calls = 0
+        self._persist_state()
 
     def _transition_to_half_open(self):
         """Transition to HALF_OPEN state."""
@@ -226,6 +234,61 @@ class CircuitBreaker:
         self._failure_count = 0
         self._success_count = 0
         self._half_open_calls = 0
+        self._persist_state()
+
+    def _load_persisted_state(self):
+        """Load circuit breaker state from persistent store on initialization."""
+        if not self.state_store:
+            return
+
+        try:
+            saved_state = self.state_store.load_state(self.name)
+            if saved_state:
+                self._state = CircuitState(saved_state["state"])
+                self._failure_count = saved_state.get("failure_count", 0)
+                self._success_count = saved_state.get("success_count", 0)
+
+                # Parse last_failure_time
+                last_failure = saved_state.get("last_failure_time")
+                if last_failure:
+                    self._last_failure_time = datetime.fromisoformat(last_failure)
+
+                logger.info(
+                    "circuit_breaker_state_restored",
+                    name=self.name,
+                    state=self._state.value,
+                    failure_count=self._failure_count,
+                )
+        except Exception as e:
+            logger.warning(
+                "circuit_breaker_state_load_error",
+                name=self.name,
+                error=str(e),
+            )
+
+    def _persist_state(self):
+        """Persist current circuit breaker state."""
+        if not self.state_store:
+            return
+
+        try:
+            state = {
+                "state": self._state.value,
+                "failure_count": self._failure_count,
+                "success_count": self._success_count,
+                "last_failure_time": (
+                    self._last_failure_time.isoformat()
+                    if self._last_failure_time
+                    else None
+                ),
+            }
+            self.state_store.save_state(self.name, state)
+        except Exception as e:
+            logger.warning(
+                "circuit_breaker_state_persist_error",
+                name=self.name,
+                error=str(e),
+            )
 
     def get_stats(self) -> dict:
         """Get circuit breaker statistics."""
