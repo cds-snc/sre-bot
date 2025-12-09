@@ -137,15 +137,25 @@ class TestGroupNotificationHandler:
     def test_handle_member_added_uses_idempotency_builder(
         self, notification_handler, mock_key_builder, sample_event_added
     ):
-        """Test that handler uses centralized idempotency builder."""
+        """Test that handler uses centralized idempotency builder with correlation_id.
+
+        Idempotency is scoped to the operation (correlation_id) to allow the same
+        member to be added/removed multiple times while preventing duplicates
+        within a single operation.
+        """
         notification_handler.handle_member_added(sample_event_added)
 
         assert mock_key_builder.build.called
-        call_kwargs = mock_key_builder.build.call_args_list[0].kwargs
-        assert call_kwargs["operation"] == "send_notification"
-        assert call_kwargs["group_id"] == "engineering-team"
-        assert call_kwargs["action"] == "add_member"
-        assert call_kwargs["provider"] == "google"
+        # Get all calls to build - one for requestor, one for member
+        all_calls = mock_key_builder.build.call_args_list
+        assert len(all_calls) >= 2
+
+        # Each call should include correlation_id and recipient
+        for call in all_calls:
+            call_kwargs = call.kwargs
+            assert call_kwargs["operation"] == "send_notification"
+            assert "correlation_id" in call_kwargs
+            assert "recipient" in call_kwargs
 
     def test_handle_member_added_sends_notifications(
         self, notification_handler, mock_dispatcher, sample_event_added
