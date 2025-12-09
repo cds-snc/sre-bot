@@ -819,6 +819,68 @@ def test_create_user_with_callable_response(fake_aws_client, monkeypatch):
 
 ## Test Organization Rules
 
+### Import Organization
+
+**Always import at module level** unless technically required inline (e.g., avoiding circular imports).
+
+Follow PEP 8 import guidelines:
+- Standard library imports first
+- Third-party imports second  
+- Local application imports third
+- Blank line between each group
+
+**Exception Imports:**
+Always import exceptions at the top of test modules, not inline within test functions:
+
+```python
+# ✅ CORRECT - Top-level import
+import pytest
+from pydantic import ValidationError
+
+from infrastructure.notifications.models import Recipient
+
+
+class TestRecipient:
+    def test_recipient_requires_email(self):
+        """Email is required by Pydantic at Recipient creation."""
+        with pytest.raises(ValidationError, match="email"):
+            Recipient()
+    
+    def test_recipient_validates_email_format(self):
+        """Invalid email format is rejected by Pydantic."""
+        with pytest.raises(ValidationError, match="email"):
+            Recipient(email="not-an-email")
+```
+
+```python
+# ❌ INCORRECT - Inline import
+import pytest
+
+from infrastructure.notifications.models import Recipient
+
+
+class TestRecipient:
+    def test_recipient_requires_email(self):
+        """Email is required by Pydantic at Recipient creation."""
+        from pydantic import ValidationError  # Don't do this!
+        
+        with pytest.raises(ValidationError, match="email"):
+            Recipient()
+```
+
+**Rationale:**
+- Follows Python conventions (PEP 8)
+- Makes dependencies explicit and visible
+- Reduces code duplication
+- Improves IDE autocomplete and static analysis
+- Simplifies debugging (import errors fail fast at module load)
+
+**When inline imports are acceptable:**
+- Breaking circular import dependencies
+- Conditional imports based on environment or feature flags
+- Heavy imports only used in specific test paths
+- These cases should be documented with comments explaining why
+
 ### Naming Conventions
 
 ```plaintext
@@ -1176,6 +1238,7 @@ This testing strategy provides a foundation for maintainable, readable tests tha
 - **Unit tests** (`@pytest.mark.unit`): When testing individual functions/classes in isolation with mocks
 - **Integration tests** (`@pytest.mark.integration`): When testing interactions between components or with stubbed services
 - Place tests in appropriate module under `tests/unit/` or `tests/integration/` following existing structure
+- Run `make fmt` and `make lint` (from `/workspace/app`) before committing test changes
 
 ### Fixture Naming & Organization
 
