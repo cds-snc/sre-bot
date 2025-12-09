@@ -35,8 +35,8 @@ def test_init(schedule_mock):
     # Instead, verify the number of calls to schedule.do()
     do_calls = [call for call in schedule_mock.mock_calls if ".do(" in str(call)]
     # The scheduled tasks were expanded to include groups reconciliation and
-    # idempotency cleanup, so there are now 7 total scheduled .do() calls.
-    assert len(do_calls) == 7  # Total number of scheduled tasks
+    # idempotency cleanup, so there are now 6 total scheduled .do() calls.
+    assert len(do_calls) == 6  # Total number of scheduled tasks
 
     # Verify parameters without checking the function directly
     # For daily tasks
