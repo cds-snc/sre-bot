@@ -10,7 +10,6 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from modules.groups.infrastructure import idempotency
 from modules.groups.reconciliation import worker as reconciliation_worker
 
 from core.logging import get_module_logger
@@ -44,11 +43,8 @@ def init(bot):
     schedule.every().day.at("16:00").do(
         notify_stale_incident_channels, client=bot.client
     )
-    # Commenting out the following line to avoid running the task every 10 seconds. Will be enabled at the time of deployment.
-    # schedule.every(10).seconds.do(revoke_aws_sso_access, client=bot.client)
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
-    schedule.every(5).minutes.do(safe_run(idempotency.cleanup_expired_entries))
     schedule.every(5).minutes.do(
         safe_run(reconciliation_worker.process_reconciliation_batch)
     )
