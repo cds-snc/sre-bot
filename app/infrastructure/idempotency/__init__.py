@@ -27,5 +27,12 @@ Usage:
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.factory import get_cache, reset_cache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
+from infrastructure.idempotency.key_builder import IdempotencyKeyBuilder
 
-__all__ = ["IdempotencyCache", "DynamoDBCache", "get_cache", "reset_cache"]
+__all__ = [
+    "IdempotencyCache",
+    "get_cache",
+    "reset_cache",
+    "DynamoDBCache",
+    "IdempotencyKeyBuilder",
+]
