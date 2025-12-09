@@ -197,21 +197,13 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
                 user_email=request.requestor,
                 metadata={
                     "orchestration": orch,
-                    "request": (
-                        request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict()
-                    ),
+                    "request": request.model_dump(),
                 },
             )
             dispatch_background(event)
             idempotency_cache.set(
                 request.idempotency_key,
-                (
-                    response.model_dump()
-                    if hasattr(response, "model_dump")
-                    else response.dict()
-                ),
+                response.model_dump(mode="json"),
                 ttl_seconds=3600,
             )
         return response
@@ -284,21 +276,13 @@ def remove_member(
                 user_email=request.requestor,
                 metadata={
                     "orchestration": orch,
-                    "request": (
-                        request.model_dump()
-                        if hasattr(request, "model_dump")
-                        else request.dict()
-                    ),
+                    "request": request.model_dump(),
                 },
             )
             dispatch_background(event)
             idempotency_cache.set(
                 request.idempotency_key,
-                (
-                    response.model_dump()
-                    if hasattr(response, "model_dump")
-                    else response.dict()
-                ),
+                response.model_dump(mode="json"),
                 ttl_seconds=3600,
             )
         return response
