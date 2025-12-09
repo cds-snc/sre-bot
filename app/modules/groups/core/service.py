@@ -13,18 +13,11 @@ from typing import TYPE_CHECKING, Any, List, Optional
 from uuid import uuid4
 from core.logging import get_module_logger
 from infrastructure.events import dispatch_background, Event
+from infrastructure.idempotency import get_cache
 from modules.groups.core import orchestration
 from modules.groups.api import schemas
 from modules.groups.infrastructure.validation import (
     ValidationError,
-)
-from modules.groups.infrastructure.idempotency import (
-    get_cached_response,
-    cache_response,
-)
-from modules.groups.infrastructure.audit import (
-    create_audit_entry_from_operation,
-    write_audit_entry,
 )
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
@@ -32,7 +25,7 @@ from modules.groups.providers.base import (
     OperationResult,
 )
 
-if TYPE_CHECKING:  # avoid runtime import cycles for typing
+if TYPE_CHECKING:
     from modules.groups.domain.types import (
         OrchestrationResponseTypedDict,
     )
@@ -114,50 +107,6 @@ def _parse_timestamp(ts: str | None) -> datetime:
         return datetime.now(timezone.utc)
 
 
-def _record_operation_audit(
-    correlation_id: str,
-    action: str,
-    request: schemas.AddMemberRequest | schemas.RemoveMemberRequest,
-    orchestration_result: "OrchestrationResponseTypedDict",
-    success: bool,
-    error_message: Optional[str] = None,
-) -> None:
-    """Record audit entry for group operation.
-
-    Synchronously writes audit entry before returning response to caller.
-    All operations (success or failure) are audited for compliance.
-
-    Args:
-        correlation_id: Correlation ID for tracing
-        action: Operation name ("add_member" or "remove_member")
-        request: Original Pydantic request model
-        orchestration_result: Result from orchestration layer
-        success: Whether operation succeeded
-        error_message: Error message if operation failed
-    """
-    audit_entry = create_audit_entry_from_operation(
-        correlation_id=correlation_id,
-        action=action,
-        group_id=request.group_id,
-        provider=request.provider.value if request.provider else "unknown",
-        success=success,
-        requestor=request.requestor,
-        member_email=request.member_email,
-        justification=request.justification,
-        metadata=(
-            {"orchestration": orchestration_result}
-            if success
-            else {
-                "exception_type": (
-                    type(error_message).__name__ if error_message else "unknown"
-                )
-            }
-        ),
-        error_message=error_message if not success else None,
-    )
-    write_audit_entry(audit_entry)
-
-
 def _build_action_response(
     orchestration_result: "OrchestrationResponseTypedDict",
     operation_type: schemas.OperationType,
@@ -196,20 +145,19 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
     """Add a member to a group using orchestration.
 
     Returns an `ActionResponse` Pydantic model summarizing the result. This
-    function schedules a background event `group.member.add_requested` with
+    function schedules a background event `group.member.added` with
     the orchestration response plus the original request payload.
 
     Implements idempotency: if the same idempotency_key is used within the TTL
     window, the cached response is returned without re-executing the operation.
 
-    All operations are logged to the audit trail synchronously before returning.
+    Audit logging is handled automatically by the centralized event system.
     """
-    # Generate correlation ID for tracing this request through the system
-    correlation_id = str(uuid4())
+    correlation_id = uuid4()
+    idempotency_cache = get_cache()
 
-    # Check idempotency cache first
-    cached_response = get_cached_response(request.idempotency_key)
-    if cached_response is not None:
+    cached_data = idempotency_cache.get(request.idempotency_key)
+    if cached_data is not None:
         logger.info(
             "idempotent_request_detected",
             idempotency_key=request.idempotency_key,
@@ -217,9 +165,8 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             member_email=request.member_email,
             correlation_id=correlation_id,
         )
-        return cached_response
+        return schemas.ActionResponse(**cached_data)
 
-    # Check if requestor is a manager of the group (permission enforcement)
     if not _check_user_is_manager(
         user_email=request.requestor,
         group_id=request.group_id,
@@ -228,28 +175,19 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
             f"User {request.requestor} is not a manager of group {request.group_id}"
         )
 
-    # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.add_member_to_group(
             primary_group_id=request.group_id,
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
-            correlation_id=correlation_id,
+            correlation_id=str(correlation_id),
         )
         response = _build_action_response(
             orchestration_result=orch,
             operation_type=schemas.OperationType.ADD_MEMBER,
             provider=request.provider,
-            correlation_id=correlation_id,
-        )
-
-        _record_operation_audit(
-            correlation_id=correlation_id,
-            action="add_member",
-            request=request,
-            orchestration_result=orch,
-            success=response.success,
+            correlation_id=str(correlation_id),
         )
 
         if response.success:
@@ -267,40 +205,45 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
                 },
             )
             dispatch_background(event)
-            cache_response(request.idempotency_key, response)
+            idempotency_cache.set(
+                request.idempotency_key,
+                (
+                    response.model_dump()
+                    if hasattr(response, "model_dump")
+                    else response.dict()
+                ),
+                ttl_seconds=3600,
+            )
         return response
     except Exception as e:
-        _record_operation_audit(
+        logger.error(
+            "add_member_failed",
             correlation_id=correlation_id,
-            action="add_member",
-            request=request,
-            orchestration_result=orch,
-            success=response.success,
-            error_message=str(e),
+            group_id=request.group_id,
+            member_email=request.member_email,
+            error=str(e),
         )
         raise
 
 
 def remove_member(
     request: schemas.RemoveMemberRequest,
-) -> schemas.ActionResponse:  # noqa: C901
+) -> schemas.ActionResponse:
     """Remove a member from a group using orchestration.
 
-    Schedules `group.member.remove_requested` as a background event and returns
+    Schedules `group.member.removed` as a background event and returns
     an `ActionResponse` summarizing the orchestration outcome.
 
     Idempotency: Requests with the same `idempotency_key` within the TTL window
     (1 hour) will return the cached response without re-executing the operation.
-    Failures are not cached to preserve retry semantics.
 
-    All operations are logged to the audit trail synchronously before returning.
+    Audit logging is handled automatically by the centralized event system.
     """
-    # Generate correlation ID for tracing this request through the system
-    correlation_id = str(uuid4())
+    correlation_id = uuid4()
+    idempotency_cache = get_cache()
 
-    # Check cache for idempotent request
-    cached_response = get_cached_response(request.idempotency_key)
-    if cached_response:
+    cached_data = idempotency_cache.get(request.idempotency_key)
+    if cached_data:
         logger.info(
             "idempotent_request_detected",
             idempotency_key=request.idempotency_key,
@@ -308,9 +251,8 @@ def remove_member(
             member_email=request.member_email,
             correlation_id=correlation_id,
         )
-        return cached_response
+        return schemas.ActionResponse(**cached_data)
 
-    # Check if requestor is a manager of the group (permission enforcement)
     if not _check_user_is_manager(
         user_email=request.requestor,
         group_id=request.group_id,
@@ -319,29 +261,20 @@ def remove_member(
             f"User {request.requestor} is not a manager of group {request.group_id}"
         )
 
-    # Orchestration and secondary providers handle identifier resolution
     try:
         orch = orchestration.remove_member_from_group(
             primary_group_id=request.group_id,
             member_email=request.member_email,
             justification=request.justification or "",
             provider_hint=(request.provider.value if request.provider else None),
-            correlation_id=correlation_id,
+            correlation_id=str(correlation_id),
         )
 
         response = _build_action_response(
             orchestration_result=orch,
             operation_type=schemas.OperationType.REMOVE_MEMBER,
             provider=request.provider,
-            correlation_id=correlation_id,
-        )
-
-        _record_operation_audit(
-            correlation_id=correlation_id,
-            action="remove_member",
-            request=request,
-            orchestration_result=orch,
-            success=response.success,
+            correlation_id=str(correlation_id),
         )
 
         if response.success:
@@ -359,16 +292,23 @@ def remove_member(
                 },
             )
             dispatch_background(event)
-            cache_response(request.idempotency_key, response)
+            idempotency_cache.set(
+                request.idempotency_key,
+                (
+                    response.model_dump()
+                    if hasattr(response, "model_dump")
+                    else response.dict()
+                ),
+                ttl_seconds=3600,
+            )
         return response
     except Exception as e:
-        _record_operation_audit(
+        logger.error(
+            "remove_member_failed",
             correlation_id=correlation_id,
-            action="remove_member",
-            request=request,
-            orchestration_result=orch,
-            success=response.success,
-            error_message=str(e),
+            group_id=request.group_id,
+            member_email=request.member_email,
+            error=str(e),
         )
         raise
 
@@ -384,7 +324,7 @@ def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
     Returns:
         List of NormalizedGroup dataclasses (or dicts after normalization)
     """
-    correlation_id = str(uuid4())
+    correlation_id = uuid4()
     provider = request.provider.value if request.provider else None
 
     # Route to appropriate orchestration function based on include_members flag
