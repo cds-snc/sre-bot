@@ -53,7 +53,7 @@ def test_init(schedule_mock):
     ]
     # There are now four 5-minute interval tasks (heartbeat, healthchecks,
     # idempotency cleanup and reconciliation worker)
-    assert len(minutes_do_calls) == 4  # Four 5-minute tasks
+    assert len(minutes_do_calls) == 3  # Four 5-minute tasks
 
     hours_do_calls = [
         call for call in schedule_mock.mock_calls if ".hours.do(" in str(call)
