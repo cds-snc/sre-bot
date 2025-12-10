@@ -33,6 +33,7 @@ Usage Example:
     logger.info(f"Sent {success_count}/{len(results)} notifications")
 """
 
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from core.logging import get_module_logger
 from infrastructure.notifications.channels.base import NotificationChannel
@@ -138,11 +139,13 @@ class NotificationDispatcher:
         # Check idempotency cache
         if notification.idempotency_key and self.idempotency_cache:
             cached = self._check_idempotency_cache(notification.idempotency_key)
-            if cached:
+            # Only use cached results if they exist and contain actual result data
+            if cached and cached.get("results"):
                 logger.info(
                     "notification_already_sent",
                     idempotency_key=notification.idempotency_key,
                     cached_at=cached.get("sent_at"),
+                    result_count=len(cached.get("results", [])),
                 )
                 return cached.get("results", [])
 
@@ -371,7 +374,7 @@ class NotificationDispatcher:
 
         Returns:
             Cached results dict with reconstructed NotificationResult objects,
-            or None if not found
+            or None if not found or invalid
         """
         if not self.idempotency_cache:
             return None
@@ -379,12 +382,31 @@ class NotificationDispatcher:
         try:
             cached = self.idempotency_cache.get(key)
             if cached:
+                # Validate cache structure
+                if not isinstance(cached, dict):
+                    logger.warning(
+                        "invalid_cache_structure",
+                        idempotency_key=key,
+                        cached_type=type(cached).__name__,
+                    )
+                    return None
+
+                # Check if results exist and are valid
+                if "results" not in cached or not cached["results"]:
+                    logger.warning(
+                        "empty_cached_results",
+                        idempotency_key=key,
+                        cache_keys=list(cached.keys()),
+                    )
+                    return None
+
                 logger.debug(
                     "idempotency_cache_hit",
                     idempotency_key=key,
+                    result_count=len(cached.get("results", [])),
                 )
                 # Reconstruct NotificationResult objects from cached dicts
-                if "results" in cached and isinstance(cached["results"], list):
+                if isinstance(cached["results"], list):
                     cached["results"] = [
                         NotificationResult(**result_dict)
                         for result_dict in cached["results"]
@@ -415,9 +437,7 @@ class NotificationDispatcher:
             # Use mode="json" to serialize datetime/enum/etc properly
             cache_data = {
                 "results": [r.model_dump(mode="json") for r in results],
-                "sent_at": (
-                    logger.get_timestamp() if hasattr(logger, "get_timestamp") else None
-                ),
+                "sent_at": datetime.now(timezone.utc).isoformat(),
             }
 
             self.idempotency_cache.set(

@@ -60,6 +60,7 @@ class GroupNotificationHandler:
         metadata = event_dict.get("metadata", {})
         req = metadata.get("request", {})
         orch = metadata.get("orchestration", {})
+        correlation_id = event_dict.get("correlation_id", "")
 
         requestor_email = req.get("requestor") or req.get("requestor_email")
         member_email = req.get("member_email")
@@ -142,12 +143,12 @@ class GroupNotificationHandler:
             )
 
         for notif_info in notifications_to_send:
+            # Idempotency key includes correlation_id to scope deduplication to this
+            # specific operation.
             idempotency_key = self.key_builder.build(
                 operation="send_notification",
-                group_id=group_id,
+                correlation_id=correlation_id,
                 recipient=notif_info["recipient"],
-                action=action_type,
-                provider=provider,
             )
 
             notification = Notification(
