@@ -14,3 +14,14 @@ class IntegrationError(Exception):
     def __init__(self, message: str, response: Any = None):
         super().__init__(message)
         self.response = response
+
+
+class ValidationError(Exception):
+    """Raised when business logic validation fails.
+
+    Examples:
+    - User is not a manager of the group (permission denied)
+    - Resource not found or in invalid state
+    """
+
+    pass

@@ -16,9 +16,7 @@ from infrastructure.events import dispatch_background, Event
 from infrastructure.idempotency import get_cache
 from modules.groups.core import orchestration
 from modules.groups.api import schemas
-from modules.groups.infrastructure.validation import (
-    ValidationError,
-)
+from modules.groups.domain.errors import ValidationError
 from modules.groups import providers as _providers
 from modules.groups.providers.base import (
     OperationStatus,
