@@ -80,6 +80,62 @@ resource "aws_dynamodb_table" "sre_bot_idempotency" {
 
 }
 
+# Audit trail table for operational queries
+resource "aws_dynamodb_table" "sre_bot_audit_trail" {
+  name           = "sre_bot_audit_trail"
+  hash_key       = "resource_id"
+  range_key      = "timestamp_correlation_id"
+  read_capacity  = 2
+  write_capacity = 2
+
+  attribute {
+    name = "resource_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp_correlation_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "user_email"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  attribute {
+    name = "correlation_id"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "ttl_timestamp"
+    enabled        = true
+  }
+
+  global_secondary_index {
+    name            = "user_email-timestamp-index"
+    hash_key        = "user_email"
+    range_key       = "timestamp"
+    projection_type = "ALL"
+    read_capacity   = 1
+    write_capacity  = 1
+  }
+
+  global_secondary_index {
+    name            = "correlation_id-index"
+    hash_key        = "correlation_id"
+    projection_type = "ALL"
+    read_capacity   = 1
+    write_capacity  = 1
+  }
+}
+
 # The following code adds a backup configuration to the DynamoDB table.
 
 # Define a KMS key to encrypt the backup.
