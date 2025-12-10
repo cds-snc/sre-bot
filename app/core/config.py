@@ -1,4 +1,13 @@
-"""SRE Bot configuration settings."""
+"""SRE Bot configuration settings.
+
+DEPRECATED: This module is maintained for backward compatibility with legacy feature
+modules (incident, roles, aws, opsgenie, trello, atip, etc.). New code should import
+from infrastructure.configuration instead.
+
+Migration:
+    from core.config import settings  # OLD
+    from infrastructure.configuration import settings  # NEW
+"""
 
 from typing import Any, Dict, Optional
 import json

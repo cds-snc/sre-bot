@@ -1,4 +1,13 @@
-"""SRE Bot structure logging module."""
+"""SRE Bot structure logging module.
+
+DEPRECATED: This module is maintained for backward compatibility with legacy feature
+modules (incident, roles, aws, opsgenie, trello, atip, etc.). New code should import
+from infrastructure.observability instead.
+
+Migration:
+    from core.logging import get_module_logger  # OLD
+    from infrastructure.observability import get_module_logger  # NEW
+"""
 
 import logging
 import inspect

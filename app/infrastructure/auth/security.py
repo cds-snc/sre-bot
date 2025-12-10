@@ -1,12 +1,6 @@
-"""JWT security and JWKS management.
+"""Infrastructure auth module - JWT validation and security.
 
-DEPRECATED: This module is maintained for backward compatibility with legacy feature
-modules (incident, roles, aws, opsgenie, trello, atip, etc.). New code should import
-from infrastructure.auth instead.
-
-Migration:
-    from core.security import validate_jwt_token, jwks_manager  # OLD
-    from infrastructure.auth import validate_jwt_token, jwks_manager  # NEW
+JWKS management and JWT token validation for API authentication.
 """
 
 from typing import Any, Dict, Optional, Tuple
@@ -14,8 +8,8 @@ from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jwt import PyJWKClient, PyJWTError, PyJWKClientError, decode
 
-from core.config import settings
-from core.logging import get_module_logger
+from infrastructure.configuration import settings
+from infrastructure.observability import get_module_logger
 
 
 ISSUER_CONFIG = settings.server.ISSUER_CONFIG
@@ -25,12 +19,13 @@ security = HTTPBearer()
 
 
 class JWKSManager:
-    """
-    A class to manage JWKS clients for different issuers.
-    It initializes a JWKS client for each issuer in the provided configuration.
+    """Manage JWKS clients for different issuers.
+
+    Initializes a JWKS client for each issuer in the provided configuration.
+
     Attributes:
-        issuer_config (Dict[str, Dict[str, Any]]): A dictionary containing issuer configurations.
-        jwks_clients (Dict[str, PyJWKClient]): A dictionary to store JWKS clients for each issuer.
+        issuer_config: Dictionary containing issuer configurations
+        jwks_clients: Dictionary to store JWKS clients for each issuer
     """
 
     def __init__(self, issuer_config: Optional[Dict[str, Dict[str, Any]]]):
@@ -41,9 +36,10 @@ class JWKSManager:
         """Get the JWKS client for the specified issuer.
 
         Args:
-            issuer (str): The issuer for which to get the JWKS client.
+            issuer: The issuer for which to get the JWKS client
+
         Returns:
-            Optional[PyJWKClient]: The JWKS client for the specified issuer, or None if not found.
+            The JWKS client for the specified issuer, or None if not found
         """
         if not self.issuer_config or issuer not in self.issuer_config:
             return None
@@ -65,12 +61,13 @@ jwks_manager = JWKSManager(getattr(settings.server, "ISSUER_CONFIG", None))
 
 
 def get_issuer_from_token(token: str) -> Optional[str]:
-    """
-    Extract the issuer from the JWT token without verifying the signature.
+    """Extract the issuer from the JWT token without verifying the signature.
+
     Args:
-        token (str): The JWT token.
+        token: The JWT token
+
     Returns:
-        str | None: The issuer (iss) claim from the token if present, otherwise None.
+        The issuer (iss) claim from the token if present, otherwise None
     """
     try:
         unverified_payload = decode(token, options={"verify_signature": False})
@@ -80,13 +77,13 @@ def get_issuer_from_token(token: str) -> Optional[str]:
 
 
 def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Extract user ID and email from the JWT token without verifying the signature.
+    """Extract user ID and email from the JWT token without verifying the signature.
+
     Args:
-        token (str): The JWT token.
+        token: The JWT token
+
     Returns:
-        Tuple[str, str] | Tuple[None, None]: A tuple containing the user ID and email if present,
-        otherwise (None, None).
+        Tuple containing the user ID and email if present, otherwise (None, None)
     """
     try:
         payload = decode(token, options={"verify_signature": False})
@@ -114,14 +111,16 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
 async def validate_jwt_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> Dict[str, Any]:
-    """
-    Validate the JWT token and extract user information.
+    """Validate the JWT token and extract user information.
+
     Args:
-        credentials (HTTPAuthorizationCredentials): The HTTP authorization credentials containing the JWT token.
+        credentials: The HTTP authorization credentials containing the JWT token
+
     Returns:
-        Dict[str, Any]: The decoded payload of the JWT token.
+        The decoded payload of the JWT token
+
     Raises:
-        HTTPException: If the token is invalid, untrusted, or if any other error occurs during validation.
+        HTTPException: If the token is invalid, untrusted, or if any other error occurs during validation
     """
     if (
         credentials is None
