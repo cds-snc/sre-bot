@@ -37,9 +37,7 @@ def generate_settings_docs(
             continue
 
         # Generate section for this settings class
-        section_lines = _generate_section_docs(
-            field_name, type(field_value), field_value
-        )
+        section_lines = _generate_section_docs(field_name, type(field_value))
         lines.extend(section_lines)
 
     # Write to file
@@ -51,14 +49,12 @@ def generate_settings_docs(
 def _generate_section_docs(
     section_name: str,
     settings_class: Type[BaseSettings],
-    instance: BaseSettings,
 ) -> list[str]:
     """Generate documentation for a single settings section.
 
     Args:
         section_name: Name of the settings section (e.g., "slack")
         settings_class: The settings class type
-        instance: Instance of the settings class
 
     Returns:
         List of markdown lines
