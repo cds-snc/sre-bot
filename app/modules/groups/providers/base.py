@@ -481,6 +481,48 @@ class GroupProvider(ABC):
         else:
             return self._health_check_impl()
 
+    def _build_health_check_result(
+        self,
+        healthy: bool,
+        status: str,
+        message: str,
+        provider_details: Optional[dict] = None,
+        error: Optional[str] = None,
+    ) -> HealthCheckResult:
+        """Build a standardized HealthCheckResult with provider-specific details.
+
+        This helper method centralizes health check result construction,
+        reducing duplication across providers. Providers can override to
+        customize the details dict.
+
+        Args:
+            healthy: Whether the provider is healthy
+            status: Status string (e.g., "healthy", "unhealthy", "degraded")
+            message: Human-readable status message
+            provider_details: Optional provider-specific details (merged into result)
+            error: Optional error string to include in details
+
+        Returns:
+            HealthCheckResult with standardized structure
+        """
+        details = {
+            "message": message,
+        }
+
+        # Add provider-specific details
+        if provider_details:
+            details.update(provider_details)
+
+        # Add error if provided
+        if error:
+            details["error"] = error
+
+        return HealthCheckResult(
+            healthy=healthy,
+            status=status,
+            details=details,
+        )
+
     @abstractmethod
     def _health_check_impl(self) -> HealthCheckResult:
         """Implementation of health_check (no circuit breaker wrapper).

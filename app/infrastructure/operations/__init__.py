@@ -8,6 +8,7 @@ classifiers for provider exceptions.
 from infrastructure.operations.classifiers import (
     classify_aws_error,
     classify_http_error,
+    classify_integration_error,
 )
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
@@ -17,4 +18,5 @@ __all__ = [
     "OperationStatus",
     "classify_http_error",
     "classify_aws_error",
+    "classify_integration_error",
 ]
