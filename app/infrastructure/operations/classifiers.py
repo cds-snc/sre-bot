@@ -1,15 +1,20 @@
 """Error classifiers for provider exceptions.
 
-Converts provider-specific exceptions (Google API, AWS SDK) into standardized
-OperationResult objects. Centralizes error classification logic to eliminate
-duplication across providers.
+Converts provider-specific exceptions (Google API, AWS SDK, integration layer)
+into standardized OperationResult objects. Centralizes error classification
+logic to eliminate duplication across providers.
 
 Key Functions:
 - classify_http_error(): Google API HTTP errors → OperationResult
 - classify_aws_error(): AWS SDK errors → OperationResult
+- classify_integration_error(): Provider integration layer errors → OperationResult
 
 Usage:
-    from infrastructure.operations.classifiers import classify_http_error
+    from infrastructure.operations.classifiers import (
+        classify_http_error,
+        classify_aws_error,
+        classify_integration_error,
+    )
 
     try:
         result = google_service.members().list(groupKey=group_id).execute()
@@ -223,4 +228,59 @@ def classify_aws_error(exc: Exception) -> OperationResult:
     return OperationResult.transient_error(
         f"AWS client error: {error_code}",
         error_code="AWS_CLIENT_ERROR",
+    )
+
+
+def classify_integration_error(exc: Exception) -> OperationResult:
+    """Classify provider integration layer errors into OperationResult.
+
+    Handles IntegrationError exceptions raised by provider adapters when their
+    underlying integration (Google, AWS, etc.) reports an error. Extracts context
+    from the IntegrationError.response attribute (which is itself an OperationResult)
+    to provide more specific classification.
+
+    This function bridges the gap between integration layer errors (OperationResult
+    objects) and provider-level error handling.
+
+    Args:
+        exc: IntegrationError or other exception from provider integration
+
+    Returns:
+        OperationResult with appropriate status, message, error_code, and
+        retry_after (if applicable)
+
+    Example:
+        from modules.groups.domain.errors import IntegrationError
+        from infrastructure.operations.classifiers import classify_integration_error
+
+        try:
+            resp = google_directory.insert_member(group_key, email)
+            if not resp.is_success:
+                raise IntegrationError("google insert_member failed", response=resp)
+        except IntegrationError as e:
+            return classify_integration_error(e)
+    """
+    # Check if this is an IntegrationError (avoid circular import by using duck typing)
+    if not (hasattr(exc, "response") and hasattr(exc, "args")):
+        # Not an IntegrationError - could be another exception
+        # Treat as transient (network issues are usually temporary)
+        return OperationResult.transient_error(
+            f"Integration error: {type(exc).__name__}: {str(exc)}",
+            error_code="INTEGRATION_ERROR",
+        )
+
+    # Extract the response attribute (which is an OperationResult)
+    response = getattr(exc, "response", None)
+
+    # If response is an OperationResult, return it directly
+    # (it already has proper classification)
+    if isinstance(response, OperationResult):
+        return response
+
+    # If response is not an OperationResult but some other API response object,
+    # treat as integration error with message from IntegrationError
+    message = str(exc) if exc.args else "Integration error"
+    return OperationResult.permanent_error(
+        f"Integration failed: {message}",
+        error_code="INTEGRATION_ERROR",
     )

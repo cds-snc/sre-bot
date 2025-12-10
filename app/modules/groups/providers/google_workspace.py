@@ -405,32 +405,26 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
             resp = google_directory.list_groups(maxResults=1)
 
             if hasattr(resp, "is_success") and not resp.is_success:
-                return HealthCheckResult(
+                return self._build_health_check_result(
                     healthy=False,
                     status="unhealthy",
-                    details={
-                        "message": "Google Workspace API unreachable",
-                        "error": str(resp),
-                    },
+                    message="Google Workspace API unreachable",
+                    error=str(resp),
                 )
 
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=True,
                 status="healthy",
-                details={
-                    "domain": self.domain,
-                    "message": "Provider is operational",
-                },
+                message="Provider is operational",
+                provider_details={"domain": self.domain},
             )
 
         except IntegrationError as e:
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=False,
                 status="unhealthy",
-                details={
-                    "message": str(e),
-                    "error_code": "API_ERROR",
-                },
+                message=str(e),
+                provider_details={"error_code": "API_ERROR"},
             )
         except Exception as e:
             logger.error(
@@ -438,11 +432,9 @@ class GoogleWorkspaceProvider(PrimaryGroupProvider):
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=False,
                 status="unhealthy",
-                details={
-                    "message": "Unexpected error during health check",
-                    "error": str(e),
-                },
+                message="Unexpected error during health check",
+                error=str(e),
             )

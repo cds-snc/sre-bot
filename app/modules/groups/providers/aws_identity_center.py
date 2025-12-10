@@ -694,53 +694,43 @@ class AwsIdentityCenterProvider(GroupProvider):
         try:
             # Get identity store ID if available (from instance attribute)
             if not self.identity_store_id:
-                return HealthCheckResult(
+                return self._build_health_check_result(
                     healthy=False,
                     status="degraded",
-                    details={
-                        "message": "Identity store ID not configured",
-                    },
+                    message="Identity store ID not configured",
                 )
 
             # Perform minimal API call: list groups with maxResults=1
             resp = identity_store.list_groups(maxResults=1)
 
             if not hasattr(resp, "success"):
-                return HealthCheckResult(
+                return self._build_health_check_result(
                     healthy=False,
                     status="unhealthy",
-                    details={
-                        "message": "AWS Identity Center API returned unexpected type",
-                    },
+                    message="AWS Identity Center API returned unexpected type",
                 )
 
             if not resp.is_success:
-                return HealthCheckResult(
+                return self._build_health_check_result(
                     healthy=False,
                     status="unhealthy",
-                    details={
-                        "message": "AWS Identity Center API unreachable",
-                        "error": str(resp),
-                    },
+                    message="AWS Identity Center API unreachable",
+                    error=str(resp),
                 )
 
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=True,
                 status="healthy",
-                details={
-                    "identity_store_id": self.identity_store_id,
-                    "message": "Provider is operational",
-                },
+                message="Provider is operational",
+                provider_details={"identity_store_id": self.identity_store_id},
             )
 
         except IntegrationError as e:
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=False,
                 status="unhealthy",
-                details={
-                    "message": str(e),
-                    "error_code": "API_ERROR",
-                },
+                message=str(e),
+                provider_details={"error_code": "API_ERROR"},
             )
         except Exception as e:
             logger.error(
@@ -748,11 +738,9 @@ class AwsIdentityCenterProvider(GroupProvider):
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return HealthCheckResult(
+            return self._build_health_check_result(
                 healthy=False,
                 status="unhealthy",
-                details={
-                    "message": "Unexpected error during health check",
-                    "error": str(e),
-                },
+                message="Unexpected error during health check",
+                error=str(e),
             )
