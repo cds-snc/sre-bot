@@ -6,7 +6,7 @@ Sentinel integration.
 
 from datetime import datetime
 from uuid import uuid4
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -16,6 +16,7 @@ from infrastructure.events.handlers.audit import (
     handle_audit_event,
     _extract_resource_info,
     _extract_provider,
+    _extract_justification,
     _is_success,
 )
 from infrastructure.audit.models import AuditEvent
@@ -499,3 +500,259 @@ class TestAuditHandlerWithMockedSentinel:
         # Timestamp should be ISO format string
         assert isinstance(audit_event.timestamp, str)
         assert "T" in audit_event.timestamp
+
+
+@pytest.mark.unit
+class TestExtractJustification:
+    """Tests for justification extraction from event metadata."""
+
+    def test_extract_justification_from_direct_metadata(self):
+        """Extract justification directly from metadata."""
+        metadata = {"justification": "User onboarding for project"}
+        justification = _extract_justification(metadata)
+        assert justification == "User onboarding for project"
+
+    def test_extract_justification_from_request(self):
+        """Extract justification from nested request object."""
+        metadata = {
+            "request": {
+                "justification": "Team member joining for Q4 project",
+                "member_email": "bob@example.com",
+            }
+        }
+        justification = _extract_justification(metadata)
+        assert justification == "Team member joining for Q4 project"
+
+    def test_extract_justification_from_orchestration(self):
+        """Extract justification from orchestration result."""
+        metadata = {
+            "orchestration": {
+                "justification": "Access required for incident response",
+                "success": True,
+            }
+        }
+        justification = _extract_justification(metadata)
+        assert justification == "Access required for incident response"
+
+    def test_extract_justification_precedence(self):
+        """Direct metadata takes precedence over nested."""
+        metadata = {
+            "justification": "Direct justification",
+            "request": {"justification": "Request justification"},
+            "orchestration": {"justification": "Orchestration justification"},
+        }
+        justification = _extract_justification(metadata)
+        assert justification == "Direct justification"
+
+    def test_extract_justification_request_over_orchestration(self):
+        """Request takes precedence over orchestration."""
+        metadata = {
+            "request": {"justification": "Request justification"},
+            "orchestration": {"justification": "Orchestration justification"},
+        }
+        justification = _extract_justification(metadata)
+        assert justification == "Request justification"
+
+    def test_extract_justification_missing_returns_none(self):
+        """Return None when justification not in metadata."""
+        metadata = {"group_id": "eng@example.com", "success": True}
+        justification = _extract_justification(metadata)
+        assert justification is None
+
+    def test_extract_justification_empty_string_returns_none(self):
+        """Return None when justification is empty string (no justification provided)."""
+        metadata = {"justification": ""}
+        justification = _extract_justification(metadata)
+        assert justification is None
+
+
+@pytest.mark.unit
+class TestAuditHandlerJustificationPersistence:
+    """Tests for justification persistence in audit events."""
+
+    def test_handle_event_with_justification_in_request(self):
+        """Justification from request appears in audit metadata."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.added",
+            correlation_id=correlation_id,
+            user_email="alice@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "provider": "google",
+                "success": True,
+                "request": {
+                    "member_email": "bob@example.com",
+                    "justification": "User joining engineering team for Q1 project",
+                },
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        handler.handle(event)
+
+        audit_event = mock_sentinel.log_audit_event.call_args[0][0]
+
+        # Justification should appear in Sentinel payload
+        payload = audit_event.to_sentinel_payload()
+        assert "audit_meta_justification" in payload
+        assert (
+            payload["audit_meta_justification"]
+            == "User joining engineering team for Q1 project"
+        )
+
+    def test_handle_event_without_justification(self):
+        """Event without justification does not have justification field."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.added",
+            correlation_id=correlation_id,
+            user_email="alice@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "provider": "google",
+                "success": True,
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        handler.handle(event)
+
+        audit_event = mock_sentinel.log_audit_event.call_args[0][0]
+        payload = audit_event.to_sentinel_payload()
+
+        # Justification should not appear if not provided
+        assert "audit_meta_justification" not in payload
+
+    def test_handle_event_with_direct_justification(self):
+        """Justification directly in metadata is preserved."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.removed",
+            correlation_id=correlation_id,
+            user_email="manager@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "provider": "google",
+                "success": True,
+                "justification": "User offboarding - left company",
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        handler.handle(event)
+
+        audit_event = mock_sentinel.log_audit_event.call_args[0][0]
+        payload = audit_event.to_sentinel_payload()
+        assert payload["audit_meta_justification"] == "User offboarding - left company"
+
+
+@pytest.mark.unit
+class TestAuditHandlerDynamoDBIntegration:
+    """Tests for DynamoDB dual-write functionality."""
+
+    def test_handler_writes_to_dynamodb(self):
+        """Audit handler writes to both Sentinel and DynamoDB."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.added",
+            correlation_id=correlation_id,
+            user_email="alice@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "provider": "google",
+                "success": True,
+                "request": {
+                    "justification": "User onboarding",
+                },
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        # Mock DynamoDB write
+        with patch(
+            "infrastructure.events.handlers.audit.dynamodb_audit"
+        ) as mock_dynamodb:
+            mock_dynamodb.write_audit_event.return_value = True
+
+            handler.handle(event)
+
+            # Verify both Sentinel and DynamoDB were called
+            assert mock_sentinel.log_audit_event.called
+            assert mock_dynamodb.write_audit_event.called
+
+            # Verify same audit event was passed to both
+            sentinel_event = mock_sentinel.log_audit_event.call_args[0][0]
+            dynamodb_event = mock_dynamodb.write_audit_event.call_args[0][0]
+            assert sentinel_event.correlation_id == dynamodb_event.correlation_id
+            assert sentinel_event.action == dynamodb_event.action
+
+    def test_handler_continues_if_dynamodb_fails(self):
+        """Handler continues even if DynamoDB write fails."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.added",
+            correlation_id=correlation_id,
+            user_email="alice@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "success": True,
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        # Mock DynamoDB write failure
+        with patch(
+            "infrastructure.events.handlers.audit.dynamodb_audit"
+        ) as mock_dynamodb:
+            mock_dynamodb.write_audit_event.return_value = False
+
+            # Should not raise exception
+            handler.handle(event)
+
+            # Sentinel write should still succeed
+            assert mock_sentinel.log_audit_event.called
+
+    def test_handler_resilient_to_dynamodb_exception(self):
+        """Handler is resilient to DynamoDB exceptions."""
+        correlation_id = uuid4()
+        event = Event(
+            event_type="group.member.added",
+            correlation_id=correlation_id,
+            user_email="alice@example.com",
+            metadata={
+                "group_id": "eng@example.com",
+                "success": True,
+            },
+        )
+
+        handler = AuditHandler()
+        mock_sentinel = Mock()
+        handler.sentinel_client = mock_sentinel
+
+        # Mock DynamoDB raising exception
+        with patch(
+            "infrastructure.events.handlers.audit.dynamodb_audit"
+        ) as mock_dynamodb:
+            mock_dynamodb.write_audit_event.side_effect = Exception("DynamoDB error")
+
+            # Should not raise exception - handler is resilient
+            handler.handle(event)
+
+            # Sentinel write should still succeed
+            assert mock_sentinel.log_audit_event.called
