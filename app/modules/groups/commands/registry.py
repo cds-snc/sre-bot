@@ -17,7 +17,7 @@ from infrastructure.commands import (
 )
 from modules.groups.api import schemas
 from modules.groups.commands import handlers
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 
 logger = get_module_logger()
 

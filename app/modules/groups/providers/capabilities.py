@@ -12,8 +12,8 @@ Separation of concerns:
 import dataclasses
 from typing import Dict, Any
 
-from core.config import settings
-from core.logging import get_module_logger
+from infrastructure.configuration import settings
+from infrastructure.observability import get_module_logger
 from modules.groups.providers.contracts import ProviderCapabilities
 
 logger = get_module_logger()

@@ -8,7 +8,7 @@ inside functions to avoid import-time failures during incremental rollout.
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
     get_primary_provider,

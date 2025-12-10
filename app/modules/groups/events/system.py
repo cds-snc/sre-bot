@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import Any, Callable, Dict, List, Optional
 
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 
 logger = get_module_logger()
 

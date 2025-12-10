@@ -4,9 +4,9 @@
 import re
 from typing import Any, Dict, List, Optional
 
-# Local application - core
-from core.config import settings
-from core.logging import get_module_logger
+# Local application - infrastructure
+from infrastructure.configuration import settings
+from infrastructure.observability import get_module_logger
 
 # Local application - integrations
 from integrations.aws import identity_store_next as identity_store

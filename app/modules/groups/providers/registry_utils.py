@@ -11,7 +11,7 @@ Usage:
 
 from typing import Dict, Type, Any, Optional
 
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 
 logger = get_module_logger()
 
