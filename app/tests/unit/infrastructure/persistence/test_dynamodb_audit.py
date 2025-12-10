@@ -5,7 +5,7 @@ using mocked DynamoDB client responses.
 """
 
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
