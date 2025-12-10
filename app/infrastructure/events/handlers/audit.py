@@ -1,6 +1,7 @@
 """Audit handler for event system.
 
-Converts events to structured audit events and writes to Sentinel for compliance.
+Converts events to structured audit events and writes to Sentinel for compliance
+and DynamoDB for operational queries.
 """
 
 from typing import Optional, Dict, Any
@@ -8,6 +9,7 @@ from typing import Optional, Dict, Any
 from core.logging import get_module_logger
 from infrastructure.audit.models import create_audit_event
 from infrastructure.events.models import Event
+from infrastructure.persistence import dynamodb_audit
 from integrations.sentinel import client as sentinel_client
 
 logger = get_module_logger()
@@ -74,6 +76,42 @@ def _extract_provider(metadata: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _extract_justification(metadata: Dict[str, Any]) -> Optional[str]:
+    """Extract justification from event metadata.
+
+    Justification can be in multiple locations depending on the event type:
+    - Directly in metadata (legacy)
+    - In nested request dict (modern, from service layer)
+    - In nested orchestration result
+
+    Args:
+        metadata: Event metadata dictionary.
+
+    Returns:
+        Justification string or None.
+    """
+    # Check direct metadata first
+    justification = metadata.get("justification")
+    if justification:
+        return justification
+
+    # Check nested in request (from service layer)
+    request = metadata.get("request")
+    if request and isinstance(request, dict):
+        justification = request.get("justification")
+        if justification:
+            return justification
+
+    # Check nested in orchestration result
+    orch = metadata.get("orchestration")
+    if orch and isinstance(orch, dict):
+        justification = orch.get("justification")
+        if justification:
+            return justification
+
+    return None
+
+
 def _is_success(metadata: Dict[str, Any]) -> bool:
     """Determine if event represents success or failure.
 
@@ -136,6 +174,7 @@ class AuditHandler:
                 event.event_type, event.metadata
             )
             provider = _extract_provider(event.metadata)
+            justification = _extract_justification(event.metadata)
             success = _is_success(event.metadata)
 
             # Determine result and error fields
@@ -164,8 +203,13 @@ class AuditHandler:
                     "group_email",
                     "incident_id",
                     "webhook_id",
+                    "justification",  # Extracted separately and added below
                 }
             }
+
+            # Add justification if present (for audit compliance)
+            if justification:
+                filtered_metadata["justification"] = justification
 
             # Create audit event
             audit_event = create_audit_event(
@@ -183,6 +227,9 @@ class AuditHandler:
 
             # Log audit event to Sentinel
             self.sentinel_client.log_audit_event(audit_event)
+
+            # Also write to DynamoDB for operational queries (non-blocking)
+            dynamodb_audit.write_audit_event(audit_event)
 
             logger.info(
                 "audit_event_written",

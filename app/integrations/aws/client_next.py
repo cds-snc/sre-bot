@@ -189,6 +189,11 @@ def get_aws_client(
     """
     session_config = session_config or {"region_name": AWS_REGION}
     client_config = client_config or {"region_name": AWS_REGION}
+
+    # Add DynamoDB Local endpoint for dev environments
+    if service_name == "dynamodb" and settings.PREFIX:
+        client_config["endpoint_url"] = "http://dynamodb-local:8000"
+
     if role_arn:
         sts_client = boto3.client("sts")
         assumed_role = sts_client.assume_role(
