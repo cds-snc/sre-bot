@@ -15,8 +15,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from core.config import settings
-from core.logging import get_module_logger
+from infrastructure.configuration import settings
+from infrastructure.observability import get_module_logger
 from email_validator import EmailNotValidError, validate_email
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.resilience.circuit_breaker import (

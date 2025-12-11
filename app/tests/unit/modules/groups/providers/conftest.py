@@ -216,14 +216,14 @@ def mock_provider_config():
     def _factory(
         provider_name: str,
         enabled: bool = True,
-        is_primary: bool = False,
+        primary: bool = False,
         prefix: Optional[str] = None,
         capabilities: Optional[dict] = None,
     ) -> dict:
         config: dict = {"enabled": enabled}
 
-        if is_primary:
-            config["is_primary"] = True
+        if primary:
+            config["primary"] = True
 
         if prefix:
             config["prefix"] = prefix
@@ -242,7 +242,7 @@ def single_primary_config(mock_provider_config):  # pylint: disable=redefined-ou
     return mock_provider_config(
         provider_name="google",
         enabled=True,
-        is_primary=True,
+        primary=True,
         capabilities={
             "supports_member_management": True,
             "provides_role_info": True,
@@ -256,7 +256,7 @@ def multi_provider_config(mock_provider_config):  # pylint: disable=redefined-ou
     google_cfg = mock_provider_config(
         provider_name="google",
         enabled=True,
-        is_primary=True,
+        primary=True,
         capabilities={
             "supports_member_management": True,
             "provides_role_info": True,
@@ -266,7 +266,7 @@ def multi_provider_config(mock_provider_config):  # pylint: disable=redefined-ou
     aws_cfg = mock_provider_config(
         provider_name="aws",
         enabled=True,
-        is_primary=False,
+        primary=False,
         prefix="aws",
         capabilities={
             "supports_member_management": True,

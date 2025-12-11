@@ -19,7 +19,7 @@ import importlib
 import pkgutil
 from typing import Dict, Optional, Type
 
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers import registry_utils
 
@@ -188,7 +188,7 @@ def activate_providers() -> str:
         ValueError: If configuration is invalid
     """
     # pylint: disable=import-outside-toplevel
-    from core.config import settings
+    from infrastructure.configuration import settings
 
     try:
         provider_configs = settings.groups.providers or {}

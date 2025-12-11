@@ -4,7 +4,7 @@ This module implements batch processing of failed propagations with retry logic,
 exponential backoff, and dead letter queue handling.
 """
 
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from modules.groups.reconciliation import integration as ri
 from modules.groups.domain.models import NormalizedMember
 from modules.groups.providers import get_provider

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from modules.groups.core import service
 from modules.groups.api import schemas
 from modules.groups.domain import models

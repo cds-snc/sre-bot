@@ -15,7 +15,7 @@ from infrastructure.notifications import (
 )
 from infrastructure.i18n import Translator, LocaleResolver, TranslationKey
 from infrastructure.idempotency import IdempotencyKeyBuilder
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 
 logger = get_module_logger()
 

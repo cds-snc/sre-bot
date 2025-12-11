@@ -3,9 +3,9 @@
 # Standard library
 from typing import Dict, List, Optional
 
-# Local application - core
-from core.config import settings
-from core.logging import get_module_logger
+# Local application - infrastructure
+from infrastructure.configuration import settings
+from infrastructure.observability import get_module_logger
 
 # Local application - integrations
 from integrations.google_workspace import google_directory_next as google_directory

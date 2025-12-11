@@ -5,7 +5,7 @@ duplication and ensure consistent presentation to users.
 """
 
 from typing import Any, Dict, Optional, List
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from infrastructure.commands import CommandContext
 
 logger = get_module_logger()

@@ -11,7 +11,7 @@ and schedule event dispatch in the background so callers return quickly.
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, List, Optional
 from uuid import uuid4
-from core.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 from infrastructure.events import dispatch_background, Event
 from infrastructure.idempotency import get_cache
 from modules.groups.core import orchestration
