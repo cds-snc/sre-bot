@@ -173,7 +173,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -210,7 +210,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -253,11 +253,11 @@ class TestProviderActivation:
 
         providers._primary_discovered["bad"] = BadPrimary
 
-        # Mock settings
+        # Mock settings - use "bad" to match the registered provider
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {"bad": {"enabled": True}}
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -284,7 +284,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {}
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -322,7 +322,7 @@ class TestProviderActivation:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -364,7 +364,7 @@ class TestProviderActivation:
             "azure": {"enabled": True, "prefix": "azure"},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -406,7 +406,7 @@ class TestProviderActivation:
             "aws": {"enabled": False},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -443,7 +443,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -488,7 +488,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -526,7 +526,7 @@ class TestProviderAccessors:
             "aws": {"enabled": True},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -582,7 +582,7 @@ class TestProviderAccessors:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -624,7 +624,7 @@ class TestProviderAccessors:
             "aws": {"enabled": True},
         }
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
@@ -661,7 +661,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "core.config.settings",
+            "infrastructure.configuration.settings",
             mock_settings,
             raising=False,
         )
