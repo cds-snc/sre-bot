@@ -136,6 +136,45 @@ resource "aws_dynamodb_table" "sre_bot_audit_trail" {
   }
 }
 
+# Retry records table for distributed retry system
+resource "aws_dynamodb_table" "sre_bot_retry_records" {
+  name           = "sre_bot_retry_records"
+  hash_key       = "record_id"
+  read_capacity  = 5
+  write_capacity = 5
+
+  attribute {
+    name = "record_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "status"
+    type = "S"
+  }
+
+  attribute {
+    name = "next_retry_at"
+    type = "N"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  # GSI for efficient time-based queries
+  # Query ACTIVE or DLQ records that are due for processing (next_retry_at <= now)
+  global_secondary_index {
+    name            = "status-next_retry_at-index"
+    hash_key        = "status"
+    range_key       = "next_retry_at"
+    projection_type = "ALL"
+    read_capacity   = 5
+    write_capacity  = 5
+  }
+}
+
 # The following code adds a backup configuration to the DynamoDB table.
 
 # Define a KMS key to encrypt the backup.
@@ -178,6 +217,9 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
     aws_dynamodb_table.webhooks_table.arn,
     aws_dynamodb_table.aws_access_requests_table.arn,
     aws_dynamodb_table.incidents_table.arn,
+    aws_dynamodb_table.sre_bot_idempotency.arn,
+    aws_dynamodb_table.sre_bot_audit_trail.arn,
+    aws_dynamodb_table.sre_bot_retry_records.arn,
   ]
 }
 
