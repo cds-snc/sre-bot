@@ -2,7 +2,7 @@
 
 import types
 from typing import Dict, Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import pytest
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers.contracts import (
@@ -449,27 +449,42 @@ def mock_command_context(mock_translator):
 
 
 @pytest.fixture
-def mock_groups_service():
+def mock_groups_service(monkeypatch):
     """Mock groups service module for commands."""
-    with patch("modules.groups.commands.handlers.service") as mock:
-        yield mock
+    mock = MagicMock()
+    monkeypatch.setattr(
+        "modules.groups.commands.handlers.service",
+        mock,
+        raising=False,
+    )
+    return mock
 
 
 @pytest.fixture
-def mock_slack_users():
+def mock_slack_users(monkeypatch):
     """Mock Slack users integration for commands."""
-    with patch("modules.groups.commands.handlers.slack_users") as mock:
-        mock.get_user_email_from_handle.return_value = "resolved@example.com"
-        yield mock
+    mock = MagicMock()
+    mock.get_user_email_from_handle.return_value = "resolved@example.com"
+    monkeypatch.setattr(
+        "modules.groups.commands.handlers.slack_users",
+        mock,
+        raising=False,
+    )
+    return mock
 
 
 @pytest.fixture
-def mock_groups_provider():
+def mock_groups_provider(monkeypatch):
     """Mock groups provider for commands."""
-    with patch("modules.groups.commands.handlers.get_active_providers") as mock:
-        mock.return_value = {
-            "google": MagicMock(),
-            "aws": MagicMock(),
-            "azure": MagicMock(),
-        }
-        yield mock
+    mock = MagicMock()
+    mock.return_value = {
+        "google": MagicMock(),
+        "aws": MagicMock(),
+        "azure": MagicMock(),
+    }
+    monkeypatch.setattr(
+        "modules.groups.commands.handlers.get_active_providers",
+        mock,
+        raising=False,
+    )
+    return mock

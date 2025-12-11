@@ -6,7 +6,6 @@ claim semantics, DLQ behavior, and thread safety.
 
 import threading
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pytest
 from modules.groups.reconciliation.store import (
@@ -265,8 +264,10 @@ class TestClaimSemantics:
         # Second claim fails
         assert store.claim_record(record_id, "worker-2", lease_seconds=300) is False
 
-    def test_claim_expires(self):
+    def test_claim_expires(self, monkeypatch):
         """Expired claims can be reclaimed."""
+        from unittest.mock import MagicMock
+
         store = InMemoryReconciliationStore()
         record = FailedPropagation(
             group_id="group-1",
@@ -276,18 +277,21 @@ class TestClaimSemantics:
         )
         record_id = store.save_failed_propagation(record)
 
-        with patch("modules.groups.reconciliation.store.datetime") as mock_datetime:
-            # Claim at 1000
-            mock_datetime.now.return_value.timestamp.return_value = 1000.0
-            assert store.claim_record(record_id, "worker-1", lease_seconds=10) is True
+        mock_datetime = MagicMock()
+        monkeypatch.setattr(
+            "modules.groups.reconciliation.store.datetime", mock_datetime, raising=False
+        )
+        # Claim at 1000
+        mock_datetime.now.return_value.timestamp.return_value = 1000.0
+        assert store.claim_record(record_id, "worker-1", lease_seconds=10) is True
 
-            # Cannot reclaim at 1005 (within lease until 1010)
-            mock_datetime.now.return_value.timestamp.return_value = 1005.0
-            assert store.claim_record(record_id, "worker-2", lease_seconds=300) is False
+        # Cannot reclaim at 1005 (within lease until 1010)
+        mock_datetime.now.return_value.timestamp.return_value = 1005.0
+        assert store.claim_record(record_id, "worker-2", lease_seconds=300) is False
 
-            # Can reclaim at 1011 (after lease at 1010)
-            mock_datetime.now.return_value.timestamp.return_value = 1011.0
-            assert store.claim_record(record_id, "worker-2", lease_seconds=300) is True
+        # Can reclaim at 1011 (after lease at 1010)
+        mock_datetime.now.return_value.timestamp.return_value = 1011.0
+        assert store.claim_record(record_id, "worker-2", lease_seconds=300) is True
 
     def test_claim_stores_worker_id(self):
         """Claim records worker ID."""
