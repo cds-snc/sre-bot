@@ -1,7 +1,6 @@
 """Unit tests for EmailChannel (Gmail implementation)."""
 
 import pytest
-from unittest.mock import patch
 from pydantic import ValidationError
 
 from infrastructure.notifications.channels.email import EmailChannel
@@ -18,21 +17,23 @@ class TestEmailChannel:
     """Tests for EmailChannel implementation."""
 
     @pytest.fixture
-    def email_channel(self, mock_gmail_next):
+    def email_channel(self, mock_gmail_next, monkeypatch):
         """Create EmailChannel instance with mocked dependencies.
 
         Args:
             mock_gmail_next: Mock gmail_next fixture
+            monkeypatch: pytest monkeypatch fixture
 
         Returns:
             EmailChannel instance with gmail_next mocked
         """
-        with patch(
+        monkeypatch.setattr(
             "infrastructure.notifications.channels.email.gmail_next",
             mock_gmail_next,
-        ):
-            channel = EmailChannel()
-            yield channel
+            raising=False,
+        )
+        channel = EmailChannel()
+        return channel
 
     def test_channel_name(self, email_channel):
         """Channel name returns 'email'."""

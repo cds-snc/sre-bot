@@ -17,7 +17,7 @@ google_directory API calls to verify provider behavior and data flow.
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from infrastructure.operations import OperationResult, OperationStatus
 from modules.groups.domain.models import NormalizedMember
@@ -43,13 +43,15 @@ def mock_settings():
 
 
 @pytest.fixture
-def google_provider(mock_settings):
+def google_provider(mock_settings, monkeypatch):
     """Provide a GoogleWorkspaceProvider instance with mocked settings."""
     from modules.groups.providers import google_workspace
 
-    with patch("modules.groups.providers.base.settings", mock_settings):
-        provider = google_workspace.GoogleWorkspaceProvider()
-        yield provider
+    monkeypatch.setattr(
+        "modules.groups.providers.base.settings", mock_settings, raising=False
+    )
+    provider = google_workspace.GoogleWorkspaceProvider()
+    return provider
 
 
 @pytest.fixture

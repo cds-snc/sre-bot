@@ -1,7 +1,7 @@
 """Integration tests for groups commands."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from infrastructure.commands.providers.slack import SlackCommandProvider
@@ -105,10 +105,15 @@ class TestGroupsCommandIntegration:
         )
         slack_payload["command"]["text"] = "list"
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_service.list_groups.return_value = []
+        mock_service = MagicMock()
+        mock_service.list_groups.return_value = []
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         # Verify acknowledge was called
         ack = slack_payload["ack"]
@@ -125,10 +130,15 @@ class TestGroupsCommandIntegration:
         )
         slack_payload["command"]["text"] = "list"
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_service.list_groups.return_value = []
+        mock_service = MagicMock()
+        mock_service.list_groups.return_value = []
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         # Verify list_groups was called
         assert mock_service.list_groups.called
@@ -143,12 +153,17 @@ class TestGroupsCommandIntegration:
             "text"
         ] = 'add user@example.com group-1 google "Test reason"'
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_result = MagicMock()
-            mock_result.model_dump.return_value = {"success": True}
-            mock_service.add_member.return_value = mock_result
+        mock_service = MagicMock()
+        mock_result = MagicMock()
+        mock_result.model_dump.return_value = {"success": True}
+        mock_service.add_member.return_value = mock_result
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         assert mock_service.add_member.called
         call_args = mock_service.add_member.call_args[0][0]
@@ -165,12 +180,17 @@ class TestGroupsCommandIntegration:
             "text"
         ] = 'remove user@example.com group-1 aws "Removing user from team"'
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_result = MagicMock()
-            mock_result.model_dump.return_value = {"success": True}
-            mock_service.remove_member.return_value = mock_result
+        mock_service = MagicMock()
+        mock_result = MagicMock()
+        mock_result.model_dump.return_value = {"success": True}
+        mock_service.remove_member.return_value = mock_result
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         assert mock_service.remove_member.called
         call_args = mock_service.remove_member.call_args[0][0]
@@ -198,10 +218,15 @@ class TestGroupsCommandIntegration:
         )
         slack_payload["command"]["text"] = "list --managed"
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_service.list_groups.return_value = []
+        mock_service = MagicMock()
+        mock_service.list_groups.return_value = []
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         call_args = mock_service.list_groups.call_args[0][0]
         assert call_args.filter_by_member_role == ["MANAGER", "OWNER"]
@@ -228,10 +253,15 @@ class TestGroupsCommandIntegration:
         )
         slack_payload["command"]["text"] = "list --role=MANAGER,OWNER"
 
-        with patch("modules.groups.commands.handlers.service") as mock_service:
-            mock_service.list_groups.return_value = []
+        mock_service = MagicMock()
+        mock_service.list_groups.return_value = []
+        monkeypatch.setattr(
+            "modules.groups.commands.handlers.service",
+            mock_service,
+            raising=False,
+        )
 
-            adapter.handle(slack_payload)
+        adapter.handle(slack_payload)
 
         call_args = mock_service.list_groups.call_args[0][0]
         assert call_args.filter_by_member_role == ["MANAGER", "OWNER"]

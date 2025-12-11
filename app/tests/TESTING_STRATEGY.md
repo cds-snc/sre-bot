@@ -603,31 +603,86 @@ def make_google_members(n=3, prefix="", domain="test.com", as_model=False):
 
 ## Integration Test Fixtures
 
+### Integration Test Fixture Hierarchy
+
+Integration test fixtures follow a layered architecture similar to unit tests:
+
+```plaintext
+tests/integration/conftest.py                           # Infrastructure-wide mocks (autouse)
+    ↓
+tests/integration/modules/<module>/conftest.py          # Module-specific integration mocks
+    ↓
+tests/integration/<area>/<component>/conftest.py        # Component-specific integration mocks
+```
+
+**Fixture Placement Rules:**
+1. **Root Integration Conftest** (`tests/integration/conftest.py`):
+   - Infrastructure-wide system boundary mocks (DynamoDB, Sentinel, external APIs)
+   - Autouse fixtures that prevent actual I/O for all integration tests
+   - Generic test utilities used across all modules
+
+2. **Module Integration Conftest** (`tests/integration/modules/<module>/conftest.py`):
+   - Module-specific orchestration mocks
+   - Module-specific event system mocks
+   - Module-specific validation mocks
+   - Module domain fixtures and test data
+
+3. **Component Integration Conftest** (`tests/integration/<area>/<component>/conftest.py`):
+   - Component-specific configuration
+   - Component-specific test scenarios
+   - Fine-grained mocks for specific features
+
 ### Root Integration `tests/integration/conftest.py`
 
-Integration-level fixtures for system boundary mocking (332 lines). Location: `/workspace/app/tests/integration/conftest.py`
+Integration-level fixtures for **infrastructure-wide** system boundary mocking. Location: `/workspace/app/tests/integration/conftest.py`
 
-**Orchestration Layer Mocks:**
-- `mock_orchestration` - Configurable mock orchestration layer for add/remove member operations with default success responses
+**Autouse Fixtures (Applied Automatically):**
+- `_autouse_mock_dynamodb_audit` - Automatically mocks `infrastructure.events.handlers.audit.dynamodb_audit.write_audit_event` to prevent actual DynamoDB writes during all integration tests
+- `_autouse_mock_sentinel_client` - Automatically mocks `integrations.sentinel.client.log_to_sentinel` and `integrations.sentinel.client.log_audit_event` to prevent actual Sentinel calls during all integration tests
 
-**Event System Mocks:**
-- `mock_event_dispatch` - Captures dispatched events for verification
-- `mock_event_system` - Complete event system mock
-- `captured_events` - Fixture for accessing captured events during tests
+**Note:** These autouse fixtures ensure that integration tests never write to actual external systems (DynamoDB, Sentinel). Tests can still assert on these mocks by using `monkeypatch` to override them if needed.
 
-**Sentinel Client Mocks:**
-- `mock_sentinel_client` - Mocks sentinel client to prevent external calls
+**Manual Request Fixtures:**
+- `mock_sentinel_client` - Explicit Sentinel client mock for tests that need to assert on Sentinel calls (most tests use the autouse fixture automatically)
 
-**Validation Layer Mocks:**
-- Mock validators for common validation scenarios
+**Module-Specific Fixtures:**
+Module-specific fixtures (e.g., groups orchestration, event dispatch) are documented in their respective module conftest files under `tests/integration/modules/<module>/conftest.py`
 
 ### Module Integration `tests/integration/modules/groups/conftest.py`
 
-Module-level integration fixtures for groups (not examined, presumed to contain):
-- Group operation request/response data
-- Service-level mocks
-- Provider integration setup
-- Event capture for groups operations
+Module-level integration fixtures for groups. Location: `/workspace/app/tests/integration/modules/groups/conftest.py`
+
+**Orchestration Layer Mocks:**
+- `mock_orchestration` - Configurable mock orchestration layer for add/remove member operations
+  - Patches: `modules.groups.core.orchestration.add_member_to_group` and `modules.groups.core.orchestration.remove_member_from_group`
+  - Returns: Namespace with `add_member` and `remove_member` mocks
+  - Default behavior: Success responses
+
+**Event System Mocks:**
+- `mock_event_dispatch` - Captures dispatched events for groups operations
+  - Patches: `modules.groups.core.service.dispatch_background` (legacy)
+  - Should be migrated to patch `infrastructure.events.dispatch_event` (centralized)
+  - Provides: `get_dispatched()` and `clear_dispatched()` methods
+
+- `mock_event_system` - Complete event system mock for groups
+  - Patches: `modules.groups.events.dispatch_event` (legacy)
+  - **TODO**: Update to patch `infrastructure.events.dispatch_event` after event system migration completes
+  - Provides: dispatch, subscribe, get_dispatched, get_subscribers, clear methods
+
+**Validation Layer Mocks:**
+- `mock_validation_success` - Mocks validation to always pass
+- `mock_validation_failure` - Mocks validation to return errors
+
+**Service Access:**
+- `groups_module` - Direct import of groups service module
+- `groups_orchestration` - Direct import of orchestration module
+- `groups_validation` - Direct import of validation module
+
+**Integration Test Context:**
+- `integration_test_context` - Pre-configured context with orchestration, events, and validation mocked
+- `isolated_group_service` - Groups service with all external boundaries mocked
+
+**Note:** These fixtures are **groups-specific** and only available to tests under `tests/integration/modules/groups/`. They extend the root integration fixtures with groups domain knowledge.
 
 ### Module Integration `tests/integration/modules/sre/conftest.py`
 

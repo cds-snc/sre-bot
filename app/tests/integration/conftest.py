@@ -117,12 +117,67 @@ def mock_event_dispatch(monkeypatch):
     return mock
 
 
+@pytest.fixture(autouse=True)
+def _autouse_mock_dynamodb_audit(monkeypatch):
+    """Automatically mock DynamoDB audit writes for all integration tests.
+
+    Integration tests should not write to actual DynamoDB tables.
+    This autouse fixture mocks the audit persistence layer to prevent
+    actual database writes during testing.
+    """
+    mock = MagicMock()
+    monkeypatch.setattr(
+        "infrastructure.events.handlers.audit.dynamodb_audit.write_audit_event",
+        mock,
+        raising=False,
+    )
+    return mock
+
+
+@pytest.fixture(autouse=True)
+def _autouse_mock_sentinel_client(monkeypatch):
+    """Automatically mock Sentinel client for all integration tests.
+
+    Integration tests should not make real calls to external systems.
+    This autouse fixture mocks the Sentinel client at the system boundary
+    at all import locations to prevent actual Sentinel calls.
+
+    Note: Individual tests can override or assert on the mock behavior
+    by requesting the mock_sentinel_client fixture.
+    """
+    mock = MagicMock()
+    mock.return_value = True
+
+    # Patch at all possible import locations
+    monkeypatch.setattr(
+        "integrations.sentinel.client.log_to_sentinel",
+        mock,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "integrations.sentinel.client.log_audit_event",
+        mock,
+        raising=False,
+    )
+    # Patch where it's imported in the audit handler
+    monkeypatch.setattr(
+        "infrastructure.events.handlers.audit.sentinel_client.log_audit_event",
+        mock,
+        raising=False,
+    )
+
+    return mock
+
+
 @pytest.fixture
 def mock_sentinel_client(monkeypatch):
     """Mock Sentinel client to prevent actual external calls.
 
     Integration tests should not make real calls to external systems.
     This fixture mocks the Sentinel client at the system boundary.
+
+    Note: For most integration tests, the autouse fixture
+    _autouse_mock_sentinel_client is automatically applied.
 
     Returns:
         MagicMock: Mock Sentinel client

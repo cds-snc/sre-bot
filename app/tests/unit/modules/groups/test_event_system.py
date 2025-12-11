@@ -6,7 +6,6 @@ exception handling, and lifecycle management.
 
 import pytest
 from threading import Event
-from unittest.mock import patch
 
 from modules.groups.events import system as event_system
 
@@ -179,17 +178,22 @@ class TestSynchronousDispatch:
         assert "good" in called
         assert "success" in results
 
-    def test_dispatch_handler_exception_logged(self):
+    def test_dispatch_handler_exception_logged(self, monkeypatch):
         """Handler exception is logged."""
+        from unittest.mock import MagicMock
+
         event_system.EVENT_HANDLERS.clear()
 
         @event_system.register_event_handler("test.log_exc")
         def failing_handler(payload):
             raise RuntimeError("test error")
 
-        with patch("modules.groups.events.system.logger") as mock_logger:
-            event_system.dispatch_event("test.log_exc", {})
-            mock_logger.error.assert_called()
+        mock_logger = MagicMock()
+        monkeypatch.setattr(
+            "modules.groups.events.system.logger", mock_logger, raising=False
+        )
+        event_system.dispatch_event("test.log_exc", {})
+        mock_logger.error.assert_called()
 
     def test_dispatch_handler_receives_correct_payload(self):
         """Handler receives correct payload even if previous handler modified it."""
@@ -328,8 +332,10 @@ class TestBackgroundDispatch:
         assert 1 in called
         assert 2 in called
 
-    def test_dispatch_background_exception_logged(self):
+    def test_dispatch_background_exception_logged(self, monkeypatch):
         """Background handler exception is logged."""
+        from unittest.mock import MagicMock
+
         event_system.EVENT_HANDLERS.clear()
         evt = Event()
 
@@ -340,11 +346,14 @@ class TestBackgroundDispatch:
 
         event_system.start_event_executor(max_workers=1)
 
-        with patch("modules.groups.events.system.logger") as mock_logger:
-            event_system.dispatch_background("test.bg_exc", {})
-            evt.wait(2)
-            # Error should be logged
-            assert mock_logger.exception.called or mock_logger.error.called
+        mock_logger = MagicMock()
+        monkeypatch.setattr(
+            "modules.groups.events.system.logger", mock_logger, raising=False
+        )
+        event_system.dispatch_background("test.bg_exc", {})
+        evt.wait(2)
+        # Error should be logged
+        assert mock_logger.exception.called or mock_logger.error.called
 
 
 class TestExecutorLifecycle:

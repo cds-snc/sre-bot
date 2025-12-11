@@ -5,7 +5,7 @@ using mocked DynamoDB client responses.
 """
 
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -19,7 +19,7 @@ from infrastructure.operations.result import OperationResult
 class TestWriteAuditEvent:
     """Tests for writing audit events to DynamoDB."""
 
-    def test_write_audit_event_success(self):
+    def test_write_audit_event_success(self, monkeypatch):
         """Successfully write audit event to DynamoDB."""
         audit_event = AuditEvent(
             correlation_id=str(uuid4()),
@@ -32,22 +32,25 @@ class TestWriteAuditEvent:
             provider="google",
         )
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.put_item.return_value = OperationResult.success(
-                data={}, message="Item written"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.put_item.return_value = OperationResult.success(
+            data={}, message="Item written"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            result = dynamodb_audit.write_audit_event(audit_event)
+        result = dynamodb_audit.write_audit_event(audit_event)
 
-            assert result is True
-            assert mock_dynamo.put_item.called
-            call_args = mock_dynamo.put_item.call_args[1]
-            assert call_args["table_name"] == "sre_bot_audit_trail"
-            assert "Item" in call_args
+        assert result is True
+        assert mock_dynamo.put_item.called
+        call_args = mock_dynamo.put_item.call_args[1]
+        assert call_args["table_name"] == "sre_bot_audit_trail"
+        assert "Item" in call_args
 
-    def test_write_audit_event_with_justification(self):
+    def test_write_audit_event_with_justification(self, monkeypatch):
         """Audit event with justification is written correctly."""
         audit_event = AuditEvent(
             correlation_id=str(uuid4()),
@@ -61,26 +64,29 @@ class TestWriteAuditEvent:
             audit_meta_justification="User joining team for Q1 project",
         )
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.put_item.return_value = OperationResult.success(
-                data={}, message="Item written"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.put_item.return_value = OperationResult.success(
+            data={}, message="Item written"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            result = dynamodb_audit.write_audit_event(audit_event)
+        result = dynamodb_audit.write_audit_event(audit_event)
 
-            assert result is True
-            call_args = mock_dynamo.put_item.call_args[1]
-            item = call_args["Item"]
+        assert result is True
+        call_args = mock_dynamo.put_item.call_args[1]
+        item = call_args["Item"]
 
-            # Verify justification is included
-            assert "audit_meta_justification" in item
-            assert item["audit_meta_justification"] == {
-                "S": "User joining team for Q1 project"
-            }
+        # Verify justification is included
+        assert "audit_meta_justification" in item
+        assert item["audit_meta_justification"] == {
+            "S": "User joining team for Q1 project"
+        }
 
-    def test_write_audit_event_with_ttl(self):
+    def test_write_audit_event_with_ttl(self, monkeypatch):
         """Audit event includes TTL timestamp."""
         audit_event = AuditEvent(
             correlation_id=str(uuid4()),
@@ -92,28 +98,31 @@ class TestWriteAuditEvent:
             result="success",
         )
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.put_item.return_value = OperationResult.success(
-                data={}, message="Item written"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.put_item.return_value = OperationResult.success(
+            data={}, message="Item written"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            result = dynamodb_audit.write_audit_event(audit_event, retention_days=90)
+        result = dynamodb_audit.write_audit_event(audit_event, retention_days=90)
 
-            assert result is True
-            call_args = mock_dynamo.put_item.call_args[1]
-            item = call_args["Item"]
+        assert result is True
+        call_args = mock_dynamo.put_item.call_args[1]
+        item = call_args["Item"]
 
-            # Verify TTL is set
-            assert "ttl_timestamp" in item
-            assert "N" in item["ttl_timestamp"]
-            # TTL should be a future timestamp
-            ttl_value = int(item["ttl_timestamp"]["N"])
-            now_ts = int(datetime.now(timezone.utc).timestamp())
-            assert ttl_value > now_ts
+        # Verify TTL is set
+        assert "ttl_timestamp" in item
+        assert "N" in item["ttl_timestamp"]
+        # TTL should be a future timestamp
+        ttl_value = int(item["ttl_timestamp"]["N"])
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        assert ttl_value > now_ts
 
-    def test_write_audit_event_failure_returns_false(self):
+    def test_write_audit_event_failure_returns_false(self, monkeypatch):
         """Write returns False on DynamoDB error."""
         audit_event = AuditEvent(
             correlation_id=str(uuid4()),
@@ -125,18 +134,21 @@ class TestWriteAuditEvent:
             result="success",
         )
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.put_item.return_value = OperationResult.permanent_error(
-                message="Table not found", error_code="ResourceNotFoundException"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.put_item.return_value = OperationResult.permanent_error(
+            message="Table not found", error_code="ResourceNotFoundException"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            result = dynamodb_audit.write_audit_event(audit_event)
+        result = dynamodb_audit.write_audit_event(audit_event)
 
-            assert result is False
+        assert result is False
 
-    def test_write_audit_event_exception_returns_false(self):
+    def test_write_audit_event_exception_returns_false(self, monkeypatch):
         """Write returns False and logs on unexpected exception."""
         audit_event = AuditEvent(
             correlation_id=str(uuid4()),
@@ -148,21 +160,24 @@ class TestWriteAuditEvent:
             result="success",
         )
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.put_item.side_effect = Exception("Unexpected error")
+        mock_dynamo = MagicMock()
+        mock_dynamo.put_item.side_effect = Exception("Unexpected error")
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            result = dynamodb_audit.write_audit_event(audit_event)
+        result = dynamodb_audit.write_audit_event(audit_event)
 
-            assert result is False
+        assert result is False
 
 
 @pytest.mark.unit
 class TestGetAuditTrail:
     """Tests for querying audit trail by resource_id."""
 
-    def test_get_audit_trail_success(self):
+    def test_get_audit_trail_success(self, monkeypatch):
         """Successfully query audit trail for resource."""
         sample_items = [
             {
@@ -179,69 +194,81 @@ class TestGetAuditTrail:
             },
         ]
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=sample_items, message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=sample_items, message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            items = dynamodb_audit.get_audit_trail("eng@example.com", limit=10)
+        items = dynamodb_audit.get_audit_trail("eng@example.com", limit=10)
 
-            assert len(items) == 2
-            assert items[0]["action"]["S"] == "group_member_added"
-            assert mock_dynamo.query.called
-            call_args = mock_dynamo.query.call_args[1]
-            assert call_args["table_name"] == "sre_bot_audit_trail"
-            assert "KeyConditionExpression" in call_args
+        assert len(items) == 2
+        assert items[0]["action"]["S"] == "group_member_added"
+        assert mock_dynamo.query.called
+        call_args = mock_dynamo.query.call_args[1]
+        assert call_args["table_name"] == "sre_bot_audit_trail"
+        assert "KeyConditionExpression" in call_args
 
-    def test_get_audit_trail_with_limit(self):
+    def test_get_audit_trail_with_limit(self, monkeypatch):
         """Query respects limit parameter."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=[], message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=[], message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            dynamodb_audit.get_audit_trail("eng@example.com", limit=50)
+        dynamodb_audit.get_audit_trail("eng@example.com", limit=50)
 
-            call_args = mock_dynamo.query.call_args[1]
-            assert call_args["Limit"] == 50
+        call_args = mock_dynamo.query.call_args[1]
+        assert call_args["Limit"] == 50
 
-    def test_get_audit_trail_limit_max_100(self):
+    def test_get_audit_trail_limit_max_100(self, monkeypatch):
         """Query limit capped at 100."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=[], message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=[], message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            dynamodb_audit.get_audit_trail("eng@example.com", limit=200)
+        dynamodb_audit.get_audit_trail("eng@example.com", limit=200)
 
-            call_args = mock_dynamo.query.call_args[1]
-            assert call_args["Limit"] == 100
+        call_args = mock_dynamo.query.call_args[1]
+        assert call_args["Limit"] == 100
 
-    def test_get_audit_trail_error_returns_empty_list(self):
+    def test_get_audit_trail_error_returns_empty_list(self, monkeypatch):
         """Query error returns empty list without raising."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.permanent_error(
-                message="Query failed", error_code="InternalServerError"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.permanent_error(
+            message="Query failed", error_code="InternalServerError"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            items = dynamodb_audit.get_audit_trail("eng@example.com")
+        items = dynamodb_audit.get_audit_trail("eng@example.com")
 
-            assert items == []
+        assert items == []
 
 
 @pytest.mark.unit
 class TestGetUserAuditTrail:
     """Tests for querying audit trail by user_email."""
 
-    def test_get_user_audit_trail_success(self):
+    def test_get_user_audit_trail_success(self, monkeypatch):
         """Successfully query audit trail for user."""
         sample_items = [
             {
@@ -252,40 +279,46 @@ class TestGetUserAuditTrail:
             },
         ]
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=sample_items, message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=sample_items, message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            items = dynamodb_audit.get_user_audit_trail("alice@example.com", limit=10)
+        items = dynamodb_audit.get_user_audit_trail("alice@example.com", limit=10)
 
-            assert len(items) == 1
-            assert items[0]["user_email"]["S"] == "alice@example.com"
-            assert mock_dynamo.query.called
-            call_args = mock_dynamo.query.call_args[1]
-            assert call_args["IndexName"] == "user_email-timestamp-index"
+        assert len(items) == 1
+        assert items[0]["user_email"]["S"] == "alice@example.com"
+        assert mock_dynamo.query.called
+        call_args = mock_dynamo.query.call_args[1]
+        assert call_args["IndexName"] == "user_email-timestamp-index"
 
-    def test_get_user_audit_trail_error_returns_empty_list(self):
+    def test_get_user_audit_trail_error_returns_empty_list(self, monkeypatch):
         """Query error returns empty list without raising."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.permanent_error(
-                message="Query failed", error_code="InternalServerError"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.permanent_error(
+            message="Query failed", error_code="InternalServerError"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            items = dynamodb_audit.get_user_audit_trail("alice@example.com")
+        items = dynamodb_audit.get_user_audit_trail("alice@example.com")
 
-            assert items == []
+        assert items == []
 
 
 @pytest.mark.unit
 class TestGetByCorrelationId:
     """Tests for querying audit event by correlation_id."""
 
-    def test_get_by_correlation_id_found(self):
+    def test_get_by_correlation_id_found(self, monkeypatch):
         """Successfully find audit event by correlation ID."""
         sample_items = [
             {
@@ -295,43 +328,52 @@ class TestGetByCorrelationId:
             },
         ]
 
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=sample_items, message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=sample_items, message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            item = dynamodb_audit.get_by_correlation_id("req-abc123")
+        item = dynamodb_audit.get_by_correlation_id("req-abc123")
 
-            assert item is not None
-            assert item["correlation_id"]["S"] == "req-abc123"
-            assert mock_dynamo.query.called
-            call_args = mock_dynamo.query.call_args[1]
-            assert call_args["IndexName"] == "correlation_id-index"
+        assert item is not None
+        assert item["correlation_id"]["S"] == "req-abc123"
+        assert mock_dynamo.query.called
+        call_args = mock_dynamo.query.call_args[1]
+        assert call_args["IndexName"] == "correlation_id-index"
 
-    def test_get_by_correlation_id_not_found(self):
+    def test_get_by_correlation_id_not_found(self, monkeypatch):
         """Return None when correlation ID not found."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.success(
-                data=[], message="Query successful"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.success(
+            data=[], message="Query successful"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            item = dynamodb_audit.get_by_correlation_id("nonexistent")
+        item = dynamodb_audit.get_by_correlation_id("nonexistent")
 
-            assert item is None
+        assert item is None
 
-    def test_get_by_correlation_id_error_returns_none(self):
+    def test_get_by_correlation_id_error_returns_none(self, monkeypatch):
         """Query error returns None without raising."""
-        with patch(
-            "infrastructure.persistence.dynamodb_audit.dynamodb_next"
-        ) as mock_dynamo:
-            mock_dynamo.query.return_value = OperationResult.permanent_error(
-                message="Query failed", error_code="InternalServerError"
-            )
+        mock_dynamo = MagicMock()
+        mock_dynamo.query.return_value = OperationResult.permanent_error(
+            message="Query failed", error_code="InternalServerError"
+        )
+        monkeypatch.setattr(
+            "infrastructure.persistence.dynamodb_audit.dynamodb_next",
+            mock_dynamo,
+            raising=False,
+        )
 
-            item = dynamodb_audit.get_by_correlation_id("req-abc123")
+        item = dynamodb_audit.get_by_correlation_id("req-abc123")
 
-            assert item is None
+        assert item is None

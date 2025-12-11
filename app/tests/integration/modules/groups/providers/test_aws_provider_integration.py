@@ -17,7 +17,7 @@ identity_store API calls to verify provider behavior and data flow.
 
 import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.operations.result import OperationResult as OperationResultImpl
@@ -43,13 +43,15 @@ def mock_settings():
 
 
 @pytest.fixture
-def aws_provider(mock_settings):
+def aws_provider(mock_settings, monkeypatch):
     """Provide an AwsIdentityCenterProvider instance with mocked settings."""
     from modules.groups.providers import aws_identity_center
 
-    with patch("modules.groups.providers.base.settings", mock_settings):
-        provider = aws_identity_center.AwsIdentityCenterProvider()
-        yield provider
+    monkeypatch.setattr(
+        "modules.groups.providers.base.settings", mock_settings, raising=False
+    )
+    provider = aws_identity_center.AwsIdentityCenterProvider()
+    return provider
 
 
 @pytest.fixture
