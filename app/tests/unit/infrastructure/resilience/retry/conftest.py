@@ -1,7 +1,6 @@
 """Shared fixtures for retry system tests."""
 
 import pytest
-from datetime import datetime, timezone
 from typing import Dict, Any
 
 from infrastructure.resilience.retry import (

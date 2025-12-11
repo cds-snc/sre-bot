@@ -1,13 +1,10 @@
 """Unit tests for retry store."""
 
-import pytest
 import threading
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from infrastructure.resilience.retry import (
-    RetryConfig,
-    RetryRecord,
     InMemoryRetryStore,
 )
 

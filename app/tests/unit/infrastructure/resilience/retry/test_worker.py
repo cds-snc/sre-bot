@@ -1,10 +1,6 @@
 """Unit tests for retry worker."""
 
-import pytest
-
 from infrastructure.resilience.retry import (
-    RetryConfig,
-    RetryRecord,
     RetryResult,
     RetryWorker,
     InMemoryRetryStore,
