@@ -202,7 +202,7 @@ class TestRetryWorker:
         record_id = retry_store.save(record)
 
         custom_id = "custom-worker-123"
-        worker = RetryWorker(retry_store, mock_processor, worker_id=custom_id)
+        RetryWorker(retry_store, mock_processor, worker_id=custom_id)
 
         # Claim the record to verify worker_id
         retry_store.claim_record(record_id, custom_id, 300)

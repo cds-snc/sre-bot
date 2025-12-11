@@ -213,9 +213,9 @@ class TestInMemoryRetryStore:
 
         retry_store.increment_attempt(record_id, "Error message")
 
-        # Fetch the record to check attempts
-        due_records = retry_store.fetch_due()
-        # Won't be due immediately due to backoff, so check stats
+        # Fetch the record to check attempts (won't be due due to backoff)
+        retry_store.fetch_due()
+        # Check stats to verify record is still active
         stats = retry_store.get_stats()
         assert stats["active_records"] == 1
 
@@ -278,7 +278,7 @@ class TestInMemoryRetryStore:
         record1 = retry_record_factory()
         record2 = retry_record_factory()
         id1 = retry_store.save(record1)
-        id2 = retry_store.save(record2)
+        retry_store.save(record2)
 
         # Claim one
         retry_store.claim_record(id1, "worker-1", 300)

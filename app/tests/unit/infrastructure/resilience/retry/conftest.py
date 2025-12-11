@@ -86,3 +86,89 @@ def mock_processor():
             self.result = RetryResult.SUCCESS
 
     return MockProcessor()
+
+
+@pytest.fixture
+def mock_dynamodb_next():
+    """Mock dynamodb_next module for testing."""
+    from unittest.mock import MagicMock
+    from infrastructure.operations import OperationResult
+
+    mock = MagicMock()
+
+    # Default successful responses
+    mock.put_item.return_value = OperationResult.success(data={})
+    mock.get_item.return_value = OperationResult.success(data={"Item": {}})
+    mock.query.return_value = OperationResult.success(data={"Items": [], "Count": 0})
+    mock.update_item.return_value = OperationResult.success(data={})
+    mock.delete_item.return_value = OperationResult.success(data={})
+
+    return mock
+
+
+@pytest.fixture
+def dynamodb_retry_store(retry_config_factory, mock_dynamodb_next, monkeypatch):
+    """Create DynamoDB retry store with mocked dynamodb_next."""
+    monkeypatch.setattr(
+        "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
+        mock_dynamodb_next,
+    )
+
+    from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
+
+    config = retry_config_factory()
+    store = DynamoDBRetryStore(
+        config=config,
+        table_name="test-retry-table",
+        ttl_days=30,
+    )
+    store._mock_dynamodb_next = mock_dynamodb_next  # Attach for test access
+    return store
+
+
+@pytest.fixture
+def mock_settings_memory_backend(monkeypatch):
+    """Mock settings to use memory backend."""
+    from types import SimpleNamespace
+
+    mock_retry_settings = SimpleNamespace(
+        backend="memory",
+        max_attempts=5,
+        base_delay_seconds=60,
+        max_delay_seconds=3600,
+        batch_size=10,
+        claim_lease_seconds=300,
+        dynamodb_table_name="retry-records",
+        dynamodb_region="ca-central-1",
+        dynamodb_ttl_days=30,
+    )
+
+    monkeypatch.setattr(
+        "infrastructure.configuration.settings.retry",
+        mock_retry_settings,
+    )
+    return mock_retry_settings
+
+
+@pytest.fixture
+def mock_settings_dynamodb_backend(monkeypatch):
+    """Mock settings to use DynamoDB backend."""
+    from types import SimpleNamespace
+
+    mock_retry_settings = SimpleNamespace(
+        backend="dynamodb",
+        max_attempts=5,
+        base_delay_seconds=60,
+        max_delay_seconds=3600,
+        batch_size=10,
+        claim_lease_seconds=300,
+        dynamodb_table_name="test-retry-records",
+        dynamodb_region="ca-central-1",
+        dynamodb_ttl_days=30,
+    )
+
+    monkeypatch.setattr(
+        "infrastructure.configuration.settings.retry",
+        mock_retry_settings,
+    )
+    return mock_retry_settings
