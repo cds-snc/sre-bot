@@ -6,7 +6,7 @@ Sentinel integration.
 
 from datetime import datetime
 from uuid import uuid4
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock
 
 import pytest
 
@@ -660,7 +660,7 @@ class TestAuditHandlerJustificationPersistence:
 class TestAuditHandlerDynamoDBIntegration:
     """Tests for DynamoDB dual-write functionality."""
 
-    def test_handler_writes_to_dynamodb(self):
+    def test_handler_writes_to_dynamodb(self, monkeypatch):
         """Audit handler writes to both Sentinel and DynamoDB."""
         correlation_id = uuid4()
         event = Event(
@@ -682,24 +682,27 @@ class TestAuditHandlerDynamoDBIntegration:
         handler.sentinel_client = mock_sentinel
 
         # Mock DynamoDB write
-        with patch(
-            "infrastructure.events.handlers.audit.dynamodb_audit"
-        ) as mock_dynamodb:
-            mock_dynamodb.write_audit_event.return_value = True
+        mock_dynamodb = MagicMock()
+        mock_dynamodb.write_audit_event.return_value = True
+        monkeypatch.setattr(
+            "infrastructure.events.handlers.audit.dynamodb_audit",
+            mock_dynamodb,
+            raising=False,
+        )
 
-            handler.handle(event)
+        handler.handle(event)
 
-            # Verify both Sentinel and DynamoDB were called
-            assert mock_sentinel.log_audit_event.called
-            assert mock_dynamodb.write_audit_event.called
+        # Verify both Sentinel and DynamoDB were called
+        assert mock_sentinel.log_audit_event.called
+        assert mock_dynamodb.write_audit_event.called
 
-            # Verify same audit event was passed to both
-            sentinel_event = mock_sentinel.log_audit_event.call_args[0][0]
-            dynamodb_event = mock_dynamodb.write_audit_event.call_args[0][0]
-            assert sentinel_event.correlation_id == dynamodb_event.correlation_id
-            assert sentinel_event.action == dynamodb_event.action
+        # Verify same audit event was passed to both
+        sentinel_event = mock_sentinel.log_audit_event.call_args[0][0]
+        dynamodb_event = mock_dynamodb.write_audit_event.call_args[0][0]
+        assert sentinel_event.correlation_id == dynamodb_event.correlation_id
+        assert sentinel_event.action == dynamodb_event.action
 
-    def test_handler_continues_if_dynamodb_fails(self):
+    def test_handler_continues_if_dynamodb_fails(self, monkeypatch):
         """Handler continues even if DynamoDB write fails."""
         correlation_id = uuid4()
         event = Event(
@@ -717,18 +720,21 @@ class TestAuditHandlerDynamoDBIntegration:
         handler.sentinel_client = mock_sentinel
 
         # Mock DynamoDB write failure
-        with patch(
-            "infrastructure.events.handlers.audit.dynamodb_audit"
-        ) as mock_dynamodb:
-            mock_dynamodb.write_audit_event.return_value = False
+        mock_dynamodb = MagicMock()
+        mock_dynamodb.write_audit_event.return_value = False
+        monkeypatch.setattr(
+            "infrastructure.events.handlers.audit.dynamodb_audit",
+            mock_dynamodb,
+            raising=False,
+        )
 
-            # Should not raise exception
-            handler.handle(event)
+        # Should not raise exception
+        handler.handle(event)
 
-            # Sentinel write should still succeed
-            assert mock_sentinel.log_audit_event.called
+        # Sentinel write should still succeed
+        assert mock_sentinel.log_audit_event.called
 
-    def test_handler_resilient_to_dynamodb_exception(self):
+    def test_handler_resilient_to_dynamodb_exception(self, monkeypatch):
         """Handler is resilient to DynamoDB exceptions."""
         correlation_id = uuid4()
         event = Event(
@@ -746,13 +752,16 @@ class TestAuditHandlerDynamoDBIntegration:
         handler.sentinel_client = mock_sentinel
 
         # Mock DynamoDB raising exception
-        with patch(
-            "infrastructure.events.handlers.audit.dynamodb_audit"
-        ) as mock_dynamodb:
-            mock_dynamodb.write_audit_event.side_effect = Exception("DynamoDB error")
+        mock_dynamodb = MagicMock()
+        mock_dynamodb.write_audit_event.side_effect = Exception("DynamoDB error")
+        monkeypatch.setattr(
+            "infrastructure.events.handlers.audit.dynamodb_audit",
+            mock_dynamodb,
+            raising=False,
+        )
 
-            # Should not raise exception - handler is resilient
-            handler.handle(event)
+        # Should not raise exception - handler is resilient
+        handler.handle(event)
 
-            # Sentinel write should still succeed
-            assert mock_sentinel.log_audit_event.called
+        # Sentinel write should still succeed
+        assert mock_sentinel.log_audit_event.called

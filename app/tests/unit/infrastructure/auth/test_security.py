@@ -7,7 +7,7 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock
 from fastapi import HTTPException
 from jwt import PyJWTError
 from infrastructure.auth.security import (
@@ -69,46 +69,55 @@ class TestJWKSManager:
 class TestGetIssuerFromToken:
     """Test suite for get_issuer_from_token utility."""
 
-    def test_get_issuer_from_valid_token(self):
+    def test_get_issuer_from_valid_token(self, monkeypatch):
         """Test extracting issuer from valid JWT token."""
         # Mock token with issuer claim
         mock_token = "header.payload.signature"
 
-        with patch("infrastructure.auth.security.decode") as mock_decode:
-            mock_decode.return_value = {
-                "iss": "https://issuer.com",
-                "sub": "user123",
-            }
+        mock_decode = MagicMock()
+        mock_decode.return_value = {
+            "iss": "https://issuer.com",
+            "sub": "user123",
+        }
+        monkeypatch.setattr(
+            "infrastructure.auth.security.decode", mock_decode, raising=False
+        )
 
-            issuer = get_issuer_from_token(mock_token)
+        issuer = get_issuer_from_token(mock_token)
 
-            assert issuer == "https://issuer.com"
-            mock_decode.assert_called_once_with(
-                mock_token,
-                options={"verify_signature": False},
-            )
+        assert issuer == "https://issuer.com"
+        mock_decode.assert_called_once_with(
+            mock_token,
+            options={"verify_signature": False},
+        )
 
-    def test_get_issuer_from_token_missing_claim(self):
+    def test_get_issuer_from_token_missing_claim(self, monkeypatch):
         """Test get_issuer_from_token with missing 'iss' claim."""
         mock_token = "header.payload.signature"
 
-        with patch("infrastructure.auth.security.decode") as mock_decode:
-            mock_decode.return_value = {"sub": "user123"}
+        mock_decode = MagicMock()
+        mock_decode.return_value = {"sub": "user123"}
+        monkeypatch.setattr(
+            "infrastructure.auth.security.decode", mock_decode, raising=False
+        )
 
-            issuer = get_issuer_from_token(mock_token)
+        issuer = get_issuer_from_token(mock_token)
 
-            assert issuer is None
+        assert issuer is None
 
-    def test_get_issuer_from_token_invalid(self):
+    def test_get_issuer_from_token_invalid(self, monkeypatch):
         """Test get_issuer_from_token with invalid token."""
         mock_token = "invalid.token"
 
-        with patch("infrastructure.auth.security.decode") as mock_decode:
-            mock_decode.side_effect = PyJWTError("Invalid token")
+        mock_decode = MagicMock()
+        mock_decode.side_effect = PyJWTError("Invalid token")
+        monkeypatch.setattr(
+            "infrastructure.auth.security.decode", mock_decode, raising=False
+        )
 
-            issuer = get_issuer_from_token(mock_token)
+        issuer = get_issuer_from_token(mock_token)
 
-            assert issuer is None
+        assert issuer is None
 
 
 class TestExtractUserInfoFromToken:
@@ -149,62 +158,83 @@ class TestValidateJwtToken:
         pass
 
     @pytest.mark.asyncio
-    async def test_validate_jwt_token_missing_issuer(self):
+    async def test_validate_jwt_token_missing_issuer(self, monkeypatch):
         """Test validate_jwt_token with missing issuer."""
         mock_credentials = Mock()
         mock_credentials.scheme = "Bearer"
         mock_credentials.credentials = "token.without.issuer"
 
-        with patch("infrastructure.auth.security.get_issuer_from_token") as mock_issuer:
-            mock_issuer.return_value = None
+        mock_issuer = MagicMock()
+        mock_issuer.return_value = None
+        monkeypatch.setattr(
+            "infrastructure.auth.security.get_issuer_from_token",
+            mock_issuer,
+            raising=False,
+        )
 
-            with pytest.raises(HTTPException) as exc_info:
-                await validate_jwt_token(mock_credentials)
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_jwt_token(mock_credentials)
 
-            assert exc_info.value.status_code == 401
-            assert "issuer" in str(exc_info.value.detail).lower()
+        assert exc_info.value.status_code == 401
+        assert "issuer" in str(exc_info.value.detail).lower()
 
     @pytest.mark.asyncio
-    async def test_validate_jwt_token_unknown_issuer(self):
+    async def test_validate_jwt_token_unknown_issuer(self, monkeypatch):
         """Test validate_jwt_token with unknown issuer."""
         mock_credentials = Mock()
         mock_credentials.credentials = "token.unknown.issuer"
 
-        with (
-            patch("infrastructure.auth.security.get_issuer_from_token") as mock_issuer,
-            patch("infrastructure.auth.security.jwks_manager") as mock_manager,
-        ):
+        mock_issuer = MagicMock()
+        mock_issuer.return_value = "https://unknown.com"
+        monkeypatch.setattr(
+            "infrastructure.auth.security.get_issuer_from_token",
+            mock_issuer,
+            raising=False,
+        )
 
-            mock_issuer.return_value = "https://unknown.com"
-            mock_manager.get_jwks_client.return_value = None
+        mock_manager = MagicMock()
+        mock_manager.get_jwks_client.return_value = None
+        monkeypatch.setattr(
+            "infrastructure.auth.security.jwks_manager", mock_manager, raising=False
+        )
 
-            with pytest.raises(HTTPException) as exc_info:
-                await validate_jwt_token(mock_credentials)
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_jwt_token(mock_credentials)
 
-            assert exc_info.value.status_code == 401
+        assert exc_info.value.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_validate_jwt_token_invalid_signature(self):
+    async def test_validate_jwt_token_invalid_signature(self, monkeypatch):
         """Test validate_jwt_token with invalid signature."""
         mock_credentials = Mock()
         mock_credentials.credentials = "invalid.signature.token"
 
-        with (
-            patch("infrastructure.auth.security.get_issuer_from_token") as mock_issuer,
-            patch("infrastructure.auth.security.jwks_manager") as mock_manager,
-            patch("infrastructure.auth.security.decode") as mock_decode,
-        ):
+        mock_issuer = MagicMock()
+        mock_issuer.return_value = "https://test.com"
+        monkeypatch.setattr(
+            "infrastructure.auth.security.get_issuer_from_token",
+            mock_issuer,
+            raising=False,
+        )
 
-            mock_issuer.return_value = "https://test.com"
-            mock_client = Mock()
-            mock_manager.get_jwks_client.return_value = mock_client
-            mock_client.get_signing_key_from_jwt.return_value.key = "signing_key"
-            mock_decode.side_effect = PyJWTError("Invalid signature")
+        mock_manager = MagicMock()
+        mock_client = Mock()
+        mock_manager.get_jwks_client.return_value = mock_client
+        mock_client.get_signing_key_from_jwt.return_value.key = "signing_key"
+        monkeypatch.setattr(
+            "infrastructure.auth.security.jwks_manager", mock_manager, raising=False
+        )
 
-            with pytest.raises(HTTPException) as exc_info:
-                await validate_jwt_token(mock_credentials)
+        mock_decode = MagicMock()
+        mock_decode.side_effect = PyJWTError("Invalid signature")
+        monkeypatch.setattr(
+            "infrastructure.auth.security.decode", mock_decode, raising=False
+        )
 
-            assert exc_info.value.status_code == 401
+        with pytest.raises(HTTPException) as exc_info:
+            await validate_jwt_token(mock_credentials)
+
+        assert exc_info.value.status_code == 401
 
 
 class TestJWKSManagerSingleton:
