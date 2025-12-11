@@ -12,7 +12,7 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from infrastructure.notifications.dispatcher import NotificationDispatcher
 from infrastructure.notifications.channels.chat import ChatChannel
@@ -51,69 +51,34 @@ class MockIdempotencyCache(IdempotencyCache):
 class TestDispatcherWithRealChannels:
     """Integration tests with real channel implementations."""
 
-    @pytest.fixture
-    def mock_slack_client(self):
-        """Mock Slack client for ChatChannel."""
-        with patch(
-            "infrastructure.notifications.channels.chat.SlackClientManager"
-        ) as mock_manager:
-            mock_client = MagicMock()
-            mock_manager.return_value.get_client.return_value = mock_client
-
-            # Mock successful user lookup
-            mock_client.users_lookupByEmail.return_value = {
-                "ok": True,
-                "user": {"id": "U12345"},
-            }
-
-            # Mock successful DM
-            mock_client.conversations_open.return_value = {
-                "ok": True,
-                "channel": {"id": "D12345"},
-            }
-            mock_client.chat_postMessage.return_value = {
-                "ok": True,
-                "ts": "1234567890.123456",
-            }
-
-            yield mock_client
-
-    @pytest.fixture
-    def mock_gmail_service(self):
-        """Mock Gmail service for EmailChannel."""
-        with patch.multiple(
-            "infrastructure.notifications.channels.email.gmail_next",
-            send_email=MagicMock(
-                return_value=OperationResult(
-                    status=OperationStatus.SUCCESS,
-                    message="Email sent successfully",
-                    data={"id": "msg123", "threadId": "thread123"},
-                )
-            ),
-            list_messages=MagicMock(
-                return_value=OperationResult(
-                    status=OperationStatus.SUCCESS,
-                    message="Messages listed successfully",
-                    data=[],
-                )
-            ),
-        ) as mocks:
-            yield mocks
-
-    @pytest.fixture
-    def mock_notify_client(self):
-        """Mock GC Notify client for SMSChannel."""
-        with patch(
-            "infrastructure.notifications.channels.sms.post_event"
-        ) as mock_post_event:
-            mock_response = MagicMock()
-            mock_response.status_code = 201
-            mock_response.json.return_value = {"id": "sms123"}
-            mock_post_event.return_value = mock_response
-            yield mock_post_event
-
-    def test_send_notification_through_chat_channel(self, mock_slack_client):
+    def test_send_notification_through_chat_channel(self, monkeypatch):
         """Test end-to-end chat notification."""
+        mock_manager = MagicMock()
+        mock_client = MagicMock()
+        mock_manager.return_value.get_client.return_value = mock_client
+
+        # Mock successful user lookup
+        mock_client.users_lookupByEmail.return_value = {
+            "ok": True,
+            "user": {"id": "U12345"},
+        }
+
+        # Mock successful DM
+        mock_client.conversations_open.return_value = {
+            "ok": True,
+            "channel": {"id": "D12345"},
+        }
+        mock_client.chat_postMessage.return_value = {
+            "ok": True,
+            "ts": "1234567890.123456",
+        }
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_manager,
+            raising=False,
+        )
+
         chat_channel = ChatChannel()
         dispatcher = NotificationDispatcher(channels={"chat": chat_channel})
 
@@ -132,14 +97,40 @@ class TestDispatcherWithRealChannels:
         assert results[0].external_id is not None
 
         # Verify Slack API calls
-        mock_slack_client.users_lookupByEmail.assert_called_once_with(
+        mock_client.users_lookupByEmail.assert_called_once_with(
             email="user@example.com"
         )
-        mock_slack_client.conversations_open.assert_called_once()
-        mock_slack_client.chat_postMessage.assert_called_once()
+        mock_client.conversations_open.assert_called_once()
+        mock_client.chat_postMessage.assert_called_once()
 
-    def test_send_notification_through_email_channel(self, mock_gmail_service):
+    def test_send_notification_through_email_channel(self, monkeypatch):
         """Test end-to-end email notification."""
+        mock_send_email = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Email sent successfully",
+                data={"id": "msg123", "threadId": "thread123"},
+            )
+        )
+        mock_list_messages = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Messages listed successfully",
+                data=[],
+            )
+        )
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.send_email",
+            mock_send_email,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.list_messages",
+            mock_list_messages,
+            raising=False,
+        )
+
         email_channel = EmailChannel()
         dispatcher = NotificationDispatcher(channels={"email": email_channel})
 
@@ -157,8 +148,20 @@ class TestDispatcherWithRealChannels:
         assert results[0].channel == "email"
         assert results[0].external_id is not None
 
-    def test_send_notification_through_sms_channel(self, mock_notify_client):
+    def test_send_notification_through_sms_channel(self, monkeypatch):
         """Test end-to-end SMS notification."""
+        mock_post_event = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": "sms123"}
+        mock_post_event.return_value = mock_response
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.sms.post_event",
+            mock_post_event,
+            raising=False,
+        )
+
         sms_channel = SMSChannel()
         dispatcher = NotificationDispatcher(channels={"sms": sms_channel})
 
@@ -179,12 +182,47 @@ class TestDispatcherWithRealChannels:
         assert results[0].external_id is not None
 
         # Verify Notify API calls
-        mock_notify_client.assert_called_once()
+        mock_post_event.assert_called_once()
 
-    def test_multi_channel_fallback(self, mock_slack_client, mock_gmail_service):
+    def test_multi_channel_fallback(self, monkeypatch):
         """Test fallback from chat to email when chat fails."""
         # Configure Slack to fail
+        mock_slack_manager = MagicMock()
+        mock_slack_client = MagicMock()
+        mock_slack_manager.return_value.get_client.return_value = mock_slack_client
         mock_slack_client.users_lookupByEmail.side_effect = Exception("Slack API error")
+
+        # Configure Gmail to succeed
+        mock_send_email = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Email sent successfully",
+                data={"id": "msg123", "threadId": "thread123"},
+            )
+        )
+        mock_list_messages = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Messages listed successfully",
+                data=[],
+            )
+        )
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_slack_manager,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.send_email",
+            mock_send_email,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.list_messages",
+            mock_list_messages,
+            raising=False,
+        )
 
         chat_channel = ChatChannel()
         email_channel = EmailChannel()
@@ -215,10 +253,11 @@ class TestDispatcherWithRealChannels:
         assert len(success_results) == 1
         assert success_results[0].channel == "email"
 
-    def test_multi_recipient_notification(self, mock_slack_client):
+    def test_multi_recipient_notification(self, monkeypatch):
         """Test notification to multiple recipients."""
-        chat_channel = ChatChannel()
-        dispatcher = NotificationDispatcher(channels={"chat": chat_channel})
+        mock_manager = MagicMock()
+        mock_client = MagicMock()
+        mock_manager.return_value.get_client.return_value = mock_client
 
         # Mock user lookups for multiple users
         def mock_lookup(email):
@@ -229,7 +268,24 @@ class TestDispatcherWithRealChannels:
             }
             return {"ok": True, "user": {"id": user_ids.get(email, "U99999")}}
 
-        mock_slack_client.users_lookupByEmail.side_effect = mock_lookup
+        mock_client.users_lookupByEmail.side_effect = mock_lookup
+        mock_client.conversations_open.return_value = {
+            "ok": True,
+            "channel": {"id": "D12345"},
+        }
+        mock_client.chat_postMessage.return_value = {
+            "ok": True,
+            "ts": "1234567890.123456",
+        }
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_manager,
+            raising=False,
+        )
+
+        chat_channel = ChatChannel()
+        dispatcher = NotificationDispatcher(channels={"chat": chat_channel})
 
         notification = Notification(
             subject="Team Update",
@@ -249,46 +305,39 @@ class TestDispatcherWithRealChannels:
         assert all(r.status == NotificationStatus.SENT for r in results)
 
         # Verify all users were looked up
-        assert mock_slack_client.users_lookupByEmail.call_count == 3
+        assert mock_client.users_lookupByEmail.call_count == 3
 
 
 @pytest.mark.integration
 class TestDispatcherIdempotencyIntegration:
     """Integration tests for idempotency cache behavior."""
 
-    @pytest.fixture
-    def idempotency_cache(self):
-        """Create in-memory idempotency cache."""
-        return MockIdempotencyCache()
-
-    @pytest.fixture
-    def mock_slack_client(self):
-        """Mock Slack client for testing."""
-        with patch(
-            "infrastructure.notifications.channels.chat.SlackClientManager"
-        ) as mock_manager:
-            mock_client = MagicMock()
-            mock_manager.return_value.get_client.return_value = mock_client
-
-            mock_client.users_lookupByEmail.return_value = {
-                "ok": True,
-                "user": {"id": "U12345"},
-            }
-            mock_client.conversations_open.return_value = {
-                "ok": True,
-                "channel": {"id": "D12345"},
-            }
-            mock_client.chat_postMessage.return_value = {
-                "ok": True,
-                "ts": "1234567890.123456",
-            }
-
-            yield mock_client
-
-    def test_duplicate_notification_prevented(
-        self, idempotency_cache, mock_slack_client
-    ):
+    def test_duplicate_notification_prevented(self, monkeypatch):
         """Test idempotency prevents duplicate sends."""
+        mock_manager = MagicMock()
+        mock_client = MagicMock()
+        mock_manager.return_value.get_client.return_value = mock_client
+
+        mock_client.users_lookupByEmail.return_value = {
+            "ok": True,
+            "user": {"id": "U12345"},
+        }
+        mock_client.conversations_open.return_value = {
+            "ok": True,
+            "channel": {"id": "D12345"},
+        }
+        mock_client.chat_postMessage.return_value = {
+            "ok": True,
+            "ts": "1234567890.123456",
+        }
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_manager,
+            raising=False,
+        )
+
+        idempotency_cache = MockIdempotencyCache()
         chat_channel = ChatChannel()
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel},
@@ -309,7 +358,7 @@ class TestDispatcherIdempotencyIntegration:
         assert results1[0].status == NotificationStatus.SENT
 
         # Verify Slack API was called
-        assert mock_slack_client.chat_postMessage.call_count == 1
+        assert mock_client.chat_postMessage.call_count == 1
 
         # Send second time with same idempotency key
         results2 = dispatcher.send(notification)
@@ -317,15 +366,37 @@ class TestDispatcherIdempotencyIntegration:
         assert results2[0].status == NotificationStatus.SENT
 
         # Verify Slack API was NOT called again
-        assert mock_slack_client.chat_postMessage.call_count == 1
+        assert mock_client.chat_postMessage.call_count == 1
 
         # Verify cached results are returned
         assert results1[0].external_id == results2[0].external_id
 
-    def test_different_idempotency_keys_send_separately(
-        self, idempotency_cache, mock_slack_client
-    ):
+    def test_different_idempotency_keys_send_separately(self, monkeypatch):
         """Test different idempotency keys allow separate sends."""
+        mock_manager = MagicMock()
+        mock_client = MagicMock()
+        mock_manager.return_value.get_client.return_value = mock_client
+
+        mock_client.users_lookupByEmail.return_value = {
+            "ok": True,
+            "user": {"id": "U12345"},
+        }
+        mock_client.conversations_open.return_value = {
+            "ok": True,
+            "channel": {"id": "D12345"},
+        }
+        mock_client.chat_postMessage.return_value = {
+            "ok": True,
+            "ts": "1234567890.123456",
+        }
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_manager,
+            raising=False,
+        )
+
+        idempotency_cache = MockIdempotencyCache()
         chat_channel = ChatChannel()
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel},
@@ -359,10 +430,34 @@ class TestDispatcherIdempotencyIntegration:
         assert results2[0].status == NotificationStatus.SENT
 
         # Verify both were sent (2 API calls)
-        assert mock_slack_client.chat_postMessage.call_count == 2
+        assert mock_client.chat_postMessage.call_count == 2
 
-    def test_cache_stats_tracking(self, idempotency_cache, mock_slack_client):
+    def test_cache_stats_tracking(self, monkeypatch):
         """Test idempotency cache statistics."""
+        mock_manager = MagicMock()
+        mock_client = MagicMock()
+        mock_manager.return_value.get_client.return_value = mock_client
+
+        mock_client.users_lookupByEmail.return_value = {
+            "ok": True,
+            "user": {"id": "U12345"},
+        }
+        mock_client.conversations_open.return_value = {
+            "ok": True,
+            "channel": {"id": "D12345"},
+        }
+        mock_client.chat_postMessage.return_value = {
+            "ok": True,
+            "ts": "1234567890.123456",
+        }
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_manager,
+            raising=False,
+        )
+
+        idempotency_cache = MockIdempotencyCache()
         chat_channel = ChatChannel()
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel},
@@ -389,41 +484,44 @@ class TestDispatcherIdempotencyIntegration:
 class TestDispatcherHealthCheck:
     """Integration tests for health check functionality."""
 
-    @pytest.fixture
-    def mock_slack_client(self):
-        """Mock Slack client."""
-        with patch(
-            "infrastructure.notifications.channels.chat.SlackClientManager"
-        ) as mock_manager:
-            mock_client = MagicMock()
-            mock_manager.return_value.get_client.return_value = mock_client
-            mock_client.auth_test.return_value = {"ok": True}
-            yield mock_client
-
-    @pytest.fixture
-    def mock_gmail_service(self):
-        """Mock Gmail service."""
-        with patch.multiple(
-            "infrastructure.notifications.channels.email.gmail_next",
-            send_email=MagicMock(
-                return_value=OperationResult(
-                    status=OperationStatus.SUCCESS,
-                    message="Email sent successfully",
-                    data={"id": "msg123", "threadId": "thread123"},
-                )
-            ),
-            list_messages=MagicMock(
-                return_value=OperationResult(
-                    status=OperationStatus.SUCCESS,
-                    message="Messages listed successfully",
-                    data=[],
-                )
-            ),
-        ) as mocks:
-            yield mocks
-
-    def test_health_check_all_channels(self, mock_slack_client, mock_gmail_service):
+    def test_health_check_all_channels(self, monkeypatch):
         """Test health check across multiple channels."""
+        mock_slack_manager = MagicMock()
+        mock_slack_client = MagicMock()
+        mock_slack_manager.return_value.get_client.return_value = mock_slack_client
+        mock_slack_client.auth_test.return_value = {"ok": True}
+
+        mock_send_email = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Email sent successfully",
+                data={"id": "msg123", "threadId": "thread123"},
+            )
+        )
+        mock_list_messages = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Messages listed successfully",
+                data=[],
+            )
+        )
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_slack_manager,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.send_email",
+            mock_send_email,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.list_messages",
+            mock_list_messages,
+            raising=False,
+        )
+
         chat_channel = ChatChannel()
         email_channel = EmailChannel()
 
@@ -435,12 +533,43 @@ class TestDispatcherHealthCheck:
 
         assert health == {"chat": True, "email": True}
 
-    def test_health_check_with_failing_channel(
-        self, mock_slack_client, mock_gmail_service
-    ):
+    def test_health_check_with_failing_channel(self, monkeypatch):
         """Test health check when one channel fails."""
-        # Configure Slack to fail
+        mock_slack_manager = MagicMock()
+        mock_slack_client = MagicMock()
+        mock_slack_manager.return_value.get_client.return_value = mock_slack_client
         mock_slack_client.auth_test.side_effect = Exception("Auth failed")
+
+        mock_send_email = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Email sent successfully",
+                data={"id": "msg123", "threadId": "thread123"},
+            )
+        )
+        mock_list_messages = MagicMock(
+            return_value=OperationResult(
+                status=OperationStatus.SUCCESS,
+                message="Messages listed successfully",
+                data=[],
+            )
+        )
+
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            mock_slack_manager,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.send_email",
+            mock_send_email,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "infrastructure.notifications.channels.email.gmail_next.list_messages",
+            mock_list_messages,
+            raising=False,
+        )
 
         chat_channel = ChatChannel()
         email_channel = EmailChannel()

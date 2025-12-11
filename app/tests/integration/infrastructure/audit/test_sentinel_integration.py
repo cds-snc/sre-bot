@@ -7,8 +7,9 @@ Tests cover:
 - Structured logging for audit operations
 """
 
+import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock
 from infrastructure.audit.models import AuditEvent, create_audit_event
 from integrations.sentinel.client import log_audit_event
 
@@ -17,7 +18,7 @@ from integrations.sentinel.client import log_audit_event
 class TestAuditEventToSentinel:
     """Integration tests for AuditEvent to Sentinel logging."""
 
-    def test_log_audit_event_success(self):
+    def test_log_audit_event_success(self, monkeypatch):
         """log_audit_event successfully sends audit event to Sentinel."""
         audit_event = AuditEvent(
             correlation_id="req-123",
@@ -30,9 +31,14 @@ class TestAuditEventToSentinel:
             duration_ms=500,
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            result = log_audit_event(audit_event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        result = log_audit_event(audit_event)
 
         assert result is True
         mock_send_event.assert_called_once()
@@ -45,7 +51,7 @@ class TestAuditEventToSentinel:
         assert "action" in payload
         assert "resource_type" in payload
 
-    def test_log_audit_event_failure(self):
+    def test_log_audit_event_failure(self, monkeypatch):
         """log_audit_event returns False when Sentinel send fails."""
         audit_event = AuditEvent(
             correlation_id="req-456",
@@ -58,13 +64,18 @@ class TestAuditEventToSentinel:
             error_message="API timeout",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = False
-            result = log_audit_event(audit_event)
+        mock_send_event = MagicMock(return_value=False)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        result = log_audit_event(audit_event)
 
         assert result is False
 
-    def test_log_audit_event_exception_handling(self):
+    def test_log_audit_event_exception_handling(self, monkeypatch):
         """log_audit_event handles exceptions and returns False."""
         audit_event = AuditEvent(
             correlation_id="req-789",
@@ -75,13 +86,18 @@ class TestAuditEventToSentinel:
             result="success",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.side_effect = Exception("Network error")
-            result = log_audit_event(audit_event)
+        mock_send_event = MagicMock(side_effect=Exception("Network error"))
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        result = log_audit_event(audit_event)
 
         assert result is False
 
-    def test_log_audit_event_payload_is_flat(self):
+    def test_log_audit_event_payload_is_flat(self, monkeypatch):
         """log_audit_event payload has flat structure for Sentinel queryability."""
         audit_event = create_audit_event(
             correlation_id="req-123",
@@ -99,9 +115,14 @@ class TestAuditEventToSentinel:
             },
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            log_audit_event(audit_event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        log_audit_event(audit_event)
 
         # Extract payload from mock call
         call_args = mock_send_event.call_args
@@ -117,7 +138,7 @@ class TestAuditEventToSentinel:
         assert "audit_meta_retry_count" in payload
         assert "audit_meta_source" in payload
 
-    def test_log_audit_event_with_factory_function(self):
+    def test_log_audit_event_with_factory_function(self, monkeypatch):
         """log_audit_event integrates well with create_audit_event factory."""
         event = create_audit_event(
             correlation_id="req-factory",
@@ -130,14 +151,19 @@ class TestAuditEventToSentinel:
             metadata={"propagation_count": 1},
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            result = log_audit_event(event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        result = log_audit_event(event)
 
         assert result is True
         assert mock_send_event.called
 
-    def test_log_audit_event_preserves_timestamps(self):
+    def test_log_audit_event_preserves_timestamps(self, monkeypatch):
         """log_audit_event preserves ISO 8601 timestamps in payload."""
         custom_timestamp = "2025-01-08T14:30:45+00:00"
         audit_event = AuditEvent(
@@ -150,15 +176,20 @@ class TestAuditEventToSentinel:
             result="success",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            log_audit_event(audit_event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        log_audit_event(audit_event)
 
         call_args = mock_send_event.call_args
         payload = call_args[0][0]
         assert payload["timestamp"] == custom_timestamp
 
-    def test_log_audit_event_handles_null_optional_fields(self):
+    def test_log_audit_event_handles_null_optional_fields(self, monkeypatch):
         """log_audit_event correctly handles None optional fields."""
         audit_event = AuditEvent(
             correlation_id="req-123",
@@ -173,9 +204,14 @@ class TestAuditEventToSentinel:
             duration_ms=None,
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            result = log_audit_event(audit_event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        result = log_audit_event(audit_event)
 
         assert result is True
 
@@ -192,7 +228,7 @@ class TestAuditEventToSentinel:
 class TestLogAuditEventStructuredLogging:
     """Tests for structured logging during audit event logging."""
 
-    def test_log_audit_event_logs_success(self):
+    def test_log_audit_event_logs_success(self, monkeypatch):
         """log_audit_event logs success event with audit details."""
         audit_event = AuditEvent(
             correlation_id="req-123",
@@ -203,15 +239,25 @@ class TestLogAuditEventStructuredLogging:
             result="success",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send:
-            with patch("integrations.sentinel.client.logger") as mock_logger:
-                mock_send.return_value = True
-                log_audit_event(audit_event)
+        mock_send = MagicMock(return_value=True)
+        mock_logger = MagicMock()
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "integrations.sentinel.client.logger",
+            mock_logger,
+            raising=False,
+        )
+
+        log_audit_event(audit_event)
 
         # Should log success
         assert mock_logger.info.called
 
-    def test_log_audit_event_logs_failure(self):
+    def test_log_audit_event_logs_failure(self, monkeypatch):
         """log_audit_event logs failure event with audit details."""
         audit_event = AuditEvent(
             correlation_id="req-456",
@@ -222,15 +268,25 @@ class TestLogAuditEventStructuredLogging:
             result="success",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send:
-            with patch("integrations.sentinel.client.logger") as mock_logger:
-                mock_send.return_value = False
-                log_audit_event(audit_event)
+        mock_send = MagicMock(return_value=False)
+        mock_logger = MagicMock()
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "integrations.sentinel.client.logger",
+            mock_logger,
+            raising=False,
+        )
+
+        log_audit_event(audit_event)
 
         # Should log error
         assert mock_logger.error.called
 
-    def test_log_audit_event_logs_exception_with_context(self):
+    def test_log_audit_event_logs_exception_with_context(self, monkeypatch):
         """log_audit_event logs exceptions with full context."""
         audit_event = AuditEvent(
             correlation_id="req-789",
@@ -241,10 +297,20 @@ class TestLogAuditEventStructuredLogging:
             result="success",
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send:
-            with patch("integrations.sentinel.client.logger") as mock_logger:
-                mock_send.side_effect = Exception("Network error")
-                log_audit_event(audit_event)
+        mock_send = MagicMock(side_effect=Exception("Network error"))
+        mock_logger = MagicMock()
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send,
+            raising=False,
+        )
+        monkeypatch.setattr(
+            "integrations.sentinel.client.logger",
+            mock_logger,
+            raising=False,
+        )
+
+        log_audit_event(audit_event)
 
         # Should log error with exc_info
         assert mock_logger.error.called
@@ -257,7 +323,7 @@ class TestLogAuditEventStructuredLogging:
 class TestSentinelPayloadFormat:
     """Tests verifying Sentinel payload format compatibility."""
 
-    def test_sentinel_payload_all_string_values(self):
+    def test_sentinel_payload_all_string_values(self, monkeypatch):
         """Sentinel payload values are string-compatible for Sentinel ingestion."""
         event = create_audit_event(
             correlation_id="req-123",
@@ -276,16 +342,19 @@ class TestSentinelPayloadFormat:
             },
         )
 
-        with patch("integrations.sentinel.client.send_event") as mock_send_event:
-            mock_send_event.return_value = True
-            log_audit_event(event)
+        mock_send_event = MagicMock(return_value=True)
+        monkeypatch.setattr(
+            "integrations.sentinel.client.send_event",
+            mock_send_event,
+            raising=False,
+        )
+
+        log_audit_event(event)
 
         call_args = mock_send_event.call_args
         payload = call_args[0][0]
 
         # All values should be serializable
-        import json
-
         json_str = json.dumps(payload)
         assert len(json_str) > 0
 
