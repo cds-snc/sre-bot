@@ -11,61 +11,70 @@ Following testing strategy in /workspace/app/tests/TESTING_STRATEGY.md:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from infrastructure.events import Event
 from modules.groups.events import handlers
 
 
 @pytest.fixture
-def mock_slack_client():
+def mock_slack_client(monkeypatch):
     """Mock Slack client for integration tests."""
-    with patch(
-        "infrastructure.notifications.channels.chat.SlackClientManager"
-    ) as mock_manager_class:
-        mock_manager = MagicMock()
-        mock_client = MagicMock()
-        mock_manager.get_client.return_value = mock_client
+    mock_manager_class = MagicMock()
+    mock_manager = MagicMock()
+    mock_client = MagicMock()
+    mock_manager.get_client.return_value = mock_client
 
-        mock_client.users_lookupByEmail.return_value = {
-            "ok": True,
-            "user": {"id": "U12345"},
-        }
+    mock_client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {"id": "U12345"},
+    }
 
-        mock_client.conversations_open.return_value = {
-            "ok": True,
-            "channel": {"id": "D12345"},
-        }
+    mock_client.conversations_open.return_value = {
+        "ok": True,
+        "channel": {"id": "D12345"},
+    }
 
-        mock_client.chat_postMessage.return_value = {
-            "ok": True,
-            "ts": "1234567890.123456",
-        }
+    mock_client.chat_postMessage.return_value = {
+        "ok": True,
+        "ts": "1234567890.123456",
+    }
 
-        mock_manager_class.return_value = mock_manager
-        yield mock_client
+    mock_manager_class.return_value = mock_manager
+    monkeypatch.setattr(
+        "infrastructure.notifications.channels.chat.SlackClientManager",
+        mock_manager_class,
+        raising=False,
+    )
+    return mock_client
 
 
 @pytest.fixture
-def mock_circuit_breaker():
+def mock_circuit_breaker(monkeypatch):
     """Mock circuit breaker to pass through calls."""
-    with patch(
-        "infrastructure.notifications.channels.chat.CircuitBreaker"
-    ) as mock_cb_class:
-        mock_cb = MagicMock()
-        mock_cb.call.side_effect = lambda func, **kwargs: func(**kwargs)
-        mock_cb_class.return_value = mock_cb
-        yield mock_cb
+    mock_cb_class = MagicMock()
+    mock_cb = MagicMock()
+    mock_cb.call.side_effect = lambda func, **kwargs: func(**kwargs)
+    mock_cb_class.return_value = mock_cb
+    monkeypatch.setattr(
+        "infrastructure.notifications.channels.chat.CircuitBreaker",
+        mock_cb_class,
+        raising=False,
+    )
+    return mock_cb
 
 
 @pytest.fixture
-def mock_idempotency_cache():
+def mock_idempotency_cache(monkeypatch):
     """Mock idempotency cache to avoid DynamoDB calls."""
-    with patch("infrastructure.idempotency.factory.get_cache") as mock_get_cache:
-        mock_cache = MagicMock()
-        mock_cache.get.return_value = None
-        mock_cache.set.return_value = None
-        mock_get_cache.return_value = mock_cache
-        yield mock_cache
+    mock_get_cache = MagicMock()
+    mock_cache = MagicMock()
+    mock_cache.get.return_value = None
+    mock_cache.set.return_value = None
+    mock_get_cache.return_value = mock_cache
+    monkeypatch.setattr(
+        "infrastructure.idempotency.factory.get_cache", mock_get_cache, raising=False
+    )
+    return mock_cache
 
 
 @pytest.fixture(autouse=True)
