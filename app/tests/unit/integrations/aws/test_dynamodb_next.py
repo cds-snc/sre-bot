@@ -1,7 +1,7 @@
 """Unit tests for dynamodb_next.py wrapper module."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 from integrations.aws.dynamodb_next import (
     get_item,
@@ -19,12 +19,17 @@ pytestmark = pytest.mark.unit
 class TestDynamoDBNextGetItem:
     """Tests for get_item function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_get_item_calls_execute_with_correct_params(self, mock_execute):
+    def test_get_item_calls_execute_with_correct_params(self, monkeypatch):
         """get_item calls execute_aws_api_call with correct parameters."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Item retrieved",
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = get_item(
@@ -40,15 +45,20 @@ class TestDynamoDBNextGetItem:
         )
         assert result.is_success
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_get_item_returns_operation_result(self, mock_execute):
+    def test_get_item_returns_operation_result(self, monkeypatch):
         """get_item returns OperationResult."""
+        mock_execute = MagicMock()
         expected_result = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Found",
             data={"Item": {"id": {"S": "123"}}},
         )
         mock_execute.return_value = expected_result
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
+        )
 
         result = get_item(
             table_name="test_table",
@@ -62,12 +72,17 @@ class TestDynamoDBNextGetItem:
 class TestDynamoDBNextPutItem:
     """Tests for put_item function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_put_item_calls_execute_with_correct_params(self, mock_execute):
+    def test_put_item_calls_execute_with_correct_params(self, monkeypatch):
         """put_item calls execute_aws_api_call with correct parameters."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Item stored",
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = put_item(
@@ -83,12 +98,17 @@ class TestDynamoDBNextPutItem:
         )
         assert result.is_success
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_put_item_supports_additional_kwargs(self, mock_execute):
+    def test_put_item_supports_additional_kwargs(self, monkeypatch):
         """put_item supports additional parameters."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Item stored",
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = put_item(
@@ -105,12 +125,17 @@ class TestDynamoDBNextPutItem:
 class TestDynamoDBNextUpdateItem:
     """Tests for update_item function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_update_item_calls_execute_with_correct_params(self, mock_execute):
+    def test_update_item_calls_execute_with_correct_params(self, monkeypatch):
         """update_item calls execute_aws_api_call with correct parameters."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Item updated",
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = update_item(
@@ -132,12 +157,17 @@ class TestDynamoDBNextUpdateItem:
 class TestDynamoDBNextDeleteItem:
     """Tests for delete_item function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_delete_item_calls_execute_with_correct_params(self, mock_execute):
+    def test_delete_item_calls_execute_with_correct_params(self, monkeypatch):
         """delete_item calls execute_aws_api_call with correct parameters."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Item deleted",
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = delete_item(
@@ -157,13 +187,18 @@ class TestDynamoDBNextDeleteItem:
 class TestDynamoDBNextQuery:
     """Tests for query function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_query_calls_execute_with_pagination(self, mock_execute):
+    def test_query_calls_execute_with_pagination(self, monkeypatch):
         """query calls execute_aws_api_call with pagination enabled."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Query completed",
             data={"Items": []},
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = query(
@@ -178,13 +213,18 @@ class TestDynamoDBNextQuery:
         assert call_kwargs["keys"] == ["Items"]
         assert result.is_success
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_query_supports_expression_values(self, mock_execute):
+    def test_query_supports_expression_values(self, monkeypatch):
         """query supports expression attribute values."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Query completed",
             data={"Items": []},
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = query(
@@ -201,13 +241,18 @@ class TestDynamoDBNextQuery:
 class TestDynamoDBNextScan:
     """Tests for scan function."""
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_scan_calls_execute_with_pagination(self, mock_execute):
+    def test_scan_calls_execute_with_pagination(self, monkeypatch):
         """scan calls execute_aws_api_call with pagination enabled."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Scan completed",
             data={"Items": []},
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = scan(table_name="test_table")
@@ -219,13 +264,18 @@ class TestDynamoDBNextScan:
         assert call_kwargs["keys"] == ["Items"]
         assert result.is_success
 
-    @patch("integrations.aws.dynamodb_next.execute_aws_api_call")
-    def test_scan_supports_filter_expression(self, mock_execute):
+    def test_scan_supports_filter_expression(self, monkeypatch):
         """scan supports filter expression."""
+        mock_execute = MagicMock()
         mock_execute.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
             message="Scan completed",
             data={"Items": []},
+        )
+        monkeypatch.setattr(
+            "integrations.aws.dynamodb_next.execute_aws_api_call",
+            mock_execute,
+            raising=False,
         )
 
         result = scan(
