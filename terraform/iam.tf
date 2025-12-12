@@ -51,7 +51,8 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
       aws_dynamodb_table.sre_bot_data.arn,
       aws_dynamodb_table.incidents_table.arn,
       aws_dynamodb_table.sre_bot_idempotency.arn,
-      aws_dynamodb_table.sre_bot_audit_trail.arn
+      aws_dynamodb_table.sre_bot_audit_trail.arn,
+      aws_dynamodb_table.sre_bot_retry_records.arn
     ]
 
   }
