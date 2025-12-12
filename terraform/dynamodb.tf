@@ -140,8 +140,13 @@ resource "aws_dynamodb_table" "sre_bot_audit_trail" {
 resource "aws_dynamodb_table" "sre_bot_retry_records" {
   name           = "sre_bot_retry_records"
   hash_key       = "record_id"
+<<<<<<< HEAD
   read_capacity  = 5
   write_capacity = 5
+=======
+  read_capacity  = 2
+  write_capacity = 2
+>>>>>>> main
 
   attribute {
     name = "record_id"
@@ -170,8 +175,8 @@ resource "aws_dynamodb_table" "sre_bot_retry_records" {
     hash_key        = "status"
     range_key       = "next_retry_at"
     projection_type = "ALL"
-    read_capacity   = 5
-    write_capacity  = 5
+    read_capacity   = 2
+    write_capacity  = 2
   }
 }
 
