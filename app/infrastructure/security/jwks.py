@@ -67,7 +67,7 @@ class JWKSManager:
                 )
                 log = logger.bind(issuer=issuer)
                 log.info("jwks_client_initialized")
-            except Exception as e:
+            except PyJWKClientError as e:
                 log = logger.bind(issuer=issuer, error=str(e))
                 log.warning("jwks_client_initialization_failed")
                 return None

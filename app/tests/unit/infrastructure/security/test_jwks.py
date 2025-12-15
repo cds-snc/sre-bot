@@ -80,7 +80,9 @@ class TestJWKSManager:
         self, mock_pyjwk_client, mock_issuer_config
     ):
         """Test get_jwks_client returns None on initialization error."""
-        mock_pyjwk_client.side_effect = Exception("Connection failed")
+        from jwt import PyJWKClientError
+
+        mock_pyjwk_client.side_effect = PyJWKClientError("Connection failed")
 
         manager = JWKSManager(issuer_config=mock_issuer_config)
         result = manager.get_jwks_client("test_issuer")
