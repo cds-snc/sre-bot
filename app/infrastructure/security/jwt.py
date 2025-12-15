@@ -11,7 +11,6 @@ from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError, decode
 
-from infrastructure.configuration import settings
 from infrastructure.security.jwks import JWKSManager
 
 logger = structlog.get_logger()

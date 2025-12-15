@@ -302,6 +302,7 @@ class TestValidateJWTToken:
                     result = validate_jwt_token(
                         credentials=credentials, jwks_manager=manager
                     )
+                    assert result == {"iss": "test_issuer"}
 
                     # Verify decode was called with config from issuer
                     call_kwargs = mock_decode.call_args[1]

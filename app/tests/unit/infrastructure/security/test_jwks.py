@@ -120,6 +120,8 @@ class TestJWKSManager:
         manager = JWKSManager(issuer_config=mock_issuer_config)
         result = manager.get_jwks_client("test_issuer")
 
+        assert result == mock_client
+
         # Verify PyJWKClient was called with correct JWKS URI
         mock_pyjwk_client.assert_called_once_with(
             "https://test.example.com/.well-known/jwks.json",

@@ -1,8 +1,5 @@
 """Fixtures for infrastructure security tests."""
 
-import json
-from unittest.mock import MagicMock
-
 import pytest
 
 
