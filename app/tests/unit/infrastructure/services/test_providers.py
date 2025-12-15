@@ -10,9 +10,9 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 
 from infrastructure.services.providers import get_settings, get_logger
 from infrastructure.services.dependencies import SettingsDep, LoggerDep
@@ -157,10 +157,10 @@ class TestDependencyOverrideCleanup:
         def original(settings: SettingsDep) -> dict:
             return {"is_real_settings": isinstance(settings, Settings)}
 
-        # Save original behavior
-        original_response = None
+        # Test original behavior (before any overrides)
         with TestClient(app) as client:
             original_response = client.get("/original").json()
+            assert original_response["is_real_settings"] is True
 
         # Override and test
         mock_settings = MagicMock(spec=Settings)
@@ -171,7 +171,7 @@ class TestDependencyOverrideCleanup:
             # Mock object doesn't have dict() method, so response should work differently
             assert overridden_response.status_code == 200
 
-        # Clear and test restored
+        # Clear and test restored behavior
         app.dependency_overrides.clear()
         get_settings.cache_clear()
 
