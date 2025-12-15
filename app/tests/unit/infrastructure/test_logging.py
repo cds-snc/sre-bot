@@ -12,7 +12,7 @@ import pytest
 import logging
 import sys
 from unittest.mock import patch
-from infrastructure.logging import (
+from infrastructure.observability.logging import (
     configure_logging,
     get_logger,
     get_module_logger,
