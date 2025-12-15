@@ -2,16 +2,17 @@
 
 DEPRECATED: This module is maintained for backward compatibility with legacy feature
 modules (incident, roles, aws, opsgenie, trello, atip, etc.). New code should import
-from infrastructure.observability instead.
+from infrastructure.logging instead.
 
 Migration:
     from core.logging import get_module_logger  # OLD
-    from infrastructure.observability import get_module_logger  # NEW
+    from infrastructure.logging import get_module_logger  # NEW
 """
 
 import logging
 import inspect
 import sys
+import warnings
 import structlog
 from structlog.stdlib import BoundLogger
 from .config import settings
@@ -23,7 +24,18 @@ def _is_test_environment() -> bool:
 
 
 def configure_logging():
-    """Configure structured logging for the application."""
+    """Configure structured logging for the application.
+
+    .. deprecated::
+        This function is deprecated. Use :func:`infrastructure.logging.configure_logging` instead.
+    """
+
+    warnings.warn(
+        "core.logging.configure_logging() is deprecated. "
+        "Use infrastructure.logging.configure_logging() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Suppress all logging during tests
     if _is_test_environment():
         # Set root logger to suppress all output during tests
@@ -82,7 +94,18 @@ logger: BoundLogger = configure_logging()
 
 
 def get_module_logger() -> BoundLogger:
-    """Get a logger for the calling module with full path context."""
+    """Get a logger for the calling module with full path context.
+
+    .. deprecated::
+        This function is deprecated. Use :func:`infrastructure.logging.get_module_logger` instead.
+    """
+
+    warnings.warn(
+        "core.logging.get_module_logger() is deprecated. "
+        "Use infrastructure.logging.get_module_logger() instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     current_frame = inspect.currentframe()
     if current_frame is None:
         return logger

@@ -3,12 +3,12 @@
 Tests cover:
 - Real logging scenarios
 - Integration with existing code
-- Migration from core.logging to infrastructure.logging
+- Migration from core.logging to infrastructure.observability
 - Backward compatibility
 """
 
 import pytest
-from infrastructure.logging import get_logger, get_module_logger
+from infrastructure.observability import get_logger, get_module_logger
 
 
 @pytest.mark.integration

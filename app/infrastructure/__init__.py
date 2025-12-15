@@ -13,6 +13,7 @@ Centralized infrastructure components:
 - resilience: Circuit breakers and retry logic
 - commands: Command framework
 - audit: Audit logging
+- services: Dependency injection services (SettingsDep, LoggerDep, get_settings, get_logger)
 """
 
 # Configuration
@@ -28,6 +29,9 @@ from infrastructure.observability import get_module_logger, logger
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
+# Dependency Injection Services
+from infrastructure.services import SettingsDep, LoggerDep, get_settings, get_logger
+
 __all__ = [
     # Configuration
     "settings",
@@ -41,4 +45,9 @@ __all__ = [
     # Operations (legacy)
     "OperationResult",
     "OperationStatus",
+    # Dependency Injection Services
+    "SettingsDep",
+    "LoggerDep",
+    "get_settings",
+    "get_logger",
 ]
