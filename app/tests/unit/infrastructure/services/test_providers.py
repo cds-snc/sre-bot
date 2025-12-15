@@ -3,9 +3,7 @@ Unit tests for dependency injection providers.
 
 Tests cover:
 - get_settings() caching behavior
-- get_logger() caching behavior
 - SettingsDep type alias with FastAPI dependency injection
-- LoggerDep type alias with FastAPI dependency injection
 - Dependency override pattern for testing
 """
 
@@ -14,8 +12,8 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from infrastructure.services.providers import get_settings, get_logger
-from infrastructure.services.dependencies import SettingsDep, LoggerDep
+from infrastructure.services.providers import get_settings
+from infrastructure.services.dependencies import SettingsDep
 from infrastructure.configuration import Settings
 
 
@@ -39,22 +37,6 @@ class TestGetSettings:
         get_settings.cache_clear()
         instance2 = get_settings()
         assert instance1 is not instance2
-
-
-class TestGetLogger:
-    """Tests for get_logger() provider function."""
-
-    def test_get_logger_returns_logger_instance(self):
-        """get_logger() returns a logger instance."""
-        result = get_logger()
-        assert result is not None
-
-    def test_get_logger_can_be_called_multiple_times(self):
-        """get_logger() can be called multiple times and returns a logger each time."""
-        result1 = get_logger()
-        result2 = get_logger()
-        assert result1 is not None
-        assert result2 is not None
 
 
 class TestDependencyOverridePattern:
@@ -83,64 +65,6 @@ class TestDependencyOverridePattern:
 
         assert response.status_code == 200
         assert response.json()["has_settings"] is True
-
-        # Cleanup
-        app.dependency_overrides.clear()
-
-    def test_logger_dep_with_dependency_override(self):
-        """LoggerDep can be overridden in FastAPI app."""
-        app = FastAPI()
-
-        @app.get("/logs")
-        def log_endpoint(logger: LoggerDep) -> dict:
-            return {"has_logger": logger is not None}
-
-        # Create mock logger
-        mock_logger = MagicMock()
-
-        # Override the dependency
-        app.dependency_overrides[get_logger] = lambda: mock_logger
-
-        # Test with client
-        with TestClient(app) as client:
-            response = client.get("/logs")
-
-        assert response.status_code == 200
-        assert response.json()["has_logger"] is True
-
-        # Cleanup
-        app.dependency_overrides.clear()
-
-    def test_multiple_dependency_overrides(self):
-        """Multiple dependencies can be overridden simultaneously."""
-        app = FastAPI()
-
-        @app.get("/both")
-        def both_deps(
-            settings: SettingsDep,
-            logger: LoggerDep,
-        ) -> dict:
-            return {
-                "has_settings": isinstance(settings, (Settings, MagicMock)),
-                "has_logger": logger is not None,
-            }
-
-        # Create mocks
-        mock_settings = MagicMock(spec=Settings)
-        mock_logger = MagicMock()
-
-        # Override both dependencies
-        app.dependency_overrides[get_settings] = lambda: mock_settings
-        app.dependency_overrides[get_logger] = lambda: mock_logger
-
-        # Test with client
-        with TestClient(app) as client:
-            response = client.get("/both")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["has_settings"] is True
-        assert data["has_logger"] is True
 
         # Cleanup
         app.dependency_overrides.clear()

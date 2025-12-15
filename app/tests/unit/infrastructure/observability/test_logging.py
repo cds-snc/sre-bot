@@ -2,7 +2,7 @@
 
 Tests cover:
 - Logger configuration
-- Module logger detection
+- Module logger detection (deprecated)
 - Test environment suppression
 - Structured logging context
 """
@@ -14,7 +14,6 @@ import structlog
 from infrastructure.observability.logging import (
     configure_logging,
     get_module_logger,
-    get_logger,
     _is_test_environment,
     logger,
 )
@@ -84,33 +83,6 @@ class TestConfigureLogging:
 
         assert result is not None
         # Development mode uses Console renderer
-
-
-class TestGetLogger:
-    """Test suite for get_logger function."""
-
-    def test_get_logger_without_name(self):
-        """Test get_logger returns logger without specific name."""
-        result = get_logger()
-
-        assert result is not None
-        assert isinstance(result, structlog.stdlib.BoundLogger)
-
-    def test_get_logger_with_name(self):
-        """Test get_logger returns logger with specific name."""
-        result = get_logger("test_component")
-
-        assert result is not None
-        assert isinstance(result, structlog.stdlib.BoundLogger)
-
-    def test_get_logger_different_names(self):
-        """Test get_logger returns different loggers for different names."""
-        logger1 = get_logger("component_a")
-        logger2 = get_logger("component_b")
-
-        # Both are valid loggers (may or may not be same instance)
-        assert logger1 is not None
-        assert logger2 is not None
 
 
 class TestGetModuleLogger:
@@ -192,16 +164,3 @@ class TestLoggingIntegration:
                 test_logger.exception("test_exception_log")
             except Exception as e:
                 pytest.fail(f"Exception logging raised exception: {e}")
-
-    def test_logging_level_filtering(self):
-        """Test logging respects level filtering."""
-        test_logger = get_logger("test_filter")
-
-        # All log levels should be callable without errors
-        try:
-            test_logger.debug("debug message")
-            test_logger.info("info message")
-            test_logger.warning("warning message")
-            test_logger.error("error message")
-        except Exception as e:
-            pytest.fail(f"Logging raised unexpected exception: {e}")

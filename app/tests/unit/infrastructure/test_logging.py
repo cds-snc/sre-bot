@@ -5,7 +5,7 @@ Tests cover:
 - Exception formatting
 - Test environment suppression
 - Production vs development rendering
-- Backward compatibility
+- Backward compatibility with get_module_logger (deprecated)
 """
 
 import pytest
@@ -14,7 +14,6 @@ import sys
 from unittest.mock import patch
 from infrastructure.observability.logging import (
     configure_logging,
-    get_logger,
     get_module_logger,
     _is_test_environment,
 )
@@ -82,41 +81,14 @@ class TestLoggingConfiguration:
 
 
 @pytest.mark.unit
-class TestLoggerUsage:
-    """Tests for logger usage patterns."""
-
-    def test_get_logger_without_name(self):
-        """get_logger() returns logger with auto-detected context."""
-        logger = get_logger()
-        # Should return a logger instance
-        assert logger is not None
-
-    def test_get_logger_with_name(self):
-        """get_logger(name) returns logger bound to provided name."""
-        logger = get_logger("test_module")
-        # Should return a logger instance
-        assert logger is not None
+class TestGetModuleLoggerBackwardCompat:
+    """Tests for get_module_logger backward compatibility."""
 
     def test_get_module_logger_backward_compatibility(self):
         """get_module_logger() provides backward compatibility."""
         logger = get_module_logger()
         # Should return a logger instance
         assert logger is not None
-
-    def test_get_logger_and_get_module_logger_both_work(self):
-        """Both get_logger() and get_module_logger() return valid loggers."""
-        logger1 = get_logger()
-        logger2 = get_module_logger()
-
-        assert logger1 is not None
-        assert logger2 is not None
-
-    def test_get_logger_with_none_frame(self):
-        """get_logger handles None frame gracefully."""
-        # When called from C extension or in unusual context
-        with patch("inspect.currentframe", return_value=None):
-            logger = get_logger()
-            assert logger is not None
 
     def test_get_module_logger_with_none_frame(self):
         """get_module_logger handles None frame gracefully."""
@@ -126,29 +98,24 @@ class TestLoggerUsage:
 
 
 @pytest.mark.unit
-class TestEnhancedProcessors:
-    """Tests for enhanced logging processors."""
+class TestLoggingBestPractices:
+    """Tests for logging best practices with structlog."""
 
-    def test_logger_has_callsite_processor(self):
-        """Logger is configured with CallsiteParameterAdder."""
-        # The enhanced logging should include file/line/function info
-        logger = get_logger("test")
-        # We can't easily inspect the processor chain, but we verify
-        # the logger was created successfully with enhanced config
+    def test_structlog_get_logger_pattern(self):
+        """Standard structlog.get_logger() pattern works."""
+        import structlog
+
+        logger = structlog.get_logger()
+        # Should return a logger instance
         assert logger is not None
+        assert hasattr(logger, "bind")
+        assert hasattr(logger, "info")
 
-    def test_logger_exception_handling(self):
-        """Logger handles exceptions with StackInfoRenderer."""
-        logger = get_logger("test")
-        # Should not raise when using exception logging
-        try:
-            raise ValueError("Test error")
-        except ValueError:
-            # Should handle exc_info without raising
-            logger.exception("test_error", exc_info=True)
+    def test_logger_bind_for_context(self):
+        """Logger.bind() adds context for structured logging."""
+        import structlog
 
-    def test_logger_binding_works(self):
-        """Logger can bind additional context."""
-        logger = get_logger("test")
+        logger = structlog.get_logger()
         bound_logger = logger.bind(user_id="123", request_id="req-abc")
         assert bound_logger is not None
+        assert hasattr(bound_logger, "info")
