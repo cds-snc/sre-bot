@@ -6,7 +6,7 @@ Provides application-scoped singleton providers for core infrastructure services
 
 from functools import lru_cache
 from infrastructure.configuration import Settings
-from infrastructure.logging import get_module_logger
+from infrastructure.observability import get_module_logger
 
 
 @lru_cache
