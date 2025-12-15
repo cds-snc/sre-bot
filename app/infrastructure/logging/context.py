@@ -89,12 +89,12 @@ def bind_request_context(
     context.update(extra_context)
 
     # Bind context for the duration of the block
-    token = structlog.contextvars.bind_contextvars(**context)
+    tokens = structlog.contextvars.bind_contextvars(**context)
     try:
         yield
     finally:
-        # Clear the bound context
-        structlog.contextvars.unbind_contextvars(*context.keys())
+        # Reset context to previous state using tokens
+        structlog.contextvars.reset_contextvars(**tokens)
 
 
 def get_correlation_id() -> Optional[str]:
