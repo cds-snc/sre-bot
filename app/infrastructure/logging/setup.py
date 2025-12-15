@@ -5,13 +5,14 @@ It configures structlog with enhanced processors for debugging context,
 proper exception formatting, and environment-aware rendering.
 
 Usage:
-    from infrastructure.logging import configure_logging, get_module_logger
+    from infrastructure.logging import configure_logging
 
     # Configure logging at app startup
     configure_logging()
 
-    # Get a logger for your module
-    logger = get_module_logger()
+    # Get a logger (standard structlog pattern)
+    import structlog
+    logger = structlog.get_logger()
     logger.info("event_name", key="value")
 
 Dependencies:
@@ -20,7 +21,6 @@ Dependencies:
 
 import logging
 import sys
-import inspect
 import structlog
 from structlog.stdlib import BoundLogger
 from typing import Optional
@@ -137,66 +137,47 @@ def configure_logging(
     return structlog.stdlib.get_logger()
 
 
-# Module-level logger (auto-configured on import)
+# Module-level logger - used for backward compatibility with legacy code
+# New code should use: structlog.get_logger()
 logger: BoundLogger = configure_logging()
 
 
-def get_logger(name: Optional[str] = None) -> BoundLogger:
-    """Get a logger instance with automatic context detection.
-
-    If name is provided, binds the logger to that name for context.
-    Otherwise, uses the current module name for context.
-
-    Args:
-        name: Optional logger name (typically __name__ in calling module)
-
-    Returns:
-        Configured logger instance with context
-
-    Example:
-        # With explicit name
-        logger = get_logger("my_module")
-
-        # With auto-detection
-        logger = get_logger()
-    """
-    if name:
-        return logger.bind(logger_name=name)
-
-    # Auto-detect calling module
-    current_frame = inspect.currentframe()
-    if current_frame is None:
-        return logger
-
-    frame = current_frame.f_back
-    if frame is None:
-        return logger
-
-    module = inspect.getmodule(frame)
-    if module:
-        module_name = module.__name__
-        return logger.bind(logger_name=module_name)
-
-    return logger.bind(logger_name="unknown")
+# =============================================================================
+# DEPRECATED FUNCTIONS - For backward compatibility only
+# =============================================================================
 
 
 def get_module_logger() -> BoundLogger:
-    """Get a logger for the calling module with full path context.
+    """Get a logger for the calling module with context.
 
-    Automatically detects the calling module and binds component
-    and module_path context for structured logging.
+    .. deprecated::
+        This function is deprecated. Use `structlog.get_logger()` instead
+        with explicit `.bind()` for context. This follows structlog best practices.
+
+        Migration example:
+            # OLD
+            from infrastructure.logging import get_module_logger
+            logger = get_module_logger()
+
+            # NEW (best practice)
+            import structlog
+            logger = structlog.get_logger()
+            log = logger.bind(component="my_module")  # explicit context
 
     Returns:
         Configured logger instance with module context
-
-    Example:
-        # In modules/groups/service.py
-        logger = get_module_logger()
-        # logger has context: {"component": "service", "module_path": "modules.groups.service"}
-
-        logger.info("group_created", group_id="123")
     """
-    # Auto-detect calling module
+    import warnings
+    import inspect
+
+    warnings.warn(
+        "get_module_logger() is deprecated. Use structlog.get_logger() with "
+        "explicit .bind() for context instead. See structlog best practices.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    # Auto-detect calling module for backward compatibility
     current_frame = inspect.currentframe()
     if current_frame is None:
         return logger
