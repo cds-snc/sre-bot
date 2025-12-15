@@ -18,7 +18,6 @@ Migration:
 # Re-export from canonical location
 from infrastructure.logging.setup import (
     configure_logging,
-    get_logger,
     get_module_logger,
     logger,
     _is_test_environment,  # For test backward compatibility
@@ -26,7 +25,6 @@ from infrastructure.logging.setup import (
 
 __all__ = [
     "configure_logging",
-    "get_logger",
     "get_module_logger",
     "logger",
     "_is_test_environment",
