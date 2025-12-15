@@ -1,19 +1,13 @@
-"""Infrastructure auth module - authentication and authorization.
+"""Infrastructure auth module - security and JWT validation.
 
 Exports:
-    identity_resolver: Global identity resolver instance
-    UserIdentity: Normalized user identity dataclass
-    IdentitySource: Enum of identity sources
     validate_jwt_token: JWT token validation function
     jwks_manager: Global JWKS manager instance
+    JWKSManager: JWKS manager class
+    get_issuer_from_token: Extract issuer from JWT token
+    extract_user_info_from_token: Extract user info from JWT token
 """
 
-from infrastructure.auth.identity import (
-    identity_resolver,
-    UserIdentity,
-    IdentitySource,
-    IdentityResolver,
-)
 from infrastructure.auth.security import (
     validate_jwt_token,
     jwks_manager,
@@ -23,10 +17,6 @@ from infrastructure.auth.security import (
 )
 
 __all__ = [
-    "identity_resolver",
-    "UserIdentity",
-    "IdentitySource",
-    "IdentityResolver",
     "validate_jwt_token",
     "jwks_manager",
     "JWKSManager",

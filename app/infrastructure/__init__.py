@@ -2,7 +2,8 @@
 
 Centralized infrastructure components:
 - configuration: Settings management (settings, RetrySettings)
-- auth: Authentication and identity resolution (identity_resolver, validate_jwt_token)
+- identity: User identity models and resolution (User, IdentityResolver)
+- auth: Authentication and JWT validation (validate_jwt_token, JWKSManager)
 - observability: Logging and monitoring (get_module_logger, logger)
 - events: Event system
 - i18n: Internationalization
@@ -13,14 +14,15 @@ Centralized infrastructure components:
 - resilience: Circuit breakers and retry logic
 - commands: Command framework
 - audit: Audit logging
-- services: Dependency injection services (SettingsDep, get_settings)
+- services: Dependency injection services (SettingsDep, IdentityResolverDep, get_settings)
 """
 
 # Configuration
 from infrastructure.configuration import settings
 
 # Auth & Identity
-from infrastructure.auth import identity_resolver, UserIdentity, validate_jwt_token
+from infrastructure.identity import User
+from infrastructure.auth import validate_jwt_token
 
 # Observability
 from infrastructure.observability import get_module_logger, logger
@@ -30,14 +32,18 @@ from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
 # Dependency Injection Services
-from infrastructure.services import SettingsDep, get_settings
+from infrastructure.services import (
+    SettingsDep,
+    IdentityResolverDep,
+    get_settings,
+    get_identity_resolver,
+)
 
 __all__ = [
     # Configuration
     "settings",
     # Auth & Identity
-    "identity_resolver",
-    "UserIdentity",
+    "User",
     "validate_jwt_token",
     # Observability
     "get_module_logger",
@@ -47,5 +53,7 @@ __all__ = [
     "OperationStatus",
     # Dependency Injection Services
     "SettingsDep",
+    "IdentityResolverDep",
     "get_settings",
+    "get_identity_resolver",
 ]

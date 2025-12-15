@@ -6,6 +6,8 @@ Provides application-scoped singleton providers for core infrastructure services
 
 from functools import lru_cache
 from infrastructure.configuration import Settings
+from infrastructure.identity import IdentityResolver
+from integrations.slack.client import SlackClientManager
 
 
 @lru_cache
@@ -22,3 +24,19 @@ def get_settings() -> Settings:
             return settings.dict()
     """
     return Settings()
+
+
+@lru_cache
+def get_identity_resolver() -> IdentityResolver:
+    """
+    Get application-scoped identity resolver singleton.
+
+    Returns:
+        IdentityResolver: Cached identity resolver instance with injected dependencies.
+
+    Usage:
+        @router.post("/identity")
+        def resolve_user(resolver: IdentityResolverDep) -> User:
+            return resolver.resolve_from_jwt(jwt_payload)
+    """
+    return IdentityResolver(slack_client_manager=SlackClientManager)
