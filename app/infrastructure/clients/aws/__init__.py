@@ -7,9 +7,9 @@ Use the provider functions in `infrastructure.services` to expose
 dependencies to FastAPI routes and other code.
 """
 
-from .client import execute_aws_api_call, get_boto3_client
-from .factory import AWSClientFactory
-from .helpers import (
+from infrastructure.clients.aws.client import execute_aws_api_call, get_boto3_client
+from infrastructure.clients.aws.factory import AWSClientFactory
+from infrastructure.clients.aws.helpers import (
     get_batch_users,
     get_batch_groups,
     list_groups_with_memberships,
