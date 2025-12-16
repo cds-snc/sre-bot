@@ -9,6 +9,11 @@ from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
 from infrastructure.security.jwks import JWKSManager
+from infrastructure.clients.aws import (
+    get_boto3_client as _get_boto3_client,
+)
+from infrastructure.clients.aws import dynamodb as dynamodb_client
+from typing import Any, Dict, Optional
 
 
 @lru_cache
@@ -56,3 +61,35 @@ def get_jwks_manager() -> JWKSManager:
     if not issuer_config:
         raise ValueError("ISSUER_CONFIG is not configured in settings.server")
     return JWKSManager(issuer_config=issuer_config)
+
+
+@lru_cache
+def get_aws_client(
+    service_name: str = "",
+    session_config: Optional[Dict[str, Any]] = None,
+    client_config: Optional[Dict[str, Any]] = None,
+    role_arn: Optional[str] = None,
+) -> Any:
+    """Provider for creating a boto3 client for a given service.
+
+    Note: This provider returns a boto3 client instance. Prefer higher-level
+    wrappers (e.g., get_dynamodb_client) for typed OperationResult returns.
+    """
+    if not service_name:
+        raise ValueError("service_name must be provided to get_aws_client")
+    return _get_boto3_client(
+        service_name,
+        session_config=session_config,
+        client_config=client_config,
+        role_arn=role_arn,
+    )
+
+
+@lru_cache
+def get_dynamodb_client() -> Any:
+    """Provider that returns the DynamoDB client wrapper module.
+
+    This returns the `dynamodb` module which exposes OperationResult-returning
+    helper functions (get_item, put_item, query, etc.).
+    """
+    return dynamodb_client
