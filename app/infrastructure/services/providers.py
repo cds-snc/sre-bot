@@ -5,7 +5,7 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
-from typing import Annotated, Optional
+from typing import Annotated
 from fastapi import Depends
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
