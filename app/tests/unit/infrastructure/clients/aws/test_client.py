@@ -116,3 +116,80 @@ class TestClient:
         )
         assert res.is_success
         assert calls["count"] >= 2
+
+    def test_force_paginate_with_keys(self, monkeypatch):
+        pages = [{"Items": [1, 2]}, {"Items": [3]}]
+
+        class FakePaginator:
+            def __init__(self, pages):
+                self._pages = pages
+
+            def paginate(self, **kwargs):
+                yield from self._pages
+
+        class FakeClient:
+            def get_paginator(self, method_name):
+                return FakePaginator(pages)
+
+            def list(self, **kwargs):
+                return None
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+
+        result = aws_client._call_api_once(
+            service_name="svc",
+            method="list",
+            keys=["Items"],
+            role_arn=None,
+            session_config=None,
+            client_config=None,
+            force_paginate=True,
+            kwargs={},
+        )
+
+        assert result == [1, 2, 3]
+
+    def test_force_paginate_without_keys(self, monkeypatch):
+        pages = [
+            {"Items": [{"id": 1}], "Count": 1, "ResponseMetadata": {}},
+            {"Items": [{"id": 2}], "Count": 1},
+        ]
+
+        class FakePaginator:
+            def __init__(self, pages):
+                self._pages = pages
+
+            def paginate(self, **kwargs):
+                yield from self._pages
+
+        class FakeClient:
+            def get_paginator(self, method_name):
+                return FakePaginator(pages)
+
+            def list(self, **kwargs):
+                return None
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+
+        result = aws_client._call_api_once(
+            service_name="svc",
+            method="list",
+            keys=None,
+            role_arn=None,
+            session_config=None,
+            client_config=None,
+            force_paginate=True,
+            kwargs={},
+        )
+
+        assert result == [{"id": 1}, 1, {"id": 2}, 1]
