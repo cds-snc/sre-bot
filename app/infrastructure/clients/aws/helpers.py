@@ -16,7 +16,6 @@ import structlog
 
 from infrastructure.clients.aws.factory import AWSClientFactory
 from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
 
 logger = structlog.get_logger()
 
