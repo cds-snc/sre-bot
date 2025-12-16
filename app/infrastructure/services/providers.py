@@ -8,6 +8,7 @@ from functools import lru_cache
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
+from infrastructure.security.jwks import JWKSManager
 
 
 @lru_cache
@@ -40,3 +41,18 @@ def get_identity_resolver() -> IdentityResolver:
             return resolver.resolve_from_jwt(jwt_payload)
     """
     return IdentityResolver(slack_client_manager=SlackClientManager)
+
+
+@lru_cache
+def get_jwks_manager() -> JWKSManager:
+    """
+    Get application-scoped JWKSManager singleton.
+
+    Returns:
+        JWKSManager: Cached JWKS manager configured from application settings.
+    """
+    settings = get_settings()
+    issuer_config = settings.server.ISSUER_CONFIG
+    if not issuer_config:
+        raise ValueError("ISSUER_CONFIG is not configured in settings.server")
+    return JWKSManager(issuer_config=issuer_config)

@@ -18,15 +18,6 @@ class TestJWKSManager:
         assert manager.issuer_config == mock_issuer_config
         assert manager.jwks_clients == {}
 
-    def test_jwks_manager_initialization_without_config(self):
-        """Test JWKSManager initialization without explicit config."""
-        # When initialized with None, it falls back to settings if available
-        manager = JWKSManager(issuer_config=None)
-
-        # It should either have settings config or be empty
-        # (depends on whether settings.server.ISSUER_CONFIG is set)
-        assert manager.jwks_clients == {}
-
     def test_get_jwks_client_returns_none_for_missing_issuer(self, mock_issuer_config):
         """Test get_jwks_client returns None for unknown issuer."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
@@ -36,10 +27,10 @@ class TestJWKSManager:
 
     def test_get_jwks_client_returns_none_for_missing_config(self):
         """Test get_jwks_client returns None when config is None."""
-        manager = JWKSManager(issuer_config=None)
-        result = manager.get_jwks_client("any_issuer")
-
-        assert result is None
+        # Construction with None should raise; ensure callers can't use a
+        # manager without explicit issuer configuration.
+        with pytest.raises(ValueError):
+            JWKSManager(issuer_config=None)
 
     def test_get_jwks_client_returns_none_for_missing_jwks_uri(self):
         """Test get_jwks_client returns None when jwks_uri is missing."""

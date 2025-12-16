@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 import structlog
 from jwt import PyJWKClient, PyJWKClientError
 
-from infrastructure.configuration import settings
 
 logger = structlog.get_logger()
 
@@ -24,16 +23,19 @@ class JWKSManager:
         jwks_clients: Cache of JWKS clients for each issuer
     """
 
-    def __init__(self, issuer_config: Optional[Dict[str, Dict[str, Any]]] = None):
+    def __init__(self, issuer_config: Dict[str, Dict[str, Any]]):
         """Initialize JWKS manager.
 
         Args:
             issuer_config: Optional issuer configuration dictionary.
                           If None, uses settings.server.ISSUER_CONFIG.
         """
-        self.issuer_config = issuer_config or getattr(
-            settings.server, "ISSUER_CONFIG", None
-        )
+        if issuer_config is None:
+            raise ValueError(
+                "issuer_config must be provided explicitly. "
+                "Use get_jwks_manager() provider for DI."
+            )
+        self.issuer_config = issuer_config
         self.jwks_clients: Dict[str, PyJWKClient] = {}
 
     def get_jwks_client(self, issuer: str) -> Optional[PyJWKClient]:

@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError, decode
 
 from infrastructure.security.jwks import JWKSManager
+from infrastructure.services.providers import get_jwks_manager
 
 logger = structlog.get_logger()
 security = HTTPBearer()
@@ -82,7 +83,7 @@ def validate_jwt_token(
         HTTPException: 401 if token is invalid, untrusted, or missing
     """
     if not jwks_manager:
-        jwks_manager = JWKSManager()
+        jwks_manager = get_jwks_manager()
 
     # Validate credentials structure
     if (
