@@ -8,9 +8,6 @@ from infrastructure.clients.aws import client as aws_client
 from infrastructure.operations.status import OperationStatus
 
 
-import pytest
-
-
 @pytest.mark.unit
 class TestClient:
     def test_calculate_retry_delay(self):
@@ -287,3 +284,38 @@ class TestClient:
 
         assert not res.is_success
         assert res.status == OperationStatus.PERMANENT_ERROR
+
+    def test_backoff_sleep_called(self, monkeypatch):
+        # Simulate transient failures twice then success; expect two sleeps with
+        # delays computed as backoff_factor * (2**attempt)
+        calls = {"count": 0}
+        sleep_calls = []
+
+        class FakeClient:
+            def flaky(self, **kwargs):
+                calls["count"] += 1
+                if calls["count"] < 3:
+                    response = {
+                        "Error": {"Code": "ThrottlingException", "Message": "throttle"}
+                    }
+                    raise ClientError(response, operation_name="Flaky")
+                return {"ok": True}
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        def fake_sleep(delay):
+            sleep_calls.append(delay)
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+        monkeypatch.setattr(aws_client.time, "sleep", fake_sleep)
+
+        res = aws_client.execute_aws_api_call(
+            "svc", "flaky", max_retries=2, backoff_factor=0.5
+        )
+        assert res.is_success
+        assert len(sleep_calls) == 2
+        assert sleep_calls[0] == pytest.approx(0.5)
+        assert sleep_calls[1] == pytest.approx(1.0)
