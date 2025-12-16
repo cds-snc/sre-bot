@@ -5,15 +5,13 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
+from typing import Annotated, Optional
+from fastapi import Depends
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
 from infrastructure.security.jwks import JWKSManager
-from infrastructure.clients.aws import (
-    get_boto3_client as _get_boto3_client,
-)
-from infrastructure.clients.aws import dynamodb as dynamodb_client
-from typing import Any, Dict, Optional
+from infrastructure.clients.aws import AWSClientFactory
 
 
 @lru_cache
@@ -63,33 +61,34 @@ def get_jwks_manager() -> JWKSManager:
     return JWKSManager(issuer_config=issuer_config)
 
 
-@lru_cache
 def get_aws_client(
-    service_name: str = "",
-    session_config: Optional[Dict[str, Any]] = None,
-    client_config: Optional[Dict[str, Any]] = None,
-    role_arn: Optional[str] = None,
-) -> Any:
-    """Provider for creating a boto3 client for a given service.
+    settings: Annotated[Settings, Depends(get_settings)] = None,
+) -> AWSClientFactory:
+    """Provider for AWS client factory with all service operations.
 
-    Note: This provider returns a boto3 client instance. Prefer higher-level
-    wrappers (e.g., get_dynamodb_client) for typed OperationResult returns.
+    Returns a fully-configured AWSClientFactory instance with region, role,
+    and endpoint settings from the application settings.
+
+    Args:
+        settings: Application settings (injected)
+
+    Returns:
+        AWSClientFactory: Configured factory instance for all AWS service calls
+
+    Usage:
+        @router.post("/groups")
+        def create_group(aws: AWSClientDep):
+            result = aws.create_account_assignment(...)
+            if result.is_success:
+                return {"assignment_id": result.data}
     """
-    if not service_name:
-        raise ValueError("service_name must be provided to get_aws_client")
-    return _get_boto3_client(
-        service_name,
-        session_config=session_config,
-        client_config=client_config,
-        role_arn=role_arn,
+    if settings is None:
+        settings = get_settings()
+    return AWSClientFactory(
+        aws_region=settings.aws.AWS_REGION,
+        endpoint_url=getattr(settings.aws, "ENDPOINT_URL", None),
+        role_arn=getattr(settings.aws, "ROLE_ARN", None),
+        treat_conflict_as_success=getattr(
+            settings.aws, "TREAT_CONFLICT_AS_SUCCESS", False
+        ),
     )
-
-
-@lru_cache
-def get_dynamodb_client() -> Any:
-    """Provider that returns the DynamoDB client wrapper module.
-
-    This returns the `dynamodb` module which exposes OperationResult-returning
-    helper functions (get_item, put_item, query, etc.).
-    """
-    return dynamodb_client
