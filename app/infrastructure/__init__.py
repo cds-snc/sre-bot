@@ -3,7 +3,7 @@
 Centralized infrastructure components:
 - configuration: Settings management (settings, RetrySettings)
 - identity: User identity models and resolution (User, IdentityResolver)
-- auth: Authentication and JWT validation (validate_jwt_token, JWKSManager)
+- security: JWT validation and JWKS management (validate_jwt_token, JWKSManager)
 - observability: Logging and monitoring (get_module_logger, logger)
 - events: Event system
 - i18n: Internationalization
@@ -22,7 +22,7 @@ from infrastructure.configuration import settings
 
 # Auth & Identity
 from infrastructure.identity import User
-from infrastructure.auth import validate_jwt_token
+from infrastructure.security import JWKSManager, validate_jwt_token
 
 # Observability
 from infrastructure.observability import get_module_logger, logger
@@ -44,6 +44,7 @@ __all__ = [
     "settings",
     # Auth & Identity
     "User",
+    "JWKSManager",
     "validate_jwt_token",
     # Observability
     "get_module_logger",

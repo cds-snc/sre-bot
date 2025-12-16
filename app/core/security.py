@@ -2,20 +2,29 @@
 
 DEPRECATED: This module is maintained for backward compatibility with legacy feature
 modules (incident, roles, aws, opsgenie, trello, atip, etc.). New code should import
-from infrastructure.auth instead.
+from infrastructure.security instead.
 
 Migration:
     from core.security import validate_jwt_token, jwks_manager  # OLD
-    from infrastructure.auth import validate_jwt_token, jwks_manager  # NEW
+    from infrastructure.security import validate_jwt_token, JWKSManager  # NEW
 """
 
+import warnings
 from typing import Any, Dict, Optional, Tuple
+
 from fastapi import HTTPException, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, PyJWTError, PyJWKClientError, decode
 
 from core.config import settings
 from core.logging import get_module_logger
+
+# Issue deprecation warning on import
+warnings.warn(
+    "core.security is deprecated, use infrastructure.security instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 ISSUER_CONFIG = settings.server.ISSUER_CONFIG
