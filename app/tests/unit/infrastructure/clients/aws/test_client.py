@@ -1,7 +1,4 @@
-from types import SimpleNamespace
-
 import pytest
-
 from botocore.exceptions import ClientError
 
 from infrastructure.clients.aws import client as aws_client
@@ -63,20 +60,14 @@ class TestClient:
         res = aws_client._map_client_error(e, "iam", "get_user", False, None)
         assert res.status == OperationStatus.UNAUTHORIZED
 
-    def test_execute_aws_api_call_success(self, monkeypatch):
-        # Patch get_boto3_client to return a client with desired method
-        dummy = SimpleNamespace()
-
+    def test_execute_aws_api_call_success(self, monkeypatch, make_fake_client):
+        # Use the fixture to create a fake client with desired method response
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            obj = SimpleNamespace()
-
-            def fake_method(**kwargs):
-                return {"ok": True, "args": kwargs}
-
-            setattr(obj, "describe_something", fake_method)
-            return obj
+            return make_fake_client(
+                api_responses={"describe_something": {"ok": True, "args": {}}}
+            )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
 
@@ -86,26 +77,24 @@ class TestClient:
         assert res.is_success
         assert res.data == {"ok": True, "args": {}}
 
-    def test_execute_aws_api_call_clienterror_retry(self, monkeypatch):
+    def test_execute_aws_api_call_clienterror_retry(
+        self, monkeypatch, make_fake_client
+    ):
         calls = {"count": 0}
 
-        class FakeClient:
-            def __init__(self):
-                pass
-
-            def flaky(self, **kwargs):
-                calls["count"] += 1
-                if calls["count"] < 2:
-                    response = {
-                        "Error": {"Code": "ThrottlingException", "Message": "throttle"}
-                    }
-                    raise ClientError(response, operation_name="Flaky")
-                return {"ok": True}
+        def flaky_raises(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] < 2:
+                response = {
+                    "Error": {"Code": "ThrottlingException", "Message": "throttle"}
+                }
+                raise ClientError(response, operation_name="Flaky")
+            return {"ok": True}
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(api_responses={"flaky": flaky_raises})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
         res = aws_client.execute_aws_api_call(
@@ -114,27 +103,13 @@ class TestClient:
         assert res.is_success
         assert calls["count"] >= 2
 
-    def test_force_paginate_with_keys(self, monkeypatch):
+    def test_force_paginate_with_keys(self, monkeypatch, make_fake_client):
         pages = [{"Items": [1, 2]}, {"Items": [3]}]
-
-        class FakePaginator:
-            def __init__(self, pages):
-                self._pages = pages
-
-            def paginate(self, **kwargs):
-                yield from self._pages
-
-        class FakeClient:
-            def get_paginator(self, method_name):
-                return FakePaginator(pages)
-
-            def list(self, **kwargs):
-                return None
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(paginated_pages=pages, api_responses={})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
 
@@ -151,30 +126,16 @@ class TestClient:
 
         assert result == [1, 2, 3]
 
-    def test_force_paginate_without_keys(self, monkeypatch):
+    def test_force_paginate_without_keys(self, monkeypatch, make_fake_client):
         pages = [
             {"Items": [{"id": 1}], "Count": 1, "ResponseMetadata": {}},
             {"Items": [{"id": 2}], "Count": 1},
         ]
 
-        class FakePaginator:
-            def __init__(self, pages):
-                self._pages = pages
-
-            def paginate(self, **kwargs):
-                yield from self._pages
-
-        class FakeClient:
-            def get_paginator(self, method_name):
-                return FakePaginator(pages)
-
-            def list(self, **kwargs):
-                return None
-
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(paginated_pages=pages, api_responses={})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
 
@@ -191,20 +152,19 @@ class TestClient:
 
         assert result == [{"id": 1}, 1, {"id": 2}, 1]
 
-    def test_conflict_callback_invoked_treat_as_success(self, monkeypatch):
+    def test_conflict_callback_invoked_treat_as_success(
+        self, monkeypatch, make_fake_client
+    ):
         called = {"flag": False}
 
-        class FakeClient:
-            def create(self, **kwargs):
-                response = {
-                    "Error": {"Code": "EntityAlreadyExists", "Message": "exists"}
-                }
-                raise ClientError(response, operation_name="Create")
+        def create_raises(*args, **kwargs):
+            response = {"Error": {"Code": "EntityAlreadyExists", "Message": "exists"}}
+            raise ClientError(response, operation_name="Create")
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(api_responses={"create": create_raises})
 
         def conflict_cb(exc):
             called["flag"] = True
@@ -222,19 +182,16 @@ class TestClient:
         assert called["flag"] is True
         assert res.is_success
 
-    def test_conflict_callback_exception_handled(self, monkeypatch):
+    def test_conflict_callback_exception_handled(self, monkeypatch, make_fake_client):
         # callback raises; execute_aws_api_call should not propagate
-        class FakeClient:
-            def create(self, **kwargs):
-                response = {
-                    "Error": {"Code": "ConflictException", "Message": "conflict"}
-                }
-                raise ClientError(response, operation_name="Create")
+        def create_raises(*args, **kwargs):
+            response = {"Error": {"Code": "ConflictException", "Message": "conflict"}}
+            raise ClientError(response, operation_name="Create")
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(api_responses={"create": create_raises})
 
         def conflict_cb(exc):
             raise RuntimeError("callback failed")
@@ -251,20 +208,19 @@ class TestClient:
 
         assert res.is_success
 
-    def test_conflict_callback_invoked_permanent_error(self, monkeypatch):
+    def test_conflict_callback_invoked_permanent_error(
+        self, monkeypatch, make_fake_client
+    ):
         called = {"flag": False}
 
-        class FakeClient:
-            def create(self, **kwargs):
-                response = {
-                    "Error": {"Code": "EntityAlreadyExists", "Message": "exists"}
-                }
-                raise ClientError(response, operation_name="Create")
+        def create_raises(*args, **kwargs):
+            response = {"Error": {"Code": "EntityAlreadyExists", "Message": "exists"}}
+            raise ClientError(response, operation_name="Create")
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(api_responses={"create": create_raises})
 
         def conflict_cb(exc):
             called["flag"] = True
@@ -280,31 +236,28 @@ class TestClient:
         )
 
         assert called["flag"] is True
-        from infrastructure.operations.status import OperationStatus
-
         assert not res.is_success
         assert res.status == OperationStatus.PERMANENT_ERROR
 
-    def test_backoff_sleep_called(self, monkeypatch):
+    def test_backoff_sleep_called(self, monkeypatch, make_fake_client):
         # Simulate transient failures twice then success; expect two sleeps with
         # delays computed as backoff_factor * (2**attempt)
         calls = {"count": 0}
         sleep_calls = []
 
-        class FakeClient:
-            def flaky(self, **kwargs):
-                calls["count"] += 1
-                if calls["count"] < 3:
-                    response = {
-                        "Error": {"Code": "ThrottlingException", "Message": "throttle"}
-                    }
-                    raise ClientError(response, operation_name="Flaky")
-                return {"ok": True}
+        def flaky_raises(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] < 3:
+                response = {
+                    "Error": {"Code": "ThrottlingException", "Message": "throttle"}
+                }
+                raise ClientError(response, operation_name="Flaky")
+            return {"ok": True}
 
         def get_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            return FakeClient()
+            return make_fake_client(api_responses={"flaky": flaky_raises})
 
         def fake_sleep(delay):
             sleep_calls.append(delay)
