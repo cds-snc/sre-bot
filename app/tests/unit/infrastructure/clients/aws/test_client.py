@@ -193,3 +193,97 @@ class TestClient:
         )
 
         assert result == [{"id": 1}, 1, {"id": 2}, 1]
+
+    def test_conflict_callback_invoked_treat_as_success(self, monkeypatch):
+        called = {"flag": False}
+
+        class FakeClient:
+            def create(self, **kwargs):
+                response = {
+                    "Error": {"Code": "EntityAlreadyExists", "Message": "exists"}
+                }
+                raise ClientError(response, operation_name="Create")
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        def conflict_cb(exc):
+            called["flag"] = True
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+
+        res = aws_client.execute_aws_api_call(
+            "svc",
+            "create",
+            treat_conflict_as_success=True,
+            conflict_callback=conflict_cb,
+            max_retries=0,
+        )
+
+        assert called["flag"] is True
+        assert res.is_success
+
+    def test_conflict_callback_exception_handled(self, monkeypatch):
+        # callback raises; execute_aws_api_call should not propagate
+        class FakeClient:
+            def create(self, **kwargs):
+                response = {
+                    "Error": {"Code": "ConflictException", "Message": "conflict"}
+                }
+                raise ClientError(response, operation_name="Create")
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        def conflict_cb(exc):
+            raise RuntimeError("callback failed")
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+
+        res = aws_client.execute_aws_api_call(
+            "svc",
+            "create",
+            treat_conflict_as_success=True,
+            conflict_callback=conflict_cb,
+            max_retries=0,
+        )
+
+        assert res.is_success
+
+    def test_conflict_callback_invoked_permanent_error(self, monkeypatch):
+        called = {"flag": False}
+
+        class FakeClient:
+            def create(self, **kwargs):
+                response = {
+                    "Error": {"Code": "EntityAlreadyExists", "Message": "exists"}
+                }
+                raise ClientError(response, operation_name="Create")
+
+        def get_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            return FakeClient()
+
+        def conflict_cb(exc):
+            called["flag"] = True
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", get_boto3_client)
+
+        res = aws_client.execute_aws_api_call(
+            "svc",
+            "create",
+            treat_conflict_as_success=False,
+            conflict_callback=conflict_cb,
+            max_retries=0,
+        )
+
+        assert called["flag"] is True
+        from infrastructure.operations.status import OperationStatus
+
+        assert not res.is_success
+        assert res.status == OperationStatus.PERMANENT_ERROR
