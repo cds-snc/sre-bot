@@ -198,14 +198,14 @@ class TestValidateJWTToken:
             assert exc_info.value.status_code == 401
             assert "Untrusted or missing" in exc_info.value.detail
 
-    @patch("infrastructure.security.jwt.JWKSManager")
-    def test_validate_jwt_token_uses_default_manager(self, mock_manager_class):
-        """Test validate_jwt_token creates default JWKSManager if not provided."""
+    @patch("infrastructure.security.jwt.get_jwks_manager")
+    def test_validate_jwt_token_uses_default_manager(self, mock_get_jwks_manager):
+        """Test validate_jwt_token uses the `get_jwks_manager` provider when not provided."""
         from fastapi.security import HTTPAuthorizationCredentials
 
         mock_manager_instance = MagicMock()
         mock_manager_instance.issuer_config = None
-        mock_manager_class.return_value = mock_manager_instance
+        mock_get_jwks_manager.return_value = mock_manager_instance
 
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
 
