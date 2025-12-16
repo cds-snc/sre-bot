@@ -1,7 +1,10 @@
+import pytest
+
 from infrastructure.clients.aws import factory as aws_factory_module
 from infrastructure.operations.result import OperationResult
 
 
+@pytest.mark.unit
 class TestDynamoDB:
     def test_build_client_kwargs_defaults(self, aws_factory):
         # aws_factory fixture already constructs with region us-east-1
@@ -28,6 +31,7 @@ class TestDynamoDB:
         assert captured["TableName"] == "tbl"
 
 
+@pytest.mark.unit
 class TestIdentityStore:
     def test_identitystore_methods_call_execute(self, monkeypatch, aws_factory):
         captured = {}
@@ -73,6 +77,7 @@ class TestIdentityStore:
         assert captured["UserId"] == "uid-1"
 
 
+@pytest.mark.unit
 class TestOrganizations:
     def test_organizations_methods_and_get_account_id_by_name(
         self, monkeypatch, aws_factory
@@ -126,6 +131,7 @@ class TestOrganizations:
         assert res.error_code == "ACCOUNT_NOT_FOUND"
 
 
+@pytest.mark.unit
 class TestSsoAdmin:
     def test_sso_admin_methods_call_execute(self, monkeypatch, aws_factory):
         captured = {}

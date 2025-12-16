@@ -8,6 +8,10 @@ from infrastructure.clients.aws import client as aws_client
 from infrastructure.operations.status import OperationStatus
 
 
+import pytest
+
+
+@pytest.mark.unit
 class TestClient:
     def test_calculate_retry_delay(self):
         assert aws_client._calculate_retry_delay(0) == pytest.approx(0.5)

@@ -1,3 +1,4 @@
+import pytest
 
 from infrastructure.clients.aws.helpers import (
     get_batch_users,
@@ -26,6 +27,7 @@ class DummyAWS:
         return OperationResult.success(data=list(self._users.values()))
 
 
+@pytest.mark.unit
 class TestHelpers:
     def test_get_batch_users(self):
         users = {
