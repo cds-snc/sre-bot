@@ -1,11 +1,6 @@
 import pytest
 
-from infrastructure.clients.aws.helpers import (
-    get_batch_users,
-    get_batch_groups,
-    _assemble_groups_with_memberships,
-    healthcheck,
-)
+from infrastructure.clients.aws.helpers import AWSHelpers
 from infrastructure.operations.result import OperationResult
 
 
@@ -35,7 +30,8 @@ class TestHelpers:
             "u2": {"UserId": "u2", "Name": "B"},
         }
         aws = DummyAWS(users=users)
-        res = get_batch_users(aws, "sid", ["u1", "u3"])
+        helpers = AWSHelpers(aws)
+        res = helpers.get_batch_users("sid", ["u1", "u3"])
         assert res.is_success
         assert res.data["u1"]["UserId"] == "u1"
         assert res.data["u3"] is None
@@ -43,7 +39,8 @@ class TestHelpers:
     def test_get_batch_groups(self):
         groups = {"g1": {"GroupId": "g1", "DisplayName": "G1"}}
         aws = DummyAWS(users=groups)
-        res = get_batch_groups(aws, "sid", ["g1", "g2"])
+        helpers = AWSHelpers(aws)
+        res = helpers.get_batch_groups("sid", ["g1", "g2"])
         assert res.is_success
         assert res.data["g1"]["GroupId"] == "g1"
         assert res.data["g2"] is None
@@ -56,7 +53,8 @@ class TestHelpers:
             "u2": {"UserId": "u2", "Name": "B"},
         }
 
-        res = _assemble_groups_with_memberships(
+        helpers = AWSHelpers(DummyAWS())
+        res = helpers._assemble_groups_with_memberships(
             groups, memberships, users_by_id, tolerate_errors=False
         )
         assert isinstance(res, list)
@@ -64,11 +62,12 @@ class TestHelpers:
 
     def test_healthcheck_success(self):
         aws = DummyAWS(users={"u1": {"UserId": "u1"}})
-        assert healthcheck(aws, "sid") is True
+        helpers = AWSHelpers(aws)
+        assert helpers.healthcheck("sid") is True
 
     def test_healthcheck_failure(self):
         class BadAWS:
             def list_users(self, identity_store_id, **kwargs):
                 return OperationResult.permanent_error(message="boom")
 
-        assert healthcheck(BadAWS(), "sid") is False
+        assert AWSHelpers(BadAWS()).healthcheck("sid") is False

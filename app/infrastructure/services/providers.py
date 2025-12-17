@@ -5,13 +5,13 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Optional
 from fastapi import Depends
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
 from infrastructure.security.jwks import JWKSManager
-from infrastructure.clients.aws import AWSClientFactory
+from infrastructure.clients.aws import AWSClientFactory, AWSHelpers
 
 
 @lru_cache
@@ -62,7 +62,7 @@ def get_jwks_manager() -> JWKSManager:
 
 
 def get_aws_client(
-    settings: Annotated[Settings, Depends(get_settings)] = None,
+    settings: Optional[Annotated[Settings, Depends(get_settings)]] = None,
 ) -> AWSClientFactory:
     """Provider for AWS client factory with all service operations.
 
@@ -92,3 +92,19 @@ def get_aws_client(
             settings.aws, "TREAT_CONFLICT_AS_SUCCESS", False
         ),
     )
+
+
+def get_aws_helpers(
+    aws: Annotated[AWSClientFactory, Depends(get_aws_client)],
+) -> AWSHelpers:
+    """Provider for AWS helpers factory.
+
+    Returns:
+        AWSHelpers: Helper operations wrapper configured with the AWS client factory
+
+    Usage:
+        @router.get("/groups")
+        def list_groups(helpers: AWSHelpersDep):
+            result = helpers.list_groups_with_memberships(store_id)
+    """
+    return AWSHelpers(aws)
