@@ -61,6 +61,7 @@ def get_jwks_manager() -> JWKSManager:
     return JWKSManager(issuer_config=issuer_config)
 
 
+@lru_cache
 def get_aws_client(
     settings: Optional[Annotated[Settings, Depends(get_settings)]] = None,
 ) -> AWSClientFactory:
@@ -95,6 +96,7 @@ def get_aws_client(
     )
 
 
+@lru_cache
 def get_aws_helpers(
     aws: Annotated[AWSClientFactory, Depends(get_aws_client)],
 ) -> AWSHelpers:
