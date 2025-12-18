@@ -61,6 +61,108 @@ def _calculate_retry_delay(attempt: int, backoff_factor: float = 0.5) -> float:
     return backoff_factor * (2**attempt)
 
 
+def _determine_pagination_strategy(
+    client: BaseClient,
+    method: str,
+    force_paginate: bool,
+) -> bool:
+    """Determine whether to use pagination for this API call.
+
+    Args:
+        client: boto3 client instance
+        method: Method name to check
+        force_paginate: Whether caller explicitly requested pagination
+
+    Returns:
+        True if pagination should be used, False otherwise
+    """
+    if force_paginate:
+        return True
+
+    try:
+        return hasattr(client, "can_paginate") and client.can_paginate(method)
+    except Exception:  # pylint: disable=broad-except
+        return False
+
+
+def _aggregate_page_items(
+    page: Dict[str, Any],
+    keys: Optional[List[str]],
+) -> List[Any]:
+    """Extract and aggregate items from a paginated response page.
+
+    Args:
+        page: Single page from paginator
+        keys: Specific keys to extract, or None to auto-discover
+
+    Returns:
+        List of aggregated items from this page
+    """
+    items: List[Any] = []
+
+    if keys:
+        # Extract only specified keys
+        for key in keys:
+            if key in page:
+                value = page[key]
+                if isinstance(value, list):
+                    items.extend(value)
+                elif isinstance(value, dict):
+                    items.append(value)
+    else:
+        # Auto-discover: include all values except pagination metadata
+        for key, value in page.items():
+            # Skip response metadata and pagination tokens
+            if key in (
+                "ResponseMetadata",
+                "NextToken",
+                "NextContinuationToken",
+                "Marker",
+            ):
+                continue
+
+            if isinstance(value, list):
+                items.extend(value)
+            elif isinstance(value, dict):
+                items.append(value)
+            else:
+                # Include scalar values (Count, etc.)
+                items.append(value)
+
+    return items
+
+
+def _call_with_paginator(
+    client: BaseClient,
+    method: str,
+    keys: Optional[List[str]],
+    api_kwargs: Dict[str, Any],
+) -> Optional[List[Any]]:
+    """Execute a paginated API call and aggregate results.
+
+    Args:
+        client: boto3 client instance
+        method: Method name to paginate
+        keys: Specific keys to extract from pages
+        api_kwargs: API method keyword arguments
+
+    Returns:
+        Aggregated list of results, or None if paginator unavailable
+    """
+    try:
+        paginator = client.get_paginator(method)
+    except Exception:  # pylint: disable=broad-except
+        # Paginator not available; caller should fallback to direct call
+        return None
+
+    results: List[Any] = []
+    for page in paginator.paginate(**api_kwargs):
+        page_items = _aggregate_page_items(page, keys)
+        results.extend(page_items)
+
+    return results
+
+
 def _call_api_once(
     service_name: str,
     method: str,
@@ -71,32 +173,39 @@ def _call_api_once(
     force_paginate: bool,
     kwargs: Dict[str, Any],
 ) -> Any:
+    """Execute a single AWS API call with optional pagination.
+
+    Args:
+        service_name: AWS service name
+        method: Method name to call
+        keys: Specific response keys to extract (pagination only)
+        role_arn: Optional cross-account role ARN
+        session_config: boto3 session configuration
+        client_config: boto3 client configuration
+        force_paginate: Force pagination even if not typically used
+        kwargs: API method keyword arguments
+
+    Returns:
+        API response or paginated results
+    """
     client = get_boto3_client(
         service_name,
         session_config=session_config,
         client_config=client_config,
         role_arn=role_arn,
     )
+
+    should_paginate = _determine_pagination_strategy(client, method, force_paginate)
+
+    if should_paginate:
+        # Try paginated call
+        paginated_result = _call_with_paginator(client, method, keys, kwargs)
+        if paginated_result is not None:
+            return paginated_result
+        # Fallback to direct call if paginator unavailable
+
+    # Direct API call (non-paginated or fallback)
     api_method = getattr(client, method)
-
-    if force_paginate and hasattr(client, "get_paginator"):
-        paginator = client.get_paginator(method)
-        results: List[Any] = []
-        for page in paginator.paginate(**kwargs):
-            if keys:
-                for k in keys:
-                    if k in page and isinstance(page[k], list):
-                        results.extend(page[k])
-            else:
-                for k, v in page.items():
-                    if k == "ResponseMetadata":
-                        continue
-                    if isinstance(v, list):
-                        results.extend(v)
-                    else:
-                        results.append(v)
-        return results
-
     return api_method(**kwargs)
 
 
