@@ -94,8 +94,15 @@ def aws_factory():
     `infrastructure.clients.aws.client.get_boto3_client` to return fake
     clients. This fixture centralizes the construction and keeps tests
     consistent with the project's testing strategy.
+
+    Configured with:
+    - aws_region: us-east-1
+    - default_identity_store_id: us-east-1 (for Identity Store operations)
     """
-    return AWSClientFactory(aws_region="us-east-1")
+    return AWSClientFactory(
+        aws_region="us-east-1",
+        default_identity_store_id="store-1234567890",
+    )
 
 
 @pytest.fixture

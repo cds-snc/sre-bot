@@ -44,37 +44,40 @@ class TestIdentityStore:
 
         monkeypatch.setattr(aws_factory_module, "execute_aws_api_call", fake_execute)
 
-        # list_users
-        res = aws_factory.list_users("sid-1")
+        # list_users - uses factory's configured identity_store_id
+        res = aws_factory.list_users()
         assert res.is_success
         assert captured["service"] == "identitystore"
         assert captured["method"] == "list_users"
-        assert captured["IdentityStoreId"] == "sid-1"
+        assert captured["IdentityStoreId"] == "store-1234567890"  # from fixture
 
-        # get_user
+        # get_user - uses factory's configured identity_store_id
         captured.clear()
-        res = aws_factory.get_user("sid-1", "uid-1")
+        res = aws_factory.get_user("uid-1")
         assert res.is_success
         assert captured["service"] == "identitystore"
         assert captured["method"] == "describe_user"
         assert captured["UserId"] == "uid-1"
+        assert captured["IdentityStoreId"] == "store-1234567890"
 
-        # create_user
+        # create_user - uses factory's configured identity_store_id
         captured.clear()
-        res = aws_factory.create_user("sid-1", UserName="jsmith", DisplayName="J Smith")
+        res = aws_factory.create_user(UserName="jsmith", DisplayName="J Smith")
         assert res.is_success
         assert captured["service"] == "identitystore"
         assert captured["method"] == "create_user"
         assert captured["UserName"] == "jsmith"
         assert captured["DisplayName"] == "J Smith"
+        assert captured["IdentityStoreId"] == "store-1234567890"
 
-        # delete_user
+        # delete_user - uses factory's configured identity_store_id
         captured.clear()
-        res = aws_factory.delete_user("sid-1", "uid-1")
+        res = aws_factory.delete_user("uid-1")
         assert res.is_success
         assert captured["service"] == "identitystore"
         assert captured["method"] == "delete_user"
         assert captured["UserId"] == "uid-1"
+        assert captured["IdentityStoreId"] == "store-1234567890"
 
 
 @pytest.mark.unit

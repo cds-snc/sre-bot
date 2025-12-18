@@ -43,12 +43,14 @@ class AWSClientFactory:
         aws_region: Optional[str] = None,
         endpoint_url: Optional[str] = None,
         role_arn: Optional[str] = None,
+        default_identity_store_id: Optional[str] = None,
         treat_conflict_as_success: bool = False,
         conflict_callback: Optional[Callable[[Exception], None]] = None,
     ):
         self.aws_region = aws_region
         self.endpoint_url = endpoint_url
         self.role_arn = role_arn
+        self.default_identity_store_id = default_identity_store_id
         self.treat_conflict_as_success = treat_conflict_as_success
         self.conflict_callback = conflict_callback
         self._logger = logger.bind(component="aws_client_factory")
@@ -256,25 +258,33 @@ class AWSClientFactory:
 
     def list_users(
         self,
-        identity_store_id: str,
+        *,
+        identity_store_id: Optional[str] = None,
         role_arn: Optional[str] = None,
         **kwargs,
     ) -> OperationResult:
         """List users in Identity Store.
 
         Args:
-            identity_store_id: AWS Identity Store ID
+            identity_store_id: Optional override for AWS Identity Store ID (uses factory default if omitted)
             role_arn: Optional override for cross-account access
             **kwargs: Additional parameters (Filters, etc.)
 
         Returns:
             OperationResult with list of users or error
         """
+        store_id = identity_store_id or self.default_identity_store_id
+        if not store_id:
+            return OperationResult.permanent_error(
+                message="identity_store_id is required",
+                error_code="MISSING_IDENTITY_STORE_ID",
+            )
+
         client_kwargs = self._build_client_kwargs(role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_users",
-            IdentityStoreId=identity_store_id,
+            IdentityStoreId=store_id,
             treat_conflict_as_success=self.treat_conflict_as_success,
             conflict_callback=self.conflict_callback,
             **client_kwargs,
@@ -283,27 +293,35 @@ class AWSClientFactory:
 
     def get_user(
         self,
-        identity_store_id: str,
         user_id: str,
+        *,
+        identity_store_id: Optional[str] = None,
         role_arn: Optional[str] = None,
         **kwargs,
     ) -> OperationResult:
         """Get a user from Identity Store.
 
         Args:
-            identity_store_id: AWS Identity Store ID
-            user_id: User ID to retrieve
+            user_id: User ID to retrieve (required)
+            identity_store_id: Optional override for AWS Identity Store ID (uses factory default if omitted)
             role_arn: Optional override for cross-account access
             **kwargs: Additional parameters
 
         Returns:
             OperationResult with user details or error
         """
+        store_id = identity_store_id or self.default_identity_store_id
+        if not store_id:
+            return OperationResult.permanent_error(
+                message="identity_store_id is required",
+                error_code="MISSING_IDENTITY_STORE_ID",
+            )
+
         client_kwargs = self._build_client_kwargs(role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "describe_user",
-            IdentityStoreId=identity_store_id,
+            IdentityStoreId=store_id,
             UserId=user_id,
             treat_conflict_as_success=self.treat_conflict_as_success,
             conflict_callback=self.conflict_callback,
@@ -313,29 +331,37 @@ class AWSClientFactory:
 
     def create_user(
         self,
-        identity_store_id: str,
         UserName: str,
         DisplayName: str,
+        *,
+        identity_store_id: Optional[str] = None,
         role_arn: Optional[str] = None,
         **kwargs,
     ) -> OperationResult:
         """Create a new user in Identity Store.
 
         Args:
-            identity_store_id: AWS Identity Store ID
-            UserName: Username for the new user
-            DisplayName: Display name for the user
+            UserName: Username for the new user (required)
+            DisplayName: Display name for the user (required)
+            identity_store_id: Optional override for AWS Identity Store ID (uses factory default if omitted)
             role_arn: Optional override for cross-account access
             **kwargs: Additional parameters
 
         Returns:
             OperationResult with created user details or error
         """
+        store_id = identity_store_id or self.default_identity_store_id
+        if not store_id:
+            return OperationResult.permanent_error(
+                message="identity_store_id is required",
+                error_code="MISSING_IDENTITY_STORE_ID",
+            )
+
         client_kwargs = self._build_client_kwargs(role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "create_user",
-            IdentityStoreId=identity_store_id,
+            IdentityStoreId=store_id,
             UserName=UserName,
             DisplayName=DisplayName,
             treat_conflict_as_success=self.treat_conflict_as_success,
@@ -346,27 +372,35 @@ class AWSClientFactory:
 
     def delete_user(
         self,
-        identity_store_id: str,
         user_id: str,
+        *,
+        identity_store_id: Optional[str] = None,
         role_arn: Optional[str] = None,
         **kwargs,
     ) -> OperationResult:
         """Delete a user from Identity Store.
 
         Args:
-            identity_store_id: AWS Identity Store ID
-            user_id: User ID to delete
+            user_id: User ID to delete (required)
+            identity_store_id: Optional override for AWS Identity Store ID (uses factory default if omitted)
             role_arn: Optional override for cross-account access
             **kwargs: Additional parameters
 
         Returns:
             OperationResult with status or error
         """
+        store_id = identity_store_id or self.default_identity_store_id
+        if not store_id:
+            return OperationResult.permanent_error(
+                message="identity_store_id is required",
+                error_code="MISSING_IDENTITY_STORE_ID",
+            )
+
         client_kwargs = self._build_client_kwargs(role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "delete_user",
-            IdentityStoreId=identity_store_id,
+            IdentityStoreId=store_id,
             UserId=user_id,
             treat_conflict_as_success=self.treat_conflict_as_success,
             conflict_callback=self.conflict_callback,
