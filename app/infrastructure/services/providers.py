@@ -88,6 +88,7 @@ def get_aws_client(
         aws_region=settings.aws.AWS_REGION,
         endpoint_url=getattr(settings.aws, "ENDPOINT_URL", None),
         role_arn=getattr(settings.aws, "ROLE_ARN", None),
+        default_identity_store_id=getattr(settings.aws, "INSTANCE_ID", None),
         treat_conflict_as_success=getattr(
             settings.aws, "TREAT_CONFLICT_AS_SUCCESS", False
         ),
