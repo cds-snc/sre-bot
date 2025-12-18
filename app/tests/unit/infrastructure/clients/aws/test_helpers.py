@@ -10,13 +10,14 @@ class DummyAWS:
         self._groups = groups or []
         self._memberships = memberships or {}
 
-    def get_user(self, identity_store_id, user_id, **kwargs):
+    def get_user(self, user_id, **kwargs):
+        """Mock get_user - identity_store_id optional, not required positional."""
         if user_id in self._users:
             return OperationResult.success(data=self._users[user_id])
         return OperationResult.permanent_error(message="not found")
 
-    def list_users(self, identity_store_id, **kwargs):
-        # Used both for listing users and for placeholder memberships in helpers
+    def list_users(self, **kwargs):
+        """Mock list_users - identity_store_id optional keyword."""
         if self._groups:
             return OperationResult.success(data=self._groups)
         return OperationResult.success(data=list(self._users.values()))

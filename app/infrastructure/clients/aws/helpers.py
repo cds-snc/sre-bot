@@ -63,7 +63,7 @@ class AWSHelpers:
 
         results = {}
         for user_id in user_ids:
-            response = self._aws.get_user(identity_store_id, user_id, **kwargs)
+            response = self._aws.get_user(user_id, **kwargs)
             if response.is_success:
                 results[user_id] = response.data
             else:
@@ -107,7 +107,7 @@ class AWSHelpers:
 
         results = {}
         for group_id in group_ids:
-            response = self._aws.get_user(identity_store_id, group_id, **kwargs)
+            response = self._aws.get_user(group_id, **kwargs)
             if response.is_success:
                 results[group_id] = response.data
             else:
