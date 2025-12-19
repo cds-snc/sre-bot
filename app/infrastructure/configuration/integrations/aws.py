@@ -46,3 +46,20 @@ class AwsSettings(IntegrationSettings):
         "RequestLimitExceeded",
     ]
     RESOURCE_NOT_FOUND_ERRS: list[str] = ["ResourceNotFoundException", "NoSuchEntity"]
+
+    @property
+    def SERVICE_ROLE_MAP(self) -> dict[str, str]:
+        """Mapping of service names to their associated role ARNs.
+
+        Returns:
+            Dict mapping service identifiers to role ARNs
+        """
+        return {
+            "audit": self.AUDIT_ROLE_ARN,
+            "organizations": self.ORG_ROLE_ARN,
+            "sso-admin": self.ORG_ROLE_ARN,
+            "logging": self.LOGGING_ROLE_ARN,
+            "ce": self.ORG_ROLE_ARN,
+            "config": self.AUDIT_ROLE_ARN,
+            "guardduty": self.LOGGING_ROLE_ARN,
+        }
