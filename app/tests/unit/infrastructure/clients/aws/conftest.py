@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from infrastructure.clients.aws import AWSClientFactory
+from infrastructure.clients.aws import AWSClients
+from infrastructure.clients.aws.session_provider import SessionProvider
 
 
 class FakePaginator:
@@ -88,10 +89,10 @@ class FakeClient:
 
 @pytest.fixture
 def aws_factory():
-    """Provide a simple AWSClientFactory instance for unit tests.
+    """Provide a simple AWSClients instance for unit tests.
 
     Tests that need to customize boto3 behavior should still monkeypatch
-    `infrastructure.clients.aws.client.get_boto3_client` to return fake
+    `infrastructure.clients.aws.executor.get_boto3_client` to return fake
     clients. This fixture centralizes the construction and keeps tests
     consistent with the project's testing strategy.
 
@@ -99,8 +100,9 @@ def aws_factory():
     - aws_region: us-east-1
     - default_identity_store_id: us-east-1 (for Identity Store operations)
     """
-    return AWSClientFactory(
-        aws_region="us-east-1",
+    # Construct facade with a SessionProvider per new API
+    return AWSClients(
+        session_provider=SessionProvider(region="us-east-1"),
         default_identity_store_id="store-1234567890",
     )
 
@@ -132,3 +134,87 @@ def make_fake_client():
         )
 
     return _factory
+
+
+@pytest.fixture
+def dynamodb_client():
+    """Fixture for DynamoDBClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.dynamodb import DynamoDBClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return DynamoDBClient(
+        session_provider=session_provider,
+        default_role_arn=None,
+    )
+
+
+@pytest.fixture
+def identity_store_client():
+    """Fixture for IdentityStoreClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.identity_store import IdentityStoreClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return IdentityStoreClient(
+        session_provider=session_provider,
+        default_identity_store_id="store-1234567890",
+    )
+
+
+@pytest.fixture
+def organizations_client():
+    """Fixture for OrganizationsClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.organizations import OrganizationsClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return OrganizationsClient(
+        session_provider=session_provider,
+        default_role_arn=None,
+    )
+
+
+@pytest.fixture
+def sso_admin_client():
+    """Fixture for SsoAdminClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.sso_admin import SsoAdminClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return SsoAdminClient(
+        session_provider=session_provider,
+        default_sso_instance_arn="arn:aws:sso:::instance/sso-instance-id",
+    )
+
+
+@pytest.fixture
+def config_client():
+    """Fixture for ConfigClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.config import ConfigClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return ConfigClient(
+        session_provider=session_provider,
+        default_role_arn=None,
+    )
+
+
+@pytest.fixture
+def guard_duty_client():
+    """Fixture for GuardDutyClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.guard_duty import GuardDutyClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return GuardDutyClient(
+        session_provider=session_provider,
+        default_role_arn=None,
+    )
+
+
+@pytest.fixture
+def cost_explorer_client():
+    """Fixture for CostExplorerClient with mocked SessionProvider."""
+    from infrastructure.clients.aws.cost_explorer import CostExplorerClient
+
+    session_provider = SessionProvider(region="us-east-1")
+    return CostExplorerClient(
+        session_provider=session_provider,
+        default_role_arn=None,
+    )
