@@ -21,6 +21,7 @@ All infrastructure services are accessed through `infrastructure/services/`
 as the single point of entry for dependency injection.
 """
 
+from infrastructure.clients.aws.config import ConfigClient
 from infrastructure.clients.aws.cost_explorer import CostExplorerClient
 from infrastructure.clients.aws.dynamodb import DynamoDBClient
 from infrastructure.clients.aws.facade import AWSClients
@@ -37,6 +38,7 @@ __all__ = [
     "IdentityStoreClient",
     "OrganizationsClient",
     "SsoAdminClient",
+    "ConfigClient",
     "GuardDutyClient",
     "CostExplorerClient",
 ]
