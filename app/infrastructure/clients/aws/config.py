@@ -26,6 +26,7 @@ class ConfigClient:
         self._default_role_arn = default_role_arn
         self._service_name = "config"
 
+    # TODO: Add support for role_arn parameters to override default_role_arn
     def describe_aggregate_compliance_by_config_rules(
         self, config_aggregator_name: str, filters: Optional[Dict[str, Any]] = None
     ) -> OperationResult:
