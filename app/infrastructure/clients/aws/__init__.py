@@ -1,25 +1,19 @@
 """Infrastructure AWS clients public API.
 
-This package provides DI-friendly AWS client factory that returns
-`OperationResult` and avoids module-level configuration reads.
+This package provides DI-friendly AWS clients with per-service class decomposition.
 
-Use the factory through the dependency injection system:
+The main facade is AWSClients, which composes per-service clients (DynamoDB,
+IdentityStore, Organizations, SsoAdmin) and exposes them as attributes:
 
-    from infrastructure.services.dependencies import AWSClientDep
+    from infrastructure.services.dependencies import AWSClientsDep
 
     @router.post("/accounts")
-    def create_account(aws: AWSClientDep):
-        result = aws.create_account_assignment(store_id, principal_id, ...)
+    def create_account(aws: AWSClientsDep):
+        result = aws.dynamodb.get_item("my_table", {"id": {"S": "123"}})
         if result.is_success:
-            return {"assignment_id": result.data}
+            return result.data
 
-For high-level helper operations (batch, orchestration), use AWSHelpers:
-
-    from infrastructure.services.dependencies import AWSHelpersDep
-
-    @router.get("/groups/{store_id}")
-    def list_groups(helpers: AWSHelpersDep):
-        result = helpers.list_groups_with_memberships(store_id)
+        result = aws.identitystore.list_users(store_id)
         if result.is_success:
             return result.data
 
@@ -27,10 +21,22 @@ All infrastructure services are accessed through `infrastructure/services/`
 as the single point of entry for dependency injection.
 """
 
-from infrastructure.clients.aws.factory import AWSClientFactory
-from infrastructure.clients.aws.helpers import AWSHelpers
+from infrastructure.clients.aws.cost_explorer import CostExplorerClient
+from infrastructure.clients.aws.dynamodb import DynamoDBClient
+from infrastructure.clients.aws.facade import AWSClients
+from infrastructure.clients.aws.guard_duty import GuardDutyClient
+from infrastructure.clients.aws.identity_store import IdentityStoreClient
+from infrastructure.clients.aws.organizations import OrganizationsClient
+from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.clients.aws.sso_admin import SsoAdminClient
 
 __all__ = [
-    "AWSClientFactory",
-    "AWSHelpers",
+    "AWSClients",
+    "SessionProvider",
+    "DynamoDBClient",
+    "IdentityStoreClient",
+    "OrganizationsClient",
+    "SsoAdminClient",
+    "GuardDutyClient",
+    "CostExplorerClient",
 ]
