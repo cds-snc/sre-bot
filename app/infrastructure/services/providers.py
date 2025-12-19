@@ -5,13 +5,12 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
-from typing import Annotated, Optional
-from fastapi import Depends
+
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
 from infrastructure.security.jwks import JWKSManager
-from infrastructure.clients.aws import AWSClientFactory, AWSHelpers
+from infrastructure.clients.aws import AWSClients
 
 
 @lru_cache
@@ -62,52 +61,29 @@ def get_jwks_manager() -> JWKSManager:
 
 
 @lru_cache
-def get_aws_client(
-    settings: Optional[Annotated[Settings, Depends(get_settings)]] = None,
-) -> AWSClientFactory:
-    """Provider for AWS client factory with all service operations.
+def get_aws_clients() -> AWSClients:
+    """Provider for AWS clients facade with all service operations.
 
-    Returns a fully-configured AWSClientFactory instance with region, role,
-    and endpoint settings from the application settings.
+    Returns a fully-configured AWSClients facade instance with region and endpoint
+    settings from application configuration. The facade composes per-service clients
+    (DynamoDB, IdentityStore, Organizations, SsoAdmin) with a shared SessionProvider.
 
-    Args:
-        settings: Application settings (injected)
+    Credentials (temporary creds from assume_role or default providers) are created
+    per API call, so caching this facade is safe—it doesn't hold stale credentials.
 
     Returns:
-        AWSClientFactory: Configured factory instance for all AWS service calls
+        AWSClients: Configured facade instance for all AWS service calls
 
     Usage:
-        @router.post("/groups")
-        def create_group(aws: AWSClientDep):
-            result = aws.create_account_assignment(...)
+        @router.post("/items")
+        def create_item(aws: AWSClientsDep):
+            result = aws.dynamodb.put_item("my_table", Item={...})
             if result.is_success:
-                return {"assignment_id": result.data}
+                return {"item_id": result.data}
+
+            result = aws.identitystore.get_user(store_id, user_id)
+            if result.is_success:
+                return {"user": result.data}
     """
-    if settings is None:
-        settings = get_settings()
-    return AWSClientFactory(
-        aws_region=settings.aws.AWS_REGION,
-        endpoint_url=getattr(settings.aws, "ENDPOINT_URL", None),
-        role_arn=getattr(settings.aws, "ROLE_ARN", None),
-        default_identity_store_id=getattr(settings.aws, "INSTANCE_ID", None),
-        treat_conflict_as_success=getattr(
-            settings.aws, "TREAT_CONFLICT_AS_SUCCESS", False
-        ),
-    )
-
-
-@lru_cache
-def get_aws_helpers(
-    aws: Annotated[AWSClientFactory, Depends(get_aws_client)],
-) -> AWSHelpers:
-    """Provider for AWS helpers factory.
-
-    Returns:
-        AWSHelpers: Helper operations wrapper configured with the AWS client factory
-
-    Usage:
-        @router.get("/groups")
-        def list_groups(helpers: AWSHelpersDep):
-            result = helpers.list_groups_with_memberships(store_id)
-    """
-    return AWSHelpers(aws)
+    settings = get_settings()
+    return AWSClients(aws_settings=settings.aws)
