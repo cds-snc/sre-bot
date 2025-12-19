@@ -5,11 +5,13 @@ used across AWS client unit tests, following the testing strategy.
 """
 
 from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock
 
 import pytest
 
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.configuration.integrations.aws import AwsSettings
 
 
 class FakePaginator:
@@ -88,7 +90,7 @@ class FakeClient:
 
 
 @pytest.fixture
-def aws_factory():
+def aws_factory(mock_aws_settings):
     """Provide a simple AWSClients instance for unit tests.
 
     Tests that need to customize boto3 behavior should still monkeypatch
@@ -98,13 +100,9 @@ def aws_factory():
 
     Configured with:
     - aws_region: us-east-1
-    - default_identity_store_id: us-east-1 (for Identity Store operations)
+    - default_identity_store_id: store-1234567890 (for Identity Store operations)
     """
-    # Construct facade with a SessionProvider per new API
-    return AWSClients(
-        session_provider=SessionProvider(region="us-east-1"),
-        default_identity_store_id="store-1234567890",
-    )
+    return AWSClients(aws_settings=mock_aws_settings)
 
 
 @pytest.fixture
@@ -134,6 +132,40 @@ def make_fake_client():
         )
 
     return _factory
+
+
+@pytest.fixture
+def mock_aws_settings():
+    """Fixture providing a mock AwsSettings instance for testing AWSClients.
+
+    Returns a MagicMock configured with standard AWS settings properties:
+    - AWS_REGION: us-east-1
+    - INSTANCE_ID: store-1234567890
+    - INSTANCE_ARN: arn:aws:sso:::instance/sso-instance-id
+    - SERVICE_ROLE_MAP: Dict mapping services to role ARNs
+    - ENDPOINT_URL: None (for local/test endpoints)
+
+    Tests can further customize this mock as needed:
+        def test_something(mock_aws_settings):
+            mock_aws_settings.AWS_REGION = "us-west-2"
+            ...
+    """
+    settings = MagicMock(spec=AwsSettings)
+    settings.AWS_REGION = "us-east-1"
+    settings.INSTANCE_ID = "store-1234567890"
+    settings.INSTANCE_ARN = "arn:aws:sso:::instance/sso-instance-id"
+    settings.SERVICE_ROLE_MAP = {
+        "dynamodb": "arn:aws:iam::123456789012:role/DynamoDBRole",
+        "organizations": "arn:aws:iam::123456789012:role/OrgsRole",
+        "sso-admin": "arn:aws:iam::123456789012:role/SSOAdminRole",
+        "config": "arn:aws:iam::123456789012:role/ConfigRole",
+        "guardduty": "arn:aws:iam::123456789012:role/GuardDutyRole",
+        "ce": "arn:aws:iam::123456789012:role/CostExplorerRole",
+        "logging": "arn:aws:iam::123456789012:role/LoggingRole",
+        "audit": "arn:aws:iam::123456789012:role/AuditRole",
+    }
+    settings.ENDPOINT_URL = None
+    return settings
 
 
 @pytest.fixture

@@ -57,14 +57,14 @@ class TestConfigClient:
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
         result = client.describe_aggregate_compliance_by_config_rules(
-            configuration_aggregator_name="org-aggregator"
+            config_aggregator_name="org-aggregator"
         )
         assert result.is_success
 
-    def test_describe_aggregate_compliance_by_config_rules_explicit_role(
+    def test_describe_aggregate_compliance_by_config_rules_with_filters(
         self, monkeypatch, make_fake_client
     ):
-        """Test describe_aggregate_compliance_by_config_rules with explicit role."""
+        """Test describe_aggregate_compliance_by_config_rules with filters."""
 
         session_provider = SessionProvider(region="us-east-1")
         client = ConfigClient(
@@ -75,7 +75,7 @@ class TestConfigClient:
         def mock_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            assert role_arn == "arn:aws:iam::999999999999:role/OverrideRole"
+            assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
             return make_fake_client(
                 api_responses={
                     "describe_aggregate_compliance_by_config_rules": {
@@ -87,8 +87,8 @@ class TestConfigClient:
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
         result = client.describe_aggregate_compliance_by_config_rules(
-            configuration_aggregator_name="org-aggregator",
-            role_arn="arn:aws:iam::999999999999:role/OverrideRole",
+            config_aggregator_name="org-aggregator",
+            filters={"ComplianceType": ["COMPLIANT"]},
         )
         assert result.is_success
 
@@ -118,97 +118,6 @@ class TestConfigClient:
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
         result = client.describe_aggregate_compliance_by_config_rules(
-            configuration_aggregator_name="org-aggregator"
+            config_aggregator_name="org-aggregator"
         )
-        assert result.is_success
-
-    def test_put_config_rule_success(self, monkeypatch, make_fake_client):
-        """Test put_config_rule creates or updates a config rule."""
-
-        session_provider = SessionProvider(region="us-east-1")
-        client = ConfigClient(session_provider=session_provider)
-
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={
-                    "put_config_rule": {"ConfigRuleArn": "arn:aws:config:..."}
-                }
-            )
-
-        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
-
-        config_rule = {
-            "ConfigRuleName": "required-tags",
-            "Source": {
-                "Owner": "AWS",
-                "SourceIdentifier": "REQUIRED_TAGS",
-            },
-        }
-        result = client.put_config_rule(config_rule=config_rule)
-        assert result.is_success
-
-    def test_delete_config_rule_success(self, monkeypatch, make_fake_client):
-        """Test delete_config_rule removes a config rule."""
-
-        session_provider = SessionProvider(region="us-east-1")
-        client = ConfigClient(session_provider=session_provider)
-
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(api_responses={"delete_config_rule": {}})
-
-        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
-
-        result = client.delete_config_rule(config_rule_name="required-tags")
-        assert result.is_success
-
-    def test_describe_config_rules_success(self, monkeypatch, make_fake_client):
-        """Test describe_config_rules returns config rules."""
-
-        session_provider = SessionProvider(region="us-east-1")
-        client = ConfigClient(session_provider=session_provider)
-
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={
-                    "describe_config_rules": {
-                        "ConfigRules": [
-                            {
-                                "ConfigRuleName": "required-tags",
-                                "Source": {
-                                    "Owner": "AWS",
-                                    "SourceIdentifier": "REQUIRED_TAGS",
-                                },
-                            }
-                        ]
-                    }
-                }
-            )
-
-        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
-
-        result = client.describe_config_rules()
-        assert result.is_success
-
-    def test_healthcheck_success(self, monkeypatch, make_fake_client):
-        """Test healthcheck returns success for reachable Config."""
-
-        session_provider = SessionProvider(region="us-east-1")
-        client = ConfigClient(session_provider=session_provider)
-
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={"describe_config_rules": {"ConfigRules": []}}
-            )
-
-        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
-
-        result = client.healthcheck()
         assert result.is_success

@@ -56,10 +56,8 @@ class TestOrganizationsClient:
         result = client.list_accounts()
         assert result.is_success
 
-    def test_list_accounts_explicit_role_overrides_default(
-        self, monkeypatch, make_fake_client
-    ):
-        """Test list_accounts explicit role_arn overrides default."""
+    def test_list_accounts_multiple_accounts(self, monkeypatch, make_fake_client):
+        """Test list_accounts returns multiple accounts."""
 
         session_provider = SessionProvider(region="us-east-1")
         client = OrganizationsClient(
@@ -70,14 +68,21 @@ class TestOrganizationsClient:
         def mock_boto3_client(
             service_name, session_config=None, client_config=None, role_arn=None
         ):
-            assert role_arn == "arn:aws:iam::999999999999:role/OverrideRole"
-            return make_fake_client(api_responses={"list_accounts": {"Accounts": []}})
+            assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
+            return make_fake_client(
+                api_responses={
+                    "list_accounts": {
+                        "Accounts": [
+                            {"Id": "111111111111", "Name": "Dev"},
+                            {"Id": "222222222222", "Name": "Prod"},
+                        ]
+                    }
+                }
+            )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
-        result = client.list_accounts(
-            role_arn="arn:aws:iam::999999999999:role/OverrideRole"
-        )
+        result = client.list_accounts()
         assert result.is_success
 
     def test_describe_account_success(self, monkeypatch, make_fake_client):

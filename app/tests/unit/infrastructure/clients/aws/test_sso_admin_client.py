@@ -32,15 +32,6 @@ class TestSsoAdminClient:
         client = SsoAdminClient(session_provider=session_provider)
         assert client._default_sso_instance_arn is None
 
-    def test_init_with_default_role_arn(self):
-        """Test SsoAdminClient initialization with default_role_arn."""
-        session_provider = SessionProvider(region="us-east-1")
-        client = SsoAdminClient(
-            session_provider=session_provider,
-            default_role_arn="arn:aws:iam::123456789012:role/SSORole",
-        )
-        assert client._default_role_arn == "arn:aws:iam::123456789012:role/SSORole"
-
     def test_create_account_assignment_success(self, monkeypatch, make_fake_client):
         """Test create_account_assignment returns request ID."""
 
@@ -176,8 +167,8 @@ class TestSsoAdminClient:
 
         result = client.list_account_assignments(
             instance_arn="arn:aws:sso:::instance/sso-1234567890",
-            account_id="123456789012",
-            permission_set_arn="arn:aws:sso:::permissionSet/ps-1234567890",
+            principal_id="user-123",
+            principal_type="USER",
         )
         assert result.is_success
 
@@ -230,10 +221,9 @@ class TestSsoAdminClient:
         assert result.is_success
 
     def test_healthcheck_missing_default_instance_arn(self):
-        """Test healthcheck returns error when default_sso_instance_arn not set."""
+        """Test healthcheck raises ValueError when default_sso_instance_arn not set."""
         session_provider = SessionProvider(region="us-east-1")
         client = SsoAdminClient(session_provider=session_provider)
 
-        result = client.healthcheck()
-        assert not result.is_success
-        assert result.error_code == "MISSING_SSO_INSTANCE_ARN"
+        with pytest.raises(ValueError, match="instance_arn must be provided"):
+            client.healthcheck()

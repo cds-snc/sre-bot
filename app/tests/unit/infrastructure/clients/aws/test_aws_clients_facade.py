@@ -26,11 +26,11 @@ class TestAWSClientsFacade:
         clients = AWSClients(aws_settings=mock_aws_settings)
 
         assert isinstance(clients.dynamodb, DynamoDBClient)
-        assert isinstance(clients.identity_store, IdentityStoreClient)
+        assert isinstance(clients.identitystore, IdentityStoreClient)
         assert isinstance(clients.organizations, OrganizationsClient)
         assert isinstance(clients.sso_admin, SsoAdminClient)
         assert isinstance(clients.config, ConfigClient)
-        assert isinstance(clients.guard_duty, GuardDutyClient)
+        assert isinstance(clients.guardduty, GuardDutyClient)
         assert isinstance(clients.cost_explorer, CostExplorerClient)
 
     def test_facade_creates_session_provider(self, mock_aws_settings):
@@ -71,8 +71,8 @@ class TestAWSClientsFacade:
     def test_facade_passes_default_sso_instance_arn_to_sso_admin(
         self, mock_aws_settings
     ):
-        """Test AWSClients passes default_sso_instance_arn to SsoAdminClient."""
-        mock_aws_settings.SSO_INSTANCE_ARN = "arn:aws:sso:::instance/sso-1234567890"
+        """Test AWSClients passes INSTANCE_ARN to SsoAdminClient."""
+        mock_aws_settings.INSTANCE_ARN = "arn:aws:sso:::instance/sso-1234567890"
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
@@ -82,23 +82,23 @@ class TestAWSClientsFacade:
         )
 
     def test_facade_passes_identity_store_id_to_identity_store(self, mock_aws_settings):
-        """Test AWSClients passes IDENTITY_STORE_ID to IdentityStoreClient."""
-        mock_aws_settings.IDENTITY_STORE_ID = "d-1234567890"
+        """Test AWSClients passes INSTANCE_ID to IdentityStoreClient."""
+        mock_aws_settings.INSTANCE_ID = "d-1234567890"
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        assert clients.identity_store._default_identity_store_id == "d-1234567890"
+        assert clients.identitystore._default_identity_store_id == "d-1234567890"
 
     def test_facade_all_clients_have_session_provider(self, mock_aws_settings):
         """Test all service clients receive the same SessionProvider instance."""
         clients = AWSClients(aws_settings=mock_aws_settings)
 
         assert clients.dynamodb._session_provider is clients._session_provider
-        assert clients.identity_store._session_provider is clients._session_provider
+        assert clients.identitystore._session_provider is clients._session_provider
         assert clients.organizations._session_provider is clients._session_provider
         assert clients.sso_admin._session_provider is clients._session_provider
         assert clients.config._session_provider is clients._session_provider
-        assert clients.guard_duty._session_provider is clients._session_provider
+        assert clients.guardduty._session_provider is clients._session_provider
         assert clients.cost_explorer._session_provider is clients._session_provider
 
     def test_facade_service_name_resolution(self, mock_aws_settings):
