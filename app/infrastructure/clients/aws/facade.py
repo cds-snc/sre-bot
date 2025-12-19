@@ -7,15 +7,18 @@ Composition-based design: each service has a focused client class, composed toge
 in a lightweight facade.
 """
 
-from typing import Optional
-
 import structlog
 
+from infrastructure.clients.aws.config import ConfigClient
+from infrastructure.clients.aws.cost_explorer import CostExplorerClient
 from infrastructure.clients.aws.dynamodb import DynamoDBClient
+from infrastructure.clients.aws.guard_duty import GuardDutyClient
+from infrastructure.clients.aws.health import AWSIntegrationHealth
 from infrastructure.clients.aws.identity_store import IdentityStoreClient
 from infrastructure.clients.aws.organizations import OrganizationsClient
 from infrastructure.clients.aws.session_provider import SessionProvider
 from infrastructure.clients.aws.sso_admin import SsoAdminClient
+from infrastructure.configuration.integrations.aws import AwsSettings
 
 logger = structlog.get_logger()
 
@@ -41,15 +44,55 @@ class AWSClients:
                 return result.data
     """
 
-    def __init__(
-        self,
-        session_provider: SessionProvider,
-        default_identity_store_id: Optional[str] = None,
-    ) -> None:
-        self.dynamodb: DynamoDBClient = DynamoDBClient(session_provider)
-        self.identitystore: IdentityStoreClient = IdentityStoreClient(
-            session_provider, default_identity_store_id
+    def __init__(self, aws_settings: AwsSettings) -> None:
+        """Initialize AWS clients facade with settings.
+
+        Args:
+            aws_settings: AWS configuration from settings.aws
+        """
+        self._session_provider = SessionProvider(
+            region=aws_settings.AWS_REGION,
+            service_role_map=aws_settings.SERVICE_ROLE_MAP,
+            endpoint_url=getattr(aws_settings, "ENDPOINT_URL", None),
         )
-        self.organizations: OrganizationsClient = OrganizationsClient(session_provider)
-        self.sso_admin: SsoAdminClient = SsoAdminClient(session_provider)
+
+        self.dynamodb: DynamoDBClient = DynamoDBClient(
+            self._session_provider,
+            default_role_arn=self._session_provider.get_role_arn_for_service(
+                "dynamodb"
+            ),
+        )
+        self.identitystore: IdentityStoreClient = IdentityStoreClient(
+            self._session_provider,
+            default_identity_store_id=aws_settings.INSTANCE_ID,
+        )
+        self.organizations: OrganizationsClient = OrganizationsClient(
+            self._session_provider,
+            default_role_arn=self._session_provider.get_role_arn_for_service(
+                "organizations"
+            ),
+        )
+        self.sso_admin: SsoAdminClient = SsoAdminClient(
+            self._session_provider,
+            default_sso_instance_arn=aws_settings.INSTANCE_ARN,
+        )
+        self.config: ConfigClient = ConfigClient(
+            self._session_provider,
+            default_role_arn=self._session_provider.get_role_arn_for_service("config"),
+        )
+        self.guardduty: GuardDutyClient = GuardDutyClient(
+            self._session_provider,
+            default_role_arn=self._session_provider.get_role_arn_for_service(
+                "guardduty"
+            ),
+        )
+        self.cost_explorer: CostExplorerClient = CostExplorerClient(
+            self._session_provider,
+            default_role_arn=self._session_provider.get_role_arn_for_service("ce"),
+        )
+        self.health: AWSIntegrationHealth = AWSIntegrationHealth(
+            self._session_provider,
+            default_identity_store_id=aws_settings.INSTANCE_ID,
+            default_sso_instance_arn=aws_settings.INSTANCE_ARN,
+        )
         self._logger = logger.bind(component="aws_clients")
