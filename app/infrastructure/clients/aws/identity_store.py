@@ -33,6 +33,7 @@ class IdentityStoreClient:
         default_identity_store_id: Optional[str] = None,
     ) -> None:
         self._session_provider = session_provider
+        self._service_name = "identitystore"
         self._default_identity_store_id = default_identity_store_id
         self._logger = logger.bind(component="identity_store_client")
 
