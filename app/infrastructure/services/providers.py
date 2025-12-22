@@ -5,10 +5,12 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
+
 from infrastructure.configuration import Settings
 from infrastructure.identity import IdentityResolver
 from integrations.slack.client import SlackClientManager
 from infrastructure.security.jwks import JWKSManager
+from infrastructure.clients.aws import AWSClients
 
 
 @lru_cache
@@ -56,3 +58,32 @@ def get_jwks_manager() -> JWKSManager:
     if not issuer_config:
         raise ValueError("ISSUER_CONFIG is not configured in settings.server")
     return JWKSManager(issuer_config=issuer_config)
+
+
+@lru_cache
+def get_aws_clients() -> AWSClients:
+    """Provider for AWS clients facade with all service operations.
+
+    Returns a fully-configured AWSClients facade instance with region and endpoint
+    settings from application configuration. The facade composes per-service clients
+    (DynamoDB, IdentityStore, Organizations, SsoAdmin) with a shared SessionProvider.
+
+    Credentials (temporary creds from assume_role or default providers) are created
+    per API call, so caching this facade is safe—it doesn't hold stale credentials.
+
+    Returns:
+        AWSClients: Configured facade instance for all AWS service calls
+
+    Usage:
+        @router.post("/items")
+        def create_item(aws: AWSClientsDep):
+            result = aws.dynamodb.put_item("my_table", Item={...})
+            if result.is_success:
+                return {"item_id": result.data}
+
+            result = aws.identitystore.get_user(store_id, user_id)
+            if result.is_success:
+                return {"user": result.data}
+    """
+    settings = get_settings()
+    return AWSClients(aws_settings=settings.aws)
