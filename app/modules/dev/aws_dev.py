@@ -1,158 +1,282 @@
-"""Testing AWS service (will be removed)"""
+"""AWS Client Testing Module - Development commands for testing AWS integrations.
+
+This module provides safe, read-only testing commands for AWS service clients.
+Each AWS service (IdentityStore, Organizations, SSO Admin, etc.) has its own
+command registry with testable operations.
+
+Usage:
+    /dev aws identitystore healthcheck
+    /dev aws organizations list-accounts
+    /dev aws sso list-permission-sets
+    /dev aws health check
+"""
 
 import json
-import time
-from core.logging import get_module_logger
-from integrations.aws import identity_store, identity_store_next
-from infrastructure import OperationResult
+import structlog
 
-logger = get_module_logger()
+from infrastructure.commands.router import CommandRouter
+from infrastructure.commands.providers.slack import SlackCommandProvider
+from infrastructure.commands.registry import CommandRegistry
+from infrastructure.services.providers import get_aws_clients
 
+logger = structlog.get_logger()
 
-def aws_dev_command(ack, client, body, respond, logger):
-    ack()
+# ============================================================
+# AWS DEV COMMAND ROUTER
+# ============================================================
 
-    logger.info("aws_dev_command", body=body)
-    respond("AWS dev command received!")
-
-    legacy_function = identity_store.list_groups_with_memberships
-    next_function = identity_store_next.list_groups_with_memberships
-    result = performance_comparison_example(
-        legacy_func=legacy_function,
-        next_func=next_function,
-        legacy_formatter=format_groups,
-        next_formatter=format_groups,
-    )
-
-    try:
-        with open("test_aws_next.json", "w", encoding="utf-8") as f:
-            json.dump(result["next"]["result"], f, indent=2)
-        logger.info(
-            "Saved group membership result to test_aws_next.json",
-            count=len(result["next"]["result"]),
-        )
-    except Exception as e:
-        logger.error("Failed to save test_aws_next.json", error=str(e))
-    try:
-        with open("test_aws_legacy.json", "w", encoding="utf-8") as f:
-            json.dump(result["legacy"]["result"], f, indent=2)
-        logger.info(
-            "Saved group membership result2 to test_aws_legacy.json",
-            count=len(result["legacy"]["result"]),
-        )
-    except Exception as e:
-        logger.error("Failed to save test_aws_legacy.json", error=str(e))
-
-    if result:
-        respond(f"Comparison complete:\n{result['comparison']}")
-    else:
-        respond("No groups found or failed to retrieve group information.")
+aws_dev_router = CommandRouter(namespace="sre dev aws")
 
 
-def format_users(users):
-    return f"Users: {len(users)}"
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 
 
-def format_groups(groups):
-    return f"Groups: {len(groups)}"
+def format_operation_result(result, operation_name: str, max_items: int = 10) -> str:
+    """Format OperationResult for Slack display.
 
+    Args:
+        result: OperationResult from AWS operation
+        operation_name: Name of the operation for display
+        max_items: Maximum number of items to show in response
 
-def format_group_memberships(memberships):
-    return f"Group Memberships: {len(memberships)}"
-
-
-def format_groups_with_members(groups):
-    group_count = len(groups)
-    member_count = sum(len(g.get("GroupMemberships", [])) for g in groups)
-    return f"Groups: {group_count}, Total memberships: {member_count}"
-
-
-def performance_comparison_example(
-    legacy_func=None,
-    next_func=None,
-    legacy_formatter=None,
-    next_formatter=None,
-    legacy_label="legacy",
-    next_label="next",
-):
+    Returns:
+        Formatted string for Slack message
     """
-    Compare two AWS Identity Store functions and return timing, counts, and formatted summaries.
-    If only one function is provided, still returns timing for that function.
-    """
-    logger.info("starting_comparison", legacy=legacy_label, next=next_label)
+    if not result.is_success:
+        return f"❌ *{operation_name} failed*\n```{result.message}```"
 
-    # Legacy
-    if legacy_func:
-        start_time = time.time()
-        legacy_result = legacy_func()
-        legacy_time = time.time() - start_time
-        legacy_summary = (
-            legacy_formatter(legacy_result)
-            if legacy_formatter
-            else f"Items: {len(legacy_result) if legacy_result else 0}"
+    data = result.data
+    if data is None:
+        return f"✅ *{operation_name} succeeded*\nNo data returned."
+
+    # Handle different data types
+    if isinstance(data, dict):
+        item_count = len(data)
+        preview = json.dumps(data, indent=2, default=str)
+        if len(preview) > 500:
+            preview = preview[:500] + "\n... (truncated)"
+        return f"✅ *{operation_name} succeeded*\n{item_count} keys in response\n```{preview}```"
+
+    if isinstance(data, list):
+        item_count = len(data)
+        preview_items = data[:max_items]
+        preview = json.dumps(preview_items, indent=2, default=str)
+        if len(preview) > 500:
+            preview = preview[:500] + "\n... (truncated)"
+
+        truncated_msg = (
+            f" (showing {max_items} of {item_count})" if item_count > max_items else ""
         )
+        return f"✅ *{operation_name} succeeded*\n{item_count} items{truncated_msg}\n```{preview}```"
+
+    # Scalar or other types
+    return f"✅ *{operation_name} succeeded*\n```{str(data)}```"
+
+
+# ============================================================
+# IDENTITY STORE COMMANDS
+# ============================================================
+
+identitystore_registry = CommandRegistry("identitystore")
+
+
+@identitystore_registry.command(
+    name="healthcheck",
+    description="Test IdentityStore client health",
+    description_key="dev.aws.identitystore.healthcheck.description",
+)
+def identitystore_healthcheck(ctx):
+    """Test IdentityStore client connectivity and configuration."""
+    aws = get_aws_clients()
+    result = aws.identitystore.healthcheck()
+
+    message = format_operation_result(result, "IdentityStore Healthcheck")
+    ctx.respond(message)
+
+
+@identitystore_registry.command(
+    name="list-users",
+    description="List users in Identity Store (first 10)",
+    description_key="dev.aws.identitystore.list_users.description",
+)
+def identitystore_list_users(ctx):
+    """List users from Identity Store (limited to first 10 for safety)."""
+    aws = get_aws_clients()
+    result = aws.identitystore.list_users(max_results=10)
+
+    message = format_operation_result(result, "List Users", max_items=10)
+    ctx.respond(message)
+
+
+@identitystore_registry.command(
+    name="list-groups",
+    description="List groups in Identity Store (first 10)",
+    description_key="dev.aws.identitystore.list_groups.description",
+)
+def identitystore_list_groups(ctx):
+    """List groups from Identity Store (limited to first 10 for safety)."""
+    aws = get_aws_clients()
+    result = aws.identitystore.list_groups(max_results=10)
+
+    message = format_operation_result(result, "List Groups", max_items=10)
+    ctx.respond(message)
+
+
+# ============================================================
+# ORGANIZATIONS COMMANDS
+# ============================================================
+
+organizations_registry = CommandRegistry("organizations")
+
+
+@organizations_registry.command(
+    name="list-accounts",
+    description="List AWS accounts in the organization (first 10)",
+    description_key="dev.aws.organizations.list_accounts.description",
+)
+def organizations_list_accounts(ctx):
+    """List AWS accounts (limited to first 10 for safety)."""
+    aws = get_aws_clients()
+    result = aws.organizations.list_accounts(max_results=10)
+
+    message = format_operation_result(result, "List Accounts", max_items=10)
+    ctx.respond(message)
+
+
+@organizations_registry.command(
+    name="describe-organization",
+    description="Describe the AWS organization",
+    description_key="dev.aws.organizations.describe_organization.description",
+)
+def organizations_describe_organization(ctx):
+    """Get organization details."""
+    aws = get_aws_clients()
+    result = aws.organizations.describe_organization()
+
+    message = format_operation_result(result, "Describe Organization")
+    ctx.respond(message)
+
+
+# ============================================================
+# SSO ADMIN COMMANDS
+# ============================================================
+
+sso_admin_registry = CommandRegistry("sso_admin")
+
+
+@sso_admin_registry.command(
+    name="list-permission-sets",
+    description="List SSO permission sets (first 10)",
+    description_key="dev.aws.sso_admin.list_permission_sets.description",
+)
+def sso_admin_list_permission_sets(ctx):
+    """List SSO permission sets (limited to first 10 for safety)."""
+    aws = get_aws_clients()
+    result = aws.sso_admin.list_permission_sets(max_results=10)
+
+    message = format_operation_result(result, "List Permission Sets", max_items=10)
+    ctx.respond(message)
+
+
+# ============================================================
+# HEALTH CHECK COMMANDS
+# ============================================================
+
+health_registry = CommandRegistry("health")
+
+
+@health_registry.command(
+    name="check",
+    description="Run comprehensive AWS integration health check",
+    description_key="dev.aws.health.check.description",
+)
+def health_check(ctx):
+    """Run comprehensive health check across all AWS services."""
+    aws = get_aws_clients()
+    result = aws.health.check_all_integrations()
+
+    if result.is_success:
+        health_data = result.data
+        lines = ["✅ *AWS Integration Health Check*\n"]
+        for service, status in health_data.items():
+            emoji = "✅" if status.get("healthy", False) else "❌"
+            lines.append(f"{emoji} {service}: {status.get('status', 'unknown')}")
+        ctx.respond("\n".join(lines))
     else:
-        legacy_result = None
-        legacy_time = 0.0
-        legacy_summary = "Not tested"
+        ctx.respond(f"❌ Health check failed: {result.message}")
 
-    # Next-gen
-    if next_func:
-        start_time = time.time()
-        response: OperationResult = next_func()
-        if response.is_success:
-            next_result = response.data
-        else:
-            next_result = None
-            logger.error(
-                "Next-gen function failed",
-                function=next_label,
-                error=response.error,
-            )
-        next_time = time.time() - start_time
-        next_summary = (
-            next_formatter(next_result)
-            if next_formatter
-            else f"Items: {len(next_result) if next_result else 0}"
-        )
-    else:
-        next_result = None
-        next_time = 0.0
-        next_summary = "Not tested"
 
-    # Calculate speedup only if both functions were tested
-    if legacy_time > 0 and next_time > 0:
-        speedup = legacy_time / next_time
-        speedup_str = f"The next function is {speedup:.2f}x faster than legacy."
-    elif legacy_time > 0 and next_time == 0:
-        speedup_str = f"Only {legacy_label} was tested."
-    elif legacy_time == 0 and next_time > 0:
-        speedup_str = f"Only {next_label} was tested."
-    else:
-        speedup_str = "No functions were tested."
+# ============================================================
+# PROVIDER IMPLEMENTATIONS
+# ============================================================
 
-    comparison_lines = [
-        f"{legacy_label.capitalize()}:",
-        legacy_summary,
-        f"Time: {legacy_time:.2f}s",
-        "",
-        f"{next_label.capitalize()}:",
-        next_summary,
-        f"Time: {next_time:.2f}s",
-        "---",
-        speedup_str,
-    ]
 
-    return {
-        legacy_label: {
-            "result": legacy_result,
-            "time": legacy_time,
-            "summary": legacy_summary,
-        },
-        next_label: {
-            "result": next_result,
-            "time": next_time,
-            "summary": next_summary,
-        },
-        "comparison": "\n".join(comparison_lines),
-    }
+class IdentityStoreTestProvider(SlackCommandProvider):
+    """Provider for IdentityStore testing commands."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = identitystore_registry
+
+
+class OrganizationsTestProvider(SlackCommandProvider):
+    """Provider for Organizations testing commands."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = organizations_registry
+
+
+class SSOAdminTestProvider(SlackCommandProvider):
+    """Provider for SSO Admin testing commands."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = sso_admin_registry
+
+
+class HealthTestProvider(SlackCommandProvider):
+    """Provider for AWS health check commands."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = health_registry
+
+
+# ============================================================
+# REGISTER PROVIDERS WITH AWS ROUTER
+# ============================================================
+
+aws_dev_router.register_subcommand(
+    name="identitystore",
+    provider=IdentityStoreTestProvider(),
+    platform="slack",
+    description="Test AWS IdentityStore client",
+    description_key="dev.aws.services.identitystore.description",
+)
+
+aws_dev_router.register_subcommand(
+    name="organizations",
+    provider=OrganizationsTestProvider(),
+    platform="slack",
+    description="Test AWS Organizations client",
+    description_key="dev.aws.services.organizations.description",
+)
+
+aws_dev_router.register_subcommand(
+    name="sso",
+    provider=SSOAdminTestProvider(),
+    platform="slack",
+    description="Test AWS SSO Admin client",
+    description_key="dev.aws.services.sso_admin.description",
+)
+
+aws_dev_router.register_subcommand(
+    name="health",
+    provider=HealthTestProvider(),
+    platform="slack",
+    description="AWS integration health check",
+    description_key="dev.aws.services.health.description",
+)

@@ -8,7 +8,8 @@ import structlog
 from infrastructure.services.providers import get_settings
 from infrastructure.commands.router import CommandRouter
 from infrastructure.commands.providers.slack import SlackCommandProvider
-from modules.dev import aws_dev, google, slack, incident
+from modules.dev import google, slack, incident
+from modules.dev.aws_dev import aws_dev_router
 
 
 PREFIX = get_settings().PREFIX
@@ -28,22 +29,23 @@ dev_router = CommandRouter(namespace="dev")
 
 
 class AwsDevProvider(SlackCommandProvider):
-    """Adapter for legacy AWS dev commands."""
+    """Provider for AWS client testing commands - delegates to aws_dev_router."""
 
     def __init__(self):
         super().__init__(config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
-        """Delegate to legacy AWS dev handler."""
+        """Delegate to AWS dev router for all AWS testing commands."""
         self.acknowledge(platform_payload)
 
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
+        # Update the nested router's namespace to include the full command path
+        # This makes help text show: /sre dev aws <service> instead of /aws <service>
+        aws_dev_router.namespace = self.parent_command
 
-        aws_dev.aws_dev_command(ack, client, body, respond, logger)
+        # The AWS router handles all subcommands
+        # Platform payload is passed through unchanged
+        aws_dev_router.handle(platform_payload)
 
 
 class GoogleDevProvider(SlackCommandProvider):
@@ -208,7 +210,7 @@ dev_router.register_subcommand(
     name="aws",
     provider=AwsDevProvider(),
     platform="slack",
-    description="AWS development commands",
+    description="Test AWS client integrations (identitystore, organizations, sso, health)",
     description_key="dev.subcommands.aws.description",
 )
 
