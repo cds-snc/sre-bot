@@ -97,12 +97,12 @@ def get_module_logger() -> BoundLogger:
     """Get a logger for the calling module with full path context.
 
     .. deprecated::
-        This function is deprecated. Use :func:`infrastructure.logging.get_module_logger` instead.
+        This function is deprecated. Use the structlog.get_logger() directly instead.
     """
 
     warnings.warn(
         "core.logging.get_module_logger() is deprecated. "
-        "Use infrastructure.logging.get_module_logger() instead.",
+        "Use structlog.get_logger() instead.",
         DeprecationWarning,
         stacklevel=2,
     )
