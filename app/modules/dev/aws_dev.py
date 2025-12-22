@@ -18,6 +18,11 @@ from infrastructure.commands.router import CommandRouter
 from infrastructure.commands.providers.slack import SlackCommandProvider
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.services.providers import get_aws_clients
+from infrastructure.commands.responses.models import (
+    Card,
+    ErrorMessage,
+    SuccessMessage,
+)
 
 logger = structlog.get_logger()
 
@@ -33,31 +38,45 @@ aws_dev_router = CommandRouter(namespace="sre dev aws")
 # ============================================================
 
 
-def format_operation_result(result, operation_name: str, max_items: int = 10) -> str:
-    """Format OperationResult for Slack display.
+def send_operation_result(
+    ctx, result, operation_name: str, max_items: int = 10
+) -> None:
+    """Send an OperationResult using platform-agnostic response models.
+
+    Uses SuccessMessage, ErrorMessage, and Card via the context responder,
+    allowing Slack (and future providers) to format appropriately.
 
     Args:
+        ctx: CommandContext for responding
         result: OperationResult from AWS operation
         operation_name: Name of the operation for display
-        max_items: Maximum number of items to show in response
-
-    Returns:
-        Formatted string for Slack message
+        max_items: Maximum number of list items to preview
     """
     if not result.is_success:
-        return f"❌ *{operation_name} failed*\n```{result.message}```"
+        ctx.respond_error(
+            ErrorMessage(
+                message=f"{operation_name} failed", details=str(result.message)
+            )
+        )
+        return
 
     data = result.data
     if data is None:
-        return f"✅ *{operation_name} succeeded*\nNo data returned."
+        ctx.respond_success(SuccessMessage(message=f"{operation_name} succeeded"))
+        return
 
-    # Handle different data types
     if isinstance(data, dict):
         item_count = len(data)
         preview = json.dumps(data, indent=2, default=str)
         if len(preview) > 500:
             preview = preview[:500] + "\n... (truncated)"
-        return f"✅ *{operation_name} succeeded*\n{item_count} keys in response\n```{preview}```"
+        ctx.respond_card(
+            Card(
+                title=f"{operation_name} succeeded",
+                text=f"{item_count} keys in response\n```{preview}```",
+            )
+        )
+        return
 
     if isinstance(data, list):
         item_count = len(data)
@@ -65,14 +84,21 @@ def format_operation_result(result, operation_name: str, max_items: int = 10) ->
         preview = json.dumps(preview_items, indent=2, default=str)
         if len(preview) > 500:
             preview = preview[:500] + "\n... (truncated)"
-
         truncated_msg = (
             f" (showing {max_items} of {item_count})" if item_count > max_items else ""
         )
-        return f"✅ *{operation_name} succeeded*\n{item_count} items{truncated_msg}\n```{preview}```"
+        ctx.respond_card(
+            Card(
+                title=f"{operation_name} succeeded",
+                text=f"{item_count} items{truncated_msg}\n```{preview}```",
+            )
+        )
+        return
 
     # Scalar or other types
-    return f"✅ *{operation_name} succeeded*\n```{str(data)}```"
+    ctx.respond_success(
+        SuccessMessage(message=f"{operation_name} succeeded", details=str(data))
+    )
 
 
 # ============================================================
@@ -91,9 +117,7 @@ def identitystore_healthcheck(ctx):
     """Test IdentityStore client connectivity and configuration."""
     aws = get_aws_clients()
     result = aws.identitystore.healthcheck()
-
-    message = format_operation_result(result, "IdentityStore Healthcheck")
-    ctx.respond(message)
+    send_operation_result(ctx, result, "IdentityStore Healthcheck")
 
 
 @identitystore_registry.command(
@@ -105,9 +129,7 @@ def identitystore_list_users(ctx):
     """List users from Identity Store (limited to first 10 for safety)."""
     aws = get_aws_clients()
     result = aws.identitystore.list_users(max_results=10)
-
-    message = format_operation_result(result, "List Users", max_items=10)
-    ctx.respond(message)
+    send_operation_result(ctx, result, "List Users", max_items=10)
 
 
 @identitystore_registry.command(
@@ -119,9 +141,7 @@ def identitystore_list_groups(ctx):
     """List groups from Identity Store (limited to first 10 for safety)."""
     aws = get_aws_clients()
     result = aws.identitystore.list_groups(max_results=10)
-
-    message = format_operation_result(result, "List Groups", max_items=10)
-    ctx.respond(message)
+    send_operation_result(ctx, result, "List Groups", max_items=10)
 
 
 # ============================================================
@@ -139,10 +159,8 @@ organizations_registry = CommandRegistry("organizations")
 def organizations_list_accounts(ctx):
     """List AWS accounts (limited to first 10 for safety)."""
     aws = get_aws_clients()
-    result = aws.organizations.list_accounts(max_results=10)
-
-    message = format_operation_result(result, "List Accounts", max_items=10)
-    ctx.respond(message)
+    result = aws.organizations.list_accounts(MaxResults=10)
+    send_operation_result(ctx, result, "List Accounts", max_items=10)
 
 
 @organizations_registry.command(
@@ -154,9 +172,7 @@ def organizations_describe_organization(ctx):
     """Get organization details."""
     aws = get_aws_clients()
     result = aws.organizations.describe_organization()
-
-    message = format_operation_result(result, "Describe Organization")
-    ctx.respond(message)
+    send_operation_result(ctx, result, "Describe Organization")
 
 
 # ============================================================
@@ -175,9 +191,7 @@ def sso_admin_list_permission_sets(ctx):
     """List SSO permission sets (limited to first 10 for safety)."""
     aws = get_aws_clients()
     result = aws.sso_admin.list_permission_sets(max_results=10)
-
-    message = format_operation_result(result, "List Permission Sets", max_items=10)
-    ctx.respond(message)
+    send_operation_result(ctx, result, "List Permission Sets", max_items=10)
 
 
 # ============================================================
