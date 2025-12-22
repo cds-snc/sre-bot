@@ -3,20 +3,21 @@
 This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
 """
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from infrastructure.commands.router import CommandRouter
 from infrastructure.commands.providers.slack import SlackCommandProvider
 from modules.groups import create_slack_provider
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
+from modules.dev.core import dev_command
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 
 PREFIX = settings.PREFIX
 GIT_SHA = settings.GIT_SHA
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 # ============================================================
@@ -129,6 +130,28 @@ class VersionProvider(SlackCommandProvider):
         respond(f"SRE Bot version: {GIT_SHA}")
 
 
+class LegacyTestProvider(SlackCommandProvider):
+    """Adapter for legacy test command."""
+
+    def __init__(self):
+        super().__init__(config={"enabled": True})
+        self.registry = None
+
+    def handle(self, platform_payload):
+        """Delegate to legacy test handler."""
+        self.acknowledge(platform_payload)
+
+        command = platform_payload["command"]
+        client = platform_payload["client"]
+        respond = platform_payload["respond"]
+        ack = platform_payload["ack"]
+
+        text = command.get("text", "")
+        args = text.split() if text else []
+
+        dev_command(ack, respond, client, command, args)
+
+
 # ============================================================
 # REGISTER LEGACY PROVIDERS
 # ============================================================
@@ -163,6 +186,14 @@ sre_router.register_subcommand(
     platform="slack",
     description="Show SRE Bot version",
     description_key="sre.subcommands.version.description",
+)
+
+sre_router.register_subcommand(
+    name="test",
+    provider=LegacyTestProvider(),
+    platform="slack",
+    description="Run test commands",
+    description_key="sre.subcommands.test.description",
 )
 
 
