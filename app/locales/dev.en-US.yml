@@ -1,0 +1,12 @@
+dev:
+  subcommands.aws.description: "AWS development commands"
+  subcommands.google.description: "Google Workspace development commands"
+  subcommands.slack.description: "Slack development commands"
+  subcommands.stale.description: "Test stale channel notification"
+  subcommands.incident.description: "List incidents"
+  subcommands.load_incidents.description: "Load incidents"
+  subcommands.add_incident.description: "Add incident"
+  help.title: "Dev Commands"
+  help.section_header: "Available subcommands:"
+  help.footer: "Type `/dev <subcommand> help` for subcommand details."
+  errors.environment_restricted: "This command is only available in the development environment."
