@@ -20,28 +20,12 @@ logger = structlog.get_logger()
 # COMMAND ROUTER SETUP
 # ============================================================
 
-dev_router = CommandRouter(namespace="sre dev")
+dev_router = CommandRouter(namespace="dev")
 
 
 # ============================================================
 # PROVIDER IMPLEMENTATIONS
 # ============================================================
-
-
-class AwsDevProvider(SlackCommandProvider):
-    """Provider for AWS client testing commands - delegates to aws_dev_router."""
-
-    def __init__(self):
-        super().__init__(config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to AWS dev router for all AWS testing commands."""
-        self.acknowledge(platform_payload)
-
-        # The AWS router handles all subcommands
-        # Platform payload is passed through unchanged
-        aws_dev_router.handle(platform_payload)
 
 
 class GoogleDevProvider(SlackCommandProvider):
@@ -204,7 +188,7 @@ class AddIncidentProvider(SlackCommandProvider):
 
 dev_router.register_subcommand(
     name="aws",
-    provider=AwsDevProvider(),
+    provider=aws_dev_router,
     platform="slack",
     description="Test AWS client integrations (identitystore, organizations, sso, health)",
     description_key="dev.subcommands.aws.description",

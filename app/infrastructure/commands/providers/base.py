@@ -317,7 +317,7 @@ class CommandProvider(ABC):
         lines = [f"*{command_prefix.upper()} Commands*"]
 
         for cmd in self.registry.list_commands():
-            lines.append(f"\n*/{command_prefix} {cmd.name}*")
+            lines.append(f"\n`/{command_prefix} {cmd.name}`")
 
             # Translate command description
             desc = self._translate_or_fallback(
@@ -349,7 +349,7 @@ class CommandProvider(ABC):
             if cmd.examples:
                 lines.append("  Examples:")
                 for example in cmd.examples:
-                    lines.append(f"    `/{self.registry.namespace} {example}`")
+                    lines.append(f"    `/{command_prefix} {example}`")
 
             if cmd.subcommands:
                 lines.append("  Subcommands:")

@@ -1,7 +1,7 @@
 """Multi-platform command router with explicit platform registry."""
 
 import shlex
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from dataclasses import dataclass
 
 from core.logging import get_module_logger
@@ -17,7 +17,7 @@ class ProviderRoute:
     """Platform-specific provider route."""
 
     platform: str  # "slack", "teams", "discord", "api"
-    provider: CommandProvider
+    provider: Union[CommandProvider, "CommandRouter"]
     registry: Optional[CommandRegistry]  # Optional for legacy handlers without registry
     description: Optional[str] = None  # Fallback description (English)
     description_key: Optional[str] = (
@@ -54,6 +54,28 @@ class CommandRouter:
         self.namespace = namespace
         # Two-level dict: routes[subcommand][platform] = ProviderRoute
         self.routes: Dict[str, Dict[str, ProviderRoute]] = {}
+
+    def _set_namespace(self, namespace: str) -> None:
+        """Set namespace and propagate to nested routers.
+
+        Ensures help output reflects the full command path when this router is
+        nested under another router after its own subcommands have been
+        registered.
+
+        Args:
+            namespace: Fully qualified namespace (e.g., "sre dev aws")
+        """
+
+        self.namespace = namespace
+
+        # Propagate to any already-registered nested routers so their help text
+        # and provider parent_command stay accurate when parents are re-nested.
+        for subcommand_name, by_platform in self.routes.items():
+            for route in by_platform.values():
+                if isinstance(route.provider, CommandRouter):
+                    route.provider._set_namespace(f"{namespace} {subcommand_name}")
+                else:
+                    route.provider.parent_command = namespace
 
     def _requote_tokens(self, tokens: List[str]) -> str:
         """Re-quote tokens that contain spaces or special characters.
@@ -93,7 +115,7 @@ class CommandRouter:
     def register_subcommand(
         self,
         name: str,
-        provider: CommandProvider,
+        provider: Union[CommandProvider, "CommandRouter"],
         platform: str,
         description: Optional[str] = None,
         description_key: Optional[str] = None,
@@ -113,14 +135,21 @@ class CommandRouter:
         # Allow optional registry for legacy handlers that don't use commands
         # (e.g., LegacyIncidentProvider delegates directly to helper functions)
 
-        # Set parent command for help generation
-        provider.parent_command = self.namespace
+        # Configure based on provider type
+        if isinstance(provider, CommandRouter):
+            # Nesting a router: propagate full command path for help display
+            provider._set_namespace(f"{self.namespace} {name}")
+            registry = None
+        else:
+            # Regular provider: set parent command for help generation
+            provider.parent_command = self.namespace
+            registry = provider.registry
 
         # Create route entry
         route = ProviderRoute(
             platform=platform,
             provider=provider,
-            registry=provider.registry,  # Can be None for legacy handlers
+            registry=registry,  # Can be None for legacy handlers or nested routers
             description=description,
             description_key=description_key,
         )
@@ -138,6 +167,33 @@ class CommandRouter:
             platform=platform,
             provider=provider.__class__.__name__,
         )
+
+    def _get_any_provider_for_platform(
+        self, platform: str
+    ) -> Optional[CommandProvider]:
+        """Find any CommandProvider for the given platform within this router tree.
+
+        Used for tokenization, preprocessing, and sending errors/help when the
+        immediate subcommand happens to be a nested router.
+
+        Args:
+            platform: Target platform key (e.g., "slack")
+
+        Returns:
+            A CommandProvider instance or None if none found
+        """
+        for _, by_platform in self.routes.items():
+            route = by_platform.get(platform)
+            if not route:
+                continue
+            prov = route.provider
+            if isinstance(prov, CommandRouter):
+                nested = prov._get_any_provider_for_platform(platform)
+                if nested is not None:
+                    return nested
+            else:
+                return prov
+        return None
 
     def _detect_platform(self, platform_payload: Any) -> Optional[str]:
         """Detect platform from payload structure.
@@ -214,9 +270,9 @@ class CommandRouter:
         # Step 2: Extract subcommand name
         # Platform provider will do full extraction, we just need first token
         try:
-            # Get provider for this platform (any subcommand) to extract text
-            sample_route = next(iter(self.routes.values())).get(platform)
-            if sample_route is None:
+            # Get any provider for this platform (handles nested routers)
+            sample_provider = self._get_any_provider_for_platform(platform)
+            if sample_provider is None:
                 logger.error(
                     "no_provider_for_platform",
                     namespace=self.namespace,
@@ -224,13 +280,11 @@ class CommandRouter:
                 )
                 return
 
-            text = sample_route.provider.extract_command_text(platform_payload)
-            preprocessed = sample_route.provider.preprocess_command_text(
+            text = sample_provider.extract_command_text(platform_payload)
+            preprocessed = sample_provider.preprocess_command_text(
                 platform_payload, text
             )
-            tokens = (
-                sample_route.provider._tokenize(preprocessed) if preprocessed else []
-            )
+            tokens = sample_provider._tokenize(preprocessed) if preprocessed else []
 
             if not tokens:
                 # Show router help
@@ -256,7 +310,7 @@ class CommandRouter:
         # Step 3: Look up provider for (subcommand, platform)
         if subcommand_name not in self.routes:
             # Unknown subcommand
-            sample_route.provider.send_error(
+            sample_provider.send_error(
                 platform_payload,
                 f"Unknown subcommand: `{subcommand_name}`. Type `help` for usage.",
             )
@@ -265,7 +319,7 @@ class CommandRouter:
         if platform not in self.routes[subcommand_name]:
             # Subcommand not available on this platform
             available_platforms = list(self.routes[subcommand_name].keys())
-            sample_route.provider.send_error(
+            sample_provider.send_error(
                 platform_payload,
                 f"❌ `{subcommand_name}` not available on {platform.upper()}.\n"
                 f"Available on: {', '.join(p.upper() for p in available_platforms)}",
@@ -286,15 +340,24 @@ class CommandRouter:
             modified_payload["activity"] = dict(modified_payload["activity"])
             modified_payload["activity"]["text"] = self._requote_tokens(tokens[1:])
 
-        logger.info(
-            "routing_to_provider",
-            namespace=self.namespace,
-            subcommand=subcommand_name,
-            platform=platform,
-            provider=route.provider.__class__.__name__,
-        )
-
-        route.provider.handle(modified_payload)
+        if isinstance(route.provider, CommandRouter):
+            logger.info(
+                "routing_to_nested_router",
+                namespace=self.namespace,
+                subcommand=subcommand_name,
+                platform=platform,
+                nested_router_namespace=route.provider.namespace,
+            )
+            route.provider.handle(modified_payload)
+        else:
+            logger.info(
+                "routing_to_provider",
+                namespace=self.namespace,
+                subcommand=subcommand_name,
+                platform=platform,
+                provider=route.provider.__class__.__name__,
+            )
+            route.provider.handle(modified_payload)
 
     def _send_router_help(self, platform_payload: Any, platform: str) -> None:
         """Send router-level help showing available subcommands.
@@ -303,29 +366,29 @@ class CommandRouter:
             platform_payload: Platform payload for sending response
             platform: Detected platform identifier
         """
-        # Get sample provider to send help
-        sample_route = next(iter(self.routes.values())).get(platform)
-        if sample_route is None:
+        # Get sample provider to send help (handles nested routers)
+        sample_provider = self._get_any_provider_for_platform(platform)
+        if sample_provider is None:
             return
 
         # Resolve locale for translation
         locale = "en-US"  # Default
         try:
-            locale = sample_route.provider._resolve_framework_locale(platform_payload)
+            locale = sample_provider._resolve_framework_locale(platform_payload)
         except Exception:  # pylint: disable=broad-except
             pass
 
         # Helper function to translate template strings
         def translate_key(key_name: str, fallback: str) -> str:
             """Translate a help template key, fall back to English if unavailable."""
-            if not sample_route.provider.translator:
+            if not sample_provider.translator:
                 return fallback
             try:
                 key = TranslationKey.from_string(f"{self.namespace}.help.{key_name}")
                 locale_enum = (
                     Locale.from_string(locale) if isinstance(locale, str) else locale
                 )
-                translated = sample_route.provider.translator.translate_message(
+                translated = sample_provider.translator.translate_message(
                     key, locale_enum
                 )
                 return translated if translated else fallback
@@ -337,7 +400,7 @@ class CommandRouter:
         section_header = translate_key("section_header", "Available subcommands:")
         # Footer is namespace-specific, so construct dynamically
         footer_fallback = (
-            f"Type /{self.namespace} <subcommand> help for subcommand details."
+            f"Type `/{self.namespace} <subcommand> help` for subcommand details."
         )
         # Translate footer template (no {namespace} placeholder in YAML)
         footer = translate_key("footer", footer_fallback)
@@ -351,7 +414,7 @@ class CommandRouter:
 
                 # Try to translate description using the provider's translator
                 desc = route.description or f"{subcommand_name} commands"
-                if route.description_key and sample_route.provider.translator:
+                if route.description_key and sample_provider.translator:
                     try:
                         key = TranslationKey.from_string(route.description_key)
                         locale_enum = (
@@ -359,7 +422,7 @@ class CommandRouter:
                             if isinstance(locale, str)
                             else locale
                         )
-                        translated = sample_route.provider.translator.translate_message(
+                        translated = sample_provider.translator.translate_message(
                             key, locale_enum
                         )
                         if translated:
@@ -368,9 +431,13 @@ class CommandRouter:
                         # Fallback to English description if translation fails
                         pass
 
+                # Annotate nested routers to hint there are deeper commands
+                if isinstance(route.provider, CommandRouter):
+                    desc = f"{desc} (has subcommands)"
+
                 lines.append(f"  `/{self.namespace} {subcommand_name}` - {desc}")
 
         lines.append(f"\n{footer}")
 
         help_text = "\n".join(lines)
-        sample_route.provider.send_help(platform_payload, help_text)
+        sample_provider.send_help(platform_payload, help_text)
