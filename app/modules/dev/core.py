@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 # COMMAND ROUTER SETUP
 # ============================================================
 
-dev_router = CommandRouter(namespace="dev")
+dev_router = CommandRouter(namespace="sre dev")
 
 
 # ============================================================
@@ -38,10 +38,6 @@ class AwsDevProvider(SlackCommandProvider):
     def handle(self, platform_payload):
         """Delegate to AWS dev router for all AWS testing commands."""
         self.acknowledge(platform_payload)
-
-        # Update the nested router's namespace to include the full command path
-        # This makes help text show: /sre dev aws <service> instead of /aws <service>
-        aws_dev_router.namespace = self.parent_command
 
         # The AWS router handles all subcommands
         # Platform payload is passed through unchanged
