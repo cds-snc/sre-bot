@@ -131,14 +131,14 @@ class VersionProvider(SlackCommandProvider):
 
 
 class LegacyTestProvider(SlackCommandProvider):
-    """Adapter for legacy test command."""
+    """Adapter for dev command - delegates to dev module."""
 
     def __init__(self):
         super().__init__(config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
-        """Delegate to legacy test handler."""
+        """Delegate to dev module handler."""
         self.acknowledge(platform_payload)
 
         command = platform_payload["command"]
@@ -189,11 +189,11 @@ sre_router.register_subcommand(
 )
 
 sre_router.register_subcommand(
-    name="test",
+    name="dev",
     provider=LegacyTestProvider(),
     platform="slack",
-    description="Run test commands",
-    description_key="sre.subcommands.test.description",
+    description="Development and testing commands",
+    description_key="sre.subcommands.dev.description",
 )
 
 
