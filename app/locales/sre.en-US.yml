@@ -4,7 +4,7 @@ sre:
   subcommands.webhooks.description: "Manage webhooks"
   subcommands.geolocate.description: "Geolocate an IP address"
   subcommands.version.description: "Show SRE Bot version"
-  subcommands.test.description: "Run test commands"
+  subcommands.dev.description: "Development and testing commands"
   help.title: "SRE Commands"
   help.section_header: "Available subcommands:"
   help.footer: "Type `/sre <subcommand> help` for subcommand details."
