@@ -6,11 +6,11 @@ Core component for i18n that integrates with infrastructure.events for notificat
 import re
 from typing import Any, Dict, Optional
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.i18n.loader import TranslationLoader
 from infrastructure.i18n.models import Locale, TranslationCatalog, TranslationKey
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class Translator:

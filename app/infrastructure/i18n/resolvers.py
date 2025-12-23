@@ -6,10 +6,10 @@ Provides strategies for resolving the appropriate locale from various sources
 
 from typing import Optional
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.i18n.models import Locale, LocaleResolutionContext
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class LocaleResolver:

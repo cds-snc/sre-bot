@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Protocol
 from uuid import uuid4
 
-from core.logging import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class ResponseChannel(Protocol):

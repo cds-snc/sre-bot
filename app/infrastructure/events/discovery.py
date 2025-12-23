@@ -25,9 +25,9 @@ import importlib
 from pathlib import Path
 from typing import Dict, List, Any
 
-from core.logging import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Track discovered modules to avoid re-discovery
 _DISCOVERED_MODULES: set = set()

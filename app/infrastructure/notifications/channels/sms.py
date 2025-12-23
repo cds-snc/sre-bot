@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from core.logging import get_module_logger
+import structlog
 from core.config import settings
 from infrastructure.notifications.channels.base import NotificationChannel
 from infrastructure.notifications.models import (
@@ -15,7 +15,7 @@ from infrastructure.operations import OperationResult
 from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.notify.client import post_event, create_authorization_header
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class SMSChannel(NotificationChannel):

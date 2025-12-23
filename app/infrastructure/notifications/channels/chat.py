@@ -4,7 +4,7 @@ from typing import List
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
 from infrastructure.notifications.models import (
     Notification,
@@ -16,7 +16,7 @@ from infrastructure.operations import OperationResult
 from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.slack.client import SlackClientManager
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class ChatChannel(NotificationChannel):

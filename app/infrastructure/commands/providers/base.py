@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from typing import Any, List, Optional
 import shlex
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext
@@ -29,7 +29,7 @@ from infrastructure.i18n.translator import Translator
 from infrastructure.i18n.resolvers import LocaleResolver
 from infrastructure.i18n.models import TranslationKey, Locale
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class CommandProvider(ABC):

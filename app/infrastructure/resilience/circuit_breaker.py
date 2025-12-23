@@ -17,9 +17,9 @@ from enum import Enum
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Any, Optional, Dict
 
-from core.logging import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class CircuitState(Enum):

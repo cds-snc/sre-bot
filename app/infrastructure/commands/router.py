@@ -4,12 +4,13 @@ import shlex
 from typing import Dict, Any, Optional, List, Union
 from dataclasses import dataclass
 
-from core.logging import get_module_logger
+import structlog
+
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.i18n.models import TranslationKey, Locale
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @dataclass

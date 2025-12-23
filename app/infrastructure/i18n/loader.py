@@ -9,10 +9,10 @@ from typing import Dict
 
 import yaml
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.i18n.models import Locale, TranslationCatalog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class TranslationLoader(ABC):

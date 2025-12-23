@@ -4,11 +4,11 @@ This module registers system-level event handlers like audit that should
 be active for all event types.
 """
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.events.dispatcher import register_event_handler
 from infrastructure.events.handlers import handle_audit_event
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def register_infrastructure_handlers() -> None:
