@@ -35,9 +35,10 @@ This README documents the current behavior and developer-facing integration poin
   a `SlackResponseChannel` and `SlackResponseFormatter`.
 
 - Router: `CommandRouter` is a higher-level router that registers named subcommands
-  to platform providers and routes incoming payloads to the correct provider based
-  on a detected platform and the first token in the command text. Router-level
-  help and platform detection live here.
+  to platform providers or nested routers. It routes incoming payloads based on
+  detected platform and command text tokens. Routers support arbitrary nesting depth
+  (e.g., `/sre dev aws health check`), automatically propagate namespace context for
+  help generation, and handle platform detection and router-level help text.
 
 - Responses: Platform-agnostic response models (cards, success, error) are rendered
   by `ResponseFormatter` implementations. `SlackResponseFormatter` implements Block
@@ -79,22 +80,57 @@ Notes:
 - Keep providers platform-agnostic: platform-specific preprocessing (mention/channel
   resolution) should be implemented in the provider's `preprocess_command_text`.
 
-2. Attach your registry to a provider instance during application initialization:
+2. Attach your registry to a provider instance and register it with a router:
 
 ```python
 from infrastructure.commands.providers import get_provider
+from infrastructure.commands.router import CommandRouter
 
+# Create provider with registry
 slack_provider = get_provider("slack")
 slack_provider.registry = registry
+
+# Register with router
+groups_router = CommandRouter(namespace="groups")
+groups_router.register_subcommand(
+    name="manage",
+    provider=slack_provider,
+    platform="slack",
+    description="Manage group memberships",
+)
 ```
 
-3. Providers handle the command flow when `handle(platform_payload)` is called:
+For nested command hierarchies, register routers with other routers:
+
+```python
+# Create nested structure: /sre dev aws <command>
+aws_dev_router = CommandRouter(namespace="aws")
+aws_dev_router.register_subcommand("health", health_provider, "slack")
+aws_dev_router.register_subcommand("identitystore", identitystore_provider, "slack")
+
+dev_router = CommandRouter(namespace="dev")
+dev_router.register_subcommand("aws", aws_dev_router, "slack")  # Nested router
+
+sre_router = CommandRouter(namespace="sre")
+sre_router.register_subcommand("dev", dev_router, "slack")  # Another nested router
+```
+
+The router automatically:
+- Propagates namespace context through nested routers for accurate help paths
+- Strips consumed tokens and passes remaining text to the next router or provider
+- Generates help text showing all available subcommands at each level
+
+3. The router delegates to providers or nested routers when `handle(platform_payload)` 
+   is called. For providers, the command flow is:
 - acknowledge
 - extract + preprocess text
 - tokenize
 - validate/parse arguments
 - build `CommandContext`
 - execute handler with parsed args (or validated Pydantic request)
+
+For nested routers, the flow extracts the next subcommand token, updates the payload
+with remaining text, and delegates to the nested router or provider.
 
 4. Translation and locale:
 - Providers may attach a translator callable to `CommandContext` (via
@@ -103,9 +139,11 @@ slack_provider.registry = registry
 
 5. Help text and errors:
 - The provider and router generate help text from command metadata (descriptions,
-  args, examples) and will attempt to resolve translation keys when a translator is
-  available. Parsing or validation errors are converted to user-facing messages by
-  providers using `_translate_error`.
+  args, examples) and translation keys when a translator is available. Help text
+  uses code formatting (backticks) for command names and examples, and shows full
+  command paths including nested router prefixes (e.g., `/sre dev aws health check`).
+  Parsing or validation errors are converted to user-facing messages by providers 
+  using `_translate_error`.
 
 ## Testing
 
@@ -121,6 +159,7 @@ slack_provider.registry = registry
 - `registry.py` — registration decorators and Pydantic `schema_command` support
 - `parser.py` — tokenization, flags, and type coercion
 - `context.py` — `CommandContext` and `ResponseChannel` protocol
+- `router.py` — command routing, nested router support, namespace propagation
 - `providers/base.py` — provider contract and generic execution flow
 - `providers/slack.py` — Slack adapter, mention/channel resolution, responder
 - `responses/formatters.py` & `responses/slack_formatter.py` — response rendering

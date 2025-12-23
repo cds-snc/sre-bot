@@ -30,7 +30,7 @@ logger = structlog.get_logger()
 # AWS DEV COMMAND ROUTER
 # ============================================================
 
-aws_dev_router = CommandRouter(namespace="sre dev aws")
+aws_dev_router = CommandRouter(namespace="aws")
 
 
 # ============================================================
@@ -209,7 +209,7 @@ health_registry = CommandRegistry("health")
 def health_check(ctx):
     """Run comprehensive health check across all AWS services."""
     aws = get_aws_clients()
-    result = aws.health.check_all_integrations()
+    result = aws.health.check_all()
 
     if result.is_success:
         health_data = result.data

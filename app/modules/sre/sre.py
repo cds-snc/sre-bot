@@ -10,7 +10,7 @@ from infrastructure.commands.providers.slack import SlackCommandProvider
 from modules.groups import create_slack_provider
 from modules.incident import incident_helper
 from modules.sre import geolocate_helper, webhook_helper
-from modules.dev.core import dev_command
+from modules.dev.core import dev_router
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 
@@ -130,28 +130,6 @@ class VersionProvider(SlackCommandProvider):
         respond(f"SRE Bot version: {GIT_SHA}")
 
 
-class LegacyTestProvider(SlackCommandProvider):
-    """Adapter for dev command - delegates to dev module."""
-
-    def __init__(self):
-        super().__init__(config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to dev module handler."""
-        self.acknowledge(platform_payload)
-
-        command = platform_payload["command"]
-        client = platform_payload["client"]
-        respond = platform_payload["respond"]
-        ack = platform_payload["ack"]
-
-        text = command.get("text", "")
-        args = text.split() if text else []
-
-        dev_command(ack, respond, client, command, args)
-
-
 # ============================================================
 # REGISTER LEGACY PROVIDERS
 # ============================================================
@@ -190,7 +168,7 @@ sre_router.register_subcommand(
 
 sre_router.register_subcommand(
     name="dev",
-    provider=LegacyTestProvider(),
+    provider=dev_router,
     platform="slack",
     description="Development and testing commands",
     description_key="sre.subcommands.dev.description",
