@@ -23,7 +23,7 @@ Example:
     ```
 """
 
-from infrastructure.configuration.settings import settings, Settings
+from infrastructure.configuration.settings import Settings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 
-__all__ = ["settings", "Settings", "RetrySettings"]
+__all__ = ["Settings", "RetrySettings"]

@@ -153,7 +153,3 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
-
-
-# Create the singleton settings instance
-settings = Settings()
