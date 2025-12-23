@@ -18,13 +18,22 @@ def get_settings() -> Settings:
     """
     Get application-scoped settings singleton.
 
+    This is the single source of truth for settings across the entire application.
+    The @lru_cache decorator ensures only ONE instance is created per process,
+    even if called from multiple packages.
+
+    Infrastructure packages should use this directly to ensure singleton consistency:
+        from infrastructure.services.providers import get_settings
+        settings = get_settings()
+
+    Application code should use the DI type alias for testability:
+        from infrastructure.services import SettingsDep
+        @router.get("/config")
+        def get_config(settings: SettingsDep):
+            return settings.dict()
+
     Returns:
         Settings: Cached settings instance loaded from environment.
-
-    Usage:
-        @app.get("/config")
-        def get_config(settings: SettingsDep) -> dict:
-            return settings.dict()
     """
     return Settings()
 
