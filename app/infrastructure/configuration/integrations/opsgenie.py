@@ -13,7 +13,9 @@ class OpsGenieSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         api_key = settings.opsgenie.OPSGENIE_INTEGRATIONS_KEY
         ```

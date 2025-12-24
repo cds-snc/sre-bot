@@ -10,7 +10,9 @@ Exports:
 
 Example:
     ```python
-    from infrastructure.configuration import settings
+    from infrastructure.services import get_settings
+
+    settings = get_settings()
 
     # Access settings
     slack_token = settings.slack.SLACK_TOKEN

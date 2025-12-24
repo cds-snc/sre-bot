@@ -37,7 +37,9 @@ class CommandsSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         enabled_providers = [
             name for name, cfg in settings.commands.providers.items()

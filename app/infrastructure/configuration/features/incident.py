@@ -14,7 +14,9 @@ class IncidentFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         incident_channel = settings.feat_incident.INCIDENT_CHANNEL
         security_group = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID

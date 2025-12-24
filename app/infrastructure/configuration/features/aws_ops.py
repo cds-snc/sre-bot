@@ -14,7 +14,9 @@ class AWSFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         admin_groups = settings.aws_feature.AWS_ADMIN_GROUPS
         ops_group = settings.aws_feature.AWS_OPS_GROUP_NAME

@@ -13,7 +13,9 @@ class AtipSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         announce_channel = settings.atip.ATIP_ANNOUNCE_CHANNEL
         ```

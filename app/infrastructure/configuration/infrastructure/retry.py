@@ -39,7 +39,9 @@ class RetrySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         if settings.retry.enabled:
             backend = settings.retry.backend

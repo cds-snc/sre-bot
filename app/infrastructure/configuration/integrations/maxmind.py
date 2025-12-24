@@ -13,7 +13,9 @@ class MaxMindSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         db_path = settings.maxmind.MAXMIND_DB_PATH
         ```

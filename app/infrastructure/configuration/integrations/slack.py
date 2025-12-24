@@ -14,7 +14,9 @@ class SlackSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         slack_token = settings.slack.SLACK_TOKEN
         incident_channel = settings.slack.INCIDENT_CHANNEL

@@ -15,7 +15,9 @@ class NotifySettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         api_url = settings.notify.NOTIFY_API_URL
         username = settings.notify.NOTIFY_SRE_USER_NAME
