@@ -14,6 +14,8 @@ class RetrySettings(InfrastructureSettings):
     Environment Variables:
         RETRY_ENABLED: Enable retry system (default: True)
         RETRY_BACKEND: Backend type - 'memory', 'dynamodb', or 'sqs'
+        RETRY_DYNAMODB_TABLE_NAME: DynamoDB table name (if using DynamoDB backend)
+        RETRY_DYNAMODB_TTL_DAYS: TTL for DynamoDB retry records (default: 7 days)
         RETRY_MAX_ATTEMPTS: Maximum retry attempts before DLQ (default: 5)
         RETRY_BASE_DELAY_SECONDS: Base exponential backoff delay (default: 60s)
         RETRY_MAX_DELAY_SECONDS: Maximum backoff delay (default: 3600s = 1h)
@@ -55,6 +57,16 @@ class RetrySettings(InfrastructureSettings):
         default="memory",
         alias="RETRY_BACKEND",
         description="Retry backend: 'memory', 'dynamodb', or 'sqs'",
+    )
+    dynamodb_table_name: str = Field(
+        default="srebot-retry-records",
+        alias="RETRY_DYNAMODB_TABLE_NAME",
+        description="DynamoDB table name for retry records (if using DynamoDB backend)",
+    )
+    dynamodb_ttl_days: int = Field(
+        default=7,
+        alias="RETRY_DYNAMODB_TTL_DAYS",
+        description="Time-to-live for retry records in DynamoDB (days)",
     )
     max_attempts: int = Field(
         default=5,
