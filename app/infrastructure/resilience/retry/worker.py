@@ -6,12 +6,12 @@ Module-specific retry logic is implemented via the RetryProcessor protocol.
 
 from typing import Protocol
 
-from infrastructure.observability import get_module_logger
+import structlog
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.models import RetryRecord, RetryResult
 from infrastructure.resilience.retry.store import RetryStore
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class RetryProcessor(Protocol):

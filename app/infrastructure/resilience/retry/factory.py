@@ -1,11 +1,12 @@
 """Factory for creating retry stores based on configuration."""
 
-from infrastructure.configuration import settings
-from infrastructure.observability import get_module_logger
+import structlog
+from infrastructure.services.providers import get_settings
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+settings = get_settings()
 
 
 def create_retry_store(config: RetryConfig, backend: str | None = None) -> RetryStore:

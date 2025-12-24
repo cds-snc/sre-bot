@@ -7,12 +7,12 @@ The protocol-based design allows for multiple storage backends (in-memory, Dynam
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Protocol
+import structlog
 
-from infrastructure.observability import get_module_logger
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.models import RetryRecord
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class RetryStore(Protocol):
