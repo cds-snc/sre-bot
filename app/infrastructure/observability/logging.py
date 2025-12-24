@@ -13,6 +13,8 @@ Maintained exports:
 Migration:
     from infrastructure.observability.logging import get_module_logger  # OLD
     from infrastructure.logging import get_module_logger  # NEW
+
+TODO: Remove this module in future major release.
 """
 
 # Re-export from canonical location

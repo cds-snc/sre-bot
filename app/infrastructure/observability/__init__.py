@@ -4,6 +4,8 @@ Exports:
     get_module_logger: Get a logger for the calling module (deprecated)
     logger: Global logger instance
     configure_logging: Configure structured logging
+
+TODO: Remove this module in future major release.
 """
 
 from infrastructure.observability.logging import (
