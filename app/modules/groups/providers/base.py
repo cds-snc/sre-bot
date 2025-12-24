@@ -17,7 +17,7 @@ from typing import Optional
 
 import structlog
 
-from infrastructure.configuration import settings
+from infrastructure.services import get_settings
 from email_validator import EmailNotValidError, validate_email
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.resilience.circuit_breaker import (
@@ -33,6 +33,7 @@ from modules.groups.providers.contracts import (
 )
 
 logger = structlog.get_logger()
+settings = get_settings()
 
 
 def validate_member_email(email: str) -> str:

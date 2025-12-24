@@ -188,7 +188,9 @@ def activate_providers() -> str:
         ValueError: If configuration is invalid
     """
     # pylint: disable=import-outside-toplevel
-    from infrastructure.configuration import settings
+    from infrastructure.services import get_settings
+
+    settings = get_settings()
 
     try:
         provider_configs = settings.groups.providers or {}

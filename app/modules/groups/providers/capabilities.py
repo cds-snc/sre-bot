@@ -13,10 +13,11 @@ import dataclasses
 from typing import Dict, Any
 
 import structlog
-from infrastructure.configuration import settings
+from infrastructure.services import get_settings
 from modules.groups.providers.contracts import ProviderCapabilities
 
 logger = structlog.get_logger()
+settings = get_settings()
 
 
 def load_capabilities(provider_name: str) -> ProviderCapabilities:
