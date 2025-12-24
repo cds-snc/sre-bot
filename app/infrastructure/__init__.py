@@ -1,60 +1,41 @@
-"""Infrastructure modules for the SRE Bot application.
+"""Infrastructure layer - dependency injection and core services.
 
-Centralized infrastructure components:
-- configuration: Settings management (settings, RetrySettings)
-- identity: User identity models and resolution (User, IdentityResolver)
-- security: JWT validation and JWKS management (validate_jwt_token, JWKSManager)
-- observability: Logging and monitoring (get_module_logger, logger)
-- events: Event system
-- i18n: Internationalization
-- idempotency: Idempotency cache
-- notifications: Notification dispatcher
-- operations: Operation results and error classification
-- persistence: Data persistence
-- resilience: Circuit breakers and retry logic
-- commands: Command framework
-- audit: Audit logging
-- services: Dependency injection services (SettingsDep, IdentityResolverDep, get_settings)
+Public API:
+- Dependency injection providers (get_settings, get_identity_resolver, etc.)
+- Type aliases for FastAPI routes (SettingsDep, IdentityResolverDep, etc.)
+- Base types used across application (OperationResult, OperationStatus)
+
+All other infrastructure packages are internal implementation details.
+Use the services layer for all infrastructure access.
 """
 
-# Configuration
-from infrastructure.configuration import settings
-
-# Auth & Identity
-from infrastructure.identity import User
-from infrastructure.security import JWKSManager, validate_jwt_token
-
-# Observability
-from infrastructure.observability import get_module_logger, logger
-
-# Operations (legacy)
+# Base types (ubiquitous across the application)
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
-# Dependency Injection Services
+# Dependency Injection Services (THE PUBLIC API)
 from infrastructure.services import (
     SettingsDep,
     IdentityResolverDep,
+    JWKSManagerDep,
+    AWSClientsDep,
     get_settings,
     get_identity_resolver,
+    get_jwks_manager,
+    get_aws_clients,
 )
 
 __all__ = [
-    # Configuration
-    "settings",
-    # Auth & Identity
-    "User",
-    "JWKSManager",
-    "validate_jwt_token",
-    # Observability
-    "get_module_logger",
-    "logger",
-    # Operations (legacy)
+    # Base types
     "OperationResult",
     "OperationStatus",
     # Dependency Injection Services
     "SettingsDep",
     "IdentityResolverDep",
+    "JWKSManagerDep",
+    "AWSClientsDep",
     "get_settings",
     "get_identity_resolver",
+    "get_jwks_manager",
+    "get_aws_clients",
 ]
