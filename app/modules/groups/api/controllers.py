@@ -3,14 +3,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
-from infrastructure.observability import get_module_logger
+import structlog
 from modules.groups.core import service
 from modules.groups.api import schemas
 from modules.groups.domain import models
 from modules.groups.providers import get_active_providers
 from infrastructure.resilience import circuit_breaker
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Controllers are thin adapters: they accept Pydantic request models, call the
 # service boundary, and return Pydantic response models. We intentionally do

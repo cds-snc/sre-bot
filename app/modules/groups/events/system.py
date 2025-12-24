@@ -15,10 +15,9 @@ import atexit
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import Any, Callable, Dict, List, Optional
+import structlog
 
-from infrastructure.observability import get_module_logger
-
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Event handler registry
 EVENT_HANDLERS: Dict[str, List[Callable]] = {}

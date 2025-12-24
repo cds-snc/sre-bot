@@ -15,8 +15,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
+import structlog
+
 from infrastructure.configuration import settings
-from infrastructure.observability import get_module_logger
 from email_validator import EmailNotValidError, validate_email
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.resilience.circuit_breaker import (
@@ -31,7 +32,7 @@ from modules.groups.providers.contracts import (
     ProviderCapabilities,
 )
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def validate_member_email(email: str) -> str:

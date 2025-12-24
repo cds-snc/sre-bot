@@ -8,7 +8,7 @@ inside functions to avoid import-time failures during incremental rollout.
 from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Any, Dict, List, TYPE_CHECKING, Optional, cast
-from infrastructure.observability import get_module_logger
+import structlog
 from modules.groups.reconciliation import integration as ri
 from modules.groups.providers import (
     get_primary_provider,
@@ -24,7 +24,7 @@ from modules.groups.domain.models import NormalizedGroup
 if TYPE_CHECKING:  # avoid runtime import cycles for typing
     from modules.groups.domain.types import OrchestrationResponseTypedDict
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 # TODO: clarify if providers shouldn't be responsible to raise an error instead.

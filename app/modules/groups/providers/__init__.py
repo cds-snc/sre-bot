@@ -19,11 +19,11 @@ import importlib
 import pkgutil
 from typing import Dict, Optional, Type
 
-from infrastructure.observability import get_module_logger
+import structlog
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers import registry_utils
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Separate registries for different provider roles
 _primary_discovered: Dict[str, Type[PrimaryGroupProvider]] = {}

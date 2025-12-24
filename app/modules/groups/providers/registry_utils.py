@@ -11,9 +11,9 @@ Usage:
 
 from typing import Dict, Type, Any, Optional
 
-from infrastructure.observability import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def filter_disabled_providers(

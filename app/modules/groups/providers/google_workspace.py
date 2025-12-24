@@ -3,9 +3,10 @@
 # Standard library
 from typing import Dict, List, Optional
 
+import structlog
+
 # Local application - infrastructure
 from infrastructure.configuration import settings
-from infrastructure.observability import get_module_logger
 
 # Local application - integrations
 from integrations.google_workspace import google_directory_next as google_directory
@@ -36,7 +37,7 @@ from infrastructure.operations import OperationResult
 from infrastructure.operations.classifiers import classify_http_error
 
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @register_provider("google")

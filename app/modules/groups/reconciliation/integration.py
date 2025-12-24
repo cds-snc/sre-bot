@@ -5,7 +5,7 @@ store implementations (in-memory for Stage 1, DynamoDB for Stage 2, SQS for Stag
 """
 
 from typing import Optional
-from infrastructure.observability import get_module_logger
+import structlog
 from infrastructure.configuration import settings
 from modules.groups.reconciliation import (
     InMemoryReconciliationStore,
@@ -13,7 +13,7 @@ from modules.groups.reconciliation import (
     ReconciliationStore,
 )
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Global store instance (initialized at module load)
 _reconciliation_store: Optional[ReconciliationStore] = None

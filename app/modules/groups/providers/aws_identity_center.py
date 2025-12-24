@@ -4,9 +4,10 @@
 import re
 from typing import Any, Dict, List, Optional
 
+import structlog
+
 # Local application - infrastructure
 from infrastructure.configuration import settings
-from infrastructure.observability import get_module_logger
 
 # Local application - integrations
 from integrations.aws import identity_store_next as identity_store
@@ -33,7 +34,7 @@ from infrastructure.operations import OperationResult
 from infrastructure.operations.classifiers import classify_aws_error
 
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # AWS Identity Center resource IDs (GroupId, UserId, MembershipId) use UUID format
 AWS_UUID_REGEX = re.compile(

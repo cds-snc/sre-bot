@@ -6,6 +6,8 @@ idempotency, and delivery.
 """
 
 from typing import Optional
+
+import structlog
 from infrastructure.events import register_event_handler, Event
 from infrastructure.notifications import (
     NotificationDispatcher,
@@ -15,9 +17,9 @@ from infrastructure.notifications import (
 )
 from infrastructure.i18n import Translator, LocaleResolver, TranslationKey
 from infrastructure.idempotency import IdempotencyKeyBuilder
-from infrastructure.observability import get_module_logger
 
-logger = get_module_logger()
+
+logger = structlog.get_logger()
 
 
 class GroupNotificationHandler:

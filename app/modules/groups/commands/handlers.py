@@ -11,13 +11,13 @@ Handlers are kept separate from registry.py for cleaner separation of concerns:
 - handlers.py: Command implementation logic
 """
 
+import structlog
 from infrastructure.commands import CommandContext
 from modules.groups.api import schemas
 from modules.groups.core import service
 from modules.groups.commands import responses
-from infrastructure.observability import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def list_groups_command(
