@@ -4,6 +4,8 @@ import structlog
 from infrastructure.services.providers import get_settings
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
+from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
+
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -40,7 +42,6 @@ def create_retry_store(config: RetryConfig, backend: str | None = None) -> Retry
             "creating_dynamodb_retry_store",
             table_name=settings.retry.dynamodb_table_name,
         )
-        from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
         return DynamoDBRetryStore(
             config=config,
