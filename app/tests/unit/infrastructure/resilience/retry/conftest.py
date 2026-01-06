@@ -144,7 +144,7 @@ def mock_settings_memory_backend(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "infrastructure.configuration.settings.retry",
+        "infrastructure.services.providers.get_settings.retry",
         mock_retry_settings,
     )
     return mock_retry_settings
@@ -168,7 +168,7 @@ def mock_settings_dynamodb_backend(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "infrastructure.configuration.settings.retry",
+        "infrastructure.services.providers.get_settings.retry",
         mock_retry_settings,
     )
     return mock_retry_settings
