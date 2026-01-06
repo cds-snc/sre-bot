@@ -9,6 +9,7 @@ from infrastructure.resilience.retry import (
     RetryResult,
     InMemoryRetryStore,
 )
+from infrastructure.services.providers import get_settings
 
 
 @pytest.fixture
@@ -132,7 +133,6 @@ def mock_settings_memory_backend(monkeypatch):
     from types import SimpleNamespace
 
     # Clear the lru_cache on get_settings before mocking
-    from infrastructure.services.providers import get_settings
 
     get_settings.cache_clear()
 
@@ -174,9 +174,6 @@ def mock_settings_memory_backend(monkeypatch):
 def mock_settings_dynamodb_backend(monkeypatch):
     """Mock settings to use DynamoDB backend."""
     from types import SimpleNamespace
-
-    # Clear the lru_cache on get_settings before mocking
-    from infrastructure.services.providers import get_settings
 
     get_settings.cache_clear()
 

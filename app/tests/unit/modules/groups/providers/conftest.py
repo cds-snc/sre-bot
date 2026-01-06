@@ -13,6 +13,7 @@ from modules.groups.providers.contracts import (
     OperationStatus,
     ProviderCapabilities,
 )
+from infrastructure.services.providers import get_settings
 
 
 @pytest.fixture
@@ -208,8 +209,6 @@ def patch_provider_base_settings(
     settings = get_settings() pattern.
     """
     # Clear the @lru_cache to allow our mock to take effect
-    from infrastructure.services.providers import get_settings
-
     get_settings.cache_clear()
 
     # Clear provider registries to prevent test pollution
