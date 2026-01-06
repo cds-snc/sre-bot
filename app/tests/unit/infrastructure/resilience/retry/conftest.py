@@ -131,6 +131,11 @@ def mock_settings_memory_backend(monkeypatch):
     """Mock settings to use memory backend."""
     from types import SimpleNamespace
 
+    # Clear the lru_cache on get_settings before mocking
+    from infrastructure.services.providers import get_settings
+
+    get_settings.cache_clear()
+
     mock_retry_settings = SimpleNamespace(
         backend="memory",
         max_attempts=5,
@@ -143,17 +148,37 @@ def mock_settings_memory_backend(monkeypatch):
         dynamodb_ttl_days=30,
     )
 
-    monkeypatch.setattr(
-        "infrastructure.services.providers.get_settings.retry",
-        mock_retry_settings,
+    mock_settings = SimpleNamespace(
+        retry=mock_retry_settings,
     )
-    return mock_retry_settings
+
+    # Patch where get_settings is called
+    monkeypatch.setattr(
+        "infrastructure.services.providers.get_settings",
+        lambda: mock_settings,
+    )
+
+    # Re-import the factory module so module-level settings assignment uses the mock
+    import importlib
+    import infrastructure.resilience.retry.factory
+
+    importlib.reload(infrastructure.resilience.retry.factory)
+
+    yield mock_retry_settings
+
+    # Clean up: clear cache again after test
+    get_settings.cache_clear()
 
 
 @pytest.fixture
 def mock_settings_dynamodb_backend(monkeypatch):
     """Mock settings to use DynamoDB backend."""
     from types import SimpleNamespace
+
+    # Clear the lru_cache on get_settings before mocking
+    from infrastructure.services.providers import get_settings
+
+    get_settings.cache_clear()
 
     mock_retry_settings = SimpleNamespace(
         backend="dynamodb",
@@ -167,8 +192,23 @@ def mock_settings_dynamodb_backend(monkeypatch):
         dynamodb_ttl_days=30,
     )
 
-    monkeypatch.setattr(
-        "infrastructure.services.providers.get_settings.retry",
-        mock_retry_settings,
+    mock_settings = SimpleNamespace(
+        retry=mock_retry_settings,
     )
-    return mock_retry_settings
+
+    # Patch where get_settings is called
+    monkeypatch.setattr(
+        "infrastructure.services.providers.get_settings",
+        lambda: mock_settings,
+    )
+
+    # Re-import the factory module so module-level settings assignment uses the mock
+    import importlib
+    import infrastructure.resilience.retry.factory
+
+    importlib.reload(infrastructure.resilience.retry.factory)
+
+    yield mock_retry_settings
+
+    # Clean up: clear cache again after test
+    get_settings.cache_clear()

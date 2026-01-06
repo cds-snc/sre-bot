@@ -12,15 +12,14 @@ Tests cover:
 
 import pytest
 
+import modules.groups.providers as providers
+
 
 class TestProviderRegistration:
     """Tests for provider discovery and registration decorators."""
 
     def test_register_primary_provider_success(self, monkeypatch, mock_primary_class):
         """Primary provider can be registered with decorator."""
-        # Import fresh providers module
-        import modules.groups.providers as providers
-
         # Reset registries for clean test
         providers._primary_discovered.clear()
         providers._secondary_discovered.clear()
@@ -38,7 +37,6 @@ class TestProviderRegistration:
         self, monkeypatch, mock_secondary_class
     ):
         """Primary registration rejects non-PrimaryGroupProvider classes."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
 
@@ -49,7 +47,6 @@ class TestProviderRegistration:
 
     def test_register_primary_provider_rejects_non_class(self, monkeypatch):
         """Primary registration rejects non-class objects."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
 
@@ -62,7 +59,6 @@ class TestProviderRegistration:
         self, monkeypatch, mock_primary_class
     ):
         """Registering duplicate primary provider name raises error."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
 
@@ -82,7 +78,6 @@ class TestProviderRegistration:
         self, monkeypatch, mock_secondary_class
     ):
         """Secondary provider can be registered with decorator."""
-        import modules.groups.providers as providers
 
         providers._secondary_discovered.clear()
 
@@ -95,7 +90,6 @@ class TestProviderRegistration:
 
     def test_register_secondary_provider_rejects_non_class(self, monkeypatch):
         """Secondary registration rejects non-class objects."""
-        import modules.groups.providers as providers
 
         providers._secondary_discovered.clear()
 
@@ -108,7 +102,6 @@ class TestProviderRegistration:
         self, monkeypatch, mock_primary_class
     ):
         """Auto-detect decorator registers primary when appropriate."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
         providers._secondary_discovered.clear()
@@ -129,7 +122,6 @@ class TestProviderRegistration:
         self, monkeypatch, mock_secondary_class
     ):
         """Auto-detect decorator registers secondary when appropriate."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
         providers._secondary_discovered.clear()
@@ -158,7 +150,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Single primary provider can be activated with config."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -174,7 +165,7 @@ class TestProviderActivation:
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
             "modules.groups.providers.get_settings",
-            mock_settings,
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -196,7 +187,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Provider config is passed to __init__ during activation."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -210,8 +200,8 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -230,7 +220,6 @@ class TestProviderActivation:
         mock_primary_class,
     ):
         """Primary provider must have provides_role_info capability."""
-        import modules.groups.providers as providers
 
         # Create primary without role info - must be PrimaryGroupProvider subclass
         class BadPrimary(mock_primary_class):
@@ -257,8 +246,8 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {"bad": {"enabled": True}}
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -273,7 +262,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Activation fails if no primary provider is enabled."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
         providers._secondary_discovered.clear()
@@ -284,8 +272,8 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {}
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -301,7 +289,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Activation fails if multiple primary providers are enabled."""
-        import modules.groups.providers as providers
 
         providers._primary_discovered.clear()
         providers._secondary_discovered.clear()
@@ -322,8 +309,8 @@ class TestProviderActivation:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -340,7 +327,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Multiple secondary providers can be activated alongside primary."""
-        import modules.groups.providers as providers
 
         # Setup registries
         providers._primary_discovered.clear()
@@ -364,8 +350,8 @@ class TestProviderActivation:
             "azure": {"enabled": True, "prefix": "azure"},
         }
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -388,7 +374,6 @@ class TestProviderActivation:
         patch_provider_base_settings,
     ):
         """Disabled providers are skipped during activation."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -406,8 +391,8 @@ class TestProviderActivation:
             "aws": {"enabled": False},
         }
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -430,7 +415,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """get_primary_provider returns active primary instance."""
-        import modules.groups.providers as providers
 
         # Setup and activate
         providers._primary_discovered.clear()
@@ -458,7 +442,6 @@ class TestProviderAccessors:
 
     def test_get_primary_provider_no_active_raises(self, monkeypatch):
         """get_primary_provider raises if no primary is active."""
-        import modules.groups.providers as providers
 
         providers._primary_active = None
 
@@ -474,7 +457,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """get_primary_provider_name returns the active primary name."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -508,7 +490,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """get_provider returns provider instance by name."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -542,7 +523,6 @@ class TestProviderAccessors:
 
     def test_get_provider_unknown_raises(self, monkeypatch):
         """get_provider raises for unknown provider name."""
-        import modules.groups.providers as providers
 
         providers._primary_active = None
         providers._secondary_active.clear()
@@ -559,7 +539,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """get_secondary_providers returns dict of all active secondaries."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -582,8 +561,8 @@ class TestProviderAccessors:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.services",
-            mock_settings,
+            "modules.groups.providers.get_settings",
+            lambda: mock_settings,
             raising=False,
         )
 
@@ -606,7 +585,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """get_active_providers returns combined primary and secondary view."""
-        import modules.groups.providers as providers
 
         # Setup
         providers._primary_discovered.clear()
@@ -647,7 +625,6 @@ class TestProviderAccessors:
         patch_provider_base_settings,
     ):
         """reset_registry clears all active providers and names."""
-        import modules.groups.providers as providers
 
         # Setup and activate
         providers._primary_discovered.clear()

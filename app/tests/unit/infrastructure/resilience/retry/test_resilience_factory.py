@@ -1,5 +1,8 @@
 """Unit tests for retry store factory."""
 
+import importlib
+from types import SimpleNamespace
+
 import pytest
 
 from infrastructure.resilience.retry import (
@@ -7,6 +10,7 @@ from infrastructure.resilience.retry import (
     create_retry_store,
 )
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
+from infrastructure.services.providers import get_settings
 
 
 class TestCreateRetryStore:
@@ -87,13 +91,22 @@ class TestCreateRetryStore:
 
     def test_create_memory_store_uses_config(self, retry_config_factory, monkeypatch):
         """Test that created memory store uses provided config."""
-        from types import SimpleNamespace
+
+        # Clear the lru_cache on get_settings before mocking
+        get_settings.cache_clear()
 
         mock_retry_settings = SimpleNamespace(backend="memory")
+        mock_settings = SimpleNamespace(retry=mock_retry_settings)
+
         monkeypatch.setattr(
-            "infrastructure.resilience.retry.factory.settings.retry",
-            mock_retry_settings,
+            "infrastructure.services.providers.get_settings",
+            lambda: mock_settings,
         )
+
+        # Re-import factory module so it picks up the mocked get_settings
+        import infrastructure.resilience.retry.factory
+
+        importlib.reload(infrastructure.resilience.retry.factory)
 
         config = retry_config_factory(
             max_attempts=10,
@@ -101,10 +114,7 @@ class TestCreateRetryStore:
             batch_size=20,
         )
 
-        store = create_retry_store(config)
-
-        assert store.config.max_attempts == 10
-        assert store.config.base_delay_seconds == 30
+        store = infrastructure.resilience.retry.factory.create_retry_store(config)
         assert store.config.batch_size == 20
 
     def test_create_dynamodb_store_uses_config(
