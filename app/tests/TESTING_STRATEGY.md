@@ -137,11 +137,70 @@ Based on [pytest good practices](https://docs.pytest.org/en/stable/explanation/g
 
 ## Environment Variables
 
-All environment variable loading is centralized in `infrastructure.configuration.settings`. Tests should:
+All environment variable loading is centralized in `infrastructure.configuration.settings` and accessed via the services providers `from infrastructure.services.providers import get_settings`. Tests should:
 - **NOT** load `.env` files directly
-- Access configuration via `settings` object
+- Access configuration via `settings` object retrieved from `get_settings()`
 - Use pytest.ini `env` section for test-specific overrides
 - Mock settings via fixtures when isolation is needed
+
+### ⚠️ Anti-Pattern: Module-Level Settings Import
+
+**NEVER import settings at module level:**
+
+```python
+# ❌ BAD - Causes import-time side effects
+from infrastructure.configuration import settings
+
+def some_function():
+    return settings.aws.AWS_REGION
+```
+
+**Why this is problematic:**
+- Loads `.env` files at import time before tests can configure environment
+- Cannot be mocked or overridden in tests (due to Python's import caching)
+- Creates circular dependency issues
+- Violates the principle of explicit dependencies
+- Breaks test isolation
+
+**✅ CORRECT patterns:**
+
+```python
+# 1. For route handlers: Use dependency injection
+from infrastructure.services import SettingsDep
+
+@router.get("/config")
+def get_config(settings: SettingsDep):
+    return {"region": settings.aws.AWS_REGION}
+
+# 2. For infrastructure code: Import get_settings from providers
+from infrastructure.services.providers import get_settings
+
+def setup_client():
+    settings = get_settings()
+    return Client(region=settings.aws.AWS_REGION)
+
+# 3. For application code/tasks: Pass settings as parameter
+from infrastructure.services import get_settings
+
+def background_task():
+    settings = get_settings()
+    process_data(settings)
+```
+
+**In tests**, always mock via the centralized `get_settings()` function:
+
+```python
+from unittest.mock import MagicMock
+
+def test_something(monkeypatch):
+    mock_settings = MagicMock()
+    mock_settings.aws.AWS_REGION = "us-west-2"
+    
+    monkeypatch.setattr(
+        "infrastructure.services.providers.get_settings",
+        lambda: mock_settings
+    )
+```
 
 ## Pytest Configuration
 
@@ -336,6 +395,68 @@ tests/unit/modules/<module>/<feature>/conftest.py  # Level 3: Feature fixtures
 2. Within same scope, dependencies execute first
 3. Autouse fixtures execute before non-autouse in same scope
 
+### Fixture Scoping Strategy
+
+**Default scope: `function`** (recommended for most fixtures)
+
+Per [pytest documentation](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session), fixtures can have different scopes:
+
+| Scope | Lifetime | Use When | Example |
+|-------|----------|----------|----------|
+| `function` | Per test (default) | Most cases - ensures test isolation | Mock objects, test data |
+| `class` | Per test class | Shared setup within class | Class-level config |
+| `module` | Per test file | Expensive setup, **immutable** data | Database connections |
+| `package` | Per test directory | Shared across subpackages | Rarely needed |
+| `session` | Entire test run | **Very rare** - static, global config | Test suite bootstrap |
+
+**Guidelines:**
+
+1. **Default to `function` scope** unless you have a specific reason
+2. **Broader scopes require immutability** - tests should not modify shared fixtures
+3. **Beware of @lru_cache** - Settings fixtures must handle cached functions
+4. **Test isolation > Performance** - only optimize after measuring
+
+**Settings Fixture Scoping:**
+
+```python
+# ✅ Function scope (RECOMMENDED) - fresh mock per test
+@pytest.fixture
+def mock_settings(monkeypatch):
+    # Each test gets independent settings mock
+    # No state leakage between tests
+    ...
+
+# ⚠️ Module scope - use cautiously
+@pytest.fixture(scope="module")
+def integration_settings():
+    # Shared across all tests in file
+    # Only use if settings truly never change
+    # Risk: tests may interfere with each other
+    ...
+
+# ❌ Session scope - avoid for settings
+# Settings should be mockable per-test
+```
+
+**When to use broader scopes:**
+
+```python
+# ✅ Good use of module scope - expensive, immutable setup
+@pytest.fixture(scope="module")
+def database_schema():
+    """Create DB schema once per test module."""
+    conn = create_connection()
+    conn.execute("CREATE TABLE...")
+    yield conn
+    conn.execute("DROP TABLE...")
+
+# ❌ Bad use of module scope - mutable state
+@pytest.fixture(scope="module")
+def user_data():
+    """Don't share mutable data across tests!"""
+    return {"count": 0}  # Tests will modify this!
+```
+
 ### Fixture Patterns
 
 #### 1. Yield Fixtures (Recommended for Teardown)
@@ -394,7 +515,11 @@ Global fixtures available to all tests:
 ```python
 # tests/conftest.py
 
+import sys
 import pytest
+from unittest.mock import MagicMock
+
+from infrastructure.configuration import Settings
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SESSION SETUP (autouse)
@@ -402,8 +527,6 @@ import pytest
 
 def pytest_configure(config):
     """Mock Slack App before any imports to prevent auth errors."""
-    from unittest.mock import MagicMock
-    import sys
     sys.modules["integrations.slack.app"] = MagicMock()
 
 
@@ -448,16 +571,190 @@ def aws_user_factory():
 
 @pytest.fixture
 def mock_settings(monkeypatch):
-    """Factory for mocking settings."""
-    import types
+    """Factory for mocking settings with real Settings instances.
     
+    This fixture provides settings mocking that:
+    - Uses real Settings class for type safety and validation
+    - Properly handles the @lru_cache decorator on get_settings()
+    - Allows nested attribute overrides via double-underscore notation
+    
+    Usage:
+        def test_something(mock_settings):
+            settings = mock_settings(
+                aws__AWS_REGION="us-west-2",      # Nested: settings.aws.AWS_REGION
+                retry__enabled=True,              # Nested: settings.retry.enabled
+                server__LOG_LEVEL="DEBUG"         # Nested: settings.server.LOG_LEVEL
+            )
+            # settings is a real Settings instance with validation
+    
+    Args:
+        monkeypatch: pytest's monkeypatch fixture
+    
+    Returns:
+        Callable that creates and installs a Settings mock
+    """
     def _mock_settings(**overrides):
-        settings = types.SimpleNamespace(**overrides)
-        monkeypatch.setattr("infrastructure.configuration.settings", settings)
+        # Create a Settings mock with spec for type safety
+        mock = MagicMock(spec=Settings)
+        
+        # Apply overrides using double-underscore for nested attributes
+        # Example: aws__AWS_REGION -> mock.aws.AWS_REGION = "us-west-2"
+        for key, value in overrides.items():
+            parts = key.split("__")
+            target = mock
+            
+            # Navigate to nested attribute
+            for part in parts[:-1]:
+                if not hasattr(target, part):
+                    setattr(target, part, MagicMock())
+                target = getattr(target, part)
+            
+            # Set the final value
+            setattr(target, parts[-1], value)
+        
+        # CRITICAL: Replace get_settings() to handle @lru_cache
+        # We replace the entire function, not just the return value
+        monkeypatch.setattr(
+            "infrastructure.services.providers.get_settings",
+            lambda: mock,
+            raising=False,
+        )
+        
+        return mock
+    
+    return _mock_settings
+
+
+@pytest.fixture
+def mock_settings_real(monkeypatch):
+    """Alternative: Use real Settings instance with environment variable overrides.
+    
+    This fixture creates actual Settings objects for maximum realism.
+    Use when you need full Pydantic validation or complex nested structures.
+    
+    Usage:
+        def test_with_validation(mock_settings_real):
+            settings = mock_settings_real(
+                AWS_REGION="us-east-1",
+                SLACK_TOKEN="xoxb-test-token"
+            )
+            # settings is a real Settings() instance
+    
+    Args:
+        monkeypatch: pytest's monkeypatch fixture
+    
+    Returns:
+        Callable that creates real Settings with env overrides
+    """
+    def _mock_settings(**env_overrides):
+        # Set environment variables temporarily
+        for key, value in env_overrides.items():
+            monkeypatch.setenv(key, str(value))
+        
+        # Create real Settings instance (will load from env)
+        settings = Settings()
+        
+        # Replace get_settings() to return this instance
+        monkeypatch.setattr(
+            "infrastructure.services.providers.get_settings",
+            lambda: settings,
+            raising=False,
+        )
+        
         return settings
     
     return _mock_settings
 ```
+
+### Settings Mocking: Real vs Mock
+
+**When to use each approach:**
+
+| Approach | Use When | Pros | Cons |
+|----------|----------|------|------|
+| **MagicMock (default)** | Most unit tests | Simple, flexible, fast | No validation, spec drift |
+| **Real Settings** | Integration tests, validation tests | Type safety, Pydantic validation | Slower, requires env setup |
+
+**Primary pattern: MagicMock with spec**
+
+```python
+def test_with_mock(mock_settings):
+    """Fast, isolated unit test."""
+    settings = mock_settings(
+        aws__AWS_REGION="us-east-1",
+        retry__enabled=True
+    )
+    # Quick mocking for unit tests
+    assert settings.aws.AWS_REGION == "us-east-1"
+```
+
+**Benefits:**
+- Fast test execution
+- Easy to set up partial mocks
+- Fine-grained control over behavior
+- No file I/O or environment pollution
+
+**Alternative: Real Settings with env overrides**
+
+```python
+def test_with_real_settings(mock_settings_real):
+    """Integration test with full validation."""
+    settings = mock_settings_real(
+        AWS_REGION="us-west-2",
+        SLACK_TOKEN="xoxb-test"
+    )
+    # Real Settings instance with Pydantic validation
+    assert isinstance(settings.aws.AWS_REGION, str)
+```
+
+**Benefits:**
+- Catches Pydantic validation errors
+- Verifies actual Settings schema
+- IDE autocomplete works
+- Tests closer to production
+
+**Use real Settings when:**
+- Testing settings initialization logic
+- Verifying Pydantic validators
+- Integration tests with real components
+- You need to catch schema mismatches
+
+**Use MagicMock when:**
+- Pure unit tests with stubbed dependencies
+- Need to mock methods (not just data)
+- Speed is critical (thousands of tests)
+- Testing edge cases that are hard to configure via env
+
+### FastAPI Dependency Override Pattern
+
+For testing FastAPI routes that use `SettingsDep`, override the dependency:
+
+```python
+from unittest.mock import MagicMock
+
+from fastapi.testclient import TestClient
+from infrastructure.services.providers import get_settings
+
+def test_endpoint_with_settings_override(app):
+    """Test FastAPI route with custom settings."""
+    # Create mock settings
+    mock_settings = MagicMock()
+    mock_settings.aws.AWS_REGION = "us-east-1"
+    
+    # Override the dependency
+    app.dependency_overrides[get_settings] = lambda: mock_settings
+    
+    try:
+        client = TestClient(app)
+        response = client.get("/api/v1/config")
+        assert response.status_code == 200
+        assert "us-east-1" in response.json()["region"]
+    finally:
+        # Clean up - critical for test isolation!
+        app.dependency_overrides.clear()
+```
+
+**Important:** Always clear `app.dependency_overrides` in cleanup to prevent test pollution.
 
 ### Level 2: Module Fixtures
 
@@ -468,6 +765,8 @@ Module-specific fixtures in `tests/unit/modules/<module>/conftest.py`:
 
 import pytest
 from unittest.mock import MagicMock
+
+from modules.groups.models import NormalizedMember, NormalizedGroup
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MOCK PROVIDERS
@@ -489,7 +788,6 @@ def mock_primary_provider():
 @pytest.fixture
 def normalized_member_factory():
     """Factory for creating NormalizedMember instances."""
-    from modules.groups.models import NormalizedMember
     
     def _factory(
         email: str = "test@example.com",
@@ -505,8 +803,6 @@ def normalized_member_factory():
 @pytest.fixture
 def normalized_group_factory():
     """Factory for creating NormalizedGroup instances."""
-    from modules.groups.models import NormalizedGroup
-    
     def _factory(
         id: str = "group-1",
         name: str = "Test Group",
@@ -528,6 +824,9 @@ Feature-specific fixtures in nested conftest files:
 import pytest
 from unittest.mock import MagicMock
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MOCK CLIENTS
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_google_directory_client():
@@ -562,6 +861,8 @@ Per [pytest documentation](https://docs.pytest.org/en/stable/how-to/fixtures.htm
 
 These are pure functions that create test data deterministically.
 """
+
+from typing import List, Dict, Any
 
 from integrations.google_workspace.schemas import Group, User
 
@@ -649,6 +950,9 @@ Autouse fixtures that mock external systems:
 import pytest
 from unittest.mock import MagicMock, patch
 
+# ─────────────────────────────────────────────────────────────────────────────
+# BOUNDARY MOCKS (autouse)
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
 def mock_dynamodb_audit(monkeypatch):
