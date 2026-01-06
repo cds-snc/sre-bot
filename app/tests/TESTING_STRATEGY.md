@@ -137,7 +137,7 @@ Based on [pytest good practices](https://docs.pytest.org/en/stable/explanation/g
 
 ## Environment Variables
 
-All environment variable loading is centralized in `infrastructure.configuration.settings` and accessed via the services providers `from infrastructure.services.providers import get_settings`. Tests should:
+All environment variable loading is centralized in `infrastructure.configuration.settings` and accessed via the services façade `from infrastructure.services import get_settings`. In tests (or infra internals when clearing `@lru_cache`), you can import the provider directly `from infrastructure.services.providers import get_settings`. Tests should:
 - **NOT** load `.env` files directly
 - Access configuration via `settings` object retrieved from `get_settings()`
 - Use pytest.ini `env` section for test-specific overrides
@@ -782,6 +782,8 @@ def test_endpoint_with_settings_override(app):
 ```
 
 **Important:** Always clear `app.dependency_overrides` in cleanup to prevent test pollution.
+
+Note: Importing `get_settings` from `infrastructure.services` also works; both references point to the same provider function.
 
 ### Level 2: Module Fixtures
 
@@ -1498,4 +1500,4 @@ pytest --lf
 
 ---
 
-*Last updated: December 2024 - Aligned with pytest 9.x best practices*
+*Last updated: January 2026 - Aligned with pytest 9.x best practices*
