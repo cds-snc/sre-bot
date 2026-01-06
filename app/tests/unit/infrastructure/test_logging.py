@@ -12,9 +12,9 @@ import pytest
 import logging
 import sys
 from unittest.mock import patch
-from infrastructure.observability.logging import (
+import structlog
+from infrastructure.logging.setup import (
     configure_logging,
-    get_module_logger,
     _is_test_environment,
 )
 
@@ -86,14 +86,14 @@ class TestGetModuleLoggerBackwardCompat:
 
     def test_get_module_logger_backward_compatibility(self):
         """get_module_logger() provides backward compatibility."""
-        logger = get_module_logger()
+        logger = structlog.get_logger()
         # Should return a logger instance
         assert logger is not None
 
     def test_get_module_logger_with_none_frame(self):
         """get_module_logger handles None frame gracefully."""
         with patch("inspect.currentframe", return_value=None):
-            logger = get_module_logger()
+            logger = structlog.get_logger()
             assert logger is not None
 
 
