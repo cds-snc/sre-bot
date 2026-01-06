@@ -143,24 +143,41 @@ All environment variable loading is centralized in `infrastructure.configuration
 - Use pytest.ini `env` section for test-specific overrides
 - Mock settings via fixtures when isolation is needed
 
-### ⚠️ Anti-Pattern: Module-Level Settings Import
+### ⚠️ Anti-Pattern: Settings Import From Configuration
 
-**NEVER import settings at module level:**
+**Module-level `settings = get_settings()` is CORRECT in production code** per our architecture standards:
 
 ```python
-# ❌ BAD - Causes import-time side effects
-from infrastructure.configuration import settings
+# ✅ CORRECT - Standard pattern for infrastructure/module code
+from infrastructure.services import get_settings
+
+logger = structlog.get_logger()
+settings = get_settings()  # Cached singleton via @lru_cache
 
 def some_function():
     return settings.aws.AWS_REGION
 ```
 
-**Why this is problematic:**
-- Loads `.env` files at import time before tests can configure environment
-- Cannot be mocked or overridden in tests (due to Python's import caching)
-- Creates circular dependency issues
-- Violates the principle of explicit dependencies
-- Breaks test isolation
+**Why module-level `get_settings()` is correct:**
+- `@lru_cache` ensures ONE Settings instance per process (singleton pattern)
+- Each ECS task gets its own cached singleton (supports horizontal scaling)
+- Consistent with infrastructure layer requirements
+
+**However, NEVER bypass the singleton by importing `settings` directly:**
+
+```python
+# ❌ BAD - Creates SECOND Settings instance, breaks singleton!
+from infrastructure.configuration import settings  
+
+def some_function():
+    return settings.aws.AWS_REGION
+```
+
+**Why `from infrastructure.configuration import settings` is problematic:**
+- Creates a separate Settings() instance at module import time
+- Breaks the singleton pattern - now have TWO instances in the process
+- Violates architectural requirement to use `get_settings()` from services
+- Cannot be properly mocked without complex import manipulation
 
 **✅ CORRECT patterns:**
 
@@ -172,33 +189,43 @@ from infrastructure.services import SettingsDep
 def get_config(settings: SettingsDep):
     return {"region": settings.aws.AWS_REGION}
 
-# 2. For infrastructure code: Import get_settings from providers
-from infrastructure.services.providers import get_settings
-
-def setup_client():
-    settings = get_settings()
-    return Client(region=settings.aws.AWS_REGION)
-
-# 3. For application code/tasks: Pass settings as parameter
+# 2. For infrastructure/module code: Module-level get_settings() call
 from infrastructure.services import get_settings
 
-def background_task():
-    settings = get_settings()
-    process_data(settings)
+logger = structlog.get_logger()
+settings = get_settings()  # Standard pattern
+
+def setup_client():
+    return Client(region=settings.aws.AWS_REGION)
+
+# 3. For functions with explicit dependencies: Accept as parameter
+from infrastructure.configuration import Settings  # Type hint only
+
+def setup_client(config: Settings):
+    return Client(region=config.aws.AWS_REGION)
 ```
 
-**In tests**, always mock via the centralized `get_settings()` function:
+**In tests**, handle `@lru_cache` by clearing cache and patching both function and variable:
 
 ```python
-from unittest.mock import MagicMock
+from infrastructure.services.providers import get_settings
 
 def test_something(monkeypatch):
+    # Clear @lru_cache to allow our mock
+    get_settings.cache_clear()
+    
     mock_settings = MagicMock()
     mock_settings.aws.AWS_REGION = "us-west-2"
     
+    # Patch the function
     monkeypatch.setattr(
-        "infrastructure.services.providers.get_settings",
+        "your.module.get_settings",
         lambda: mock_settings
+    )
+    # Patch the module-level variable
+    monkeypatch.setattr(
+        "your.module.settings",
+        mock_settings
     )
 ```
 
