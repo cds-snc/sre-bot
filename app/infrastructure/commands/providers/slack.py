@@ -5,15 +5,17 @@ from typing import Any, Callable, Dict, Optional
 from slack_sdk import WebClient
 
 import structlog
-from core.config import settings
+
 from infrastructure.commands.providers.base import CommandProvider
 from infrastructure.commands.context import CommandContext, ResponseChannel
 from infrastructure.commands.providers import register_command_provider
 from infrastructure.commands.responses.slack_formatter import SlackResponseFormatter
 from infrastructure.i18n.models import TranslationKey, Locale
+from infrastructure.services.providers import get_settings
 from integrations.slack.users import get_user_email_from_id, get_user_email_from_handle
 
 logger = structlog.get_logger()
+settings = get_settings()
 
 
 class SlackResponseChannel(ResponseChannel):

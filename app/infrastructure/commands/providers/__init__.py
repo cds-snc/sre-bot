@@ -10,10 +10,11 @@ from typing import Dict
 import importlib
 import pkgutil
 import structlog
-from core.config import settings
 from infrastructure.commands.providers.base import CommandProvider
+from infrastructure.services.providers import get_settings
 
 logger = structlog.get_logger()
+settings = get_settings()
 # Registry of discovered command providers (populated by provider modules)
 _discovered: Dict[str, type] = {}
 

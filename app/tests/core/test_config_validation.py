@@ -1,6 +1,6 @@
 import pytest
 
-from core.config import GroupsFeatureSettings
+from infrastructure.configuration.features import GroupsFeatureSettings
 
 
 def test_groups_feature_settings_multiple_primary_raises():
