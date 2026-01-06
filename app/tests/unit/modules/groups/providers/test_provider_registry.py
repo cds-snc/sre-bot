@@ -173,7 +173,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "modules.groups.providers.get_settings",
             mock_settings,
             raising=False,
         )
@@ -210,7 +210,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -257,7 +257,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {"bad": {"enabled": True}}
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -284,7 +284,7 @@ class TestProviderActivation:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = {}
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -322,7 +322,7 @@ class TestProviderActivation:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -364,7 +364,7 @@ class TestProviderActivation:
             "azure": {"enabled": True, "prefix": "azure"},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -406,7 +406,7 @@ class TestProviderActivation:
             "aws": {"enabled": False},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -443,7 +443,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -488,7 +488,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -526,7 +526,7 @@ class TestProviderAccessors:
             "aws": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -582,7 +582,7 @@ class TestProviderAccessors:
             "azure": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -624,7 +624,7 @@ class TestProviderAccessors:
             "aws": {"enabled": True},
         }
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
@@ -661,7 +661,7 @@ class TestProviderAccessors:
         mock_settings = mock_settings_groups
         mock_settings.groups.providers = single_primary_config
         monkeypatch.setattr(
-            "infrastructure.configuration.settings",
+            "infrastructure.services",
             mock_settings,
             raising=False,
         )
