@@ -22,8 +22,12 @@ from typing import Dict, Optional, Type
 import structlog
 from modules.groups.providers.base import GroupProvider, PrimaryGroupProvider
 from modules.groups.providers import registry_utils
+from infrastructure.services import get_settings
+
 
 logger = structlog.get_logger()
+settings = get_settings()
+
 
 # Separate registries for different provider roles
 _primary_discovered: Dict[str, Type[PrimaryGroupProvider]] = {}
@@ -187,10 +191,6 @@ def activate_providers() -> str:
         RuntimeError: If activation fails (no primary, validation errors)
         ValueError: If configuration is invalid
     """
-    # pylint: disable=import-outside-toplevel
-    from infrastructure.services import get_settings
-
-    settings = get_settings()
 
     try:
         provider_configs = settings.groups.providers or {}
