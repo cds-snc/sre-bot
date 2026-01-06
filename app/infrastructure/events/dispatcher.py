@@ -10,10 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from typing import Any, Callable, Dict, List, Optional
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.events.models import Event
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Event handler registry: event_type -> list of handlers
 EVENT_HANDLERS: Dict[str, List[Callable]] = {}

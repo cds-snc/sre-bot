@@ -14,11 +14,11 @@ Table schema:
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.audit.models import AuditEvent
 from integrations.aws import dynamodb_next
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 TABLE_NAME = "sre_bot_audit_trail"
 

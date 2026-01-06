@@ -6,7 +6,7 @@ from infrastructure.configuration instead.
 
 Migration:
     from core.config import settings  # OLD
-    from infrastructure.configuration import settings  # NEW
+    from infrastructure.services import get_settings()  # NEW
 """
 
 from typing import Any, Dict, Optional

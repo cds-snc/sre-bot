@@ -3,9 +3,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol
 
-from infrastructure.observability import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @dataclass

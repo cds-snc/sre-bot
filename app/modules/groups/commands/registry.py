@@ -10,6 +10,7 @@ This separation provides:
 """
 
 from typing import Dict, Any
+import structlog
 from infrastructure.commands import (
     CommandRegistry,
     Argument,
@@ -17,9 +18,9 @@ from infrastructure.commands import (
 )
 from modules.groups.api import schemas
 from modules.groups.commands import handlers
-from infrastructure.observability import get_module_logger
 
-logger = get_module_logger()
+
+logger = structlog.get_logger()
 
 # Create registry for groups commands
 registry = CommandRegistry(namespace="groups")

@@ -4,7 +4,8 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.configuration import settings, RetrySettings
+from infrastructure.services.providers import get_settings
+from infrastructure.configuration import RetrySettings
 from infrastructure.configuration.base import (
     IntegrationSettings,
     FeatureSettings,
@@ -41,6 +42,7 @@ class TestSettingsStructure:
 
     def test_settings_loads_all_integration_sections(self):
         """Verify all integration settings sections load correctly."""
+        settings = get_settings()
         # Integration settings
         assert hasattr(settings, "slack")
         assert hasattr(settings, "aws")
@@ -54,6 +56,7 @@ class TestSettingsStructure:
 
     def test_settings_loads_all_feature_sections(self):
         """Verify all feature settings sections load correctly."""
+        settings = get_settings()
         # Feature settings
         assert hasattr(settings, "groups")
         assert hasattr(settings, "commands")
@@ -64,6 +67,7 @@ class TestSettingsStructure:
 
     def test_settings_loads_all_infrastructure_sections(self):
         """Verify all infrastructure settings sections load correctly."""
+        settings = get_settings()
         # Infrastructure settings
         assert hasattr(settings, "retry")
         assert hasattr(settings, "idempotency")
@@ -72,7 +76,7 @@ class TestSettingsStructure:
 
     def test_settings_preserves_field_access(self):
         """Verify settings values are accessible at same paths as before."""
-        # Integration fields
+        settings = get_settings()
         assert hasattr(settings.slack, "SLACK_TOKEN")
         assert hasattr(settings.aws, "AWS_REGION")
         assert hasattr(settings.google_workspace, "GOOGLE_DELEGATED_ADMIN_EMAIL")
@@ -98,6 +102,7 @@ class TestSettingsStructure:
 
     def test_settings_is_production_property(self):
         """Verify is_production property works correctly."""
+        settings = get_settings()
         # Production is when PREFIX is empty
         assert hasattr(settings, "is_production")
         assert isinstance(settings.is_production, bool)
@@ -111,10 +116,10 @@ class TestSettingsStructure:
 
     def test_settings_singleton_still_works(self):
         """Verify settings singleton behavior is preserved."""
-        # Settings should be a single instance
-        from infrastructure.configuration import settings as settings2
-
-        assert settings is settings2
+        # Settings should be a single instance from get_settings
+        settings1 = get_settings()
+        settings2 = get_settings()
+        assert settings1 is settings2
 
     def test_all_integration_settings_classes_instantiable(self):
         """Verify all integration settings classes can be instantiated."""

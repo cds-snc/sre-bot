@@ -35,7 +35,7 @@ Usage Example:
 
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
-from core.logging import get_module_logger
+import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
 from infrastructure.notifications.models import (
     Notification,
@@ -44,7 +44,7 @@ from infrastructure.notifications.models import (
 )
 from infrastructure.idempotency.cache import IdempotencyCache
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class NotificationDispatcher:

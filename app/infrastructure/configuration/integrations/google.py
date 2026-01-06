@@ -22,7 +22,9 @@ class GoogleWorkspaceSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         admin_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
         customer_id = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
@@ -83,7 +85,9 @@ class GoogleResourcesConfig(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         incident_drive = settings.google_resources.incident_drive_id
         incident_folder = settings.google_resources.incident_folder_id

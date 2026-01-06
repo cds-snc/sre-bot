@@ -61,7 +61,9 @@ class GroupsFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         if settings.groups.circuit_breaker_enabled:
             threshold = settings.groups.circuit_breaker_failure_threshold

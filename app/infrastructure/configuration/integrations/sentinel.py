@@ -15,7 +15,9 @@ class SentinelSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         customer_id = settings.sentinel.SENTINEL_CUSTOMER_ID
         log_type = settings.sentinel.SENTINEL_LOG_TYPE

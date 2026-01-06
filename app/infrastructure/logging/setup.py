@@ -24,7 +24,9 @@ import sys
 import structlog
 from structlog.stdlib import BoundLogger
 from typing import Optional
-from infrastructure.configuration import settings
+from infrastructure.services.providers import get_settings
+
+settings = get_settings()
 
 
 def _is_test_environment() -> bool:

@@ -20,7 +20,9 @@ class ServerSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         backend_url = settings.server.BACKEND_URL
         client_id = settings.server.GOOGLE_CLIENT_ID
@@ -57,7 +59,9 @@ class DevSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         dev_channel = settings.dev.SLACK_DEV_MSG_CHANNEL
         ```

@@ -6,13 +6,13 @@ and DynamoDB for operational queries.
 
 from typing import Optional, Dict, Any
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.audit.models import create_audit_event
 from infrastructure.events.models import Event
 from infrastructure.persistence import dynamodb_audit
 from integrations.sentinel import client as sentinel_client
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def _extract_resource_info(

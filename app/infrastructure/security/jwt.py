@@ -12,7 +12,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWTError, decode
 
 from infrastructure.security.jwks import JWKSManager
-from infrastructure.services.providers import get_jwks_manager
 
 logger = structlog.get_logger()
 security = HTTPBearer()
@@ -67,14 +66,14 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
 
 
 def validate_jwt_token(
+    jwks_manager: JWKSManager,
     credentials: HTTPAuthorizationCredentials = Security(security),
-    jwks_manager: Optional[JWKSManager] = None,
 ) -> Dict[str, Any]:
     """Validate JWT token and extract payload.
 
     Args:
         credentials: HTTP authorization credentials containing JWT token
-        jwks_manager: Optional JWKS manager (uses default if None)
+        jwks_manager: JWKS manager instance
 
     Returns:
         The decoded and verified JWT payload
@@ -83,7 +82,7 @@ def validate_jwt_token(
         HTTPException: 401 if token is invalid, untrusted, or missing
     """
     if not jwks_manager:
-        jwks_manager = get_jwks_manager()
+        raise HTTPException(status_code=500, detail="JWKS manager not configured")
 
     # Validate credentials structure
     if (

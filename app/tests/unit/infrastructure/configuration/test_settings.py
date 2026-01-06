@@ -9,6 +9,7 @@ Tests cover:
 import pytest
 
 from infrastructure.configuration.settings import RetrySettings, Settings
+from infrastructure.services.providers import get_settings
 
 
 class TestRetrySettings:
@@ -127,9 +128,12 @@ class TestSettingsIntegration:
         assert retry.max_attempts == 10
 
     def test_settings_singleton_behavior(self):
-        """Test settings module exports singleton instance."""
-        from infrastructure.configuration import settings
+        """Test settings from get_settings returns singleton instance."""
 
-        assert settings is not None
-        assert isinstance(settings, Settings)
-        assert hasattr(settings, "retry")
+        settings1 = get_settings()
+        settings2 = get_settings()
+
+        assert settings1 is not None
+        assert isinstance(settings1, Settings)
+        assert isinstance(settings2, Settings)
+        assert settings1 is settings2  # Same instance (singleton)

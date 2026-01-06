@@ -13,7 +13,9 @@ class IdempotencySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import settings
+        from infrastructure.services import get_settings
+
+        settings = get_settings()
 
         ttl = settings.idempotency.IDEMPOTENCY_TTL_SECONDS
         # Configure idempotency cache with TTL...

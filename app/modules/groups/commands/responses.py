@@ -5,10 +5,10 @@ duplication and ensure consistent presentation to users.
 """
 
 from typing import Any, Dict, Optional, List
-from infrastructure.observability import get_module_logger
+import structlog
 from infrastructure.commands import CommandContext
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def format_action_response(

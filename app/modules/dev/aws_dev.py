@@ -17,12 +17,12 @@ import structlog
 from infrastructure.commands.router import CommandRouter
 from infrastructure.commands.providers.slack import SlackCommandProvider
 from infrastructure.commands.registry import CommandRegistry
-from infrastructure.services.providers import get_aws_clients
 from infrastructure.commands.responses.models import (
     Card,
     ErrorMessage,
     SuccessMessage,
 )
+from infrastructure.services import get_aws_clients
 
 logger = structlog.get_logger()
 

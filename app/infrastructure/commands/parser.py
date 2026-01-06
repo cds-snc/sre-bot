@@ -3,14 +3,14 @@
 from typing import Any, Dict, List, Tuple
 import re
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.commands.models import (
     Command,
     ArgumentType,
     ParsedCommand,
 )
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class CommandParseError(Exception):

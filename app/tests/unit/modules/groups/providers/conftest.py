@@ -13,6 +13,7 @@ from modules.groups.providers.contracts import (
     OperationStatus,
     ProviderCapabilities,
 )
+from infrastructure.services.providers import get_settings
 
 
 @pytest.fixture
@@ -198,12 +199,41 @@ def mock_settings_groups_disabled_cb():
 def patch_provider_base_settings(
     monkeypatch, mock_settings_groups
 ):  # pylint: disable=redefined-outer-name
-    """Patch settings import in provider base module.
+    """Patch settings import in provider base module and get_settings function.
 
-    Simplifies provider instantiation in tests by avoiding circuit breaker setup.
+    Simplifies provider instantiation in tests by avoiding circuit breaker setup
+    and properly mocking the centralized get_settings provider.
+
+    Handles @lru_cache by clearing the cache before patching to ensure tests
+    get the mocked settings even though production code uses module-level
+    settings = get_settings() pattern.
     """
+    # Clear the @lru_cache to allow our mock to take effect
+    get_settings.cache_clear()
+
+    # Clear provider registries to prevent test pollution
+    import modules.groups.providers as providers
+
+    providers._primary_discovered.clear()
+    providers._secondary_discovered.clear()
+    providers._primary_active = None
+    providers._secondary_active.clear()
+
     monkeypatch.setattr(
         "modules.groups.providers.base.settings",
+        mock_settings_groups,
+        raising=False,
+    )
+    # Patch get_settings() in the modules.groups.providers namespace
+    monkeypatch.setattr(
+        "modules.groups.providers.get_settings",
+        lambda: mock_settings_groups,
+        raising=False,
+    )
+
+    # Also patch the module-level settings variable that was set at import time
+    monkeypatch.setattr(
+        "modules.groups.providers.settings",
         mock_settings_groups,
         raising=False,
     )

@@ -7,13 +7,13 @@ AWS DynamoDB for shared state across multiple application instances.
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 import time
+import structlog
 
-from infrastructure.observability import get_module_logger
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.models import RetryRecord
 from integrations.aws import dynamodb_next
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class DynamoDBRetryStore:

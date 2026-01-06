@@ -10,7 +10,9 @@ Exports:
 
 Example:
     ```python
-    from infrastructure.configuration import settings
+    from infrastructure.services import get_settings
+
+    settings = get_settings()
 
     # Access settings
     slack_token = settings.slack.SLACK_TOKEN
@@ -23,7 +25,7 @@ Example:
     ```
 """
 
-from infrastructure.configuration.settings import settings, Settings
+from infrastructure.configuration.settings import Settings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 
-__all__ = ["settings", "Settings", "RetrySettings"]
+__all__ = ["Settings", "RetrySettings"]

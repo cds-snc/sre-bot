@@ -3,10 +3,10 @@
 Writes events to structured logs.
 """
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.events.models import Event
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class LoggingHandler:

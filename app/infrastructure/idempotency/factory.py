@@ -1,10 +1,10 @@
 """Idempotency cache factory."""
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Singleton cache instance
 _cache_instance: IdempotencyCache = None

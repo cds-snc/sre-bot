@@ -4,12 +4,12 @@ This module implements batch processing of failed propagations with retry logic,
 exponential backoff, and dead letter queue handling.
 """
 
-from infrastructure.observability import get_module_logger
+import structlog
 from modules.groups.reconciliation import integration as ri
 from modules.groups.domain.models import NormalizedMember
 from modules.groups.providers import get_provider
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Worker ID for claiming records
 _worker_id = "reconciliation-worker-1"

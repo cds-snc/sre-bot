@@ -12,11 +12,12 @@ Separation of concerns:
 import dataclasses
 from typing import Dict, Any
 
-from infrastructure.configuration import settings
-from infrastructure.observability import get_module_logger
+import structlog
+from infrastructure.services import get_settings
 from modules.groups.providers.contracts import ProviderCapabilities
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+settings = get_settings()
 
 
 def load_capabilities(provider_name: str) -> ProviderCapabilities:

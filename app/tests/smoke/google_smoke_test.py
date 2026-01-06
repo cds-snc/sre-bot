@@ -42,15 +42,17 @@ if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
     )
 
 
-from core.config import settings  # noqa: E402
 from integrations.google_workspace import google_directory_next as gdn  # noqa: E402
 from integrations.google_workspace.schemas import User  # noqa: E402
 from infrastructure.operations import OperationResult, OperationStatus  # noqa: E402
+from infrastructure.services.providers import get_settings  # noqa: E402
 from tests.factories.google import (
     make_google_groups,
     make_google_members,
     make_google_users,
 )  # noqa: E402
+
+settings = get_settings()
 
 
 def _validate_integration_response(resp, expected_model=None):

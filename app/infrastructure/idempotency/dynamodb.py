@@ -4,12 +4,13 @@ import json
 import time
 from typing import Any, Dict, Optional
 
-from core.config import settings
-from core.logging import get_module_logger
+import structlog
 from infrastructure.idempotency.cache import IdempotencyCache
+from infrastructure.services.providers import get_settings
 from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+settings = get_settings()
 
 # DynamoDB table configuration
 IDEMPOTENCY_TABLE = "sre_bot_idempotency"

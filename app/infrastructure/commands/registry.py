@@ -15,15 +15,16 @@ from typing import (
 from uuid import uuid4
 from enum import Enum
 
+import structlog
+
 from pydantic import BaseModel, ValidationError, EmailStr
-from core.logging import get_module_logger
 from infrastructure.commands.models import Command, Argument, ArgumentType
 
 
 if TYPE_CHECKING:
     from infrastructure.commands import CommandContext
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 class CommandRegistry:
