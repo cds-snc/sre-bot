@@ -5,7 +5,7 @@ Only available in development environment (PREFIX=dev-).
 """
 
 import structlog
-from infrastructure.services.providers import get_settings
+from infrastructure.services import get_settings
 from infrastructure.commands.router import CommandRouter
 from infrastructure.commands.providers.slack import SlackCommandProvider
 from modules.dev import google, slack, incident
