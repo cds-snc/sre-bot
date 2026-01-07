@@ -535,3 +535,52 @@ def command_registry_factory():
         return CommandRegistry(namespace=namespace)
 
     return _factory
+
+
+# --- Settings Mock Factory (Level 1 - for all tests) ---
+
+
+@pytest.fixture
+def make_mock_settings():
+    """Factory for creating mock settings with package-specific overrides.
+
+    This factory eliminates duplication of mock settings across different
+    test packages. Each package can override specific settings without
+    recreating the entire mock.
+
+    Usage:
+        def mock_settings(make_mock_settings):
+            return make_mock_settings(
+                **{
+                    'slack.SLACK_TOKEN': 'xoxb-test-token',
+                    'commands.providers': {},
+                }
+            )
+
+    Returns:
+        Callable: Factory function that accepts **overrides kwargs
+    """
+    from unittest.mock import MagicMock
+
+    def _factory(**overrides):
+        """Create mock settings with provided overrides."""
+        settings = MagicMock()
+
+        # Set common defaults for all packages
+        settings.aws.AWS_REGION = "us-east-1"
+
+        # Apply package-specific overrides
+        for key, value in overrides.items():
+            if "." in key:
+                # Handle nested attributes: 'slack.SLACK_TOKEN' -> settings.slack.SLACK_TOKEN
+                parts = key.split(".")
+                obj = settings
+                for part in parts[:-1]:
+                    obj = getattr(obj, part)
+                setattr(obj, parts[-1], value)
+            else:
+                setattr(settings, key, value)
+
+        return settings
+
+    return _factory
