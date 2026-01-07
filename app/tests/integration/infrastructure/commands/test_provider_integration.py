@@ -1,7 +1,5 @@
 """Integration tests for command provider system."""
 
-from unittest.mock import MagicMock
-
 import pytest
 from infrastructure.commands import CommandRegistry
 from infrastructure.commands.providers import (
@@ -18,8 +16,9 @@ from infrastructure.commands.providers.base import CommandProvider
 class MockCommandProvider(CommandProvider):
     """Mock adapter for integration testing."""
 
-    def __init__(self, config):
+    def __init__(self, settings, config):
         super().__init__(registry=None)
+        self.settings = settings
         self.config = config
 
     def extract_command_text(self, payload):
@@ -60,22 +59,18 @@ def cleanup():
 class TestCommandProviderIntegration:
     """Integration tests for command provider activation."""
 
-    def test_full_provider_lifecycle(self, monkeypatch):
+    def test_full_provider_lifecycle(self, mock_settings):
         """Test full lifecycle: register → load → get → use."""
 
         @register_command_provider("test")
         class TestAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers (discover + activate)
-        providers = load_providers()
+        providers = load_providers(mock_settings)
 
         assert len(providers) == 1
         assert "test" in providers
@@ -87,7 +82,7 @@ class TestCommandProviderIntegration:
         # Use provider
         assert provider.config == {"enabled": True}
 
-    def test_load_providers_with_multiple_providers(self, monkeypatch):
+    def test_load_providers_with_multiple_providers(self, mock_settings):
         """Test loading multiple registered providers."""
 
         @register_command_provider("test1")
@@ -98,24 +93,20 @@ class TestCommandProviderIntegration:
         class TestAdapter2(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {
             "test1": {"enabled": True},
             "test2": {"enabled": True},
         }
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        providers = load_providers()
+        providers = load_providers(mock_settings)
 
         assert len(providers) == 2
         assert get_provider("test1")
         assert get_provider("test2")
 
-    def test_load_providers_mixed_enabled_disabled(self, monkeypatch):
+    def test_load_providers_mixed_enabled_disabled(self, mock_settings):
         """Test loading with mix of enabled/disabled providers."""
 
         @register_command_provider("enabled")
@@ -126,100 +117,80 @@ class TestCommandProviderIntegration:
         class DisabledAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {
             "enabled": {"enabled": True},
             "disabled": {"enabled": False},
         }
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        providers = load_providers()
+        providers = load_providers(mock_settings)
 
         # Only enabled provider should be active
         assert len(providers) == 1
         assert "enabled" in providers
         assert "disabled" not in providers
 
-    def test_load_providers_api_only_mode(self, monkeypatch):
+    def test_load_providers_api_only_mode(self, mock_settings):
         """Test load_providers in API-only mode."""
-        # Mock settings with no providers
-        mock_settings = MagicMock()
+        # Configure settings with no providers
         mock_settings.commands.providers = {}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        providers = load_providers()
+        providers = load_providers(mock_settings)
 
         assert providers == {}
         assert len(get_active_providers()) == 0
 
-    def test_provider_config_passed_correctly(self, monkeypatch):
+    def test_provider_config_passed_correctly(self, mock_settings):
         """Test that provider config is passed during instantiation."""
 
         captured_config = {}
 
         @register_command_provider("test")
         class ConfigCapturingAdapter(MockCommandProvider):
-            def __init__(self, config):
+            def __init__(self, settings, config):
                 captured_config.update(config)
-                super().__init__(config)
+                super().__init__(settings, config)
 
         test_config = {"enabled": True, "custom_field": "custom_value"}
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"test": test_config}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        load_providers()
+        load_providers(mock_settings)
 
         # Verify config was passed correctly
         assert captured_config == test_config
 
-    def test_provider_error_handling(self, monkeypatch):
+    def test_provider_error_handling(self, mock_settings):
         """Test that provider instantiation errors are handled."""
 
         @register_command_provider("failing")
         class FailingAdapter(MockCommandProvider):
-            def __init__(self, config):
+            def __init__(self, settings, config):
                 raise RuntimeError("Provider initialization failed")
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"failing": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers should raise
         with pytest.raises(RuntimeError, match="Provider initialization failed"):
-            load_providers()
+            load_providers(mock_settings)
 
-    def test_concurrent_provider_access(self, monkeypatch):
+    def test_concurrent_provider_access(self, mock_settings):
         """Test accessing providers from different parts of code."""
 
         @register_command_provider("test")
         class TestAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        load_providers()
+        load_providers(mock_settings)
 
         # Access from multiple "locations"
         prov1 = get_provider("test")
@@ -228,28 +199,24 @@ class TestCommandProviderIntegration:
         # Should be same instance
         assert prov1 is prov2
 
-    def test_provider_activation_idempotent(self, monkeypatch):
+    def test_provider_activation_idempotent(self, mock_settings):
         """Test that loading providers multiple times is safe."""
 
         @register_command_provider("test")
         class TestAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load once
-        load_providers()
+        load_providers(mock_settings)
         prov1 = get_provider("test")
 
         # Reset and load again
         reset_registry()
 
-        load_providers()
+        load_providers(mock_settings)
         prov2 = get_provider("test")
 
         # Both should work
@@ -260,22 +227,18 @@ class TestCommandProviderIntegration:
 class TestModuleIntegration:
     """Tests for module integration with provider system."""
 
-    def test_module_attaches_registry_to_provider(self, monkeypatch):
+    def test_module_attaches_registry_to_provider(self, mock_settings):
         """Test module can attach its registry to provider."""
 
         @register_command_provider("test")
         class TestAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"test": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        load_providers()
+        load_providers(mock_settings)
 
         # Module gets provider and attaches registry
         provider = get_provider("test")
@@ -284,22 +247,18 @@ class TestModuleIntegration:
 
         assert provider.registry == test_registry
 
-    def test_different_modules_can_use_same_provider(self, monkeypatch):
+    def test_different_modules_can_use_same_provider(self, mock_settings):
         """Test multiple modules can use same provider (with different registries)."""
 
         @register_command_provider("slack")
         class SlackAdapter(MockCommandProvider):
             pass
 
-        # Mock settings
-        mock_settings = MagicMock()
+        # Configure settings
         mock_settings.commands.providers = {"slack": {"enabled": True}}
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.settings", mock_settings, raising=False
-        )
 
         # Load providers
-        load_providers()
+        load_providers(mock_settings)
 
         # Module 1 gets provider
         provider1 = get_provider("slack")
