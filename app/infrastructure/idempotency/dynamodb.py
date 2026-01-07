@@ -6,11 +6,11 @@ from typing import Any, Dict, Optional
 
 import structlog
 from infrastructure.idempotency.cache import IdempotencyCache
-from infrastructure.services.providers import get_settings
+from infrastructure.configuration import Settings
 from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
 
 logger = structlog.get_logger()
-settings = get_settings()
+settings = Settings()
 
 # DynamoDB table configuration
 IDEMPOTENCY_TABLE = "sre_bot_idempotency"
@@ -27,10 +27,11 @@ class DynamoDBCache(IdempotencyCache):
     Suitable for multi-instance deployments where cache must be shared across all ECS tasks.
     """
 
-    def __init__(self, table_name: str = IDEMPOTENCY_TABLE):
+    def __init__(self, settings: Settings, table_name: str = IDEMPOTENCY_TABLE):
         """Initialize DynamoDB cache.
 
         Args:
+            settings: Settings instance (required for dependency injection).
             table_name: DynamoDB table name (default: sre_bot_idempotency).
         """
         self.table_name = table_name
@@ -92,7 +93,9 @@ class DynamoDBCache(IdempotencyCache):
             )
             return None
 
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int = None) -> None:
+    def set(
+        self, key: str, response: Dict[str, Any], ttl_seconds: Optional[int] = None
+    ) -> None:
         """Cache a response for the given idempotency key.
 
         Args:
