@@ -29,14 +29,12 @@ class TestGroupsCommandIntegration:
 
         locale_resolver = LocaleResolver(default_locale=Locale.EN_US)
 
-        # Mock settings.slack.SLACK_TOKEN for the entire test
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
+        # Create mock settings
+        mock_settings = MagicMock()
+        mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
 
-        # Create adapter (SLACK_TOKEN is now available in settings)
-        adapter = SlackCommandProvider(config={"enabled": True})
+        # Create adapter with settings
+        adapter = SlackCommandProvider(settings=mock_settings, config={"enabled": True})
 
         # Patch slack_users functions for the entire test session
         # Use MagicMock instead of lambdas for more reliable mocking
@@ -98,11 +96,6 @@ class TestGroupsCommandIntegration:
 
     def test_list_command_end_to_end(self, adapter, slack_payload, monkeypatch):
         """Test complete flow from Slack payload to response."""
-        # Ensure settings are mocked for this test
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "list"
 
         mock_service = MagicMock()
@@ -124,10 +117,6 @@ class TestGroupsCommandIntegration:
 
     def test_list_empty_response(self, adapter, slack_payload, monkeypatch):
         """Test list command when no groups exist."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "list"
 
         mock_service = MagicMock()
@@ -145,10 +134,6 @@ class TestGroupsCommandIntegration:
 
     def test_add_command_end_to_end(self, adapter, slack_payload, monkeypatch):
         """Test add command flow."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"][
             "text"
         ] = 'add user@example.com group-1 google "Test reason"'
@@ -172,10 +157,6 @@ class TestGroupsCommandIntegration:
 
     def test_remove_command_end_to_end(self, adapter, slack_payload, monkeypatch):
         """Test remove command flow."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"][
             "text"
         ] = 'remove user@example.com group-1 aws "Removing user from team"'
@@ -198,10 +179,6 @@ class TestGroupsCommandIntegration:
 
     def test_unknown_command_error(self, adapter, slack_payload, monkeypatch):
         """Test error handling for unknown command."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "unknown_command"
 
         adapter.handle(slack_payload)
@@ -212,10 +189,6 @@ class TestGroupsCommandIntegration:
 
     def test_list_with_managed_flag(self, adapter, slack_payload, monkeypatch):
         """Test list command with --managed flag."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "list --managed"
 
         mock_service = MagicMock()
@@ -233,10 +206,6 @@ class TestGroupsCommandIntegration:
 
     def test_locale_detection(self, adapter, slack_payload, monkeypatch):
         """Test that locale is detected and used in context."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "help"
 
         adapter.handle(slack_payload)
@@ -247,10 +216,6 @@ class TestGroupsCommandIntegration:
 
     def test_list_with_role_filter(self, adapter, slack_payload, monkeypatch):
         """Test list command with --role filter."""
-        monkeypatch.setattr(
-            "infrastructure.commands.providers.slack.settings.slack.SLACK_TOKEN",
-            "xoxb-test-token",
-        )
         slack_payload["command"]["text"] = "list --role=MANAGER,OWNER"
 
         mock_service = MagicMock()
