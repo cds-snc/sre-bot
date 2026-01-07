@@ -1,23 +1,21 @@
 """Fixtures for command provider tests."""
 
 import pytest
-from unittest.mock import MagicMock
 
 
-@pytest.fixture(autouse=True, scope="function")
-def mock_slack_settings(monkeypatch):
-    """Mock Slack settings for all tests in this directory.
+@pytest.fixture
+def mock_settings(make_mock_settings):
+    """Create mock settings for command provider tests.
 
-    This ensures SlackCommandProvider can be instantiated in tests
-    without requiring actual Slack configuration.
+    This fixture is shared across all command provider tests
+    and provides a MagicMock settings object with Slack-specific
+    pre-configuration.
+
+    Uses the factory from root conftest to avoid duplication.
     """
-    mock_settings = MagicMock()
-    mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-
-    # Patch both where settings is used and where it's defined
-    monkeypatch.setattr("core.config.settings", mock_settings)
-    monkeypatch.setattr(
-        "infrastructure.commands.providers.slack.settings", mock_settings
+    return make_mock_settings(
+        **{
+            "slack.SLACK_TOKEN": "xoxb-test-token",
+            "commands.providers": {},
+        }
     )
-
-    return mock_settings
