@@ -27,6 +27,9 @@ from typing import Dict, List, Any
 
 import structlog
 
+from infrastructure.events.dispatcher import get_registered_events
+
+
 logger = structlog.get_logger()
 
 # Track discovered modules to avoid re-discovery
@@ -57,7 +60,6 @@ def discover_and_register_handlers(
             "errors": Dict[str, str],
         }
     """
-    from infrastructure.events.dispatcher import get_registered_events
 
     # Get absolute path to scan
     base_dir = Path(base_path)
