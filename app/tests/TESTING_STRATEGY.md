@@ -486,6 +486,53 @@ def user_data():
 
 ### Fixture Patterns
 
+#### ⚠️ Anti-Pattern: Inline Mock Creation
+
+**❌ DO NOT create mock objects inline in test methods:**
+
+```python
+# BAD - Creates mock in every test method
+def test_something(retry_config_factory):
+    """Anti-pattern: SimpleNamespace created inline."""
+    mock_settings = SimpleNamespace(retry=SimpleNamespace(backend="memory"))
+    store = create_retry_store(retry_config_factory(), mock_settings)
+    assert isinstance(store, InMemoryRetryStore)
+```
+
+**Why this is problematic:**
+- Code duplication across multiple tests
+- Harder to maintain when settings structure changes
+- Test logic mixed with test data setup
+- Inconsistent with other test modules
+
+**✅ DO define fixtures in conftest.py:**
+
+```python
+# conftest.py
+@pytest.fixture
+def mock_settings():
+    """Create mock settings for tests."""
+    settings = MagicMock()
+    settings.retry.backend = "memory"
+    settings.retry.batch_size = 10
+    return settings
+
+# In test file
+def test_something(retry_config_factory, mock_settings):
+    """Cleaner: fixture from conftest."""
+    store = create_retry_store(retry_config_factory(), mock_settings)
+    assert isinstance(store, InMemoryRetryStore)
+```
+
+**Benefits:**
+- DRY principle - single source of truth
+- Consistent across all tests in module/package
+- Uses `MagicMock` for flexibility and IDE support
+- Easier to update when mocking strategy changes
+- Clear separation of concerns (data setup vs test logic)
+
+**Guideline:** Any mock object used by multiple tests should be defined as a fixture in `conftest.py`, not created inline.
+
 #### 1. Yield Fixtures (Recommended for Teardown)
 
 Per [pytest docs](https://docs.pytest.org/en/stable/how-to/fixtures.html#yield-fixtures-recommended):
@@ -593,24 +640,112 @@ def aws_user_factory():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SETTINGS FACTORY (Level 1 - DRY principle)
+# ─────────────────────────────────────────────────────────────────────────────
+# NOTE: Settings use factory-as-fixture pattern to follow DRY principle
+# and avoid duplication across test packages. See Fixture Architecture
+# section for details on hierarchical fixture design.
+
+@pytest.fixture
+def make_mock_settings():
+    """Factory for creating mock settings with package-specific overrides.
+
+    Uses the factory-as-fixture pattern to eliminate code duplication
+    across different test packages. Each package can override specific
+    settings via keyword arguments without recreating the entire mock.
+
+    This follows the same factory-as-fixture pattern recommended for
+    test data factories (google_groups, aws_users, etc.) but applied
+    to configuration objects.
+
+    **Why factory pattern for settings?**
+    - DRY: Single source of truth for default settings
+    - Flexible: Each package sets only the fields it needs
+    - Hierarchical: Parent conftest provides base, child adds specifics
+    - Composable: Easy to extend without duplication
+
+    Usage at each level:
+
+    ```python
+    # Level 1 (root conftest.py)
+    @pytest.fixture
+    def make_mock_settings():
+        def _factory(**overrides):
+            settings = MagicMock()
+            settings.aws.AWS_REGION = "us-east-1"  # Defaults
+            # Apply overrides...
+            return settings
+        return _factory
+
+    # Level 2 (tests/integration/conftest.py)
+    @pytest.fixture
+    def mock_settings(make_mock_settings):
+        return make_mock_settings(
+            **{
+                'idempotency.IDEMPOTENCY_TTL_SECONDS': 3600,
+                'commands.providers': {},
+            }
+        )
+
+    # Level 3 (tests/integration/infrastructure/commands/conftest.py)
+    @pytest.fixture
+    def mock_settings(make_mock_settings):
+        return make_mock_settings(
+            **{
+                'slack.SLACK_TOKEN': 'xoxb-test-token',
+                'commands.providers': {},
+            }
+        )
+    ```
+
+    Args:
+        **overrides: Package-specific settings to override defaults
+
+    Returns:
+        MagicMock: Settings mock with applied overrides
+    """
+    from unittest.mock import MagicMock
+
+    def _factory(**overrides):
+        """Create mock settings with provided overrides."""
+        settings = MagicMock()
+        
+        # Set common defaults for all packages
+        settings.aws.AWS_REGION = "us-east-1"
+        
+        # Apply package-specific overrides
+        for key, value in overrides.items():
+            if '.' in key:
+                # Handle nested attributes: 'slack.SLACK_TOKEN' -> settings.slack.SLACK_TOKEN
+                parts = key.split('.')
+                obj = settings
+                for part in parts[:-1]:
+                    obj = getattr(obj, part)
+                setattr(obj, parts[-1], value)
+            else:
+                setattr(settings, key, value)
+        
+        return settings
+
+    return _factory
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mock_settings(monkeypatch):
-    """Factory for mocking settings with real Settings instances.
+def mock_settings_real(monkeypatch):
+    """Alternative: Real Settings instance with environment variable overrides.
     
-    This fixture provides settings mocking that:
-    - Uses real Settings class for type safety and validation
-    - Properly handles the @lru_cache decorator on get_settings()
-    - Allows nested attribute overrides via double-underscore notation
-    
+    Use this when you need Pydantic validation and type safety.
+    Most tests should use the MagicMock approach via make_mock_settings.
+
     Usage:
-        def test_something(mock_settings):
-            settings = mock_settings(
-                aws__AWS_REGION="us-west-2",      # Nested: settings.aws.AWS_REGION
-                retry__enabled=True,              # Nested: settings.retry.enabled
-                server__LOG_LEVEL="DEBUG"         # Nested: settings.server.LOG_LEVEL
+        def test_something(mock_settings_real):
+            settings = mock_settings_real(
+                aws__AWS_REGION="us-west-2",
+                server__LOG_LEVEL="DEBUG"
             )
             # settings is a real Settings instance with validation
     
@@ -618,11 +753,11 @@ def mock_settings(monkeypatch):
         monkeypatch: pytest's monkeypatch fixture
     
     Returns:
-        Callable that creates and installs a Settings mock
+        Callable that creates and installs a real Settings instance
     """
-    def _mock_settings(**overrides):
+    def _mock_settings_real(**overrides):
         # Create a Settings mock with spec for type safety
-        mock = MagicMock(spec=Settings)
+        mock = MagicMock()
         
         # Apply overrides using double-underscore for nested attributes
         # Example: aws__AWS_REGION -> mock.aws.AWS_REGION = "us-west-2"
@@ -649,7 +784,7 @@ def mock_settings(monkeypatch):
         
         return mock
     
-    return _mock_settings
+    return _mock_settings_real
 
 
 @pytest.fixture
