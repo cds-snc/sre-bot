@@ -6,15 +6,16 @@ Explicit provider management with direct imports.
 - Lookup: Retrieve active provider instances
 """
 
-from typing import Dict
+from typing import Dict, TYPE_CHECKING
 import importlib
 import pkgutil
 import structlog
 from infrastructure.commands.providers.base import CommandProvider
-from infrastructure.services.providers import get_settings
+
+if TYPE_CHECKING:
+    from infrastructure.configuration import Settings
 
 logger = structlog.get_logger()
-settings = get_settings()
 # Registry of discovered command providers (populated by provider modules)
 _discovered: Dict[str, type] = {}
 
@@ -58,11 +59,13 @@ def register_command_provider(name: str):
     return decorator
 
 
-def activate_providers() -> Dict[str, CommandProvider]:
+def activate_providers(settings: "Settings") -> Dict[str, CommandProvider]:
     """Activate command providers based on configuration.
 
-    Reads core.config.settings.commands.providers and instantiates
-    enabled providers.
+    Reads settings.commands.providers and instantiates enabled providers.
+
+    Args:
+        settings: Settings instance (required for dependency injection).
 
     Returns:
         Dict mapping provider name to adapter instance
@@ -94,8 +97,8 @@ def activate_providers() -> Dict[str, CommandProvider]:
         adapter_class = _discovered[name]
 
         try:
-            # Instantiate with config
-            instance = adapter_class(provider_cfg)
+            # Instantiate with settings and config
+            instance = adapter_class(settings=settings, config=provider_cfg)
             new_active[name] = instance
 
             logger.info(
@@ -151,11 +154,14 @@ def get_provider(name: str) -> CommandProvider:
     return _active[name]
 
 
-def load_providers() -> Dict[str, CommandProvider]:
+def load_providers(settings: "Settings") -> Dict[str, CommandProvider]:
     """Initialize and activate command providers.
 
     Explicitly imports provider modules to trigger registration,
     then activates enabled providers from configuration.
+
+    Args:
+        settings: Settings instance (required for dependency injection).
 
     Returns:
         Dict of active provider instances
@@ -174,7 +180,7 @@ def load_providers() -> Dict[str, CommandProvider]:
                 error=str(e),
             )
     # Activate providers from config
-    return activate_providers()
+    return activate_providers(settings)
 
 
 def reset_registry() -> None:

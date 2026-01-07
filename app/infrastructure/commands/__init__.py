@@ -23,8 +23,10 @@ Example:
 
     # In Slack bot registration:
     from infrastructure.commands.providers.slack import SlackCommandProvider
+    from infrastructure.services import get_settings
 
-    adapter = SlackCommandProvider(config={})
+    settings = get_settings()
+    adapter = SlackCommandProvider(settings=settings, config={})
     bot.command("/sre mymodule")(adapter.handle)
 """
 
