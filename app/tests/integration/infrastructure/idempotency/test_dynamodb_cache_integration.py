@@ -20,7 +20,9 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
     @patch("infrastructure.idempotency.dynamodb.put_item")
-    def test_cache_roundtrip_store_and_retrieve(self, mock_put, mock_get):
+    def test_cache_roundtrip_store_and_retrieve(
+        self, mock_put, mock_get, mock_settings
+    ):
         """Test storing and retrieving a response from cache."""
         response_data = {
             "success": True,
@@ -41,7 +43,7 @@ class TestDynamoDBCacheIntegration:
             data={"Item": {"response_json": {"S": json.dumps(response_data)}}},
         )
 
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
 
         # Store response
         cache.set("test-key", response_data, ttl_seconds=3600)
@@ -52,7 +54,9 @@ class TestDynamoDBCacheIntegration:
         assert result == response_data
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_json_serialization_with_complex_response(self, mock_get):
+    def test_cache_json_serialization_with_complex_response(
+        self, mock_get, mock_settings
+    ):
         """Test cache handles complex nested responses."""
         complex_response = {
             "success": True,
@@ -75,7 +79,7 @@ class TestDynamoDBCacheIntegration:
             data={"Item": {"response_json": {"S": json.dumps(complex_response)}}},
         )
 
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
         result = cache.get("complex-key")
 
         assert result == complex_response
@@ -84,7 +88,9 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.scan")
     @patch("infrastructure.idempotency.dynamodb.delete_item")
-    def test_cache_clear_removes_all_entries(self, mock_delete, mock_scan):
+    def test_cache_clear_removes_all_entries(
+        self, mock_delete, mock_scan, mock_settings
+    ):
         """Test cache clear removes all entries."""
         mock_scan.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -102,14 +108,14 @@ class TestDynamoDBCacheIntegration:
             message="Deleted",
         )
 
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
         cache.clear()
 
         # Verify delete was called for each item
         assert mock_delete.call_count == 3
 
     @patch("infrastructure.idempotency.dynamodb.put_item")
-    def test_cache_uses_correct_dynamodb_format(self, mock_put):
+    def test_cache_uses_correct_dynamodb_format(self, mock_put, mock_settings):
         """Test cache uses correct DynamoDB attribute format."""
         mock_put.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -117,7 +123,7 @@ class TestDynamoDBCacheIntegration:
         )
 
         response_data = {"success": True, "value": 42}
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
         cache.set("test-key", response_data, ttl_seconds=1800)
 
         # Verify put_item was called with correct DynamoDB format
@@ -141,7 +147,7 @@ class TestDynamoDBCacheIntegration:
         assert item["operation_type"]["S"] == "api_response"
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_handles_missing_item_attribute(self, mock_get):
+    def test_cache_handles_missing_item_attribute(self, mock_get, mock_settings):
         """Test cache handles response with missing Item attribute."""
         mock_get.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -149,14 +155,14 @@ class TestDynamoDBCacheIntegration:
             data={},  # Missing Item key
         )
 
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
         result = cache.get("nonexistent-key")
 
         assert result is None
 
-    def test_cache_stats_contains_all_fields(self):
+    def test_cache_stats_contains_all_fields(self, mock_settings):
         """Test cache stats contains all required fields."""
-        cache = DynamoDBCache(table_name="custom_table")
+        cache = DynamoDBCache(settings=mock_settings, table_name="custom_table")
         cache.ttl_seconds = 7200
 
         stats = cache.get_stats()
@@ -168,7 +174,9 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.put_item")
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_multiple_operations_same_table(self, mock_get, mock_put):
+    def test_cache_multiple_operations_same_table(
+        self, mock_get, mock_put, mock_settings
+    ):
         """Test cache handles multiple operations on same table."""
         mock_put.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -191,7 +199,7 @@ class TestDynamoDBCacheIntegration:
             ),
         ]
 
-        cache = DynamoDBCache()
+        cache = DynamoDBCache(settings=mock_settings)
 
         # Store two responses
         cache.set("key-1", response1)
