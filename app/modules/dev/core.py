@@ -32,7 +32,8 @@ class GoogleDevProvider(SlackCommandProvider):
     """Adapter for legacy Google dev commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -51,7 +52,8 @@ class SlackDevProvider(SlackCommandProvider):
     """Adapter for legacy Slack dev commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -76,7 +78,8 @@ class StaleChannelProvider(SlackCommandProvider):
     """Test stale channel notification."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -129,7 +132,8 @@ class ListIncidentsProvider(SlackCommandProvider):
     """List incidents handler."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -148,7 +152,8 @@ class LoadIncidentsProvider(SlackCommandProvider):
     """Load incidents handler."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -167,7 +172,8 @@ class AddIncidentProvider(SlackCommandProvider):
     """Add incident handler."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
