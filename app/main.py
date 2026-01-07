@@ -121,7 +121,7 @@ def providers_startup():
 
     # Activate command providers
     try:
-        command_providers = load_command_providers()
+        command_providers = load_command_providers(settings=settings)
         server_app.state.command_providers = command_providers
 
         if command_providers:
