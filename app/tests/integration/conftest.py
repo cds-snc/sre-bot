@@ -384,6 +384,28 @@ def mock_orchestration_partial_failure(mock_orchestration):
 
 
 # ============================================================================
+# Settings Mocks
+# ============================================================================
+
+
+@pytest.fixture
+def mock_settings(make_mock_settings):
+    """Create base mock settings for integration tests.
+
+    This fixture provides default settings for all integration tests.
+    Child conftest files can override this to provide package-specific settings.
+
+    Uses the factory from root conftest to avoid duplication.
+    """
+    return make_mock_settings(
+        **{
+            "idempotency.IDEMPOTENCY_TTL_SECONDS": 3600,
+            "commands.providers": {},
+        }
+    )
+
+
+# ============================================================================
 # Test Markers
 # ============================================================================
 
