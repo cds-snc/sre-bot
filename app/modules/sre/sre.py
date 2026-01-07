@@ -49,7 +49,7 @@ class LegacyIncidentProvider(SlackCommandProvider):
     """Adapter for legacy incident_helper."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None  # Legacy handlers don't use registry
 
     def handle(self, platform_payload):
@@ -73,7 +73,7 @@ class LegacyWebhooksProvider(SlackCommandProvider):
     """Adapter for legacy webhook_helper."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -96,7 +96,7 @@ class GeolocateProvider(SlackCommandProvider):
     """Adapter for geolocate helper."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
@@ -120,7 +120,7 @@ class VersionProvider(SlackCommandProvider):
     """Adapter for version command."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = None
 
     def handle(self, platform_payload):
