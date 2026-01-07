@@ -1,21 +1,25 @@
 """Factory for creating retry stores based on configuration."""
 
 import structlog
-from infrastructure.services.providers import get_settings
+from infrastructure.configuration import Settings
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
 
 logger = structlog.get_logger()
-settings = get_settings()
 
 
-def create_retry_store(config: RetryConfig, backend: str | None = None) -> RetryStore:
+def create_retry_store(
+    config: RetryConfig,
+    settings: Settings,
+    backend: str | None = None,
+) -> RetryStore:
     """Factory to create appropriate retry store based on configuration.
 
     Args:
         config: Retry configuration (backoff, max attempts, etc.)
+        settings: Settings instance (required for dependency injection).
         backend: Optional backend override (memory, dynamodb).
                 If None, uses settings.retry.backend
 
@@ -26,10 +30,12 @@ def create_retry_store(config: RetryConfig, backend: str | None = None) -> Retry
         ValueError: If unknown backend specified
 
     Examples:
+        >>> from infrastructure.services import get_settings
+        >>> settings = get_settings()
         >>> config = RetryConfig()
-        >>> store = create_retry_store(config)  # Uses settings.retry.backend
-        >>> store = create_retry_store(config, backend="memory")  # Force memory
-        >>> store = create_retry_store(config, backend="dynamodb")  # Force DynamoDB
+        >>> store = create_retry_store(config, settings)  # Uses settings.retry.backend
+        >>> store = create_retry_store(config, settings, backend="memory")  # Force memory
+        >>> store = create_retry_store(config, settings, backend="dynamodb")  # Force DynamoDB
     """
     backend = backend or settings.retry.backend
 
