@@ -18,6 +18,7 @@ from typing import Optional
 from infrastructure.commands.providers.slack import SlackCommandProvider
 from infrastructure.events import register_event_handler, dispatch_event
 from infrastructure.i18n import Translator, LocaleResolver, YAMLTranslationLoader
+from infrastructure.services import get_settings
 from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,
@@ -59,6 +60,9 @@ def create_slack_provider(
         groups_provider = create_slack_provider(parent_command="sre")
         router.register_subcommand("groups", groups_provider, platform="slack")
     """
+    # Get settings for provider
+    settings = get_settings()
+
     # Load i18n (groups-specific translation files)
     loader = YAMLTranslationLoader(translations_dir=Path("locales"))
     translator = Translator(loader=loader)
@@ -66,7 +70,7 @@ def create_slack_provider(
     locale_resolver = LocaleResolver()
 
     # Create provider (generic infrastructure component)
-    provider = SlackCommandProvider(config={"enabled": True})
+    provider = SlackCommandProvider(settings=settings, config={"enabled": True})
 
     # Wire with groups-specific config
     provider.registry = command_registry  # groups command definitions
