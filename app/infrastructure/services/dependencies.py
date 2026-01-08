@@ -7,7 +7,7 @@ Provides annotated type hints for common infrastructure dependencies.
 from typing import Annotated
 from fastapi import Depends
 from infrastructure.configuration import Settings
-from infrastructure.identity import IdentityResolver
+from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.events.service import EventDispatcher
@@ -16,7 +16,7 @@ from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.services.providers import (
     get_settings,
-    get_identity_resolver,
+    get_identity_service,
     get_jwks_manager,
     get_aws_clients,
     get_event_dispatcher,
@@ -28,8 +28,8 @@ from infrastructure.services.providers import (
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
-# Identity resolver dependency
-IdentityResolverDep = Annotated[IdentityResolver, Depends(get_identity_resolver)]
+# Identity service dependency
+IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 
 # JWKS manager dependency
 JWKSManagerDep = Annotated[JWKSManager, Depends(get_jwks_manager)]
@@ -52,7 +52,7 @@ ResilienceServiceDep = Annotated[ResilienceService, Depends(get_resilience_servi
 
 __all__ = [
     "SettingsDep",
-    "IdentityResolverDep",
+    "IdentityServiceDep",
     "JWKSManagerDep",
     "AWSClientsDep",
     "EventDispatcherDep",
