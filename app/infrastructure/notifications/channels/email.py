@@ -1,6 +1,6 @@
 """Email channel implementation using Google Workspace Gmail."""
 
-from typing import List
+from typing import List, TYPE_CHECKING
 
 import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
@@ -12,11 +12,12 @@ from infrastructure.notifications.models import (
 )
 from infrastructure.operations import OperationResult
 from infrastructure.resilience.circuit_breaker import CircuitBreaker
-from infrastructure.services.providers import get_settings
 from integrations.google_workspace import gmail_next
 
+if TYPE_CHECKING:
+    from infrastructure.configuration import Settings
+
 logger = structlog.get_logger()
-settings = get_settings()
 
 
 class EmailChannel(NotificationChannel):
@@ -26,8 +27,12 @@ class EmailChannel(NotificationChannel):
     Supports sending from configured service account or user delegation.
     """
 
-    def __init__(self):
-        """Initialize Gmail email channel."""
+    def __init__(self, settings: "Settings"):
+        """Initialize Gmail email channel.
+
+        Args:
+            settings: Settings instance with google_workspace configuration.
+        """
         self._circuit_breaker = CircuitBreaker(
             name="gmail_email_channel",
             failure_threshold=5,

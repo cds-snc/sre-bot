@@ -17,11 +17,12 @@ class TestEmailChannel:
     """Tests for EmailChannel implementation."""
 
     @pytest.fixture
-    def email_channel(self, mock_gmail_next, monkeypatch):
+    def email_channel(self, mock_gmail_next, mock_settings, monkeypatch):
         """Create EmailChannel instance with mocked dependencies.
 
         Args:
             mock_gmail_next: Mock gmail_next fixture
+            mock_settings: Mock settings fixture
             monkeypatch: pytest monkeypatch fixture
 
         Returns:
@@ -32,7 +33,7 @@ class TestEmailChannel:
             mock_gmail_next,
             raising=False,
         )
-        channel = EmailChannel()
+        channel = EmailChannel(settings=mock_settings)
         return channel
 
     def test_channel_name(self, email_channel):

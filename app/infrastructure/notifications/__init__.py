@@ -32,6 +32,18 @@ Usage:
     # Check results
     success = sum(1 for r in results if r.is_success)
     logger.info(f"Sent {success}/{len(results)} notifications")
+
+Recommended Usage (Service Pattern with DI):
+    from infrastructure.services import NotificationServiceDep
+
+    @router.post("/notify")
+    def send_notification(
+        notification_service: NotificationServiceDep,
+        notification: Notification
+    ):
+        results = notification_service.send(notification)
+        success_count = sum(1 for r in results if r.is_success)
+        return {"sent": success_count, "total": len(results)}
 """
 
 # Models
@@ -43,7 +55,10 @@ from infrastructure.notifications.models import (
     NotificationStatus,
 )
 
-# Dispatcher
+# Service (preferred)
+from infrastructure.notifications.service import NotificationService
+
+# Dispatcher (legacy, use NotificationService instead)
 from infrastructure.notifications.dispatcher import NotificationDispatcher
 
 # Channel interface
@@ -70,4 +85,6 @@ __all__ = [
     "ChatChannel",
     "EmailChannel",
     "SMSChannel",
+    # Service
+    "NotificationService",
 ]

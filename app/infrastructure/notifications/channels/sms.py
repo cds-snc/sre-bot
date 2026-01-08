@@ -1,6 +1,6 @@
 """SMS channel implementation using GC Notify."""
 
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
@@ -12,11 +12,12 @@ from infrastructure.notifications.models import (
 )
 from infrastructure.operations import OperationResult
 from infrastructure.resilience.circuit_breaker import CircuitBreaker
-from infrastructure.services.providers import get_settings
 from integrations.notify.client import post_event, create_authorization_header
 
+if TYPE_CHECKING:
+    from infrastructure.configuration import Settings
+
 logger = structlog.get_logger()
-settings = get_settings()
 
 
 class SMSChannel(NotificationChannel):
@@ -26,8 +27,12 @@ class SMSChannel(NotificationChannel):
     Requires phone numbers in E.164 format (+1234567890).
     """
 
-    def __init__(self):
-        """Initialize GC Notify SMS channel."""
+    def __init__(self, settings: "Settings"):
+        """Initialize GC Notify SMS channel.
+
+        Args:
+            settings: Settings instance with notify configuration.
+        """
         self._circuit_breaker = CircuitBreaker(
             name="gc_notify_sms_channel",
             failure_threshold=5,

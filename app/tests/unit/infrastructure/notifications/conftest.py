@@ -14,6 +14,20 @@ from infrastructure.notifications.models import (
 
 
 @pytest.fixture
+def mock_settings():
+    """Mock Settings instance for testing channels.
+
+    Returns:
+        Mock settings with notify and google_workspace configurations
+    """
+    mock = MagicMock()
+    mock.notify.NOTIFY_API_KEY = "test-api-key"
+    mock.notify.NOTIFY_API_URL = "https://api.notification.canada.ca"
+    mock.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL = "admin@example.com"
+    return mock
+
+
+@pytest.fixture
 def recipient_factory():
     """Factory for creating Recipient instances.
 

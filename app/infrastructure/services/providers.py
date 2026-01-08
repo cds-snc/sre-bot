@@ -14,6 +14,7 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
+from infrastructure.notifications.service import NotificationService
 
 
 @lru_cache
@@ -210,3 +211,29 @@ def get_resilience_service() -> ResilienceService:
     """
     settings = get_settings()
     return ResilienceService(settings=settings)
+
+
+@lru_cache
+def get_notification_service() -> NotificationService:
+    """Get application-scoped notification service singleton.
+
+    Returns a NotificationService instance for multi-channel notification
+    delivery with automatic fallback, idempotency, and circuit breakers.
+
+    Usage:
+        from infrastructure.services import NotificationServiceDep
+
+        @router.post("/notify")
+        def send_notification(
+            notification_service: NotificationServiceDep,
+            notification: Notification
+        ):
+            results = notification_service.send(notification)
+            success_count = sum(1 for r in results if r.is_success)
+            return {"sent": success_count, "total": len(results)}
+
+    Returns:
+        NotificationService: Cached notification service instance
+    """
+    settings = get_settings()
+    return NotificationService(settings=settings)

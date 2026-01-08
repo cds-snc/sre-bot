@@ -14,6 +14,7 @@ from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
+from infrastructure.notifications.service import NotificationService
 from infrastructure.services.providers import (
     get_settings,
     get_identity_service,
@@ -23,6 +24,7 @@ from infrastructure.services.providers import (
     get_translation_service,
     get_idempotency_service,
     get_resilience_service,
+    get_notification_service,
 )
 
 # Settings dependency
@@ -50,6 +52,11 @@ IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_se
 # Resilience service dependency
 ResilienceServiceDep = Annotated[ResilienceService, Depends(get_resilience_service)]
 
+# Notification service dependency
+NotificationServiceDep = Annotated[
+    NotificationService, Depends(get_notification_service)
+]
+
 __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
@@ -59,4 +66,5 @@ __all__ = [
     "TranslationServiceDep",
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
+    "NotificationServiceDep",
 ]
