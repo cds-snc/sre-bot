@@ -48,33 +48,33 @@ class TestLoggingConfiguration:
                     # Re-import pytest since we removed it
                     import pytest as _  # noqa: F401
 
-    def test_configure_logging_returns_bound_logger(self):
+    def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a logger instance."""
-        logger = configure_logging()
+        logger = configure_logging(settings=mock_settings)
         # Should return a structlog logger (may be BoundLoggerLazyProxy)
         assert logger is not None
         assert hasattr(logger, "bind")
 
-    def test_configure_logging_in_test_environment(self):
+    def test_configure_logging_in_test_environment(self, mock_settings):
         """configure_logging suppresses logs in test environment."""
         # We're in a test environment, so logging should be at CRITICAL+1
-        configure_logging()
+        configure_logging(settings=mock_settings)
         root_level = logging.root.level
         assert root_level == logging.CRITICAL + 1
 
-    def test_configure_logging_with_custom_log_level(self):
+    def test_configure_logging_with_custom_log_level(self, mock_settings):
         """configure_logging accepts custom log level."""
-        logger = configure_logging(log_level="DEBUG")
+        logger = configure_logging(settings=mock_settings, log_level="DEBUG")
         # Should return a logger instance
         assert logger is not None
         assert hasattr(logger, "bind")
 
-    def test_configure_logging_with_custom_production_flag(self):
+    def test_configure_logging_with_custom_production_flag(self, mock_settings):
         """configure_logging accepts custom production flag."""
         # Note: We can't easily verify the processor setup, but we can verify
         # it doesn't raise an error with different production flags
-        logger1 = configure_logging(is_production=True)
-        logger2 = configure_logging(is_production=False)
+        logger1 = configure_logging(settings=mock_settings, is_production=True)
+        logger2 = configure_logging(settings=mock_settings, is_production=False)
 
         assert logger1 is not None
         assert logger2 is not None

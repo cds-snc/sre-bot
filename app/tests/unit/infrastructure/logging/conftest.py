@@ -1,4 +1,4 @@
-"""Module-level fixtures for infrastructure tests (Level 2)."""
+"""Fixtures for infrastructure.logging tests."""
 
 import pytest
 from unittest.mock import Mock
@@ -13,7 +13,3 @@ def mock_settings():
     settings.LOG_LEVEL = "INFO"
     settings.is_production = False
     return settings
-
-
-# Note: Command-framework-specific fixtures are in Level 3 conftest
-# (tests/unit/infrastructure/commands/conftest.py)

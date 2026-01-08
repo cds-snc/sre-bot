@@ -38,9 +38,9 @@ class TestIsTestEnvironment:
 class TestConfigureLogging:
     """Test suite for configure_logging function."""
 
-    def test_configure_logging_returns_bound_logger(self):
+    def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a BoundLogger instance."""
-        result = configure_logging()
+        result = configure_logging(settings=mock_settings)
 
         assert result is not None
         assert hasattr(result, "info")
@@ -48,44 +48,44 @@ class TestConfigureLogging:
         assert hasattr(result, "warning")
         assert hasattr(result, "error")
 
-    def test_configure_logging_default_parameters(self):
+    def test_configure_logging_default_parameters(self, mock_settings):
         """configure_logging works with default parameters."""
-        logger = configure_logging()
+        logger = configure_logging(settings=mock_settings)
 
         assert logger is not None
 
-    def test_configure_logging_with_log_level(self):
+    def test_configure_logging_with_log_level(self, mock_settings):
         """configure_logging accepts log_level parameter."""
         # In test environment, logging is suppressed, but function should still work
-        logger = configure_logging(log_level="DEBUG")
+        logger = configure_logging(settings=mock_settings, log_level="DEBUG")
         assert logger is not None
 
-        logger = configure_logging(log_level="INFO")
+        logger = configure_logging(settings=mock_settings, log_level="INFO")
         assert logger is not None
 
-        logger = configure_logging(log_level="WARNING")
+        logger = configure_logging(settings=mock_settings, log_level="WARNING")
         assert logger is not None
 
-    def test_configure_logging_with_is_production(self):
+    def test_configure_logging_with_is_production(self, mock_settings):
         """configure_logging accepts is_production parameter."""
         # In test environment, logging is suppressed, but parameters should be accepted
-        logger = configure_logging(is_production=True)
+        logger = configure_logging(settings=mock_settings, is_production=True)
         assert logger is not None
 
-        logger = configure_logging(is_production=False)
+        logger = configure_logging(settings=mock_settings, is_production=False)
         assert logger is not None
 
-    def test_configure_logging_idempotent(self):
+    def test_configure_logging_idempotent(self, mock_settings):
         """Multiple configure_logging calls are safe."""
-        logger1 = configure_logging()
-        logger2 = configure_logging()
+        logger1 = configure_logging(settings=mock_settings)
+        logger2 = configure_logging(settings=mock_settings)
 
         assert logger1 is not None
         assert logger2 is not None
 
-    def test_configure_logging_suppresses_in_test_env(self):
+    def test_configure_logging_suppresses_in_test_env(self, mock_settings):
         """In test environment, root logger level is set high to suppress output."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         # In test environment, root logger should be set to suppress output
         root_logger = logging.getLogger()
@@ -97,9 +97,9 @@ class TestConfigureLogging:
 class TestGetModuleLogger:
     """Test suite for get_module_logger function (deprecated)."""
 
-    def test_get_module_logger_returns_bound_logger(self):
+    def test_get_module_logger_returns_bound_logger(self, mock_settings):
         """get_module_logger returns a BoundLogger with expected methods."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -114,16 +114,16 @@ class TestGetModuleLogger:
         assert hasattr(logger, "info")
         assert hasattr(logger, "bind")
 
-    def test_get_module_logger_emits_deprecation_warning(self):
+    def test_get_module_logger_emits_deprecation_warning(self, mock_settings):
         """get_module_logger emits DeprecationWarning."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         with pytest.warns(DeprecationWarning, match="deprecated"):
             get_module_logger()
 
-    def test_get_module_logger_still_works(self):
+    def test_get_module_logger_still_works(self, mock_settings):
         """get_module_logger still returns functional logger for backward compat."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
@@ -140,9 +140,9 @@ class TestGetModuleLogger:
 class TestLoggingBestPractices:
     """Tests demonstrating structlog best practices."""
 
-    def test_standard_structlog_pattern(self):
+    def test_standard_structlog_pattern(self, mock_settings):
         """Standard structlog.get_logger() pattern works."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         # This is the recommended pattern
         logger = structlog.get_logger()
@@ -151,9 +151,9 @@ class TestLoggingBestPractices:
         assert hasattr(logger, "info")
         assert hasattr(logger, "bind")
 
-    def test_bind_for_context(self):
+    def test_bind_for_context(self, mock_settings):
         """Use .bind() for adding context."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         logger = structlog.get_logger()
         log = logger.bind(user_id="123", operation="test")
@@ -161,9 +161,9 @@ class TestLoggingBestPractices:
         assert log is not None
         assert hasattr(log, "info")
 
-    def test_chained_binds(self):
+    def test_chained_binds(self, mock_settings):
         """Multiple .bind() calls can be chained."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         logger = structlog.get_logger()
         log = logger.bind(request_id="req-123")
@@ -171,9 +171,9 @@ class TestLoggingBestPractices:
 
         assert log is not None
 
-    def test_logging_methods_dont_raise(self):
+    def test_logging_methods_dont_raise(self, mock_settings):
         """Logging methods execute without raising exceptions."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         logger = structlog.get_logger()
         log = logger.bind(component="test")
@@ -184,9 +184,9 @@ class TestLoggingBestPractices:
         log.warning("warning message")
         log.error("error message", error_code="E001")
 
-    def test_exception_logging(self):
+    def test_exception_logging(self, mock_settings):
         """Exception logging works correctly."""
-        configure_logging()
+        configure_logging(settings=mock_settings)
 
         logger = structlog.get_logger()
 
