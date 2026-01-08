@@ -204,12 +204,14 @@ def get_notification_handler() -> GroupNotificationHandler:
     from infrastructure.notifications.channels.chat import ChatChannel
     from infrastructure.idempotency.factory import get_cache
     from infrastructure.i18n import YAMLTranslationLoader
+    from infrastructure.services import get_settings
     from pathlib import Path
 
+    settings = get_settings()
     dispatcher = NotificationDispatcher(
         channels={"chat": ChatChannel()},
         fallback_order=["chat"],
-        idempotency_cache=get_cache(),
+        idempotency_cache=get_cache(settings),
         idempotency_ttl_seconds=3600,
     )
 

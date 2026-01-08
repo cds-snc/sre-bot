@@ -19,6 +19,8 @@ from infrastructure.i18n.models import (
 )
 from infrastructure.i18n.resolvers import LanguageNegotiator, LocaleResolver
 from infrastructure.i18n.translator import Translator
+from infrastructure.i18n.factory import create_translator
+from infrastructure.i18n.service import TranslationService
 
 __all__ = [
     "Locale",
@@ -30,4 +32,6 @@ __all__ = [
     "Translator",
     "LocaleResolver",
     "LanguageNegotiator",
+    "create_translator",
+    "TranslationService",
 ]

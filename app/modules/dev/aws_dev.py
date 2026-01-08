@@ -22,7 +22,7 @@ from infrastructure.commands.responses.models import (
     ErrorMessage,
     SuccessMessage,
 )
-from infrastructure.services import get_aws_clients
+from infrastructure.services import get_aws_clients, get_settings
 
 logger = structlog.get_logger()
 
@@ -231,7 +231,8 @@ class IdentityStoreTestProvider(SlackCommandProvider):
     """Provider for IdentityStore testing commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = identitystore_registry
 
 
@@ -239,7 +240,8 @@ class OrganizationsTestProvider(SlackCommandProvider):
     """Provider for Organizations testing commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = organizations_registry
 
 
@@ -247,7 +249,8 @@ class SSOAdminTestProvider(SlackCommandProvider):
     """Provider for SSO Admin testing commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = sso_admin_registry
 
 
@@ -255,7 +258,8 @@ class HealthTestProvider(SlackCommandProvider):
     """Provider for AWS health check commands."""
 
     def __init__(self):
-        super().__init__(config={"enabled": True})
+        settings = get_settings()
+        super().__init__(settings=settings, config={"enabled": True})
         self.registry = health_registry
 
 

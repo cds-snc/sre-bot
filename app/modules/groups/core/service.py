@@ -22,6 +22,8 @@ from modules.groups.providers.base import (
     OperationStatus,
     OperationResult,
 )
+from infrastructure.services import get_settings
+
 
 if TYPE_CHECKING:
     from modules.groups.domain.types import (
@@ -151,8 +153,10 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
 
     Audit logging is handled automatically by the centralized event system.
     """
+
     correlation_id = uuid4()
-    idempotency_cache = get_cache()
+    settings = get_settings()
+    idempotency_cache = get_cache(settings)
 
     cached_data = idempotency_cache.get(request.idempotency_key)
     if cached_data is not None:
@@ -229,8 +233,11 @@ def remove_member(
 
     Audit logging is handled automatically by the centralized event system.
     """
+    from infrastructure.services import get_settings
+
     correlation_id = uuid4()
-    idempotency_cache = get_cache()
+    settings = get_settings()
+    idempotency_cache = get_cache(settings)
 
     cached_data = idempotency_cache.get(request.idempotency_key)
     if cached_data:

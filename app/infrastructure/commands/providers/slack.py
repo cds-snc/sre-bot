@@ -11,11 +11,15 @@ from infrastructure.commands.context import CommandContext, ResponseChannel
 from infrastructure.commands.providers import register_command_provider
 from infrastructure.commands.responses.slack_formatter import SlackResponseFormatter
 from infrastructure.i18n.models import TranslationKey, Locale
-from infrastructure.services.providers import get_settings
+from infrastructure.services.providers import get_translation_service
 from integrations.slack.users import get_user_email_from_id, get_user_email_from_handle
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from infrastructure.configuration import Settings
+
 logger = structlog.get_logger()
-settings = get_settings()
 
 
 class SlackResponseChannel(ResponseChannel):
@@ -99,26 +103,29 @@ class SlackCommandProvider(CommandProvider):
         bot.command("/sre groups")(adapter.handle)
     """
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, settings: "Settings", config: Dict[str, Any]):
         """Initialize Slack adapter.
 
         Args:
+            settings: Settings instance (required for dependency injection)
             config: Provider configuration dict from settings.commands.providers['slack']
 
         Raises:
             ValueError: If SLACK_TOKEN is not configured
         """
-        # pylint: disable=import-outside-toplevel
+
+        self.settings = settings
 
         # Validate Slack is configured
-        if not settings.slack.SLACK_TOKEN:
+        if not self.settings.slack.SLACK_TOKEN:
             raise ValueError("SLACK_TOKEN required for Slack command provider")
 
         # NOTE: Registry, translator, and locale_resolver are set later by modules
         # This allows each module to attach its own command registry and i18n context
+        translation_service = get_translation_service()
         super().__init__(
             registry=None,  # Will be set by modules
-            translator=None,  # Will be set in create_context from LocaleResolver
+            translator=translation_service.translator,  # Access underlying Translator
             locale_resolver=None,  # Will be set in create_context
         )
 

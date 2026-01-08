@@ -1,8 +1,5 @@
 """Unit tests for retry store factory."""
 
-import importlib
-from types import SimpleNamespace
-
 import pytest
 
 from infrastructure.resilience.retry import (
@@ -10,37 +7,36 @@ from infrastructure.resilience.retry import (
     create_retry_store,
 )
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
-from infrastructure.services.providers import get_settings
 
 
 class TestCreateRetryStore:
     """Tests for create_retry_store factory function."""
 
-    def test_create_memory_store_by_default(
-        self, retry_config_factory, mock_settings_memory_backend
-    ):
+    def test_create_memory_store_by_default(self, retry_config_factory, mock_settings):
         """Test that memory store is created by default."""
         config = retry_config_factory()
 
-        store = create_retry_store(config)
+        store = create_retry_store(config, mock_settings)
 
         assert isinstance(store, InMemoryRetryStore)
         assert store.config == config
 
     def test_create_memory_store_explicit(
-        self, retry_config_factory, mock_settings_dynamodb_backend
+        self, retry_config_factory, mock_settings_with_dynamodb
     ):
         """Test explicit memory store creation overrides settings."""
         config = retry_config_factory()
 
-        store = create_retry_store(config, backend="memory")
+        store = create_retry_store(
+            config, mock_settings_with_dynamodb, backend="memory"
+        )
 
         assert isinstance(store, InMemoryRetryStore)
 
     def test_create_dynamodb_store_from_settings(
         self,
         retry_config_factory,
-        mock_settings_dynamodb_backend,
+        mock_settings_with_dynamodb,
         mock_dynamodb_next,
         monkeypatch,
     ):
@@ -51,7 +47,8 @@ class TestCreateRetryStore:
         )
 
         config = retry_config_factory()
-        store = create_retry_store(config)
+
+        store = create_retry_store(config, mock_settings_with_dynamodb)
 
         assert isinstance(store, DynamoDBRetryStore)
         assert store.table_name == "test-retry-records"
@@ -60,7 +57,7 @@ class TestCreateRetryStore:
     def test_create_dynamodb_store_explicit(
         self,
         retry_config_factory,
-        mock_settings_memory_backend,
+        mock_settings,
         mock_dynamodb_next,
         monkeypatch,
     ):
@@ -68,59 +65,42 @@ class TestCreateRetryStore:
         config = retry_config_factory()
 
         # Update settings for DynamoDB
-        mock_settings_memory_backend.backend = "dynamodb"
-        mock_settings_memory_backend.dynamodb_table_name = "explicit-table"
+        mock_settings.retry.backend = "dynamodb"
+        mock_settings.retry.dynamodb_table_name = "explicit-table"
 
         monkeypatch.setattr(
             "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
             mock_dynamodb_next,
         )
 
-        store = create_retry_store(config, backend="dynamodb")
+        store = create_retry_store(config, mock_settings, backend="dynamodb")
 
         assert isinstance(store, DynamoDBRetryStore)
 
     def test_create_store_unknown_backend_raises_error(
-        self, retry_config_factory, mock_settings_memory_backend
+        self, retry_config_factory, mock_settings
     ):
         """Test that unknown backend raises ValueError."""
         config = retry_config_factory()
 
         with pytest.raises(ValueError, match="Unknown retry backend: redis"):
-            create_retry_store(config, backend="redis")
+            create_retry_store(config, mock_settings, backend="redis")
 
-    def test_create_memory_store_uses_config(self, retry_config_factory, monkeypatch):
+    def test_create_memory_store_uses_config(self, retry_config_factory, mock_settings):
         """Test that created memory store uses provided config."""
-
-        # Clear the lru_cache on get_settings before mocking
-        get_settings.cache_clear()
-
-        mock_retry_settings = SimpleNamespace(backend="memory")
-        mock_settings = SimpleNamespace(retry=mock_retry_settings)
-
-        monkeypatch.setattr(
-            "infrastructure.services.providers.get_settings",
-            lambda: mock_settings,
-        )
-
-        # Re-import factory module so it picks up the mocked get_settings
-        import infrastructure.resilience.retry.factory
-
-        importlib.reload(infrastructure.resilience.retry.factory)
-
         config = retry_config_factory(
             max_attempts=10,
             base_delay_seconds=30,
             batch_size=20,
         )
 
-        store = infrastructure.resilience.retry.factory.create_retry_store(config)
+        store = create_retry_store(config, mock_settings)
         assert store.config.batch_size == 20
 
     def test_create_dynamodb_store_uses_config(
         self,
         retry_config_factory,
-        mock_settings_dynamodb_backend,
+        mock_settings_with_dynamodb,
         mock_dynamodb_next,
         monkeypatch,
     ):
@@ -135,19 +115,21 @@ class TestCreateRetryStore:
             base_delay_seconds=45,
         )
 
-        store = create_retry_store(config)
+        store = create_retry_store(config, mock_settings_with_dynamodb)
 
         assert store.config.max_attempts == 7
         assert store.config.base_delay_seconds == 45
 
     def test_factory_respects_backend_parameter_over_settings(
-        self, retry_config_factory, mock_settings_dynamodb_backend
+        self, retry_config_factory, mock_settings_with_dynamodb
     ):
         """Test that backend parameter overrides settings."""
         config = retry_config_factory()
 
         # Settings say dynamodb, but we explicitly request memory
-        store = create_retry_store(config, backend="memory")
+        store = create_retry_store(
+            config, mock_settings_with_dynamodb, backend="memory"
+        )
 
         assert isinstance(store, InMemoryRetryStore)
         assert not isinstance(store, DynamoDBRetryStore)

@@ -2,6 +2,7 @@
 
 import pytest
 from typing import Dict, Any
+from unittest.mock import MagicMock
 
 from infrastructure.resilience.retry import (
     RetryConfig,
@@ -9,7 +10,6 @@ from infrastructure.resilience.retry import (
     RetryResult,
     InMemoryRetryStore,
 )
-from infrastructure.services.providers import get_settings
 
 
 @pytest.fixture
@@ -128,84 +128,32 @@ def dynamodb_retry_store(retry_config_factory, mock_dynamodb_next, monkeypatch):
 
 
 @pytest.fixture
-def mock_settings_memory_backend(monkeypatch):
-    """Mock settings to use memory backend."""
-    from types import SimpleNamespace
-
-    # Clear the lru_cache on get_settings before mocking
-
-    get_settings.cache_clear()
-
-    mock_retry_settings = SimpleNamespace(
-        backend="memory",
-        max_attempts=5,
-        base_delay_seconds=60,
-        max_delay_seconds=3600,
-        batch_size=10,
-        claim_lease_seconds=300,
-        dynamodb_table_name="retry-records",
-        dynamodb_region="ca-central-1",
-        dynamodb_ttl_days=30,
-    )
-
-    mock_settings = SimpleNamespace(
-        retry=mock_retry_settings,
-    )
-
-    # Patch where get_settings is called
-    monkeypatch.setattr(
-        "infrastructure.services.providers.get_settings",
-        lambda: mock_settings,
-    )
-
-    # Re-import the factory module so module-level settings assignment uses the mock
-    import importlib
-    import infrastructure.resilience.retry.factory
-
-    importlib.reload(infrastructure.resilience.retry.factory)
-
-    yield mock_retry_settings
-
-    # Clean up: clear cache again after test
-    get_settings.cache_clear()
+def mock_settings():
+    """Create mock settings object for retry tests with memory backend."""
+    settings = MagicMock()
+    settings.retry.backend = "memory"
+    settings.retry.max_attempts = 5
+    settings.retry.base_delay_seconds = 60
+    settings.retry.max_delay_seconds = 3600
+    settings.retry.batch_size = 10
+    settings.retry.claim_lease_seconds = 300
+    settings.retry.dynamodb_table_name = "retry-records"
+    settings.retry.dynamodb_region = "ca-central-1"
+    settings.retry.dynamodb_ttl_days = 30
+    return settings
 
 
 @pytest.fixture
-def mock_settings_dynamodb_backend(monkeypatch):
-    """Mock settings to use DynamoDB backend."""
-    from types import SimpleNamespace
-
-    get_settings.cache_clear()
-
-    mock_retry_settings = SimpleNamespace(
-        backend="dynamodb",
-        max_attempts=5,
-        base_delay_seconds=60,
-        max_delay_seconds=3600,
-        batch_size=10,
-        claim_lease_seconds=300,
-        dynamodb_table_name="test-retry-records",
-        dynamodb_region="ca-central-1",
-        dynamodb_ttl_days=30,
-    )
-
-    mock_settings = SimpleNamespace(
-        retry=mock_retry_settings,
-    )
-
-    # Patch where get_settings is called
-    monkeypatch.setattr(
-        "infrastructure.services.providers.get_settings",
-        lambda: mock_settings,
-    )
-
-    # Re-import the factory module so module-level settings assignment uses the mock
-    import importlib
-    import infrastructure.resilience.retry.factory
-
-    importlib.reload(infrastructure.resilience.retry.factory)
-
-    yield mock_retry_settings
-
-    # Clean up: clear cache again after test
-    get_settings.cache_clear()
+def mock_settings_with_dynamodb():
+    """Create mock settings object for retry tests with DynamoDB backend."""
+    settings = MagicMock()
+    settings.retry.backend = "dynamodb"
+    settings.retry.max_attempts = 5
+    settings.retry.base_delay_seconds = 60
+    settings.retry.max_delay_seconds = 3600
+    settings.retry.batch_size = 10
+    settings.retry.claim_lease_seconds = 300
+    settings.retry.dynamodb_table_name = "test-retry-records"
+    settings.retry.dynamodb_region = "ca-central-1"
+    settings.retry.dynamodb_ttl_days = 30
+    return settings

@@ -1,9 +1,19 @@
 """Fixtures for idempotency cache tests."""
 
 import pytest
+from unittest.mock import MagicMock
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.factory import reset_cache
 from infrastructure.operations.result import OperationResult, OperationStatus
+
+
+@pytest.fixture
+def mock_settings():
+    """Create mock settings for idempotency tests."""
+    settings = MagicMock()
+    settings.idempotency.IDEMPOTENCY_TTL_SECONDS = 3600
+    settings.aws.AWS_REGION = "us-east-1"
+    return settings
 
 
 @pytest.fixture
