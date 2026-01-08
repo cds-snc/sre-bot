@@ -1,8 +1,8 @@
 from functools import partial
 
-from core.config import settings
-from core.logging import get_module_logger
-from dotenv import load_dotenv
+from infrastructure.services import get_settings
+from infrastructure.logging.setup import configure_logging
+
 from infrastructure.events import (
     discover_and_register_handlers,
     log_registered_handlers,
@@ -31,10 +31,11 @@ from server import bot_middleware, server
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-server_app = server.handler
-logger = get_module_logger()
+settings = get_settings()
+configure_logging(settings=settings)  # Explicit structlog configuration
 
-load_dotenv()
+server_app = server.handler
+logger = configure_logging(settings=settings)
 
 
 def main(bot):
