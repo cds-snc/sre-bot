@@ -7,8 +7,7 @@ Provides application-scoped singleton providers for core infrastructure services
 from functools import lru_cache
 
 from infrastructure.configuration import Settings
-from infrastructure.identity import IdentityResolver
-from integrations.slack.client import SlackClientManager
+from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.i18n.service import TranslationService
@@ -43,19 +42,32 @@ def get_settings() -> Settings:
 
 
 @lru_cache
-def get_identity_resolver() -> IdentityResolver:
+def get_identity_service() -> IdentityService:
     """
-    Get application-scoped identity resolver singleton.
+    Get application-scoped identity service singleton.
+
+    Returns an IdentityService instance with configured IdentityResolver
+    for resolving user identities from Slack, JWT, webhooks, and system contexts.
 
     Returns:
-        IdentityResolver: Cached identity resolver instance with injected dependencies.
+        IdentityService: Cached identity service instance with injected dependencies.
 
     Usage:
-        @router.post("/identity")
-        def resolve_user(resolver: IdentityResolverDep) -> User:
-            return resolver.resolve_from_jwt(jwt_payload)
+        # Via dependency injection
+        from infrastructure.services import IdentityServiceDep
+
+        @router.post("/identity/slack")
+        def resolve_user(identity: IdentityServiceDep, slack_user_id: str):
+            user = identity.resolve_from_slack(slack_user_id)
+            return {"user": user.model_dump()}
+
+        @router.post("/identity/jwt")
+        def resolve_jwt_user(identity: IdentityServiceDep, jwt_payload: dict):
+            user = identity.resolve_from_jwt(jwt_payload)
+            return {"user": user.model_dump()}
     """
-    return IdentityResolver(slack_client_manager=SlackClientManager)
+    settings = get_settings()
+    return IdentityService(settings=settings)
 
 
 @lru_cache

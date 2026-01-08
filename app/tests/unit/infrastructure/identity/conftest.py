@@ -3,7 +3,20 @@
 import pytest
 from unittest.mock import Mock
 
-from infrastructure.identity import IdentityResolver, IdentitySource, User, SlackUser
+from infrastructure.identity import (
+    IdentityService,
+    IdentityResolver,
+    IdentitySource,
+    User,
+    SlackUser,
+)
+from infrastructure.configuration import Settings
+
+
+@pytest.fixture
+def mock_settings():
+    """Mock Settings instance for testing."""
+    return Mock(spec=Settings)
 
 
 @pytest.fixture
@@ -19,6 +32,14 @@ def mock_slack_client_manager():
 def identity_resolver(mock_slack_client_manager):
     """Create IdentityResolver with mocked Slack client."""
     return IdentityResolver(slack_client_manager=mock_slack_client_manager)
+
+
+@pytest.fixture
+def identity_service(mock_settings, mock_slack_client_manager):
+    """Create IdentityService with mocked dependencies."""
+    return IdentityService(
+        settings=mock_settings, slack_client_manager=mock_slack_client_manager
+    )
 
 
 @pytest.fixture
