@@ -23,10 +23,10 @@ import logging
 import sys
 import structlog
 from structlog.stdlib import BoundLogger
-from typing import Optional
-from infrastructure.services.providers import get_settings
+from typing import TYPE_CHECKING
 
-settings = get_settings()
+if TYPE_CHECKING:
+    from infrastructure.configuration import Settings
 
 
 def _is_test_environment() -> bool:
@@ -39,8 +39,9 @@ def _is_test_environment() -> bool:
 
 
 def configure_logging(
-    log_level: Optional[str] = None,
-    is_production: Optional[bool] = None,
+    settings: "Settings",
+    log_level: str | None = None,
+    is_production: bool | None = None,
 ) -> BoundLogger:
     """Configure structured logging with enhanced processors.
 
@@ -51,6 +52,7 @@ def configure_logging(
     - Test environment detection for log suppression
 
     Args:
+        settings: Settings instance (REQUIRED). Must be passed explicitly.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to settings.LOG_LEVEL if not provided.
         is_production: Optional override for production mode. Defaults to
@@ -61,11 +63,14 @@ def configure_logging(
 
     Example:
         # At application startup
-        logger = configure_logging()
+        from infrastructure.services import get_settings
+        settings = get_settings()
+        logger = configure_logging(settings=settings)
 
         # With overrides for testing
-        logger = configure_logging(log_level="DEBUG", is_production=False)
+        logger = configure_logging(settings=settings, log_level="DEBUG", is_production=False)
     """
+
     # Suppress all logging during tests
     if _is_test_environment():
         # Set root logger to suppress all output during tests
@@ -139,11 +144,6 @@ def configure_logging(
     return structlog.stdlib.get_logger()
 
 
-# Module-level logger - used for backward compatibility with legacy code
-# New code should use: structlog.get_logger()
-logger: BoundLogger = configure_logging()
-
-
 # =============================================================================
 # DEPRECATED FUNCTIONS - For backward compatibility only
 # =============================================================================
@@ -182,11 +182,11 @@ def get_module_logger() -> BoundLogger:
     # Auto-detect calling module for backward compatibility
     current_frame = inspect.currentframe()
     if current_frame is None:
-        return logger
+        return structlog.get_logger()
 
     frame = current_frame.f_back
     if frame is None:
-        return logger
+        return structlog.get_logger()
 
     module = inspect.getmodule(frame)
     if module:
@@ -196,6 +196,6 @@ def get_module_logger() -> BoundLogger:
             "component": parts[-1],
             "module_path": module_name,
         }
-        return logger.bind(**context)
+        return structlog.get_logger().bind(**context)
 
-    return logger.bind(component="unknown")
+    return structlog.get_logger().bind(component="unknown")

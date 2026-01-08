@@ -51,7 +51,6 @@ Example (Best Practice):
 # Core logging setup
 from infrastructure.logging.setup import (
     configure_logging,
-    logger,  # Module-level logger for backward compat
     # Deprecated - kept for backward compatibility
     get_module_logger,
 )
@@ -76,7 +75,6 @@ from infrastructure.logging.formatters import (
 __all__ = [
     # Setup
     "configure_logging",
-    "logger",
     # Deprecated - backward compatibility only
     "get_module_logger",
     # Context
