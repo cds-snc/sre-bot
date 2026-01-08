@@ -103,7 +103,7 @@ class TestDispatcherWithRealChannels:
         mock_client.conversations_open.assert_called_once()
         mock_client.chat_postMessage.assert_called_once()
 
-    def test_send_notification_through_email_channel(self, monkeypatch):
+    def test_send_notification_through_email_channel(self, monkeypatch, mock_settings):
         """Test end-to-end email notification."""
         mock_send_email = MagicMock(
             return_value=OperationResult(
@@ -131,7 +131,7 @@ class TestDispatcherWithRealChannels:
             raising=False,
         )
 
-        email_channel = EmailChannel()
+        email_channel = EmailChannel(settings=mock_settings)
         dispatcher = NotificationDispatcher(channels={"email": email_channel})
 
         notification = Notification(
@@ -148,7 +148,7 @@ class TestDispatcherWithRealChannels:
         assert results[0].channel == "email"
         assert results[0].external_id is not None
 
-    def test_send_notification_through_sms_channel(self, monkeypatch):
+    def test_send_notification_through_sms_channel(self, monkeypatch, mock_settings):
         """Test end-to-end SMS notification."""
         mock_post_event = MagicMock()
         mock_response = MagicMock()
@@ -162,7 +162,7 @@ class TestDispatcherWithRealChannels:
             raising=False,
         )
 
-        sms_channel = SMSChannel()
+        sms_channel = SMSChannel(settings=mock_settings)
         dispatcher = NotificationDispatcher(channels={"sms": sms_channel})
 
         notification = Notification(
@@ -184,7 +184,7 @@ class TestDispatcherWithRealChannels:
         # Verify Notify API calls
         mock_post_event.assert_called_once()
 
-    def test_multi_channel_fallback(self, monkeypatch):
+    def test_multi_channel_fallback(self, monkeypatch, mock_settings):
         """Test fallback from chat to email when chat fails."""
         # Configure Slack to fail
         mock_slack_manager = MagicMock()
@@ -225,7 +225,7 @@ class TestDispatcherWithRealChannels:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel()
+        email_channel = EmailChannel(settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel},
@@ -484,7 +484,7 @@ class TestDispatcherIdempotencyIntegration:
 class TestDispatcherHealthCheck:
     """Integration tests for health check functionality."""
 
-    def test_health_check_all_channels(self, monkeypatch):
+    def test_health_check_all_channels(self, monkeypatch, mock_settings):
         """Test health check across multiple channels."""
         mock_slack_manager = MagicMock()
         mock_slack_client = MagicMock()
@@ -523,7 +523,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel()
+        email_channel = EmailChannel(settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}
@@ -533,7 +533,7 @@ class TestDispatcherHealthCheck:
 
         assert health == {"chat": True, "email": True}
 
-    def test_health_check_with_failing_channel(self, monkeypatch):
+    def test_health_check_with_failing_channel(self, monkeypatch, mock_settings):
         """Test health check when one channel fails."""
         mock_slack_manager = MagicMock()
         mock_slack_client = MagicMock()
@@ -572,7 +572,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel()
+        email_channel = EmailChannel(settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}

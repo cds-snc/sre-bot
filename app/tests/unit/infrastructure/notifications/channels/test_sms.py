@@ -16,13 +16,16 @@ class TestSMSChannel:
     """Tests for SMSChannel implementation."""
 
     @pytest.fixture
-    def sms_channel(self):
+    def sms_channel(self, mock_settings):
         """Create SMSChannel instance.
+
+        Args:
+            mock_settings: Mock settings fixture
 
         Returns:
             SMSChannel instance
         """
-        return SMSChannel()
+        return SMSChannel(settings=mock_settings)
 
     def test_channel_name(self, sms_channel):
         """Channel name returns 'sms'."""
