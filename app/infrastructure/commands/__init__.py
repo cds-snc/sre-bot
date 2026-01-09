@@ -5,6 +5,7 @@ This framework provides:
 - CommandContext: Platform-agnostic execution context
 - CommandParser: Parse and validate command arguments
 - SlackCommandProvider: Slack Bolt SDK integration (in providers)
+- CommandService: Service wrapper for dependency injection
 
 Example:
     from infrastructure.commands import (
@@ -28,6 +29,15 @@ Example:
     settings = get_settings()
     adapter = SlackCommandProvider(settings=settings, config={})
     bot.command("/sre mymodule")(adapter.handle)
+
+Recommended Usage (Service Pattern with DI):
+    from infrastructure.services import CommandServiceDep
+
+    @router.post("/commands/register")
+    def register_command(command_service: CommandServiceDep, module: str):
+        registry = command_service.get_registry(module)
+        commands = registry.get_all_commands()
+        return {"module": module, "commands": len(commands)}
 """
 
 from infrastructure.commands.models import (
@@ -40,6 +50,7 @@ from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.parser import CommandParser, CommandParseError
 from infrastructure.commands.context import CommandContext, ResponseChannel
 from infrastructure.commands.providers.base import CommandProvider
+from infrastructure.commands.service import CommandService
 from infrastructure.commands.responses import (
     Button,
     ButtonStyle,
@@ -67,6 +78,8 @@ __all__ = [
     "CommandParseError",
     "CommandContext",
     "ResponseChannel",
+    # Service
+    "CommandService",
     # Adapters
     "CommandProvider",
     # Responses
