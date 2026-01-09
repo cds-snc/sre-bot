@@ -15,6 +15,8 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
+from infrastructure.commands.service import CommandService
+from infrastructure.persistence.service import PersistenceService
 from infrastructure.services.providers import (
     get_settings,
     get_identity_service,
@@ -25,6 +27,8 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_resilience_service,
     get_notification_service,
+    get_command_service,
+    get_persistence_service,
 )
 
 # Settings dependency
@@ -57,6 +61,12 @@ NotificationServiceDep = Annotated[
     NotificationService, Depends(get_notification_service)
 ]
 
+# Command service dependency
+CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
+
+# Persistence service dependency
+PersistenceServiceDep = Annotated[PersistenceService, Depends(get_persistence_service)]
+
 __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
@@ -67,4 +77,6 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "NotificationServiceDep",
+    "CommandServiceDep",
+    "PersistenceServiceDep",
 ]

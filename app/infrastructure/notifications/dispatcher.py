@@ -34,7 +34,7 @@ Usage Example:
 """
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
 from infrastructure.notifications.models import (
@@ -42,7 +42,9 @@ from infrastructure.notifications.models import (
     NotificationResult,
     NotificationStatus,
 )
-from infrastructure.idempotency.cache import IdempotencyCache
+
+if TYPE_CHECKING:
+    from infrastructure.idempotency.cache import IdempotencyCache
 
 logger = structlog.get_logger()
 
@@ -79,7 +81,7 @@ class NotificationDispatcher:
         self,
         channels: Dict[str, NotificationChannel],
         fallback_order: Optional[List[str]] = None,
-        idempotency_cache: Optional[IdempotencyCache] = None,
+        idempotency_cache: Optional["IdempotencyCache"] = None,
         idempotency_ttl_seconds: int = 3600,
     ):
         """Initialize notification dispatcher.

@@ -1,6 +1,6 @@
 """Chat channel implementation using Slack."""
 
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -13,8 +13,10 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.slack.client import SlackClientManager
+
+if TYPE_CHECKING:
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -26,14 +28,26 @@ class ChatChannel(NotificationChannel):
     Supports recipient resolution by email or Slack user ID.
     """
 
-    def __init__(self):
-        """Initialize Slack chat channel."""
+    def __init__(self, circuit_breaker: Optional["CircuitBreaker"] = None):
+        """Initialize Slack chat channel.
+
+        Args:
+            circuit_breaker: Optional circuit breaker for fault tolerance.
+                           If not provided, creates a default one.
+        """
         self._client_manager = SlackClientManager()
-        self._circuit_breaker = CircuitBreaker(
-            name="slack_chat_channel",
-            failure_threshold=5,
-            timeout_seconds=60,
-        )
+
+        if circuit_breaker is None:
+            # Import only if needed (for backward compatibility)
+            from infrastructure.resilience.circuit_breaker import CircuitBreaker
+
+            circuit_breaker = CircuitBreaker(
+                name="slack_chat_channel",
+                failure_threshold=5,
+                timeout_seconds=60,
+            )
+
+        self._circuit_breaker = circuit_breaker
         logger.info("initialized_chat_channel", backend="slack")
 
     @property

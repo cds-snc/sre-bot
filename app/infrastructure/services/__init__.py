@@ -14,6 +14,8 @@ from infrastructure.services.dependencies import (
     IdempotencyServiceDep,
     ResilienceServiceDep,
     NotificationServiceDep,
+    CommandServiceDep,
+    PersistenceServiceDep,
 )
 from infrastructure.services.providers import (
     get_settings,
@@ -25,6 +27,8 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_resilience_service,
     get_notification_service,
+    get_command_service,
+    get_persistence_service,
 )
 
 __all__ = [
@@ -37,6 +41,8 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "NotificationServiceDep",
+    "CommandServiceDep",
+    "PersistenceServiceDep",
     "get_settings",
     "get_identity_service",
     "get_jwks_manager",
@@ -46,4 +52,6 @@ __all__ = [
     "get_idempotency_service",
     "get_resilience_service",
     "get_notification_service",
+    "get_command_service",
+    "get_persistence_service",
 ]

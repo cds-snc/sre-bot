@@ -27,17 +27,12 @@ class TestChatChannel:
         Returns:
             ChatChannel instance
         """
-        with (
-            patch(
-                "infrastructure.notifications.channels.chat.SlackClientManager",
-                return_value=mock_slack_client_manager,
-            ),
-            patch(
-                "infrastructure.notifications.channels.chat.CircuitBreaker",
-                return_value=mock_circuit_breaker,
-            ),
+        with patch(
+            "infrastructure.notifications.channels.chat.SlackClientManager",
+            return_value=mock_slack_client_manager,
         ):
-            return ChatChannel()
+            # Pass circuit breaker as parameter (new pattern)
+            return ChatChannel(circuit_breaker=mock_circuit_breaker)
 
     def test_channel_name(self, chat_channel):
         """Channel name returns 'chat'."""

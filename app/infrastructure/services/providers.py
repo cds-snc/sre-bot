@@ -15,6 +15,8 @@ from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
+from infrastructure.commands.service import CommandService
+from infrastructure.persistence.service import PersistenceService
 
 
 @lru_cache
@@ -220,6 +222,11 @@ def get_notification_service() -> NotificationService:
     Returns a NotificationService instance for multi-channel notification
     delivery with automatic fallback, idempotency, and circuit breakers.
 
+    The service is initialized with injected dependencies:
+    - Settings for configuration
+    - IdempotencyService for preventing duplicate sends
+    - ResilienceService for circuit breakers
+
     Usage:
         from infrastructure.services import NotificationServiceDep
 
@@ -236,4 +243,58 @@ def get_notification_service() -> NotificationService:
         NotificationService: Cached notification service instance
     """
     settings = get_settings()
-    return NotificationService(settings=settings)
+    idempotency_service = get_idempotency_service()
+    resilience_service = get_resilience_service()
+    return NotificationService(
+        settings=settings,
+        idempotency_service=idempotency_service,
+        resilience_service=resilience_service,
+    )
+
+
+@lru_cache
+def get_command_service() -> CommandService:
+    """Get application-scoped command service singleton.
+
+    Returns a CommandService instance that provides centralized command
+    registration and execution for all modules.
+
+    Usage:
+        from infrastructure.services import CommandServiceDep
+
+        @router.post("/commands/register")
+        def register_command(command_service: CommandServiceDep, module: str):
+            registry = command_service.get_registry(module)
+            commands = registry.get_all_commands()
+            return {"module": module, "commands": len(commands)}
+
+    Returns:
+        CommandService: Cached command service instance
+    """
+    settings = get_settings()
+    return CommandService(settings=settings)
+
+
+@lru_cache
+def get_persistence_service() -> PersistenceService:
+    """Get application-scoped persistence service singleton.
+
+    Returns a PersistenceService instance for audit trail and operational
+    data storage in DynamoDB.
+
+    Usage:
+        from infrastructure.services import PersistenceServiceDep
+
+        @router.post("/audit/write")
+        def write_audit(
+            persistence: PersistenceServiceDep,
+            event: AuditEvent
+        ):
+            success = persistence.write_audit_event(event)
+            return {"written": success}
+
+    Returns:
+        PersistenceService: Cached persistence service instance
+    """
+    settings = get_settings()
+    return PersistenceService(settings=settings)

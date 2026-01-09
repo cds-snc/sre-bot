@@ -11,11 +11,11 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.notify.client import post_event, create_authorization_header
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -27,17 +27,29 @@ class SMSChannel(NotificationChannel):
     Requires phone numbers in E.164 format (+1234567890).
     """
 
-    def __init__(self, settings: "Settings"):
+    def __init__(
+        self,
+        settings: "Settings",
+        circuit_breaker: Optional["CircuitBreaker"] = None,
+    ):
         """Initialize GC Notify SMS channel.
 
         Args:
             settings: Settings instance with notify configuration.
+            circuit_breaker: Optional circuit breaker for fault tolerance.
+                           If not provided, creates a default one.
         """
-        self._circuit_breaker = CircuitBreaker(
-            name="gc_notify_sms_channel",
-            failure_threshold=5,
-            timeout_seconds=60,
-        )
+        if circuit_breaker is None:
+            # Import only if needed (for backward compatibility)
+            from infrastructure.resilience.circuit_breaker import CircuitBreaker
+
+            circuit_breaker = CircuitBreaker(
+                name="gc_notify_sms_channel",
+                failure_threshold=5,
+                timeout_seconds=60,
+            )
+
+        self._circuit_breaker = circuit_breaker
         self._api_url = settings.notify.NOTIFY_API_URL
         logger.info("initialized_sms_channel", backend="gc_notify")
 
