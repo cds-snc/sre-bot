@@ -51,12 +51,13 @@ def mock_slack_client(monkeypatch):
 @pytest.fixture
 def mock_circuit_breaker(monkeypatch):
     """Mock circuit breaker to pass through calls."""
+    # Mock at resilience module level, not at channel import level
     mock_cb_class = MagicMock()
     mock_cb = MagicMock()
     mock_cb.call.side_effect = lambda func, **kwargs: func(**kwargs)
     mock_cb_class.return_value = mock_cb
     monkeypatch.setattr(
-        "infrastructure.notifications.channels.chat.CircuitBreaker",
+        "infrastructure.resilience.circuit_breaker.CircuitBreaker",
         mock_cb_class,
         raising=False,
     )
@@ -271,7 +272,9 @@ class TestNotificationResilience:
         for _ in range(3):
             handlers.handle_member_added(event)
 
-        assert mock_circuit_breaker.call.call_count >= 2
+        # Circuit breaker's call method should be invoked for each notification attempt
+        # Each event triggers 2 notifications (requestor + member), so 3 events = 6 calls
+        assert mock_circuit_breaker.call.call_count >= 4
 
     def test_notification_failure_does_not_propagate(
         self, mock_slack_client, mock_circuit_breaker, mock_idempotency_cache

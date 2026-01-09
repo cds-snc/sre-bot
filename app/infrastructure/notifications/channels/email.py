@@ -1,6 +1,6 @@
 """Email channel implementation using Google Workspace Gmail."""
 
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 import structlog
 from infrastructure.notifications.channels.base import NotificationChannel
@@ -11,11 +11,11 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.google_workspace import gmail_next
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -27,17 +27,29 @@ class EmailChannel(NotificationChannel):
     Supports sending from configured service account or user delegation.
     """
 
-    def __init__(self, settings: "Settings"):
+    def __init__(
+        self,
+        settings: "Settings",
+        circuit_breaker: Optional["CircuitBreaker"] = None,
+    ):
         """Initialize Gmail email channel.
 
         Args:
             settings: Settings instance with google_workspace configuration.
+            circuit_breaker: Optional circuit breaker for fault tolerance.
+                           If not provided, creates a default one.
         """
-        self._circuit_breaker = CircuitBreaker(
-            name="gmail_email_channel",
-            failure_threshold=5,
-            timeout_seconds=60,
-        )
+        if circuit_breaker is None:
+            # Import only if needed (for backward compatibility)
+            from infrastructure.resilience.circuit_breaker import CircuitBreaker
+
+            circuit_breaker = CircuitBreaker(
+                name="gmail_email_channel",
+                failure_threshold=5,
+                timeout_seconds=60,
+            )
+
+        self._circuit_breaker = circuit_breaker
         self._sender_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
         logger.info(
             "initialized_email_channel",
