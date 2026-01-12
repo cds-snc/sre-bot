@@ -1,6 +1,5 @@
 """Unit tests for SheetsClient."""
 
-
 import pytest
 
 from infrastructure.clients.google_workspace.sheets import (
