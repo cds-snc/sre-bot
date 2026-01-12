@@ -2,9 +2,10 @@
 
 import json
 from typing import Any, Callable
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
+from googleapiclient.errors import HttpError
 
 
 @pytest.fixture
@@ -101,6 +102,25 @@ def mock_google_workspace_settings(google_credentials_json: str) -> Mock:
 
 
 @pytest.fixture
+def mock_session_provider():
+    """Mock SessionProvider that prevents actual API calls.
+
+    Returns a Mock that provides a properly configured mock service.
+    This ensures no real Google API calls are made during tests.
+
+    Usage:
+        def test_something(mock_session_provider):
+            # Configure mock service behavior
+            mock_service = mock_session_provider.get_service.return_value
+            mock_service.files().get().execute.return_value = {"id": "123"}
+    """
+    provider = Mock()
+    # Return a MagicMock for the service to support arbitrary chaining
+    provider.get_service.return_value = MagicMock()
+    return provider
+
+
+@pytest.fixture
 def make_mock_request() -> Callable:
     """Factory fixture for creating mock Google API requests.
 
@@ -150,7 +170,6 @@ def mock_google_api_error():
             error = mock_google_api_error(status=404, reason="Not Found")
             # Use error in test
     """
-    from googleapiclient.errors import HttpError
 
     def _make(status: int = 500, reason: str = "Internal Server Error") -> HttpError:
         """Create a mock HttpError.
@@ -179,20 +198,3 @@ def mock_google_api_error():
         return HttpError(resp=resp, content=content)
 
     return _make
-
-
-@pytest.fixture
-def mock_session_provider() -> Mock:
-    """Mock SessionProvider for testing.
-
-    Returns a mock SessionProvider that can be configured for testing.
-    Use this to mock SessionProvider dependencies in client tests.
-
-    Example:
-        def test_client(mock_session_provider):
-            mock_service = Mock()
-            mock_session_provider.get_service.return_value = mock_service
-            client = DirectoryClient(mock_session_provider)
-            # client will use the mocked service
-    """
-    return Mock()

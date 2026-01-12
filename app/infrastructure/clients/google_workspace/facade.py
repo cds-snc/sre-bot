@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from infrastructure.clients.google_workspace.directory import DirectoryClient
+from infrastructure.clients.google_workspace.drive import DriveClient
 from infrastructure.clients.google_workspace.session_provider import SessionProvider
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ class GoogleWorkspaceClients:
 
     Attributes:
         directory: DirectoryClient for users, groups, and members operations
+        drive: DriveClient for files, folders, and metadata operations
 
     Usage:
         @router.get("/users/{user_id}")
@@ -37,6 +39,7 @@ class GoogleWorkspaceClients:
 
     _session_provider: SessionProvider
     directory: DirectoryClient
+    drive: DriveClient
 
     def __init__(self, google_settings: "GoogleWorkspaceSettings") -> None:
         """Initialize Google Workspace clients facade.
@@ -55,7 +58,11 @@ class GoogleWorkspaceClients:
             session_provider=self._session_provider,
             default_customer_id=google_settings.GOOGLE_WORKSPACE_CUSTOMER_ID,
         )
+        self.drive = DriveClient(
+            session_provider=self._session_provider,
+        )
         # self.sheets = SheetsClient(...)
+        # self.docs = DocsClient(...)
         # self.gmail = GmailClient(...)
 
         self._logger = logger.bind(component="google_workspace_clients")
