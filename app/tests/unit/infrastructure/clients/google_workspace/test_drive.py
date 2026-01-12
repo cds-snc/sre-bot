@@ -1,6 +1,5 @@
 """Unit tests for DriveClient."""
 
-
 import pytest
 
 from infrastructure.clients.google_workspace.drive import DriveClient, MIME_TYPES
