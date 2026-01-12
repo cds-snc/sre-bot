@@ -98,3 +98,23 @@ class TestGoogleWorkspaceClients:
         # Verify logger attribute exists (structlog.bind returns a new logger)
         assert hasattr(facade, "_logger")
         assert facade._logger is not None
+
+    @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
+    def test_client_attributes_exist(
+        self, mock_session_provider_class, mock_google_workspace_settings
+    ):
+        """Test that all client attributes are properly initialized."""
+        mock_provider_instance = Mock(spec=SessionProvider)
+        mock_session_provider_class.return_value = mock_provider_instance
+
+        facade = GoogleWorkspaceClients(mock_google_workspace_settings)
+
+        # Verify all client attributes exist
+        assert hasattr(facade, "directory")
+        assert hasattr(facade, "drive")
+        assert hasattr(facade, "docs")
+        assert hasattr(facade, "sheets")
+        assert facade.directory is not None
+        assert facade.drive is not None
+        assert facade.docs is not None
+        assert facade.sheets is not None
