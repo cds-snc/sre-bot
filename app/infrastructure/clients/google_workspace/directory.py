@@ -76,7 +76,7 @@ class DirectoryClient:
         Returns:
             OperationResult with user data in data field
         """
-        self._logger.info("get_user", user_key=user_key)
+        self._logger.debug("getting_user", user_key=user_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -109,7 +109,7 @@ class DirectoryClient:
             OperationResult with list of users in data field
         """
         customer_id = customer or self._default_customer_id
-        self._logger.info("list_users", customer=customer_id)
+        self._logger.debug("listing_users", customer=customer_id)
 
         def api_call() -> list[dict[str, Any]]:
             service = self._session_provider.get_service(
@@ -149,7 +149,7 @@ class DirectoryClient:
         Returns:
             OperationResult with created user data in data field
         """
-        self._logger.info("create_user", email=body.get("primaryEmail"))
+        self._logger.info("creating_user", email=body.get("primaryEmail"))
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -179,7 +179,7 @@ class DirectoryClient:
         Returns:
             OperationResult with updated user data in data field
         """
-        self._logger.info("update_user", user_key=user_key)
+        self._logger.info("updating_user", user_key=user_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -207,7 +207,7 @@ class DirectoryClient:
         Returns:
             OperationResult with success status (no data)
         """
-        self._logger.info("delete_user", user_key=user_key)
+        self._logger.info("deleting_user", user_key=user_key)
 
         def api_call() -> None:
             service = self._session_provider.get_service(
@@ -236,7 +236,7 @@ class DirectoryClient:
         Returns:
             OperationResult with group data in data field
         """
-        self._logger.info("get_group", group_key=group_key)
+        self._logger.debug("getting_group", group_key=group_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -269,7 +269,7 @@ class DirectoryClient:
             OperationResult with list of groups in data field
         """
         customer_id = customer or self._default_customer_id
-        self._logger.info("list_groups", customer=customer_id)
+        self._logger.debug("listing_groups", customer=customer_id)
 
         def api_call() -> list[dict[str, Any]]:
             service = self._session_provider.get_service(
@@ -309,7 +309,7 @@ class DirectoryClient:
         Returns:
             OperationResult with created group data in data field
         """
-        self._logger.info("create_group", email=body.get("email"))
+        self._logger.info("creating_group", email=body.get("email"))
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -339,7 +339,7 @@ class DirectoryClient:
         Returns:
             OperationResult with updated group data in data field
         """
-        self._logger.info("update_group", group_key=group_key)
+        self._logger.info("updating_group", group_key=group_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -367,7 +367,7 @@ class DirectoryClient:
         Returns:
             OperationResult with success status (no data)
         """
-        self._logger.info("delete_group", group_key=group_key)
+        self._logger.info("deleting_group", group_key=group_key)
 
         def api_call() -> None:
             service = self._session_provider.get_service(
@@ -398,7 +398,7 @@ class DirectoryClient:
         Returns:
             OperationResult with list of members in data field
         """
-        self._logger.info("list_members", group_key=group_key)
+        self._logger.debug("listing_members", group_key=group_key)
 
         def api_call() -> list[dict[str, Any]]:
             service = self._session_provider.get_service(
@@ -441,7 +441,7 @@ class DirectoryClient:
             OperationResult with member data in data field
         """
         self._logger.info(
-            "add_member", group_key=group_key, member_email=body.get("email")
+            "adding_member", group_key=group_key, member_email=body.get("email")
         )
 
         def api_call() -> dict[str, Any]:
@@ -472,7 +472,7 @@ class DirectoryClient:
         Returns:
             OperationResult with success status (no data)
         """
-        self._logger.info("remove_member", group_key=group_key, member_key=member_key)
+        self._logger.info("removing_member", group_key=group_key, member_key=member_key)
 
         def api_call() -> None:
             service = self._session_provider.get_service(
@@ -503,7 +503,7 @@ class DirectoryClient:
         Returns:
             OperationResult with member data in data field
         """
-        self._logger.info("get_member", group_key=group_key, member_key=member_key)
+        self._logger.debug("getting_member", group_key=group_key, member_key=member_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -535,7 +535,9 @@ class DirectoryClient:
         Returns:
             OperationResult with boolean data indicating membership
         """
-        self._logger.info("has_member", group_key=group_key, member_key=member_key)
+        self._logger.debug(
+            "checking_member", group_key=group_key, member_key=member_key
+        )
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -569,7 +571,7 @@ class DirectoryClient:
         Returns:
             OperationResult with dict mapping user_key to user data (or None if error)
         """
-        self._logger.debug("get_batch_users", user_keys=user_keys, kwargs=kwargs)
+        self._logger.debug("getting_batch_users", user_keys=user_keys, kwargs=kwargs)
 
         def api_call() -> dict[str, Optional[dict]]:
             service = self._session_provider.get_service(
@@ -622,7 +624,7 @@ class DirectoryClient:
         Returns:
             OperationResult with dict mapping group_key to group data (or None if error)
         """
-        self._logger.info("get_batch_groups", group_keys=group_keys, kwargs=kwargs)
+        self._logger.debug("getting_batch_groups", group_keys=group_keys, kwargs=kwargs)
 
         def api_call() -> dict[str, Optional[dict]]:
             service = self._session_provider.get_service(
@@ -678,7 +680,7 @@ class DirectoryClient:
             OperationResult with dict mapping group_key to member data (or None if not a member)
         """
         self._logger.debug(
-            "get_batch_members_for_user",
+            "getting_batch_members_for_user",
             group_keys=group_keys,
             user_key=user_key,
             kwargs=kwargs,
@@ -739,7 +741,7 @@ class DirectoryClient:
             OperationResult with dict mapping group_key to list of members
         """
         self._logger.debug(
-            "get_batch_group_members", group_keys=group_keys, kwargs=kwargs
+            "getting_batch_group_members", group_keys=group_keys, kwargs=kwargs
         )
 
         def api_call() -> dict[str, list[dict]]:
