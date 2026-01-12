@@ -7,6 +7,7 @@ import structlog
 from infrastructure.clients.google_workspace.directory import DirectoryClient
 from infrastructure.clients.google_workspace.docs import DocsClient
 from infrastructure.clients.google_workspace.drive import DriveClient
+from infrastructure.clients.google_workspace.gmail import GmailClient
 from infrastructure.clients.google_workspace.session_provider import SessionProvider
 from infrastructure.clients.google_workspace.sheets import SheetsClient
 
@@ -32,6 +33,7 @@ class GoogleWorkspaceClients:
         drive: DriveClient for files, folders, and metadata operations
         docs: DocsClient for Google Docs document operations
         sheets: SheetsClient for spreadsheet operations
+        gmail: GmailClient for email and messaging operations
 
     Usage:
         @router.get("/users/{user_id}")
@@ -46,6 +48,7 @@ class GoogleWorkspaceClients:
     drive: DriveClient
     docs: DocsClient
     sheets: SheetsClient
+    gmail: GmailClient
 
     def __init__(self, google_settings: "GoogleWorkspaceSettings") -> None:
         """Initialize Google Workspace clients facade.
@@ -73,6 +76,8 @@ class GoogleWorkspaceClients:
         self.sheets = SheetsClient(
             session_provider=self._session_provider,
         )
-        # self.gmail = GmailClient(...)
+        self.gmail = GmailClient(
+            session_provider=self._session_provider,
+        )
 
         self._logger = logger.bind(component="google_workspace_clients")

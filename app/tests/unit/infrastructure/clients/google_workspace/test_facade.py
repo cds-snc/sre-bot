@@ -114,7 +114,9 @@ class TestGoogleWorkspaceClients:
         assert hasattr(facade, "drive")
         assert hasattr(facade, "docs")
         assert hasattr(facade, "sheets")
+        assert hasattr(facade, "gmail")
         assert facade.directory is not None
         assert facade.drive is not None
         assert facade.docs is not None
         assert facade.sheets is not None
+        assert facade.gmail is not None
