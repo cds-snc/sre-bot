@@ -45,7 +45,7 @@ class GoogleDevProvider(SlackCommandProvider):
         body = platform_payload["command"]
         respond = platform_payload["respond"]
 
-        google.google_service_command(ack, client, body, respond, logger)
+        google.google_service_command(ack, client, body, respond)
 
 
 class SlackDevProvider(SlackCommandProvider):

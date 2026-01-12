@@ -10,6 +10,7 @@ from infrastructure.configuration import Settings
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
+from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.i18n.service import TranslationService
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
@@ -115,6 +116,47 @@ def get_aws_clients() -> AWSClients:
     """
     settings = get_settings()
     return AWSClients(aws_settings=settings.aws)
+
+
+@lru_cache
+def get_google_workspace_clients() -> GoogleWorkspaceClients:
+    """Provider for Google Workspace clients facade with all service operations.
+
+    Returns a fully-configured GoogleWorkspaceClients facade instance with credentials
+    and workspace settings from application configuration. The facade composes per-service
+    clients (Directory, Drive, Docs, Sheets, Gmail) with a shared SessionProvider.
+
+    Credentials are loaded from the service account key file specified in settings.
+    The facade holds a single SessionProvider instance that manages authentication
+    and delegation across all Google Workspace services.
+
+    Returns:
+        GoogleWorkspaceClients: Configured facade instance for all Google Workspace API calls.
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import GoogleWorkspaceClientsDep
+
+        @router.get("/groups")
+        def list_groups(google_clients: GoogleWorkspaceClientsDep):
+            result = google_clients.directory.list_groups()
+            if result.is_success:
+                return {"groups": result.data}
+
+        # Application code (jobs, modules, utils)
+        from infrastructure.services import get_google_workspace_clients
+
+        def sync_groups():
+            google_clients = get_google_workspace_clients()
+            result = google_clients.directory.list_groups()
+            return result
+
+    Note:
+        For Google Workspace types and data classes, import from:
+        infrastructure.clients.google_workspace
+    """
+    settings = get_settings()
+    return GoogleWorkspaceClients(google_settings=settings.google_workspace)
 
 
 @lru_cache

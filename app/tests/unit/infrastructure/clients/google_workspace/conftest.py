@@ -31,6 +31,45 @@ def google_credentials_json(google_service_account_credentials: dict[str, Any]) 
 
 
 @pytest.fixture
+def mock_batch_with_callback():
+    """Create a mock batch object that properly captures and uses callback.
+
+    Returns a function that creates a configured mock batch for testing.
+    """
+
+    def create_mock_batch(responses_dict: dict[str, Any]):
+        """Create mock batch with pre-configured responses.
+
+        Args:
+            responses_dict: Dict mapping request_id -> (response_data, exception)
+
+        Example:
+            mock_batch = create_mock_batch({
+                "group1@example.com": ({"email": "group1@example.com"}, None),
+                "group2@example.com": (None, Exception("Not found"))
+            })
+        """
+        mock_batch = Mock()
+        callback_holder = {}
+
+        def capture_callback(callback):
+            callback_holder["callback"] = callback
+            return mock_batch
+
+        def batch_execute():
+            cb = callback_holder["callback"]
+            for request_id, (response, exception) in responses_dict.items():
+                cb(request_id, response, exception)
+
+        mock_batch.execute = batch_execute
+        mock_batch.add = Mock()
+
+        return capture_callback, mock_batch
+
+    return create_mock_batch
+
+
+@pytest.fixture
 def mock_google_service() -> Mock:
     """Mock Google API service resource.
 
@@ -140,3 +179,20 @@ def mock_google_api_error():
         return HttpError(resp=resp, content=content)
 
     return _make
+
+
+@pytest.fixture
+def mock_session_provider() -> Mock:
+    """Mock SessionProvider for testing.
+
+    Returns a mock SessionProvider that can be configured for testing.
+    Use this to mock SessionProvider dependencies in client tests.
+
+    Example:
+        def test_client(mock_session_provider):
+            mock_service = Mock()
+            mock_session_provider.get_service.return_value = mock_service
+            client = DirectoryClient(mock_session_provider)
+            # client will use the mocked service
+    """
+    return Mock()

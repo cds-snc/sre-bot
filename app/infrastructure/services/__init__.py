@@ -9,6 +9,7 @@ from infrastructure.services.dependencies import (
     IdentityServiceDep,
     JWKSManagerDep,
     AWSClientsDep,
+    GoogleWorkspaceClientsDep,
     EventDispatcherDep,
     TranslationServiceDep,
     IdempotencyServiceDep,
@@ -22,6 +23,7 @@ from infrastructure.services.providers import (
     get_identity_service,
     get_jwks_manager,
     get_aws_clients,
+    get_google_workspace_clients,
     get_event_dispatcher,
     get_translation_service,
     get_idempotency_service,
@@ -32,10 +34,12 @@ from infrastructure.services.providers import (
 )
 
 __all__ = [
+    # Core dependencies
     "SettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
     "AWSClientsDep",
+    "GoogleWorkspaceClientsDep",
     "EventDispatcherDep",
     "TranslationServiceDep",
     "IdempotencyServiceDep",
@@ -43,10 +47,12 @@ __all__ = [
     "NotificationServiceDep",
     "CommandServiceDep",
     "PersistenceServiceDep",
+    # Core providers
     "get_settings",
     "get_identity_service",
     "get_jwks_manager",
     "get_aws_clients",
+    "get_google_workspace_clients",
     "get_event_dispatcher",
     "get_translation_service",
     "get_idempotency_service",
