@@ -89,7 +89,7 @@ class DriveClient:
         Returns:
             OperationResult with updated file metadata containing name and appProperties
         """
-        self._logger.debug(
+        self._logger.info(
             "adding_metadata",
             file_id=file_id,
             key=key,
@@ -136,7 +136,7 @@ class DriveClient:
         Returns:
             OperationResult with updated file metadata
         """
-        self._logger.debug(
+        self._logger.info(
             "deleting_metadata",
             file_id=file_id,
             key=key,
