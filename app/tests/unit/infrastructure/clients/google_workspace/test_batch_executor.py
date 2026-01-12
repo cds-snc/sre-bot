@@ -291,6 +291,9 @@ class TestExecuteBatchRequest:
         assert len(custom_callback_calls) == 2
         assert custom_callback_calls[0]["request_id"] == "req1"
         assert custom_callback_calls[1]["request_id"] == "req2"
+        # When using custom callback, no results are collected by default callback
+        # The custom callback is responsible for handling results
+        assert result.is_success
 
     def test_batch_request_adds_all_requests_to_batch(self, mock_google_service):
         """Test that all requests are added to the batch."""
