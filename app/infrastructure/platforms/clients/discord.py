@@ -43,7 +43,7 @@ class DiscordClientFacade:
         channel_id: str,
         content: Optional[str] = None,
         embeds: Optional[List[Dict[str, Any]]] = None,
-        **kwargs
+        **kwargs,
     ) -> OperationResult:
         """Send a message to a Discord channel.
 
@@ -67,7 +67,7 @@ class DiscordClientFacade:
         message_id: str,
         content: Optional[str] = None,
         embeds: Optional[List[Dict[str, Any]]] = None,
-        **kwargs
+        **kwargs,
     ) -> OperationResult:
         """Edit an existing Discord message.
 

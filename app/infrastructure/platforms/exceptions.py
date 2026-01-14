@@ -4,6 +4,8 @@ Provides specialized exceptions for platform provider errors,
 capability issues, and registration problems.
 """
 
+from typing import Optional
+
 
 class PlatformError(Exception):
     """Base exception for all platform-related errors.
@@ -125,7 +127,7 @@ class RateLimitExceededError(PlatformError):
         ...     time.sleep(e.retry_after)
     """
 
-    def __init__(self, message: str, retry_after: int = None):
+    def __init__(self, message: str, retry_after: Optional[int] = None):
         """Initialize with message and optional retry_after.
 
         Args:

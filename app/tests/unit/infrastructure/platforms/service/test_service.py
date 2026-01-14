@@ -1,11 +1,11 @@
 """Tests for PlatformService."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from infrastructure.configuration import Settings
-from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.exceptions import (
     CapabilityNotSupportedError,
@@ -57,9 +57,10 @@ class MockProvider(BasePlatformProvider):
             data={"message_id": "123"}, message="Message sent"
         )
 
-    def format_response(self, data, error=None):
-        if error:
-            return {"type": "error", "message": error}
+    def format_response(self, data, message_type="success"):
+        """Format response based on message_type."""
+        if message_type == "error":
+            return {"type": "error", "message": data.get("error", "Unknown error")}
         return {"type": "success", "data": data}
 
     def initialize_app(self):

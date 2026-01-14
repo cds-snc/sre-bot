@@ -50,7 +50,7 @@ import json
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
-import requests
+import requests  # type: ignore[import-untyped]
 import structlog
 
 from infrastructure.operations import OperationResult, OperationStatus
@@ -197,7 +197,7 @@ class InternalHttpClient:
             "DELETE", path, params=params, headers=headers, timeout=timeout
         )
 
-    def _request(
+    def _request(  # noqa: C901
         self,
         method: str,
         path: str,

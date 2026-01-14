@@ -243,7 +243,11 @@ class PlatformService:
             >>> print(response["blocks"])
         """
         provider = self.get_provider(platform)
-        return provider.format_response(data=data or {}, error=error)
+        message_type = "error" if error else "success"
+        response_data = data or {}
+        if error:
+            response_data["error"] = error
+        return provider.format_response(data=response_data, message_type=message_type)
 
     def supports_capability(
         self, platform: str, capability: PlatformCapability
@@ -323,6 +327,14 @@ class PlatformService:
             )
 
         log.debug("initializing_provider")
+
+        # Check if provider has initialize_app method
+        if not hasattr(provider, "initialize_app"):
+            log.warning("provider_no_initialize_method")
+            return OperationResult.success(
+                message=f"Platform provider {platform} does not require initialization",
+            )
+
         result = provider.initialize_app()
 
         if result.is_success:

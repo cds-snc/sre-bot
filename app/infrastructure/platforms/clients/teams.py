@@ -8,8 +8,8 @@ import structlog
 from typing import Any, Dict, Optional
 
 try:
-    from botbuilder.core import TurnContext, BotAdapter
-    from botbuilder.schema import Activity, ActivityTypes, Attachment
+    from botbuilder.core import TurnContext, BotAdapter  # type: ignore[import-not-found]
+    from botbuilder.schema import Activity, ActivityTypes, Attachment  # type: ignore[import-not-found]
 
     TEAMS_SDK_AVAILABLE = True
 except ImportError:

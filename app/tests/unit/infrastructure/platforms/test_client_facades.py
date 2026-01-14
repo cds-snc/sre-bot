@@ -1,6 +1,5 @@
 """Tests for platform client facades (Slack, Teams, Discord)."""
 
-import pytest
 from unittest.mock import Mock, patch
 from infrastructure.platforms.clients import (
     SlackClientFacade,

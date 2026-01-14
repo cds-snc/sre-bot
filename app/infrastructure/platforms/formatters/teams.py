@@ -62,7 +62,7 @@ class TeamsAdaptiveCardsFormatter(BaseResponseFormatter):
         log = logger.bind(operation="format_success", message=message)
         log.debug("formatting_success_response")
 
-        card_body = [
+        card_body: list[Dict[str, Any]] = [
             {
                 "type": "TextBlock",
                 "text": "✅ Success",
@@ -114,7 +114,7 @@ class TeamsAdaptiveCardsFormatter(BaseResponseFormatter):
         )
         log.debug("formatting_error_response")
 
-        card_body = [
+        card_body: list[Dict[str, Any]] = [
             {
                 "type": "TextBlock",
                 "text": "❌ Error",
@@ -166,7 +166,7 @@ class TeamsAdaptiveCardsFormatter(BaseResponseFormatter):
         log = logger.bind(operation="format_info", message=message)
         log.debug("formatting_info_message")
 
-        card_body = [
+        card_body: list[Dict[str, Any]] = [
             {
                 "type": "TextBlock",
                 "text": "ℹ️ Info",
@@ -206,7 +206,7 @@ class TeamsAdaptiveCardsFormatter(BaseResponseFormatter):
         log = logger.bind(operation="format_warning", message=message)
         log.debug("formatting_warning_message")
 
-        card_body = [
+        card_body: list[Dict[str, Any]] = [
             {
                 "type": "TextBlock",
                 "text": "⚠️ Warning",

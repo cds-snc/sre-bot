@@ -1,8 +1,5 @@
 """Tests for platform-agnostic data models."""
 
-import pytest
-from datetime import datetime
-
 from infrastructure.platforms.models import (
     CardAction,
     CardActionStyle,

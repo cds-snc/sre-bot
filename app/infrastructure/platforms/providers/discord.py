@@ -21,7 +21,7 @@ For reference:
 from typing import Any, Dict, Optional
 
 from infrastructure.platforms.providers.base import BasePlatformProvider
-from infrastructure.platforms.capabilities.models import PlatformCapability
+from infrastructure.platforms.capabilities.models import CapabilityDeclaration
 from infrastructure.operations import OperationResult
 
 
@@ -31,14 +31,14 @@ class DiscordPlatformProvider(BasePlatformProvider):
     ⚠️ NOT IMPLEMENTED - OUT OF SCOPE ⚠️
     """
 
-    def __init__(self, settings, formatter=None):
+    def __init__(self, settings: Any, formatter: Any = None):
         """Initialize Discord platform provider."""
         raise NotImplementedError(
             "Discord provider is not implemented. "
             "Discord platform support is out of scope for current release."
         )
 
-    def get_capabilities(self) -> PlatformCapability:
+    def get_capabilities(self) -> CapabilityDeclaration:
         """Get platform capabilities - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")
 
@@ -51,10 +51,10 @@ class DiscordPlatformProvider(BasePlatformProvider):
         """Send message - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")
 
-    def format_response(self, result: OperationResult) -> Dict[str, Any]:
+    def format_response(
+        self,
+        data: Dict[str, Any],
+        message_type: str = "success",
+    ) -> Dict[str, Any]:
         """Format response - NOT IMPLEMENTED."""
-        raise NotImplementedError("Discord support is out of scope")
-
-    def initialize_app(self) -> OperationResult:
-        """Initialize Discord bot - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")

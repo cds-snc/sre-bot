@@ -275,11 +275,20 @@ class BaseCommandAdapter(ABC):
             # No translation service - return key with parameters
             return key.format(**kwargs) if kwargs else key
 
-        return self._translation_service.translate(
-            key=key,
-            locale=locale or "en",
-            **kwargs,
-        )
+        # Convert string key to TranslationKey
+        from infrastructure.i18n.models import TranslationKey, Locale
+
+        try:
+            translation_key = TranslationKey.from_string(key)
+            locale_obj = Locale.from_string(locale or "en-US")
+            return self._translation_service.translate(
+                key=translation_key,
+                locale=locale_obj,
+                variables=kwargs or None,
+            )
+        except (ValueError, KeyError):
+            # Fallback to key with parameters if translation fails
+            return key.format(**kwargs) if kwargs else key
 
     def close(self) -> None:
         """Close adapter resources."""

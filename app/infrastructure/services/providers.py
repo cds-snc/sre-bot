@@ -509,6 +509,5 @@ def get_discord_client():
     """
     from infrastructure.platforms.clients import DiscordClientFacade
 
-    settings = get_settings()
     # Discord token not yet in settings - use empty string for placeholder
     return DiscordClientFacade(token="")
