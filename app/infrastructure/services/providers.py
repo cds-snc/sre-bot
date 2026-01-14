@@ -11,6 +11,7 @@ from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
+from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.i18n.service import TranslationService
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
@@ -159,6 +160,42 @@ def get_google_workspace_clients() -> GoogleWorkspaceClients:
     """
     settings = get_settings()
     return GoogleWorkspaceClients(google_settings=settings.google_workspace)
+
+
+@lru_cache
+def get_maxmind_client() -> MaxMindClient:
+    """Provider for MaxMind GeoIP2 client.
+
+    Returns a fully-configured MaxMindClient instance with database path
+    from application configuration.
+
+    Returns:
+        MaxMindClient: Configured client instance for geolocation operations
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import MaxMindClientDep
+
+        @router.get("/geolocate")
+        def geolocate(ip: str, maxmind: MaxMindClientDep):
+            result = maxmind.geolocate(ip_address=ip)
+            if result.is_success:
+                return result.data
+
+        # Application code (jobs, modules, utils)
+        from infrastructure.services import get_maxmind_client
+
+        def check_ip_location(ip: str):
+            maxmind = get_maxmind_client()
+            result = maxmind.geolocate(ip_address=ip)
+            return result
+
+    Note:
+        For MaxMind types and data classes, import from:
+        infrastructure.clients.maxmind
+    """
+    settings = get_settings()
+    return MaxMindClient(settings=settings)
 
 
 @lru_cache

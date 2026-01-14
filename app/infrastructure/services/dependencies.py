@@ -11,6 +11,7 @@ from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
+from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.service import IdempotencyService
@@ -30,6 +31,7 @@ from infrastructure.services.providers import (
     get_jwks_manager,
     get_aws_clients,
     get_google_workspace_clients,
+    get_maxmind_client,
     get_event_dispatcher,
     get_translation_service,
     get_idempotency_service,
@@ -62,6 +64,11 @@ AWSClientsDep = Annotated[AWSClients, Depends(get_aws_clients)]
 GoogleWorkspaceClientsDep = Annotated[
     GoogleWorkspaceClients, Depends(get_google_workspace_clients)
 ]
+
+# MaxMind client dependency - provides IP geolocation operations
+# Usage: maxmind.geolocate(ip_address="8.8.8.8")
+# For types and data classes: from infrastructure.clients.maxmind import GeoLocationData
+MaxMindClientDep = Annotated[MaxMindClient, Depends(get_maxmind_client)]
 
 # Events dispatcher dependency
 EventDispatcherDep = Annotated[EventDispatcher, Depends(get_event_dispatcher)]
