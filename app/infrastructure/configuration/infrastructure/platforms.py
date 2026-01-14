@@ -5,7 +5,7 @@ Configuration for collaboration platform integrations (Slack, Teams, Discord).
 
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from infrastructure.configuration.base import InfrastructureSettings
@@ -35,8 +35,8 @@ class SlackPlatformSettings(InfrastructureSettings):
     model_config = SettingsConfigDict(env_prefix="SLACK_")
 
     ENABLED: bool = Field(
-        default=False,
-        description="Enable Slack platform provider",
+        default=True,
+        description="Enable Slack platform provider (set SLACK_ENABLED=true to enable)",
     )
 
     SOCKET_MODE: bool = Field(
@@ -103,6 +103,12 @@ class SlackPlatformSettings(InfrastructureSettings):
                     "SLACK_SIGNING_SECRET is required when SOCKET_MODE is disabled (HTTP webhooks). "
                     "Find your signing secret at https://api.slack.com/apps → Basic Information"
                 )
+
+    @model_validator(mode="after")
+    def _validate_config(self):
+        """Automatically validate configuration after model initialization."""
+        self.validate_configuration()
+        return self
 
 
 class TeamsPlatformSettings(InfrastructureSettings):

@@ -100,11 +100,11 @@ class PlatformService:
             >>> print(f"Loaded {len(providers)} providers")
         """
         # Create and register Slack provider if configured
-        if self._settings.slack.ENABLED:
+        if self._settings.platforms.slack.ENABLED:
             try:
                 slack_formatter = SlackBlockKitFormatter()
                 slack_provider = SlackPlatformProvider(
-                    settings=self._settings.slack,
+                    settings=self._settings.platforms.slack,
                     formatter=slack_formatter,
                 )
                 self._registry.register_provider(slack_provider)

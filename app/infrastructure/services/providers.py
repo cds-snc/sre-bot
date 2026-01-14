@@ -19,8 +19,12 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
-
-# Note: PlatformService imported lazily in get_platform_service() to avoid circular imports
+from infrastructure.platforms import PlatformService
+from infrastructure.platforms.clients import (
+    SlackClientFacade,
+    TeamsClientFacade,
+    DiscordClientFacade,
+)
 
 
 @lru_cache
@@ -420,8 +424,6 @@ def get_platform_service():
     Returns:
         PlatformService: Cached platform service instance
     """
-    from infrastructure.platforms import PlatformService
-
     settings = get_settings()
     return PlatformService(settings=settings)
 
@@ -463,8 +465,6 @@ def get_slack_client():
     Note:
         For advanced use cases, access the raw WebClient via client.raw_client
     """
-    from infrastructure.platforms.clients import SlackClientFacade
-
     settings = get_settings()
     return SlackClientFacade(token=settings.slack.SLACK_TOKEN)
 
@@ -513,8 +513,6 @@ def get_teams_client():
     Note:
         Check facade.is_available before use if SDK availability is uncertain
     """
-    from infrastructure.platforms.clients import TeamsClientFacade
-
     settings = get_settings()
     return TeamsClientFacade(
         app_id=settings.teams.APP_ID,
@@ -544,7 +542,5 @@ def get_discord_client():
     Returns:
         DiscordClientFacade: Placeholder instance (not implemented)
     """
-    from infrastructure.platforms.clients import DiscordClientFacade
-
     # Discord token not yet in settings - use empty string for placeholder
     return DiscordClientFacade(token="")
