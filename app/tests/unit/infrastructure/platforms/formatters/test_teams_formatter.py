@@ -17,7 +17,7 @@ class TestTeamsAdaptiveCardsFormatterInitialization:
         formatter = TeamsAdaptiveCardsFormatter()
 
         assert formatter.SCHEMA_VERSION == "1.4"
-        assert formatter._locale == "en"
+        assert formatter._locale_str == "en-US"
 
     def test_initialization_sets_schema_version(self):
         """Test formatter uses Adaptive Cards schema version 1.4."""

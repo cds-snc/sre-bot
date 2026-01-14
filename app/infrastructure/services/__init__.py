@@ -18,6 +18,9 @@ from infrastructure.services.dependencies import (
     CommandServiceDep,
     PersistenceServiceDep,
     PlatformServiceDep,
+    SlackClientDep,
+    TeamsClientDep,
+    DiscordClientDep,
 )
 from infrastructure.services.providers import (
     get_settings,
@@ -33,6 +36,9 @@ from infrastructure.services.providers import (
     get_command_service,
     get_persistence_service,
     get_platform_service,
+    get_slack_client,
+    get_teams_client,
+    get_discord_client,
 )
 
 __all__ = [
@@ -50,6 +56,10 @@ __all__ = [
     "CommandServiceDep",
     "PersistenceServiceDep",
     "PlatformServiceDep",
+    # Platform client facades
+    "SlackClientDep",
+    "TeamsClientDep",
+    "DiscordClientDep",
     # Core providers
     "get_settings",
     "get_identity_service",
@@ -64,4 +74,8 @@ __all__ = [
     "get_command_service",
     "get_persistence_service",
     "get_platform_service",
+    # Platform client providers
+    "get_slack_client",
+    "get_teams_client",
+    "get_discord_client",
 ]

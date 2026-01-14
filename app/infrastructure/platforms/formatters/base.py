@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.i18n.translator import Translator
+from infrastructure.i18n.models import Locale, TranslationKey
 
 
 logger = structlog.get_logger()
@@ -28,22 +28,23 @@ class BaseResponseFormatter(ABC):
     - Implement format_error() for error messages
     - Implement format_info() for informational messages
     - Support OperationResult conversion via format_operation_result()
-    - Integrate with i18n Translator for multi-locale support
+    - Integrate with TranslationService for multi-locale support
 
     Attributes:
-        _translator: Optional Translator instance for i18n support.
+        _translation_service: Optional TranslationService instance for i18n support.
         _locale: Default locale for message formatting.
     """
 
-    def __init__(self, translator: Optional[Translator] = None, locale: str = "en"):
+    def __init__(self, translation_service=None, locale: str = "en-US"):
         """Initialize the response formatter.
 
         Args:
-            translator: Optional Translator instance for i18n.
-            locale: Default locale for formatting (default: "en").
+            translation_service: Optional TranslationService instance for i18n.
+            locale: Default locale for formatting (default: "en-US").
         """
-        self._translator = translator
-        self._locale = locale
+        self._translation_service = translation_service
+        # Store locale as string for flexibility, convert only when needed
+        self._locale_str = locale
         self._logger = logger.bind(formatter=self.__class__.__name__)
 
     @abstractmethod
@@ -141,33 +142,74 @@ class BaseResponseFormatter(ABC):
                 details=result.data,
             )
 
-    def translate(self, key: str, **kwargs) -> str:
+    def translate(
+        self,
+        key: str,
+        variables: Optional[Dict[str, Any]] = None,
+        fallback: Optional[str] = None,
+    ) -> str:
         """Translate a message key to the current locale.
 
+        Uses the injected TranslationService to translate message keys.
+        If no translation service is available, returns the fallback or key.
+
         Args:
-            key: Translation key.
-            **kwargs: Substitution variables for the translation.
+            key: Translation key (e.g., "platforms.slack.success")
+            variables: Optional substitution variables for the translation
+            fallback: Optional fallback string if translation not found
 
         Returns:
-            Translated string, or key if translator not available.
+            Translated string, or fallback, or key if translation unavailable
+
+        Example:
+            >>> formatter = SlackBlockKitFormatter(translation_service=service)
+            >>> msg = formatter.translate(
+            ...     "platforms.success_message",
+            ...     variables={"action": "created"},
+            ...     fallback="Operation completed successfully"
+            ... )
         """
-        if self._translator:
-            return self._translator.translate(key, locale=self._locale, **kwargs)
-        return key
+        if not self._translation_service:
+            return fallback or key
+
+        try:
+            translation_key = TranslationKey.from_string(key)
+            locale = Locale.from_string(self._locale_str)
+            return self._translation_service.translate(
+                key=translation_key, locale=locale, variables=variables
+            )
+        except (KeyError, ValueError) as e:
+            self._logger.warning(
+                "translation_failed", key=key, locale=self._locale_str, error=str(e)
+            )
+            return fallback or key
 
     def set_locale(self, locale: str) -> None:
         """Set the default locale for formatting.
 
         Args:
-            locale: Locale code (e.g., "en", "fr").
+            locale: Locale code (e.g., "en", "fr", "en-US")
         """
-        self._locale = locale
+        self._locale_str = locale
 
     @property
     def locale(self) -> str:
-        """Get the current locale."""
-        return self._locale
+        """Get the current locale.
+
+        Returns:
+            String representing current locale
+        """
+        return self._locale_str
+
+    @property
+    def has_translation_service(self) -> bool:
+        """Check if formatter has translation service configured.
+
+        Returns:
+            True if translation service is available
+        """
+        return self._translation_service is not None
 
     def __repr__(self) -> str:
         """String representation of the formatter."""
-        return f"{self.__class__.__name__}(locale={self._locale!r})"
+        return f"{self.__class__.__name__}(locale={self._locale_str!r})"

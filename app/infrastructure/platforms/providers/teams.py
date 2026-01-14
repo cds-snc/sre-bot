@@ -120,6 +120,39 @@ class TeamsPlatformProvider(BasePlatformProvider):
             },
         )
 
+    def get_webhook_router(self):
+        """Get FastAPI router for Teams HTTP webhooks.
+
+        Teams uses HTTP webhooks for all bot interactions. This method returns
+        a FastAPI APIRouter with endpoints for receiving Teams activities.
+
+        Returns:
+            Optional[APIRouter]: Router with webhook endpoints, or None if not initialized.
+
+        Note:
+            This is a placeholder. Full implementation would include:
+            - POST /messages - Receive messages/activities from Teams
+            - POST /messaging - Handle messaging extension queries
+            - Signature verification middleware
+            - Activity handler registration
+
+        Example:
+            >>> router = provider.get_webhook_router()
+            >>> if router:
+            ...     app.include_router(router, prefix="/webhooks/teams")
+        """
+        # TODO: Implement Teams webhook router with Bot Framework endpoints
+        # from fastapi import APIRouter
+        # router = APIRouter()
+        # @router.post("/messages")
+        # def handle_teams_activity(request: Request): ...
+        # return router
+        self._logger.warning(
+            "teams_webhook_router_not_implemented",
+            message="Teams webhook router is a placeholder - requires Bot Framework integration",
+        )
+        return None  # Placeholder - to be implemented with Bot Framework SDK
+
     def send_message(
         self,
         channel: str,

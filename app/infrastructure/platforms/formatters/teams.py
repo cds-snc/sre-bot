@@ -36,14 +36,14 @@ class TeamsAdaptiveCardsFormatter(BaseResponseFormatter):
 
     SCHEMA_VERSION = "1.4"
 
-    def __init__(self, translator=None, locale: str = "en"):
+    def __init__(self, translation_service=None, locale: str = "en-US"):
         """Initialize Teams Adaptive Cards formatter.
 
         Args:
-            translator: Optional Translator instance for i18n
-            locale: Locale code (default: "en")
+            translation_service: Optional TranslationService instance for i18n
+            locale: Locale code (default: "en-US")
         """
-        super().__init__(translator=translator, locale=locale)
+        super().__init__(translation_service=translation_service, locale=locale)
 
     def format_success(
         self,

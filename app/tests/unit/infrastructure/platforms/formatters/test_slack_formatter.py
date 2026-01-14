@@ -9,7 +9,7 @@ from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 class MockTranslator:
     """Mock translator for testing."""
 
-    def translate(self, key: str, locale: str = "en", **kwargs) -> str:
+    def translate(self, key: str, locale: str = "en-US", **kwargs) -> str:
         """Mock translate method."""
         return f"[{locale.upper()}] {key}"
 
@@ -22,8 +22,8 @@ class TestSlackBlockKitFormatter:
         """Test formatter initialization."""
         formatter = SlackBlockKitFormatter()
 
-        assert formatter.locale == "en"
-        assert formatter._translator is None
+        assert formatter.locale == "en-US"
+        assert formatter._translation_service is None
 
     def test_initialization_with_locale(self):
         """Test formatter with custom locale."""
@@ -31,12 +31,12 @@ class TestSlackBlockKitFormatter:
 
         assert formatter.locale == "fr"
 
-    def test_initialization_with_translator(self):
+    def test_initialization_with_translation_service(self):
         """Test formatter with translator."""
         translator = MockTranslator()
-        formatter = SlackBlockKitFormatter(translator=translator)
+        formatter = SlackBlockKitFormatter(translation_service=translator)
 
-        assert formatter._translator is translator
+        assert formatter._translation_service is translator
 
 
 @pytest.mark.unit

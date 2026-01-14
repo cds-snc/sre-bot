@@ -59,6 +59,51 @@ class SlackPlatformSettings(InfrastructureSettings):
         description="Slack signing secret for webhook verification",
     )
 
+    def validate_configuration(self) -> None:
+        """Validate Slack platform configuration.
+
+        Ensures either Socket Mode (APP_TOKEN) or HTTP webhooks (SIGNING_SECRET)
+        is properly configured when the provider is enabled.
+
+        Raises:
+            ValueError: If configuration is invalid
+
+        Example:
+            >>> settings = SlackPlatformSettings(
+            ...     ENABLED=True,
+            ...     SOCKET_MODE=True,
+            ...     APP_TOKEN="xapp-123",
+            ...     BOT_TOKEN="xoxb-456"
+            ... )
+            >>> settings.validate_configuration()  # OK
+
+            >>> settings = SlackPlatformSettings(ENABLED=True)
+            >>> settings.validate_configuration()  # Raises ValueError
+        """
+        if not self.ENABLED:
+            return  # Skip validation if disabled
+
+        # BOT_TOKEN always required
+        if not self.BOT_TOKEN:
+            raise ValueError(
+                "SLACK_BOT_TOKEN is required when Slack provider is enabled"
+            )
+
+        # Socket Mode: APP_TOKEN required
+        if self.SOCKET_MODE:
+            if not self.APP_TOKEN:
+                raise ValueError(
+                    "SLACK_APP_TOKEN is required when SOCKET_MODE is enabled. "
+                    "Get an app-level token from https://api.slack.com/apps"
+                )
+        # HTTP Mode: SIGNING_SECRET required
+        else:
+            if not self.SIGNING_SECRET:
+                raise ValueError(
+                    "SLACK_SIGNING_SECRET is required when SOCKET_MODE is disabled (HTTP webhooks). "
+                    "Find your signing secret at https://api.slack.com/apps → Basic Information"
+                )
+
 
 class TeamsPlatformSettings(InfrastructureSettings):
     """Microsoft Teams platform provider settings.
@@ -102,6 +147,37 @@ class TeamsPlatformSettings(InfrastructureSettings):
         description="Azure AD tenant ID",
     )
 
+    def validate_configuration(self) -> None:
+        """Validate Teams platform configuration.
+
+        Ensures APP_ID and APP_PASSWORD are configured when provider is enabled.
+
+        Raises:
+            ValueError: If configuration is invalid
+
+        Example:
+            >>> settings = TeamsPlatformSettings(
+            ...     ENABLED=True,
+            ...     APP_ID="12345678-1234-1234-1234-123456789012",
+            ...     APP_PASSWORD="secret"
+            ... )
+            >>> settings.validate_configuration()  # OK
+        """
+        if not self.ENABLED:
+            return  # Skip validation if disabled
+
+        if not self.APP_ID:
+            raise ValueError(
+                "TEAMS_APP_ID is required when Teams provider is enabled. "
+                "Register your app at https://dev.botframework.com/bots/new"
+            )
+
+        if not self.APP_PASSWORD:
+            raise ValueError(
+                "TEAMS_APP_PASSWORD is required when Teams provider is enabled. "
+                "Get app password from Azure AD app registration"
+            )
+
 
 class DiscordPlatformSettings(InfrastructureSettings):
     """Discord platform provider settings.
@@ -144,6 +220,20 @@ class DiscordPlatformSettings(InfrastructureSettings):
         default=None,
         description="Discord public key for interaction verification",
     )
+
+    def validate_configuration(self) -> None:
+        """Validate Discord platform configuration.
+
+        ⚠️ Discord support is out of scope - this is a placeholder.
+
+        Raises:
+            NotImplementedError: Always raises since Discord is not implemented
+        """
+        if self.ENABLED:
+            raise NotImplementedError(
+                "Discord platform provider is not implemented. "
+                "Discord support is out of scope for the current release."
+            )
 
 
 class PlatformsSettings(InfrastructureSettings):

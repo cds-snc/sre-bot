@@ -19,6 +19,11 @@ from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
 from infrastructure.platforms.service import PlatformService
+from infrastructure.platforms.clients import (
+    SlackClientFacade,
+    TeamsClientFacade,
+    DiscordClientFacade,
+)
 from infrastructure.services.providers import (
     get_settings,
     get_identity_service,
@@ -33,6 +38,9 @@ from infrastructure.services.providers import (
     get_command_service,
     get_persistence_service,
     get_platform_service,
+    get_slack_client,
+    get_teams_client,
+    get_discord_client,
 )
 
 # Settings dependency
@@ -81,6 +89,16 @@ PersistenceServiceDep = Annotated[PersistenceService, Depends(get_persistence_se
 # Platform service dependency
 PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]
 
+# Platform client facades - wrap platform SDKs with OperationResult APIs
+# Slack client facade dependency
+SlackClientDep = Annotated[SlackClientFacade, Depends(get_slack_client)]
+
+# Teams client facade dependency
+TeamsClientDep = Annotated[TeamsClientFacade, Depends(get_teams_client)]
+
+# Discord client facade dependency (placeholder - not implemented)
+DiscordClientDep = Annotated[DiscordClientFacade, Depends(get_discord_client)]
+
 __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
@@ -95,4 +113,7 @@ __all__ = [
     "CommandServiceDep",
     "PersistenceServiceDep",
     "PlatformServiceDep",
+    "SlackClientDep",
+    "TeamsClientDep",
+    "DiscordClientDep",
 ]

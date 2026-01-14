@@ -103,8 +103,19 @@ class SlackPlatformProvider(BasePlatformProvider):
             metadata={
                 "socket_mode": self._settings.SOCKET_MODE,
                 "platform": "slack",
+                "connection_mode": "websocket",
             },
         )
+
+    def get_webhook_router(self):
+        """Get webhook router for Slack.
+
+        Slack uses Socket Mode (WebSocket), so no HTTP webhooks are needed.
+
+        Returns:
+            None (WebSocket mode, not HTTP)
+        """
+        return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
 
     def send_message(
         self,

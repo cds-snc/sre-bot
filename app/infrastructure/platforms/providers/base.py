@@ -89,6 +89,27 @@ class BasePlatformProvider(ABC):
         """
         pass
 
+    def get_webhook_router(self):
+        """Get FastAPI router for HTTP webhooks.
+
+        For HTTP-based platforms (Teams, Discord): Returns APIRouter with webhook endpoints.
+        For WebSocket-based platforms (Slack Socket Mode): Returns None.
+
+        Returns:
+            Optional[APIRouter]: Router with webhook endpoints, or None if not HTTP-based.
+
+        Example:
+            # Teams/Discord provider (HTTP webhooks)
+            router = provider.get_webhook_router()
+            if router:
+                app.include_router(router, prefix="/webhooks/teams")
+
+            # Slack provider (WebSocket/Socket Mode)
+            router = provider.get_webhook_router()
+            assert router is None  # No webhooks needed
+        """
+        return None  # Default: no webhook router (WebSocket mode)
+
     @abstractmethod
     def format_response(
         self,

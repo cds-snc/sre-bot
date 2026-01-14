@@ -27,9 +27,9 @@ class DiscordEmbedFormatter(BaseResponseFormatter):
     ⚠️ NOT IMPLEMENTED - OUT OF SCOPE ⚠️
     """
 
-    def __init__(self, translator=None, locale: str = "en"):
+    def __init__(self, translation_service=None, locale: str = "en-US"):
         """Initialize Discord Embed formatter."""
-        super().__init__(translator=translator, locale=locale)
+        super().__init__(translation_service=translation_service, locale=locale)
         raise NotImplementedError(
             "Discord formatter is not implemented. "
             "Discord platform support is out of scope for current release."
