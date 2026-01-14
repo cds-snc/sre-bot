@@ -19,6 +19,8 @@ from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
 
+# Note: PlatformService imported lazily in get_platform_service() to avoid circular imports
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -340,3 +342,48 @@ def get_persistence_service() -> PersistenceService:
     """
     settings = get_settings()
     return PersistenceService(settings=settings)
+
+
+@lru_cache
+def get_platform_service():
+    """Get application-scoped platform service singleton.
+
+    Returns a PlatformService instance for managing collaboration platform
+    providers (Slack, Teams, Discord) with unified interfaces for messaging,
+    capability detection, and provider initialization.
+
+    The service is initialized with injected dependencies from settings
+    and manages a thread-safe registry of platform providers.
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import PlatformServiceDep
+
+        @router.post("/platforms/send")
+        def send_message(
+            platform_service: PlatformServiceDep,
+            platform: str,
+            channel: str,
+            message: dict
+        ):
+            result = platform_service.send(platform, channel, message)
+            if result.is_success:
+                return {"sent": True}
+            return {"error": result.message}
+
+        # Application code (startup, jobs, modules)
+        from infrastructure.services import get_platform_service
+
+        def initialize_platforms():
+            platform_service = get_platform_service()  # Singleton
+            providers = platform_service.load_providers()
+            init_results = platform_service.initialize_all_providers()
+            return init_results
+
+    Returns:
+        PlatformService: Cached platform service instance
+    """
+    from infrastructure.platforms import PlatformService
+
+    settings = get_settings()
+    return PlatformService(settings=settings)

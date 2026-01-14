@@ -8,6 +8,7 @@ from infrastructure.events import (
     log_registered_handlers,
     register_infrastructure_handlers,
 )
+from infrastructure.services import get_platform_service
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -105,6 +106,53 @@ def providers_startup():
         )
         pass
 
+    # ========== NEW: Platform System Initialization ==========
+    # Initialize platform system (Slack, Teams, Discord providers)
+    # This runs alongside legacy providers during transition period
+    try:
+        # Get platform service singleton from provider
+        platform_service = get_platform_service()
+
+        # Load and register platform providers
+        platform_providers = platform_service.load_providers()
+
+        # Store platform service for app-wide access
+        server_app.state.platform_service = platform_service
+        server_app.state.platform_providers = platform_providers
+
+        # Initialize enabled providers (establishes connections)
+        init_results = platform_service.initialize_all_providers()
+
+        initialized = [
+            name for name, result in init_results.items() if result.is_success
+        ]
+        failed = [
+            name for name, result in init_results.items() if not result.is_success
+        ]
+
+        if initialized:
+            logger.info(
+                "platform_providers_initialized",
+                count=len(initialized),
+                providers=initialized,
+            )
+
+        if failed:
+            logger.warning(
+                "platform_providers_initialization_failed",
+                count=len(failed),
+                providers=failed,
+            )
+    except Exception as e:
+        # Log error but don't fail startup - platform system is optional during transition
+        logger.error(
+            "platform_system_initialization_failed",
+            error=str(e),
+            message="Platform system failed to initialize - continuing with legacy providers",
+        )
+    # ========== END: Platform System Initialization ==========
+
+    # LEGACY: Group providers (will be migrated to platform system)
     try:
         primary = load_providers()
         # store for app-wide access
@@ -120,7 +168,7 @@ def providers_startup():
         logger.error("group_providers_activation_failed", error=str(e))
         raise
 
-    # Activate command providers
+    # LEGACY: Command providers (will be migrated to platform system)
     try:
         command_providers = load_command_providers(settings=settings)
         server_app.state.command_providers = command_providers
@@ -164,6 +212,38 @@ def list_configs():
             logger.info("configuration_loaded", config_setting=key, keys=value)
 
 
+def platform_shutdown():
+    """Clean up platform provider connections on shutdown."""
+    try:
+        if hasattr(server_app.state, "platform_service"):
+            platform_service = server_app.state.platform_service
+
+            # Get all registered providers
+            if hasattr(server_app.state, "platform_providers"):
+                for provider_name in server_app.state.platform_providers.keys():
+                    try:
+                        provider = platform_service.get_provider(provider_name)
+                        if hasattr(provider, "shutdown"):
+                            provider.shutdown()
+                        logger.info(
+                            "platform_provider_shutdown",
+                            provider=provider_name,
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "platform_provider_shutdown_failed",
+                            provider=provider_name,
+                            error=str(e),
+                        )
+
+            logger.info("platform_system_shutdown_complete")
+    except Exception as e:
+        logger.error(
+            "platform_shutdown_error",
+            error=str(e),
+        )
+
+
 bot = get_bot()
 
 if bot:
@@ -172,6 +252,8 @@ if bot:
     # can rely on active providers.
     server_app.add_event_handler("startup", providers_startup)
     server_app.add_event_handler("startup", partial(main, bot))
+    server_app.add_event_handler("shutdown", platform_shutdown)
 else:
     # Even when Slack is not present, activate providers for FastAPI-first usage
     server_app.add_event_handler("startup", providers_startup)
+    server_app.add_event_handler("shutdown", platform_shutdown)

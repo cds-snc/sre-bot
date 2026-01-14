@@ -17,6 +17,7 @@ from infrastructure.services.dependencies import (
     NotificationServiceDep,
     CommandServiceDep,
     PersistenceServiceDep,
+    PlatformServiceDep,
 )
 from infrastructure.services.providers import (
     get_settings,
@@ -31,6 +32,7 @@ from infrastructure.services.providers import (
     get_notification_service,
     get_command_service,
     get_persistence_service,
+    get_platform_service,
 )
 
 __all__ = [
@@ -47,6 +49,7 @@ __all__ = [
     "NotificationServiceDep",
     "CommandServiceDep",
     "PersistenceServiceDep",
+    "PlatformServiceDep",
     # Core providers
     "get_settings",
     "get_identity_service",
@@ -60,4 +63,5 @@ __all__ = [
     "get_notification_service",
     "get_command_service",
     "get_persistence_service",
+    "get_platform_service",
 ]

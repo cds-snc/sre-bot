@@ -31,6 +31,7 @@ from infrastructure.configuration.infrastructure import (
     RetrySettings,
     ServerSettings,
     DevSettings,
+    PlatformsSettings,
 )
 
 
@@ -103,6 +104,7 @@ class Settings(BaseSettings):
     dev: DevSettings
     idempotency: IdempotencySettings
     retry: RetrySettings
+    platforms: PlatformsSettings
 
     @property
     def is_production(self) -> bool:
@@ -142,6 +144,7 @@ class Settings(BaseSettings):
             "dev": DevSettings,
             "idempotency": IdempotencySettings,
             "retry": RetrySettings,
+            "platforms": PlatformsSettings,
         }
 
         for setting_name, setting_class in settings_map.items():

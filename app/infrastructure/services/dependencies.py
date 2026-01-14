@@ -18,6 +18,7 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
+from infrastructure.platforms.service import PlatformService
 from infrastructure.services.providers import (
     get_settings,
     get_identity_service,
@@ -31,6 +32,7 @@ from infrastructure.services.providers import (
     get_notification_service,
     get_command_service,
     get_persistence_service,
+    get_platform_service,
 )
 
 # Settings dependency
@@ -76,6 +78,9 @@ CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
 # Persistence service dependency
 PersistenceServiceDep = Annotated[PersistenceService, Depends(get_persistence_service)]
 
+# Platform service dependency
+PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]
+
 __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
@@ -89,4 +94,5 @@ __all__ = [
     "NotificationServiceDep",
     "CommandServiceDep",
     "PersistenceServiceDep",
+    "PlatformServiceDep",
 ]
