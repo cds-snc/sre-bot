@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 import structlog
 
+from infrastructure.i18n.models import TranslationKey, Locale
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.clients.http import InternalHttpClient
 from infrastructure.platforms.models import CommandPayload, CommandResponse
@@ -276,8 +277,6 @@ class BaseCommandAdapter(ABC):
             return key.format(**kwargs) if kwargs else key
 
         # Convert string key to TranslationKey
-        from infrastructure.i18n.models import TranslationKey, Locale
-
         try:
             translation_key = TranslationKey.from_string(key)
             locale_obj = Locale.from_string(locale or "en-US")
