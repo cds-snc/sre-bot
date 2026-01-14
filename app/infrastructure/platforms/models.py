@@ -23,7 +23,7 @@ Usage:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 @dataclass
@@ -63,6 +63,29 @@ class CommandResponse:
     blocks: Optional[List[Dict[str, Any]]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CommandDefinition:
+    """Command metadata for auto-help generation.
+
+    Attributes:
+        name: Command name (e.g., "geolocate", "/geolocate")
+        handler: Callable that handles CommandPayload → CommandResponse
+        description: English description for fallback
+        description_key: i18n translation key (e.g., "geolocate.slack.description")
+        usage_hint: Usage string (e.g., "<ip_address>")
+        examples: List of example invocations (just the arguments, not full command)
+        example_keys: List of translation keys for examples
+    """
+
+    name: str
+    handler: Callable[[CommandPayload], CommandResponse]
+    description: str = ""
+    description_key: Optional[str] = None
+    usage_hint: str = ""
+    examples: List[str] = field(default_factory=list)
+    example_keys: List[str] = field(default_factory=list)
 
 
 # View/Modal Models
@@ -181,6 +204,7 @@ __all__ = [
     # Command models
     "CommandPayload",
     "CommandResponse",
+    "CommandDefinition",
     # View/Modal models
     "ViewField",
     "ViewDefinition",

@@ -52,6 +52,7 @@ from infrastructure.platforms.models import (
     CardSection,
     CommandPayload,
     CommandResponse,
+    CommandDefinition,
     HttpEndpointRequest,
     HttpEndpointResponse,
     ViewDefinition,
@@ -96,6 +97,7 @@ __all__ = [
     # Models - Command
     "CommandPayload",
     "CommandResponse",
+    "CommandDefinition",
     # Models - View/Modal
     "ViewField",
     "ViewDefinition",

@@ -46,6 +46,15 @@ from infrastructure.platforms.exceptions import (
     ProviderNotFoundError,
 )
 from infrastructure.platforms.providers.base import BasePlatformProvider
+from infrastructure.platforms.providers import (
+    SlackPlatformProvider,
+    # TeamsPlatformProvider,  # Out of scope
+    # DiscordPlatformProvider,  # Out of scope
+)
+from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
+
+# from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter  # Out of scope
+# from infrastructure.platforms.formatters.discord import DiscordEmbedFormatter  # Out of scope
 from infrastructure.platforms.registry import PlatformRegistry
 
 logger = structlog.get_logger()
@@ -70,14 +79,16 @@ class PlatformService:
         Args:
             settings: Application settings from infrastructure.configuration
         """
+        from infrastructure.platforms.registry import get_platform_registry
+
         self._settings = settings
-        self._registry = PlatformRegistry()
+        self._registry = get_platform_registry()  # Use global singleton
         self._logger = logger.bind(component="platform_service")
 
     def load_providers(self) -> Dict[str, BasePlatformProvider]:
-        """Discover and register all available platform providers.
+        """Discover and load all available platform providers.
 
-        Imports provider modules to trigger registration via decorators,
+        Creates and registers provider instances based on settings,
         then returns all registered providers from the registry.
 
         Returns:
@@ -88,27 +99,32 @@ class PlatformService:
             >>> providers = service.load_providers()
             >>> print(f"Loaded {len(providers)} providers")
         """
-        import importlib
-        import pkgutil
-
-        # Import all provider modules to enable provider imports
-        import infrastructure.platforms.providers as providers_package
-
-        for module_info in pkgutil.iter_modules(providers_package.__path__):
-            module_name = module_info.name
-            if module_name.startswith("_") or module_name == "base":
-                continue  # Skip private modules and base class
-
-            full_module_name = f"{providers_package.__name__}.{module_name}"
+        # Create and register Slack provider if configured
+        if self._settings.slack.ENABLED:
             try:
-                importlib.import_module(full_module_name)
-                self._logger.debug("provider_module_imported", module=full_module_name)
-            except Exception as e:
-                self._logger.warning(
-                    "provider_module_import_failed",
-                    module=full_module_name,
-                    error=str(e),
+                slack_formatter = SlackBlockKitFormatter()
+                slack_provider = SlackPlatformProvider(
+                    settings=self._settings.slack,
+                    formatter=slack_formatter,
                 )
+                self._registry.register_provider(slack_provider)
+                self._logger.debug("slack_provider_registered")
+            except Exception as e:
+                self._logger.warning("slack_provider_registration_failed", error=str(e))
+
+        # Create and register Teams provider if configured
+        # Teams support coming soon
+        # if self._settings.teams.TEAMS_TOKEN:
+        #     teams_formatter = TeamsAdaptiveCardsFormatter()
+        #     teams_provider = TeamsPlatformProvider(...)
+        #     self._registry.register_provider(teams_provider)
+
+        # Create and register Discord provider if configured
+        # Discord support coming soon
+        # if self._settings.discord.DISCORD_TOKEN:
+        #     discord_formatter = DiscordEmbedFormatter()
+        #     discord_provider = DiscordPlatformProvider(...)
+        #     self._registry.register_provider(discord_provider)
 
         provider_list = self._registry.list_providers()
         # Convert list to dict keyed by platform_id
