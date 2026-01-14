@@ -5,10 +5,18 @@ All platform-specific providers (Slack, Teams, Discord) inherit from this base c
 
 import structlog
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import CapabilityDeclaration
+from infrastructure.platforms.models import (
+    CommandPayload,
+    CommandResponse,
+    CommandDefinition,
+)
+
+if TYPE_CHECKING:
+    from infrastructure.i18n.translator import Translator
 
 
 logger = structlog.get_logger()
@@ -45,6 +53,9 @@ class BasePlatformProvider(ABC):
         self._version = version
         self._enabled = enabled
         self._logger = logger.bind(provider=name, version=version)
+        self._commands: Dict[str, CommandDefinition] = {}
+        self._translator: Optional["Translator"] = None
+        self._parent_command: Optional[str] = None  # e.g., "sre" for "/sre geolocate"
 
     @property
     def name(self) -> str:
@@ -138,6 +149,210 @@ class BasePlatformProvider(ABC):
         """
         capabilities = self.get_capabilities()
         return any(cap.value == capability for cap in capabilities.capabilities)
+
+    def set_translator(self, translator: "Translator") -> None:
+        """Set translator for i18n support in help generation.
+
+        Args:
+            translator: Translator instance for message translation
+        """
+        self._translator = translator
+
+    def set_parent_command(self, parent: str) -> None:
+        """Set parent command prefix for help generation.
+
+        Args:
+            parent: Parent command (e.g., "sre" for "/sre geolocate")
+        """
+        self._parent_command = parent
+
+    def register_command(
+        self,
+        command: str,
+        handler: Callable[[CommandPayload], CommandResponse],
+        description: str = "",
+        description_key: Optional[str] = None,
+        usage_hint: str = "",
+        examples: Optional[List[str]] = None,
+        example_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Register a platform command with metadata for auto-help generation.
+
+        Args:
+            command: Command name (e.g., "geolocate" or "/geolocate")
+            handler: Function that handles CommandPayload → CommandResponse
+            description: English description (fallback if translation unavailable)
+            description_key: i18n translation key (e.g., "geolocate.slack.description")
+            usage_hint: Usage string (e.g., "<ip_address>")
+            examples: List of example argument strings (not full command)
+            example_keys: List of translation keys for examples
+
+        Example:
+            provider.register_command(
+                command="geolocate",
+                handler=handle_geolocate_command,
+                description="Lookup geographic location of an IP address",
+                description_key="geolocate.slack.description",
+                usage_hint="<ip_address>",
+                examples=["8.8.8.8", "1.1.1.1"],
+            )
+        """
+        # Normalize command name (remove leading slash if present)
+        cmd_name = command.lstrip("/")
+
+        self._commands[cmd_name] = CommandDefinition(
+            name=cmd_name,
+            handler=handler,
+            description=description,
+            description_key=description_key,
+            usage_hint=usage_hint,
+            examples=examples or [],
+            example_keys=example_keys or [],
+        )
+
+        self._logger.debug(
+            "command_registered",
+            command=cmd_name,
+            has_description=bool(description or description_key),
+        )
+
+    def generate_help(self, locale: str = "en-US") -> str:
+        """Generate formatted help text for all registered commands.
+
+        Args:
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Formatted help text with all registered commands and examples
+        """
+        if not self._commands:
+            return "No commands registered."
+
+        prefix = self._parent_command if self._parent_command else ""
+        lines = ["*Commands*", ""]
+
+        for cmd_def in self._commands.values():
+            # Build command signature
+            prefix_str = f"/{prefix} {cmd_def.name}" if prefix else f"/{cmd_def.name}"
+            if cmd_def.usage_hint:
+                signature = f"{prefix_str} {cmd_def.usage_hint}"
+            else:
+                signature = prefix_str
+            lines.append(f"`{signature}`")
+
+            # Translate description
+            desc = self._translate_or_fallback(
+                cmd_def.description_key, cmd_def.description, locale
+            )
+            if desc:
+                lines.append(f"  {desc}")
+
+            # Add examples
+            if cmd_def.examples:
+                # Translate "Examples:" label
+                examples_label = self._translate_or_fallback(
+                    "commands.labels.examples", "Examples:", locale
+                )
+                lines.append(f"  *{examples_label}*")
+
+                for i, example in enumerate(cmd_def.examples):
+                    # Try to translate example if key available
+                    if i < len(cmd_def.example_keys):
+                        example_text = self._translate_or_fallback(
+                            cmd_def.example_keys[i], example, locale
+                        )
+                    else:
+                        example_text = example
+
+                    example_line = (
+                        f"`{prefix} {cmd_def.name} {example_text}`"
+                        if prefix
+                        else f"/{cmd_def.name} {example_text}`"
+                    )
+                    lines.append(f"  • {example_line}")
+
+            lines.append("")  # Blank line between commands
+
+        return "\n".join(lines)
+
+    def dispatch_command(
+        self, command_name: str, payload: CommandPayload
+    ) -> CommandResponse:
+        """Dispatch a command to its registered handler.
+
+        Args:
+            command_name: Name of the command to dispatch
+            payload: CommandPayload with command text and metadata
+
+        Returns:
+            CommandResponse from the handler, or error response if command not found
+
+        Raises:
+            None - always returns CommandResponse (no exceptions)
+        """
+        # Check for help requests
+        text = payload.text.strip().lower() if payload.text else ""
+        if not text or text in ("help", "aide", "--help", "-h"):
+            # Return help as a response
+            help_text = self.generate_help()
+            return CommandResponse(message=help_text, ephemeral=True)
+
+        # Look up command
+        cmd_def = self._commands.get(command_name)
+        if not cmd_def:
+            return CommandResponse(
+                message=f"Unknown command: {command_name}",
+                ephemeral=True,
+            )
+
+        # Dispatch to handler
+        try:
+            response = cmd_def.handler(payload)
+            return response
+        except Exception as e:
+            self._logger.error(
+                "command_handler_error",
+                command=command_name,
+                error=str(e),
+            )
+            return CommandResponse(
+                message=f"Error executing {command_name}: {str(e)}",
+                ephemeral=True,
+            )
+
+    def _translate_or_fallback(
+        self, key: Optional[str], fallback: str, locale: str
+    ) -> str:
+        """Translate key or return fallback text.
+
+        Args:
+            key: Translation key (e.g., "geolocate.slack.description")
+            fallback: Fallback text if translation unavailable
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Translated message or fallback text
+        """
+        if not key or not self._translator:
+            return fallback
+
+        try:
+            from infrastructure.i18n.models import TranslationKey, Locale
+
+            translation_key = TranslationKey.from_string(key)
+            locale_enum = Locale.from_string(locale)
+            translated = self._translator.translate_message(
+                translation_key, locale_enum
+            )
+            return translated if translated else fallback
+        except Exception as e:
+            self._logger.debug(
+                "translation_fallback",
+                key=key,
+                error=str(e),
+                locale=locale,
+            )
+            return fallback
 
     def __repr__(self) -> str:
         """String representation of the provider."""
