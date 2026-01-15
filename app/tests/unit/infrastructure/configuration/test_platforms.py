@@ -14,8 +14,13 @@ from infrastructure.configuration.infrastructure.platforms import (
 class TestSlackPlatformSettings:
     """Test SlackPlatformSettings configuration."""
 
-    def test_default_values(self):
-        """Test SlackPlatformSettings with default values."""
+    def test_default_values(self, monkeypatch):
+        """Test SlackPlatformSettings with default values (unset optional fields)."""
+        # Remove optional token env vars to test defaults
+        monkeypatch.delenv("SLACK_APP_TOKEN", raising=False)
+        monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+        monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
+
         settings = SlackPlatformSettings()
 
         assert settings.ENABLED is False
@@ -41,6 +46,7 @@ class TestSlackPlatformSettings:
     def test_socket_mode_false(self, monkeypatch):
         """Test SlackPlatformSettings with HTTP webhook mode."""
         monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
+        monkeypatch.setenv("SLACK_SIGNING_SECRET", "test-signing-secret")
 
         settings = SlackPlatformSettings()
 
