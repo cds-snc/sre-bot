@@ -57,6 +57,7 @@ from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 # from infrastructure.platforms.formatters.discord import DiscordEmbedFormatter  # Out of scope
 from infrastructure.platforms.registry import PlatformRegistry
 
+
 logger = structlog.get_logger()
 
 

@@ -58,3 +58,11 @@ class DiscordPlatformProvider(BasePlatformProvider):
     ) -> Dict[str, Any]:
         """Format response - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")
+
+    def generate_help(self, locale: str = "en-US") -> str:
+        """Generate help text - NOT IMPLEMENTED."""
+        raise NotImplementedError("Discord support is out of scope")
+
+    def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
+        """Generate command help - NOT IMPLEMENTED."""
+        raise NotImplementedError("Discord support is out of scope")

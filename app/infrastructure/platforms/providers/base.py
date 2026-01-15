@@ -5,7 +5,7 @@ All platform-specific providers (Slack, Teams, Discord) inherit from this base c
 
 import structlog
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import CapabilityDeclaration
@@ -14,6 +14,8 @@ from infrastructure.platforms.models import (
     CommandResponse,
     CommandDefinition,
 )
+
+from infrastructure.i18n.models import TranslationKey
 
 if TYPE_CHECKING:
     from infrastructure.i18n.translator import Translator
@@ -53,6 +55,7 @@ class BasePlatformProvider(ABC):
         self._version = version
         self._enabled = enabled
         self._logger = logger.bind(provider=name, version=version)
+        # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: Dict[str, CommandDefinition] = {}
         self._translator: Optional["Translator"] = None
         self._parent_command: Optional[str] = None  # e.g., "sre" for "/sre geolocate"
@@ -158,122 +161,167 @@ class BasePlatformProvider(ABC):
         """
         self._translator = translator
 
+    def _translate_or_fallback(
+        self,
+        key: Optional[str],
+        fallback: str,
+        locale: str = "en-US",
+    ) -> str:
+        """Translate a key or return fallback if translation unavailable.
+
+        Args:
+            key: Translation key (e.g., "commands.geolocate.description")
+            fallback: Fallback text if key is None or translation missing
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Translated text or fallback
+        """
+        if not key:
+            return fallback
+
+        if not self._translator:
+            # No translator configured, use fallback
+            return fallback
+
+        try:
+            # Create TranslationKey from string
+            translation_key = TranslationKey(key=key)
+
+            # Attempt translation
+            result = self._translator.translate(translation_key, locale=locale)
+
+            # Return translation if successful, otherwise fallback
+            return result if result else fallback
+
+        except Exception as e:
+            self._logger.warning(
+                "translation_failed",
+                key=key,
+                locale=locale,
+                error=str(e),
+            )
+            return fallback
+
+    def _ensure_parent_chain_exists(self, parent: str) -> None:
+        """Ensure all intermediate parent nodes exist in the command tree.
+
+        Auto-generates intermediate command nodes if they don't exist.
+
+        Args:
+            parent: Parent command path in dot notation (e.g., "sre.dev" creates "sre" and "sre.dev" nodes)
+
+        Example:
+            # Registering command with parent="sre.dev" ensures:
+            # 1. "sre" node exists (auto-generated if needed)
+            # 2. "sre.dev" node exists (auto-generated if needed)
+            # 3. Then registers the actual command as child of "sre.dev"
+        """
+        if not parent:
+            return
+
+        # Split parent chain: "sre.dev" -> ["sre", "dev"]
+        parts = parent.split(".")
+
+        # Build intermediate paths: ["sre", "sre.dev"]
+        for i in range(len(parts)):
+            partial_path = ".".join(parts[: i + 1])
+
+            # Create auto-generated node if doesn't exist
+            if partial_path not in self._commands:
+                # Determine parent for this node
+                node_parent = ".".join(parts[:i]) if i > 0 else None
+                node_name = parts[i]
+                auto_cmd = CommandDefinition(
+                    name=node_name,
+                    handler=None,  # No handler for auto-generated nodes
+                    description=f"Commands for {node_name}",  # Generic description
+                    parent=node_parent,
+                    is_auto_generated=True,
+                )
+
+                self._commands[partial_path] = auto_cmd
+
+                self._logger.debug(
+                    "auto_generated_intermediate_command",
+                    path=partial_path,
+                    parent=node_parent,
+                )
+
+    def _get_child_commands(self, parent_path: str) -> List[CommandDefinition]:
+        """Get all direct children of a command node.
+
+        Args:
+            parent_path: Parent full_path (e.g., "sre.dev")
+
+        Returns:
+            List of child CommandDefinition objects
+        """
+        children = []
+        for cmd in self._commands.values():
+            # Check if this command's parent matches
+            if cmd.parent == parent_path:
+                children.append(cmd)
+
+        return sorted(children, key=lambda c: c.name)
+
     def set_parent_command(self, parent: str) -> None:
         """Set parent command prefix for help generation.
+
+        DEPRECATED: This method is being phased out. Use the `parent` parameter
+        in register_command() instead.
 
         Args:
             parent: Parent command (e.g., "sre" for "/sre geolocate")
         """
         self._parent_command = parent
 
-    def register_command(
-        self,
-        command: str,
-        handler: Callable[[CommandPayload], CommandResponse],
-        description: str = "",
-        description_key: Optional[str] = None,
-        usage_hint: str = "",
-        examples: Optional[List[str]] = None,
-        example_keys: Optional[List[str]] = None,
-    ) -> None:
-        """Register a platform command with metadata for auto-help generation.
+    @abstractmethod
+    def generate_help(
+        self, locale: str = "en-US", root_command: Optional[str] = None
+    ) -> str:
+        """Generate formatted help text for registered commands.
 
-        Args:
-            command: Command name (e.g., "geolocate" or "/geolocate")
-            handler: Function that handles CommandPayload → CommandResponse
-            description: English description (fallback if translation unavailable)
-            description_key: i18n translation key (e.g., "geolocate.slack.description")
-            usage_hint: Usage string (e.g., "<ip_address>")
-            examples: List of example argument strings (not full command)
-            example_keys: List of translation keys for examples
+        Platform-specific implementation with appropriate formatting
+        (Slack: `/command`, Teams: `@BotName command`, Discord: `/command`).
 
-        Example:
-            provider.register_command(
-                command="geolocate",
-                handler=handle_geolocate_command,
-                description="Lookup geographic location of an IP address",
-                description_key="geolocate.slack.description",
-                usage_hint="<ip_address>",
-                examples=["8.8.8.8", "1.1.1.1"],
-            )
-        """
-        # Normalize command name (remove leading slash if present)
-        cmd_name = command.lstrip("/")
-
-        self._commands[cmd_name] = CommandDefinition(
-            name=cmd_name,
-            handler=handler,
-            description=description,
-            description_key=description_key,
-            usage_hint=usage_hint,
-            examples=examples or [],
-            example_keys=example_keys or [],
-        )
-
-        self._logger.debug(
-            "command_registered",
-            command=cmd_name,
-            has_description=bool(description or description_key),
-        )
-
-    def generate_help(self, locale: str = "en-US") -> str:
-        """Generate formatted help text for all registered commands.
+        Supports hierarchical command display:
+        - If root_command is None: Shows all top-level commands
+        - If root_command is specified: Shows only children of that command
 
         Args:
             locale: Locale string (e.g., "en-US", "fr-FR")
+            root_command: Optional root command full_path (e.g., "sre.dev")
+                         to filter help to only its children
 
         Returns:
-            Formatted help text with all registered commands and examples
+            Formatted help text with commands and examples
+
+        Example Output (Slack):
+            ```
+            Available commands:
+            • `/sre` - SRE Operations
+            • `/sre dev` - Development tools
+            • `/sre dev aws` - AWS development commands
+            ```
         """
-        if not self._commands:
-            return "No commands registered."
+        pass
 
-        prefix = self._parent_command if self._parent_command else ""
-        lines = ["*Commands*", ""]
+    @abstractmethod
+    def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
+        """Generate formatted help text for a specific command.
 
-        for cmd_def in self._commands.values():
-            # Build command signature
-            prefix_str = f"/{prefix} {cmd_def.name}" if prefix else f"/{cmd_def.name}"
-            if cmd_def.usage_hint:
-                signature = f"{prefix_str} {cmd_def.usage_hint}"
-            else:
-                signature = prefix_str
-            lines.append(f"`{signature}`")
+        Platform-specific implementation with appropriate formatting
+        (Slack markdown, Teams Adaptive Cards, Discord embeds, etc.).
 
-            # Translate description
-            desc = self._translate_or_fallback(
-                cmd_def.description_key, cmd_def.description, locale
-            )
-            if desc:
-                lines.append(f"  {desc}")
+        Args:
+            command_name: Full path of the command (e.g., "sre.dev.aws")
+            locale: Locale string (e.g., "en-US", "fr-FR")
 
-            # Add examples
-            if cmd_def.examples:
-                # Translate "Examples:" label
-                examples_label = self._translate_or_fallback(
-                    "commands.labels.examples", "Examples:", locale
-                )
-                lines.append(f"  *{examples_label}*")
-
-                for i, example in enumerate(cmd_def.examples):
-                    # Try to translate example if key available
-                    if i < len(cmd_def.example_keys):
-                        example_text = self._translate_or_fallback(
-                            cmd_def.example_keys[i], example, locale
-                        )
-                    else:
-                        example_text = example
-
-                    example_line = (
-                        f"`{prefix} {cmd_def.name} {example_text}`"
-                        if prefix
-                        else f"/{cmd_def.name} {example_text}`"
-                    )
-                    lines.append(f"  • {example_line}")
-
-            lines.append("")  # Blank line between commands
-
-        return "\n".join(lines)
+        Returns:
+            Formatted help text for the specified command
+        """
+        pass
 
     def dispatch_command(
         self, command_name: str, payload: CommandPayload
@@ -290,20 +338,26 @@ class BasePlatformProvider(ABC):
         Raises:
             None - always returns CommandResponse (no exceptions)
         """
-        # Check for help requests
-        text = payload.text.strip().lower() if payload.text else ""
-        if not text or text in ("help", "aide", "--help", "-h"):
-            # Return help as a response
-            help_text = self.generate_help()
-            return CommandResponse(message=help_text, ephemeral=True)
-
-        # Look up command
+        # Look up command first
         cmd_def = self._commands.get(command_name)
         if not cmd_def:
             return CommandResponse(
                 message=f"Unknown command: {command_name}",
                 ephemeral=True,
             )
+
+        # Check for EXPLICIT help requests
+        text = payload.text.strip().lower() if payload.text else ""
+        if text in ("help", "aide", "--help", "-h"):
+            # Return help for this specific command only
+            help_text = self.generate_command_help(command_name)
+            return CommandResponse(message=help_text, ephemeral=True)
+
+        # If command has no handler (auto-generated parent), show help for children
+        # This handles cases like `/sre dev` where `dev` is just a grouping node
+        if cmd_def.handler is None:
+            help_text = self.generate_help(root_command=command_name)
+            return CommandResponse(message=help_text, ephemeral=True)
 
         # Dispatch to handler
         try:
@@ -319,40 +373,6 @@ class BasePlatformProvider(ABC):
                 message=f"Error executing {command_name}: {str(e)}",
                 ephemeral=True,
             )
-
-    def _translate_or_fallback(
-        self, key: Optional[str], fallback: str, locale: str
-    ) -> str:
-        """Translate key or return fallback text.
-
-        Args:
-            key: Translation key (e.g., "geolocate.slack.description")
-            fallback: Fallback text if translation unavailable
-            locale: Locale string (e.g., "en-US", "fr-FR")
-
-        Returns:
-            Translated message or fallback text
-        """
-        if not key or not self._translator:
-            return fallback
-
-        try:
-            from infrastructure.i18n.models import TranslationKey, Locale
-
-            translation_key = TranslationKey.from_string(key)
-            locale_enum = Locale.from_string(locale)
-            translated = self._translator.translate_message(
-                translation_key, locale_enum
-            )
-            return translated if translated else fallback
-        except Exception as e:
-            self._logger.debug(
-                "translation_fallback",
-                key=key,
-                error=str(e),
-                locale=locale,
-            )
-            return fallback
 
     def __repr__(self) -> str:
         """String representation of the provider."""

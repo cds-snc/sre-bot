@@ -32,6 +32,7 @@ from infrastructure.platforms.capabilities.models import (
     create_capability_declaration,
 )
 from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter
+from infrastructure.platforms.models import CommandDefinition
 from infrastructure.platforms.providers.base import BasePlatformProvider
 
 logger = structlog.get_logger()
@@ -311,3 +312,323 @@ class TeamsPlatformProvider(BasePlatformProvider):
             TeamsPlatformSettings instance
         """
         return self._settings
+
+    def register_command(
+        self,
+        command: str,
+        handler,  # Callable[[CommandPayload], CommandResponse]
+        description: str = "",
+        description_key: Optional[str] = None,
+        usage_hint: str = "",
+        examples: Optional[list] = None,
+        example_keys: Optional[list] = None,
+        parent: Optional[str] = None,
+    ) -> None:
+        """Register a Teams command with hierarchical support.
+
+        Automatically creates intermediate command nodes if parent uses dot notation.
+
+        Note: Teams uses @mention syntax, not slash commands: "@BotName command args"
+
+        Args:
+            command: Command name (e.g., "aws", "test-connection")
+            handler: Function that handles CommandPayload → CommandResponse
+            description: English description (fallback if translation unavailable)
+            description_key: i18n translation key (e.g., "commands.aws.description")
+            usage_hint: Usage string (e.g., "<account_id>")
+            examples: List of example argument strings
+            example_keys: List of translation keys for examples
+            parent: Dot notation parent path (e.g., "sre.dev")
+
+        Example:
+            # Register nested command: @BotName sre dev aws test-connection
+            provider.register_command(
+                command="test-connection",
+                handler=handle_test_connection,
+                description="Test AWS connection",
+                parent="sre.dev.aws",
+            )
+        """
+        # Auto-generate intermediate nodes if parent specified
+        if parent:
+            self._ensure_parent_chain_exists(parent)
+
+        # Create the command definition
+        cmd_def = CommandDefinition(
+            name=command,
+            handler=handler,
+            description=description,
+            description_key=description_key,
+            usage_hint=usage_hint,
+            examples=examples or [],
+            example_keys=example_keys or [],
+            parent=parent,
+        )
+
+        # Store by full_path
+        self._commands[cmd_def.full_path] = cmd_def
+
+        self._logger.debug(
+            "teams_command_registered",
+            command=command,
+            parent=parent,
+            full_path=cmd_def.full_path,
+            has_description=bool(description or description_key),
+        )
+
+    def _append_command_help(
+        self,
+        lines: list,
+        cmd_def,  # CommandDefinition
+        indent_level: int,
+        locale: str,
+    ) -> None:
+        """Recursively append command help with hierarchical formatting for Teams.
+
+        Args:
+            lines: List of strings to append to
+            cmd_def: CommandDefinition to render
+            indent_level: Current indentation level (0 = root)
+            locale: Locale string for translations
+        """
+        indent = "  " * indent_level
+
+        # Convert dot notation to space-separated for display
+        # e.g., "sre.dev.aws" → "@BotName sre dev aws"
+        display_path = cmd_def.full_path.replace(".", " ")
+        bot_name = getattr(self._settings, "BOT_NAME", "SREBot")
+
+        # Build command signature (Teams uses @mention, not slash)
+        if cmd_def.usage_hint:
+            signature = f"@{bot_name} {display_path} {cmd_def.usage_hint}"
+        else:
+            signature = f"@{bot_name} {display_path}"
+
+        # Add command line (Teams markdown uses ** for bold)
+        lines.append(f"{indent}• **{signature}**")
+
+        # Add description if not auto-generated
+        if not cmd_def.is_auto_generated:
+            desc = self._translate_or_fallback(
+                cmd_def.description_key, cmd_def.description, locale
+            )
+            if desc:
+                lines.append(f"{indent}  {desc}")
+
+        # Add examples if not auto-generated
+        if not cmd_def.is_auto_generated and cmd_def.examples:
+            examples_label = self._translate_or_fallback(
+                "commands.labels.examples", "Examples:", locale
+            )
+            lines.append(f"{indent}  **{examples_label}**")
+
+            for i, example in enumerate(cmd_def.examples):
+                # Try to translate example if key available
+                if i < len(cmd_def.example_keys):
+                    example_text = self._translate_or_fallback(
+                        cmd_def.example_keys[i], example, locale
+                    )
+                else:
+                    example_text = example
+
+                example_line = f"`@{bot_name} {display_path} {example_text}`"
+                lines.append(f"{indent}    • {example_line}")
+
+        # Add blank line after command
+        lines.append("")
+
+    def generate_help(
+        self,
+        locale: str = "en-US",
+        root_command: Optional[str] = None,
+    ) -> str:
+        """Generate Teams-formatted help text for registered commands.
+
+        Supports hierarchical command display using the new dot notation.
+        Uses Teams markdown formatting (** for bold).
+
+        Note: Teams uses @mention syntax, not slash commands.
+
+        Args:
+            locale: Locale string (e.g., "en-US", "fr-FR")
+            root_command: Optional root command full_path (e.g., "sre.dev")
+                         to filter help to only its children. If None, shows
+                         all top-level commands.
+
+        Returns:
+            Teams-formatted help text with commands and examples
+
+        Example Output:
+            ```
+            **Available Commands**
+
+            • **@SREBot sre** - SRE Operations
+            • **@SREBot sre dev** - Development tools
+              • **@SREBot sre dev aws** - AWS development commands
+            ```
+        """
+        if not self._commands:
+            return "No commands registered."
+
+        lines = ["**Available Commands**", ""]
+
+        # Determine which commands to display
+        if root_command:
+            # Show children of root_command
+            children = self._get_child_commands(root_command)
+            if not children:
+                return f"No commands found under `{root_command}`"
+
+            # Render each child command with its subtree
+            for cmd_def in children:
+                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
+        else:
+            # Show all top-level commands (no parent)
+            top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
+
+            if not top_level:
+                return "No top-level commands registered."
+
+            for cmd_def in sorted(top_level, key=lambda c: c.name):
+                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
+
+        return "\n".join(lines)
+
+        """Generate Teams-formatted help text for all registered commands.
+
+        TODO: Implement with Adaptive Cards formatting for rich help display.
+        Current implementation uses plain text as placeholder.
+
+        Args:
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Teams-formatted help text (currently plain text)
+        """
+        if not self._commands:
+            return "No commands registered."
+
+        prefix = self._parent_command if self._parent_command else ""
+        lines = ["**Commands**", ""]
+
+        for cmd_def in self._commands.values():
+            # Build command signature
+            prefix_str = f"/{prefix} {cmd_def.name}" if prefix else f"/{cmd_def.name}"
+            if cmd_def.usage_hint:
+                signature = f"{prefix_str} {cmd_def.usage_hint}"
+            else:
+                signature = prefix_str
+            lines.append(f"**{signature}**")
+
+            # Translate description
+            desc = self._translate_or_fallback(
+                cmd_def.description_key, cmd_def.description, locale
+            )
+            if desc:
+                lines.append(f"  {desc}")
+
+            # Add examples
+            if cmd_def.examples:
+                examples_label = self._translate_or_fallback(
+                    "commands.labels.examples", "Examples:", locale
+                )
+                lines.append(f"  **{examples_label}**")
+
+                for i, example in enumerate(cmd_def.examples):
+                    if i < len(cmd_def.example_keys):
+                        example_text = self._translate_or_fallback(
+                            cmd_def.example_keys[i], example, locale
+                        )
+                    else:
+                        example_text = example
+
+                    example_line = (
+                        f"`/{prefix} {cmd_def.name} {example_text}`"
+                        if prefix
+                        else f"`/{cmd_def.name} {example_text}`"
+                    )
+                    lines.append(f"  • {example_line}")
+
+            lines.append("")
+
+        return "\n".join(lines)
+
+    def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
+        """Generate Teams-formatted help text for a specific command.
+
+        Uses Teams markdown formatting (** for bold).
+        Note: Teams uses @mention syntax, not slash commands.
+
+        Args:
+            command_name: Full path of the command (e.g., "sre.dev.aws")
+            locale: Locale string (e.g., "en-US", "fr-FR")
+
+        Returns:
+            Teams-formatted help text for the specified command
+        """
+        # Look up command by full_path
+        cmd_def = self._commands.get(command_name)
+        if not cmd_def:
+            return f"Unknown command: `{command_name}`"
+
+        lines = []
+
+        # Convert dot notation to space-separated for display
+        # e.g., "sre.dev.aws" → "@SREBot sre dev aws"
+        display_path = cmd_def.full_path.replace(".", " ")
+        bot_name = getattr(self._settings, "BOT_NAME", "SREBot")
+
+        # Build command signature (Teams uses @mention, not slash)
+        if cmd_def.usage_hint:
+            signature = f"@{bot_name} {display_path} {cmd_def.usage_hint}"
+        else:
+            signature = f"@{bot_name} {display_path}"
+
+        lines.append(f"**{signature}**")
+        lines.append("")
+
+        # Translate description (skip if auto-generated)
+        if not cmd_def.is_auto_generated:
+            desc = self._translate_or_fallback(
+                cmd_def.description_key, cmd_def.description, locale
+            )
+            if desc:
+                lines.append(desc)
+                lines.append("")
+
+        # Add examples (skip if auto-generated)
+        if not cmd_def.is_auto_generated and cmd_def.examples:
+            # Translate "Examples:" label
+            examples_label = self._translate_or_fallback(
+                "commands.labels.examples", "Examples:", locale
+            )
+            lines.append(f"**{examples_label}**")
+
+            for i, example in enumerate(cmd_def.examples):
+                # Try to translate example if key available
+                if i < len(cmd_def.example_keys):
+                    example_text = self._translate_or_fallback(
+                        cmd_def.example_keys[i], example, locale
+                    )
+                else:
+                    example_text = example
+
+                example_line = f"`@{bot_name} {display_path} {example_text}`"
+                lines.append(f"• {example_line}")
+
+        # Show sub-commands if any
+        children = self._get_child_commands(cmd_def.full_path)
+        if children:
+            lines.append("")
+            lines.append("**Sub-commands:**")
+            for child in children:
+                child_display = child.full_path.replace(".", " ")
+                lines.append(f"• **@{bot_name} {child_display}**")
+                if not child.is_auto_generated and child.description:
+                    desc = self._translate_or_fallback(
+                        child.description_key, child.description, locale
+                    )
+                    if desc:
+                        lines.append(f"  {desc}")
+
+        return "\n".join(lines)

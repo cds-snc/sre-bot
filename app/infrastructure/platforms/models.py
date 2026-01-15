@@ -69,23 +69,40 @@ class CommandResponse:
 class CommandDefinition:
     """Command metadata for auto-help generation.
 
+    Supports hierarchical command trees with auto-generated intermediate nodes.
+
     Attributes:
-        name: Command name (e.g., "geolocate", "/geolocate")
-        handler: Callable that handles CommandPayload → CommandResponse
+        name: Command name (e.g., "aws", "google", "dev")
+        handler: Optional handler (None for auto-generated intermediate nodes)
         description: English description for fallback
         description_key: i18n translation key (e.g., "geolocate.slack.description")
         usage_hint: Usage string (e.g., "<ip_address>")
         examples: List of example invocations (just the arguments, not full command)
         example_keys: List of translation keys for examples
+        parent: Parent command path in dot notation (e.g., "sre.dev" for /sre dev aws)
+        full_path: Full command path (e.g., "sre.dev.aws") - computed automatically
+        is_auto_generated: True if this node was auto-created for hierarchy
     """
 
     name: str
-    handler: Callable[[CommandPayload], CommandResponse]
+    handler: Optional[Callable[[CommandPayload], CommandResponse]] = None
     description: str = ""
     description_key: Optional[str] = None
     usage_hint: str = ""
     examples: List[str] = field(default_factory=list)
     example_keys: List[str] = field(default_factory=list)
+    parent: Optional[str] = None
+    full_path: str = field(init=False)
+    is_auto_generated: bool = False
+
+    def __post_init__(self):
+        """Compute full_path from parent and name."""
+        if self.parent:
+            # parent="sre.dev" + name="aws" -> full_path="sre.dev.aws"
+            self.full_path = f"{self.parent}.{self.name}"
+        else:
+            # No parent -> top-level command
+            self.full_path = self.name
 
 
 # View/Modal Models
