@@ -98,12 +98,6 @@ def register_slack_commands() -> None:
     This function should be called explicitly from main.py during startup,
     just like FastAPI's app.include_router() pattern.
 
-    Pattern validated in docs/architecture-review/PLATFORM_PROVIDERS_VALIDATION.md
-    - ✅ Explicit registration (called from main.py)
-    - ✅ Uses ergonomic accessor (get_slack_provider)
-    - ✅ No import side-effects
-    - ✅ Testable (can mock get_slack_provider)
-
     Example:
         # main.py
         from packages.geolocate.slack import register_slack_commands

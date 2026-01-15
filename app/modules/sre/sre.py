@@ -195,6 +195,11 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         "channel_id": payload.channel_id,
     }
 
+    # Merge all Slack command fields from platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
+    if payload.platform_metadata:
+        body.update(payload.platform_metadata)
+
     # Capture responses sent via respond()
     captured_response = {"message": None, "blocks": None}
 
@@ -253,6 +258,11 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         "user_id": payload.user_id,
         "channel_id": payload.channel_id,
     }
+
+    # Merge all Slack command fields from platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
+    if payload.platform_metadata:
+        body.update(payload.platform_metadata)
 
     # Capture responses sent via respond()
     captured_response = {"message": None, "blocks": None}
@@ -348,13 +358,16 @@ def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
     subcommand = parts[0]
     subcommand_args = parts[1] if len(parts) > 1 else ""
 
-    # Create CommandPayload
+    # Create CommandPayload with full Slack command as platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
+    # (trigger_id, channel_name, etc.) without us having to enumerate them
     payload = CommandPayload(
         text=subcommand_args,
         user_id=user_id,
         channel_id=channel_id,
         user_email="",
         response_url="",
+        platform_metadata=command,  # Pass entire Slack command object
     )
 
     # Dispatch to handler
