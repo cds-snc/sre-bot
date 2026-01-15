@@ -65,6 +65,10 @@ def _register_incident_subcommand():
 
     TODO: Move handler to modules/incident/ with its own register_slack_features().
     Handler should live with the feature code, not here.
+
+    NOTE: Uses legacy_mode=True to allow incident_helper to handle its own help text.
+    This enables gradual migration - the legacy handler manages all its subcommands
+    and help text while we build the new platform provider architecture around it.
     """
     slack_provider = get_slack_provider()
     slack_provider.register_command(
@@ -73,6 +77,7 @@ def _register_incident_subcommand():
         description="Manage incidents",
         description_key="sre.subcommands.incident.description",
         parent="sre",
+        legacy_mode=True,  # Let incident_helper handle its own help text
     )
     logger.info("subcommand_registered", command="incident")
 
@@ -82,6 +87,8 @@ def _register_webhooks_subcommand():
 
     TODO: Move handler to modules/sre/webhooks/ with its own register_slack_features().
     Handler should live with the feature code, not here.
+
+    NOTE: Uses legacy_mode=True to allow webhook_helper to handle its own help text.
     """
     slack_provider = get_slack_provider()
     slack_provider.register_command(
@@ -90,6 +97,7 @@ def _register_webhooks_subcommand():
         description="Manage webhooks",
         description_key="sre.subcommands.webhooks.description",
         parent="sre",
+        legacy_mode=True,  # Let webhook_helper handle its own help text
     )
     logger.info("subcommand_registered", command="webhooks")
 
@@ -107,6 +115,7 @@ def _register_groups_subcommand():
         description="Manage groups and memberships",
         description_key="sre.subcommands.groups.description",
         parent="sre",
+        legacy_mode=True,
     )
     logger.info("subcommand_registered", command="groups")
 
