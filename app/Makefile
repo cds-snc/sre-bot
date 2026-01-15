@@ -24,6 +24,9 @@ install-dev:
 lint:
 	flake8 .
 
+lint-types:
+	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs --explicit-package-bases || echo "⚠️  mypy not installed. Run 'make install-dev' to enable type checking."
+
 # NEW STRUCTURE: Pure unit tests
 test-unit:
 	python3 -m coverage run -m pytest tests/unit -s -vv && \
@@ -80,6 +83,7 @@ test-coverage-all:
 
 lint-ci:
 	flake8 .
+	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs || true
 
 fmt-ci:
 	black --check . --target-version py311

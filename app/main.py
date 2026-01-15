@@ -28,6 +28,10 @@ from modules.groups.providers import (
 from infrastructure.commands.providers import (
     load_providers as load_command_providers,
 )
+from packages.geolocate.slack import (
+    register_slack_commands as register_geolocate,
+)
+from modules.sre.sre import register_slack_features as register_sre_features
 from server import bot_middleware, server
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -143,6 +147,17 @@ def providers_startup():
                 count=len(failed),
                 providers=failed,
             )
+
+        # ✅ EXPLICIT COMMAND REGISTRATION (FastAPI pattern)
+        # Each feature exports a registration function that's called explicitly,
+        # following the same pattern as app.include_router() in FastAPI.
+        # This ensures clear, traceable registration without import magic.
+
+        # Register feature commands explicitly
+        register_geolocate()
+        register_sre_features()
+
+        logger.info("platform_commands_registered")
     except Exception as e:
         # Log error but don't fail startup - platform system is optional during transition
         logger.error(
