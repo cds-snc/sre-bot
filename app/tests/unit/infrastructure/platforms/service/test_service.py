@@ -1,10 +1,7 @@
 """Tests for PlatformService."""
 
-from unittest.mock import Mock
-
 import pytest
 
-from infrastructure.configuration import Settings
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.exceptions import (
@@ -12,6 +9,7 @@ from infrastructure.platforms.exceptions import (
     ProviderNotFoundError,
 )
 from infrastructure.platforms.providers.base import BasePlatformProvider
+from infrastructure.platforms.registry import get_platform_registry
 from infrastructure.platforms.service import PlatformService
 
 
@@ -63,6 +61,14 @@ class MockProvider(BasePlatformProvider):
             return {"type": "error", "message": data.get("error", "Unknown error")}
         return {"type": "success", "data": data}
 
+    def generate_help(self, locale="en-US", root_command=None):
+        """Generate mock help."""
+        return "Mock help"
+
+    def generate_command_help(self, command_name, locale="en-US"):
+        """Generate mock command help."""
+        return f"Help for {command_name}"
+
     def initialize_app(self):
         if not self.enabled:
             return OperationResult.permanent_error(
@@ -71,10 +77,25 @@ class MockProvider(BasePlatformProvider):
         return OperationResult.success(message="Initialized")
 
 
+@pytest.fixture(autouse=True)
+def clear_registry():
+    """Clear the global registry before and after each test to ensure isolation."""
+    registry = get_platform_registry()
+    registry.clear()
+    yield
+    registry.clear()
+
+
 @pytest.fixture
-def mock_settings():
-    """Create mock settings."""
-    return Mock(spec=Settings)
+def mock_settings(make_mock_settings):
+    """Create mock settings with platforms configuration."""
+    return make_mock_settings(
+        **{
+            "platforms.slack.ENABLED": False,
+            "platforms.teams.ENABLED": False,
+            "platforms.discord.ENABLED": False,
+        }
+    )
 
 
 @pytest.fixture

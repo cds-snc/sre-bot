@@ -17,41 +17,51 @@ class TestSlackPlatformSettings:
         settings = SlackPlatformSettings(ENABLED=False)
         settings.validate_configuration()  # Should not raise
 
-    def test_socket_mode_requires_app_token(self):
+    def test_socket_mode_requires_app_token(self, monkeypatch):
         """Should require APP_TOKEN when Socket Mode is enabled."""
-        settings = SlackPlatformSettings(
-            ENABLED=True,
-            SOCKET_MODE=True,
-            BOT_TOKEN="xoxb-123",
-            # Missing APP_TOKEN
-        )
+        # Set APP_TOKEN to empty/None in environment
+        monkeypatch.setenv("SLACK__APP_TOKEN", "")
+        monkeypatch.setenv("PLATFORMS__SLACK__APP_TOKEN", "")
 
+        # Pydantic validates on __init__, so exception raised during construction
         with pytest.raises(ValueError, match="SLACK_APP_TOKEN is required"):
-            settings.validate_configuration()
+            SlackPlatformSettings(
+                ENABLED=True,
+                SOCKET_MODE=True,
+                BOT_TOKEN="xoxb-123",
+                APP_TOKEN="",  # Explicitly set to empty
+            )
 
-    def test_http_mode_requires_signing_secret(self):
+    def test_http_mode_requires_signing_secret(self, monkeypatch):
         """Should require SIGNING_SECRET when HTTP webhooks are enabled."""
-        settings = SlackPlatformSettings(
-            ENABLED=True,
-            SOCKET_MODE=False,
-            BOT_TOKEN="xoxb-123",
-            # Missing SIGNING_SECRET
-        )
+        # Set SIGNING_SECRET to empty in environment
+        monkeypatch.setenv("SLACK__SIGNING_SECRET", "")
+        monkeypatch.setenv("PLATFORMS__SLACK__SIGNING_SECRET", "")
 
+        # Pydantic validates on __init__, so exception raised during construction
         with pytest.raises(ValueError, match="SLACK_SIGNING_SECRET is required"):
-            settings.validate_configuration()
+            SlackPlatformSettings(
+                ENABLED=True,
+                SOCKET_MODE=False,
+                BOT_TOKEN="xoxb-123",
+                SIGNING_SECRET="",  # Explicitly set to empty
+            )
 
-    def test_always_requires_bot_token(self):
+    def test_always_requires_bot_token(self, monkeypatch):
         """Should always require BOT_TOKEN when enabled."""
-        settings = SlackPlatformSettings(
-            ENABLED=True,
-            SOCKET_MODE=True,
-            APP_TOKEN="xapp-123",
-            # Missing BOT_TOKEN
-        )
+        # Set BOT_TOKEN to empty in environment
+        monkeypatch.setenv("SLACK__BOT_TOKEN", "")
+        monkeypatch.setenv("SLACK__SLACK_TOKEN", "")
+        monkeypatch.setenv("PLATFORMS__SLACK__BOT_TOKEN", "")
 
+        # Pydantic validates on __init__, so exception raised during construction
         with pytest.raises(ValueError, match="SLACK_BOT_TOKEN is required"):
-            settings.validate_configuration()
+            SlackPlatformSettings(
+                ENABLED=True,
+                SOCKET_MODE=True,
+                APP_TOKEN="xapp-123",
+                BOT_TOKEN="",  # Explicitly set to empty
+            )
 
     def test_valid_socket_mode_configuration(self):
         """Should accept valid Socket Mode configuration."""

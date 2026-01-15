@@ -55,6 +55,20 @@ class MockPlatformProvider(BasePlatformProvider):
     ) -> Dict[str, Any]:
         return {"type": message_type, "data": data}
 
+    def generate_help(
+        self,
+        locale: str = "en-US",
+        root_command: Optional[str] = None,
+    ) -> str:
+        return "Mock help"
+
+    def generate_command_help(
+        self,
+        command_name: str,
+        locale: str = "en-US",
+    ) -> str:
+        return f"Help for {command_name}"
+
 
 @pytest.fixture
 def registry():

@@ -57,6 +57,22 @@ class ConcretePlatformProvider(BasePlatformProvider):
             "data": data,
         }
 
+    def generate_help(
+        self,
+        locale: str = "en-US",
+        root_command: Optional[str] = None,
+    ) -> str:
+        """Mock generate_help implementation."""
+        return "Available commands: help"
+
+    def generate_command_help(
+        self,
+        command_name: str,
+        locale: str = "en-US",
+    ) -> str:
+        """Mock generate_command_help implementation."""
+        return f"Help for {command_name}"
+
 
 @pytest.mark.unit
 class TestBasePlatformProvider:
@@ -250,6 +266,12 @@ class TestAbstractMethodEnforcement:
             def format_response(self, data, message_type="success"):
                 return {}
 
+            def generate_help(self, locale="en-US", root_command=None):
+                return ""
+
+            def generate_command_help(self, command_name, locale="en-US"):
+                return ""
+
         with pytest.raises(TypeError) as exc_info:
             IncompleteProvider(name="Incomplete")  # type: ignore
 
@@ -265,6 +287,12 @@ class TestAbstractMethodEnforcement:
             def format_response(self, data, message_type="success"):
                 return {}
 
+            def generate_help(self, locale="en-US", root_command=None):
+                return ""
+
+            def generate_command_help(self, command_name, locale="en-US"):
+                return ""
+
         with pytest.raises(TypeError) as exc_info:
             IncompleteProvider(name="Incomplete")  # type: ignore
 
@@ -279,6 +307,12 @@ class TestAbstractMethodEnforcement:
 
             def send_message(self, channel, message, thread_ts=None):
                 return OperationResult.success(data={})
+
+            def generate_help(self, locale="en-US", root_command=None):
+                return ""
+
+            def generate_command_help(self, command_name, locale="en-US"):
+                return ""
 
         with pytest.raises(TypeError) as exc_info:
             IncompleteProvider(name="Incomplete")  # type: ignore
