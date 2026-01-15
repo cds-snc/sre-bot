@@ -35,7 +35,7 @@ class SlackPlatformSettings(InfrastructureSettings):
     model_config = SettingsConfigDict(env_prefix="SLACK_")
 
     ENABLED: bool = Field(
-        default=True,
+        default=False,
         description="Enable Slack platform provider (set SLACK_ENABLED=true to enable)",
     )
 
