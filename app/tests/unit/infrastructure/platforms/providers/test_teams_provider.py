@@ -25,9 +25,13 @@ class TestTeamsPlatformProviderInitialization:
         assert provider._settings == teams_settings
         assert isinstance(provider._formatter, TeamsAdaptiveCardsFormatter)
 
-    def test_initialization_with_custom_formatter(self, teams_settings, teams_formatter):
+    def test_initialization_with_custom_formatter(
+        self, teams_settings, teams_formatter
+    ):
         """Test initialization with custom formatter."""
-        provider = TeamsPlatformProvider(settings=teams_settings, formatter=teams_formatter)
+        provider = TeamsPlatformProvider(
+            settings=teams_settings, formatter=teams_formatter
+        )
 
         assert provider._formatter is teams_formatter
 
@@ -40,9 +44,7 @@ class TestTeamsPlatformProviderInitialization:
     def test_initialization_custom_name_version(self, teams_settings):
         """Test initialization with custom name and version."""
         provider = TeamsPlatformProvider(
-            settings=teams_settings,
-            name="custom-teams",
-            version="2.0.0"
+            settings=teams_settings, name="custom-teams", version="2.0.0"
         )
 
         assert provider.name == "custom-teams"
@@ -115,8 +117,7 @@ class TestSendMessage:
         provider = TeamsPlatformProvider(settings=teams_settings)
 
         result = provider.send_message(
-            channel="19:abcd@thread.tacv2",
-            message={"text": "Hello Teams"}
+            channel="19:abcd@thread.tacv2", message={"text": "Hello Teams"}
         )
 
         assert result.is_success
@@ -131,12 +132,20 @@ class TestSendMessage:
             "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
             "type": "AdaptiveCard",
             "version": "1.4",
-            "body": [{"type": "TextBlock", "text": "Hello"}]
+            "body": [{"type": "TextBlock", "text": "Hello"}],
         }
 
         result = provider.send_message(
             channel="19:abcd@thread.tacv2",
-            message={"attachments": [{"contentType": "application/vnd.microsoft.card.adaptive", "contentUrl": None, "content": card}]}
+            message={
+                "attachments": [
+                    {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "contentUrl": None,
+                        "content": card,
+                    }
+                ]
+            },
         )
 
         assert result.is_success
@@ -146,8 +155,7 @@ class TestSendMessage:
         provider = TeamsPlatformProvider(settings=teams_settings_disabled)
 
         result = provider.send_message(
-            channel="19:abcd@thread.tacv2",
-            message={"text": "Test"}
+            channel="19:abcd@thread.tacv2", message={"text": "Test"}
         )
 
         assert not result.is_success
@@ -158,10 +166,7 @@ class TestSendMessage:
         """Test sending message with empty content."""
         provider = TeamsPlatformProvider(settings=teams_settings)
 
-        result = provider.send_message(
-            channel="19:abcd@thread.tacv2",
-            message={}
-        )
+        result = provider.send_message(channel="19:abcd@thread.tacv2", message={})
 
         assert not result.is_success
         assert result.error_code == "EMPTY_CONTENT"
@@ -170,10 +175,7 @@ class TestSendMessage:
         """Test sending message with None content."""
         provider = TeamsPlatformProvider(settings=teams_settings)
 
-        result = provider.send_message(
-            channel="19:abcd@thread.tacv2",
-            message=None
-        )
+        result = provider.send_message(channel="19:abcd@thread.tacv2", message=None)
 
         assert not result.is_success
         assert result.error_code == "EMPTY_CONTENT"
@@ -189,7 +191,9 @@ class TestFormatResponse:
 
         response = provider.format_response(data={"user_id": "U123"})
 
-        assert "body" in response[0] if isinstance(response, list) else "body" in response
+        assert (
+            "body" in response[0] if isinstance(response, list) else "body" in response
+        )
 
     def test_format_response_with_error(self, teams_settings):
         """Test formatting an error response."""
@@ -207,11 +211,12 @@ class TestFormatResponse:
 
         assert response is not None
 
-    def test_format_response_uses_custom_formatter(self, teams_settings, teams_formatter):
+    def test_format_response_uses_custom_formatter(
+        self, teams_settings, teams_formatter
+    ):
         """Test that format_response uses the configured formatter."""
         provider = TeamsPlatformProvider(
-            settings=teams_settings,
-            formatter=teams_formatter
+            settings=teams_settings, formatter=teams_formatter
         )
 
         provider.format_response(data={"test": "data"})

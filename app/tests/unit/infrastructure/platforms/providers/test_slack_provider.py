@@ -265,7 +265,9 @@ class TestFormatResponse:
 
         assert "blocks" in response
 
-    def test_format_response_uses_custom_formatter(self, slack_settings, slack_formatter):
+    def test_format_response_uses_custom_formatter(
+        self, slack_settings, slack_formatter
+    ):
         """Test that format_response uses the configured formatter."""
         provider = SlackPlatformProvider(
             settings=slack_settings, formatter=slack_formatter
