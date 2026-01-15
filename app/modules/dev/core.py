@@ -5,11 +5,9 @@ Only available in development environment (PREFIX=dev-).
 """
 
 import structlog
-from infrastructure.services import get_settings
-from infrastructure.commands.router import CommandRouter
-from infrastructure.commands.providers.slack import SlackCommandProvider
-from modules.dev import google, slack, incident
-from modules.dev.aws_dev import aws_dev_router
+from infrastructure.services import get_settings, get_slack_provider
+from infrastructure.platforms.models import CommandPayload, CommandResponse
+from modules.dev.aws_dev import register_slack_features as register_aws_dev
 
 
 PREFIX = get_settings().PREFIX
@@ -17,270 +15,138 @@ logger = structlog.get_logger()
 
 
 # ============================================================
-# COMMAND ROUTER SETUP
-# ============================================================
-
-dev_router = CommandRouter(namespace="dev")
-
-
-# ============================================================
-# PROVIDER IMPLEMENTATIONS
+# PUBLIC: FEATURE REGISTRATION INTERFACE
 # ============================================================
 
 
-class GoogleDevProvider(SlackCommandProvider):
-    """Adapter for legacy Google dev commands."""
+def register_slack_features():
+    """Explicitly register all dev module Slack features with platform provider.
 
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy Google service handler."""
-        self.acknowledge(platform_payload)
-
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        google.google_service_command(ack, client, body, respond)
-
-
-class SlackDevProvider(SlackCommandProvider):
-    """Adapter for legacy Slack dev commands."""
-
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy Slack handler."""
-        self.acknowledge(platform_payload)
-
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        text = body.get("text", "")
-        args = text.split() if text else []
-        # Remove the "slack" subcommand from args
-        if args and args[0] == "slack":
-            args.pop(0)
-
-        slack.slack_command(ack, client, body, respond, logger, args)
-
-
-class StaleChannelProvider(SlackCommandProvider):
-    """Test stale channel notification."""
-
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Send test stale channel notification."""
-        self.acknowledge(platform_payload)
-
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-
-        logger.info("test_stale_channel_notification_received", body=body)
-        text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.\n
-        Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
-        attachments = [
-            {
-                "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver le canal maintenant ou planifier une rétro?",
-                "fallback": "You are unable to archive the channel | Vous ne pouvez pas archiver ce canal",
-                "callback_id": "archive_channel",
-                "color": "#3AA3E3",
-                "attachment_type": "default",
-                "actions": [
-                    {
-                        "name": "archive",
-                        "text": "Archive channel | Canal d'archives",
-                        "type": "button",
-                        "value": "archive",
-                        "style": "danger",
-                    },
-                    {
-                        "name": "schedule_retro",
-                        "text": "Schedule Retro | Calendrier rétro",
-                        "type": "button",
-                        "value": "schedule_retro",
-                        "style": "primary",
-                    },
-                    {
-                        "name": "ignore",
-                        "text": "Ignore | Ignorer",
-                        "type": "button",
-                        "value": "ignore",
-                    },
-                ],
-            }
-        ]
-        client.chat_postMessage(
-            channel=body["channel_id"], text=text, attachments=attachments
-        )
-
-
-class ListIncidentsProvider(SlackCommandProvider):
-    """List incidents handler."""
-
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy incident list handler."""
-        self.acknowledge(platform_payload)
-
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        incident.list_incidents(ack, logger, respond, client, body)
-
-
-class LoadIncidentsProvider(SlackCommandProvider):
-    """Load incidents handler."""
-
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy load incidents handler."""
-        self.acknowledge(platform_payload)
-
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        incident.load_incidents(ack, logger, respond, client, body)
-
-
-class AddIncidentProvider(SlackCommandProvider):
-    """Add incident handler."""
-
-    def __init__(self):
-        settings = get_settings()
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy add incident handler."""
-        self.acknowledge(platform_payload)
-
-        ack = platform_payload["ack"]
-        client = platform_payload["client"]
-        body = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        incident.add_incident(ack, logger, respond, client, body)
-
-
-# ============================================================
-# REGISTER PROVIDERS
-# ============================================================
-
-dev_router.register_subcommand(
-    name="aws",
-    provider=aws_dev_router,
-    platform="slack",
-    description="Test AWS client integrations (identitystore, organizations, sso, health)",
-    description_key="dev.subcommands.aws.description",
-)
-
-dev_router.register_subcommand(
-    name="google",
-    provider=GoogleDevProvider(),
-    platform="slack",
-    description="Google Workspace development commands",
-    description_key="dev.subcommands.google.description",
-)
-
-dev_router.register_subcommand(
-    name="slack",
-    provider=SlackDevProvider(),
-    platform="slack",
-    description="Slack development commands",
-    description_key="dev.subcommands.slack.description",
-)
-
-dev_router.register_subcommand(
-    name="stale",
-    provider=StaleChannelProvider(),
-    platform="slack",
-    description="Test stale channel notification",
-    description_key="dev.subcommands.stale.description",
-)
-
-dev_router.register_subcommand(
-    name="incident",
-    provider=ListIncidentsProvider(),
-    platform="slack",
-    description="List incidents",
-    description_key="dev.subcommands.incident.description",
-)
-
-dev_router.register_subcommand(
-    name="load-incidents",
-    provider=LoadIncidentsProvider(),
-    platform="slack",
-    description="Load incidents",
-    description_key="dev.subcommands.load_incidents.description",
-)
-
-dev_router.register_subcommand(
-    name="add-incident",
-    provider=AddIncidentProvider(),
-    platform="slack",
-    description="Add incident",
-    description_key="dev.subcommands.add_incident.description",
-)
-
-
-# ============================================================
-# MAIN COMMAND HANDLER
-# ============================================================
-
-
-def dev_command(ack, respond, client, body, args):
-    """Main dev command handler - delegates all subcommands to router.
-
-    Only available in development environment (PREFIX=dev-).
+    This is the public entry point for dev feature registration.
+    Called by sre.register_dev_subcommands() during startup.
     """
-    ack()
+    logger.info("registering_slack_features", module="dev")
+    register_dev_subcommands()
 
-    if PREFIX != "dev-":
-        respond("This command is only available in the development environment.")
-        return
 
-    logger.info(
-        "dev_command_received",
-        command=body.get("text", ""),
-        user_id=body.get("user_id"),
-        user_name=body.get("user_name"),
-        channel_id=body.get("channel_id"),
+def register_dev_subcommands():
+    """Register /dev subcommands with Slack provider."""
+    slack_provider = get_slack_provider()
+
+    logger.info("registering_subcommands", parent_command="dev", count=6)
+
+    # Register: /sre dev google (using dot notation parent)
+    slack_provider.register_command(
+        command="google",
+        handler=handle_google_dev_command,
+        description="Google Workspace development commands",
+        description_key="dev.subcommands.google.description",
+        parent="sre.dev",
     )
 
-    # Build standard payload for router
-    payload = {
-        "command": dict(body),
-        "client": client,
-        "respond": respond,
-        "ack": ack,
-    }
+    # Register: /sre dev slack
+    slack_provider.register_command(
+        command="slack",
+        handler=handle_slack_dev_command,
+        description="Slack development commands",
+        description_key="dev.subcommands.slack.description",
+        parent="sre.dev",
+    )
 
-    # Router handles ALL subcommands
-    # Router automatically generates help for empty commands
-    dev_router.handle(payload)
+    # Register: /sre dev stale
+    slack_provider.register_command(
+        command="stale",
+        handler=handle_stale_dev_command,
+        description="Test stale channel notification",
+        description_key="dev.subcommands.stale.description",
+        parent="sre.dev",
+    )
+
+    # Register: /sre dev incident
+    slack_provider.register_command(
+        command="incident",
+        handler=handle_incident_dev_command,
+        description="List incidents",
+        description_key="dev.subcommands.incident.description",
+        parent="sre.dev",
+    )
+
+    # Register: /sre dev load-incidents
+    slack_provider.register_command(
+        command="load-incidents",
+        handler=handle_load_incidents_command,
+        description="Load incidents",
+        description_key="dev.subcommands.load_incidents.description",
+        parent="sre.dev",
+    )
+
+    # Register: /sre dev add-incident
+    slack_provider.register_command(
+        command="add-incident",
+        handler=handle_add_incident_command,
+        description="Add incident",
+        description_key="dev.subcommands.add_incident.description",
+        parent="sre.dev",
+    )
+
+    # Register AWS dev commands
+    register_aws_dev()
+
+
+# ============================================================
+# COMMAND HANDLERS - Called by platform provider via dispatch_command()
+# ============================================================
+
+
+def handle_google_dev_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev google command."""
+    logger.info("command_received", command="google", text=payload.text)
+    return CommandResponse(
+        message="Google dev command - implementation pending",
+        ephemeral=True,
+    )
+
+
+def handle_slack_dev_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev slack command."""
+    logger.info("command_received", command="slack", text=payload.text)
+    return CommandResponse(
+        message="Slack dev command - implementation pending",
+        ephemeral=True,
+    )
+
+
+def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev stale command."""
+    logger.info("command_received", command="stale")
+    return CommandResponse(
+        message="Stale channel test - implementation pending",
+        ephemeral=True,
+    )
+
+
+def handle_incident_dev_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev incident command."""
+    logger.info("command_received", command="incident")
+    return CommandResponse(
+        message="Incident list - implementation pending",
+        ephemeral=True,
+    )
+
+
+def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev load-incidents command."""
+    logger.info("command_received", command="load-incidents")
+    return CommandResponse(
+        message="Load incidents - implementation pending",
+        ephemeral=True,
+    )
+
+
+def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /dev add-incident command."""
+    logger.info("command_received", command="add-incident")
+    return CommandResponse(
+        message="Add incident - implementation pending",
+        ephemeral=True,
+    )
