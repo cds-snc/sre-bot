@@ -346,9 +346,10 @@ class BasePlatformProvider(ABC):
                 ephemeral=True,
             )
 
-        # Check for EXPLICIT help requests
+        # Check for EXPLICIT help requests (unless in legacy mode)
+        # Legacy mode allows the handler to process help itself
         text = payload.text.strip().lower() if payload.text else ""
-        if text in ("help", "aide", "--help", "-h"):
+        if not cmd_def.legacy_mode and text in ("help", "aide", "--help", "-h"):
             # Return help for this specific command only
             help_text = self.generate_command_help(command_name)
             return CommandResponse(message=help_text, ephemeral=True)

@@ -82,6 +82,7 @@ class CommandDefinition:
         parent: Parent command path in dot notation (e.g., "sre.dev" for /sre dev aws)
         full_path: Full command path (e.g., "sre.dev.aws") - computed automatically
         is_auto_generated: True if this node was auto-created for hierarchy
+        legacy_mode: True to bypass help interception and pass all text to handler
     """
 
     name: str
@@ -94,6 +95,7 @@ class CommandDefinition:
     parent: Optional[str] = None
     full_path: str = field(init=False)
     is_auto_generated: bool = False
+    legacy_mode: bool = False
 
     def __post_init__(self):
         """Compute full_path from parent and name."""

@@ -276,6 +276,7 @@ class SlackPlatformProvider(BasePlatformProvider):
         examples: Optional[list] = None,
         example_keys: Optional[list] = None,
         parent: Optional[str] = None,
+        legacy_mode: bool = False,
     ) -> None:
         """Register a Slack command with hierarchical support.
 
@@ -290,6 +291,7 @@ class SlackPlatformProvider(BasePlatformProvider):
             examples: List of example argument strings
             example_keys: List of translation keys for examples
             parent: Dot notation parent path (e.g., "sre.dev")
+            legacy_mode: If True, bypass automatic help interception (for gradual migration)
 
         Example:
             # Register nested command: /sre dev aws test-connection
@@ -320,6 +322,7 @@ class SlackPlatformProvider(BasePlatformProvider):
             examples=examples or [],
             example_keys=example_keys or [],
             parent=parent,
+            legacy_mode=legacy_mode,
         )
 
         # Store by full_path
