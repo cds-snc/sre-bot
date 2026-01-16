@@ -17,7 +17,6 @@ from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
-from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
 from infrastructure.platforms import PlatformService
 from infrastructure.platforms.clients import (
@@ -335,29 +334,6 @@ def get_notification_service() -> NotificationService:
         idempotency_service=idempotency_service,
         resilience_service=resilience_service,
     )
-
-
-@lru_cache
-def get_command_service() -> CommandService:
-    """Get application-scoped command service singleton.
-
-    Returns a CommandService instance that provides centralized command
-    registration and execution for all modules.
-
-    Usage:
-        from infrastructure.services import CommandServiceDep
-
-        @router.post("/commands/register")
-        def register_command(command_service: CommandServiceDep, module: str):
-            registry = command_service.get_registry(module)
-            commands = registry.get_all_commands()
-            return {"module": module, "commands": len(commands)}
-
-    Returns:
-        CommandService: Cached command service instance
-    """
-    settings = get_settings()
-    return CommandService(settings=settings)
 
 
 @lru_cache

@@ -18,7 +18,6 @@ from infrastructure.services.dependencies import (
     IdempotencyServiceDep,
     ResilienceServiceDep,
     NotificationServiceDep,
-    CommandServiceDep,
     PersistenceServiceDep,
     PlatformServiceDep,
     SlackClientDep,
@@ -37,7 +36,6 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_resilience_service,
     get_notification_service,
-    get_command_service,
     get_persistence_service,
     get_platform_service,
     get_slack_client,
@@ -50,6 +48,9 @@ from infrastructure.platforms import (
     SlackPlatformProvider,
     TeamsPlatformProvider,
     DiscordPlatformProvider,
+    slack_commands,
+    teams_commands,
+    discord_commands,
 )
 
 
@@ -128,7 +129,6 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "NotificationServiceDep",
-    "CommandServiceDep",
     "PersistenceServiceDep",
     "PlatformServiceDep",
     # Platform client facades
@@ -147,7 +147,6 @@ __all__ = [
     "get_idempotency_service",
     "get_resilience_service",
     "get_notification_service",
-    "get_command_service",
     "get_persistence_service",
     "get_platform_service",
     # Platform client providers
@@ -158,4 +157,8 @@ __all__ = [
     "get_slack_provider",
     "get_teams_provider",
     "get_discord_provider",
+    # Commands
+    "slack_commands",
+    "teams_commands",
+    "discord_commands",
 ]
