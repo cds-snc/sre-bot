@@ -4,7 +4,7 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
 import structlog
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import (
@@ -13,7 +13,11 @@ from infrastructure.platforms.capabilities.models import (
     create_capability_declaration,
 )
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
-from infrastructure.platforms.models import CommandDefinition
+from infrastructure.platforms.models import (
+    CommandDefinition,
+    CommandPayload,
+    CommandResponse,
+)
 from infrastructure.platforms.providers.base import BasePlatformProvider
 
 logger = structlog.get_logger()
@@ -269,7 +273,7 @@ class SlackPlatformProvider(BasePlatformProvider):
     def register_command(
         self,
         command: str,
-        handler,  # Callable[[CommandPayload], CommandResponse]
+        handler: Callable[..., CommandResponse],
         description: str = "",
         description_key: Optional[str] = None,
         usage_hint: str = "",
@@ -277,10 +281,15 @@ class SlackPlatformProvider(BasePlatformProvider):
         example_keys: Optional[list] = None,
         parent: Optional[str] = None,
         legacy_mode: bool = False,
+        arguments: Optional[list] = None,
+        schema: Optional[type] = None,
+        argument_mapper: Optional[Callable] = None,
+        fallback_handler: Optional[Callable[[CommandPayload], CommandResponse]] = None,
     ) -> None:
-        """Register a Slack command with hierarchical support.
+        """Register a Slack command with hierarchical support and argument parsing.
 
         Automatically creates intermediate command nodes if parent uses dot notation.
+        Supports rich argument parsing with type validation and schema mapping.
 
         Args:
             command: Command name (e.g., "aws", "test-connection")
@@ -292,21 +301,34 @@ class SlackPlatformProvider(BasePlatformProvider):
             example_keys: List of translation keys for examples
             parent: Dot notation parent path (e.g., "sre.dev")
             legacy_mode: If True, bypass automatic help interception (for gradual migration)
+            arguments: List of Argument definitions for parsing (from infrastructure.platforms.parsing)
+            schema: Pydantic BaseModel schema for validation
+            argument_mapper: Function to transform parsed args Dict to schema fields Dict
+            fallback_handler: Optional handler called when command expects arguments but none provided
 
         Example:
-            # Register nested command: /sre dev aws test-connection
+            # Simple command
             provider.register_command(
-                command="test-connection",
-                handler=handle_test_connection,
-                description="Test AWS connection",
-                parent="sre.dev.aws",
+                command="version",
+                handler=handle_version,
+                description="Show version",
+                parent="sre",
             )
 
-            # Automatically creates:
-            # - CommandDefinition(name="sre", full_path="sre", is_auto_generated=True)
-            # - CommandDefinition(name="dev", full_path="sre.dev", is_auto_generated=True)
-            # - CommandDefinition(name="aws", full_path="sre.dev.aws", is_auto_generated=True)
-            # - CommandDefinition(name="test-connection", full_path="sre.dev.aws.test-connection")
+            # With argument parsing
+            from infrastructure.platforms.parsing import Argument, ArgumentType
+
+            provider.register_command(
+                command="list",
+                handler=handle_groups_list,
+                parent="sre.groups",
+                arguments=[
+                    Argument(name="--provider", type=ArgumentType.CHOICE, choices=["aws", "google"]),
+                    Argument(name="--include-members", type=ArgumentType.BOOLEAN),
+                ],
+                schema=ListGroupsRequest,
+                argument_mapper=lambda parsed: {"provider": parsed.get("--provider")},
+            )
         """
         # Auto-generate intermediate nodes if parent specified
         if parent:
@@ -323,6 +345,10 @@ class SlackPlatformProvider(BasePlatformProvider):
             example_keys=example_keys or [],
             parent=parent,
             legacy_mode=legacy_mode,
+            arguments=arguments,
+            schema=schema,
+            argument_mapper=argument_mapper,
+            fallback_handler=fallback_handler,
         )
 
         # Store by full_path

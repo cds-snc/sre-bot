@@ -23,7 +23,12 @@ Usage:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Type
+
+try:
+    from pydantic import BaseModel
+except ImportError:
+    BaseModel = None  # type: ignore
 
 
 @dataclass
@@ -83,10 +88,14 @@ class CommandDefinition:
         full_path: Full command path (e.g., "sre.dev.aws") - computed automatically
         is_auto_generated: True if this node was auto-created for hierarchy
         legacy_mode: True to bypass help interception and pass all text to handler
+        arguments: List of Argument definitions for parsing
+        schema: Pydantic schema for validation
+        argument_mapper: Function to transform parsed args to schema fields
+        fallback_handler: Optional handler called when command expects arguments but none provided
     """
 
     name: str
-    handler: Optional[Callable[[CommandPayload], CommandResponse]] = None
+    handler: Optional[Callable[..., CommandResponse]] = None
     description: str = ""
     description_key: Optional[str] = None
     usage_hint: str = ""
@@ -96,6 +105,10 @@ class CommandDefinition:
     full_path: str = field(init=False)
     is_auto_generated: bool = False
     legacy_mode: bool = False
+    arguments: Optional[List[Any]] = None  # List[Argument] from parsing.models
+    schema: Optional[Type[Any]] = None  # Type[BaseModel] for validation
+    argument_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    fallback_handler: Optional[Callable[[CommandPayload], CommandResponse]] = None
 
     def __post_init__(self):
         """Compute full_path from parent and name."""

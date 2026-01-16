@@ -14,8 +14,12 @@ from infrastructure.platforms.models import (
     CommandResponse,
     CommandDefinition,
 )
+from infrastructure.platforms.parsing import (
+    CommandArgumentParser,
+    ArgumentParsingError,
+)
 
-from infrastructure.i18n.models import TranslationKey
+from infrastructure.i18n.models import TranslationKey, Locale
 
 if TYPE_CHECKING:
     from infrastructure.i18n.translator import Translator
@@ -185,11 +189,16 @@ class BasePlatformProvider(ABC):
             return fallback
 
         try:
-            # Create TranslationKey from string
-            translation_key = TranslationKey(key=key)
+            # Create TranslationKey from dot-separated string
+            translation_key = TranslationKey.from_string(key)
+
+            # Convert locale string to Locale enum
+            locale_enum = Locale.from_string(locale)
 
             # Attempt translation
-            result = self._translator.translate(translation_key, locale=locale)
+            result = self._translator.translate_message(
+                translation_key, locale_enum, variables=None
+            )
 
             # Return translation if successful, otherwise fallback
             return result if result else fallback
@@ -362,7 +371,57 @@ class BasePlatformProvider(ABC):
 
         # Dispatch to handler
         try:
-            response = cmd_def.handler(payload)
+            # Parse arguments if defined
+            parsed_args = None
+            request = None
+
+            if cmd_def.arguments:
+                # If command expects arguments but none provided
+                if not payload.text or not payload.text.strip():
+                    # Use fallback handler if provided, otherwise show help
+                    if cmd_def.fallback_handler:
+                        return cmd_def.fallback_handler(payload)
+                    else:
+                        help_text = self.generate_command_help(command_name)
+                        return CommandResponse(message=help_text, ephemeral=True)
+
+                parser = CommandArgumentParser(cmd_def.arguments)
+                try:
+                    parsed_args = parser.parse(payload.text)
+
+                    # Apply argument mapper if provided
+                    if cmd_def.argument_mapper:
+                        mapped_args = cmd_def.argument_mapper(parsed_args)
+                    else:
+                        mapped_args = parsed_args
+
+                    # Validate with schema if provided
+                    if cmd_def.schema:
+                        request = cmd_def.schema(**mapped_args)
+
+                except ArgumentParsingError as e:
+                    # Show parsing errors (invalid arguments, unknown options, etc.)
+                    return CommandResponse(
+                        message=f"❌ Argument parsing error: {e.message}",
+                        ephemeral=True,
+                    )
+                except Exception as e:
+                    return CommandResponse(
+                        message=f"❌ Validation error: {str(e)}",
+                        ephemeral=True,
+                    )
+
+            # Call handler with appropriate arguments
+            if request is not None:
+                # Handler expects: payload, parsed_args, request
+                response = cmd_def.handler(payload, parsed_args, request)
+            elif parsed_args is not None:
+                # Handler expects: payload, parsed_args
+                response = cmd_def.handler(payload, parsed_args)
+            else:
+                # Handler expects: payload only
+                response = cmd_def.handler(payload)
+
             return response
         except Exception as e:
             self._logger.error(
