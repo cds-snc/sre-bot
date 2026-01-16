@@ -28,10 +28,9 @@ from modules.groups.providers import (
 from infrastructure.commands.providers import (
     load_providers as load_command_providers,
 )
-from packages.geolocate.slack import (
-    register_slack_commands as register_geolocate,
+from infrastructure.platforms.registry import (
+    get_auto_discovery,
 )
-from modules.sre.sre import register_slack_features as register_sre_features
 from server import bot_middleware, server
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -148,14 +147,43 @@ def providers_startup():
                 providers=failed,
             )
 
-        # ✅ EXPLICIT COMMAND REGISTRATION (FastAPI pattern)
-        # Each feature exports a registration function that's called explicitly,
-        # following the same pattern as app.include_router() in FastAPI.
-        # This ensures clear, traceable registration without import magic.
+        # ✅ AUTO-DISCOVERY COMMAND REGISTRATION (FastAPI-inspired pattern)
+        # Commands are discovered and registered automatically via decorators,
+        # following the same pattern as FastAPI's automatic route discovery.
 
-        # Register feature commands explicitly
-        register_geolocate()
-        register_sre_features()
+        # Initialize auto-discovery orchestrator
+        auto_discovery = get_auto_discovery()
+
+        # Discover all platform-specific command modules
+        # (modules/*/platforms/{slack,teams,discord}.py, packages/*/platforms/{slack,teams,discord}.py)
+        auto_discovery.discover_all()
+        logger.info("auto_discovery_completed")
+
+        # Get provider instances (may be None if not initialized/enabled)
+        try:
+            slack_provider = platform_service.get_provider("slack")
+        except Exception as e:
+            logger.warning("failed_to_get_slack_provider", error=str(e))
+            slack_provider = None
+
+        try:
+            teams_provider = platform_service.get_provider("teams")
+        except Exception as e:
+            logger.warning("failed_to_get_teams_provider", error=str(e))
+            teams_provider = None
+
+        try:
+            discord_provider = platform_service.get_provider("discord")
+        except Exception as e:
+            logger.warning("failed_to_get_discord_provider", error=str(e))
+            discord_provider = None
+
+        # Register all discovered commands with their respective providers
+        auto_discovery.register_all(
+            slack_provider=slack_provider,
+            teams_provider=teams_provider,
+            discord_provider=discord_provider,
+        )
 
         logger.info("platform_commands_registered")
     except Exception as e:
