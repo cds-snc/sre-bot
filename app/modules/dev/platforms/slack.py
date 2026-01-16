@@ -7,7 +7,7 @@ Registers all /sre dev subcommands (google, slack, stale, incident, load-inciden
 import structlog
 
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import slack_commands
+from infrastructure.services import slack_commands
 
 
 logger = structlog.get_logger()
