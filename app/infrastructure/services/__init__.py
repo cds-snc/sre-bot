@@ -48,9 +48,13 @@ from infrastructure.platforms import (
     SlackPlatformProvider,
     TeamsPlatformProvider,
     DiscordPlatformProvider,
-    slack_commands,
-    teams_commands,
-    discord_commands,
+)
+
+# Plugin infrastructure
+from infrastructure.services.plugins import (
+    hookimpl,
+    get_platform_plugin_manager,
+    discover_and_register_platforms,
 )
 
 
@@ -157,8 +161,8 @@ __all__ = [
     "get_slack_provider",
     "get_teams_provider",
     "get_discord_provider",
-    # Commands
-    "slack_commands",
-    "teams_commands",
-    "discord_commands",
+    # Plugin infrastructure
+    "hookimpl",
+    "get_platform_plugin_manager",
+    "discover_and_register_platforms",
 ]
