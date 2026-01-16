@@ -65,7 +65,12 @@ from infrastructure.platforms.providers import (
     SlackPlatformProvider,
     TeamsPlatformProvider,
 )
-from infrastructure.platforms.registry import PlatformRegistry
+from infrastructure.platforms.registry import (
+    PlatformRegistry,
+    slack_commands,
+    teams_commands,
+    discord_commands,
+)
 from infrastructure.platforms.service import PlatformService
 
 __all__ = [
@@ -122,4 +127,8 @@ __all__ = [
     "AuthenticationError",
     "RateLimitExceededError",
     "FormatterError",
+    # Commands
+    "slack_commands",
+    "teams_commands",
+    "discord_commands",
 ]
