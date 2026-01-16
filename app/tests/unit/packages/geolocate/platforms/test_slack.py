@@ -1,11 +1,15 @@
 """Tests for Slack platform features."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from packages.geolocate.platforms.slack import handle_geolocate_command
+from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from packages.geolocate.platforms.slack import (
+    handle_geolocate_command,
+    register_commands,
+)
 
 
 @pytest.mark.unit
@@ -77,4 +81,36 @@ def test_handle_geolocate_command_invalid_ip():
         assert isinstance(result, CommandResponse)
         assert result.ephemeral is True
         assert "❌" in result.message
-        assert "invalid" in result.message.lower()
+        assert "Invalid" in result.message
+
+
+@pytest.mark.unit
+def test_geolocate_without_arguments_shows_error():
+    """Test that /sre geolocate without arguments returns help text."""
+    # Create a mock settings object
+    mock_settings = MagicMock()
+    mock_settings.ENABLED = True
+    mock_settings.SOCKET_MODE = True
+
+    # Create provider and register geolocate command
+    provider = SlackPlatformProvider(settings=mock_settings)
+    register_commands(provider)
+
+    # Create command payload with no arguments
+    payload = CommandPayload(
+        text="",  # Empty text - no IP address provided
+        user_id="U123",
+        channel_id="C123",
+    )
+
+    # Dispatch the command (this should show help instead of error)
+    result = provider.dispatch_command("sre.geolocate", payload)
+
+    # Should return help text, not an error
+    assert isinstance(result, CommandResponse)
+    assert result.ephemeral is True
+    # Should NOT contain error marker
+    assert "❌" not in result.message
+    # Should contain help/documentation text
+    assert "/sre geolocate" in result.message
+    assert "ip_address" in result.message.lower() or "example" in result.message.lower()

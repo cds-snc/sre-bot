@@ -5,25 +5,21 @@ Registers all SRE subcommands (version, incident, webhooks, groups).
 """
 
 import structlog
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from slack_bolt import Ack, Respond
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import slack_commands
 from infrastructure.services import get_settings, get_slack_client
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
+
+if TYPE_CHECKING:
+    from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 
 logger = structlog.get_logger()
 
 
-@slack_commands.register(
-    name="version",
-    parent="sre",
-    description="Show SRE Bot version",
-    description_key="sre.subcommands.version.description",
-)
 def handle_version_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre version Slack command.
 
@@ -42,13 +38,6 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
     )
 
 
-@slack_commands.register(
-    name="incident",
-    parent="sre",
-    description="Manage incidents",
-    description_key="sre.subcommands.incident.description",
-    legacy_mode=True,
-)
 def handle_incident_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre incident Slack command.
 
@@ -112,13 +101,6 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         return CommandResponse(message="Incident command executed", ephemeral=True)
 
 
-@slack_commands.register(
-    name="webhooks",
-    parent="sre",
-    description="Manage webhooks",
-    description_key="sre.subcommands.webhooks.description",
-    legacy_mode=True,
-)
 def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre webhooks Slack command.
 
@@ -182,13 +164,6 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         return CommandResponse(message="Webhooks command executed", ephemeral=True)
 
 
-@slack_commands.register(
-    name="groups",
-    parent="sre",
-    description="Manage groups and memberships",
-    description_key="sre.subcommands.groups.description",
-    legacy_mode=True,
-)
 def handle_groups_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre groups Slack command.
 
@@ -210,4 +185,37 @@ def handle_groups_command(payload: CommandPayload) -> CommandResponse:
             "Full platform migration coming soon."
         ),
         ephemeral=True,
+    )
+
+
+def register_commands(provider: "SlackPlatformProvider") -> None:
+    """Register SRE module commands with Slack provider.
+
+    Args:
+        provider: Slack platform provider instance
+    """
+    provider.register_command(
+        command="version",
+        handler=handle_version_command,
+        parent="sre",
+        description="Show SRE Bot version",
+        description_key="sre.subcommands.version.description",
+    )
+
+    provider.register_command(
+        command="incident",
+        handler=handle_incident_command,
+        parent="sre",
+        description="Manage incidents",
+        description_key="sre.subcommands.incident.description",
+        legacy_mode=True,
+    )
+
+    provider.register_command(
+        command="webhooks",
+        handler=handle_webhooks_command,
+        parent="sre",
+        description="Manage webhooks",
+        description_key="sre.subcommands.webhooks.description",
+        legacy_mode=True,
     )

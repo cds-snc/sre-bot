@@ -186,6 +186,11 @@ class BasePlatformProvider(ABC):
 
         if not self._translator:
             # No translator configured, use fallback
+            self._logger.debug(
+                "translation_skipped_no_translator",
+                key=key,
+                locale=locale,
+            )
             return fallback
 
         try:
@@ -201,7 +206,15 @@ class BasePlatformProvider(ABC):
             )
 
             # Return translation if successful, otherwise fallback
-            return result if result else fallback
+            translated = result if result else fallback
+            self._logger.debug(
+                "translation_result",
+                key=key,
+                locale=locale,
+                found=bool(result),
+                result=translated,
+            )
+            return translated
 
         except Exception as e:
             self._logger.warning(
@@ -355,18 +368,31 @@ class BasePlatformProvider(ABC):
                 ephemeral=True,
             )
 
+        # Get user's locale for help/error messages
+        user_locale = (
+            payload.user_locale if hasattr(payload, "user_locale") else "en-US"
+        )
+        self._logger.debug(
+            "dispatch_command_locale",
+            command=command_name,
+            locale=user_locale,
+            has_user_locale_attr=hasattr(payload, "user_locale"),
+        )
+
         # Check for EXPLICIT help requests (unless in legacy mode)
         # Legacy mode allows the handler to process help itself
         text = payload.text.strip().lower() if payload.text else ""
         if not cmd_def.legacy_mode and text in ("help", "aide", "--help", "-h"):
             # Return help for this specific command only
-            help_text = self.generate_command_help(command_name)
+            help_text = self.generate_command_help(command_name, locale=user_locale)
             return CommandResponse(message=help_text, ephemeral=True)
 
         # If command has no handler (auto-generated parent), show help for children
         # This handles cases like `/sre dev` where `dev` is just a grouping node
         if cmd_def.handler is None:
-            help_text = self.generate_help(root_command=command_name)
+            help_text = self.generate_help(
+                locale=user_locale, root_command=command_name
+            )
             return CommandResponse(message=help_text, ephemeral=True)
 
         # Dispatch to handler
@@ -382,7 +408,9 @@ class BasePlatformProvider(ABC):
                     if cmd_def.fallback_handler:
                         return cmd_def.fallback_handler(payload)
                     else:
-                        help_text = self.generate_command_help(command_name)
+                        help_text = self.generate_command_help(
+                            command_name, locale=user_locale
+                        )
                         return CommandResponse(message=help_text, ephemeral=True)
 
                 parser = CommandArgumentParser(cmd_def.arguments)

@@ -4,21 +4,18 @@ Uses decorator-based command registration via auto-discovery.
 """
 
 import structlog
+from typing import TYPE_CHECKING
 
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import teams_commands
 from infrastructure.services import get_settings
+
+if TYPE_CHECKING:
+    from infrastructure.platforms.providers.teams import TeamsPlatformProvider
 
 
 logger = structlog.get_logger()
 
 
-@teams_commands.register(
-    name="version",
-    parent="sre",
-    description="Show SRE Bot version",
-    description_key="sre.subcommands.version.description",
-)
 def handle_version_command(payload: CommandPayload) -> CommandResponse:
     """Handle @bot sre version Teams command.
 
@@ -35,3 +32,21 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
         message=f"**SRE Bot version:** {settings.GIT_SHA}",
         ephemeral=True,
     )
+
+
+def register_commands(provider: "TeamsPlatformProvider") -> None:
+    """Register SRE module Teams commands (experimental - no handlers yet).
+
+    Args:
+        provider: Teams platform provider instance
+    """
+    # Teams provider is experimental - command registration available but handlers not implemented yet
+    # Uncomment when ready to implement:
+    # provider.register_command(
+    #     command="version",
+    #     handler=handle_version_command,
+    #     parent="sre",
+    #     description="Show SRE Bot version",
+    #     description_key="sre.subcommands.version.description",
+    # )
+    pass

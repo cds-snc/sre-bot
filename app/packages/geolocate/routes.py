@@ -9,7 +9,7 @@ from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/api/v1/geolocate", tags=["geolocate"])
+router = APIRouter(prefix="/geolocate", tags=["geolocate"])
 
 
 @router.get(

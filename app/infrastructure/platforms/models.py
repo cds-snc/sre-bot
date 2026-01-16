@@ -40,6 +40,7 @@ class CommandPayload:
         user_id: Platform-specific user ID
         user_email: User's email address (if available from platform)
         channel_id: Channel/conversation ID where command was invoked
+        user_locale: User's locale (e.g., "en-US", "fr-FR") for i18n
         response_url: URL for sending async responses (Slack, Teams)
         correlation_id: For distributed tracing and debugging
         platform_metadata: Platform-specific extras not normalized
@@ -49,6 +50,7 @@ class CommandPayload:
     user_id: str
     user_email: Optional[str] = None
     channel_id: Optional[str] = None
+    user_locale: str = "en-US"
     response_url: Optional[str] = None
     correlation_id: str = ""
     platform_metadata: Dict[str, Any] = field(default_factory=dict)

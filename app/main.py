@@ -25,12 +25,9 @@ from modules.groups.providers import (
     get_active_providers,
     get_primary_provider_name,
 )
-from infrastructure.commands.providers import (
-    load_providers as load_command_providers,
-)
-from infrastructure.platforms.registry import (
-    get_auto_discovery,
-)
+from infrastructure.services import discover_and_register_platforms
+from infrastructure.i18n.factory import create_translator
+
 from server import bot_middleware, server
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -86,6 +83,88 @@ def main(bot):
         server_app.add_event_handler("shutdown", lambda: stop_run_continuously.set())
 
 
+def _initialize_platform_system():
+    """Initialize platform system (Slack, Teams, Discord providers)."""
+    # Get platform service singleton from provider
+    platform_service = get_platform_service()
+
+    # Load and register platform providers
+    platform_providers = platform_service.load_providers()
+
+    # Store platform service for app-wide access
+    server_app.state.platform_service = platform_service
+    server_app.state.platform_providers = platform_providers
+
+    # Initialize enabled providers (establishes connections)
+    init_results = platform_service.initialize_all_providers()
+
+    initialized = [name for name, result in init_results.items() if result.is_success]
+    failed = [name for name, result in init_results.items() if not result.is_success]
+
+    if initialized:
+        logger.info(
+            "platform_providers_initialized",
+            count=len(initialized),
+            providers=initialized,
+        )
+
+    if failed:
+        logger.warning(
+            "platform_providers_initialization_failed",
+            count=len(failed),
+            providers=failed,
+        )
+
+
+def _register_platform_commands():
+    """Auto-discover and register platform commands using Pluggy."""
+    # Get provider instances (may be None if not initialized/enabled)
+    platform_service = server_app.state.platform_service
+
+    # Initialize translator for i18n support in help/error messages
+
+    translator = create_translator()
+    logger.info("translator_created_for_platform_system")
+
+    slack_provider = None
+    try:
+        slack_provider = platform_service.get_provider("slack")
+        if slack_provider:
+            slack_provider.set_translator(translator)
+            logger.info("translator_set_on_slack_provider")
+        else:
+            logger.warning("slack_provider_not_available")
+    except Exception as e:
+        logger.warning("failed_to_get_slack_provider", error=str(e))
+
+    teams_provider = None
+    try:
+        teams_provider = platform_service.get_provider("teams")
+        if teams_provider:
+            teams_provider.set_translator(translator)
+            logger.info("translator_set_on_teams_provider")
+    except Exception as e:
+        logger.warning("failed_to_get_teams_provider", error=str(e))
+
+    discord_provider = None
+    try:
+        discord_provider = platform_service.get_provider("discord")
+        if discord_provider:
+            discord_provider.set_translator(translator)
+            logger.info("translator_set_on_discord_provider")
+    except Exception as e:
+        logger.warning("failed_to_get_discord_provider", error=str(e))
+
+    # Auto-discover and register all platform commands via Pluggy
+    discover_and_register_platforms(
+        slack_provider=slack_provider,
+        teams_provider=teams_provider,
+        discord_provider=discord_provider,
+    )
+
+    logger.info("platform_commands_registered")
+
+
 # Ensure providers are activated once per FastAPI process at startup.
 def providers_startup():
     """Activate group and command providers at startup."""
@@ -107,85 +186,13 @@ def providers_startup():
             "event_handlers_discovery_failed",
             error=str(e),
         )
-        pass
 
     # ========== NEW: Platform System Initialization ==========
     # Initialize platform system (Slack, Teams, Discord providers)
     # This runs alongside legacy providers during transition period
     try:
-        # Get platform service singleton from provider
-        platform_service = get_platform_service()
-
-        # Load and register platform providers
-        platform_providers = platform_service.load_providers()
-
-        # Store platform service for app-wide access
-        server_app.state.platform_service = platform_service
-        server_app.state.platform_providers = platform_providers
-
-        # Initialize enabled providers (establishes connections)
-        init_results = platform_service.initialize_all_providers()
-
-        initialized = [
-            name for name, result in init_results.items() if result.is_success
-        ]
-        failed = [
-            name for name, result in init_results.items() if not result.is_success
-        ]
-
-        if initialized:
-            logger.info(
-                "platform_providers_initialized",
-                count=len(initialized),
-                providers=initialized,
-            )
-
-        if failed:
-            logger.warning(
-                "platform_providers_initialization_failed",
-                count=len(failed),
-                providers=failed,
-            )
-
-        # ✅ AUTO-DISCOVERY COMMAND REGISTRATION (FastAPI-inspired pattern)
-        # Commands are discovered and registered automatically via decorators,
-        # following the same pattern as FastAPI's automatic route discovery.
-
-        # Initialize auto-discovery orchestrator
-        auto_discovery = get_auto_discovery()
-
-        # Discover all platform-specific command modules
-        # (modules/*/platforms/{slack,teams,discord}.py, packages/*/platforms/{slack,teams,discord}.py)
-        auto_discovery.discover_all()
-        logger.info("auto_discovery_completed")
-
-        # Get provider instances (may be None if not initialized/enabled)
-        try:
-            slack_provider = platform_service.get_provider("slack")
-        except Exception as e:
-            logger.warning("failed_to_get_slack_provider", error=str(e))
-            slack_provider = None
-
-        try:
-            teams_provider = platform_service.get_provider("teams")
-        except Exception as e:
-            logger.warning("failed_to_get_teams_provider", error=str(e))
-            teams_provider = None
-
-        try:
-            discord_provider = platform_service.get_provider("discord")
-        except Exception as e:
-            logger.warning("failed_to_get_discord_provider", error=str(e))
-            discord_provider = None
-
-        # Register all discovered commands with their respective providers
-        auto_discovery.register_all(
-            slack_provider=slack_provider,
-            teams_provider=teams_provider,
-            discord_provider=discord_provider,
-        )
-
-        logger.info("platform_commands_registered")
+        _initialize_platform_system()
+        _register_platform_commands()
     except Exception as e:
         # Log error but don't fail startup - platform system is optional during transition
         logger.error(
@@ -209,26 +216,6 @@ def providers_startup():
     except Exception as e:
         # Fail fast on provider activation error
         logger.error("group_providers_activation_failed", error=str(e))
-        raise
-
-    # LEGACY: Command providers (will be migrated to platform system)
-    try:
-        command_providers = load_command_providers(settings=settings)
-        server_app.state.command_providers = command_providers
-
-        if command_providers:
-            logger.info(
-                "command_providers_activated",
-                count=len(command_providers),
-                providers=list(command_providers.keys()),
-            )
-        else:
-            logger.info(
-                "api_only_mode",
-                message="No command providers enabled - API endpoints only",
-            )
-    except Exception as e:  # pylint: disable=broad-except
-        logger.error("command_providers_activation_failed", error=str(e))
         raise
 
 

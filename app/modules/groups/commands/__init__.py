@@ -1,5 +1,8 @@
-"""Groups commands module."""
+"""Groups commands module (DEPRECATED).
 
-from modules.groups.commands.registry import registry
+Commands have been migrated to the platform-specific pattern.
+See modules/groups/platforms/{slack,teams,discord}.py
+"""
 
-__all__ = ["registry"]
+# This module is kept for backward compatibility only
+# The registry is now deprecated and commands use the new platform pattern

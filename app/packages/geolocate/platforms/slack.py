@@ -1,55 +1,75 @@
-"""Slack platform implementation for geolocate package.
+"""Slack platform implementation for geolocate package."""
 
-Uses decorator-based command registration via auto-discovery.
-"""
-
-from typing import Any, Dict
+from typing import Any, Dict, TYPE_CHECKING
 
 import structlog
 
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import slack_commands
+from infrastructure.platforms.parsing import Argument, ArgumentType
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
+if TYPE_CHECKING:
+    from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
 
-@slack_commands.register(
-    name="geolocate",
-    parent="sre",
-    description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
-    description_key="geolocate.slack.description",
-    usage_hint="<ip_address>",
-    examples=[
-        "8.8.8.8",
-        "1.1.1.1",
-        "2001:4860:4860::8888",
-    ],
-    example_keys=[
-        "geolocate.examples.google_dns",
-        "geolocate.examples.cloudflare",
-        "geolocate.examples.ipv6",
-    ],
-)
-def handle_geolocate_command(cmd: CommandPayload) -> CommandResponse:
+def register_commands(provider: "SlackPlatformProvider") -> None:
+    """Register geolocate Slack commands with the provider.
+
+    Args:
+        provider: Slack platform provider instance.
+    """
+    provider.register_command(
+        command="geolocate",
+        handler=handle_geolocate_command,
+        parent="sre",
+        description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
+        description_key="geolocate.slack.description",
+        usage_hint="<ip_address>",
+        examples=[
+            "8.8.8.8",
+            "1.1.1.1",
+            "2001:4860:4860::8888",
+        ],
+        example_keys=[
+            "geolocate.examples.google_dns",
+            "geolocate.examples.cloudflare",
+            "geolocate.examples.ipv6",
+        ],
+        arguments=[
+            Argument(
+                name="ip_address",
+                type=ArgumentType.STRING,
+                required=True,
+                description="IPv4 or IPv6 address to geolocate",
+            )
+        ],
+    )
+
+
+def handle_geolocate_command(
+    payload: CommandPayload,
+    parsed_args: Dict[str, Any],
+) -> CommandResponse:
     """Handle /sre geolocate <ip> Slack command.
 
     Args:
-        cmd: Command payload from Slack platform provider
+        payload: Command payload from Slack platform provider
+        parsed_args: Parsed and validated command arguments (automatically provided by framework)
 
     Returns:
         CommandResponse formatted for Slack
     """
     log = logger.bind(
-        command="geolocate", user_id=cmd.user_id, channel_id=cmd.channel_id
+        command="geolocate", user_id=payload.user_id, channel_id=payload.channel_id
     )
-    log.info("slack_command_received", text=cmd.text)
+    log.info("slack_command_received", text=payload.text)
 
-    # Parse command text (expect single IP address)
-    ip_address = cmd.text.strip()
+    # Get the IP address from parsed arguments (framework ensures it's present and valid)
+    ip_address = parsed_args.get("ip_address", "").strip()
 
     # Call service layer directly (no HTTP overhead)
     result = geolocate_ip(ip_address=ip_address)

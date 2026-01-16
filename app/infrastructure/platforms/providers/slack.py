@@ -383,43 +383,38 @@ class SlackPlatformProvider(BasePlatformProvider):
         # e.g., "sre.dev.aws" → "/sre dev aws"
         display_path = cmd_def.full_path.replace(".", " ")
 
-        # Build command signature
-        if cmd_def.usage_hint:
-            signature = f"/{display_path} {cmd_def.usage_hint}"
-        else:
-            signature = f"/{display_path}"
-
-        # Add command line
-        lines.append(f"{indent}• `{signature}`")
-
-        # Add description if not auto-generated
+        # Add description as the bullet point (if not auto-generated)
         if not cmd_def.is_auto_generated:
             desc = self._translate_or_fallback(
                 cmd_def.description_key, cmd_def.description, locale
             )
-            if desc:
-                lines.append(f"{indent}  {desc}")
-
-        # Add examples ONLY for leaf commands (commands without children)
-        # Commands with subcommands should only show description
-        has_children = bool(self._get_child_commands(cmd_def.full_path))
-        if not cmd_def.is_auto_generated and cmd_def.examples and not has_children:
-            examples_label = self._translate_or_fallback(
-                "commands.labels.examples", "Examples:", locale
+            self._logger.debug(
+                "command_help_translation",
+                command=cmd_def.full_path,
+                key=cmd_def.description_key,
+                locale=locale,
+                translated=desc,
+                fallback=cmd_def.description,
             )
-            lines.append(f"{indent}  *{examples_label}*")
+            if desc:
+                lines.append(f"{indent}• {desc}")
+            else:
+                # Fallback to command name if no description
+                lines.append(f"{indent}• {cmd_def.name}")
+        else:
+            # For auto-generated commands, just show the name
+            lines.append(f"{indent}• {cmd_def.name}")
 
-            for i, example in enumerate(cmd_def.examples):
-                # Try to translate example if key available
-                if i < len(cmd_def.example_keys):
-                    example_text = self._translate_or_fallback(
-                        cmd_def.example_keys[i], example, locale
-                    )
-                else:
-                    example_text = example
+        # Build and add command signature indented below
+        if cmd_def.usage_hint:
+            signature = f"/{display_path} {cmd_def.usage_hint}"
+            lines.append(f"{indent}  `{signature}`")
+        else:
+            # Show command path even without usage hint
+            lines.append(f"{indent}  `/{display_path}`")
 
-                example_line = f"`/{display_path} {example_text}`"
-                lines.append(f"{indent}    • {example_line}")
+        # Don't show examples when displaying a list of subcommands
+        # Examples are only shown when user requests help for a specific command
 
         # Add blank line after command
         lines.append("")

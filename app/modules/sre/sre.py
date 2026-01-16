@@ -8,26 +8,11 @@ import structlog
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 
-from infrastructure.platforms.models import CommandPayload, CommandResponse
+from infrastructure.platforms.models import CommandPayload
 from infrastructure.services import get_slack_provider, get_settings
 
 
 logger = structlog.get_logger()
-
-
-# ============================================================
-# PUBLIC: FEATURE REGISTRATION INTERFACE
-# ============================================================
-
-
-def register_slack_features():
-    """Register SRE-specific features.
-
-    Note: All SRE subcommands (geolocate, version, incident, webhooks, groups)
-    and dev subcommands are now auto-discovered via the platform provider
-    auto-discovery system.
-    """
-    logger.info("registering_slack_features", module="sre")
 
 
 # ============================================================
@@ -73,10 +58,30 @@ def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
         respond("Slack provider not available")
         return
 
+    # Extract user's locale from Slack profile (defaults to en-US)
+    user_locale = "en-US"
+    try:
+        user_info = client.users_info(user=user_id)
+        if user_info.get("ok") and user_info.get("user"):
+            profile = user_info["user"].get("profile", {})
+            if profile.get("locale"):
+                user_locale = profile["locale"]
+                logger.info(
+                    "user_locale_extracted", user_id=user_id, locale=user_locale
+                )
+            else:
+                logger.debug(
+                    "user_profile_no_locale",
+                    user_id=user_id,
+                    profile_keys=list(profile.keys()),
+                )
+    except Exception as e:
+        logger.warning("failed_to_get_user_locale", user_id=user_id, error=str(e))
+
     # Handle help request
     if not text or text.lower() in ("help", "aide", "--help", "-h"):
         # Show all commands under /sre (root_command="sre")
-        help_text = slack_provider.generate_help(root_command="sre")
+        help_text = slack_provider.generate_help(locale=user_locale, root_command="sre")
         respond(help_text)
         return
 
@@ -92,6 +97,7 @@ def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
         text=subcommand_args,
         user_id=user_id,
         channel_id=channel_id,
+        user_locale=user_locale,
         user_email="",
         response_url="",
         platform_metadata=command,  # Pass entire Slack command object

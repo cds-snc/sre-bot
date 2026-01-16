@@ -1,39 +1,38 @@
-"""Teams platform implementation for geolocate package.
+"""Teams platform implementation for geolocate package."""
 
-Uses decorator-based command registration via auto-discovery.
-"""
-
-from typing import Any, Dict
+from typing import TYPE_CHECKING
 
 import structlog
 
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import teams_commands
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
+if TYPE_CHECKING:
+    from infrastructure.platforms.providers.teams import TeamsPlatformProvider
 
 logger = structlog.get_logger()
 
 
-@teams_commands.register(
-    name="geolocate",
-    parent="sre",
-    description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
-    description_key="geolocate.teams.description",
-    usage_hint="<ip_address>",
-    examples=[
-        "8.8.8.8",
-        "1.1.1.1",
-        "2001:4860:4860::8888",
-    ],
-    example_keys=[
-        "geolocate.examples.google_dns",
-        "geolocate.examples.cloudflare",
-        "geolocate.examples.ipv6",
-    ],
-)
+def register_commands(provider: "TeamsPlatformProvider") -> None:
+    """Register geolocate Teams commands (experimental - no handlers yet).
+
+    Args:
+        provider: Teams platform provider instance.
+    """
+    # Teams provider is experimental - command registration available but handlers not implemented yet
+    # Uncomment when ready to implement:
+    # provider.register_command(
+    #     command="geolocate",
+    #     handler=handle_geolocate_command,
+    #     parent="sre",
+    #     description="Lookup the geographic location of an IP address",
+    #     description_key="geolocate.teams.description",
+    # )
+    pass
+
+
 def handle_geolocate_command(cmd: CommandPayload) -> CommandResponse:
     """Handle @bot sre geolocate <ip> Teams command.
 

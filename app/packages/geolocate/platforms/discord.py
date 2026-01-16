@@ -1,39 +1,46 @@
-"""Discord platform implementation for geolocate package.
+"""Discord platform implementation for geolocate package."""
 
-Uses decorator-based command registration via auto-discovery.
-"""
-
-from typing import Any, Dict
+from typing import TYPE_CHECKING
 
 import structlog
 
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.registry import discord_commands
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
+if TYPE_CHECKING:
+    from infrastructure.platforms.providers.discord import DiscordPlatformProvider
 
 logger = structlog.get_logger()
 
 
-@discord_commands.register(
-    name="geolocate",
-    parent="sre",
-    description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
-    description_key="geolocate.discord.description",
-    usage_hint="<ip_address>",
-    examples=[
-        "8.8.8.8",
-        "1.1.1.1",
-        "2001:4860:4860::8888",
-    ],
-    example_keys=[
-        "geolocate.examples.google_dns",
-        "geolocate.examples.cloudflare",
-        "geolocate.examples.ipv6",
-    ],
-)
+def register_commands(provider: "DiscordPlatformProvider") -> None:
+    """Register geolocate Discord commands with the provider.
+
+    Args:
+        provider: Discord platform provider instance.
+    """
+    provider.register_command(
+        command="geolocate",
+        handler=handle_geolocate_command,
+        parent="sre",
+        description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
+        description_key="geolocate.discord.description",
+        usage_hint="<ip_address>",
+        examples=[
+            "8.8.8.8",
+            "1.1.1.1",
+            "2001:4860:4860::8888",
+        ],
+        example_keys=[
+            "geolocate.examples.google_dns",
+            "geolocate.examples.cloudflare",
+            "geolocate.examples.ipv6",
+        ],
+    )
+
+
 def handle_geolocate_command(cmd: CommandPayload) -> CommandResponse:
     """Handle /sre geolocate <ip> Discord command.
 
