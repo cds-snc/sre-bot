@@ -2,6 +2,8 @@
 
 Wraps the Bot Framework SDK with OperationResult-based APIs
 for consistent error handling across the platform.
+
+STATUS: EXPERIMENTAL - not yet tested with real Teams instances.
 """
 
 import structlog
