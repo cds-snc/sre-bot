@@ -107,6 +107,16 @@ class BasePlatformProvider(ABC):
         """
         pass
 
+    def initialize_app(self) -> OperationResult:
+        """Initialize platform app (if needed).
+
+        For platforms requiring app initialization (e.g., Slack Socket Mode),
+        override this method to set up connections or event handlers.
+
+        Default implementation does nothing.
+        """
+        return OperationResult.success(message="No app initialization needed")
+
     def get_webhook_router(self):
         """Get FastAPI router for HTTP webhooks.
 
