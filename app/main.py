@@ -1,5 +1,4 @@
-from functools import partial
-
+import structlog
 from infrastructure.services import get_settings
 from infrastructure.logging.setup import configure_logging
 
@@ -30,51 +29,61 @@ from infrastructure.i18n.factory import create_translator
 
 from server import bot_middleware, server
 from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 settings = get_settings()
 configure_logging(settings=settings)  # Explicit structlog configuration
 
 server_app = server.handler
-logger = configure_logging(settings=settings)
+
+logger = structlog.get_logger()
 
 
-def main(bot):
-    """Main function to start the application."""
+def main(bot: App):
+    """Main function to start the application - Option 2 Gradual Migration.
+
+    During gradual migration, legacy handlers still register with the platform-managed
+    Slack app. As modules are migrated to the new platform system, remove their
+    register() calls here and add hookimpl(register_slack_commands) to their
+    platforms/slack.py instead.
+
+    Migration path: role → incident_helper → incident → aws → atip → webhook_helper
+    """
     # Log startup output
     logger.info(
         "application_startup",
+        migration_mode="option_2_gradual",
     )
     list_configs()
 
-    APP_TOKEN = settings.slack.APP_TOKEN
     PREFIX = settings.PREFIX
 
-    # Register Roles commands
+    if not bot:
+        logger.warning("slack_bot_not_available_skipping_legacy_handlers")
+        return
+
+    # TODO: Migrate role module to platform system
     role.register(bot)
 
-    # Register ATIP module
+    # TODO: Migrate atip module to platform system
     atip.register(bot)
 
-    # Register AWS commands
+    # TODO: Migrate aws module to platform system
     aws.register(bot)
 
-    # Register Secret command
+    # TODO: Migrate secret module to platform system
     secret.register(bot)
 
-    # Register SRE events
+    # SRE: Bridges to platform system via sre.py dispatcher
     sre.register(bot)
 
-    # Webhooks events
+    # TODO: Migrate webhook_helper module to platform system
     webhook_helper.register(bot)
 
-    # Register incident events
+    # TODO: Migrate incident module to platform system
     incident.register(bot)
 
-    # Incident events
+    # TODO: Migrate incident_helper module to platform system
     incident_helper.register(bot)
-
-    SocketModeHandler(bot, APP_TOKEN).connect()
 
     # Run scheduled tasks if not in dev
     if PREFIX == "":
@@ -84,7 +93,12 @@ def main(bot):
 
 
 def _initialize_platform_system():
-    """Initialize platform system (Slack, Teams, Discord providers)."""
+    """Initialize platform system (Slack, Teams, Discord providers).
+
+    Creates and manages platform provider instances. For Slack, this initializes
+    the Bolt app and Socket Mode handler, but command registration happens in
+    main() or via platform provider's register_command() method.
+    """
     # Get platform service singleton from provider
     platform_service = get_platform_service()
 
@@ -114,6 +128,15 @@ def _initialize_platform_system():
             count=len(failed),
             providers=failed,
         )
+
+    # For gradual migration (Option 2): expose Slack app for legacy handlers
+    try:
+        slack_provider = platform_service.get_provider("slack")
+        if slack_provider and hasattr(slack_provider, "app") and slack_provider.app:
+            server_app.state.slack_app = slack_provider.app
+            logger.info("slack_app_exposed_to_app_state_for_legacy_handlers")
+    except Exception as e:
+        logger.warning("failed_to_expose_slack_app_to_state", error=str(e))
 
 
 def _register_platform_commands():
@@ -220,15 +243,33 @@ def providers_startup():
 
 
 def get_bot():
-    SLACK_TOKEN = settings.slack.SLACK_TOKEN
-    if not bool(SLACK_TOKEN):
-        return False
-    return App(token=SLACK_TOKEN)
+    """Get Slack Bolt App instance from platform provider.
+
+    This should only be called AFTER providers_startup() has run,
+    ensuring the platform provider is initialized.
+
+    Returns:
+        Slack Bolt App instance managed by SlackPlatformProvider
+    """
+    platform_service = get_platform_service()
+    slack_provider = platform_service.get_provider("slack")
+
+    if not slack_provider:
+        logger.warning("slack_provider_not_available")
+        return None
+
+    app = slack_provider.app
+    if not app:
+        logger.warning("slack_provider_app_not_initialized")
+        return None
+
+    logger.info("returning_slack_app_from_platform_provider")
+    return app
 
 
 def list_configs():
     """List all configuration settings keys"""
-    config_settings = {"settings": []}
+    config_settings: dict = {"settings": []}
 
     for key, value in settings.model_dump().items():
         if isinstance(value, dict):
@@ -274,16 +315,29 @@ def platform_shutdown():
         )
 
 
-bot = get_bot()
+def _call_main_after_startup():
+    """Call main(bot) after providers are initialized.
 
-if bot:
-    server_app.add_middleware(bot_middleware.BotMiddleware, bot=bot)
-    # register providers activation first so any handlers registered in main()
-    # can rely on active providers.
-    server_app.add_event_handler("startup", providers_startup)
-    server_app.add_event_handler("startup", partial(main, bot))
-    server_app.add_event_handler("shutdown", platform_shutdown)
-else:
-    # Even when Slack is not present, activate providers for FastAPI-first usage
-    server_app.add_event_handler("startup", providers_startup)
-    server_app.add_event_handler("shutdown", platform_shutdown)
+    This ensures get_bot() retrieves the app from the initialized provider,
+    and registers legacy handlers after the provider is ready.
+    """
+    bot = get_bot()
+    if bot:
+        # Register legacy handlers
+        main(bot)
+    else:
+        logger.warning("skipping_legacy_handler_registration_slack_not_available")
+
+
+# Add middleware (will lazily get bot from platform provider)
+server_app.add_middleware(bot_middleware.BotMiddleware)
+
+# Register startup handlers in correct order:
+# 1. First, initialize platform providers
+server_app.add_event_handler("startup", providers_startup)
+# 2. Then, register legacy handlers with the initialized bot
+server_app.add_event_handler("startup", _call_main_after_startup)
+# 3. Clean up on shutdown
+server_app.add_event_handler("shutdown", platform_shutdown)
+
+logger.info("slack_startup_configured_with_delayed_handler_registration")
