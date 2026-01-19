@@ -22,7 +22,7 @@ def test_get_geolocate_success(client):
     with patch("packages.geolocate.routes.geolocate_ip") as mock_geolocate:
         mock_geolocate.return_value = mock_result
 
-        response = client.get("/api/v1/geolocate?ip=8.8.8.8")
+        response = client.get("/geolocate?ip=8.8.8.8")
 
         assert response.status_code == 200
         data = response.json()
@@ -42,7 +42,7 @@ def test_get_geolocate_not_found(client):
     with patch("packages.geolocate.routes.geolocate_ip") as mock_geolocate:
         mock_geolocate.return_value = mock_result
 
-        response = client.get("/api/v1/geolocate?ip=192.168.1.1")
+        response = client.get("/geolocate?ip=192.168.1.1")
 
         assert response.status_code == 404
 
@@ -59,7 +59,7 @@ def test_get_geolocate_invalid_ip(client):
     with patch("packages.geolocate.routes.geolocate_ip") as mock_geolocate:
         mock_geolocate.return_value = mock_result
 
-        response = client.get("/api/v1/geolocate?ip=not-an-ip")
+        response = client.get("/geolocate?ip=not-an-ip")
 
         assert response.status_code == 400
 
@@ -67,6 +67,6 @@ def test_get_geolocate_invalid_ip(client):
 @pytest.mark.integration
 def test_get_geolocate_missing_ip(client):
     """Test missing IP parameter."""
-    response = client.get("/api/v1/geolocate")
+    response = client.get("/geolocate")
 
     assert response.status_code == 422  # FastAPI validation error
