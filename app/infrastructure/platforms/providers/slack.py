@@ -5,6 +5,8 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 
 import structlog
 from typing import Any, Callable, Dict, Optional
+from slack_bolt import App
+from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import (
@@ -82,13 +84,16 @@ class SlackPlatformProvider(BasePlatformProvider):
         self._formatter = formatter or SlackBlockKitFormatter()
 
         # Will be initialized when app is started
-        self._app = None
-        self._client = None
+        self._app: Optional[App] = None
+        self._client: Optional[Any] = None
 
         self._logger.info(
             "slack_provider_initialized",
             socket_mode=settings.SOCKET_MODE,
             enabled=settings.ENABLED,
+        )
+        self._handler: Optional[SocketModeHandler] = (
+            None  # Socket Mode handler reference
         )
 
     def get_capabilities(self) -> CapabilityDeclaration:
@@ -197,13 +202,14 @@ class SlackPlatformProvider(BasePlatformProvider):
         return self._formatter.format_success(data=data)
 
     def initialize_app(self) -> OperationResult:
-        """Initialize Slack Bolt app (placeholder for future implementation).
+        """Initialize Slack Bolt app with Socket Mode handler.
 
-        This will set up:
+        Sets up:
         - Bolt App instance
-        - Socket Mode handler
-        - Event listeners
-        - Command handlers
+        - Socket Mode handler (if enabled)
+
+        Note: Command handlers are registered separately via register_command()
+        or by the application layer (e.g., main.py) directly with the app.
 
         Returns:
             OperationResult with initialization status
@@ -234,23 +240,34 @@ class SlackPlatformProvider(BasePlatformProvider):
                 error_code="MISSING_BOT_TOKEN",
             )
 
-        # TODO: Initialize Bolt App when ready (CLARIFICATION REQUIRED: fastapi startup is handled in main.py and server initializes the platform apps)
-        # from slack_bolt import App
-        # from slack_bolt.adapter.socket_mode import SocketModeHandler
-        #
-        # self._app = App(token=self._settings.BOT_TOKEN)
-        # if self._settings.SOCKET_MODE:
-        #     handler = SocketModeHandler(
-        #         self._app,
-        #         self._settings.APP_TOKEN
-        #     )
-        # self._client = self._app.client
+        try:
 
-        log.info("slack_app_initialized_placeholder")
-        return OperationResult.success(
-            data={"initialized": True, "socket_mode": self._settings.SOCKET_MODE},
-            message="Slack app initialization completed (placeholder)",
-        )
+            # Create Bolt App instance
+            self._app = App(token=self._settings.BOT_TOKEN)
+            self._client = self._app.client
+            log.debug("slack_app_created")
+
+            # Initialize Socket Mode if enabled
+            if self._settings.SOCKET_MODE:
+                handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
+                handler.connect()
+                self._handler = handler
+                log.info("socket_mode_handler_started")
+            else:
+                log.info("socket_mode_disabled_http_mode")
+
+            log.info("slack_app_initialized")
+            return OperationResult.success(
+                data={"initialized": True, "socket_mode": self._settings.SOCKET_MODE},
+                message="Slack app initialization completed",
+            )
+
+        except Exception as e:
+            log.error("slack_app_initialization_failed", error=str(e))
+            return OperationResult.permanent_error(
+                message=f"Failed to initialize Slack app: {str(e)}",
+                error_code="INITIALIZATION_ERROR",
+            )
 
     @property
     def formatter(self) -> SlackBlockKitFormatter:
@@ -269,6 +286,19 @@ class SlackPlatformProvider(BasePlatformProvider):
             SlackPlatformSettings instance
         """
         return self._settings
+
+    @property
+    def app(self):
+        """Get the Slack Bolt App instance.
+
+        Returns:
+            Slack Bolt App instance (or None if not yet initialized)
+
+        Note:
+            For legacy support during gradual migration, modules can access
+            the managed Bolt app for registering legacy handlers.
+        """
+        return self._app
 
     def register_command(
         self,
