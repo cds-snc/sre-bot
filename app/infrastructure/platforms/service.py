@@ -55,7 +55,7 @@ from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 
 # from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter  # Out of scope
 # from infrastructure.platforms.formatters.discord import DiscordEmbedFormatter  # Out of scope
-from infrastructure.platforms.registry import PlatformRegistry
+from infrastructure.platforms.registry import PlatformRegistry, get_platform_registry
 
 
 logger = structlog.get_logger()
@@ -80,7 +80,6 @@ class PlatformService:
         Args:
             settings: Application settings from infrastructure.configuration
         """
-        from infrastructure.platforms.registry import get_platform_registry
 
         self._settings = settings
         self._registry = get_platform_registry()  # Use global singleton
