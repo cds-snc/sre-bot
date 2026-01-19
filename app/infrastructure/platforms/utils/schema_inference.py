@@ -5,7 +5,7 @@ schema fields when arguments=None is provided to @register() decorator.
 """
 
 from typing import List, get_origin, get_args, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from pydantic_core import PydanticUndefined
 from infrastructure.platforms.parsing import Argument, ArgumentType
 
@@ -99,6 +99,13 @@ def _infer_argument_type(python_type: type) -> ArgumentType:
             return ArgumentType.CSV
         return ArgumentType.STRING
 
+    # Check for EmailStr type
+    if python_type is EmailStr or (
+        hasattr(python_type, "__origin__")
+        and str(python_type).startswith("pydantic.networks.EmailStr")
+    ):
+        return ArgumentType.EMAIL
+
     # Handle basic types
     if python_type is str:
         return ArgumentType.STRING
@@ -111,27 +118,3 @@ def _infer_argument_type(python_type: type) -> ArgumentType:
 
     # Default to STRING for unknown types
     return ArgumentType.STRING
-
-
-def _has_email_validator(field_info) -> bool:
-    """Check if a field has email validation.
-
-    Args:
-        field_info: Pydantic FieldInfo object.
-
-    Returns:
-        True if field has email validation.
-    """
-    # Check validators (Pydantic v2)
-    if hasattr(field_info, "metadata"):
-        metadata_str = str(field_info.metadata).lower()
-        if "email" in metadata_str:
-            return True
-
-    # Check constraints
-    if hasattr(field_info, "constraints"):
-        for constraint in field_info.constraints:
-            if "email" in str(constraint).lower():
-                return True
-
-    return False
