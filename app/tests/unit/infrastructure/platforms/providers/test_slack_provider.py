@@ -8,6 +8,29 @@ from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 
+# Fake Slack Bolt classes for unit tests to avoid network/socket operations
+@pytest.fixture
+def mock_slack_bolt(monkeypatch):
+    class FakeApp:
+        def __init__(self, token=None):
+            self.client = object()
+
+    class FakeSocketModeHandler:
+        def __init__(self, app, token):
+            self.app = app
+            self.token = token
+
+        def connect(self):
+            return None
+
+    monkeypatch.setattr("infrastructure.platforms.providers.slack.App", FakeApp)
+    monkeypatch.setattr(
+        "infrastructure.platforms.providers.slack.SocketModeHandler",
+        FakeSocketModeHandler,
+    )
+    return None
+
+
 @pytest.mark.unit
 class TestSlackPlatformProvider:
     """Test SlackPlatformProvider initialization and basic operations."""
@@ -283,7 +306,7 @@ class TestFormatResponse:
 class TestInitializeApp:
     """Test initialize_app() method."""
 
-    def test_initialize_app_success(self, slack_settings):
+    def test_initialize_app_success(self, slack_settings, mock_slack_bolt):
         """Test successful app initialization."""
         provider = SlackPlatformProvider(settings=slack_settings)
 
@@ -293,7 +316,9 @@ class TestInitializeApp:
         assert result.data["initialized"] is True
         assert result.data["socket_mode"] is True
 
-    def test_initialize_app_disabled_provider(self, slack_settings_disabled):
+    def test_initialize_app_disabled_provider(
+        self, slack_settings_disabled, mock_slack_bolt
+    ):
         """Test initialization when provider is disabled."""
         provider = SlackPlatformProvider(settings=slack_settings_disabled)
 
@@ -335,7 +360,9 @@ class TestInitializeApp:
         assert not result.is_success
         assert result.error_code == "MISSING_BOT_TOKEN"
 
-    def test_initialize_app_without_socket_mode(self, slack_settings_http_mode):
+    def test_initialize_app_without_socket_mode(
+        self, slack_settings_http_mode, mock_slack_bolt
+    ):
         """Test initialization without Socket Mode."""
         provider = SlackPlatformProvider(settings=slack_settings_http_mode)
 
@@ -345,7 +372,7 @@ class TestInitializeApp:
         assert result.is_success
         assert result.data["socket_mode"] is False
 
-    def test_initialize_app_all_tokens_present(self, slack_settings):
+    def test_initialize_app_all_tokens_present(self, slack_settings, mock_slack_bolt):
         """Test initialization with all required tokens."""
         provider = SlackPlatformProvider(settings=slack_settings)
 
