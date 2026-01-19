@@ -24,19 +24,22 @@ install-dev:
 lint:
 	flake8 .
 
+lint-types:
+	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs --explicit-package-bases || echo "⚠️  mypy not installed. Run 'make install-dev' to enable type checking."
+
 # NEW STRUCTURE: Pure unit tests
 test-unit:
-	python3 -m coverage run -m pytest tests/unit -s -vv && \
+	python3 -m coverage run -m pytest tests/unit --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 # NEW STRUCTURE: Integration tests
 test-integration:
-	python3 -m coverage run -m pytest tests/integration -s -vv && \
+	python3 -m coverage run -m pytest tests/integration --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 # NEW STRUCTURE: Both unit and integration (recommended going forward)
 test-new:
-	python3 -m coverage run -m pytest tests/unit tests/integration -s -vv && \
+	python3 -m coverage run -m pytest tests/unit tests/integration --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 # LEGACY: All legacy tests (gradual phase-out)
@@ -52,7 +55,7 @@ test-legacy:
 		tests/utils \
 		tests/test_main.py \
 		tests/test_factory_validation.py \
-		-s -vv && \
+		--show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 # RUN ALL: New + legacy (default, maintain backward compatibility)
@@ -60,26 +63,27 @@ test: test-new test-legacy
 
 # ALL tests including smoke, load, performance (explicit opt-in for slower tests)
 test-all:
-	python3 -m coverage run -m pytest tests -s -vv && \
+	python3 -m coverage run -m pytest tests --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 # Coverage reports with focus on new structure
 test-coverage-unit:
-	python3 -m coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api -vv && \
+	python3 -m coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m && \
 	python3 -m coverage html
 
 test-coverage-integration:
-	python3 -m coverage run -m pytest tests/integration --cov=modules --cov=integrations -vv && \
+	python3 -m coverage run -m pytest tests/integration --cov=modules --cov=integrations --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m && \
 	python3 -m coverage html
 
 test-coverage-all:
-	python3 -m coverage run -m pytest tests/unit tests/integration --cov --cov-report=html -vv && \
+	python3 -m coverage run -m pytest tests/unit tests/integration --cov --cov-report=html --show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
 
 lint-ci:
 	flake8 .
+	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs || true
 
 fmt-ci:
 	black --check . --target-version py311
