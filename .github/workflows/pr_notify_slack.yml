@@ -1,8 +1,11 @@
 name: PR Slack Notify
 
+# Trigger when the CI workflow completes successfully. This ensures notifications
+# are only sent after lint/format/tests passed.
 on:
-  pull_request:
-    types: [review_requested]
+  workflow_run:
+    workflows: ["Lint, format and test code"]
+    types: [completed]
 
 permissions:
   pull-requests: read
@@ -11,16 +14,18 @@ permissions:
 jobs:
   pr_slack_notify:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Send Slack message
-        if: ${{ github.event.requested_team.name == 'Internal SRE'}}
+      - name: Send Slack message for PRs from successful CI run
+        # Only send when the requested team is Internal SRE on the pull request
+        if: ${{ github.event.workflow_run.pull_requests && github.event.workflow_run.pull_requests[0].requested_team && github.event.workflow_run.pull_requests[0].requested_team.name == 'Internal SRE' }}
         env:
           SLACK_SRE_CHANNEL_WEBHOOK_URL: ${{ secrets.SLACK_SRE_CHANNEL_WEBHOOK_URL }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_TITLE: ${{ github.event.workflow_run.pull_requests[0].title }}
           REPO_NAME: ${{ github.repository }}
-          PR_CREATOR: ${{ github.event.pull_request.user.login }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_CREATOR: ${{ github.event.workflow_run.pull_requests[0].user.login }}
+          PR_URL: ${{ github.event.workflow_run.pull_requests[0].html_url }}
         run: |
             curl -X POST -H 'Content-type: application/json' \
             --data "{\"text\":\"*Review requested*: <$PR_URL|PR> - $PR_TITLE by $PR_CREATOR in $REPO_NAME.\n$PR_URL\"}" \
