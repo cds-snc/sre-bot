@@ -15,6 +15,7 @@ google-auth==2.40.3
 httpx==0.28.1
 itsdangerous==2.2.0
 pandas==2.3.3
+pluggy==1.6.0
 pydantic-settings==2.10.1
 PyJWT==2.10.1
 PyYAML!=6.0.0,!=5.4.0,!=5.4.1
