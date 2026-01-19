@@ -491,8 +491,8 @@ def get_teams_client():
     """
     settings = get_settings()
     return TeamsClientFacade(
-        app_id=settings.teams.APP_ID,
-        app_password=settings.teams.APP_PASSWORD,
+        app_id=settings.platforms.teams.APP_ID,
+        app_password=settings.platforms.teams.APP_PASSWORD,
     )
 
 
