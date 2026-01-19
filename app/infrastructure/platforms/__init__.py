@@ -14,7 +14,6 @@ Key Components:
     - Clients: Internal HTTP and platform SDK facades
 """
 
-from infrastructure.platforms.adapters import BaseCommandAdapter
 from infrastructure.platforms.capabilities.models import (
     CapabilityDeclaration,
     PlatformCapability,
@@ -89,8 +88,6 @@ __all__ = [
     "SlackBlockKitFormatter",
     "TeamsAdaptiveCardsFormatter",
     "DiscordEmbedFormatter",
-    # Adapters
-    "BaseCommandAdapter",
     # Clients
     "InternalHttpClient",
     "SlackClientFacade",
