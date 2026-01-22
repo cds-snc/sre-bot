@@ -21,6 +21,7 @@ from infrastructure.platforms.models import (
     CommandResponse,
 )
 from infrastructure.platforms.providers.base import BasePlatformProvider
+from infrastructure.platforms.utils.help import generate_help_text
 
 logger = structlog.get_logger()
 
@@ -300,6 +301,64 @@ class SlackPlatformProvider(BasePlatformProvider):
         """
         return self._app
 
+    def get_user_locale(self, user_id: str) -> str:
+        """Get user's locale from Slack API.
+
+        Extracts the user's locale preference from their Slack profile.
+        Falls back to "en-US" if locale cannot be determined.
+
+        Args:
+            user_id: Slack user ID (e.g., "U02KULRUCA2")
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR")
+        """
+        default_locale = "en-US"
+        supported_locales = ["en-US", "fr-FR"]
+
+        if not user_id:
+            return default_locale
+
+        if not self._client:
+            self._logger.warning(
+                "slack_client_not_available_for_locale_extraction",
+                user_id=user_id,
+            )
+            return default_locale
+
+        try:
+            user_info = self._client.users_info(user=user_id, include_locale=True)
+            if user_info.get("ok") and user_info.get("user"):
+                user_locale = user_info["user"].get("locale")
+                if user_locale and user_locale in supported_locales:
+                    self._logger.debug(
+                        "user_locale_extracted_from_slack",
+                        user_id=user_id,
+                        locale=user_locale,
+                    )
+                    return user_locale
+                else:
+                    self._logger.debug(
+                        "user_locale_not_supported_or_missing",
+                        user_id=user_id,
+                        locale=user_locale,
+                        supported=supported_locales,
+                    )
+            else:
+                self._logger.warning(
+                    "slack_users_info_failed",
+                    user_id=user_id,
+                    ok=user_info.get("ok"),
+                )
+        except Exception as e:
+            self._logger.warning(
+                "failed_to_get_user_locale_from_slack",
+                user_id=user_id,
+                error=str(e),
+            )
+
+        return default_locale
+
     def register_command(
         self,
         command: str,
@@ -478,16 +537,30 @@ class SlackPlatformProvider(BasePlatformProvider):
             ```
         """
         if not self._commands:
-            return "No commands registered."
+            msg = self._translate_or_fallback(
+                "commands.errors.no_commands_registered",
+                "No commands registered.",
+                locale,
+            )
+            return msg
 
-        lines = ["*Available Commands*", ""]
+        # Translate section header
+        header = self._translate_or_fallback(
+            "commands.labels.available_commands", "Available Commands", locale
+        )
+        lines = [f"*{header}*", ""]
 
         # Determine which commands to display
         if root_command:
             # Show children of root_command
             children = self._get_child_commands(root_command)
             if not children:
-                return f"No commands found under `{root_command}`"
+                msg = self._translate_or_fallback(
+                    "commands.errors.no_commands_under",
+                    f"No commands found under `{root_command}`",
+                    locale,
+                )
+                return msg
 
             # Render each child command with its subtree
             for cmd_def in children:
@@ -497,7 +570,12 @@ class SlackPlatformProvider(BasePlatformProvider):
             top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
 
             if not top_level:
-                return "No top-level commands registered."
+                msg = self._translate_or_fallback(
+                    "commands.errors.no_top_level_commands",
+                    "No top-level commands registered.",
+                    locale,
+                )
+                return msg
 
             for cmd_def in sorted(top_level, key=lambda c: c.name):
                 self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
@@ -545,12 +623,29 @@ class SlackPlatformProvider(BasePlatformProvider):
                 lines.append(desc)
                 lines.append("")
 
+        # Add arguments if present (for leaf commands)
+        if cmd_def.arguments:
+            lines.append("")
+            arguments_label = self._translate_or_fallback(
+                "commands.labels.arguments", "Arguments:", locale
+            )
+            lines.append(f"*{arguments_label}*")
+            # Generate formatted argument help using utility
+            args_help = generate_help_text(
+                cmd_def.arguments,
+                include_types=True,
+                include_defaults=True,
+                indent="  ",
+            )
+            lines.append(args_help)
+
         # Add examples (skip if auto-generated)
         if not cmd_def.is_auto_generated and cmd_def.examples:
             # Translate "Examples:" label
             examples_label = self._translate_or_fallback(
                 "commands.labels.examples", "Examples:", locale
             )
+            lines.append("")
             lines.append(f"*{examples_label}*")
 
             for i, example in enumerate(cmd_def.examples):
@@ -569,7 +664,10 @@ class SlackPlatformProvider(BasePlatformProvider):
         children = self._get_child_commands(cmd_def.full_path)
         if children:
             lines.append("")
-            lines.append("*Sub-commands:*")
+            subcommands_label = self._translate_or_fallback(
+                "commands.labels.subcommands", "Sub-commands:", locale
+            )
+            lines.append(f"*{subcommands_label}*")
             for child in children:
                 child_display = child.full_path.replace(".", " ")
                 lines.append(f"• `/{child_display}`")

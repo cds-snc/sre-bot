@@ -85,10 +85,27 @@ def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
         respond(help_text)
         return
 
-    # Parse subcommand and args
-    parts = text.split(maxsplit=1)
-    subcommand = parts[0]
-    subcommand_args = parts[1] if len(parts) > 1 else ""
+    # Parse subcommand and args, finding the longest matching command path
+    # For hierarchical commands like /sre groups list, we need to find the full path
+    # Example: text="groups list" should resolve to "sre.groups.list" not "sre.groups"
+    parts = text.split()
+    subcommand_args = ""
+
+    # Build full_path by trying progressively longer command paths
+    full_command_path = None
+    for i in range(len(parts), 0, -1):
+        candidate_path = "sre." + ".".join(parts[:i])
+        if candidate_path in slack_provider._commands:
+            full_command_path = candidate_path
+            # Remaining parts are arguments
+            subcommand_args = " ".join(parts[i:]) if i < len(parts) else ""
+            break
+
+    # Fallback: if no command found, use first word as subcommand
+    if not full_command_path:
+        subcommand = parts[0] if parts else ""
+        full_command_path = f"sre.{subcommand}"
+        subcommand_args = " ".join(parts[1:]) if len(parts) > 1 else ""
 
     # Create CommandPayload with full Slack command as platform_metadata
     # This ensures legacy handlers have access to all Slack-specific fields
@@ -105,8 +122,6 @@ def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
 
     # Dispatch to handler
     try:
-        # Build full_path: subcommand in /sre context -> "sre.{subcommand}"
-        full_command_path = f"sre.{subcommand}"
         response = slack_provider.dispatch_command(full_command_path, payload)
 
         if response.blocks:

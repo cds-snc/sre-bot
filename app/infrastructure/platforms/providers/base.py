@@ -309,6 +309,21 @@ class BasePlatformProvider(ABC):
         self._parent_command = parent
 
     @abstractmethod
+    def get_user_locale(self, user_id: str) -> str:
+        """Get user's locale from platform API.
+
+        Platform-specific providers must implement this to extract
+        the user's locale from their respective APIs (Slack, Teams, Discord).
+
+        Args:
+            user_id: Platform-specific user ID
+
+        Returns:
+            Locale string (e.g., "en-US", "fr-FR"), defaults to "en-US" on error
+        """
+        pass
+
+    @abstractmethod
     def generate_help(
         self, locale: str = "en-US", root_command: Optional[str] = None
     ) -> str:
@@ -378,15 +393,32 @@ class BasePlatformProvider(ABC):
                 ephemeral=True,
             )
 
+        # Enrich payload with user locale if not already set
+        # This ensures platform-specific locale extraction happens automatically
+        if not payload.user_locale or payload.user_locale == "en-US":
+            # Try to get actual user locale from platform API
+            try:
+                detected_locale = self.get_user_locale(payload.user_id)
+                if detected_locale and detected_locale != "en-US":
+                    payload.user_locale = detected_locale
+                    self._logger.info(
+                        "locale_enriched_from_platform",
+                        user_id=payload.user_id,
+                        locale=detected_locale,
+                    )
+            except Exception as e:
+                self._logger.warning(
+                    "locale_enrichment_failed",
+                    user_id=payload.user_id,
+                    error=str(e),
+                )
+
         # Get user's locale for help/error messages
-        user_locale = (
-            payload.user_locale if hasattr(payload, "user_locale") else "en-US"
-        )
+        user_locale = payload.user_locale
         self._logger.debug(
             "dispatch_command_locale",
             command=command_name,
             locale=user_locale,
-            has_user_locale_attr=hasattr(payload, "user_locale"),
         )
 
         # Check for EXPLICIT help requests (unless in legacy mode)

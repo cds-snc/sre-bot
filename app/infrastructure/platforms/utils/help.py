@@ -46,7 +46,7 @@ def generate_help_text(
 
     lines = []
 
-    for arg in arguments:
+    for i, arg in enumerate(arguments):
         # Argument name and syntax
         if arg.is_positional:
             arg_str = f"{arg.name}"
@@ -55,35 +55,39 @@ def generate_help_text(
         else:  # is_option
             arg_str = f"{arg.name} VALUE"
 
+        # Add type and required info
+        type_info = ""
+        if include_types:
+            status = "required" if arg.required else "optional"
+            type_info = f"({arg.type.value}, {status})"
+
+        # Build signature line: name + type info
+        if type_info:
+            lines.append(f"{indent}{arg_str} {type_info}")
+        else:
+            lines.append(f"{indent}{arg_str}")
+
         # Add aliases if present
         if arg.aliases:
             aliases_str = ", ".join(arg.aliases)
-            arg_str += f" (aliases: {aliases_str})"
+            lines.append(f"{indent}{indent}Aliases: {aliases_str}")
 
-        # Add type info
-        if include_types:
-            arg_str += f" ({arg.type.value}"
-            if arg.required:
-                arg_str += ", required"
-            else:
-                arg_str += ", optional"
-            arg_str += ")"
-
-        lines.append(f"{indent}{arg_str}")
-
-        # Add description on next line if present
+        # Add description
         if arg.description:
             lines.append(f"{indent}{indent}{arg.description}")
 
-        # Add default value if applicable and include_defaults is True
+        # Add default value if applicable
         if include_defaults and arg.default is not None:
-            default_str = f"{indent}{indent}[default: {arg.default}]"
-            lines.append(default_str)
+            lines.append(f"{indent}{indent}Default: {arg.default}")
 
         # Add choices if applicable
         if arg.choices:
             choices_str = ", ".join(arg.choices)
-            lines.append(f"{indent}{indent}Valid values: {choices_str}")
+            lines.append(f"{indent}{indent}Values: {choices_str}")
+
+        # Add blank line between arguments for visual separation (except after last one)
+        if i < len(arguments) - 1:
+            lines.append("")
 
     return "\n".join(lines)
 
