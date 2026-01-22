@@ -1,209 +1,121 @@
-"""SRE Module
+"""SRE Module - Main command handler for /sre commands
 
-This module contains the main command for the SRE bot. It is responsible for handling the `/sre` command and its subcommands.
+This module provides the entry point for /sre commands via the legacy Slack Bolt interface.
+It bridges the Slack Bolt interface with the new platform provider system.
 """
 
 import structlog
-from core.config import settings
-from infrastructure.commands.router import CommandRouter
-from infrastructure.commands.providers.slack import SlackCommandProvider
-from modules.groups import create_slack_provider
-from modules.incident import incident_helper
-from modules.sre import geolocate_helper, webhook_helper
-from modules.dev.core import dev_router
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 
-PREFIX = settings.PREFIX
-GIT_SHA = settings.GIT_SHA
+from infrastructure.platforms.models import CommandPayload
+from infrastructure.services import get_slack_provider, get_settings
+
 
 logger = structlog.get_logger()
 
 
 # ============================================================
-# COMMAND ROUTER SETUP
+# SLACK BOT INTEGRATION - Legacy Bolt interface
 # ============================================================
-
-sre_router = CommandRouter(namespace="sre")
-
-# ============================================================
-# NEW ARCHITECTURE: groups subcommand
-# ============================================================
-
-groups_provider = create_slack_provider(parent_command="sre")
-sre_router.register_subcommand(
-    name="groups",
-    provider=groups_provider,
-    platform="slack",
-    description="Manage groups and memberships",
-    description_key="sre.subcommands.groups.description",
-)
-
-# ============================================================
-# LEGACY ARCHITECTURE: incident, webhooks, etc.
-# Wrapped in adapter providers for router compatibility
-# ============================================================
-
-
-class LegacyIncidentProvider(SlackCommandProvider):
-    """Adapter for legacy incident_helper."""
-
-    def __init__(self):
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None  # Legacy handlers don't use registry
-
-    def handle(self, platform_payload):
-        """Delegate to legacy incident handler."""
-        self.acknowledge(platform_payload)
-
-        command = platform_payload["command"]
-        client = platform_payload["client"]
-        respond = platform_payload["respond"]
-        ack = platform_payload["ack"]
-
-        text = command.get("text", "")
-        args = text.split() if text else []
-
-        incident_helper.handle_incident_command(
-            args, client, platform_payload["command"], respond, ack
-        )
-
-
-class LegacyWebhooksProvider(SlackCommandProvider):
-    """Adapter for legacy webhook_helper."""
-
-    def __init__(self):
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Delegate to legacy webhooks handler."""
-        self.acknowledge(platform_payload)
-
-        command = platform_payload["command"]
-        client = platform_payload["client"]
-        respond = platform_payload["respond"]
-
-        text = command.get("text", "")
-        args = text.split() if text else []
-
-        webhook_helper.handle_webhook_command(
-            args, client, platform_payload["command"], respond
-        )
-
-
-class GeolocateProvider(SlackCommandProvider):
-    """Adapter for geolocate helper."""
-
-    def __init__(self):
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Handle geolocate command."""
-        self.acknowledge(platform_payload)
-
-        command = platform_payload["command"]
-        respond = platform_payload["respond"]
-
-        text = command.get("text", "")
-        args = text.split() if text else []
-
-        if not args:
-            respond("Please provide an IP address.\n" "SVP fournir une adresse IP")
-            return
-
-        geolocate_helper.geolocate(args, respond)
-
-
-class VersionProvider(SlackCommandProvider):
-    """Adapter for version command."""
-
-    def __init__(self):
-        super().__init__(settings=settings, config={"enabled": True})
-        self.registry = None
-
-    def handle(self, platform_payload):
-        """Send version info."""
-        self.acknowledge(platform_payload)
-        respond = platform_payload["respond"]
-        respond(f"SRE Bot version: {GIT_SHA}")
-
-
-# ============================================================
-# REGISTER LEGACY PROVIDERS
-# ============================================================
-
-sre_router.register_subcommand(
-    name="incident",
-    provider=LegacyIncidentProvider(),
-    platform="slack",
-    description="Manage incidents",
-    description_key="sre.subcommands.incident.description",
-)
-
-sre_router.register_subcommand(
-    name="webhooks",
-    provider=LegacyWebhooksProvider(),
-    platform="slack",
-    description="Manage webhooks",
-    description_key="sre.subcommands.webhooks.description",
-)
-
-sre_router.register_subcommand(
-    name="geolocate",
-    provider=GeolocateProvider(),
-    platform="slack",
-    description="Geolocate an IP address",
-    description_key="sre.subcommands.geolocate.description",
-)
-
-sre_router.register_subcommand(
-    name="version",
-    provider=VersionProvider(),
-    platform="slack",
-    description="Show SRE Bot version",
-    description_key="sre.subcommands.version.description",
-)
-
-sre_router.register_subcommand(
-    name="dev",
-    provider=dev_router,
-    platform="slack",
-    description="Development and testing commands",
-    description_key="sre.subcommands.dev.description",
-)
 
 
 def register(bot: App):
-    bot.command(f"/{PREFIX}sre")(sre_command)
+    """Register the /sre Slack command with Bolt.
+
+    Called by main.py to register the command handler with Slack Bolt.
+    This provides the legacy Bolt entry point that dispatches to platform providers.
+    """
+    settings = get_settings()
+    bot.command(f"/{settings.PREFIX}sre")(sre_command)
 
 
-def sre_command(
-    ack: Ack,
-    command,
-    respond: Respond,
-    client: WebClient,
-):
-    """Main /sre command handler - delegates all subcommands to router."""
+def sre_command(ack: Ack, command, respond: Respond, client: WebClient):
+    """Handle /sre command from Slack Bolt.
+
+    This is the legacy Bolt entry point that bridges to the platform provider system.
+    It acknowledges the command, extracts the subcommand, and dispatches to the
+    appropriate handler via the platform provider.
+
+    Args:
+        ack: Slack Bolt acknowledgment function
+        command: Command payload from Slack
+        respond: Function to send response back to Slack
+        client: Slack WebClient instance
+    """
     ack()
-    logger.info(
-        "sre_command_received",
-        command=command["text"],
-        user_id=command["user_id"],
-        user_name=command["user_name"],
-        channel_id=command["channel_id"],
-        channel_name=command["channel_name"],
+
+    text = command.get("text", "").strip()
+    user_id = command.get("user_id", "")
+    channel_id = command.get("channel_id", "")
+
+    logger.info("sre_command_received", text=text, user=user_id, channel=channel_id)
+
+    # Get platform service
+    slack_provider = get_slack_provider()
+
+    if not slack_provider:
+        respond("Slack provider not available")
+        return
+
+    # Extract user's locale from Slack profile (defaults to en-US)
+    user_locale = "en-US"
+    try:
+        user_info = client.users_info(user=user_id)
+        if user_info.get("ok") and user_info.get("user"):
+            profile = user_info["user"].get("profile", {})
+            if profile.get("locale"):
+                user_locale = profile["locale"]
+                logger.info(
+                    "user_locale_extracted", user_id=user_id, locale=user_locale
+                )
+            else:
+                logger.debug(
+                    "user_profile_no_locale",
+                    user_id=user_id,
+                    profile_keys=list(profile.keys()),
+                )
+    except Exception as e:
+        logger.warning("failed_to_get_user_locale", user_id=user_id, error=str(e))
+
+    # Handle help request
+    if not text or text.lower() in ("help", "aide", "--help", "-h"):
+        # Show all commands under /sre (root_command="sre")
+        help_text = slack_provider.generate_help(locale=user_locale, root_command="sre")
+        respond(help_text)
+        return
+
+    # Parse subcommand and args
+    parts = text.split(maxsplit=1)
+    subcommand = parts[0]
+    subcommand_args = parts[1] if len(parts) > 1 else ""
+
+    # Create CommandPayload with full Slack command as platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
+    # (trigger_id, channel_name, etc.) without us having to enumerate them
+    payload = CommandPayload(
+        text=subcommand_args,
+        user_id=user_id,
+        channel_id=channel_id,
+        user_locale=user_locale,
+        user_email="",
+        response_url="",
+        platform_metadata=command,  # Pass entire Slack command object
     )
 
-    # Build standard payload for router
-    payload = {
-        "command": dict(command),
-        "client": client,
-        "respond": respond,
-        "ack": ack,
-    }
+    # Dispatch to handler
+    try:
+        # Build full_path: subcommand in /sre context -> "sre.{subcommand}"
+        full_command_path = f"sre.{subcommand}"
+        response = slack_provider.dispatch_command(full_command_path, payload)
 
-    # Router handles ALL subcommands (new + legacy)
-    # Router automatically generates help for empty commands or `/sre help`
-    sre_router.handle(payload)
+        if response.blocks:
+            respond(blocks=response.blocks)
+        elif response.message:
+            respond(response.message)
+        else:
+            respond(f"Executed: {subcommand}")
+
+    except Exception as e:
+        logger.error("command_dispatch_failed", subcommand=subcommand, error=str(e))
+        respond(f"Error executing command '{subcommand}': {str(e)}")

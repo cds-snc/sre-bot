@@ -432,23 +432,6 @@ def mock_translator():
 
 
 @pytest.fixture
-def mock_command_context(mock_translator):
-    """Create mock CommandContext for groups commands."""
-    from tests.factories.groups_commands import make_groups_list_context
-
-    ctx = make_groups_list_context()
-    ctx._translator = mock_translator  # pylint: disable=protected-access
-
-    # Mock responder
-    mock_responder = MagicMock()
-    mock_responder.send_message = MagicMock()
-    mock_responder.send_ephemeral = MagicMock()
-    ctx._responder = mock_responder  # pylint: disable=protected-access
-
-    return ctx
-
-
-@pytest.fixture
 def mock_groups_service(monkeypatch):
     """Mock groups service module for commands."""
     mock = MagicMock()
