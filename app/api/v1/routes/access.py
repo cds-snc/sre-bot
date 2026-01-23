@@ -1,5 +1,7 @@
+import structlog
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Request, HTTPException
+
 from integrations.aws.organizations import get_active_account_names
 from models.webhooks import AccessRequest
 from modules.aws.aws import request_aws_account_access
@@ -9,12 +11,13 @@ from server.utils import (
     get_user_email_from_request,
 )
 
-from core.logging import get_module_logger
+
 from core.security import validate_jwt_token
 from api.dependencies.rate_limits import get_limiter
 
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+
 router = APIRouter(tags=["Access"])
 limiter = get_limiter()
 

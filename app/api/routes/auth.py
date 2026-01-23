@@ -5,13 +5,13 @@ in favor of JWT-based authentication via Backstage issuer configuration.
 Authentication is now handled at the API endpoint level using validate_jwt_token.
 """
 
+import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from core.logging import get_module_logger
 from core.security import validate_jwt_token
 from api.dependencies.rate_limits import get_limiter
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 limiter = get_limiter()
 
