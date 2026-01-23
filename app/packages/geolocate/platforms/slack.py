@@ -27,7 +27,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         handler=handle_geolocate_command,
         parent="sre",
         description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
-        description_key="geolocate.slack.description",
+        description_key="geolocate.description",
         usage_hint="<ip_address>",
         examples=[
             "8.8.8.8",

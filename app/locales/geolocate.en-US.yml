@@ -1,0 +1,5 @@
+geolocate:
+  description: "Lookup the geographic location of an IP address using MaxMind GeoIP database."
+  examples.google_dns: "`/sre geolocate 8.8.8.8` - Lookup the geographic location of Google's public DNS server."
+  examples.cloudflare: "`/sre geolocate 1.1.1.1` - Lookup the geographic location of Cloudflare's public DNS server."
+  examples.ipv6: "`/sre geolocate 2001:4860:4860::8888` - Lookup the geographic location of Google's public DNS server (IPv6)."
