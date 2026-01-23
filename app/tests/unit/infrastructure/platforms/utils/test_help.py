@@ -45,7 +45,7 @@ class TestGenerateHelpText:
         assert "--role VALUE" in help_text
         assert "string" in help_text.lower()  # type is lowercase
         assert "optional" in help_text
-        assert "default: MEMBER" in help_text
+        assert "Default: MEMBER" in help_text  # Updated assertion
 
     def test_generate_help_text_with_choices(self):
         """Test help text for choice arguments."""
