@@ -10,7 +10,6 @@ from infrastructure.configuration import Settings
 from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
 
 logger = structlog.get_logger()
-settings = Settings()
 
 # DynamoDB table configuration
 IDEMPOTENCY_TABLE = "sre_bot_idempotency"
