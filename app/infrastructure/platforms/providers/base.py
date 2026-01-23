@@ -370,7 +370,7 @@ class BasePlatformProvider(ABC):
         """
         pass
 
-    def dispatch_command(
+    def dispatch_command(  # noqa: C901
         self, command_name: str, payload: CommandPayload
     ) -> CommandResponse:
         """Dispatch a command to its registered handler.

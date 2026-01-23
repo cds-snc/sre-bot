@@ -57,6 +57,10 @@ class ConcretePlatformProvider(BasePlatformProvider):
             "data": data,
         }
 
+    def get_user_locale(self, user_id):
+        """Mock get_user_locale implementation."""
+        return "en-US"
+
     def generate_help(
         self,
         locale: str = "en-US",
