@@ -21,24 +21,27 @@ def register_commands(provider: "DiscordPlatformProvider") -> None:
     Args:
         provider: Discord platform provider instance.
     """
-    provider.register_command(
-        command="geolocate",
-        handler=handle_geolocate_command,
-        parent="sre",
-        description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
-        description_key="geolocate.discord.description",
-        usage_hint="<ip_address>",
-        examples=[
-            "8.8.8.8",
-            "1.1.1.1",
-            "2001:4860:4860::8888",
-        ],
-        example_keys=[
-            "geolocate.examples.google_dns",
-            "geolocate.examples.cloudflare",
-            "geolocate.examples.ipv6",
-        ],
-    )
+    # Discord provider is not implemented - command registration available but handlers not implemented yet
+    # Uncomment when ready to implement:
+    # provider.register_command(
+    #     command="geolocate",
+    #     handler=handle_geolocate_command,
+    #     parent="sre",
+    #     description="Lookup the geographic location of an IP address using MaxMind GeoIP database",
+    #     description_key="geolocate.discord.description",
+    #     usage_hint="<ip_address>",
+    #     examples=[
+    #         "8.8.8.8",
+    #         "1.1.1.1",
+    #         "2001:4860:4860::8888",
+    #     ],
+    #     example_keys=[
+    #         "geolocate.examples.google_dns",
+    #         "geolocate.examples.cloudflare",
+    #         "geolocate.examples.ipv6",
+    #     ],
+    # )
+    pass
 
 
 def handle_geolocate_command(cmd: CommandPayload) -> CommandResponse:
