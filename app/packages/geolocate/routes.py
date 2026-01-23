@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from infrastructure.operations import OperationStatus
 from infrastructure.services import SettingsDep
-from packages.geolocate.schemas import GeolocateResponse
+from packages.geolocate.schemas import GeolocateResponse, GeolocateRequest
 from packages.geolocate.service import geolocate_ip
 
 logger = structlog.get_logger()
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/geolocate", tags=["geolocate"])
     description="Query MaxMind database for IP geolocation data",
 )
 def get_geolocate(
-    ip: str = Query(..., description="IPv4 or IPv6 address"),
+    request: GeolocateRequest = Query(..., description="Geolocate request payload"),
     settings: SettingsDep = None,
 ) -> GeolocateResponse:
     """Geolocate an IP address via HTTP GET.
@@ -34,13 +34,14 @@ def get_geolocate(
     Raises:
         HTTPException: 400 for invalid IP, 404 if not found, 500 for errors
     """
-    log = logger.bind(ip_address=ip, endpoint="/geolocate")
+    log = logger.bind(ip_address=request.ip_address, endpoint="/geolocate")
     log.info("geolocate_request")
 
-    result = geolocate_ip(ip_address=ip)
+    result = geolocate_ip(ip_address=request.ip_address)
 
-    if result.is_success:
-        return GeolocateResponse(ip_address=ip, **result.data)
+    if result.is_success and result.data:
+        log.info("geolocate_success", data=result.data)
+        return GeolocateResponse(ip_address=request.ip_address, **result.data)
     elif result.status == OperationStatus.NOT_FOUND:
         log.warning("geolocate_not_found")
         raise HTTPException(status_code=404, detail=result.message)
