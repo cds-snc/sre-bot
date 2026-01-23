@@ -11,6 +11,7 @@ from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
+from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.i18n.service import TranslationService
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
@@ -18,6 +19,12 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.persistence.service import PersistenceService
+from infrastructure.platforms import PlatformService
+from infrastructure.platforms.clients import (
+    SlackClientFacade,
+    TeamsClientFacade,
+    DiscordClientFacade,
+)
 
 
 @lru_cache
@@ -157,6 +164,42 @@ def get_google_workspace_clients() -> GoogleWorkspaceClients:
     """
     settings = get_settings()
     return GoogleWorkspaceClients(google_settings=settings.google_workspace)
+
+
+@lru_cache
+def get_maxmind_client() -> MaxMindClient:
+    """Provider for MaxMind GeoIP2 client.
+
+    Returns a fully-configured MaxMindClient instance with database path
+    from application configuration.
+
+    Returns:
+        MaxMindClient: Configured client instance for geolocation operations
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import MaxMindClientDep
+
+        @router.get("/geolocate")
+        def geolocate(ip: str, maxmind: MaxMindClientDep):
+            result = maxmind.geolocate(ip_address=ip)
+            if result.is_success:
+                return result.data
+
+        # Application code (jobs, modules, utils)
+        from infrastructure.services import get_maxmind_client
+
+        def check_ip_location(ip: str):
+            maxmind = get_maxmind_client()
+            result = maxmind.geolocate(ip_address=ip)
+            return result
+
+    Note:
+        For MaxMind types and data classes, import from:
+        infrastructure.clients.maxmind
+    """
+    settings = get_settings()
+    return MaxMindClient(settings=settings)
 
 
 @lru_cache
@@ -340,3 +383,164 @@ def get_persistence_service() -> PersistenceService:
     """
     settings = get_settings()
     return PersistenceService(settings=settings)
+
+
+@lru_cache
+def get_platform_service():
+    """Get application-scoped platform service singleton.
+
+    Returns a PlatformService instance for managing collaboration platform
+    providers (Slack, Teams, Discord) with unified interfaces for messaging,
+    capability detection, and provider initialization.
+
+    The service is initialized with injected dependencies from settings
+    and manages a thread-safe registry of platform providers.
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import PlatformServiceDep
+
+        @router.post("/platforms/send")
+        def send_message(
+            platform_service: PlatformServiceDep,
+            platform: str,
+            channel: str,
+            message: dict
+        ):
+            result = platform_service.send(platform, channel, message)
+            if result.is_success:
+                return {"sent": True}
+            return {"error": result.message}
+
+        # Application code (startup, jobs, modules)
+        from infrastructure.services import get_platform_service
+
+        def initialize_platforms():
+            platform_service = get_platform_service()  # Singleton
+            providers = platform_service.load_providers()
+            init_results = platform_service.initialize_all_providers()
+            return init_results
+
+    Returns:
+        PlatformService: Cached platform service instance
+    """
+    settings = get_settings()
+    return PlatformService(settings=settings)
+
+
+@lru_cache
+def get_slack_client():
+    """Get application-scoped Slack client facade singleton.
+
+    Returns a SlackClientFacade instance that wraps the Slack SDK
+    (slack_sdk.WebClient) with OperationResult-based APIs for consistent
+    error handling across the platform.
+
+    Credentials are loaded from settings.slack.SLACK_TOKEN (bot token).
+    The facade provides methods for posting messages, updating messages,
+    listing conversations, getting user info, and opening views (modals).
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import SlackClientDep
+
+        @router.post("/slack/message")
+        def send_message(slack: SlackClientDep, channel: str, text: str):
+            result = slack.post_message(channel=channel, text=text)
+            if result.is_success:
+                return {"ts": result.data["ts"]}
+            return {"error": result.message}
+
+        # Application code (jobs, modules, utils)
+        from infrastructure.services import get_slack_client
+
+        def send_notification():
+            slack = get_slack_client()  # Singleton
+            result = slack.post_message(channel="C123", text="Alert!")
+            return result
+
+    Returns:
+        SlackClientFacade: Cached Slack client instance
+
+    Note:
+        For advanced use cases, access the raw WebClient via client.raw_client
+    """
+    settings = get_settings()
+    return SlackClientFacade(token=settings.slack.SLACK_TOKEN)
+
+
+@lru_cache
+def get_teams_client():
+    """Get application-scoped Teams client facade singleton.
+
+    Returns a TeamsClientFacade instance that wraps the Bot Framework SDK
+    with OperationResult-based APIs for consistent error handling.
+
+    Note:
+        This facade requires botbuilder-core to be installed.
+        If the SDK is not available, facade methods return error results.
+
+    Credentials are loaded from settings.teams (APP_ID, APP_PASSWORD).
+    The facade provides methods for sending activities, updating activities,
+    deleting activities, and sending adaptive cards.
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import TeamsClientDep
+
+        @router.post("/teams/activity")
+        def send_activity(
+            teams: TeamsClientDep,
+            turn_context: TurnContext,
+            text: str
+        ):
+            result = teams.send_activity(turn_context, text=text)
+            if result.is_success:
+                return {"id": result.data["id"]}
+            return {"error": result.message}
+
+        # Application code (webhook handlers)
+        from infrastructure.services import get_teams_client
+
+        def handle_teams_message(turn_context):
+            teams = get_teams_client()  # Singleton
+            result = teams.send_activity(turn_context, text="Received!")
+            return result
+
+    Returns:
+        TeamsClientFacade: Cached Teams client instance
+
+    Note:
+        Check facade.is_available before use if SDK availability is uncertain
+    """
+    settings = get_settings()
+    return TeamsClientFacade(
+        app_id=settings.platforms.teams.APP_ID,
+        app_password=settings.platforms.teams.APP_PASSWORD,
+    )
+
+
+@lru_cache
+def get_discord_client():
+    """Get application-scoped Discord client facade singleton.
+
+    Returns a DiscordClientFacade placeholder instance.
+
+    Note:
+        Discord integration is currently out of scope per project requirements.
+        All facade methods return NotImplementedError results.
+
+    Usage:
+        # Not yet implemented
+        from infrastructure.services import DiscordClientDep
+
+        @router.post("/discord/message")
+        def send_message(discord: DiscordClientDep, channel: str, text: str):
+            result = discord.send_message(channel=channel, content=text)
+            # Will always return permanent_error with DISCORD_NOT_IMPLEMENTED
+
+    Returns:
+        DiscordClientFacade: Placeholder instance (not implemented)
+    """
+    # Discord token not yet in settings - use empty string for placeholder
+    return DiscordClientFacade(token="")
