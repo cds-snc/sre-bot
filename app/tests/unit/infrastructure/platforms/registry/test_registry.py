@@ -55,6 +55,9 @@ class MockPlatformProvider(BasePlatformProvider):
     ) -> Dict[str, Any]:
         return {"type": message_type, "data": data}
 
+    def get_user_locale(self, user_id):
+        return "en-US"
+
     def generate_help(
         self,
         locale: str = "en-US",
