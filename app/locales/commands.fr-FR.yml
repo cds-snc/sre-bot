@@ -6,4 +6,11 @@ commands:
   errors.parse_error: "Syntaxe de commande invalide: {error}"
   errors.internal_error: "Une erreur s'est produite lors du traitement de votre commande."
   errors.invalid_payload: "Charge utile invalide fournie."
+  errors.no_commands_registered: "Aucune commande enregistrée."
+  errors.no_commands_under: "Aucune commande trouvée sous `{command}`"
+  errors.no_top_level_commands: "Aucune commande de niveau supérieur enregistrée."
+  labels.examples: "Exemples"
+  labels.available_commands: "Commandes disponibles"
+  labels.subcommands: "Sous-commandes:"
+  labels.arguments: "Paramètres"
   
