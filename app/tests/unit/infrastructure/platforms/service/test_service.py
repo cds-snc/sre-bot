@@ -61,6 +61,10 @@ class MockProvider(BasePlatformProvider):
             return {"type": "error", "message": data.get("error", "Unknown error")}
         return {"type": "success", "data": data}
 
+    def get_user_locale(self, user_id):
+        """Generate mock user locale."""
+        return "en-US"
+
     def generate_help(self, locale="en-US", root_command=None):
         """Generate mock help."""
         return "Mock help"
