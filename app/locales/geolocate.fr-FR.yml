@@ -1,0 +1,5 @@
+geolocate:
+  description: "Recupérer la localisation géographique d'une adresse IP en utilisant la base de données MaxMind GeoIP."
+  examples.google_dns: "`/sre geolocate 8.8.8.8` - Récupérer la localisation géographique du serveur DNS public de Google."
+  examples.cloudflare: "`/sre geolocate 1.1.1.1` - Récupérer la localisation géographique du serveur DNS public de Cloudflare."
+  examples.ipv6: "`/sre geolocate 2001:4860:4860::8888` - Récupérer la localisation géographique du serveur DNS public de Google (IPv6)."
