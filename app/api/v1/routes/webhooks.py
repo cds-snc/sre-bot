@@ -1,8 +1,9 @@
 import json
 from typing import Union, Dict, Any
+import structlog
 
 from api.dependencies.rate_limits import get_limiter
-from core.logging import get_module_logger
+
 from fastapi import APIRouter, HTTPException, Request, Body
 from integrations.sentinel import log_to_sentinel
 from models.webhooks import (
@@ -13,7 +14,7 @@ from modules.webhooks.base import handle_webhook_payload
 from modules.webhooks.slack import map_emails_to_slack_users
 
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 router = APIRouter(tags=["Access"])
 limiter = get_limiter()
 
@@ -41,13 +42,20 @@ def handle_webhook(
     Returns:
         dict: A dictionary indicating success if the message was posted successfully.
     """
+    log = logger.bind(
+        webhook_id=webhook_id,
+        path=request.url.path,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else "unknown",
+    )
+
     if isinstance(payload, dict):
         payload_dict = payload
     else:
         try:
             payload_dict = json.loads(payload)
         except json.JSONDecodeError as e:
-            logger.error("payload_validation_error", error=str(e), payload=str(payload))
+            log.error("payload_validation_error", error=str(e), payload=str(payload))
             raise HTTPException(status_code=400, detail=str(e)) from e
 
     webhook = webhooks.get_webhook(webhook_id)
@@ -55,11 +63,7 @@ def handle_webhook(
         raise HTTPException(status_code=404, detail="Webhook not found")
 
     if not webhook.get("active", {}).get("BOOL", False):
-        logger.info(
-            "webhook_not_active",
-            webhook_id=webhook_id,
-            error="Webhook is not active",
-        )
+        log.info("webhook_not_active", error="Webhook is not active")
         raise HTTPException(status_code=404, detail="Webhook not active")
     webhooks.increment_invocation_count(webhook_id)
 
@@ -92,9 +96,8 @@ def handle_webhook(
             )
 
         except Exception as e:
-            logger.exception(
+            log.exception(
                 "webhook_posting_error",
-                webhook_id=webhook_id,
                 error=str(e),
             )
             raise HTTPException(status_code=500, detail="Failed to send message") from e

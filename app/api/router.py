@@ -1,11 +1,13 @@
+import structlog
 from fastapi import APIRouter, Request, Depends
 from api.routes.system import router as system_router
 from api.routes.auth import router as auth_router
 from api.routes.landing import router as landing_router
 from api.v1.router import router as v1_router, legacy_router
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+
+logger = structlog.get_logger()
+
 api_router = APIRouter()
 
 
@@ -14,8 +16,7 @@ def log_legacy_calls(request: Request):
     Log a warning message indicating that the legacy API is being used.
     This function is intended to be called when the legacy API is accessed.
     """
-    logger.warning(
-        "legacy_api_endpoint_accessed",
+    log = logger.bind(
         path=request.url.path,
         method=request.method,
         query_params=str(request.query_params),
@@ -25,6 +26,7 @@ def log_legacy_calls(request: Request):
         x_forwarded_for=request.headers.get("x-forwarded-for"),
         authorization_present=bool(request.headers.get("authorization")),
     )
+    log.warning("legacy_api_endpoint_accessed")
 
 
 api_router.include_router(landing_router)
