@@ -59,7 +59,19 @@ class DiscordPlatformProvider(BasePlatformProvider):
         """Format response - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")
 
-    def generate_help(self, locale: str = "en-US") -> str:
+    def get_user_locale(self, user_id: str) -> str:
+        """Get user's locale - NOT IMPLEMENTED.
+
+        Args:
+            user_id: Discord user ID
+
+        Returns:
+            Locale string (always "en-US" for stub)
+        """
+        # Discord support is out of scope, always return default
+        return "en-US"
+
+    def generate_help(self, locale: str = "en-US", _root_command: str = "") -> str:
         """Generate help text - NOT IMPLEMENTED."""
         raise NotImplementedError("Discord support is out of scope")
 
