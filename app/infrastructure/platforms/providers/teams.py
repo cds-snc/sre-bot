@@ -154,6 +154,24 @@ class TeamsPlatformProvider(BasePlatformProvider):
         )
         return None  # Placeholder - to be implemented with Bot Framework SDK
 
+    def get_user_locale(self, user_id: str) -> str:
+        """Get user's locale from Teams API.
+
+        Args:
+            user_id: Teams user ID
+
+        Returns:
+            Locale string, defaults to "en-US"
+
+        Note:
+            TODO: Implement Teams-specific locale extraction using Bot Framework SDK.
+            Teams user locale can be extracted from:
+            - Activity.locale property in incoming messages
+            - User profile via Microsoft Graph API
+        """
+        # TODO: Implement Teams locale extraction
+        return "en-US"
+
     def send_message(
         self,
         channel: str,
