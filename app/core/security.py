@@ -11,13 +11,14 @@ Migration:
 
 import warnings
 from typing import Any, Dict, Optional, Tuple
+import structlog
 
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient, PyJWTError, PyJWKClientError, decode
 
 from core.config import settings
-from core.logging import get_module_logger
+
 
 # Issue deprecation warning on import
 warnings.warn(
@@ -29,7 +30,8 @@ warnings.warn(
 
 ISSUER_CONFIG = settings.server.ISSUER_CONFIG
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+
 security = HTTPBearer()
 
 
@@ -57,15 +59,14 @@ class JWKSManager:
         if not self.issuer_config or issuer not in self.issuer_config:
             return None
         if issuer not in self.jwks_clients:
+            log = logger.bind(issuer=issuer)
             try:
                 cfg = self.issuer_config[issuer]
                 self.jwks_clients[issuer] = PyJWKClient(
                     cfg["jwks_uri"], cache_jwk_set=True, lifespan=3600, timeout=10
                 )
             except Exception as e:
-                logger.warning(
-                    "jwks_client_initialization_failed", error=str(e), issuer=issuer
-                )
+                log.warning("jwks_client_initialization_failed", error=str(e))
                 return None
         return self.jwks_clients[issuer]
 
@@ -97,26 +98,21 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
         Tuple[str, str] | Tuple[None, None]: A tuple containing the user ID and email if present,
         otherwise (None, None).
     """
+    payload: Dict[str, Any] | None = None
     try:
         payload = decode(token, options={"verify_signature": False})
         user_id = None
         user_email = None
 
-        # For user JWTs, email may be a top-level claim
         if "email" in payload:
             user_email = payload["email"]
 
-        # sub is always present
         if "sub" in payload:
             user_id = payload["sub"].split("/")[-1]
 
         return user_id, user_email
     except Exception as e:
-        logger.warning(
-            "user_info_extraction_failed",
-            error=str(e),
-            payload=payload,
-        )
+        logger.warning("user_info_extraction_failed", error=str(e))
         return None, None
 
 
