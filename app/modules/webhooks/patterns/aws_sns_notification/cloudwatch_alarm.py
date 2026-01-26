@@ -55,7 +55,7 @@ def handle_cloudwatch_alarm(payload: AwsSnsPayload, client: WebClient) -> List[D
     account_id = msg.get("AWSAccountId", "unknown")
 
     # Create the CloudWatch console link
-    link = f"https://console.amazon.com/cloudwatch/home?region={region}#alarm:alarmFilter=ANY;name={urllib.parse.quote(alarm_name)}"
+    link = f"https://console.aws.amazon.com/cloudwatch/home?region={region}#alarm:alarmFilter=ANY;name={urllib.parse.quote(alarm_name)}"
 
     blocks = [
         {"type": "section", "text": {"type": "mrkdwn", "text": " "}},
