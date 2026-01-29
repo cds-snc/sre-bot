@@ -109,13 +109,12 @@ async def get_accounts(
     Returns:
         list: A list of active AWS account names.
     """
-    logger.info(
-        "get_accounts",
-        user=token_data["sub"],
-        email=token_data["email"],
-        issuer=token_data["iss"],
-        token_data=token_data,
+    log = logger.bind(
+        user=token_data.get("sub"),
+        email=token_data.get("email"),
+        issuer=token_data.get("iss"),
     )
+    log.info("get_accounts")
     return get_active_account_names()
 
 
