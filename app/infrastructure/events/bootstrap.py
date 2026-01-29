@@ -23,4 +23,5 @@ def register_infrastructure_handlers() -> None:
     """
     # Register audit handler for all events via wildcard
     register_event_handler("*")(handle_audit_event)
-    logger.info("infrastructure_handlers_registered", handlers=["audit"])
+    log = logger.bind(handlers=["audit"])
+    log.info("infrastructure_handlers_registered")

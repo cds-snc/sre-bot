@@ -8,7 +8,7 @@ import structlog
 
 from infrastructure.configuration.base import IntegrationSettings
 
-logger = structlog.stdlib.get_logger().bind(component="config.google")
+logger = structlog.get_logger().bind(component="config.google")
 
 
 class GoogleWorkspaceSettings(IntegrationSettings):

@@ -153,6 +153,9 @@ class AuditHandler:
         """
         self.sentinel_client = sentinel_client_override or sentinel_client
 
+        # Base logger for this handler; bind call-specific context in `handle`
+        self.log = logger.bind(component="audit_handler")
+
     def handle(self, event: Event) -> None:
         """Handle event by converting to audit event and writing to Sentinel.
 
@@ -162,12 +165,11 @@ class AuditHandler:
         Args:
             event: The event to audit.
         """
+        log = self.log.bind(
+            event_type=event.event_type, correlation_id=str(event.correlation_id)
+        )
         try:
-            logger.info(
-                "converting_event_to_audit",
-                event_type=event.event_type,
-                correlation_id=str(event.correlation_id),
-            )
+            log.info("converting_event_to_audit")
 
             # Extract structured fields from event
             resource_type, resource_id = _extract_resource_info(
@@ -231,20 +233,16 @@ class AuditHandler:
             # Also write to DynamoDB for operational queries (non-blocking)
             dynamodb_audit.write_audit_event(audit_event)
 
-            logger.info(
+            log.info(
                 "audit_event_written",
-                event_type=event.event_type,
-                correlation_id=str(event.correlation_id),
                 action=audit_event.action,
                 resource_type=audit_event.resource_type,
             )
 
         except Exception as e:
             # Never fail - log error and continue
-            logger.error(
+            log.error(
                 "failed_to_write_audit_event",
-                event_type=event.event_type,
-                correlation_id=str(event.correlation_id),
                 error=str(e),
                 error_type=type(e).__name__,
             )

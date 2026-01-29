@@ -12,7 +12,7 @@ import yaml
 import structlog
 from infrastructure.i18n.models import Locale, TranslationCatalog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="i18n.loader")
 
 
 class TranslationLoader(ABC):
@@ -79,11 +79,9 @@ class YAMLTranslationLoader(TranslationLoader):
                 f"Translations directory not found: {self.translations_dir}"
             )
 
-        logger.info(
-            "initialized_yaml_loader",
-            translations_dir=str(self.translations_dir),
-            use_cache=use_cache,
-        )
+        self.log = logger.bind(translations_dir=str(self.translations_dir))
+        log = self.log.bind(use_cache=use_cache)
+        log.info("initialized_yaml_loader")
 
     def load(self, locale: Locale) -> TranslationCatalog:
         """Load translations for a locale from YAML files.
@@ -102,7 +100,8 @@ class YAMLTranslationLoader(TranslationLoader):
             ValueError: If YAML parsing fails.
         """
         if self.use_cache and locale in self.cache:
-            logger.info("loaded_from_cache", locale=locale.value)
+            log = self.log.bind(locale=locale.value)
+            log.info("loaded_from_cache")
             return self.cache[locale]
 
         catalog = TranslationCatalog(locale=locale)
@@ -120,15 +119,16 @@ class YAMLTranslationLoader(TranslationLoader):
                     if data:
                         self._merge_yaml_data(catalog, data, yaml_file)
             except yaml.YAMLError as e:
-                logger.error("yaml_parse_error", file=str(yaml_file), error=str(e))
+                log = self.log.bind(file=str(yaml_file))
+                log.error("yaml_parse_error", error=str(e))
                 raise ValueError(f"Failed to parse {yaml_file}: {e}") from e
 
-        logger.info(
-            "loaded_translations",
+        log = self.log.bind(
             locale=locale.value,
             file_count=len(yaml_files),
             namespace_count=len(catalog.messages),
         )
+        log.info("loaded_translations")
 
         if self.use_cache:
             self.cache[locale] = catalog
@@ -167,7 +167,8 @@ class YAMLTranslationLoader(TranslationLoader):
             try:
                 result[locale] = self.load(locale)
             except FileNotFoundError:
-                logger.warning("could_not_load_locale", locale=locale.value)
+                log = self.log.bind(locale=locale.value)
+                log.warning("could_not_load_locale")
 
         return result
 
@@ -190,18 +191,14 @@ class YAMLTranslationLoader(TranslationLoader):
             source_file: Source file (for logging).
         """
         if not isinstance(data, dict):
-            logger.warning(
-                "invalid_yaml_format", file=str(source_file), expected="dict"
-            )
+            log = self.log.bind(file=str(source_file))
+            log.warning("invalid_yaml_format", expected="dict")
             return
 
         for namespace, messages in data.items():
             if not isinstance(messages, dict):
-                logger.warning(
-                    "invalid_namespace_format",
-                    namespace=namespace,
-                    expected="dict",
-                )
+                log = self.log.bind(namespace=namespace)
+                log.warning("invalid_namespace_format", expected="dict")
                 continue
 
             if namespace not in catalog.messages:
@@ -212,4 +209,4 @@ class YAMLTranslationLoader(TranslationLoader):
     def clear_cache(self) -> None:
         """Clear all cached translations."""
         self.cache.clear()
-        logger.info("cleared_translation_cache")
+        self.log.info("cleared_translation_cache")

@@ -11,7 +11,7 @@ from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.translator import Translator
 from infrastructure.i18n.models import Locale
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="i18n.factory")
 
 
 def create_translator(
@@ -62,15 +62,13 @@ def create_translator(
 
     if preload:
         translator.load_all()
-        logger.info(
-            "translator_created_with_preload",
+        log = logger.bind(
             translations_dir=str(translations_dir),
             locale_count=len(translator.get_available_locales()),
         )
+        log.info("translator_created_with_preload")
     else:
-        logger.info(
-            "translator_created_lazy",
-            translations_dir=str(translations_dir),
-        )
+        log = logger.bind(translations_dir=str(translations_dir))
+        log.info("translator_created_lazy")
 
     return translator

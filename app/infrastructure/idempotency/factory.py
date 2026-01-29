@@ -8,7 +8,7 @@ from infrastructure.idempotency.dynamodb import DynamoDBCache
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="idempotency.factory")
 
 # Singleton cache instance
 _cache_instance: IdempotencyCache = None
@@ -29,7 +29,8 @@ def get_cache(settings: "Settings") -> IdempotencyCache:
         return _cache_instance
 
     _cache_instance = DynamoDBCache(settings=settings)
-    logger.info("initialized_idempotency_cache", backend="dynamodb")
+    log = logger.bind(backend="dynamodb")
+    log.info("initialized_idempotency_cache")
 
     return _cache_instance
 

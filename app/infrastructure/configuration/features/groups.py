@@ -8,7 +8,7 @@ import structlog
 
 from infrastructure.configuration.base import FeatureSettings
 
-logger = structlog.stdlib.get_logger().bind(component="config.groups")
+logger = structlog.get_logger().bind(component="config.groups")
 
 
 class GroupsFeatureSettings(FeatureSettings):

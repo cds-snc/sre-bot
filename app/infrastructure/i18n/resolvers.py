@@ -9,7 +9,7 @@ from typing import Optional
 import structlog
 from infrastructure.i18n.models import Locale, LocaleResolutionContext
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="i18n.resolver")
 
 
 class LocaleResolver:
@@ -29,6 +29,7 @@ class LocaleResolver:
             default_locale: Fallback locale when no preference found.
         """
         self.default_locale = default_locale
+        self.log = logger.bind(default_locale=default_locale.value)
 
     def resolve_from_header(
         self,
@@ -70,17 +71,20 @@ class LocaleResolver:
             # Try exact match
             for locale in supported:
                 if locale.value.lower() == lang_range.lower():
-                    logger.info("resolved_from_header", locale=locale.value)
+                    log = self.log.bind(locale=locale.value)
+                    log.info("resolved_from_header")
                     return locale
 
             # Try language-only match (e.g., "en" matches "en-US")
             lang_code = lang_range.split("-")[0].lower()
             for locale in supported:
                 if locale.language.lower() == lang_code:
-                    logger.info("resolved_from_header", locale=locale.value)
+                    log = self.log.bind(locale=locale.value)
+                    log.info("resolved_from_header")
                     return locale
 
-        logger.info("no_matching_locale_in_header", default=self.default_locale.value)
+        log = self.log.bind(default=self.default_locale.value)
+        log.info("no_matching_locale_in_header")
         return self.default_locale
 
     def resolve_from_context(
@@ -98,7 +102,8 @@ class LocaleResolver:
             Resolved Locale.
         """
         resolved = context.resolve()
-        logger.info("resolved_from_context", locale=resolved.value)
+        log = self.log.bind(locale=resolved.value)
+        log.info("resolved_from_context")
         return resolved
 
     def resolve_from_string(self, locale_str: str) -> Locale:
@@ -116,7 +121,8 @@ class LocaleResolver:
         try:
             return Locale.from_string(locale_str)
         except ValueError:
-            logger.warning("invalid_locale_string", locale_str=locale_str)
+            log = self.log.bind(locale_str=locale_str)
+            log.warning("invalid_locale_string")
             raise
 
 

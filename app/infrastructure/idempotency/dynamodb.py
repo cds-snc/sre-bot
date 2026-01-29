@@ -9,7 +9,7 @@ from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.configuration import Settings
 from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="idempotency.dynamodb")
 
 # DynamoDB table configuration
 IDEMPOTENCY_TABLE = "sre_bot_idempotency"
@@ -35,12 +35,12 @@ class DynamoDBCache(IdempotencyCache):
         """
         self.table_name = table_name
         self.ttl_seconds = settings.idempotency.IDEMPOTENCY_TTL_SECONDS
-        logger.info(
-            "initialized_dynamodb_idempotency_cache",
-            table_name=table_name,
+        self.log = logger.bind(table_name=table_name)
+        log = self.log.bind(
             ttl_seconds=self.ttl_seconds,
             region=settings.aws.AWS_REGION,
         )
+        log.info("initialized_dynamodb_idempotency_cache")
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached response for idempotency key.
@@ -51,6 +51,7 @@ class DynamoDBCache(IdempotencyCache):
         Returns:
             Cached response dict or None if not found/expired.
         """
+        log = self.log.bind(key=key)
         try:
             result = get_item(
                 table_name=self.table_name,
@@ -58,16 +59,12 @@ class DynamoDBCache(IdempotencyCache):
             )
 
             if not result.is_success:
-                logger.debug(
-                    "idempotency_cache_get_failed",
-                    key=key,
-                    error=result.message,
-                )
+                log.debug("idempotency_cache_get_failed", error=result.message)
                 return None
 
             # DynamoDB get_item returns None data if item not found
             if result.data is None or "Item" not in result.data:
-                logger.debug("idempotency_cache_miss", key=key)
+                log.debug("idempotency_cache_miss")
                 return None
 
             item = result.data.get("Item", {})
@@ -80,16 +77,11 @@ class DynamoDBCache(IdempotencyCache):
                 response_json_str = response_json_attr
 
             cached_response = json.loads(response_json_str)
-            logger.debug("idempotency_cache_hit", key=key)
+            log.debug("idempotency_cache_hit")
             return cached_response
 
         except Exception as e:
-            logger.error(
-                "idempotency_cache_get_error",
-                key=key,
-                error=str(e),
-                exc_info=True,
-            )
+            log.exception("idempotency_cache_get_error", error=str(e))
             return None
 
     def set(
@@ -104,6 +96,8 @@ class DynamoDBCache(IdempotencyCache):
         """
         if ttl_seconds is None:
             ttl_seconds = self.ttl_seconds
+
+        log = self.log.bind(key=key, ttl_seconds=ttl_seconds)
 
         try:
             now = int(time.time())
@@ -124,31 +118,14 @@ class DynamoDBCache(IdempotencyCache):
             )
 
             if result.is_success:
-                logger.debug(
-                    "idempotency_cache_set_success",
-                    key=key,
-                    ttl_seconds=ttl_seconds,
-                )
+                log.debug("idempotency_cache_set_success")
             else:
-                logger.error(
-                    "idempotency_cache_set_failed",
-                    key=key,
-                    error=result.message,
-                )
+                log.error("idempotency_cache_set_failed", error=result.message)
 
         except (TypeError, ValueError) as e:
-            logger.error(
-                "idempotency_cache_serialization_error",
-                key=key,
-                error=str(e),
-            )
+            log.error("idempotency_cache_serialization_error", error=str(e))
         except Exception as e:
-            logger.error(
-                "idempotency_cache_set_error",
-                key=key,
-                error=str(e),
-                exc_info=True,
-            )
+            log.exception("idempotency_cache_set_error", error=str(e))
 
     def clear(self) -> None:
         """Clear all cached entries.
@@ -157,16 +134,14 @@ class DynamoDBCache(IdempotencyCache):
         For production, use DynamoDB TTL or manual cleanup in AWS console.
         Should only be used in testing.
         """
-        logger.warning("idempotency_cache_clear_called", backend="dynamodb")
+        log = self.log.bind(backend="dynamodb")
+        log.warning("idempotency_cache_clear_called")
         try:
             # Scan for all items
             result = scan(table_name=self.table_name)
 
             if not result.is_success:
-                logger.error(
-                    "idempotency_cache_clear_scan_failed",
-                    error=result.message,
-                )
+                log.error("idempotency_cache_clear_scan_failed", error=result.message)
                 return
 
             items = result.data.get("Items", []) if result.data else []
@@ -180,14 +155,10 @@ class DynamoDBCache(IdempotencyCache):
                         Key={PARTITION_KEY: {"S": key_value}},
                     )
 
-            logger.info("idempotency_cache_cleared", items_deleted=len(items))
+            log.info("idempotency_cache_cleared", items_deleted=len(items))
 
         except Exception as e:
-            logger.error(
-                "idempotency_cache_clear_error",
-                error=str(e),
-                exc_info=True,
-            )
+            log.exception("idempotency_cache_clear_error", error=str(e))
 
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics.

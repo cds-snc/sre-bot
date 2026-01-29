@@ -10,7 +10,7 @@ import structlog
 from infrastructure.i18n.loader import TranslationLoader
 from infrastructure.i18n.models import Locale, TranslationCatalog, TranslationKey
 
-logger = structlog.get_logger()
+logger = structlog.get_logger().bind(component="i18n.translator")
 
 
 class Translator:
@@ -39,12 +39,13 @@ class Translator:
         self.loader = loader
         self.fallback_locale = fallback_locale
         self.catalogs: Dict[Locale, TranslationCatalog] = {}
-        logger.info("initialized_translator", fallback_locale=fallback_locale.value)
+        self.log = logger.bind(fallback_locale=fallback_locale.value)
+        self.log.info("initialized_translator")
 
     def load_all(self) -> None:
         """Load all available locales from loader."""
         self.catalogs = self.loader.load_all()
-        logger.info("loaded_all_translations", locale_count=len(self.catalogs))
+        self.log.info("loaded_all_translations", locale_count=len(self.catalogs))
 
     def load_locale(self, locale: Locale) -> None:
         """Load specific locale from loader.
@@ -56,7 +57,7 @@ class Translator:
             FileNotFoundError: If translation files not found.
         """
         self.catalogs[locale] = self.loader.load(locale)
-        logger.info("loaded_locale_translations", locale=locale.value)
+        self.log.info("loaded_locale_translations", locale=locale.value)
 
     def translate_message(
         self,
@@ -92,7 +93,7 @@ class Translator:
             message = fallback_catalog.get_message(key) if fallback_catalog else None
 
             if message:
-                logger.info(
+                self.log.info(
                     "used_fallback_translation",
                     key=str(key),
                     requested_locale=locale.value,
@@ -100,7 +101,7 @@ class Translator:
                 )
 
         if not message:
-            logger.error(
+            self.log.error(
                 "translation_not_found",
                 key=str(key),
                 locale=locale.value,
@@ -168,7 +169,7 @@ class Translator:
 
         for var_name in all_vars:
             if var_name not in variables:
-                logger.error(
+                self.log.error(
                     "missing_interpolation_variable",
                     variable=var_name,
                     available_variables=list(variables.keys()),
@@ -202,4 +203,4 @@ class Translator:
         """Reload all translations from loader."""
         self.catalogs.clear()
         self.load_all()
-        logger.info("reloaded_all_translations")
+        self.log.info("reloaded_all_translations")
