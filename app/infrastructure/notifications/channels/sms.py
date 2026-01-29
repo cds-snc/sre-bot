@@ -51,7 +51,8 @@ class SMSChannel(NotificationChannel):
 
         self._circuit_breaker = circuit_breaker
         self._api_url = settings.notify.NOTIFY_API_URL
-        logger.info("initialized_sms_channel", backend="gc_notify")
+        self.log = logger.bind(component="sms_channel")
+        self.log.info("initialized_sms_channel", backend="gc_notify")
 
     @property
     def channel_name(self) -> str:
@@ -104,7 +105,7 @@ class SMSChannel(NotificationChannel):
                         external_id=send_result.data.get("notification_id"),
                     )
                 )
-                logger.info(
+                self.log.info(
                     "sms_sent",
                     phone_number=phone_number,
                     priority=notification.priority.value,
@@ -119,7 +120,7 @@ class SMSChannel(NotificationChannel):
                         error_code=send_result.error_code,
                     )
                 )
-                logger.error(
+                self.log.error(
                     "sms_failed",
                     phone_number=phone_number,
                     error=send_result.message,
@@ -185,7 +186,7 @@ class SMSChannel(NotificationChannel):
                 )
 
         except Exception as e:
-            logger.error("gc_notify_health_check_failed", error=str(e), exc_info=True)
+            self.log.error("gc_notify_health_check_failed", error=str(e), exc_info=True)
             return OperationResult.transient_error(
                 message=f"Health check failed: {str(e)}",
                 error_code="HEALTH_CHECK_ERROR",
@@ -211,7 +212,7 @@ class SMSChannel(NotificationChannel):
             # Truncate if needed (SMS has length limits)
             if len(full_message) > 1600:  # GC Notify SMS limit
                 full_message = full_message[:1597] + "..."
-                logger.warning(
+                self.log.warning(
                     "sms_message_truncated",
                     phone_number=phone_number,
                     original_length=len(full_message),
@@ -240,7 +241,7 @@ class SMSChannel(NotificationChannel):
                 )
 
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "sms_send_error",
                 phone_number=phone_number,
                 error=str(e),

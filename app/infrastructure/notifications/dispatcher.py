@@ -97,12 +97,13 @@ class NotificationDispatcher:
         self.idempotency_cache = idempotency_cache
         self.idempotency_ttl_seconds = idempotency_ttl_seconds
 
-        logger.info(
-            "initialized_notification_dispatcher",
+        self.log = logger.bind(component="notification_dispatcher")
+        log = self.log.bind(
             channels=list(channels.keys()),
             fallback_order=self.fallback_order,
             idempotency_enabled=idempotency_cache is not None,
         )
+        log.info("initialized_notification_dispatcher")
 
     def send(self, notification: Notification) -> List[NotificationResult]:
         """Send notification through appropriate channels.
@@ -143,7 +144,7 @@ class NotificationDispatcher:
             cached = self._check_idempotency_cache(notification.idempotency_key)
             # Only use cached results if they exist and contain actual result data
             if cached and cached.get("results"):
-                logger.info(
+                self.log.info(
                     "notification_already_sent",
                     idempotency_key=notification.idempotency_key,
                     cached_at=cached.get("sent_at"),
@@ -160,7 +161,7 @@ class NotificationDispatcher:
 
         # Log summary
         success_count = sum(1 for r in results if r.is_success)
-        logger.info(
+        self.log.info(
             "notification_sent",
             subject=notification.subject,
             recipient_count=len(notification.recipients),
@@ -202,7 +203,7 @@ class NotificationDispatcher:
             list(self.channels.keys()) if all_channels else notification.channels
         )
 
-        logger.info(
+        self.log.info(
             "broadcasting_notification",
             subject=notification.subject,
             recipient_count=len(notification.recipients),
@@ -213,7 +214,7 @@ class NotificationDispatcher:
         for channel_name in channels_to_use:
             channel = self.channels.get(channel_name)
             if not channel:
-                logger.warning(
+                self.log.warning(
                     "channel_not_found",
                     channel_name=channel_name,
                     available_channels=list(self.channels.keys()),
@@ -224,7 +225,7 @@ class NotificationDispatcher:
                 channel_results = channel.send(notification)
                 results.extend(channel_results)
             except Exception as e:
-                logger.error(
+                self.log.error(
                     "channel_send_failed",
                     channel_name=channel_name,
                     error=str(e),
@@ -272,7 +273,7 @@ class NotificationDispatcher:
             for channel_name in channel_order:
                 channel = self.channels.get(channel_name)
                 if not channel:
-                    logger.warning(
+                    self.log.warning(
                         "channel_not_available",
                         channel_name=channel_name,
                         recipient=recipient.email,
@@ -300,7 +301,7 @@ class NotificationDispatcher:
                     # Check if any send succeeded
                     if any(r.is_success for r in results):
                         recipient_sent = True
-                        logger.debug(
+                        self.log.debug(
                             "recipient_notified",
                             recipient=recipient.email,
                             channel=channel_name,
@@ -308,7 +309,7 @@ class NotificationDispatcher:
                         break  # Success, stop trying channels
 
                 except Exception as e:
-                    logger.error(
+                    self.log.error(
                         "channel_exception",
                         channel_name=channel_name,
                         recipient=recipient.email,
@@ -326,7 +327,7 @@ class NotificationDispatcher:
                     )
 
             if not recipient_sent:
-                logger.warning(
+                self.log.warning(
                     "recipient_notification_failed",
                     recipient=recipient.email,
                     channels_tried=channel_order,
@@ -386,7 +387,7 @@ class NotificationDispatcher:
             if cached:
                 # Validate cache structure
                 if not isinstance(cached, dict):
-                    logger.warning(
+                    self.log.warning(
                         "invalid_cache_structure",
                         idempotency_key=key,
                         cached_type=type(cached).__name__,
@@ -395,14 +396,14 @@ class NotificationDispatcher:
 
                 # Check if results exist and are valid
                 if "results" not in cached or not cached["results"]:
-                    logger.warning(
+                    self.log.warning(
                         "empty_cached_results",
                         idempotency_key=key,
                         cache_keys=list(cached.keys()),
                     )
                     return None
 
-                logger.debug(
+                self.log.debug(
                     "idempotency_cache_hit",
                     idempotency_key=key,
                     result_count=len(cached.get("results", [])),
@@ -415,7 +416,7 @@ class NotificationDispatcher:
                     ]
                 return cached
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "idempotency_cache_error",
                 idempotency_key=key,
                 error=str(e),
@@ -448,14 +449,14 @@ class NotificationDispatcher:
                 ttl_seconds=self.idempotency_ttl_seconds,
             )
 
-            logger.debug(
+            self.log.debug(
                 "cached_notification_results",
                 idempotency_key=key,
                 result_count=len(results),
                 ttl_seconds=self.idempotency_ttl_seconds,
             )
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "idempotency_cache_set_error",
                 idempotency_key=key,
                 error=str(e),
@@ -488,7 +489,7 @@ class NotificationDispatcher:
                 result = channel.health_check()
                 health_status[channel_name] = result.is_success
             except Exception as e:
-                logger.error(
+                self.log.error(
                     "channel_health_check_failed",
                     channel_name=channel_name,
                     error=str(e),

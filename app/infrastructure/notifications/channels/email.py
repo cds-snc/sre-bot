@@ -51,11 +51,9 @@ class EmailChannel(NotificationChannel):
 
         self._circuit_breaker = circuit_breaker
         self._sender_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
-        logger.info(
-            "initialized_email_channel",
-            backend="gmail",
-            sender=self._sender_email,
-        )
+        self.log = logger.bind(component="email_channel")
+        log = self.log.bind(backend="gmail", sender=self._sender_email)
+        log.info("initialized_email_channel")
 
     @property
     def channel_name(self) -> str:
@@ -109,7 +107,7 @@ class EmailChannel(NotificationChannel):
                         external_id=send_result.data.get("message_id"),
                     )
                 )
-                logger.info(
+                self.log.info(
                     "gmail_sent",
                     recipient=recipient_email,
                     subject=notification.subject,
@@ -125,7 +123,7 @@ class EmailChannel(NotificationChannel):
                         error_code=send_result.error_code,
                     )
                 )
-                logger.error(
+                self.log.error(
                     "gmail_failed",
                     recipient=recipient_email,
                     error=send_result.message,

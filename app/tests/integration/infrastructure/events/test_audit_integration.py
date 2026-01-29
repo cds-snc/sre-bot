@@ -386,7 +386,11 @@ class TestSentinelIntegration:
         dispatch_event(event)
 
         # Error should be logged but dispatch should continue
-        assert mock_logger.error.called
+        # After structlog best practices, logger is bound twice:
+        # 1. In AuditHandler.__init__: self.log = logger.bind(component="audit_handler")
+        # 2. In handle(): log = self.log.bind(event_type=..., correlation_id=...)
+        # So we check: logger.bind().bind().error() was called
+        assert mock_logger.bind.return_value.bind.return_value.error.called
 
     def test_multiple_events_audit_trail(self, monkeypatch):
         """Multiple events create corresponding audit trail entries."""

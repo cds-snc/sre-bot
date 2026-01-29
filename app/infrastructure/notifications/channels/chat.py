@@ -48,7 +48,8 @@ class ChatChannel(NotificationChannel):
             )
 
         self._circuit_breaker = circuit_breaker
-        logger.info("initialized_chat_channel", backend="slack")
+        self.log = logger.bind(component="chat_channel")
+        self.log.info("initialized_chat_channel", backend="slack")
 
     @property
     def channel_name(self) -> str:
@@ -103,7 +104,7 @@ class ChatChannel(NotificationChannel):
                         external_id=send_result.data.get("ts"),
                     )
                 )
-                logger.info(
+                self.log.info(
                     "slack_dm_sent",
                     recipient=recipient.email,
                     slack_user_id=slack_user_id,
@@ -119,7 +120,7 @@ class ChatChannel(NotificationChannel):
                         error_code=send_result.error_code,
                     )
                 )
-                logger.error(
+                self.log.error(
                     "slack_dm_failed",
                     recipient=recipient.email,
                     error=send_result.message,
@@ -149,7 +150,7 @@ class ChatChannel(NotificationChannel):
                             data={"slack_user_id": recipient.slack_user_id},
                         )
                 except SlackApiError as e:
-                    logger.warning(
+                    self.log.warning(
                         "slack_user_id_validation_failed",
                         user_id=recipient.slack_user_id,
                         error=str(e),
@@ -177,7 +178,7 @@ class ChatChannel(NotificationChannel):
             )
 
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "recipient_resolution_error",
                 recipient=recipient.email,
                 error=str(e),
@@ -213,7 +214,7 @@ class ChatChannel(NotificationChannel):
                 )
 
         except Exception as e:
-            logger.error("slack_health_check_failed", error=str(e), exc_info=True)
+            self.log.error("slack_health_check_failed", error=str(e), exc_info=True)
             return OperationResult.transient_error(
                 message=f"Health check failed: {str(e)}",
                 error_code="HEALTH_CHECK_ERROR",
@@ -265,7 +266,7 @@ class ChatChannel(NotificationChannel):
                 )
 
         except SlackApiError as e:
-            logger.error(
+            self.log.error(
                 "slack_dm_send_error",
                 user_id=user_id,
                 error=e.response["error"],
@@ -276,7 +277,7 @@ class ChatChannel(NotificationChannel):
                 error_code=e.response["error"],
             )
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "slack_dm_send_unexpected_error",
                 user_id=user_id,
                 error=str(e),

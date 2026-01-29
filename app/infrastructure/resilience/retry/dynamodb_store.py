@@ -50,12 +50,12 @@ class DynamoDBRetryStore:
         self.ttl_days = ttl_days
         self._record_counter = 0
 
-        logger.info(
-            "dynamodb_retry_store_initialized",
-            table_name=table_name,
+        self.log = logger.bind(component="dynamodb_retry_store", table_name=table_name)
+        log = self.log.bind(
             max_attempts=config.max_attempts,
             batch_size=config.batch_size,
         )
+        log.info("dynamodb_retry_store_initialized")
 
     def save(self, record: RetryRecord) -> str:
         """Save a retry record to DynamoDB.
@@ -125,14 +125,14 @@ class DynamoDBRetryStore:
         )
 
         if result.is_success:
-            logger.debug(
+            self.log.debug(
                 "retry_record_saved",
                 record_id=record.id,
                 operation_type=record.operation_type,
             )
             return record.id
         else:
-            logger.error(
+            self.log.error(
                 "dynamodb_save_failed",
                 record_id=record.id,
                 error=result.message,
@@ -167,7 +167,7 @@ class DynamoDBRetryStore:
         )
 
         if not result.is_success:
-            logger.error(
+            self.log.error(
                 "dynamodb_fetch_due_failed",
                 error=result.message,
                 error_code=result.error_code,
@@ -193,7 +193,7 @@ class DynamoDBRetryStore:
             if len(due_records) >= limit:
                 break
 
-        logger.debug(
+        self.log.debug(
             "fetched_due_retry_records",
             count=len(due_records),
             total_queried=len(items),
@@ -227,7 +227,7 @@ class DynamoDBRetryStore:
         )
 
         if result.is_success:
-            logger.debug(
+            self.log.debug(
                 "retry_record_claimed",
                 record_id=record_id,
                 worker=worker_id,
@@ -237,14 +237,14 @@ class DynamoDBRetryStore:
         else:
             # Conditional check failure means already claimed
             if result.error_code == "ConditionalCheckFailedException":
-                logger.debug(
+                self.log.debug(
                     "retry_claim_failed_already_claimed",
                     record_id=record_id,
                     worker=worker_id,
                 )
                 return False
             else:
-                logger.error(
+                self.log.error(
                     "dynamodb_claim_failed",
                     record_id=record_id,
                     error=result.message,
@@ -264,9 +264,9 @@ class DynamoDBRetryStore:
         )
 
         if result.is_success:
-            logger.debug("retry_record_success", record_id=record_id)
+            self.log.debug("retry_record_success", record_id=record_id)
         else:
-            logger.error(
+            self.log.error(
                 "dynamodb_mark_success_failed",
                 record_id=record_id,
                 error=result.message,
@@ -315,13 +315,13 @@ class DynamoDBRetryStore:
         )
 
         if result.is_success:
-            logger.info(
+            self.log.info(
                 "retry_record_moved_to_dlq",
                 record_id=record_id,
                 last_error=last_error,
             )
         else:
-            logger.error(
+            self.log.error(
                 "dynamodb_mark_permanent_failure_failed",
                 record_id=record_id,
                 error=result.message,
@@ -347,7 +347,7 @@ class DynamoDBRetryStore:
             or not get_result.data
             or "Item" not in get_result.data
         ):
-            logger.warning(
+            self.log.warning(
                 "retry_record_not_found_for_increment",
                 record_id=record_id,
                 error=(
@@ -369,7 +369,7 @@ class DynamoDBRetryStore:
 
         # Check if max attempts reached
         if new_attempts >= self.config.max_attempts:
-            logger.info(
+            self.log.info(
                 "retry_max_attempts_reached",
                 record_id=record_id,
                 attempts=new_attempts,
@@ -405,14 +405,14 @@ class DynamoDBRetryStore:
         )
 
         if result.is_success:
-            logger.info(
+            self.log.info(
                 "retry_attempt_incremented",
                 record_id=record_id,
                 attempts=new_attempts,
                 next_retry_seconds=delay_seconds,
             )
         else:
-            logger.error(
+            self.log.error(
                 "dynamodb_increment_attempt_failed",
                 record_id=record_id,
                 error=result.message,
@@ -457,7 +457,7 @@ class DynamoDBRetryStore:
         claimed_count = 0
 
         if not active_result.is_success or not dlq_result.is_success:
-            logger.error(
+            self.log.error(
                 "dynamodb_get_stats_failed",
                 active_error=(
                     active_result.message if not active_result.is_success else None
@@ -490,7 +490,7 @@ class DynamoDBRetryStore:
         )
 
         if not result.is_success:
-            logger.error(
+            self.log.error(
                 "dynamodb_get_dlq_entries_failed",
                 error=result.message,
                 error_code=result.error_code,

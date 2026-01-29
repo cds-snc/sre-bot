@@ -68,9 +68,9 @@ def execute_google_api_call(
 
     for attempt in range(max_attempts + 1):
         try:
-            logger.debug(
+            log = logger.bind(operation=operation_name)
+            log.debug(
                 "google_api_call_attempt",
-                operation=operation_name,
                 attempt=attempt + 1,
                 max_attempts=max_attempts + 1,
             )
@@ -78,11 +78,7 @@ def execute_google_api_call(
             result = api_callable()
 
             if attempt > 0:
-                logger.info(
-                    "google_api_retry_success",
-                    operation=operation_name,
-                    attempt=attempt + 1,
-                )
+                log.info("google_api_retry_success", attempt=attempt + 1)
 
             # If api_callable already returns OperationResult, propagate it
             if isinstance(result, OperationResult):
@@ -101,9 +97,8 @@ def execute_google_api_call(
             # Retry logic for retryable errors
             if status_code in retry_codes and not is_last_attempt:
                 delay = _calculate_retry_delay(attempt, status_code)
-                logger.warning(
+                log.warning(
                     "google_api_retrying",
-                    operation=operation_name,
                     attempt=attempt + 1,
                     status_code=status_code,
                     delay=delay,
@@ -112,9 +107,8 @@ def execute_google_api_call(
                 continue
 
             # Non-retryable or last attempt
-            logger.error(
+            log.error(
                 "google_api_error",
-                operation=operation_name,
                 status_code=status_code,
                 error=str(e),
             )
@@ -126,11 +120,7 @@ def execute_google_api_call(
 
         except Exception as e:
             last_exception = e
-            logger.error(
-                "google_api_unexpected_error",
-                operation=operation_name,
-                error=str(e),
-            )
+            log.exception("google_api_unexpected_error", error=str(e))
             return OperationResult.permanent_error(
                 message=str(e),
                 error_code="GOOGLE_API_ERROR",

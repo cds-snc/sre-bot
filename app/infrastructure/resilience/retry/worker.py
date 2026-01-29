@@ -88,6 +88,7 @@ class RetryWorker:
         self.processor = processor
         self.config = config or RetryConfig()
         self.worker_id = worker_id
+        self.log = logger.bind(component="retry_worker", worker_id=worker_id)
 
     def process_batch(self) -> dict:
         """Process a batch of retry records.
@@ -105,13 +106,13 @@ class RetryWorker:
 
         Example:
             stats = worker.process_batch()
-            logger.info("batch_complete", **stats)
+            self.log.info("batch_complete", **stats)
         """
         # Fetch due records
         records = self.store.fetch_due(limit=self.config.batch_size)
 
         if not records:
-            logger.debug("retry_batch_no_records")
+            self.log.debug("retry_batch_no_records")
             return {
                 "processed": 0,
                 "successful": 0,
@@ -120,7 +121,7 @@ class RetryWorker:
                 "skipped": 0,
             }
 
-        logger.info(
+        self.log.info(
             "retry_batch_start",
             worker_id=self.worker_id,
             record_count=len(records),
@@ -141,7 +142,7 @@ class RetryWorker:
                 self.worker_id,
                 self.config.claim_lease_seconds,
             ):
-                logger.debug(
+                self.log.debug(
                     "retry_record_skipped_claim_failed",
                     record_id=record.id,
                 )
@@ -161,7 +162,7 @@ class RetryWorker:
                     stats["permanent_failures"] += 1
 
             except Exception as e:
-                logger.error(
+                self.log.error(
                     "retry_processing_exception",
                     record_id=record.id,
                     operation_type=record.operation_type,
@@ -174,7 +175,7 @@ class RetryWorker:
                 )
                 stats["retried"] += 1
 
-        logger.info(
+        self.log.info(
             "retry_batch_complete",
             worker_id=self.worker_id,
             **stats,
@@ -191,7 +192,7 @@ class RetryWorker:
         Returns:
             RetryResult indicating the outcome
         """
-        logger.info(
+        self.log.info(
             "retry_record_processing",
             record_id=record.id,
             operation_type=record.operation_type,
@@ -205,7 +206,7 @@ class RetryWorker:
             # Update store based on result
             if result == RetryResult.SUCCESS:
                 self.store.mark_success(record.id)  # type: ignore
-                logger.info(
+                self.log.info(
                     "retry_record_succeeded",
                     record_id=record.id,
                     operation_type=record.operation_type,
@@ -216,7 +217,7 @@ class RetryWorker:
                     record.id,  # type: ignore
                     reason="Processor returned permanent failure",
                 )
-                logger.warning(
+                self.log.warning(
                     "retry_record_permanent_failure",
                     record_id=record.id,
                     operation_type=record.operation_type,
@@ -227,7 +228,7 @@ class RetryWorker:
                     record.id,  # type: ignore
                     last_error="Operation failed, will retry",
                 )
-                logger.info(
+                self.log.info(
                     "retry_record_rescheduled",
                     record_id=record.id,
                     operation_type=record.operation_type,
@@ -237,7 +238,7 @@ class RetryWorker:
             return result
 
         except Exception as e:
-            logger.error(
+            self.log.error(
                 "retry_processor_exception",
                 record_id=record.id,
                 operation_type=record.operation_type,

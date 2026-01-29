@@ -39,10 +39,9 @@ def register_event_handler(event_type: str):
             EVENT_HANDLERS[event_type] = []
         EVENT_HANDLERS[event_type].append(handler_func)
         handler_name = getattr(handler_func, "__name__", "unknown")
-        logger.debug(
+        log = logger.bind(handler=handler_name, event_type=event_type)
+        log.debug(
             "registered_event_handler",
-            handler=handler_name,
-            event_type=event_type,
             total_handlers=len(EVENT_HANDLERS[event_type]),
         )
         return handler_func
@@ -70,12 +69,10 @@ def dispatch_event(event: Event) -> List[Any]:
     wildcard_handlers = EVENT_HANDLERS.get("*", [])
     all_handlers = handlers + wildcard_handlers
 
-    logger.info(
-        "dispatching_event",
-        event_type=event.event_type,
-        handler_count=len(all_handlers),
-        correlation_id=str(event.correlation_id),
+    log = logger.bind(
+        event_type=event.event_type, correlation_id=str(event.correlation_id)
     )
+    log.info("dispatching_event", handler_count=len(all_handlers))
 
     for handler in all_handlers:
         try:
@@ -83,12 +80,10 @@ def dispatch_event(event: Event) -> List[Any]:
             results.append(result)
         except Exception as e:
             handler_name = getattr(handler, "__name__", "unknown")
-            logger.error(
+            log.error(
                 "event_handler_failed",
                 handler=handler_name,
-                event_type=event.event_type,
                 error=str(e),
-                correlation_id=str(event.correlation_id),
             )
 
     return results
@@ -99,12 +94,10 @@ def _background_worker(evt: Event) -> None:
     try:
         dispatch_event(evt)
     except Exception as e:
-        logger.exception(
-            "background_event_dispatch_failed",
-            event_type=evt.event_type,
-            error=str(e),
-            correlation_id=str(evt.correlation_id),
+        log = logger.bind(
+            event_type=evt.event_type, correlation_id=str(evt.correlation_id)
         )
+        log.exception("background_event_dispatch_failed", error=str(e))
 
 
 def _get_or_create_executor(max_workers: int = 4) -> Optional[ThreadPoolExecutor]:
@@ -181,19 +174,17 @@ def dispatch_background(event: Event) -> None:
     try:
         executor = _get_or_create_executor()
         if executor is None:
-            logger.error(
-                "event_executor_unavailable",
-                event_type=event.event_type,
-                correlation_id=str(event.correlation_id),
+            log = logger.bind(
+                event_type=event.event_type, correlation_id=str(event.correlation_id)
             )
+            log.error("event_executor_unavailable")
             return
         executor.submit(_background_worker, event)
     except Exception:
-        logger.exception(
-            "failed_to_submit_event_to_executor",
-            event_type=event.event_type,
-            correlation_id=str(event.correlation_id),
+        log = logger.bind(
+            event_type=event.event_type, correlation_id=str(event.correlation_id)
         )
+        log.exception("failed_to_submit_event_to_executor")
 
 
 def get_registered_events() -> List[str]:
