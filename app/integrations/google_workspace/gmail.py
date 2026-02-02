@@ -2,10 +2,10 @@
 
 import base64
 from email.message import EmailMessage
+import structlog
 from integrations.google_workspace import google_service
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
@@ -28,7 +28,8 @@ def create_email_message(subject: str, message: str, sender: str, recipient: str
     email["To"] = recipient
     encoded_message = base64.urlsafe_b64encode(email.as_bytes()).decode()
     email_message = {"message": {"raw": encoded_message}}
-    logger.debug("email_message_created", email_message=email_message)
+    log = logger.bind(operation="create_email_message")
+    log.debug("email_message_created", email_message=email_message)
     return email_message
 
 

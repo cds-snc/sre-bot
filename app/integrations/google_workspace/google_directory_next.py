@@ -6,7 +6,7 @@ Google Directory module using simplified Google service functions.
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
-from core.logging import get_module_logger
+import structlog
 from integrations.google_workspace import google_service_next as google_service
 from integrations.google_workspace.google_service_next import (
     execute_batch_request,
@@ -17,7 +17,7 @@ from infrastructure.operations.result import OperationResult
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @dataclass

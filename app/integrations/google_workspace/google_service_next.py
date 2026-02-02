@@ -38,8 +38,8 @@ from functools import wraps
 from json import JSONDecodeError
 from typing import Any, Callable, List, Optional, Tuple, Union, cast
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from google.oauth2 import service_account
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
@@ -55,7 +55,7 @@ GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
 )
 SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Enhanced error configuration (from enhanced_error_handling.py)
 ERROR_CONFIG = {

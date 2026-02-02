@@ -4,13 +4,13 @@ Google Drive Module.
 This module provides functionalities to interact with Google Drive. It includes functions to add metadata to a file, create a new folder, create a new document from a template, and copy a file to a new folder.
 """
 
+import structlog
 from integrations.google_workspace import google_service
-from core.logging import get_module_logger
 
 INCIDENT_TEMPLATE = google_service.INCIDENT_TEMPLATE
 DELEGATED_USER_EMAIL = google_service.SRE_BOT_EMAIL
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 

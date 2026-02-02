@@ -4,11 +4,11 @@ This module provides functions to create and manipulate Google Docs.
 """
 
 import re
+import structlog
 
 from integrations.google_workspace import google_service
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 
