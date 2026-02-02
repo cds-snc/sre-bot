@@ -1,8 +1,10 @@
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from api.routes.system import router as system_router
+from api.routes import system
+from utils.tests import create_test_app
 
-client = TestClient(system_router)
+test_app = create_test_app(system.router)
+client = TestClient(test_app)
 
 
 def test_get_version_unkown():
