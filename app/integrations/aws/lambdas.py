@@ -1,7 +1,7 @@
-from core.logging import get_module_logger
+import structlog
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @handle_aws_api_errors
@@ -11,12 +11,13 @@ def list_functions():
     Returns:
         list: A list of Lambda functions.
     """
-    logger.debug("lambda_list_functions_started")
+    log = logger.bind(operation="list_functions")
+    log.debug("lambda_list_functions_started")
     response = execute_aws_api_call(
         "lambda", "list_functions", paginated=True, keys=["Functions"]
     )
     function_count = len(response) if response else 0
-    logger.debug("lambda_list_functions_completed", function_count=function_count)
+    log.debug("lambda_list_functions_completed", function_count=function_count)
     return response
 
 
@@ -27,12 +28,13 @@ def list_layers():
     Returns:
         list: A list of Lambda layers.
     """
-    logger.debug("lambda_list_layers_started")
+    log = logger.bind(operation="list_layers")
+    log.debug("lambda_list_layers_started")
     response = execute_aws_api_call(
         "lambda", "list_layers", paginated=True, keys=["Layers"]
     )
     layer_count = len(response) if response else 0
-    logger.debug("lambda_list_layers_completed", layer_count=layer_count)
+    log.debug("lambda_list_layers_completed", layer_count=layer_count)
     return response
 
 
@@ -47,20 +49,15 @@ def get_layer_version(layer_name, version_number):
     Returns:
         dict: The Lambda layer version.
     """
-    logger.debug(
-        "lambda_get_layer_version_started",
-        layer_name=layer_name,
-        version=version_number,
+    log = logger.bind(
+        operation="get_layer_version", layer_name=layer_name, version=version_number
     )
+    log.debug("lambda_get_layer_version_started")
     response = execute_aws_api_call(
         "lambda",
         "get_layer_version",
         LayerName=layer_name,
         VersionNumber=version_number,
     )
-    logger.debug(
-        "lambda_get_layer_version_completed",
-        layer_name=layer_name,
-        version=version_number,
-    )
+    log.debug("lambda_get_layer_version_completed")
     return response

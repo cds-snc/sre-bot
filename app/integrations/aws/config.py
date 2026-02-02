@@ -1,8 +1,9 @@
+import structlog
+
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 AUDIT_ROLE_ARN = settings.aws.AUDIT_ROLE_ARN
 
 
@@ -17,11 +18,12 @@ def describe_aggregate_compliance_by_config_rules(config_aggregator_name, filter
     Returns:
         list: A list of compliance objects
     """
-    logger.debug(
-        "config_describe_aggregate_compliance_started",
+    log = logger.bind(
+        operation="describe_aggregate_compliance_by_config_rules",
         aggregator=config_aggregator_name,
         filter_keys=list(filters.keys()) if filters else [],
     )
+    log.debug("config_describe_aggregate_compliance_started")
 
     params = {
         "ConfigurationAggregatorName": config_aggregator_name,
@@ -37,10 +39,6 @@ def describe_aggregate_compliance_by_config_rules(config_aggregator_name, filter
     )
 
     rule_count = len(response) if response else 0
-    logger.debug(
-        "config_describe_aggregate_compliance_completed",
-        aggregator=config_aggregator_name,
-        rule_count=rule_count,
-    )
+    log.debug("config_describe_aggregate_compliance_completed", rule_count=rule_count)
 
     return response if response else []
