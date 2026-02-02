@@ -47,12 +47,12 @@ def test_user_info_endpoint_with_valid_token():
         test_app.dependency_overrides.clear()
 
 
-# Test the user info endpoint without token (should fail with 403)
+# Test the user info endpoint without token (should fail with 401)
 def test_user_info_endpoint_without_token():
     """Test /auth/me endpoint without Bearer token."""
     response = client.get("/auth/me")
-    # Should get 403 Forbidden because Bearer token is required
-    assert response.status_code == 403
+    # Should get 401 Unauthorized because Bearer token is required
+    assert response.status_code == 401
 
 
 # Test the user info endpoint with missing claims
