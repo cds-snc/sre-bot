@@ -1,4 +1,6 @@
-"""Gmail API integration for Google Workspace."""
+"""Gmail API integration for Google Workspace.
+
+To be ported in the new infrastructure clients packages."""
 
 import base64
 from email.message import EmailMessage
