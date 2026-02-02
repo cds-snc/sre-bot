@@ -1,10 +1,10 @@
 """AWS GuardDuty integration module."""
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 LOGGING_ROLE_ARN = settings.aws.LOGGING_ROLE_ARN
 
 
@@ -15,7 +15,8 @@ def list_detectors():
     Returns:
         list: A list of detector objects.
     """
-    logger.debug("guard_duty_list_detectors_started")
+    log = logger.bind(operation="list_detectors")
+    log.debug("guard_duty_list_detectors_started")
     response = execute_aws_api_call(
         "guardduty",
         "list_detectors",
@@ -24,7 +25,7 @@ def list_detectors():
         role_arn=LOGGING_ROLE_ARN,
     )
     detector_count = len(response) if response else 0
-    logger.debug("guard_duty_list_detectors_completed", detector_count=detector_count)
+    log.debug("guard_duty_list_detectors_completed", detector_count=detector_count)
     return response if response else []
 
 
@@ -39,9 +40,9 @@ def get_findings_statistics(detector_id, finding_criteria=None):
     Returns:
         dict: The findings statistics.
     """
-    logger.debug(
+    log = logger.bind(operation="get_findings_statistics", detector_id=detector_id)
+    log.debug(
         "guard_duty_get_findings_statistics_started",
-        detector_id=detector_id,
         criteria_present=finding_criteria is not None,
     )
 
@@ -62,9 +63,8 @@ def get_findings_statistics(detector_id, finding_criteria=None):
     has_findings = bool(
         response.get("FindingStatistics", {}).get("CountBySeverity", {})
     )
-    logger.debug(
+    log.debug(
         "guard_duty_get_findings_statistics_completed",
-        detector_id=detector_id,
         has_findings=has_findings,
     )
 

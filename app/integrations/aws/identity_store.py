@@ -1,7 +1,7 @@
 """AWS Identity Store module"""
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 
 import pandas as pd
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
@@ -10,7 +10,7 @@ from utils import filters
 INSTANCE_ID = settings.aws.INSTANCE_ID
 ROLE_ARN = settings.aws.ORG_ROLE_ARN
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def resolve_identity_store_id(kwargs):

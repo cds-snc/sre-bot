@@ -31,14 +31,15 @@ Notes:
 import time
 from typing import Any, List, Optional, Callable, cast
 
+import structlog
 import boto3  # type: ignore
 from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from core.config import settings
-from core.logging import get_module_logger
+
 from infrastructure.operations.result import OperationResult
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 AWS_REGION = settings.aws.AWS_REGION
 THROTTLING_ERRS = settings.aws.THROTTLING_ERRS

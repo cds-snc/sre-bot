@@ -15,18 +15,20 @@ def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
-
+    mock_logger_bind = MagicMock()
+    mock_logger.bind.return_value = mock_logger_bind
     result = decorated_func()
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.error.assert_called_once_with(
+    mock_logger.bind.assert_called_once_with(
+        module="mock_module", function="mock_func_name"
+    )
+    mock_logger_bind.error.assert_called_once_with(
         "boto_core_error",
-        module="mock_module",
-        function="mock_func_name",
         error="An unspecified error occurred",
     )
-    mock_logger.info.assert_not_called()
+    mock_logger_bind.info.assert_not_called()
 
 
 @patch("integrations.aws.client.logger")
@@ -38,20 +40,25 @@ def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logg
     )
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
+    mock_bind_logger = MagicMock()
+    mock_logger.bind.return_value = mock_bind_logger
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
 
     result = decorated_func()
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.warning.assert_called_once_with(
-        "aws_resource_not_found",
+    mock_logger.bind.assert_called_once_with(
         module="mock_module",
         function="mock_func_name",
+        error_code="ResourceNotFoundException",
+    )
+    mock_bind_logger.warning.assert_called_once_with(
+        "aws_resource_not_found",
         error="An error occurred (ResourceNotFoundException) when calling the operation_name operation: Unknown",
     )
-    mock_logger.error.assert_not_called()
-    mock_logger.info.assert_not_called()
+    mock_bind_logger.error.assert_not_called()
+    mock_bind_logger.info.assert_not_called()
 
 
 @patch("integrations.aws.client.logger")
@@ -64,19 +71,22 @@ def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
     )
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
+    mock_bind_logger = MagicMock()
+    mock_logger.bind.return_value = mock_bind_logger
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
 
     result = decorated_func()
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.error.assert_called_once_with(
+    mock_logger.bind.assert_called_once_with(
+        module="mock_module", function="mock_func_name", error_code="OtherError"
+    )
+    mock_bind_logger.error.assert_called_once_with(
         "aws_client_error",
-        module="mock_module",
-        function="mock_func_name",
         error="An error occurred (OtherError) when calling the operation_name operation: An error occurred",
     )
-    mock_logger.info.assert_not_called()
+    mock_bind_logger.info.assert_not_called()
 
 
 @patch("integrations.aws.client.logger")
@@ -85,18 +95,20 @@ def test_handle_aws_api_errors_catches_exception(mock_logger):
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
     decorated_func = aws_client.handle_aws_api_errors(mock_func)
-
+    mock_bind_logger = MagicMock()
+    mock_logger.bind.return_value = mock_bind_logger
     result = decorated_func()
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.error.assert_called_once_with(
+    mock_logger.bind.assert_called_once_with(
+        module="mock_module", function="mock_func_name"
+    )
+    mock_bind_logger.error.assert_called_once_with(
         "unexpected_error",
-        module="mock_module",
-        function="mock_func_name",
         error="Exception message",
     )
-    mock_logger.info.assert_not_called()
+    mock_bind_logger.info.assert_not_called()
 
 
 def test_handle_aws_api_errors_passes_through_return_value():
@@ -199,6 +211,8 @@ def test_paginator_raises_exception_on_non_200_status(mock_logger):
     mock_client = MagicMock(spec=BaseClient)
     mock_paginator = MagicMock()
     mock_client.get_paginator.return_value = mock_paginator
+    mock_bound_logger = MagicMock()
+    mock_logger.bind.return_value = mock_bound_logger  # Setup: bind() returns this mock
 
     # Add the meta attribute to the mock client
     mock_client.meta = MagicMock()
@@ -227,10 +241,12 @@ def test_paginator_raises_exception_on_non_200_status(mock_logger):
     assert str(excinfo.value) == (
         "API call to mock_service.operation failed with status code 500"
     )
-    mock_logger.error.assert_called_once_with(
+    mock_logger.bind.assert_called_once_with(
+        service="mock_service", operation="operation"
+    )
+    mock_bound_logger.error.assert_called_once()
+    mock_bound_logger.error.assert_called_once_with(
         "api_call_failed_during_pagination",
-        service="mock_service",
-        operation="operation",
         status_code=500,
     )
 

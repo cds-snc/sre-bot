@@ -1,13 +1,13 @@
 """AWS DynamoDB API client"""
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.aws.client import (
     execute_aws_api_call,
     handle_aws_api_errors,
 )
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 client_config = dict(
     region_name=settings.aws.AWS_REGION,
@@ -22,7 +22,8 @@ def query(
     TableName,
     **kwargs,
 ):
-    logger.debug("dynamodb_query_started", table=TableName)
+    log = logger.bind(operation="query", table=TableName)
+    log.debug("dynamodb_query_started")
     params = {
         "TableName": TableName,
     }
@@ -31,9 +32,8 @@ def query(
     response = execute_aws_api_call(
         "dynamodb", "query", paginated=True, client_config=client_config, **params
     )
-    logger.debug(
+    log.debug(
         "dynamodb_query_completed",
-        table=TableName,
         item_count=len(response) if response else 0,
     )
     return response
@@ -42,7 +42,8 @@ def query(
 @handle_aws_api_errors
 def scan(TableName, **kwargs):
     """Scan a DynamoDB table. Will return only the list of items found in the table that match the query."""
-    logger.debug("dynamodb_scan_started", table=TableName)
+    log = logger.bind(operation="scan", table=TableName)
+    log.debug("dynamodb_scan_started")
     params = {
         "TableName": TableName,
     }
@@ -56,9 +57,8 @@ def scan(TableName, **kwargs):
         client_config=client_config,
         **params,
     )
-    logger.debug(
+    log.debug(
         "dynamodb_scan_completed",
-        table=TableName,
         item_count=len(response) if response else 0,
     )
     return response
@@ -66,7 +66,8 @@ def scan(TableName, **kwargs):
 
 @handle_aws_api_errors
 def put_item(TableName, **kwargs):
-    logger.debug("dynamodb_put_item_started", table=TableName)
+    log = logger.bind(operation="put_item", table=TableName)
+    log.debug("dynamodb_put_item_started")
     params = {
         "TableName": TableName,
     }
@@ -75,7 +76,7 @@ def put_item(TableName, **kwargs):
     response = execute_aws_api_call(
         "dynamodb", "put_item", client_config=client_config, **params
     )
-    logger.debug("dynamodb_put_item_completed", table=TableName)
+    log.debug("dynamodb_put_item_completed")
     return response
 
 
@@ -85,7 +86,8 @@ def get_item(TableName, **kwargs) -> dict:
 
     Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
     """
-    logger.debug("dynamodb_get_item_started", table=TableName)
+    log = logger.bind(operation="get_item", table=TableName)
+    log.debug("dynamodb_get_item_started")
     params = {
         "TableName": TableName,
     }
@@ -95,16 +97,14 @@ def get_item(TableName, **kwargs) -> dict:
         "dynamodb", "get_item", client_config=client_config, **params
     )
     if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
-        logger.debug(
+        log.debug(
             "dynamodb_get_item_completed",
-            table=TableName,
             item_found=bool(response.get("Item")),
         )
         return response.get("Item")
     else:
-        logger.warning(
+        log.warning(
             "dynamodb_get_item_failed",
-            table=TableName,
             status_code=response.get("ResponseMetadata", {}).get("HTTPStatusCode"),
         )
         return None
@@ -122,7 +122,8 @@ def update_item(TableName, **kwargs):
         dict: Response from the AWS API call
     Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
     """
-    logger.debug("dynamodb_update_item_started", table=TableName)
+    log = logger.bind(operation="update_item", table=TableName)
+    log.debug("dynamodb_update_item_started")
     params = {
         "TableName": TableName,
     }
@@ -132,19 +133,19 @@ def update_item(TableName, **kwargs):
         "dynamodb", "update_item", client_config=client_config, **params
     )
     if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
-        logger.debug("dynamodb_update_item_completed", table=TableName)
+        log.debug("dynamodb_update_item_completed")
         return response
     else:
-        logger.warning(
+        log.warning(
             "dynamodb_update_item_failed",
-            table=TableName,
             status_code=response.get("ResponseMetadata", {}).get("HTTPStatusCode"),
         )
 
 
 @handle_aws_api_errors
 def delete_item(TableName, **kwargs):
-    logger.debug("dynamodb_delete_item_started", table=TableName)
+    log = logger.bind(operation="delete_item", table=TableName)
+    log.debug("dynamodb_delete_item_started")
     params = {
         "TableName": TableName,
     }
@@ -153,17 +154,18 @@ def delete_item(TableName, **kwargs):
     response = execute_aws_api_call(
         "dynamodb", "delete_item", client_config=client_config, **params
     )
-    logger.debug("dynamodb_delete_item_completed", table=TableName)
+    log.debug("dynamodb_delete_item_completed")
     return response
 
 
 @handle_aws_api_errors
 def list_tables(**kwargs):
-    logger.debug("dynamodb_list_tables_started")
+    log = logger.bind(operation="list_tables")
+    log.debug("dynamodb_list_tables_started")
     response = execute_aws_api_call(
         "dynamodb", "list_tables", client_config=client_config, **kwargs
     )
-    logger.debug(
+    log.debug(
         "dynamodb_list_tables_completed",
         table_count=len(response.get("TableNames", [])),
     )

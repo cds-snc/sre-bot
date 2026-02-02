@@ -1,7 +1,7 @@
-from core.logging import get_module_logger
+import structlog
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 @handle_aws_api_errors
@@ -14,11 +14,8 @@ def get_queue_url(queue_name):
     Returns:
         str: The URL of the SQS queue.
     """
-    logger.info(
-        "getting_queue_url",
-        service="sqs",
-        queue_name=queue_name,
-    )
+    log = logger.bind(operation="get_queue_url", queue_name=queue_name)
+    log.info("getting_queue_url")
     if not queue_name:
         raise ValueError("Queue_name must not be empty")
     return execute_aws_api_call("sqs", "get_queue_url", QueueName=queue_name)[
@@ -38,13 +35,12 @@ def send_message(queue_url, message_body, message_group_id):
     Returns:
         dict: The response from the SQS service.
     """
-    logger.info(
-        "sending_message",
-        service="sqs",
+    log = logger.bind(
+        operation="send_message",
         queue_url=queue_url,
-        message_body=message_body,
         message_group_id=message_group_id,
     )
+    log.info("sending_message")
     return execute_aws_api_call(
         "sqs",
         "send_message",
@@ -66,13 +62,13 @@ def receive_message(queue_url, max_number_of_messages=10, wait_time_seconds=10):
     Returns:
         list: A list of messages.
     """
-    logger.info(
-        "receiving_message",
-        service="sqs",
+    log = logger.bind(
+        operation="receive_message",
         queue_url=queue_url,
         max_number_of_messages=max_number_of_messages,
         wait_time_seconds=wait_time_seconds,
     )
+    log.info("receiving_message")
     return execute_aws_api_call(
         "sqs",
         "receive_message",

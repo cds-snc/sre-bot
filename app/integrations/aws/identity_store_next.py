@@ -17,8 +17,8 @@ not through this module.
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Mapping
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.aws.client_next import execute_aws_api_call
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
@@ -27,7 +27,7 @@ from infrastructure.operations.status import OperationStatus
 AWS_IDENTITY_STORE_ID = settings.aws.INSTANCE_ID
 ROLE_ARN = settings.aws.ORG_ROLE_ARN
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 # User Management Functions

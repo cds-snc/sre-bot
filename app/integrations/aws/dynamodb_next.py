@@ -20,12 +20,12 @@ Usage:
 
 from typing import Any, Dict
 
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.aws.client_next import execute_aws_api_call
 from infrastructure.operations.result import OperationResult
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 AWS_REGION = settings.aws.AWS_REGION
 
