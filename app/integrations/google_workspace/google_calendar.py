@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta, timezone
 import requests
 import pytz
+import structlog
 
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 

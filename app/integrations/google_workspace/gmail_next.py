@@ -16,11 +16,11 @@ import base64
 from email.message import EmailMessage
 from typing import Optional
 
-from core.logging import get_module_logger
+import structlog
 from infrastructure.operations.result import OperationResult
 from integrations.google_workspace.google_service_next import execute_google_api_call
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 # Gmail API scopes
 GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
@@ -61,12 +61,15 @@ def _create_mime_message(
     # Encode message for Gmail API
     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
 
-    logger.debug(
-        "mime_message_created",
+    log = logger.bind(
+        operation="_create_mime_message",
         subject=subject,
         sender=sender,
         recipient=recipient,
         content_type=content_type,
+    )
+    log.debug(
+        "mime_message_created",
         encoded_length=len(encoded_message),
     )
 
@@ -114,12 +117,13 @@ def send_email(
         else:
             logger.error(f"Failed to send: {result.message}")
     """
+    log = logger.bind(operation="send_email", recipient=recipient, sender=sender)
     try:
         raw_message = _create_mime_message(
             subject, body, sender, recipient, content_type
         )
     except Exception as e:
-        logger.error("failed_to_create_mime_message", error=str(e))
+        log.error("failed_to_create_mime_message", error=str(e))
         return OperationResult.permanent_error(
             message=f"Failed to create email message: {str(e)}",
             error_code="MIME_CREATION_ERROR",
@@ -168,12 +172,13 @@ def create_draft(
                 }
             }
     """
+    log = logger.bind(operation="create_draft", recipient=recipient, sender=sender)
     try:
         raw_message = _create_mime_message(
             subject, body, sender, recipient, content_type
         )
     except Exception as e:
-        logger.error("failed_to_create_mime_message", error=str(e))
+        log.error("failed_to_create_mime_message", error=str(e))
         return OperationResult.permanent_error(
             message=f"Failed to create email message: {str(e)}",
             error_code="MIME_CREATION_ERROR",

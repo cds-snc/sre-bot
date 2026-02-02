@@ -1,14 +1,14 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
 import pandas as pd
+import structlog
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
-from core.logging import get_module_logger
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 handle_google_api_errors = google_service.handle_google_api_errors
 
 

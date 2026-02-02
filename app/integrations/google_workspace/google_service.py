@@ -17,12 +17,12 @@ from functools import wraps
 from json import JSONDecodeError
 from typing import Any, Callable
 
+import structlog
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import Resource, build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 from integrations.utils.api import convert_kwargs_to_camel_case
 from core.config import settings
-from core.logging import get_module_logger
 
 # Define the default arguments
 GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
@@ -32,7 +32,7 @@ GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
 SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
 INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def get_google_service(
