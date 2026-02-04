@@ -21,12 +21,74 @@ Dependencies:
 
 import logging
 import sys
+from pathlib import Path
 import structlog
 from structlog.stdlib import BoundLogger
-from typing import TYPE_CHECKING
+from structlog.processors import CallsiteParameter
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
+
+
+def _apply_otel_code_conventions(
+    logger: Any, method_name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply OpenTelemetry semantic conventions for code attributes.
+
+    Converts structlog callsite parameters to OTel standard fields:
+        - code.filepath: Full file path (replaces deprecated code.filepath)
+        - code.function: Fully qualified function name (includes module.function)
+        - code.lineno: Line number (renamed from lineno)
+
+    Per OpenTelemetry specs, code.namespace is deprecated and should be
+    included in code.function as a fully qualified name.
+
+    References:
+        - https://opentelemetry.io/docs/specs/semconv/attributes-registry/code/
+    """
+    # Extract pathname and convert to code.filepath (OTel standard)
+    if "pathname" in event_dict:
+        pathname = event_dict["pathname"]
+
+        # Convert absolute path to relative from app root for cleaner logs
+        try:
+            path = Path(pathname)
+            parts = path.parts
+            if "app" in parts:
+                app_index = parts.index("app")
+                # Get path relative to app directory
+                relative_parts = parts[app_index + 1 :]
+                if relative_parts:
+                    event_dict["code.filepath"] = "/".join(relative_parts)
+                else:
+                    event_dict["code.filepath"] = pathname
+            else:
+                event_dict["code.filepath"] = pathname
+        except (ValueError, IndexError):
+            event_dict["code.filepath"] = pathname
+
+    # Create fully qualified function name (module.function)
+    if "module" in event_dict and "func_name" in event_dict:
+        module = event_dict["module"]
+        func_name = event_dict["func_name"]
+        event_dict["code.function"] = f"{module}.{func_name}"
+    elif "func_name" in event_dict:
+        # Fallback: just use function name if module unavailable
+        event_dict["code.function"] = event_dict["func_name"]
+
+    # Rename lineno to code.lineno (OTel standard)
+    if "lineno" in event_dict:
+        event_dict["code.lineno"] = event_dict["lineno"]
+
+    # Clean up fields we don't need in final output
+    event_dict.pop("pathname", None)
+    event_dict.pop("module", None)
+    event_dict.pop("func_name", None)
+    event_dict.pop("lineno", None)
+    event_dict.pop("filename", None)  # Redundant with code.filepath
+
+    return event_dict
 
 
 def _is_test_environment() -> bool:
@@ -43,10 +105,10 @@ def configure_logging(
     log_level: str | None = None,
     is_production: bool | None = None,
 ) -> BoundLogger:
-    """Configure structured logging with enhanced processors.
+    """Configure structured logging with OpenTelemetry semantic conventions.
 
     Configures structlog with:
-    - Enhanced processors for file/line/function context
+    - OpenTelemetry code attributes (code.filepath, code.function, code.lineno)
     - Proper exception formatting with stack traces
     - Context variable merging for correlation IDs
     - Test environment detection for log suppression
@@ -109,13 +171,17 @@ def configure_logging(
         # Add timestamp in ISO 8601 format
         structlog.processors.TimeStamper(fmt="iso"),
         # Add file, line, and function information (enhanced debugging)
+        # Using OpenTelemetry semantic conventions for code attributes
         structlog.processors.CallsiteParameterAdder(
             parameters=[
-                structlog.processors.CallsiteParameter.FILENAME,
-                structlog.processors.CallsiteParameter.LINENO,
-                structlog.processors.CallsiteParameter.FUNC_NAME,
+                CallsiteParameter.LINENO,
+                CallsiteParameter.FUNC_NAME,
+                CallsiteParameter.MODULE,  # For fully qualified function name
+                CallsiteParameter.PATHNAME,  # For code.filepath
             ]
         ),
+        # Apply OpenTelemetry semantic conventions for code attributes
+        _apply_otel_code_conventions,
         # Format exceptions with full stack traces
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
