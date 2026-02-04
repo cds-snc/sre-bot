@@ -41,7 +41,7 @@ def validate_payload(
     selected_model = select_best_model(payload_dict, models, priorities)
     if selected_model:
         model, validated_payload = selected_model
-        logger.info(
+        logger.debug(
             "payload_validation_success",
             model=model.__name__,
             payload=validated_payload.model_dump(),
@@ -64,7 +64,7 @@ def handle_webhook_payload(
             - action (Literal["post", "log", "none"]): The action to take.
             - payload (Optional[WebhookPayload]): The payload to post, if applicable.
     """
-    logger.info("processing_webhook_payload", payload=payload_dict)
+    logger.debug("processing_webhook_payload", payload=payload_dict)
     payload_validation_result = validate_payload(payload_dict)
 
     webhook_result = WebhookResult(
