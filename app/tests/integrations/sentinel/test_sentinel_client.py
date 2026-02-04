@@ -77,9 +77,7 @@ def test_log_to_sentinel(send_event_mock, logging_mock):
     bound_logger_mock = logging_mock.bind.return_value
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
-    bound_logger_mock.info.assert_called_with(
-        "sentinel_event_sent"
-    )
+    bound_logger_mock.info.assert_called_with("sentinel_event_sent")
 
 
 @patch("integrations.sentinel.client.send_event")
