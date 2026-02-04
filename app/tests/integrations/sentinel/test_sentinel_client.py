@@ -74,9 +74,10 @@ def test_post_data_failure(mock_requests):
 @patch("integrations.sentinel.client.logger")
 @patch("integrations.sentinel.client.send_event")
 def test_log_to_sentinel(send_event_mock, logging_mock):
+    bound_logger_mock = logging_mock.bind.return_value
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
-    logging_mock.info.assert_called_with(
+    bound_logger_mock.info.assert_called_with(
         "sentinel_event_sent", payload={"event": "foo", "message": {"bar": "baz"}}
     )
 
@@ -84,9 +85,10 @@ def test_log_to_sentinel(send_event_mock, logging_mock):
 @patch("integrations.sentinel.client.send_event")
 @patch("integrations.sentinel.client.logger")
 def test_log_to_sentinel_logs_error(logging_mock, send_event_mock):
+    bound_logger_mock = logging_mock.bind.return_value
     send_event_mock.return_value = False
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
-    logging_mock.error.assert_called_with(
+    bound_logger_mock.error.assert_called_with(
         "sentinel_event_error", payload={"event": "foo", "message": {"bar": "baz"}}
     )

@@ -1,11 +1,11 @@
 """Client for interacting with Maxmind's GeoIP2 database."""
 
 import geoip2.database
+import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
-from core.logging import get_module_logger
 from core.config import settings
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 MAXMIND_DB_PATH = settings.maxmind.MAXMIND_DB_PATH
 
 
@@ -18,6 +18,7 @@ def geolocate(ip) -> tuple | str:
     Returns:
         tuple | str: A tuple containing the country code, city name, latitude, and longitude of the IP address. A string if the IP address is not found or invalid.
     """
+    log = logger.bind(ip=ip)
     try:
         reader = geoip2.database.Reader(MAXMIND_DB_PATH)
         try:
@@ -33,12 +34,12 @@ def geolocate(ip) -> tuple | str:
         except ValueError:
             return "Invalid IP address"
         except GeoIP2Error as e:
-            logger.error("maxmind_geolocate_error", error=str(e))
+            log.error("maxmind_geolocate_error", error=str(e))
             raise
         finally:
             reader.close()
     except (FileNotFoundError, IOError) as e:
-        logger.error("maxmind_infrastructure_error", error=str(e))
+        log.error("maxmind_infrastructure_error", error=str(e))
         raise
 
 

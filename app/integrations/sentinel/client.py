@@ -4,12 +4,12 @@ import hmac
 import hashlib
 import json
 import requests
+import structlog
 
-from core.logging import get_module_logger
 from core.config import settings
 from infrastructure.audit.models import AuditEvent
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 SENTINEL_CUSTOMER_ID = settings.sentinel.SENTINEL_CUSTOMER_ID
 SENTINEL_LOG_TYPE = settings.sentinel.SENTINEL_LOG_TYPE
 SENTINEL_SHARED_KEY = settings.sentinel.SENTINEL_SHARED_KEY
@@ -53,6 +53,10 @@ def build_signature(
 
 
 def post_data(customer_id, shared_key, body, log_type):
+    log = logger.bind(
+        customer_id=customer_id,
+        log_type=log_type,
+    )
     method = "POST"
     content_type = "application/json"
     resource = "/api/logs"
@@ -84,37 +88,34 @@ def post_data(customer_id, shared_key, body, log_type):
 
     response = requests.post(uri, data=body, headers=headers, timeout=60)
     if response.status_code >= 200 and response.status_code <= 299:
-        logger.info(
+        log.info(
             "sentinel_event_sent",
-            customer_id=customer_id,
-            log_type=log_type,
             content_length=content_length,
         )
         return True
     else:
         print(response.text)
-        logger.error(
+        log.error(
             "sentinel_event_error",
-            customer_id=customer_id,
-            log_type=log_type,
             content_length=content_length,
         )
         return False
 
 
 def log_to_sentinel(event, message):
+    log = logger.bind(event=event)
     is_event_sent = False
     payload = {"event": event, "message": message}
 
     try:
         is_event_sent = send_event(payload)
     except Exception as e:
-        logger.exception("log_to_sentinel_error", error=str(e))
+        log.exception("log_to_sentinel_error", error=str(e))
 
     if is_event_sent:
-        logger.info("sentinel_event_sent", payload=payload)
+        log.info("sentinel_event_sent", payload=payload)
     else:
-        logger.error("sentinel_event_error", payload=payload)
+        log.error("sentinel_event_error", payload=payload)
 
 
 def log_audit_event(audit_event: AuditEvent) -> bool:
@@ -131,6 +132,10 @@ def log_audit_event(audit_event: AuditEvent) -> bool:
         bool: True if event was successfully sent to Sentinel, False otherwise.
               Never raises exceptions; always logs and returns a status bool.
     """
+    log = logger.bind(
+        correlation_id=audit_event.correlation_id,
+        action=audit_event.action,
+    )
     is_event_sent = False
 
     try:
@@ -138,28 +143,22 @@ def log_audit_event(audit_event: AuditEvent) -> bool:
         payload = audit_event.to_sentinel_payload()
         is_event_sent = send_event(payload)
     except Exception as e:
-        logger.error(
+        log.error(
             "log_audit_event_error",
-            correlation_id=audit_event.correlation_id,
-            action=audit_event.action,
             error=str(e),
             exc_info=True,
         )
         return False
 
     if is_event_sent:
-        logger.info(
+        log.info(
             "audit_event_sent_to_sentinel",
-            correlation_id=audit_event.correlation_id,
-            action=audit_event.action,
             resource_type=audit_event.resource_type,
             resource_id=audit_event.resource_id,
         )
     else:
-        logger.error(
+        log.error(
             "audit_event_failed_to_sentinel",
-            correlation_id=audit_event.correlation_id,
-            action=audit_event.action,
             resource_type=audit_event.resource_type,
             resource_id=audit_event.resource_id,
         )

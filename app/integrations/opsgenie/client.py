@@ -1,14 +1,15 @@
 import json
+import structlog
 from urllib.request import Request, urlopen
 from core.config import settings
-from core.logging import get_module_logger
 
 # Use the integrations API Key as the Opsgenie API Key
 OPSGENIE_KEY = settings.opsgenie.OPSGENIE_INTEGRATIONS_KEY
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def get_on_call_users(schedule):
+    log = logger.bind(schedule=schedule)
     content = api_get_request(
         f"https://api.opsgenie.com/v2/schedules/{schedule}/on-calls",
         {"name": "GenieKey", "token": OPSGENIE_KEY},
@@ -17,7 +18,7 @@ def get_on_call_users(schedule):
         data = json.loads(content)
         return list(map(lambda x: x["name"], data["data"]["onCallParticipants"]))
     except Exception as e:
-        logger.exception(
+        log.exception(
             "get_on_call_users_error",
             schedule=schedule,
             error=str(e),
@@ -27,6 +28,7 @@ def get_on_call_users(schedule):
 
 # Create an Opsgenie alert. This is used to notify the on-call users
 def create_alert(description):
+    log = logger.bind(description=description)
     content = api_post_request(
         "https://api.opsgenie.com/v2/alerts",
         {"name": "GenieKey", "token": OPSGENIE_KEY},
@@ -37,14 +39,14 @@ def create_alert(description):
     )
     try:
         data = json.loads(content)
-        logger.info(
+        log.info(
             "create_alert",
             description=description,
             result=data["result"],
         )
         return data["result"]
     except Exception as e:
-        logger.exception(
+        log.exception(
             "create_alert_error",
             description=description,
             error=str(e),

@@ -39,9 +39,10 @@ def test_geolocate_geoip2_error(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader().city.side_effect = geoip2.errors.GeoIP2Error(
         "GeoIP2 Error"
     )
+    bound_logger_mock = logger_mock.bind.return_value
     with pytest.raises(geoip2.errors.GeoIP2Error):
         maxmind.geolocate("test_ip")
-    logger_mock.error.assert_called_with(
+    bound_logger_mock.error.assert_called_with(
         "maxmind_geolocate_error",
         error="GeoIP2 Error",
     )
@@ -52,9 +53,10 @@ def test_geolocate_geoip2_error(geiop2_mock, logger_mock):
 @patch("integrations.maxmind.client.geoip2")
 def test_geolocate_file_not_found(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader.side_effect = FileNotFoundError("File not found")
+    bound_logger_mock = logger_mock.bind.return_value
     with pytest.raises(FileNotFoundError):
         maxmind.geolocate("test_ip")
-    logger_mock.error.assert_called_with(
+    bound_logger_mock.error.assert_called_with(
         "maxmind_infrastructure_error",
         error="File not found",
     )
@@ -65,9 +67,10 @@ def test_geolocate_file_not_found(geiop2_mock, logger_mock):
 @patch("integrations.maxmind.client.geoip2")
 def test_geolocate_io_error(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader.side_effect = IOError("IO Error")
+    bound_logger_mock = logger_mock.bind.return_value
     with pytest.raises(IOError):
         maxmind.geolocate("test_ip")
-    logger_mock.error.assert_called_with(
+    bound_logger_mock.error.assert_called_with(
         "maxmind_infrastructure_error",
         error="IO Error",
     )

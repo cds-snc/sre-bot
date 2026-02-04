@@ -6,10 +6,10 @@ import time
 
 import jwt
 import requests
+import structlog
 from core.config import settings
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 NOTIFY_SRE_USER_NAME = settings.notify.NOTIFY_SRE_USER_NAME
 NOTIFY_SRE_CLIENT_SECRET = settings.notify.NOTIFY_SRE_CLIENT_SECRET
 NOTIFY_API_URL = settings.notify.NOTIFY_API_URL
@@ -40,11 +40,12 @@ def create_jwt_token(secret, client_id):
 
     Returns a JWT token for this request
     """
+    log = logger.bind(client_id=client_id)
     if not secret:
-        logger.error("jwt_token_creation_failed", error="Missing secret key")
+        log.error("jwt_token_creation_failed", error="Missing secret key")
         raise ValueError("Missing secret key")
     if not client_id:
-        logger.error("jwt_token_creation_failed", error="Missing client id")
+        log.error("jwt_token_creation_failed", error="Missing client id")
         raise ValueError("Missing client id")
 
     headers = {"typ": "JWT", "alg": "HS256"}
@@ -97,15 +98,21 @@ def post_event(url, payload):
 
 def revoke_api_key(api_key, api_type, github_repo, source):
     """Function to revoke an api key by calling Notify's revoke api endpoint"""
+    log = logger.bind(
+        api_key=api_key,
+        api_type=api_type,
+        github_repo=github_repo,
+        source=source,
+    )
     # get the url and jwt_token
 
     if not settings.is_production:
-        logger.info("revoke_api_key_skipped", api_key=api_key)
+        log.info("revoke_api_key_skipped", api_key=api_key)
         return False
     url = NOTIFY_API_URL
 
     if url is None:
-        logger.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")
+        log.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")
         return False
 
     # append the revoke-endpoint to the url
@@ -123,10 +130,10 @@ def revoke_api_key(api_key, api_type, github_repo, source):
     response = post_event(url, payload)
     # A successful response has a status code of 201
     if response.status_code == 201:
-        logger.info("revoke_api_key_success", api_key=api_key)
+        log.info("revoke_api_key_success", api_key=api_key)
         return True
     else:
-        logger.error(
+        log.error(
             "revoke_api_key_error",
             api_key=api_key,
             response_code=response.status_code,
