@@ -113,7 +113,7 @@ def log_to_sentinel(event, message):
         log.exception("log_to_sentinel_error", error=str(e))
 
     if is_event_sent:
-        log.info("sentinel_event_sent", payload=payload)
+        log.info("sentinel_event_sent")
     else:
         log.error("sentinel_event_error", payload=payload)
 

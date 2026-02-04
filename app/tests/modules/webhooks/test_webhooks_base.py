@@ -31,7 +31,7 @@ def test_validate_payload_returns_model_if_valid(mock_select_best_model, mock_lo
         None,  # priorities argument
     )
     assert validated == (MockModel, MockModel(text="validated_payload"))
-    mock_logger.info.assert_called_once_with(
+    mock_logger.debug.assert_called_once_with(
         "payload_validation_success",
         model="MockModel",
         payload={"text": "validated_payload"},
