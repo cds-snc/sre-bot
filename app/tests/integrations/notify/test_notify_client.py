@@ -16,10 +16,11 @@ def decode_token(token, secret):
 # Test that an exception is raised if the secret is missing
 @patch("integrations.notify.client.logger")
 def test_create_jwt_token_secret_missing(mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     with pytest.raises(ValueError) as err:
         notify.create_jwt_token(None, "client_id")
     assert str(err.value) == "Missing secret key"
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "jwt_token_creation_failed", error="Missing secret key"
     )
 
@@ -27,10 +28,11 @@ def test_create_jwt_token_secret_missing(mock_logger):
 # Test that an exception is raised if the client_id is missing
 @patch("integrations.notify.client.logger")
 def test_create_jwt_token_client_id_missing(mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     with pytest.raises(ValueError) as err:
         notify.create_jwt_token("secret", None)
     assert str(err.value) == "Missing client id"
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "jwt_token_creation_failed", error="Missing client id"
     )
 
@@ -83,10 +85,11 @@ def test_token_contains_correct_iat():
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
 def test_authorization_header_missing_client_id(jwt_token_mock, mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     with pytest.raises(ValueError) as err:
         notify.create_authorization_header()
     assert str(err.value) == "NOTIFY_SRE_USER_NAME is missing"
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "authorization_header_creation_failed",
         error="NOTIFY_SRE_USER_NAME is missing",
     )
@@ -99,10 +102,11 @@ def test_authorization_header_missing_client_id(jwt_token_mock, mock_logger):
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
 def test_authorization_header_missing_secret(jwt_token_mock, mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     with pytest.raises(ValueError) as err:
         notify.create_authorization_header()
     assert str(err.value) == "NOTIFY_SRE_CLIENT_SECRET is missing"
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "authorization_header_creation_failed",
         error="NOTIFY_SRE_CLIENT_SECRET is missing",
     )
@@ -110,8 +114,10 @@ def test_authorization_header_missing_secret(jwt_token_mock, mock_logger):
 
 
 # Test that the authorization header is created correctly and the correct header is generated
+@patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
-def test_successful_creation_of_header(mock_jwt_token):
+def test_successful_creation_of_header(mock_jwt_token, mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     mock_jwt_token.return_value = "mocked_jwt_token"
     header_key, header_value = notify.create_authorization_header()
 
@@ -152,10 +158,11 @@ def test_post_event(mock_auth_header, mock_post):
 @patch.object(notify, "NOTIFY_API_URL", None)
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_missing_url(mock_logger):
+    bound_logger_mock = mock_logger.bind.return_value
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
 
     assert result is False
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "revoke_api_key_error", error="NOTIFY_API_URL is missing"
     )
 
@@ -165,6 +172,7 @@ def test_revoke_api_key_missing_url(mock_logger):
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_success(mock_logger, mock_post_event):
+    bound_logger_mock = mock_logger.bind.return_value
     # Mock successful response
     mock_response = MagicMock()
     mock_response.status_code = 201
@@ -193,7 +201,9 @@ def test_revoke_api_key_success(mock_logger, mock_post_event):
     mock_post_event.assert_called_once_with(expected_url, expected_payload)
 
     # Verify logger was called correctly
-    mock_logger.info.assert_called_once_with("revoke_api_key_success", api_key=api_key)
+    bound_logger_mock.info.assert_called_once_with(
+        "revoke_api_key_success", api_key=api_key
+    )
 
 
 # Test failed API key revocation (non-201 status code)
@@ -201,6 +211,7 @@ def test_revoke_api_key_success(mock_logger, mock_post_event):
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_failure(mock_logger, mock_post_event):
+    bound_logger_mock = mock_logger.bind.return_value
     # Mock failed response
     mock_response = MagicMock()
     mock_response.status_code = 400
@@ -218,7 +229,7 @@ def test_revoke_api_key_failure(mock_logger, mock_post_event):
     assert result is False
 
     # Verify logger was called correctly
-    mock_logger.error.assert_called_once_with(
+    bound_logger_mock.error.assert_called_once_with(
         "revoke_api_key_error",
         api_key=api_key,
         response_code=400,

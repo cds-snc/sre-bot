@@ -241,6 +241,8 @@ class TestLogAuditEventStructuredLogging:
 
         mock_send = MagicMock(return_value=True)
         mock_logger = MagicMock()
+        mock_bound_logger = MagicMock()
+        mock_logger.bind.return_value = mock_bound_logger
         monkeypatch.setattr(
             "integrations.sentinel.client.send_event",
             mock_send,
@@ -254,8 +256,8 @@ class TestLogAuditEventStructuredLogging:
 
         log_audit_event(audit_event)
 
-        # Should log success
-        assert mock_logger.info.called
+        # Should log success via bound logger
+        assert mock_bound_logger.info.called
 
     def test_log_audit_event_logs_failure(self, monkeypatch):
         """log_audit_event logs failure event with audit details."""
@@ -270,6 +272,8 @@ class TestLogAuditEventStructuredLogging:
 
         mock_send = MagicMock(return_value=False)
         mock_logger = MagicMock()
+        mock_bound_logger = MagicMock()
+        mock_logger.bind.return_value = mock_bound_logger
         monkeypatch.setattr(
             "integrations.sentinel.client.send_event",
             mock_send,
@@ -283,8 +287,8 @@ class TestLogAuditEventStructuredLogging:
 
         log_audit_event(audit_event)
 
-        # Should log error
-        assert mock_logger.error.called
+        # Should log error via bound logger
+        assert mock_bound_logger.error.called
 
     def test_log_audit_event_logs_exception_with_context(self, monkeypatch):
         """log_audit_event logs exceptions with full context."""
@@ -299,6 +303,8 @@ class TestLogAuditEventStructuredLogging:
 
         mock_send = MagicMock(side_effect=Exception("Network error"))
         mock_logger = MagicMock()
+        mock_bound_logger = MagicMock()
+        mock_logger.bind.return_value = mock_bound_logger
         monkeypatch.setattr(
             "integrations.sentinel.client.send_event",
             mock_send,
@@ -312,9 +318,9 @@ class TestLogAuditEventStructuredLogging:
 
         log_audit_event(audit_event)
 
-        # Should log error with exc_info
-        assert mock_logger.error.called
-        call_args = mock_logger.error.call_args
+        # Should log error with exc_info via bound logger
+        assert mock_bound_logger.error.called
+        call_args = mock_bound_logger.error.call_args
         # Check that exc_info=True was passed
         assert call_args.kwargs.get("exc_info") is True
 

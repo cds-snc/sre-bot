@@ -4,13 +4,13 @@ This module contains the user related functionality for the Slack integration.
 """
 
 import re
+import structlog
 from slack_sdk import WebClient
-from core.logging import get_module_logger
 from integrations.slack.client import SlackClientManager
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def get_all_users(client: WebClient, deleted=False, is_bot=False):
@@ -24,6 +24,7 @@ def get_all_users(client: WebClient, deleted=False, is_bot=False):
     Returns:
         list: A list of active users.
     """
+    log = logger.bind(deleted=deleted, is_bot=is_bot)
 
     users_list = []
     cursor = None
@@ -37,10 +38,10 @@ def get_all_users(client: WebClient, deleted=False, is_bot=False):
                 if not cursor:
                     break
             else:
-                logger.error("get_all_users_failed", extra={"response": response})
+                log.error("get_all_users_failed", response=response)
                 break
     except Exception as e:
-        logger.error("get_all_users_failed", extra={"error": str(e)})
+        log.error("get_all_users_failed", error=str(e))
 
     # filters
     if not deleted:
@@ -103,8 +104,9 @@ def get_user_email_from_handle(client: WebClient, user_handle: str) -> str | Non
     Returns:
         str | None: The user email or None.
     """
+    log = logger.bind(user_handle=user_handle)
     user_handle = user_handle.lstrip("@")
-
+    log.debug("resolving_user_email_from_handle", user_handle=user_handle)
     users_list = get_all_users(client)
     for member in users_list:
         if "name" in member and member["name"] == user_handle:
@@ -114,7 +116,6 @@ def get_user_email_from_handle(client: WebClient, user_handle: str) -> str | Non
 
             if user_info["ok"]:
                 return user_info["user"]["profile"]["email"]
-
     return None
 
 
@@ -132,6 +133,7 @@ def get_user_email_from_id(client: WebClient, user_id: str) -> str | None:
     Returns:
         str | None: The user email or None if not found or error occurs.
     """
+    log = logger.bind(user_id=user_id)
     try:
         user_info = client.users_info(user=user_id)
         if user_info.get("ok"):
@@ -139,20 +141,20 @@ def get_user_email_from_id(client: WebClient, user_id: str) -> str | None:
             profile: dict = user.get("profile", {}) if isinstance(user, dict) else {}  # type: ignore
             email = profile.get("email") if isinstance(profile, dict) else None
             if email:
-                logger.debug(
+                log.debug(
                     "resolved_user_email_from_id",
                     user_id=user_id,
                     email=email,
                 )
                 return email
         else:
-            logger.warning(
+            log.warning(
                 "get_user_email_from_id_failed",
                 user_id=user_id,
                 error=user_info.get("error", "unknown"),
             )
     except Exception as e:  # pylint: disable=broad-except
-        logger.warning(
+        log.warning(
             "get_user_email_from_id_exception",
             user_id=user_id,
             error=str(e),
@@ -199,6 +201,7 @@ def replace_users_emails_with_mention(text: str) -> str:
     Returns:
         str: The modified text with email addresses replaced by Slack user mentions.
     """
+    log = logger.bind(component="replace_users_emails_with_mention")
 
     client = SlackClientManager.get_client()
     if not client:
@@ -211,9 +214,7 @@ def replace_users_emails_with_mention(text: str) -> str:
         # It's okay to catch all exceptions here since we don't want to fail the entire
         # operation if one email lookup fails.
         except Exception as e:  # pylint: disable=broad-except
-            logger.info(
-                "replace_users_emails_with_mention_failed", extra={"error": str(e)}
-            )
+            log.info("replace_users_emails_with_mention_failed", error=str(e))
             response = None
         if response:
             user: dict = response.get("user", {})

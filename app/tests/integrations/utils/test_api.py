@@ -255,6 +255,7 @@ def test_no_illegal_characters():
 
 def test_retry_request_success():
     mock_func = MagicMock(return_value="success")
+    mock_func.__name__ = "test_func"
     result = retry_request(mock_func, max_attempts=3, delay=1)
     assert result == "success"
     mock_func.assert_called_once()
@@ -263,18 +264,21 @@ def test_retry_request_success():
 @patch("integrations.utils.api.logger")
 def test_retry_request_success_after_retries(mock_logger):
     mock_func = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "success"])
+    mock_func.__name__ = "test_func"
+    bound_logger_mock = mock_logger.bind.return_value
     result = retry_request(mock_func, max_attempts=3, delay=1)
     assert result == "success"
     assert mock_func.call_count == 3
-    assert mock_logger.warning.call_count == 2
-    assert mock_logger.warning.call_args_list == [
-        call("retry_request_attempt", extra={"error": "fail"}, attempt=1),
-        call("retry_request_attempt", extra={"error": "fail"}, attempt=2),
+    assert bound_logger_mock.warning.call_count == 2
+    assert bound_logger_mock.warning.call_args_list == [
+        call("retry_request_attempt", error="fail", attempt=1),
+        call("retry_request_attempt", error="fail", attempt=2),
     ]
 
 
 def test_retry_request_failure():
     mock_func = MagicMock(side_effect=Exception("fail"))
+    mock_func.__name__ = "test_func"
     with pytest.raises(Exception, match="fail"):
         retry_request(mock_func, max_attempts=3, delay=1)
     assert mock_func.call_count == 3
@@ -283,6 +287,7 @@ def test_retry_request_failure():
 @patch("time.sleep", return_value=None)
 def test_retry_request_delay(mock_sleep):
     mock_func = MagicMock(side_effect=[Exception("fail"), "success"])
+    mock_func.__name__ = "test_func"
     result = retry_request(mock_func, max_attempts=3, delay=2)
     assert result == "success"
     assert mock_func.call_count == 2
@@ -292,21 +297,24 @@ def test_retry_request_delay(mock_sleep):
 @patch("integrations.utils.api.logger")
 def test_retry_request_logging(mock_logger: MagicMock):
     mock_func = MagicMock(side_effect=Exception("fail"))
+    mock_func.__name__ = "test_func"
+    bound_logger_mock = mock_logger.bind.return_value
     with pytest.raises(Exception, match="fail"):
         retry_request(mock_func, max_attempts=3, delay=1)
     assert mock_func.call_count == 3
-    assert mock_logger.warning.call_count == 3
-    mock_logger.warning.assert_has_calls(
+    assert bound_logger_mock.warning.call_count == 3
+    bound_logger_mock.warning.assert_has_calls(
         [
-            call("retry_request_attempt", extra={"error": "fail"}, attempt=1),
-            call("retry_request_attempt", extra={"error": "fail"}, attempt=2),
-            call("retry_request_failed", extra={"error": "fail"}),
+            call("retry_request_attempt", error="fail", attempt=1),
+            call("retry_request_attempt", error="fail", attempt=2),
+            call("retry_request_failed", error="fail"),
         ]
     )
 
 
 def test_retry_request_passes_args_and_kwargs():
     mock_func = MagicMock(return_value="success")
+    mock_func.__name__ = "test_func"
     result = retry_request(
         mock_func,
         "arg1",

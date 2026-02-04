@@ -4,9 +4,9 @@ import re
 import string
 import random
 import time
-from core.logging import get_module_logger
+import structlog
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def convert_string_to_camel_case(snake_str):
@@ -110,16 +110,15 @@ def retry_request(
     Returns:
         Any: The result of the function call.
     """
+    log = logger.bind(func=func.__name__, max_attempts=max_attempts)
     for i in range(max_attempts):
         try:
             return func(*args, **kwargs)
         except Exception as e:
             if i == max_attempts - 1:
-                logger.warning("retry_request_failed", extra={"error": str(e)})
+                log.warning("retry_request_failed", error=str(e))
                 raise e
             else:
-                logger.warning(
-                    "retry_request_attempt", extra={"error": str(e)}, attempt=i + 1
-                )
+                log.warning("retry_request_attempt", error=str(e), attempt=i + 1)
             time.sleep(delay)
             continue
