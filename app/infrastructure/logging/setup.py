@@ -162,16 +162,15 @@ def configure_logging(
     # Determine production mode
     prod_mode = is_production if is_production is not None else settings.is_production
 
-    # Build processor pipeline
+    # Build processor pipeline per structlog best practices
+    # Order matters: context vars first, then enrichment, then formatting
     processors = [
-        # Add context variables (correlation IDs, user info, etc)
+        # 1. Context propagation (must be first)
         structlog.contextvars.merge_contextvars,
-        # Add log level
+        # 2. Add metadata
         structlog.stdlib.add_log_level,
-        # Add timestamp in ISO 8601 format
         structlog.processors.TimeStamper(fmt="iso"),
-        # Add file, line, and function information (enhanced debugging)
-        # Using OpenTelemetry semantic conventions for code attributes
+        # 3. Add OpenTelemetry code attributes for debugging
         structlog.processors.CallsiteParameterAdder(
             parameters=[
                 CallsiteParameter.LINENO,
@@ -180,15 +179,20 @@ def configure_logging(
                 CallsiteParameter.PATHNAME,  # For code.filepath
             ]
         ),
-        # Apply OpenTelemetry semantic conventions for code attributes
+        # 4. Apply OpenTelemetry semantic conventions
         _apply_otel_code_conventions,
-        # Format exceptions with full stack traces
+        # 5. Exception formatting
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
     ]
 
-    # Add pretty printing for development, JSON for production
+    # 6. Final rendering (environment-specific)
     if not prod_mode:  # Development mode
+        # Pretty exceptions with colors (requires rich or better-exceptions)
+        try:
+            processors.append(structlog.processors.ExceptionPrettyPrinter())
+        except ImportError:
+            pass  # Fall back to plain exceptions if rich not installed
         processors.append(structlog.dev.ConsoleRenderer())
     else:  # Production mode
         processors.append(structlog.processors.JSONRenderer())
