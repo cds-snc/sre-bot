@@ -56,7 +56,6 @@ def create_alert(description):
 
 def healthcheck():
     """Check if the bot can interact with the Opsgenie API."""
-    log = logger.bind()
     healthy = False
     try:
         content = api_get_request(
@@ -65,13 +64,13 @@ def healthcheck():
         )
         result = json.loads(content)
         healthy = "data" in result
-        log.info(
+        logger.info(
             "opsgenie_healthcheck_success",
             status="healthy" if healthy else "unhealthy",
             result=result,
         )
     except Exception as error:
-        log.exception(
+        logger.exception(
             "opsgenie_healthcheck_error",
             error=str(error),
         )

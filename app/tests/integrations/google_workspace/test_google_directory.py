@@ -270,13 +270,13 @@ def test_add_users_to_group_skips_when_no_members(mock_list_group_members):
     assert group.get("members") is None
 
 
-@patch("integrations.google_workspace.google_directory.list_groups")
-@patch("integrations.google_workspace.google_directory.list_group_members")
 @patch("integrations.google_workspace.google_directory.list_users")
+@patch("integrations.google_workspace.google_directory.retry_request")
+@patch("integrations.google_workspace.google_directory.list_groups")
 def test_list_groups_with_members(
-    mock_list_users,
-    mock_list_group_members,
     mock_list_groups,
+    mock_retry_request,
+    mock_list_users,
     google_groups,
     google_group_members,
     google_users,
@@ -290,20 +290,20 @@ def test_list_groups_with_members(
     groups_with_users.remove(groups_with_users[0])
 
     mock_list_groups.return_value = groups
-    mock_list_group_members.side_effect = group_members
+    mock_retry_request.side_effect = group_members
     mock_list_users.return_value = users
 
     assert google_directory.list_groups_with_members() == groups_with_users
 
 
 @patch("integrations.google_workspace.google_directory.filters.filter_by_condition")
-@patch("integrations.google_workspace.google_directory.list_groups")
-@patch("integrations.google_workspace.google_directory.list_group_members")
 @patch("integrations.google_workspace.google_directory.list_users")
+@patch("integrations.google_workspace.google_directory.retry_request")
+@patch("integrations.google_workspace.google_directory.list_groups")
 def test_list_groups_with_members_filtered(
-    mock_list_users,
-    mock_list_group_members,
     mock_list_groups,
+    mock_retry_request,
+    mock_list_users,
     mock_filter_by_condition,
     google_groups,
     google_group_members,
@@ -320,7 +320,7 @@ def test_list_groups_with_members_filtered(
     groups_with_users.remove(groups_with_users[0])
 
     mock_list_groups.return_value = groups
-    mock_list_group_members.side_effect = group_members
+    mock_retry_request.side_effect = group_members
     mock_list_users.return_value = users
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
@@ -330,7 +330,7 @@ def test_list_groups_with_members_filtered(
         == groups_with_users
     )
     assert mock_filter_by_condition.called_once_with(groups, groups_filters)
-    assert mock_list_group_members.call_count == 2
+    assert mock_retry_request.call_count == 2
     assert mock_list_users.call_count == 1
 
 
@@ -526,13 +526,13 @@ def test_list_groups_with_members_skips_when_no_groups(mock_list_groups):
 
 
 @patch("integrations.google_workspace.google_directory.filters.filter_by_condition")
-@patch("integrations.google_workspace.google_directory.list_groups")
-@patch("integrations.google_workspace.google_directory.list_group_members")
 @patch("integrations.google_workspace.google_directory.list_users")
+@patch("integrations.google_workspace.google_directory.retry_request")
+@patch("integrations.google_workspace.google_directory.list_groups")
 def test_list_groups_with_members_filtered_dataframe(
-    mock_list_users,
-    mock_list_group_members,
     mock_list_groups,
+    mock_retry_request,
+    mock_list_users,
     mock_filter_by_condition,
     google_groups,
     google_group_members,
@@ -549,7 +549,7 @@ def test_list_groups_with_members_filtered_dataframe(
     groups_with_users.remove(groups_with_users[0])
 
     mock_list_groups.return_value = groups
-    mock_list_group_members.side_effect = group_members
+    mock_retry_request.side_effect = group_members
     mock_list_users.return_value = users
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]

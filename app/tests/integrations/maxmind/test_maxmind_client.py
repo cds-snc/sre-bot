@@ -83,9 +83,8 @@ def test_healthcheck_healthy(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader().city.return_value.city.name = "test_city"
     geiop2_mock.database.Reader().city.return_value.location.latitude = "test_lat"
     geiop2_mock.database.Reader().city.return_value.location.longitude = "test_long"
-    bound_logger_mock = logger_mock.bind.return_value
     assert maxmind.healthcheck() is True
-    bound_logger_mock.info.assert_called_with(
+    logger_mock.info.assert_called_with(
         "maxmind_healthcheck_success",
         result=("CA", "test_city", "test_lat", "test_long"),
         status="healthy",
@@ -96,9 +95,8 @@ def test_healthcheck_healthy(geiop2_mock, logger_mock):
 @patch("integrations.maxmind.client.geoip2")
 def test_healthcheck_unhealthy(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader().city.side_effect = ValueError
-    bound_logger_mock = logger_mock.bind.return_value
     assert maxmind.healthcheck() is False
-    bound_logger_mock.info.assert_called_with(
+    logger_mock.info.assert_called_with(
         "maxmind_healthcheck_success", result="Invalid IP address", status="unhealthy"
     )
 
@@ -108,8 +106,7 @@ def test_healthcheck_unhealthy(geiop2_mock, logger_mock):
 @patch("integrations.maxmind.client.geoip2")
 def test_healthcheck_error(geiop2_mock, logger_mock):
     geiop2_mock.database.Reader.side_effect = FileNotFoundError("some_path")
-    bound_logger_mock = logger_mock.bind.return_value
     assert maxmind.healthcheck() is False
-    bound_logger_mock.exception.assert_called_with(
+    logger_mock.exception.assert_called_with(
         "maxmind_healthcheck_failed", error="some_path"
     )

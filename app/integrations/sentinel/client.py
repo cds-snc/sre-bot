@@ -16,13 +16,12 @@ SENTINEL_SHARED_KEY = settings.sentinel.SENTINEL_SHARED_KEY
 
 
 def send_event(payload):
-    log = logger.bind()
     customer_id = SENTINEL_CUSTOMER_ID
     log_type = SENTINEL_LOG_TYPE
     shared_key = SENTINEL_SHARED_KEY
 
     if customer_id is None or shared_key is None:
-        log.error("send_event_error", error="customer_id or shared_key is missing")
+        logger.error("send_event_error", error="customer_id or shared_key is missing")
         return False
 
     post_data(customer_id, shared_key, json.dumps(payload), log_type)

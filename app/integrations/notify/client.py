@@ -60,7 +60,6 @@ def create_jwt_token(secret, client_id):
 
 def create_authorization_header():
     """Function to create the authorization header for the Notify API"""
-    log = logger.bind()
     # get the client_id and secret from the environment variables
     client_id = NOTIFY_SRE_USER_NAME
     secret = NOTIFY_SRE_CLIENT_SECRET
@@ -68,14 +67,14 @@ def create_authorization_header():
     # If the client_id or secret is missing, raise an error
     if not client_id:
         error = "NOTIFY_SRE_USER_NAME is missing"
-        log.error(
+        logger.error(
             "authorization_header_creation_failed",
             error=error,
         )
         raise ValueError(error)
     if not secret:
         error = "NOTIFY_SRE_CLIENT_SECRET is missing"
-        log.error(
+        logger.error(
             "authorization_header_creation_failed",
             error=error,
         )

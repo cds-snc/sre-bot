@@ -45,16 +45,15 @@ def geolocate(ip) -> tuple | str:
 
 def healthcheck():
     """Check if the bot can interact with Maxmind."""
-    log = logger.bind()
     healthy = False
     try:
         result = geolocate("8.8.8.8")
         healthy = isinstance(result, tuple)
-        log.info(
+        logger.info(
             "maxmind_healthcheck_success",
             result=result,
             status="healthy" if healthy else "unhealthy",
         )
     except Exception as error:
-        log.exception("maxmind_healthcheck_failed", error=str(error))
+        logger.exception("maxmind_healthcheck_failed", error=str(error))
     return healthy
