@@ -413,3 +413,6 @@ Before committing tests:
 - [ ] Cleanup handled by fixtures
 - [ ] No secrets in test code
 - [ ] Coverage >80%: `pytest --cov=modules --cov-report=term-missing`
+- [ ] Fix linting issues: `flake8 .`
+- [ ] Check formatting issues: `black . --check`
+- [ ] Check for type errors: `mypy .`
