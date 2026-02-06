@@ -6,23 +6,19 @@ This module contains the ATIP commands and events for the Slack Bot.
 from datetime import datetime
 
 import i18n  # type: ignore
+from structlog import get_logger
 
-from core.config import settings
-from core.logging import get_module_logger
-
+from infrastructure.services import get_settings
 from integrations.slack import users as slack_users, commands as slack_commands
 from integrations import trello
 
 
-logger = get_module_logger()
+logger = get_logger()
 
 i18n.load_path.append("./locales/")
 
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
-
-PREFIX = settings.PREFIX
-ATIP_ANNOUNCE_CHANNEL = settings.atip.ATIP_ANNOUNCE_CHANNEL
 
 
 def register(bot):
@@ -37,8 +33,10 @@ def register(bot):
         atip.register(bot)
     ```
     """
-    bot.command(f"/{PREFIX}atip")(atip_command)
-    bot.command(f"/{PREFIX}aiprp")(atip_command)
+    settings = get_settings()
+    prefix = settings.PREFIX if settings.PREFIX else ""
+    bot.command(f"/{prefix}atip")(atip_command)
+    bot.command(f"/{prefix}aiprp")(atip_command)
     bot.action("ati_search_width")(atip_width_action)
     bot.view("atip_view")(atip_view_handler)
     bot.action("atip_change_locale")(update_modal_locale)
@@ -48,14 +46,14 @@ def atip_command(ack, command, respond, client, body):
     ack()
     user_id = body["user_id"]
     i18n.set("locale", slack_users.get_user_locale(client, user_id))
-    logger.info(
-        "atip_command_called",
-        command=command["text"],
+    log = logger.bind(
         user_id=command["user_id"],
         user_name=command["user_name"],
         channel_id=command["channel_id"],
         channel_name=command["channel_name"],
+        command_text=command["text"],
     )
+    log.info("atip_command_called")
 
     if command["text"] == "":
         respond(i18n.t("atip.help_text", command=command["command"]))
@@ -355,14 +353,17 @@ def update_modal_locale(ack, client, body):
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
     if ati_id is None:
         ati_id = ""
-    locale = next(
+    locale_action = next(
         (
             action
             for action in body["actions"]
             if action["action_id"] == "atip_change_locale"
         ),
         None,
-    )["value"]
+    )
+    if locale_action is None:
+        return
+    locale = locale_action["value"]
     if locale == "en-US":
         locale = "fr-FR"
     else:
@@ -379,6 +380,7 @@ def atip_width_action(ack):
 
 def atip_view_handler(ack, body, say, client):
     ack()
+    settings = get_settings()
 
     ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
@@ -423,14 +425,14 @@ def atip_view_handler(ack, body, say, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
-    if PREFIX:
-        slug = f"{PREFIX}-{slug}"
+    prefix = settings.PREFIX if settings.PREFIX else ""
+    if prefix:
+        slug = f"{prefix}-{slug}"
     response = client.conversations_create(name=f"{slug}")
     channel_id = response["channel"]["id"]
     channel_name = response["channel"]["name"]
-    logger.info(
-        "atip_channel_created", channel_id=channel_id, channel_name=channel_name
-    )
+    log = logger.bind(channel_id=channel_id, channel_name=channel_name, ati_id=ati_id)
+    log.info("atip_channel_created")
 
     channel_id = response["channel"]["id"]
 
@@ -517,7 +519,7 @@ Il est important que vous ne supprimiez aucune documentation relative à la dema
 Merci de votre compréhension! L’accès à l’information renforce notre démocratie. 💪
 """
     )
-    say(text=post_content, channel=ATIP_ANNOUNCE_CHANNEL)
+    say(text=post_content, channel="C033L7RGCT0")
     say(text=post_content, channel=channel_id)
 
     # Add trello card
