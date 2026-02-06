@@ -4,6 +4,7 @@ Tests the scheduling logic, error handling, and task integration without
 executing the actual scheduled work.
 """
 
+import pytest
 from unittest.mock import MagicMock, patch
 from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, run_continuously
 
@@ -11,6 +12,7 @@ from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, run_continuously
 class TestSafeRun:
     """Tests for the safe_run error handling wrapper."""
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.logger")
     def test_safe_run_executes_job_successfully(self, mock_logger) -> None:
         """Test that safe_run executes a successful job without logging errors."""
@@ -24,6 +26,7 @@ class TestSafeRun:
         job.assert_called_once()
         mock_logger.error.assert_not_called()
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.logger")
     def test_safe_run_catches_exception(self, mock_logger) -> None:
         """Test that safe_run catches and logs exceptions."""
@@ -45,6 +48,7 @@ class TestSafeRun:
         assert error_call[1]["function"] == "failing_job"
         assert error_call[1]["module"] == "test_module"
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.logger")
     def test_safe_run_preserves_job_arguments(self, mock_logger) -> None:
         """Test that safe_run passes through job arguments and kwargs."""
@@ -57,6 +61,7 @@ class TestSafeRun:
 
         job.assert_called_once_with("arg1", "arg2", kwarg1="value1", kwarg2="value2")
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.logger")
     def test_safe_run_logs_arguments_on_exception(self, mock_logger) -> None:
         """Test that safe_run logs job arguments when exception occurs."""
@@ -77,6 +82,7 @@ class TestSafeRun:
 class TestSchedulerHeartbeat:
     """Tests for scheduler heartbeat logging."""
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.time")
     @patch("jobs.scheduled_tasks.logger")
     def test_scheduler_heartbeat_logs_current_time(
@@ -93,6 +99,7 @@ class TestSchedulerHeartbeat:
         assert log_call[1]["module"] == "scheduled_tasks"
         assert "10:30:00" in log_call[1]["time"]
 
+    @pytest.mark.unit
     @patch("jobs.scheduled_tasks.time")
     @patch("jobs.scheduled_tasks.logger")
     def test_scheduler_heartbeat_calls_ctime(self, mock_logger, mock_time) -> None:
@@ -105,6 +112,7 @@ class TestSchedulerHeartbeat:
 class TestRunContinuously:
     """Tests for continuous run loop."""
 
+    @pytest.mark.unit
     def test_run_continuously_returns_event(self) -> None:
         """Test that run_continuously returns a threading.Event.
 

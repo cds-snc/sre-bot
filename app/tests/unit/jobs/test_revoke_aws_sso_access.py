@@ -10,16 +10,36 @@ from jobs.revoke_aws_sso_access import revoke_aws_sso_access
 
 
 @pytest.fixture
-def expired_request() -> dict:
-    """Sample expired access request."""
-    return {
-        "account_id": {"S": "123456789"},
-        "account_name": {"S": "production"},
-        "user_id": {"S": "U12345"},
-        "email": {"S": "user@example.com"},
-        "access_type": {"S": "ReadOnlyAccess"},
-        "created_at": {"N": "1704067200"},
-    }
+def make_expired_request() -> callable:
+    """Factory fixture for creating expired access requests with optional overrides."""
+
+    def _make(**overrides) -> dict:
+        """Create an expired request with default values.
+
+        Args:
+            **overrides: Field overrides to apply to the default request.
+                        Example: make_expired_request(account_id={"S": "different"})
+
+        Returns:
+            Dictionary representing an expired access request.
+        """
+        default = {
+            "account_id": {"S": "123456789"},
+            "account_name": {"S": "production"},
+            "user_id": {"S": "U12345"},
+            "email": {"S": "user@example.com"},
+            "access_type": {"S": "ReadOnlyAccess"},
+            "created_at": {"N": "1704067200"},
+        }
+        return {**default, **overrides}
+
+    return _make
+
+
+@pytest.fixture
+def expired_request(make_expired_request) -> dict:
+    """Default expired access request (convenience fixture for backward compatibility)."""
+    return make_expired_request()
 
 
 @pytest.fixture
@@ -28,6 +48,7 @@ def mock_slack_client() -> MagicMock:
     return MagicMock()
 
 
+@pytest.mark.unit
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
@@ -77,6 +98,7 @@ def test_revoke_access_success(
     assert mock_log_ops.call_count == 1
 
 
+@pytest.mark.unit
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
@@ -114,6 +136,7 @@ def test_revoke_access_handles_identity_store_error(
     mock_slack_client.chat_postEphemeral.assert_not_called()
 
 
+@pytest.mark.unit
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
@@ -146,6 +169,7 @@ def test_revoke_access_handles_sso_deletion_error(
     mock_log_ops.assert_not_called()
 
 
+@pytest.mark.unit
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
@@ -186,6 +210,7 @@ def test_revoke_access_multiple_requests(
     assert mock_slack_client.chat_postEphemeral.call_count == 2
 
 
+@pytest.mark.unit
 @patch("jobs.revoke_aws_sso_access.aws_access_requests")
 @patch("jobs.revoke_aws_sso_access.identity_store")
 @patch("jobs.revoke_aws_sso_access.sso_admin")
