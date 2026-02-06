@@ -4,17 +4,20 @@ from typing import Optional
 from fastapi import HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt  # type: ignore
+import structlog
 
-from core.config import settings
-from core.logging import get_module_logger
+from infrastructure.services import get_settings
 
 
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
-ACCESS_TOKEN_MAX_AGE_MINUTES = settings.server.ACCESS_TOKEN_MAX_AGE_MINUTES
-SECRET_KEY = settings.server.SECRET_KEY
 ALGORITHM = "HS256"
 
-logger = get_module_logger()
+logger = structlog.get_logger()
+
+# Get settings once at module import (safe - singleton with @lru_cache)
+_settings = get_settings()
+ACCESS_TOKEN_EXPIRE_MINUTES = _settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
+ACCESS_TOKEN_MAX_AGE_MINUTES = _settings.server.ACCESS_TOKEN_MAX_AGE_MINUTES
+SECRET_KEY = _settings.server.SECRET_KEY
 oauth2_scheme = HTTPBearer(auto_error=False)
 
 
