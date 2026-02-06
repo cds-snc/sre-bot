@@ -5,7 +5,7 @@ verifying task registration and error handling across the system.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from jobs import scheduled_tasks
 
 
