@@ -13,7 +13,6 @@ from server import bot_middleware
 
 middlewares = [(bot_middleware.BotMiddleware, {"bot": MagicMock()})]
 test_app = create_test_app(access.router, middlewares)
-client = TestClient(test_app)
 
 
 @pytest.fixture
@@ -309,9 +308,10 @@ async def test_get_aws_active_requests_unauthenticated():
                 await access.get_current_user(request, None)
 
             # If you need to test the actual endpoint, use the TestClient
-            response = client.get(
-                "/active_requests", cookies={"access_token": invalid_jwt_token}
-            )
+            with TestClient(test_app) as client:
+                response = client.get(
+                    "/active_requests", cookies={"access_token": invalid_jwt_token}
+                )
 
             # Assertions for the endpoint
             assert response.status_code == 401
@@ -372,7 +372,8 @@ async def test_get_aws_active_requests_exception_unauthenticated():
             ),
         ):
             # Make the GET request
-            response = client.get("/active_requests")
+            with TestClient(test_app) as client:
+                response = client.get("/active_requests")
 
             # Assertions
             assert response.status_code == 401

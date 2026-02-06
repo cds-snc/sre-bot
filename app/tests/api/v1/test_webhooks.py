@@ -9,7 +9,6 @@ from models.webhooks import (
     WebhookResult,
 )
 from utils.tests import create_test_app
-from server import bot_middleware
 
 
 @pytest.fixture
@@ -19,9 +18,10 @@ def bot_mock():
 
 @pytest.fixture
 def test_client(bot_mock):
-    middlewares = [(bot_middleware.BotMiddleware, {"bot": bot_mock})]
-    test_app = create_test_app(webhooks.router, middlewares)
-    return TestClient(test_app)
+    test_app = create_test_app(webhooks.router)
+    test_app.state.bot = bot_mock  # Inject mock bot into app state
+    with TestClient(test_app) as client:
+        yield client
 
 
 @patch("api.v1.routes.webhooks.map_emails_to_slack_users")

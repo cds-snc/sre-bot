@@ -11,7 +11,6 @@ from utils.tests import create_test_app, rate_limiting_helper
 
 middlewares: list = []
 test_app = create_test_app(auth.router, middlewares)
-client = TestClient(test_app)
 
 
 # Test the user info endpoint with valid JWT token
@@ -33,7 +32,8 @@ def test_user_info_endpoint_with_valid_token():
 
     try:
         # Make the request to /auth/me
-        response = client.get("/auth/me")
+        with TestClient(test_app) as client:
+            response = client.get("/auth/me")
 
         # Verify the response
         assert response.status_code == 200
@@ -53,10 +53,11 @@ def test_user_info_endpoint_with_valid_token():
 )
 def test_user_info_endpoint_without_token():
     """Test /auth/me endpoint without Bearer token."""
-    response = client.get("/auth/me")
-    # Should get 401 Unauthorized because Bearer token is required
-    # Receiving 403 instead, needs investigation or possibly review approach to testing 3rd party dependencies in this case
-    assert response.status_code == 401
+    with TestClient(test_app) as client:
+        response = client.get("/auth/me")
+        # Should get 401 Unauthorized because Bearer token is required
+        # Receiving 403 instead, needs investigation or possibly review approach to testing 3rd party dependencies in this case
+        assert response.status_code == 401
 
 
 # Test the user info endpoint with missing claims
@@ -74,13 +75,14 @@ def test_user_info_endpoint_partial_claims():
     test_app.dependency_overrides[auth.validate_jwt_token] = override_validate_jwt
 
     try:
-        response = client.get("/auth/me")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["sub"] == "user456"
-        assert data["email"] is None
-        assert data["name"] is None
-        assert data["issuer"] == "https://example.com"
+        with TestClient(test_app) as client:
+            response = client.get("/auth/me")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["sub"] == "user456"
+            assert data["email"] is None
+            assert data["name"] is None
+            assert data["issuer"] == "https://example.com"
     finally:
         # Clean up dependency override
         test_app.dependency_overrides.clear()
