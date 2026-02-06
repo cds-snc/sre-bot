@@ -406,6 +406,36 @@ def mock_settings(make_mock_settings):
 
 
 # ============================================================================
+# FastAPI App Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def app_with_lifespan(monkeypatch):
+    """Provide a real FastAPI app instance with lifespan context.
+
+    This fixture exercises the full app initialization lifecycle including:
+    - Lifespan startup (settings, logger, providers, bot initialization)
+    - Request/response cycle
+    - Lifespan shutdown
+
+    Use this for end-to-end integration tests that need to validate:
+    - app.state is properly initialized
+    - HTTP routes work with real app context
+    - Graceful error handling when dependencies are unavailable
+
+    Returns:
+        TestClient: FastAPI TestClient with real app initialized
+    """
+    from fastapi.testclient import TestClient
+    from server.server import handler
+
+    # Create client which triggers lifespan context manager
+    with TestClient(handler) as client:
+        yield client
+
+
+# ============================================================================
 # Test Markers
 # ============================================================================
 
