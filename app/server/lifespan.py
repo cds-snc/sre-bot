@@ -15,7 +15,11 @@ from infrastructure.events import (
     register_infrastructure_handlers,
 )
 from infrastructure.logging.setup import configure_logging
-from infrastructure.services import get_settings
+from infrastructure.services import (
+    discover_and_register_platforms,
+    get_platform_service,
+    get_settings,
+)
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -135,6 +139,46 @@ def _activate_providers(
         )
     except Exception as exc:
         logger.error("group_providers_activation_failed", error=str(exc))
+        raise
+
+    try:
+        platform_service = get_platform_service()
+        platform_providers = platform_service.load_providers()
+        app.state.platform_service = platform_service
+        app.state.platform_providers = platform_providers
+
+        # Initialize all enabled providers (establishes connections)
+        init_results = platform_service.initialize_all_providers()
+        initialized = [
+            name for name, result in init_results.items() if result.is_success
+        ]
+        failed = [
+            name for name, result in init_results.items() if not result.is_success
+        ]
+
+        if failed:
+            logger.warning(
+                "platform_providers_initialization_partial_failure",
+                initialized=initialized,
+                failed=failed,
+            )
+
+        # Discover and register platform commands for ALL enabled providers
+        # The discover function handles None providers gracefully
+        discover_and_register_platforms(
+            slack_provider=platform_providers.get("slack"),  # type: ignore
+            teams_provider=platform_providers.get("teams"),  # type: ignore
+            discord_provider=platform_providers.get("discord"),  # type: ignore
+        )
+
+        logger.info(
+            "platform_providers_activated",
+            count=len(platform_providers),
+            providers=list(platform_providers.keys()),
+            initialized=initialized,
+        )
+    except Exception as exc:
+        logger.error("platform_providers_activation_failed", error=str(exc))
         raise
 
     try:

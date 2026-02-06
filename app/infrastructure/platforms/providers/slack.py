@@ -3,8 +3,9 @@
 Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
-import structlog
 from typing import Any, Callable, Dict, Optional
+
+import structlog
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
