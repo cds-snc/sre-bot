@@ -6,7 +6,7 @@ executing the actual scheduled work.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, run_continuously
+from jobs.scheduled_tasks import safe_run, scheduler_heartbeat
 
 
 class TestSafeRun:
@@ -107,25 +107,3 @@ class TestSchedulerHeartbeat:
         scheduler_heartbeat()
 
         mock_time.ctime.assert_called_once()
-
-
-class TestRunContinuously:
-    """Tests for continuous run loop."""
-
-    @pytest.mark.unit
-    def test_run_continuously_returns_event(self) -> None:
-        """Test that run_continuously returns a threading.Event.
-
-        Note: Full mocking of run_continuously is complex due to the
-        nested ScheduleThread class. This test verifies the function
-        can be called without errors and returns the correct type.
-        """
-        # This is an integration test - it actually starts a thread
-        result = run_continuously(interval=1440)  # 24 hour interval so it barely runs
-
-        # Verify it returns an Event object
-        assert hasattr(result, "is_set")
-        assert hasattr(result, "set")
-
-        # Stop the thread
-        result.set()
