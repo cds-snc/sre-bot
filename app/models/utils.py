@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Optional, Type, Tuple
 from pydantic import BaseModel, ValidationError
-from core.logging import get_module_logger
+from structlog import get_logger
 from modules.ops.notifications import log_ops_message
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:
@@ -126,10 +126,8 @@ def select_best_model(
             best_match = (model, instance)
 
     if best_match is None:
-        logger.warning(
-            "invalid_model_detected",
-            payload=str(data),
-        )
+        log = logger.bind(model_count=len(models), data_keys=list(data.keys()))
+        log.warning("invalid_model_detected", payload=str(data))
         log_ops_message(
             f"Received invalid payload that did not match any known model:\n`{data}`",
         )
