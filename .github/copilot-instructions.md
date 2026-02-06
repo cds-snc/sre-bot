@@ -67,14 +67,14 @@ modules/feature/
 
 Detailed patterns with code examples and checklists:
 
-1. **[imports-pattern.md](.github/skills/imports-pattern.md)** ⚠️ TOP PRIORITY
-2. **[settings-singleton.md](.github/skills/settings-singleton.md)**
-3. **[logging-pattern.md](.github/skills/logging-pattern.md)**
-4. **[provider-pattern.md](.github/skills/provider-pattern.md)**
-5. **[initialization-pattern.md](.github/skills/initialization-pattern.md)**
-6. **[no-async-pattern.md](.github/skills/no-async-pattern.md)**
-7. **[type-hints-pattern.md](.github/skills/type-hints-pattern.md)**
-8. **[testing-pattern.md](.github/skills/testing-pattern.md)**
+1. **[imports-pattern.md](./skills/imports-pattern.md)** ⚠️ TOP PRIORITY
+2. **[settings-singleton.md](./skills/settings-singleton.md)**
+3. **[logging-pattern.md](./skills/logging-pattern.md)**
+4. **[provider-pattern.md](./skills/provider-pattern.md)**
+5. **[initialization-pattern.md](./skills/initialization-pattern.md)**
+6. **[no-async-pattern.md](./skills/no-async-pattern.md)**
+7. **[type-hints-pattern.md](./skills/type-hints-pattern.md)**
+8. **[testing-pattern.md](./skills/testing-pattern.md)**
 
 **Read skills before implementing patterns.**
 
