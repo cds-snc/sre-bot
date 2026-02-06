@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, cast
 
 from fastapi import Request
 from pydantic import BaseModel
+from slack_sdk import WebClient
 from core.logging import get_module_logger
 from utils.models import select_best_model
 from models.webhooks import (
@@ -15,6 +16,13 @@ from modules.webhooks.aws_sns import process_aws_sns_payload
 from modules.webhooks.simple_text import process_simple_text_payload
 
 logger = get_module_logger()
+
+
+def _get_bot_client(request: Request) -> Optional[WebClient]:
+    bot = getattr(request.app.state, "bot", None)
+    if bot is None:
+        return None
+    return getattr(bot, "client", None)
 
 
 def validate_payload(
@@ -90,8 +98,15 @@ def handle_webhook_payload(
             )
         case "AwsSnsPayload":
             aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
+            bot_client = _get_bot_client(request)
+            if bot_client is None:
+                return WebhookResult(
+                    status="error",
+                    action="none",
+                    message="Slack bot not initialized",
+                )
             webhook_result = process_aws_sns_payload(
-                aws_sns_payload_instance, request.state.bot.client
+                aws_sns_payload_instance, bot_client
             )
 
         case "AccessRequest":
