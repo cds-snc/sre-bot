@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import sys
 import threading
 from typing import AsyncIterator, Optional, TYPE_CHECKING, cast
 
@@ -34,6 +35,11 @@ from modules.groups.providers import (
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
+
+
+def _is_test_environment() -> bool:
+    """Detect if running in a test environment."""
+    return "pytest" in sys.modules
 
 
 def _get_logger(settings: "Settings") -> BoundLogger:
@@ -152,9 +158,15 @@ def _activate_providers(
 
 
 def _get_bot(settings: "Settings") -> Optional[App]:
+    """Create Slack App instance if token available and not in test environment."""
+    # Skip Slack initialization during tests
+    if _is_test_environment():
+        return None
+
     slack_token = settings.slack.SLACK_TOKEN
     if not bool(slack_token):
         return None
+
     return App(token=slack_token)
 
 
