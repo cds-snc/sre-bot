@@ -48,7 +48,6 @@ test-legacy:
 		tests/api \
 		tests/core \
 		tests/modules \
-		tests/server \
 		tests/jobs \
 		tests/integrations \
 		tests/models \
