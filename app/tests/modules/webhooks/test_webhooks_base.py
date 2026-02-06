@@ -89,6 +89,7 @@ def test_handle_webhook_payload_with_sns_payload(
     process_aws_sns_payload_mock,
 ):
     request = MagicMock()
+    request.app.state.bot.client = MagicMock()
     payload = {
         "Type": "Notification",
         "MessageId": "12345",
@@ -119,7 +120,7 @@ def test_handle_webhook_payload_with_sns_payload(
     assert isinstance(response.payload, WebhookPayload)
     assert response.payload.text == "Processed SNS message"
     process_aws_sns_payload_mock.assert_called_once_with(
-        ANY, request.state.bot.client
+        ANY, request.app.state.bot.client
     )  # Ensure the client is passed
 
 

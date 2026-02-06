@@ -1,14 +1,13 @@
 import json
-from typing import Union, Dict, Any
+from typing import Any, Dict, Optional, Union
 import structlog
 
-from api.dependencies.rate_limits import get_limiter
-
 from fastapi import APIRouter, HTTPException, Request, Body
+from slack_sdk import WebClient
+
+from api.dependencies.rate_limits import get_limiter
 from integrations.sentinel import log_to_sentinel
-from models.webhooks import (
-    WebhookPayload,
-)
+from models.webhooks import WebhookPayload
 from modules.slack import webhooks
 from modules.webhooks.base import handle_webhook_payload
 from modules.webhooks.slack import map_emails_to_slack_users
@@ -17,6 +16,13 @@ from modules.webhooks.slack import map_emails_to_slack_users
 logger = structlog.get_logger()
 router = APIRouter(tags=["Access"])
 limiter = get_limiter()
+
+
+def _get_bot_client(request: Request) -> Optional[WebClient]:
+    bot = getattr(request.app.state, "bot", None)
+    if bot is None:
+        return None
+    return getattr(bot, "client", None)
 
 
 @router.post("/hook/{webhook_id}")
@@ -70,7 +76,13 @@ def handle_webhook(
     webhook_result = handle_webhook_payload(payload_dict, request)
 
     if webhook_result.status == "error":
-        raise HTTPException(status_code=400, detail="Invalid payload")
+        status_code = 400
+        if webhook_result.message == "Slack bot not initialized":
+            status_code = 503
+        raise HTTPException(
+            status_code=status_code,
+            detail=webhook_result.message or "Invalid payload",
+        )
 
     if webhook_result.action == "post" and isinstance(
         webhook_result.payload, WebhookPayload
@@ -86,10 +98,16 @@ def handle_webhook(
 
         webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
 
-        try:
-            request.app.state.bot.client.api_call(
-                "chat.postMessage", json=webhook_payload_parsed
+        bot_client = _get_bot_client(request)
+        if bot_client is None:
+            log.error("slack_bot_unavailable")
+            raise HTTPException(
+                status_code=503,
+                detail="Slack bot not initialized",
             )
+
+        try:
+            bot_client.api_call("chat.postMessage", json=webhook_payload_parsed)
             log_to_sentinel(
                 "webhook_sent",
                 {"webhook": webhook, "payload": webhook_payload_parsed},
