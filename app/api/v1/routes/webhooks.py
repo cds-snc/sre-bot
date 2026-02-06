@@ -87,7 +87,7 @@ def handle_webhook(
         webhook_payload_parsed = webhook_payload.model_dump(exclude_none=True)
 
         try:
-            request.state.bot.client.api_call(
+            request.app.state.bot.client.api_call(
                 "chat.postMessage", json=webhook_payload_parsed
             )
             log_to_sentinel(
