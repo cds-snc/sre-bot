@@ -26,12 +26,12 @@ def test_identity_service_dep_in_route():
         )
         return {"user_id": user.user_id, "email": user.email}
 
-    client = TestClient(app)
-    response = client.get("/test-identity")
+    with TestClient(app) as client:
+        response = client.get("/test-identity")
 
-    assert response.status_code == 200
-    assert response.json()["user_id"] == "test123"
-    assert response.json()["email"] == "test@example.com"
+        assert response.status_code == 200
+        assert response.json()["user_id"] == "test123"
+        assert response.json()["email"] == "test@example.com"
 
 
 def test_identity_service_dep_override():
@@ -55,11 +55,11 @@ def test_identity_service_dep_override():
     app.dependency_overrides[get_identity_service] = lambda: mock_service
 
     try:
-        client = TestClient(app)
-        response = client.get("/test-identity")
+        with TestClient(app) as client:
+            response = client.get("/test-identity")
 
-        assert response.status_code == 200
-        assert response.json()["user_id"] == "test123"
+            assert response.status_code == 200
+            assert response.json()["user_id"] == "test123"
     finally:
         app.dependency_overrides.clear()
 
@@ -83,19 +83,18 @@ def test_identity_service_multiple_routes():
         user = identity.resolve_from_webhook({"user_id": "webhook_user"})
         return {"user_id": user.user_id, "source": user.source.value}
 
-    client = TestClient(app)
+    with TestClient(app) as client:
+        # Test JWT resolution
+        jwt_response = client.get("/jwt-resolve")
+        assert jwt_response.status_code == 200
+        assert jwt_response.json()["source"] == "api_jwt"
 
-    # Test JWT resolution
-    jwt_response = client.get("/jwt-resolve")
-    assert jwt_response.status_code == 200
-    assert jwt_response.json()["source"] == "api_jwt"
+        # Test system resolution
+        system_response = client.get("/system-resolve")
+        assert system_response.status_code == 200
+        assert system_response.json()["user_id"] == "system"
 
-    # Test system resolution
-    system_response = client.get("/system-resolve")
-    assert system_response.status_code == 200
-    assert system_response.json()["user_id"] == "system"
-
-    # Test webhook resolution
-    webhook_response = client.post("/webhook-resolve")
-    assert webhook_response.status_code == 200
-    assert webhook_response.json()["user_id"] == "webhook_user"
+        # Test webhook resolution
+        webhook_response = client.post("/webhook-resolve")
+        assert webhook_response.status_code == 200
+        assert webhook_response.json()["user_id"] == "webhook_user"

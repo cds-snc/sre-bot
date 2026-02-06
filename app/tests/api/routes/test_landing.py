@@ -9,7 +9,8 @@ from main import server_app
 @pytest.fixture
 def test_app():
     """Provide a test client for the FastAPI app."""
-    return TestClient(server_app)
+    with TestClient(server_app) as client:
+        yield client
 
 
 @pytest.fixture

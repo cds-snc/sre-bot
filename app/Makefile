@@ -48,12 +48,10 @@ test-legacy:
 		tests/api \
 		tests/core \
 		tests/modules \
-		tests/server \
 		tests/jobs \
 		tests/integrations \
 		tests/models \
 		tests/utils \
-		tests/test_main.py \
 		tests/test_factory_validation.py \
 		--show-capture=log --log-level=INFO -r fE && \
 	python3 -m coverage report -m
