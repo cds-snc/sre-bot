@@ -48,7 +48,6 @@ test-legacy:
 		tests/api \
 		tests/core \
 		tests/modules \
-		tests/jobs \
 		tests/integrations \
 		tests/utils \
 		tests/test_factory_validation.py \

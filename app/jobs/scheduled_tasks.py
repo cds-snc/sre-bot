@@ -2,6 +2,7 @@ import threading
 import time
 import schedule
 
+from structlog import get_logger
 from integrations import maxmind, opsgenie
 from integrations.google_workspace import google_drive
 
@@ -12,9 +13,8 @@ from modules.incident.notify_stale_incident_channels import (
 )
 from modules.groups.reconciliation import worker as reconciliation_worker
 
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def safe_run(job):
