@@ -8,6 +8,7 @@ This module provides the following features:
 
 """
 
+import structlog
 from slack_bolt import App, Ack, Respond
 from slack_sdk.web import WebClient
 
@@ -22,13 +23,9 @@ from modules.aws import (
     lambdas,
     spending,
 )
-from core.config import settings
-from core.logging import get_module_logger
+from infrastructure.services import get_settings
 
-PREFIX = settings.PREFIX
-AWS_ADMIN_GROUPS = settings.aws_feature.AWS_ADMIN_GROUPS
-
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 help_text = """
 \n `/aws users <operation> <user1> <user2> ...`
@@ -61,7 +58,8 @@ def register(bot: App) -> None:
     Args:
         bot (SlackBot): The SlackBot instance to which the module will be registered.
     """
-    bot.command(f"/{PREFIX}aws")(aws_command)
+    settings = get_settings()
+    bot.command(f"/{settings.PREFIX}aws")(aws_command)
     bot.view("aws_access_view")(aws_access_requests.access_view_handler)
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
@@ -74,20 +72,21 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
     Args:
         ack (function): The function to acknowledge the command.
         command (dict): The command dictionary containing the command text.
-        logger (Logger): The logger instance.
         respond (function): The function to respond to the command.
         client (SlackClient): The Slack client instance.
         body (dict): The request
     """
 
     ack()
-    logger.info(
-        "aws_command_received",
-        command=command["text"],
+    log = logger.bind(
         user_id=command["user_id"],
         user_name=command["user_name"],
         channel_id=command["channel_id"],
         channel_name=command["channel_name"],
+    )
+    log.info(
+        "aws_command_received",
+        command=command["text"],
     )
 
     if command["text"] == "":
@@ -105,23 +104,23 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
         case "health":
             aws_account_health.request_health_modal(client, body)
         case "users":
-            users.command_handler(client, body, respond, args, logger)
+            users.command_handler(client, body, respond, args)
         case "groups":
-            groups.command_handler(client, body, respond, args, logger)
+            groups.command_handler(client, body, respond, args)
         case "lambda" | "lambdas":
-            lambdas.command_handler(client, body, respond, args, logger)
+            lambdas.command_handler(client, body, respond, args)
         case "spending":
             respond(
                 "Generating spending data...\nGénération des données de dépenses..."
             )
-            spending_df = spending.generate_spending_data(logger)
+            spending_df = spending.generate_spending_data()
             if spending_df is None:
                 respond(
                     "Failed to generate spending data. Please try again later.\n"
                     "Échec de la génération des données de dépenses. Veuillez réessayer plus tard."
                 )
                 return
-            spending.update_spending_data(spending_df, logger)
+            spending.update_spending_data(spending_df)
             respond(
                 "Spending data has been updated.\nLes données de dépenses ont été mises à jour."
             )

@@ -1,7 +1,10 @@
+import structlog
 from slack_sdk.web import WebClient
 from slack_bolt import Respond
 
 from integrations.aws import lambdas as aws_lambdas
+
+logger = structlog.get_logger()
 
 help_text = """
 \n *AWS Lambda*:
@@ -10,7 +13,7 @@ help_text = """
 """
 
 
-def command_handler(client: WebClient, body, respond: Respond, args, logger):
+def command_handler(client: WebClient, body, respond: Respond, args):
     """Handle the command.
 
     Args:
@@ -18,7 +21,6 @@ def command_handler(client: WebClient, body, respond: Respond, args, logger):
         body (dict): The request body.
         respond (function): The function to respond to the request.
         args (list[str]): The list of arguments.
-        logger (Logger): The logger.
     """
 
     action = args.pop(0) if args else ""
@@ -27,14 +29,14 @@ def command_handler(client: WebClient, body, respond: Respond, args, logger):
         case "help" | "aide":
             respond(help_text)
         case "functions" | "function":
-            request_list_functions(client, body, respond, logger)
+            request_list_functions(client, body, respond)
         case "layers" | "layer":
-            request_list_layers(client, body, respond, logger)
+            request_list_layers(client, body, respond)
         case _:
             respond("Invalid command. Type `/aws lambda help` for more information.")
 
 
-def request_list_functions(client: WebClient, body, respond: Respond, logger):
+def request_list_functions(client: WebClient, body, respond: Respond):
     """List all Lambda functions.
 
     Args:
@@ -45,7 +47,8 @@ def request_list_functions(client: WebClient, body, respond: Respond, logger):
     respond("Fetching Lambda functions...")
     response = aws_lambdas.list_functions()
     if response:
-        logger.info("lambda_functions_found", count=len(response), response=response)
+        log = logger.bind(count=len(response))
+        log.info("lambda_functions_found")
         function_string = ""
         for function in response:
             function_string += f"\n • {function['FunctionName']}"
@@ -54,7 +57,7 @@ def request_list_functions(client: WebClient, body, respond: Respond, logger):
         respond("Lambda functions management is currently disabled.")
 
 
-def request_list_layers(client: WebClient, body, respond: Respond, logger):
+def request_list_layers(client: WebClient, body, respond: Respond):
     """List all Lambda layers.
 
     Args:
@@ -65,7 +68,8 @@ def request_list_layers(client: WebClient, body, respond: Respond, logger):
     response = aws_lambdas.list_layers()
     respond("Fetching Lambda layers...")
     if response:
-        logger.info("lambda_layers_found", count=len(response), response=response)
+        log = logger.bind(count=len(response))
+        log.info("lambda_layers_found")
         response_string = ""
         for layer in response:
             response_string += f"\n • {layer['LayerName']} <latest version: {layer['LatestMatchingVersion']['Version']}>"

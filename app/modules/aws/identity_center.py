@@ -1,11 +1,12 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 
+import structlog
+
 from integrations.aws import identity_store
 from modules.provisioning import groups, entities, users
 from utils import filters
-from core.logging import get_module_logger
 
-logger = get_module_logger()
+logger = structlog.get_logger()
 
 
 def synchronize(
@@ -33,8 +34,7 @@ def synchronize(
         tuple: A tuple containing the users sync status and groups sync status.
     """
 
-    logger.info(
-        "synchronize_task_requested",
+    log = logger.bind(
         enable_users_sync=enable_users_sync,
         enable_groups_sync=enable_groups_sync,
         enable_user_create=enable_user_create,
@@ -42,7 +42,10 @@ def synchronize(
         enable_membership_create=enable_membership_create,
         enable_membership_delete=enable_membership_delete,
         query=query,
-        pre_processing_filters=pre_processing_filters,
+    )
+    log.info(
+        "synchronize_task_requested",
+        pre_processing_filters_count=len(pre_processing_filters),
     )
     users_sync_status = None
     groups_sync_status = None
@@ -55,7 +58,7 @@ def synchronize(
         post_processing_filters=source_groups_filters,
     )
     source_users = filters.get_unique_nested_dicts(source_groups, "members")
-    logger.info(
+    log.info(
         "source_groups_users_fetched",
         groups_count=len(source_groups),
         users_count=len(source_users),
@@ -65,7 +68,7 @@ def synchronize(
         "aws_identity_center", pre_processing_filters=pre_processing_filters
     )
     target_users = identity_store.list_users()
-    logger.info(
+    log.info(
         "target_groups_users_fetched",
         groups_count=len(target_groups),
         users_count=len(target_users),
@@ -85,7 +88,7 @@ def synchronize(
             enable_membership_create,
             enable_membership_delete,
         )
-    logger.info(
+    log.info(
         "synchronize_task_completed",
         users_sync_status=users_sync_status,
         groups_sync_status=groups_sync_status,

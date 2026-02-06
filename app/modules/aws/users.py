@@ -1,11 +1,13 @@
 import json
+import structlog
+
 from slack_sdk.web import WebClient
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from integrations.slack import users as slack_users
-from core.config import settings
+from infrastructure.services import get_settings
 
-AWS_ADMIN_GROUPS = settings.aws_feature.AWS_ADMIN_GROUPS
+logger = structlog.get_logger()
 
 help_text = """
 \n *AWS Users*:
@@ -14,7 +16,7 @@ help_text = """
 """
 
 
-def command_handler(client: WebClient, body, respond, args: str, logger):
+def command_handler(client: WebClient, body, respond, args: str):
     """Handle the command.
 
     Args:
@@ -22,7 +24,6 @@ def command_handler(client: WebClient, body, respond, args: str, logger):
         body (dict): The request body.
         respond (function): The function to respond to the request.
         args (list[str]): The list of arguments.
-        logger (Logger): The logger.
     """
     action: list[str] = args.pop(0) if args else ""
     match action:
@@ -31,12 +32,12 @@ def command_handler(client: WebClient, body, respond, args: str, logger):
         case "create" | "delete":
             # reinsert the action into the args list for the request_user_provisioning function
             args.insert(0, action)
-            request_user_provisioning(client, body, respond, args, logger)
+            request_user_provisioning(client, body, respond, args)
         case _:
             respond("Invalid command. Type `/aws users help` for more information.")
 
 
-def request_user_provisioning(client: WebClient, body, respond, args, logger):
+def request_user_provisioning(client: WebClient, body, respond, args):
     """Request AWS user provisioning.
 
     This function processes a request to provision or deprovision AWS users.
@@ -46,13 +47,14 @@ def request_user_provisioning(client: WebClient, body, respond, args, logger):
         body (dict): The request body.
         respond (function): The function to respond to the request.
         args (list): The list of arguments passed with the command.
-        logger (Logger): The logger instance.
     """
+    settings = get_settings()
     requestor_email = slack_users.get_user_email_from_body(client, body)
-    logger.info(
-        "aws_users_provisioning_request_received", requestor_email=requestor_email
-    )
-    if permissions.is_user_member_of_groups(requestor_email, AWS_ADMIN_GROUPS):
+    log = logger.bind(requestor_email=requestor_email)
+    log.info("aws_users_provisioning_request_received")
+    if permissions.is_user_member_of_groups(
+        requestor_email, settings.aws_feature.AWS_ADMIN_GROUPS
+    ):
         operation = args[0]
         users_emails = args[1:]
         users_emails = [
@@ -70,6 +72,4 @@ def request_user_provisioning(client: WebClient, body, respond, args, logger):
             "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."
         )
 
-    logger.info(
-        "aws_users_provisioning_request_completed", requestor_email=requestor_email
-    )
+    log.info("aws_users_provisioning_request_completed")

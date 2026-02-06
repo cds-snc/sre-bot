@@ -2,18 +2,26 @@ import datetime
 import uuid
 
 import boto3  # type: ignore
-from core.config import settings
+import structlog
+
+from infrastructure.services import get_settings
 from integrations.aws import identity_store, organizations, sso_admin
 from modules.ops.notifications import log_ops_message
 from slack_sdk import WebClient
 
-PREFIX = settings.PREFIX
+logger = structlog.get_logger()
 
-dynamodb_client = boto3.client(
-    "dynamodb",
-    endpoint_url=("http://dynamodb-local:8000" if PREFIX != "" else None),
-    region_name="ca-central-1",
-)
+
+def _get_dynamodb_client():
+    settings = get_settings()
+    return boto3.client(
+        "dynamodb",
+        endpoint_url=("http://dynamodb-local:8000" if settings.PREFIX != "" else None),
+        region_name="ca-central-1",
+    )
+
+
+dynamodb_client = _get_dynamodb_client()
 
 table = "aws_access_requests"
 
@@ -158,7 +166,7 @@ def get_past_requests():
     return response.get("Items", [])
 
 
-def access_view_handler(ack, body, logger, client: WebClient):
+def access_view_handler(ack, body, request_logger, client: WebClient):
     ack()
 
     errors = {}
@@ -190,13 +198,15 @@ def access_view_handler(ack, body, logger, client: WebClient):
 
     msg = f"<@{user_id}> ({email}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
 
-    logger.info(
-        "aws_account_access_request",
+    log = logger.bind(
         user_id=user_id,
         email=email,
         account_id=account,
         account_name=account_name,
         access_type=access_type,
+    )
+    log.info(
+        "aws_account_access_request",
         rationale=rationale,
     )
     log_ops_message(msg)
