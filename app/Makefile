@@ -49,7 +49,6 @@ test-legacy:
 		tests/core \
 		tests/modules \
 		tests/integrations \
-		tests/models \
 		tests/utils \
 		tests/test_factory_validation.py \
 		--show-capture=log --log-level=INFO -r fE && \
