@@ -102,6 +102,12 @@ def _format_success_blocks(data: GeolocateResponse) -> list[Dict[str, Any]]:
         fields.append({"type": "mrkdwn", "text": f"*City:*\n{data.city}"})
     if data.country:
         fields.append({"type": "mrkdwn", "text": f"*Country:*\n{data.country}"})
+    if data.country_code:
+        fields.append(
+            {"type": "mrkdwn", "text": f"*Country Code:*\n{data.country_code}"}
+        )
+    if data.postal_code:
+        fields.append({"type": "mrkdwn", "text": f"*Postal Code:*\n{data.postal_code}"})
     if data.latitude and data.longitude:
         fields.append(
             {
@@ -111,6 +117,14 @@ def _format_success_blocks(data: GeolocateResponse) -> list[Dict[str, Any]]:
         )
     if data.time_zone:
         fields.append({"type": "mrkdwn", "text": f"*Time Zone:*\n{data.time_zone}"})
+
+    if not fields:
+        fields.append(
+            {
+                "type": "mrkdwn",
+                "text": "*Details:*\nNo location data available for this IP.",
+            }
+        )
 
     return [
         {
