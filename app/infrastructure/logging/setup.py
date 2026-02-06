@@ -37,17 +37,17 @@ def _apply_otel_code_conventions(
     """Apply OpenTelemetry semantic conventions for code attributes.
 
     Converts structlog callsite parameters to OTel standard fields:
-        - code.filepath: Full file path (replaces deprecated code.filepath)
-        - code.function: Fully qualified function name (includes module.function)
-        - code.lineno: Line number (renamed from lineno)
+        - code.file.path: Full file path
+        - code.function.name: Fully qualified function name (includes module.function)
+        - code.line.number: Line number
 
     Per OpenTelemetry specs, code.namespace is deprecated and should be
-    included in code.function as a fully qualified name.
+    included in code.function.name as a fully qualified name.
 
     References:
         - https://opentelemetry.io/docs/specs/semconv/attributes-registry/code/
     """
-    # Extract pathname and convert to code.filepath (OTel standard)
+    # Extract pathname and convert to code.file.path (OTel standard)
     if "pathname" in event_dict:
         pathname = event_dict["pathname"]
 
@@ -60,33 +60,33 @@ def _apply_otel_code_conventions(
                 # Get path relative to app directory
                 relative_parts = parts[app_index + 1 :]
                 if relative_parts:
-                    event_dict["code.filepath"] = "/".join(relative_parts)
+                    event_dict["code.file.path"] = "/".join(relative_parts)
                 else:
-                    event_dict["code.filepath"] = pathname
+                    event_dict["code.file.path"] = pathname
             else:
-                event_dict["code.filepath"] = pathname
+                event_dict["code.file.path"] = pathname
         except (ValueError, IndexError):
-            event_dict["code.filepath"] = pathname
+            event_dict["code.file.path"] = pathname
 
     # Create fully qualified function name (module.function)
     if "module" in event_dict and "func_name" in event_dict:
         module = event_dict["module"]
         func_name = event_dict["func_name"]
-        event_dict["code.function"] = f"{module}.{func_name}"
+        event_dict["code.function.name"] = f"{module}.{func_name}"
     elif "func_name" in event_dict:
         # Fallback: just use function name if module unavailable
-        event_dict["code.function"] = event_dict["func_name"]
+        event_dict["code.function.name"] = event_dict["func_name"]
 
-    # Rename lineno to code.lineno (OTel standard)
+    # Rename lineno to code.line.number (OTel standard)
     if "lineno" in event_dict:
-        event_dict["code.lineno"] = event_dict["lineno"]
+        event_dict["code.line.number"] = event_dict["lineno"]
 
     # Clean up fields we don't need in final output
     event_dict.pop("pathname", None)
     event_dict.pop("module", None)
     event_dict.pop("func_name", None)
     event_dict.pop("lineno", None)
-    event_dict.pop("filename", None)  # Redundant with code.filepath
+    event_dict.pop("filename", None)  # Redundant with code.file.path
 
     return event_dict
 
@@ -108,7 +108,7 @@ def configure_logging(
     """Configure structured logging with OpenTelemetry semantic conventions.
 
     Configures structlog with:
-    - OpenTelemetry code attributes (code.filepath, code.function, code.lineno)
+    - OpenTelemetry code attributes (code.file.path, code.function.name, code.line.number)
     - Proper exception formatting with stack traces
     - Context variable merging for correlation IDs
     - Test environment detection for log suppression
@@ -176,7 +176,7 @@ def configure_logging(
                 CallsiteParameter.LINENO,
                 CallsiteParameter.FUNC_NAME,
                 CallsiteParameter.MODULE,  # For fully qualified function name
-                CallsiteParameter.PATHNAME,  # For code.filepath
+                CallsiteParameter.PATHNAME,  # For code.file.path
             ]
         ),
         # 4. Apply OpenTelemetry semantic conventions
