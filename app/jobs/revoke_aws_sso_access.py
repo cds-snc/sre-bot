@@ -1,9 +1,9 @@
-from core.logging import get_module_logger
+from structlog import get_logger
 from integrations.aws import identity_store, sso_admin
 from modules.aws import aws_access_requests
 from modules.ops.notifications import log_ops_message
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def revoke_aws_sso_access(client):
