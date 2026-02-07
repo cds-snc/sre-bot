@@ -202,7 +202,7 @@ from infrastructure.platforms.models import Card
 
 logger = structlog.get_logger()
 
-async def handle_add_member_command(
+def handle_add_member_command(
     payload: dict,
     request_id: str,
     settings: "Settings",
@@ -237,8 +237,8 @@ async def handle_add_member_command(
     group_id, user_email = args
     
     # Call internal HTTP endpoint (platform-agnostic business logic)
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
+    with httpx.Client() as client:
+        response = client.post(
             f"{settings.server.BASE_URL}/api/v1/groups/members",
             json={"group_id": group_id, "user_email": user_email},
             headers={"X-Request-ID": request_id},
@@ -261,6 +261,31 @@ async def handle_add_member_command(
     
     formatter = get_formatter("slack", settings)
     return formatter.format_card(card)
+
+---
+
+## Footnote: Async Platform Adapters (Future)
+
+Async adapters are deferred until the async-first migration. When that happens,
+use async HTTP clients and await the internal call.
+
+```python
+# Future async example (not current standard)
+import httpx
+
+async def handle_add_member_command(
+    payload: dict,
+    request_id: str,
+    settings: "Settings",
+) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{settings.server.BASE_URL}/api/v1/groups/members",
+            json={"group_id": "example", "user_email": "user@example.com"},
+            headers={"X-Request-ID": request_id},
+        )
+    return response.json()
+```
 ```
 
 **Why httpx for Internal Calls**:
