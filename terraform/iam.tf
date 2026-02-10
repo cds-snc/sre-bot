@@ -29,6 +29,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     ]
     resources = [
       "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config",
+      "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config-infrastructure",
       aws_ssm_parameter.gcp_sre_service_account_key.arn
     ]
   }
