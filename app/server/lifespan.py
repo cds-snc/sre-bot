@@ -16,8 +16,8 @@ from infrastructure.events import (
 )
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
-    discover_and_register_platforms,
-    get_platform_service,
+    # discover_and_register_platforms,
+    # get_platform_service,
     get_settings,
 )
 from jobs import scheduled_tasks
