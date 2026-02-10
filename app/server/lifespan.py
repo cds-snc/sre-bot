@@ -147,7 +147,24 @@ def _activate_providers(
         app.state.platform_service = platform_service
         app.state.platform_providers = platform_providers
 
+        # Discover and register platform commands for ALL enabled providers
+        # The discover function handles None providers gracefully
+        # This must happen BEFORE initialize_all_providers() to ensure handlers
+        # are registered before Socket Mode starts consuming events
+        discover_and_register_platforms(
+            slack_provider=platform_providers.get("slack"),  # type: ignore
+            teams_provider=platform_providers.get("teams"),  # type: ignore
+            discord_provider=platform_providers.get("discord"),  # type: ignore
+        )
+
+        logger.info(
+            "platform_commands_registered",
+            count=len(platform_providers),
+            providers=list(platform_providers.keys()),
+        )
+
         # Initialize all enabled providers (establishes connections)
+        # Done after handlers are registered to prevent race condition
         init_results = platform_service.initialize_all_providers()
         initialized = [
             name for name, result in init_results.items() if result.is_success
@@ -162,14 +179,6 @@ def _activate_providers(
                 initialized=initialized,
                 failed=failed,
             )
-
-        # Discover and register platform commands for ALL enabled providers
-        # The discover function handles None providers gracefully
-        discover_and_register_platforms(
-            slack_provider=platform_providers.get("slack"),  # type: ignore
-            teams_provider=platform_providers.get("teams"),  # type: ignore
-            discord_provider=platform_providers.get("discord"),  # type: ignore
-        )
 
         logger.info(
             "platform_providers_activated",
