@@ -16,8 +16,8 @@ from infrastructure.events import (
 )
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
-    discover_and_register_platforms,
-    get_platform_service,
+    # discover_and_register_platforms,
+    # get_platform_service,
     get_settings,
 )
 from jobs import scheduled_tasks
@@ -141,54 +141,57 @@ def _activate_providers(
         logger.error("group_providers_activation_failed", error=str(exc))
         raise
 
-    try:
-        platform_service = get_platform_service()
-        platform_providers = platform_service.load_providers()
-        app.state.platform_service = platform_service
-        app.state.platform_providers = platform_providers
-
-        # Discover and register platform commands for ALL enabled providers
-        # The discover function handles None providers gracefully
-        # This must happen BEFORE initialize_all_providers() to ensure handlers
-        # are registered before Socket Mode starts consuming events
-        discover_and_register_platforms(
-            slack_provider=platform_providers.get("slack"),  # type: ignore
-            teams_provider=platform_providers.get("teams"),  # type: ignore
-            discord_provider=platform_providers.get("discord"),  # type: ignore
-        )
-
-        logger.info(
-            "platform_commands_registered",
-            count=len(platform_providers),
-            providers=list(platform_providers.keys()),
-        )
-
-        # Initialize all enabled providers (establishes connections)
-        # Done after handlers are registered to prevent race condition
-        init_results = platform_service.initialize_all_providers()
-        initialized = [
-            name for name, result in init_results.items() if result.is_success
-        ]
-        failed = [
-            name for name, result in init_results.items() if not result.is_success
-        ]
-
-        if failed:
-            logger.warning(
-                "platform_providers_initialization_partial_failure",
-                initialized=initialized,
-                failed=failed,
-            )
-
-        logger.info(
-            "platform_providers_activated",
-            count=len(platform_providers),
-            providers=list(platform_providers.keys()),
-            initialized=initialized,
-        )
-    except Exception as exc:
-        logger.error("platform_providers_activation_failed", error=str(exc))
-        raise
+    # TODO: Platform system providers integration - commented out pending redesign
+    # This section was causing race conditions with Slack Socket Mode initialization.
+    # Will be re-implemented after refactoring to reuse the legacy Slack App instance.
+    # try:
+    #     platform_service = get_platform_service()
+    #     platform_providers = platform_service.load_providers()
+    #     app.state.platform_service = platform_service
+    #     app.state.platform_providers = platform_providers
+    #
+    #     # Discover and register platform commands for ALL enabled providers
+    #     # The discover function handles None providers gracefully
+    #     # This must happen BEFORE initialize_all_providers() to ensure handlers
+    #     # are registered before Socket Mode starts consuming events
+    #     discover_and_register_platforms(
+    #         slack_provider=platform_providers.get("slack"),  # type: ignore
+    #         teams_provider=platform_providers.get("teams"),  # type: ignore
+    #         discord_provider=platform_providers.get("discord"),  # type: ignore
+    #     )
+    #
+    #     logger.info(
+    #         "platform_commands_registered",
+    #         count=len(platform_providers),
+    #         providers=list(platform_providers.keys()),
+    #     )
+    #
+    #     # Initialize all enabled providers (establishes connections)
+    #     # Done after handlers are registered to prevent race condition
+    #     init_results = platform_service.initialize_all_providers()
+    #     initialized = [
+    #         name for name, result in init_results.items() if result.is_success
+    #     ]
+    #     failed = [
+    #         name for name, result in init_results.items() if not result.is_success
+    #     ]
+    #
+    #     if failed:
+    #         logger.warning(
+    #             "platform_providers_initialization_partial_failure",
+    #             initialized=initialized,
+    #             failed=failed,
+    #         )
+    #
+    #     logger.info(
+    #         "platform_providers_activated",
+    #         count=len(platform_providers),
+    #         providers=list(platform_providers.keys()),
+    #         initialized=initialized,
+    #     )
+    # except Exception as exc:
+    #     logger.error("platform_providers_activation_failed", error=str(exc))
+    #     raise
 
     try:
         command_providers = load_command_providers(settings=settings)
