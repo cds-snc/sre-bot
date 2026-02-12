@@ -3,23 +3,23 @@
 All platform-specific providers (Slack, Teams, Discord) inherit from this base class.
 """
 
-import structlog
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional
 
+import structlog
+
+from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import CapabilityDeclaration
 from infrastructure.platforms.models import (
+    CommandDefinition,
     CommandPayload,
     CommandResponse,
-    CommandDefinition,
 )
 from infrastructure.platforms.parsing import (
-    CommandArgumentParser,
     ArgumentParsingError,
+    CommandArgumentParser,
 )
-
-from infrastructure.i18n.models import TranslationKey, Locale
 
 if TYPE_CHECKING:
     from infrastructure.i18n.translator import Translator
@@ -62,7 +62,6 @@ class BasePlatformProvider(ABC):
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: Dict[str, CommandDefinition] = {}
         self._translator: Optional["Translator"] = None
-        self._parent_command: Optional[str] = None  # e.g., "sre" for "/sre geolocate"
 
     @property
     def name(self) -> str:
@@ -297,16 +296,17 @@ class BasePlatformProvider(ABC):
 
         return sorted(children, key=lambda c: c.name)
 
-    def set_parent_command(self, parent: str) -> None:
-        """Set parent command prefix for help generation.
+    def get_help_keywords(self) -> FrozenSet[str]:
+        """Get platform-specific help keywords for text commands.
 
-        DEPRECATED: This method is being phased out. Use the `parent` parameter
-        in register_command() instead.
+        Platforms that accept flat text commands can override this to enable
+        automatic help routing in dispatch_command(). Platforms with structured
+        input (cards, slash options) should return an empty set.
 
-        Args:
-            parent: Parent command (e.g., "sre" for "/sre geolocate")
+        Returns:
+            FrozenSet of keywords that should trigger help output.
         """
-        self._parent_command = parent
+        return frozenset()
 
     @abstractmethod
     def get_user_locale(self, user_id: str) -> str:
@@ -424,7 +424,8 @@ class BasePlatformProvider(ABC):
         # Check for EXPLICIT help requests (unless in legacy mode)
         # Legacy mode allows the handler to process help itself
         text = payload.text.strip().lower() if payload.text else ""
-        if not cmd_def.legacy_mode and text in ("help", "aide", "--help", "-h"):
+        help_keywords = self.get_help_keywords()
+        if help_keywords and not cmd_def.legacy_mode and text in help_keywords:
             # Return help for this specific command only
             help_text = self.generate_command_help(command_name, locale=user_locale)
             return CommandResponse(message=help_text, ephemeral=True)

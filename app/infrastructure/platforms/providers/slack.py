@@ -3,10 +3,11 @@
 Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
-from typing import Any, Callable, Dict, Optional
+import threading
+from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
 import structlog
-from slack_bolt import App
+from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from infrastructure.operations import OperationResult
@@ -21,8 +22,14 @@ from infrastructure.platforms.models import (
     CommandPayload,
     CommandResponse,
 )
+from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
-from infrastructure.platforms.utils.help import generate_help_text
+from infrastructure.platforms.utils.slack_help import (
+    SLACK_HELP_KEYWORDS,
+    build_slack_command_signature,
+    build_slack_display_path,
+    generate_slack_help_text,
+)
 
 logger = structlog.get_logger()
 
@@ -61,6 +68,8 @@ class SlackPlatformProvider(BasePlatformProvider):
         )
     """
 
+    SLACK_HELP_KEYWORDS = SLACK_HELP_KEYWORDS
+
     def __init__(
         self,
         settings,  # SlackPlatformSettings type
@@ -97,6 +106,7 @@ class SlackPlatformProvider(BasePlatformProvider):
         self._handler: Optional[SocketModeHandler] = (
             None  # Socket Mode handler reference
         )
+        self._socket_thread: Optional[threading.Thread] = None
 
     def get_capabilities(self) -> CapabilityDeclaration:
         """Get Slack platform capabilities.
@@ -112,10 +122,12 @@ class SlackPlatformProvider(BasePlatformProvider):
             PlatformCapability.THREADS,
             PlatformCapability.REACTIONS,
             PlatformCapability.FILE_SHARING,
+            PlatformCapability.HIERARCHICAL_TEXT_COMMANDS,
             metadata={
                 "socket_mode": self._settings.SOCKET_MODE,
                 "platform": "slack",
                 "connection_mode": "websocket",
+                "command_parsing": "hierarchical_text",
             },
         )
 
@@ -128,6 +140,10 @@ class SlackPlatformProvider(BasePlatformProvider):
             None (WebSocket mode, not HTTP)
         """
         return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
+
+    def get_help_keywords(self) -> FrozenSet[str]:
+        """Get Slack-specific help keywords for text commands."""
+        return self.SLACK_HELP_KEYWORDS
 
     def send_message(
         self,
@@ -243,18 +259,20 @@ class SlackPlatformProvider(BasePlatformProvider):
             )
 
         try:
-
             # Create Bolt App instance
             self._app = App(token=self._settings.BOT_TOKEN)
             self._client = self._app.client
             log.debug("slack_app_created")
 
-            # Initialize Socket Mode if enabled
+            # Auto-register root commands with Slack Bolt
+            # Extract unique root commands from registered command tree
+            # (e.g., "sre" from "sre.incident", "sre.webhooks", etc.)
+            self._auto_register_root_commands()
+
+            # Prepare Socket Mode handler if enabled (start happens separately)
             if self._settings.SOCKET_MODE:
-                handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
-                handler.connect()
-                self._handler = handler
-                log.info("socket_mode_handler_started")
+                self._handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
+                log.info("socket_mode_handler_prepared")
             else:
                 log.info("socket_mode_disabled_http_mode")
 
@@ -270,6 +288,185 @@ class SlackPlatformProvider(BasePlatformProvider):
                 message=f"Failed to initialize Slack app: {str(e)}",
                 error_code="INITIALIZATION_ERROR",
             )
+
+    def start(self) -> OperationResult:
+        """Start Slack Socket Mode if enabled."""
+        log = self._logger.bind(socket_mode=self._settings.SOCKET_MODE)
+
+        if not self._settings.SOCKET_MODE:
+            log.info("socket_mode_start_skipped")
+            return OperationResult.success(message="Socket Mode disabled")
+
+        if not self._handler:
+            log.error("socket_mode_handler_missing")
+            return OperationResult.permanent_error(
+                message="Socket Mode handler not initialized",
+                error_code="SOCKET_MODE_HANDLER_MISSING",
+            )
+
+        try:
+            self._socket_thread = threading.Thread(
+                target=self._handler.connect,
+                daemon=True,
+                name="slack-socket-mode",
+            )
+            self._socket_thread.start()
+            log.info("socket_mode_started")
+            return OperationResult.success(message="Socket Mode started")
+        except Exception as e:
+            log.error("socket_mode_start_failed", error=str(e))
+            return OperationResult.permanent_error(
+                message=f"Failed to start Socket Mode: {str(e)}",
+                error_code="SOCKET_MODE_START_FAILED",
+            )
+
+    def stop(self) -> None:
+        """Stop Slack Socket Mode handler if running."""
+        if self._handler:
+            self._handler.close()
+        if self._socket_thread and self._socket_thread.is_alive():
+            self._socket_thread.join(timeout=5)
+
+    def _auto_register_root_commands(self) -> None:
+        """Auto-register root commands with Slack Bolt based on registered command tree.
+
+        Analyzes self._commands to extract unique root commands (e.g., "sre" from "sre.incident")
+        and registers Slack Bolt handlers for them that delegate to route_hierarchical_command().
+
+        This eliminates the need for manual @bot.command("/sre") registrations in modules/.
+
+        Example:
+            After packages register:
+            - provider.register_command("incident", parent="sre", ...)
+            - provider.register_command("webhooks", parent="sre", ...)
+
+            This method auto-detects "/sre" is needed and registers:
+            @bot.command("/sre")
+            def handle_sre(ack, command, respond):
+                # Calls route_hierarchical_command("sre", ...)
+        """
+        if not self._app:
+            self._logger.warning("app_not_initialized_skipping_root_registration")
+            return
+
+        # Extract unique root commands from command tree
+        root_commands = set()
+        for full_path in self._commands.keys():
+            # Extract root from paths like "sre.incident", "sre.webhooks" → "sre"
+            root = full_path.split(".")[0]
+            root_commands.add(root)
+
+        # Register each root command with Slack Bolt
+        for root_command in sorted(root_commands):
+            # Build slash command (e.g., /sre, /geolocate)
+            slash_command = f"/{root_command}"
+
+            # Create handler closure that captures root_command
+            def create_handler(captured_root: str):
+                def handler(ack: Ack, command: Dict[str, Any], respond: Respond):
+                    """Auto-generated root command handler."""
+                    ack()
+
+                    # Create base payload from Slack command
+                    payload = CommandPayload(
+                        text="",  # Will be set by route_hierarchical_command
+                        user_id=command.get("user_id", ""),
+                        user_email=command.get("user_email"),
+                        channel_id=command.get("channel_id"),
+                        user_locale=command.get("locale", "en-US"),
+                        response_url=command.get("response_url"),
+                        platform_metadata=dict(command),
+                    )
+
+                    # Route through provider's hierarchical command handler
+                    response = self.route_hierarchical_command(
+                        root_command=captured_root,
+                        text=command.get("text", ""),
+                        payload=payload,
+                    )
+
+                    # Send response back to Slack
+                    self._send_command_response(response, respond)
+
+                return handler
+
+            # Register the handler with Slack Bolt
+            self._app.command(slash_command)(create_handler(root_command))
+
+            self._logger.info(
+                "auto_registered_root_command",
+                slash_command=slash_command,
+                root=root_command,
+            )
+
+    def _tokenize_command_text(self, text: str) -> List[str]:
+        """Tokenize Slack command text using quote-aware parsing."""
+        parser = CommandArgumentParser([])
+        return parser._tokenize(text)
+
+    def route_hierarchical_command(
+        self, root_command: str, text: str, payload: CommandPayload
+    ) -> CommandResponse:
+        """Route a Slack hierarchical command from flat text input.
+
+        Slack provides flat text input ("incident list --priority high"). This
+        method parses the first token as the subcommand and routes the remainder
+        to the matching handler using quote-aware tokenization.
+        """
+        if not text or not text.strip():
+            return self.dispatch_command(root_command, payload)
+
+        tokens = self._tokenize_command_text(text)
+        if not tokens:
+            return self.dispatch_command(root_command, payload)
+
+        first_word = tokens[0]
+        remaining_text = " ".join(tokens[1:]) if len(tokens) > 1 else ""
+
+        if first_word.lower() in self.SLACK_HELP_KEYWORDS:
+            payload.text = first_word
+            return self.dispatch_command(root_command, payload)
+
+        child_path = f"{root_command}.{first_word}"
+        if child_path in self._commands:
+            payload.text = remaining_text
+            return self.dispatch_command(child_path, payload)
+
+        payload.text = text
+        return self.dispatch_command(root_command, payload)
+
+    def _send_command_response(
+        self, response: CommandResponse, respond: Respond
+    ) -> None:
+        """Send CommandResponse to Slack using respond function.
+
+        Args:
+            response: CommandResponse from handler
+            respond: Slack Bolt respond function
+        """
+        response_type = "ephemeral" if response.ephemeral else "in_channel"
+
+        if response.blocks:
+            respond(
+                text=response.message or "",
+                blocks=response.blocks,
+                response_type=response_type,
+            )
+            return
+
+        if response.attachments:
+            respond(
+                text=response.message or "",
+                attachments=response.attachments,
+                response_type=response_type,
+            )
+            return
+
+        if response.message:
+            respond(text=response.message, response_type=response_type)
+            return
+
+        respond(text="", response_type=response_type)
 
     @property
     def formatter(self) -> SlackBlockKitFormatter:
@@ -301,6 +498,11 @@ class SlackPlatformProvider(BasePlatformProvider):
             the managed Bolt app for registering legacy handlers.
         """
         return self._app
+
+    @property
+    def socket_mode_handler(self) -> Optional[SocketModeHandler]:
+        """Get the Socket Mode handler if initialized."""
+        return self._handler
 
     def get_user_locale(self, user_id: str) -> str:
         """Get user's locale from Slack API.
@@ -470,10 +672,10 @@ class SlackPlatformProvider(BasePlatformProvider):
         indent = "  " * indent_level
 
         # Convert dot notation to space-separated for display
-        # e.g., "sre.dev.aws" → "/sre dev aws"
-        display_path = cmd_def.full_path.replace(".", " ")
+        # e.g., "sre.dev.aws" → "sre dev aws"
+        display_path = build_slack_display_path(cmd_def.full_path)
 
-        # Add description as the bullet point (if not auto-generated)
+        # Add command path and description as the bullet point (if not auto-generated)
         if not cmd_def.is_auto_generated:
             desc = self._translate_or_fallback(
                 cmd_def.description_key, cmd_def.description, locale
@@ -487,21 +689,20 @@ class SlackPlatformProvider(BasePlatformProvider):
                 fallback=cmd_def.description,
             )
             if desc:
-                lines.append(f"{indent}• {desc}")
+                lines.append(f"{indent}• /{display_path} - {desc}")
             else:
-                # Fallback to command name if no description
-                lines.append(f"{indent}• {cmd_def.name}")
+                # Fallback to just command path if no description
+                lines.append(f"{indent}• /{display_path}")
         else:
-            # For auto-generated commands, just show the name
-            lines.append(f"{indent}• {cmd_def.name}")
+            # For auto-generated commands, show the command path
+            lines.append(f"{indent}• /{display_path}")
 
         # Build and add command signature indented below
-        if cmd_def.usage_hint:
-            signature = f"/{display_path} {cmd_def.usage_hint}"
-            lines.append(f"{indent}  `{signature}`")
-        else:
-            # Show command path even without usage hint
-            lines.append(f"{indent}  `/{display_path}`")
+        signature = build_slack_command_signature(
+            cmd_def.full_path,
+            cmd_def.usage_hint,
+        )
+        lines.append(f"{indent}  `{signature}`")
 
         # Don't show examples when displaying a list of subcommands
         # Examples are only shown when user requests help for a specific command
@@ -604,13 +805,13 @@ class SlackPlatformProvider(BasePlatformProvider):
 
         # Convert dot notation to space-separated for display
         # e.g., "sre.dev.aws" → "/sre dev aws"
-        display_path = cmd_def.full_path.replace(".", " ")
+        display_path = build_slack_display_path(cmd_def.full_path)
 
         # Build command signature
-        if cmd_def.usage_hint:
-            signature = f"/{display_path} {cmd_def.usage_hint}"
-        else:
-            signature = f"/{display_path}"
+        signature = build_slack_command_signature(
+            cmd_def.full_path,
+            cmd_def.usage_hint,
+        )
 
         lines.append(f"*{signature}*")
         lines.append("")
@@ -626,17 +827,20 @@ class SlackPlatformProvider(BasePlatformProvider):
 
         # Add arguments if present (for leaf commands)
         if cmd_def.arguments:
-            lines.append("")
             arguments_label = self._translate_or_fallback(
                 "commands.labels.arguments", "Arguments:", locale
             )
-            lines.append(f"*{arguments_label}*")
-            # Generate formatted argument help using utility
-            args_help = generate_help_text(
+            # Generate formatted argument help using utility with i18n support
+            args_help = generate_slack_help_text(
                 cmd_def.arguments,
                 include_types=True,
                 include_defaults=True,
                 indent="  ",
+                include_header=True,
+                header=f"*{arguments_label}*",
+                translate=lambda key, fallback: self._translate_or_fallback(
+                    key, fallback, locale
+                ),
             )
             lines.append(args_help)
 
@@ -670,7 +874,7 @@ class SlackPlatformProvider(BasePlatformProvider):
             )
             lines.append(f"*{subcommands_label}*")
             for child in children:
-                child_display = child.full_path.replace(".", " ")
+                child_display = build_slack_display_path(child.full_path)
                 lines.append(f"• `/{child_display}`")
                 if not child.is_auto_generated and child.description:
                     desc = self._translate_or_fallback(
