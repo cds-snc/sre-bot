@@ -17,6 +17,8 @@ class PlatformCapability(str, Enum):
     """
 
     COMMANDS = "commands"  # Text-based command execution (/slash, @mention)
+    HIERARCHICAL_TEXT_COMMANDS = "hierarchical_text_commands"  # Slack-style text
+    STRUCTURED_COMMANDS = "structured_commands"  # Structured options (Teams, Discord)
     VIEWS_MODALS = "views_modals"  # Rich form-based interactions
     INTERACTIVE_CARDS = "interactive_cards"  # Rich messages with buttons/actions
     MESSAGING = "messaging"  # Send messages to channels/users
