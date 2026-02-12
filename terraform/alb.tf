@@ -59,7 +59,7 @@ resource "aws_lb" "sre_bot" {
 
 # Serve security.txt as a fixed response from the ALB
 resource "aws_alb_listener_rule" "security_txt" {
-  listener_arn = aws_lb_listener.sre_bot_listener.arn 
+  listener_arn = aws_lb_listener.sre_bot_listener.arn
   priority     = 1
 
   action {
