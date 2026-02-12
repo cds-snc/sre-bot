@@ -526,7 +526,8 @@ class TeamsPlatformProvider(BasePlatformProvider):
         if not self._commands:
             return "No commands registered."
 
-        prefix = self._parent_command if self._parent_command else ""
+        # Parent command prefix for help generation (tracked from command tree)
+        prefix = ""
         lines = ["**Commands**", ""]
 
         for cmd_def in self._commands.values():
