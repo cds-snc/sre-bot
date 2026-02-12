@@ -394,6 +394,40 @@ class PlatformService:
 
         return results
 
+    def start_all_providers(self) -> Dict[str, OperationResult]:
+        """Start all enabled platform providers.
+
+        Returns:
+            Dict mapping provider names to start results
+        """
+        results: Dict[str, OperationResult] = {}
+        providers = self.get_enabled_providers()
+
+        self._logger.info("starting_all_providers", count=len(providers))
+
+        for provider in providers:
+            if hasattr(provider, "start"):
+                results[provider.name] = provider.start()
+
+        success_count = sum(1 for r in results.values() if r.is_success)
+        self._logger.info(
+            "provider_start_complete",
+            total=len(results),
+            successful=success_count,
+            failed=len(results) - success_count,
+        )
+
+        return results
+
+    def stop_all_providers(self) -> None:
+        """Stop all enabled platform providers."""
+        providers = self.get_enabled_providers()
+        self._logger.info("stopping_all_providers", count=len(providers))
+
+        for provider in providers:
+            if hasattr(provider, "stop"):
+                provider.stop()
+
     def health_check(self, platform: str) -> OperationResult:
         """Perform health check on a platform provider.
 
