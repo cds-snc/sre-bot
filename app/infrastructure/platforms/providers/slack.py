@@ -685,25 +685,6 @@ class SlackPlatformProvider(BasePlatformProvider):
             has_description=bool(description or description_key),
         )
 
-    def _append_command_help(
-        self,
-        lines: list,
-        cmd_def,  # CommandDefinition
-        indent_level: int,
-        locale: str,
-    ) -> None:
-        """DEPRECATED: Use SlackHelpGenerator instead.
-
-        This method is kept for backward compatibility but delegates to
-        the unified help generator.
-        """
-        generator = SlackHelpGenerator(
-            commands=self._commands,
-            translator=self._translate_or_fallback,
-        )
-        # Note: Direct call not ideal but maintains compatibility
-        generator._append_command_tree_entry(lines, cmd_def, indent_level)
-
     def generate_help(
         self,
         locale: str = "en-US",
