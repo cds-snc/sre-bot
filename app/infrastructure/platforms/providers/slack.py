@@ -490,7 +490,11 @@ class SlackPlatformProvider(BasePlatformProvider):
             user_info = self._client.users_info(user=user_id, include_locale=True)
             if user_info.get("ok") and user_info.get("user"):
                 user_locale = user_info["user"].get("locale")
-                if user_locale and user_locale in supported_locales:
+                if (
+                    user_locale
+                    and isinstance(user_locale, str)
+                    and user_locale in supported_locales
+                ):
                     self._logger.debug(
                         "user_locale_extracted_from_slack",
                         user_id=user_id,
@@ -522,7 +526,7 @@ class SlackPlatformProvider(BasePlatformProvider):
     def register_command(
         self,
         command: str,
-        handler: Callable[..., CommandResponse],
+        handler: Optional[Callable[..., CommandResponse]],
         description: str = "",
         description_key: Optional[str] = None,
         usage_hint: str = "",
@@ -640,9 +644,11 @@ class SlackPlatformProvider(BasePlatformProvider):
               • `/sre dev aws` - AWS development commands
             ```
         """
-        return self._help_generator.generate(
-            root_command, mode="tree" if root_command else None
-        ) or self._help_generator.generate(None, mode="tree")
+        if root_command:
+            return self._help_generator.generate(
+                root_command, mode="tree", locale=locale
+            )
+        return self._help_generator.generate("", mode="tree", locale=locale)
 
     def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
         """Generate Slack-formatted help text for a specific command.
@@ -657,4 +663,6 @@ class SlackPlatformProvider(BasePlatformProvider):
         Returns:
             Slack-formatted help text for the specified command
         """
-        return self._help_generator.generate(command_name, mode="command")
+        return self._help_generator.generate(
+            command_name, mode="command", locale=locale
+        )
