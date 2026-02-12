@@ -22,6 +22,8 @@ class TestPlatformCapability:
         """Test that all expected capabilities are defined."""
         expected = {
             "COMMANDS",
+            "HIERARCHICAL_TEXT_COMMANDS",
+            "STRUCTURED_COMMANDS",
             "VIEWS_MODALS",
             "INTERACTIVE_CARDS",
             "MESSAGING",

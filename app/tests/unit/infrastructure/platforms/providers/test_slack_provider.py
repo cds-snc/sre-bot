@@ -5,6 +5,7 @@ import pytest
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
+from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 
@@ -141,6 +142,14 @@ class TestGetCapabilities:
 
         assert capabilities.supports(PlatformCapability.FILE_SHARING)
 
+    def test_capabilities_include_hierarchical_text_commands(self, slack_settings):
+        """Test that capabilities include HIERARCHICAL_TEXT_COMMANDS."""
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        capabilities = provider.get_capabilities()
+
+        assert capabilities.supports(PlatformCapability.HIERARCHICAL_TEXT_COMMANDS)
+
     def test_capabilities_metadata_includes_socket_mode(self, slack_settings):
         """Test that capabilities metadata includes socket_mode."""
         provider = SlackPlatformProvider(settings=slack_settings)
@@ -157,6 +166,47 @@ class TestGetCapabilities:
         capabilities = provider.get_capabilities()
 
         assert capabilities.metadata["platform"] == "slack"
+
+    def test_capabilities_metadata_includes_command_parsing(self, slack_settings):
+        """Test that capabilities metadata includes command_parsing."""
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        capabilities = provider.get_capabilities()
+
+        assert capabilities.metadata["command_parsing"] == "hierarchical_text"
+
+
+@pytest.mark.unit
+class TestHierarchicalRouting:
+    """Test Slack hierarchical command routing behavior."""
+
+    def test_route_hierarchical_command_preserves_quoted_args(
+        self, slack_settings: object
+    ) -> None:
+        """Should preserve quoted arguments when routing to subcommands."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=payload.text)
+
+        provider.register_command(
+            command="create",
+            parent="incident",
+            handler=handler,
+            description="Create incident",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act
+        response = provider.route_hierarchical_command(
+            root_command="incident",
+            text='create --title "Database outage in prod"',
+            payload=payload,
+        )
+
+        # Assert
+        assert response.message == "--title Database outage in prod"
 
     def test_capabilities_socket_mode_false(self, slack_settings_http_mode):
         """Test capabilities metadata when socket_mode is False."""
