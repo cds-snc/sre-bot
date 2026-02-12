@@ -54,6 +54,7 @@ variable "authorized_endpoints_with_constraints" {
     { path = "/hook", positional_constraint = "STARTS_WITH" },
     { path = "/version", positional_constraint = "EXACTLY" },
     { path = "/access", positional_constraint = "STARTS_WITH" },
-    { path = "/health", positional_constraint = "EXACTLY" }
+    { path = "/health", positional_constraint = "EXACTLY" },
+    { path = "/.well-known/security.txt", positional_constraint = "EXACTLY" }
   ]
 }
