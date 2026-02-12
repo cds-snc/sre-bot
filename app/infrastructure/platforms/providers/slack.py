@@ -4,7 +4,7 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
 import threading
-from typing import Any, Callable, Dict, FrozenSet, List, Optional
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, cast
 
 import structlog
 from slack_bolt import Ack, App, Respond
@@ -500,7 +500,7 @@ class SlackPlatformProvider(BasePlatformProvider):
                         user_id=user_id,
                         locale=user_locale,
                     )
-                    return user_locale
+                    return cast(str, user_locale)
                 else:
                     self._logger.debug(
                         "user_locale_not_supported_or_missing",
