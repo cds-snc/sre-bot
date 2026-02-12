@@ -5,10 +5,8 @@ from typing import AsyncIterator, Optional, TYPE_CHECKING, cast
 
 from fastapi import FastAPI
 from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
 from structlog.stdlib import BoundLogger
 
-from infrastructure.commands.providers import load_providers as load_command_providers
 from infrastructure.events import (
     discover_and_register_handlers,
     log_registered_handlers,
@@ -16,9 +14,10 @@ from infrastructure.events import (
 )
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
-    # discover_and_register_platforms,
-    # get_platform_service,
+    discover_and_register_platforms,
+    get_platform_service,
     get_settings,
+    get_translation_service,
 )
 from jobs import scheduled_tasks
 from modules import (
@@ -77,20 +76,6 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
     incident_helper.register(bot)
 
 
-def _start_socket_mode(
-    bot: App, app_token: str, logger: BoundLogger
-) -> tuple[SocketModeHandler, threading.Thread]:
-    handler = SocketModeHandler(bot, app_token)
-    thread = threading.Thread(
-        target=handler.connect,
-        daemon=True,
-        name="slack-socket-mode",
-    )
-    thread.start()
-    logger.info("socket_mode_started")
-    return handler, thread
-
-
 def _start_scheduled_tasks(
     bot: App,
     settings: "Settings",
@@ -141,90 +126,6 @@ def _activate_providers(
         logger.error("group_providers_activation_failed", error=str(exc))
         raise
 
-    # TODO: Platform system providers integration - commented out pending redesign
-    # This section was causing race conditions with Slack Socket Mode initialization.
-    # Will be re-implemented after refactoring to reuse the legacy Slack App instance.
-    # try:
-    #     platform_service = get_platform_service()
-    #     platform_providers = platform_service.load_providers()
-    #     app.state.platform_service = platform_service
-    #     app.state.platform_providers = platform_providers
-    #
-    #     # Discover and register platform commands for ALL enabled providers
-    #     # The discover function handles None providers gracefully
-    #     # This must happen BEFORE initialize_all_providers() to ensure handlers
-    #     # are registered before Socket Mode starts consuming events
-    #     discover_and_register_platforms(
-    #         slack_provider=platform_providers.get("slack"),  # type: ignore
-    #         teams_provider=platform_providers.get("teams"),  # type: ignore
-    #         discord_provider=platform_providers.get("discord"),  # type: ignore
-    #     )
-    #
-    #     logger.info(
-    #         "platform_commands_registered",
-    #         count=len(platform_providers),
-    #         providers=list(platform_providers.keys()),
-    #     )
-    #
-    #     # Initialize all enabled providers (establishes connections)
-    #     # Done after handlers are registered to prevent race condition
-    #     init_results = platform_service.initialize_all_providers()
-    #     initialized = [
-    #         name for name, result in init_results.items() if result.is_success
-    #     ]
-    #     failed = [
-    #         name for name, result in init_results.items() if not result.is_success
-    #     ]
-    #
-    #     if failed:
-    #         logger.warning(
-    #             "platform_providers_initialization_partial_failure",
-    #             initialized=initialized,
-    #             failed=failed,
-    #         )
-    #
-    #     logger.info(
-    #         "platform_providers_activated",
-    #         count=len(platform_providers),
-    #         providers=list(platform_providers.keys()),
-    #         initialized=initialized,
-    #     )
-    # except Exception as exc:
-    #     logger.error("platform_providers_activation_failed", error=str(exc))
-    #     raise
-
-    try:
-        command_providers = load_command_providers(settings=settings)
-        app.state.command_providers = command_providers
-
-        if command_providers:
-            logger.info(
-                "command_providers_activated",
-                count=len(command_providers),
-                providers=list(command_providers.keys()),
-            )
-        else:
-            logger.info(
-                "api_only_mode",
-                message="No command providers enabled - API endpoints only",
-            )
-    except Exception as exc:
-        logger.error("command_providers_activation_failed", error=str(exc))
-        raise
-
-
-def _get_bot(settings: "Settings") -> Optional[App]:
-    """Create Slack App instance if token available and not in test environment."""
-    # Skip Slack initialization during tests
-    if _is_test_environment():
-        return None
-
-    slack_token = settings.slack.SLACK_TOKEN
-    if not bool(slack_token):
-        return None
-
-    return App(token=slack_token)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -239,23 +140,64 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _activate_providers(app, settings, logger)
 
-    bot = _get_bot(settings)
-    app.state.bot = bot
+    app.state.command_providers = {}
 
-    socket_mode_handler = None
-    scheduled_stop_event = None
+    platform_service = get_platform_service()
+    platform_providers = platform_service.load_providers()
+    app.state.platform_service = platform_service
+    app.state.platform_providers = platform_providers
 
-    if bot is not None:
-        _register_legacy_handlers(bot, logger)
-        socket_mode_handler, socket_mode_thread = _start_socket_mode(
-            bot,
-            settings.slack.APP_TOKEN,
-            logger,
+    # Inject translator into platform providers for i18n support
+    translation_service = get_translation_service()
+    for provider in platform_providers.values():
+        provider.set_translator(translation_service._translator)
+    logger.info(
+        "translation_service_injected_into_providers",
+        provider_count=len(platform_providers),
+    )
+
+    discover_and_register_platforms(
+        slack_provider=platform_providers.get("slack"),
+        teams_provider=platform_providers.get("teams"),
+        discord_provider=platform_providers.get("discord"),
+    )
+    logger.info(
+        "platform_commands_registered",
+        count=len(platform_providers),
+        providers=list(platform_providers.keys()),
+    )
+
+    init_results = platform_service.initialize_all_providers()
+    failed = [name for name, result in init_results.items() if not result.is_success]
+    if failed:
+        logger.warning(
+            "platform_providers_initialization_partial_failure",
+            failed=failed,
         )
-        app.state.socket_mode_thread = socket_mode_thread
-        scheduled_stop_event = _start_scheduled_tasks(bot, settings, logger)
 
-    app.state.socket_mode_handler = socket_mode_handler
+    slack_provider = platform_providers.get("slack")
+    if slack_provider and getattr(slack_provider, "app", None):
+        slack_app = cast(App, slack_provider.app)
+        _register_legacy_handlers(slack_app, logger)
+        app.state.bot = slack_app
+        app.state.socket_mode_handler = slack_provider.socket_mode_handler
+        if not _is_test_environment():
+            scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
+        else:
+            scheduled_stop_event = None
+    else:
+        app.state.bot = None
+        app.state.socket_mode_handler = None
+        scheduled_stop_event = None
+
+    if not _is_test_environment():
+        start_results = platform_service.start_all_providers()
+        failed_start = [
+            name for name, result in start_results.items() if not result.is_success
+        ]
+        if failed_start:
+            logger.warning("platform_providers_start_failed", failed=failed_start)
+
     app.state.scheduled_stop_event = scheduled_stop_event
 
     yield
@@ -264,6 +206,4 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _stop_scheduled_tasks(app.state.scheduled_stop_event)
 
-    if app.state.socket_mode_handler is not None:
-        app.state.socket_mode_handler.close()
-        logger.info("socket_mode_stopped")
+    platform_service.stop_all_providers()
