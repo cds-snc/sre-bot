@@ -11,11 +11,11 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
+from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.google_workspace import gmail_next
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
-    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -40,9 +40,6 @@ class EmailChannel(NotificationChannel):
                            If not provided, creates a default one.
         """
         if circuit_breaker is None:
-            # Import only if needed (for backward compatibility)
-            from infrastructure.resilience.circuit_breaker import CircuitBreaker
-
             circuit_breaker = CircuitBreaker(
                 name="gmail_email_channel",
                 failure_threshold=5,
