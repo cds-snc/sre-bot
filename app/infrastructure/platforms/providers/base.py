@@ -4,7 +4,7 @@ All platform-specific providers (Slack, Teams, Discord) inherit from this base c
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional
 
 import structlog
 
@@ -87,25 +87,6 @@ class BasePlatformProvider(ABC):
         """
         pass
 
-    @abstractmethod
-    def send_message(
-        self,
-        channel: str,
-        message: Dict[str, Any],
-        thread_ts: Optional[str] = None,
-    ) -> OperationResult:
-        """Send a message to the platform.
-
-        Args:
-            channel: Channel/conversation ID or user ID.
-            message: Platform-specific message payload (Block Kit, Adaptive Card, etc.).
-            thread_ts: Optional thread timestamp for threaded messages.
-
-        Returns:
-            OperationResult with message metadata on success, error on failure.
-        """
-        pass
-
     def initialize_app(self) -> OperationResult:
         """Initialize platform app (if needed).
 
@@ -136,23 +117,6 @@ class BasePlatformProvider(ABC):
             assert router is None  # No webhooks needed
         """
         return None  # Default: no webhook router (WebSocket mode)
-
-    @abstractmethod
-    def format_response(
-        self,
-        data: Dict[str, Any],
-        message_type: str = "success",
-    ) -> Dict[str, Any]:
-        """Format a response dict into platform-native format.
-
-        Args:
-            data: Data dictionary to format.
-            message_type: Type of message ("success", "error", "info", "warning").
-
-        Returns:
-            Platform-specific message payload (Block Kit, Adaptive Card, Embed, etc.).
-        """
-        pass
 
     def supports_capability(self, capability: str) -> bool:
         """Check if this provider supports a specific capability.

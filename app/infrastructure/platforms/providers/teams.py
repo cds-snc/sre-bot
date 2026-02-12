@@ -23,7 +23,7 @@ Example:
 """
 
 import structlog
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import (
@@ -171,92 +171,6 @@ class TeamsPlatformProvider(BasePlatformProvider):
         """
         # TODO: Implement Teams locale extraction
         return "en-US"
-
-    def send_message(
-        self,
-        channel: str,
-        message: Dict[str, Any],
-        thread_ts: Optional[str] = None,
-    ) -> OperationResult:
-        """Send a message to a Teams channel or chat.
-
-        Args:
-            channel: Teams conversation/channel ID (e.g., "19:meeting_id@thread.v2")
-            message: Message payload (Adaptive Card or text)
-            thread_ts: Optional reply-to message ID (not commonly used in Teams)
-
-        Returns:
-            OperationResult with send status
-
-        Example:
-            >>> result = provider.send_message(
-            ...     channel="19:meeting_id@thread.v2",
-            ...     message={"text": "Hello!", "attachments": [...]}
-            ... )
-        """
-        log = self._logger.bind(channel=channel, has_thread=bool(thread_ts))
-        log.info("sending_teams_message")
-
-        if not self.enabled:
-            log.warning("teams_provider_disabled")
-            return OperationResult.permanent_error(
-                message="Teams provider is disabled",
-                error_code="PROVIDER_DISABLED",
-            )
-
-        # Validate message
-        if not message:
-            log.error("empty_message_provided")
-            return OperationResult.permanent_error(
-                message="Message cannot be empty",
-                error_code="INVALID_MESSAGE",
-            )
-
-        log.debug("preparing_teams_message")
-
-        # Build Teams activity payload
-        payload: dict[str, Any] = {
-            "type": "message",
-            "conversation": {"id": channel},
-        }
-
-        # Merge message content (Adaptive Card or simple text)
-        payload.update(message)
-
-        # Add reply-to reference if provided (optional in Teams)
-        if thread_ts:
-            payload["replyToId"] = thread_ts
-
-        log.info(
-            "teams_message_prepared",
-            channel=channel,
-            has_attachments="attachments" in message,
-        )
-
-        # In real implementation, this would call Bot Framework Connector API
-        # For now, return success to indicate message was formatted correctly
-        return OperationResult.success(
-            message="Message formatted for Teams",
-            data={"channel": channel, "payload": payload},
-        )
-
-    def format_response(
-        self,
-        data: Dict[str, Any],
-        error: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Format response using TeamsAdaptiveCardsFormatter.
-
-        Args:
-            data: Response data payload
-            error: Optional error message
-
-        Returns:
-            Formatted response dict with Teams Adaptive Card
-        """
-        if error:
-            return self._formatter.format_error(message=error)
-        return self._formatter.format_success(data=data)
 
     def initialize_app(self) -> OperationResult:
         """Initialize Teams Bot Framework application.
