@@ -26,9 +26,7 @@ from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
 from infrastructure.platforms.utils.slack_help import (
     SLACK_HELP_KEYWORDS,
-    build_slack_command_signature,
-    build_slack_display_path,
-    generate_slack_help_text,
+    SlackHelpGenerator,
 )
 
 logger = structlog.get_logger()
@@ -97,6 +95,12 @@ class SlackPlatformProvider(BasePlatformProvider):
         # Will be initialized when app is started
         self._app: Optional[App] = None
         self._client: Optional[Any] = None
+
+        # Help generator for unified help text generation
+        self._help_generator = SlackHelpGenerator(
+            commands=self._commands,
+            translator=self._translate_or_fallback,
+        )
 
         self._logger.info(
             "slack_provider_initialized",
@@ -407,11 +411,34 @@ class SlackPlatformProvider(BasePlatformProvider):
     def route_hierarchical_command(
         self, root_command: str, text: str, payload: CommandPayload
     ) -> CommandResponse:
-        """Route a Slack hierarchical command from flat text input.
+        """Route a Slack hierarchical command recursively to leaf command.
 
-        Slack provides flat text input ("incident list --priority high"). This
-        method parses the first token as the subcommand and routes the remainder
-        to the matching handler using quote-aware tokenization.
+        Handles multi-level command hierarchies by recursively routing through
+        the command tree. Uses quote-aware tokenization to preserve arguments
+        with spaces.
+
+        Flow:
+        1. Tokenize text (quote-aware)
+        2. Check if first token is help keyword → generate help
+        3. Check if first token matches child command → recurse
+        4. If no match or no tokens, dispatch to current command
+
+        Args:
+            root_command: Current command path (e.g., "sre" or "sre.groups")
+            text: Flattened text from Slack (e.g., "groups list --managed")
+            payload: CommandPayload with user context
+
+        Returns:
+            CommandResponse from handler or auto-generated help
+
+        Example:
+            User: /sre groups add email@example.com
+            Call: route_hierarchical_command("sre", "groups add email@example.com")
+            Internal routing:
+              - "sre" + "groups" → "sre.groups" (child found, recurse)
+              - "sre.groups" + "add" → "sre.groups.add" (child found, recurse)
+              - "sre.groups.add" + "email@..." → no child (dispatch)
+            Handler receives: text="email@example.com" (arguments only)
         """
         if not text or not text.strip():
             return self.dispatch_command(root_command, payload)
@@ -423,15 +450,19 @@ class SlackPlatformProvider(BasePlatformProvider):
         first_word = tokens[0]
         remaining_text = " ".join(tokens[1:]) if len(tokens) > 1 else ""
 
+        # Check for help keyword (early exit, don't recurse deeper)
         if first_word.lower() in self.SLACK_HELP_KEYWORDS:
             payload.text = first_word
             return self.dispatch_command(root_command, payload)
 
+        # Try to recurse to child command
         child_path = f"{root_command}.{first_word}"
         if child_path in self._commands:
             payload.text = remaining_text
-            return self.dispatch_command(child_path, payload)
+            # Recursively route the child to handle arbitrary depth
+            return self.route_hierarchical_command(child_path, remaining_text, payload)
 
+        # No child found, dispatch to current command with full text
         payload.text = text
         return self.dispatch_command(root_command, payload)
 
@@ -661,54 +692,17 @@ class SlackPlatformProvider(BasePlatformProvider):
         indent_level: int,
         locale: str,
     ) -> None:
-        """Recursively append command help with hierarchical formatting.
+        """DEPRECATED: Use SlackHelpGenerator instead.
 
-        Args:
-            lines: List of strings to append to
-            cmd_def: CommandDefinition to render
-            indent_level: Current indentation level (0 = root)
-            locale: Locale string for translations
+        This method is kept for backward compatibility but delegates to
+        the unified help generator.
         """
-        indent = "  " * indent_level
-
-        # Convert dot notation to space-separated for display
-        # e.g., "sre.dev.aws" → "sre dev aws"
-        display_path = build_slack_display_path(cmd_def.full_path)
-
-        # Add command path and description as the bullet point (if not auto-generated)
-        if not cmd_def.is_auto_generated:
-            desc = self._translate_or_fallback(
-                cmd_def.description_key, cmd_def.description, locale
-            )
-            self._logger.debug(
-                "command_help_translation",
-                command=cmd_def.full_path,
-                key=cmd_def.description_key,
-                locale=locale,
-                translated=desc,
-                fallback=cmd_def.description,
-            )
-            if desc:
-                lines.append(f"{indent}• /{display_path} - {desc}")
-            else:
-                # Fallback to just command path if no description
-                lines.append(f"{indent}• /{display_path}")
-        else:
-            # For auto-generated commands, show the command path
-            lines.append(f"{indent}• /{display_path}")
-
-        # Build and add command signature indented below
-        signature = build_slack_command_signature(
-            cmd_def.full_path,
-            cmd_def.usage_hint,
+        generator = SlackHelpGenerator(
+            commands=self._commands,
+            translator=self._translate_or_fallback,
         )
-        lines.append(f"{indent}  `{signature}`")
-
-        # Don't show examples when displaying a list of subcommands
-        # Examples are only shown when user requests help for a specific command
-
-        # Add blank line after command
-        lines.append("")
+        # Note: Direct call not ideal but maintains compatibility
+        generator._append_command_tree_entry(lines, cmd_def, indent_level)
 
     def generate_help(
         self,
@@ -717,7 +711,8 @@ class SlackPlatformProvider(BasePlatformProvider):
     ) -> str:
         """Generate Slack-formatted help text for registered commands.
 
-        Supports hierarchical command display using the new dot notation.
+        Delegates to SlackHelpGenerator for unified help generation.
+        Supports hierarchical command display using the dot notation.
         Uses Slack markdown formatting (backticks, asterisks, bullet points).
 
         Args:
@@ -738,55 +733,14 @@ class SlackPlatformProvider(BasePlatformProvider):
               • `/sre dev aws` - AWS development commands
             ```
         """
-        if not self._commands:
-            msg = self._translate_or_fallback(
-                "commands.errors.no_commands_registered",
-                "No commands registered.",
-                locale,
-            )
-            return msg
-
-        # Translate section header
-        header = self._translate_or_fallback(
-            "commands.labels.available_commands", "Available Commands", locale
-        )
-        lines = [f"*{header}*", ""]
-
-        # Determine which commands to display
-        if root_command:
-            # Show children of root_command
-            children = self._get_child_commands(root_command)
-            if not children:
-                msg = self._translate_or_fallback(
-                    "commands.errors.no_commands_under",
-                    f"No commands found under `{root_command}`",
-                    locale,
-                )
-                return msg
-
-            # Render each child command with its subtree
-            for cmd_def in children:
-                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
-        else:
-            # Show all top-level commands (no parent)
-            top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
-
-            if not top_level:
-                msg = self._translate_or_fallback(
-                    "commands.errors.no_top_level_commands",
-                    "No top-level commands registered.",
-                    locale,
-                )
-                return msg
-
-            for cmd_def in sorted(top_level, key=lambda c: c.name):
-                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
-
-        return "\n".join(lines)
+        return self._help_generator.generate(
+            root_command, mode="tree" if root_command else None
+        ) or self._help_generator.generate(None, mode="tree")
 
     def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
         """Generate Slack-formatted help text for a specific command.
 
+        Delegates to SlackHelpGenerator for unified help generation.
         Uses Slack markdown formatting (backticks, asterisks, bullet points).
 
         Args:
@@ -796,91 +750,4 @@ class SlackPlatformProvider(BasePlatformProvider):
         Returns:
             Slack-formatted help text for the specified command
         """
-        # Look up command by full_path
-        cmd_def = self._commands.get(command_name)
-        if not cmd_def:
-            return f"Unknown command: `{command_name}`"
-
-        lines = []
-
-        # Convert dot notation to space-separated for display
-        # e.g., "sre.dev.aws" → "/sre dev aws"
-        display_path = build_slack_display_path(cmd_def.full_path)
-
-        # Build command signature
-        signature = build_slack_command_signature(
-            cmd_def.full_path,
-            cmd_def.usage_hint,
-        )
-
-        lines.append(f"*{signature}*")
-        lines.append("")
-
-        # Translate description (skip if auto-generated)
-        if not cmd_def.is_auto_generated:
-            desc = self._translate_or_fallback(
-                cmd_def.description_key, cmd_def.description, locale
-            )
-            if desc:
-                lines.append(desc)
-                lines.append("")
-
-        # Add arguments if present (for leaf commands)
-        if cmd_def.arguments:
-            arguments_label = self._translate_or_fallback(
-                "commands.labels.arguments", "Arguments:", locale
-            )
-            # Generate formatted argument help using utility with i18n support
-            args_help = generate_slack_help_text(
-                cmd_def.arguments,
-                include_types=True,
-                include_defaults=True,
-                indent="  ",
-                include_header=True,
-                header=f"*{arguments_label}*",
-                translate=lambda key, fallback: self._translate_or_fallback(
-                    key, fallback, locale
-                ),
-            )
-            lines.append(args_help)
-
-        # Add examples (skip if auto-generated)
-        if not cmd_def.is_auto_generated and cmd_def.examples:
-            # Translate "Examples:" label
-            examples_label = self._translate_or_fallback(
-                "commands.labels.examples", "Examples:", locale
-            )
-            lines.append("")
-            lines.append(f"*{examples_label}*")
-
-            for i, example in enumerate(cmd_def.examples):
-                # Try to translate example if key available
-                if i < len(cmd_def.example_keys):
-                    example_text = self._translate_or_fallback(
-                        cmd_def.example_keys[i], example, locale
-                    )
-                else:
-                    example_text = example
-
-                example_line = f"`/{display_path} {example_text}`"
-                lines.append(f"• {example_line}")
-
-        # Show sub-commands if any
-        children = self._get_child_commands(cmd_def.full_path)
-        if children:
-            lines.append("")
-            subcommands_label = self._translate_or_fallback(
-                "commands.labels.subcommands", "Sub-commands:", locale
-            )
-            lines.append(f"*{subcommands_label}*")
-            for child in children:
-                child_display = build_slack_display_path(child.full_path)
-                lines.append(f"• `/{child_display}`")
-                if not child.is_auto_generated and child.description:
-                    desc = self._translate_or_fallback(
-                        child.description_key, child.description, locale
-                    )
-                    if desc:
-                        lines.append(f"  {desc}")
-
-        return "\n".join(lines)
+        return self._help_generator.generate(command_name, mode="command")

@@ -223,3 +223,224 @@ def get_argument_by_name(
         if arg.aliases and name in arg.aliases:
             return arg
     return None
+
+
+class SlackHelpGenerator:
+    """Unified Slack help text generator with DRY principles.
+
+    Consolidates help generation logic into single class with mode-based API:
+    - "tree": Show command tree starting from root
+    - "command": Show single command with signature, args, examples
+    - "arguments": Show arguments only
+
+    Usage:
+        generator = SlackHelpGenerator(
+            commands=provider._commands,
+            translator=provider._translate_or_fallback,
+        )
+        help_text = generator.generate(command_path="sre", mode="tree")
+    """
+
+    def __init__(
+        self,
+        commands: dict,
+        translator: Optional[Callable[[Optional[str], str], str]] = None,
+    ):
+        """Initialize help generator.
+
+        Args:
+            commands: Dict of registered CommandDefinition objects
+            translator: Optional i18n translator function
+        """
+        self._commands = commands
+        self._translator = translator or (lambda key, fallback: fallback)
+
+    def generate(self, command_path: str, mode: str = "command") -> str:
+        """Generate help text in specified mode.
+
+        Args:
+            command_path: Command path (e.g., "sre", "sre.groups")
+            mode: Help mode ("tree", "command", "arguments")
+
+        Returns:
+            Formatted help text for the specified mode
+        """
+        if mode == "tree":
+            return self._generate_tree(command_path)
+        elif mode == "command":
+            return self._generate_command(command_path)
+        elif mode == "arguments":
+            return self._generate_arguments(command_path)
+        else:
+            return f"Unknown help mode: {mode}"
+
+    def _generate_tree(self, root_path: Optional[str] = None) -> str:
+        """Generate help tree for command and children.
+
+        Args:
+            root_path: Command path to show tree for (None for all top-level)
+
+        Returns:
+            Formatted tree of commands
+        """
+        if not self._commands:
+            return self._translator(
+                "commands.errors.no_commands_registered",
+                "No commands registered.",
+            )
+
+        header = self._translator(
+            "commands.labels.available_commands", "Available Commands"
+        )
+        lines = [f"*{header}*", ""]
+
+        if root_path:
+            # Show children of specified command
+            children = self._get_child_commands(root_path)
+            if not children:
+                return self._translator(
+                    "commands.errors.no_commands_under",
+                    f"No commands found under `{root_path}`",
+                )
+            for cmd_def in children:
+                self._append_command_tree_entry(lines, cmd_def, indent_level=0)
+        else:
+            # Show all top-level commands
+            top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
+            if not top_level:
+                return self._translator(
+                    "commands.errors.no_top_level_commands",
+                    "No top-level commands registered.",
+                )
+            for cmd_def in sorted(top_level, key=lambda c: c.name):
+                self._append_command_tree_entry(lines, cmd_def, indent_level=0)
+
+        return "\n".join(lines)
+
+    def _generate_command(self, command_path: str) -> str:
+        """Generate help for a specific command.
+
+        Args:
+            command_path: Full command path
+
+        Returns:
+            Command-specific help text
+        """
+        cmd_def = self._commands.get(command_path)
+        if not cmd_def:
+            return f"Unknown command: `{command_path}`"
+
+        lines = []
+
+        # Command signature
+        signature = build_slack_command_signature(command_path, cmd_def.usage_hint)
+        lines.append(f"*{signature}*")
+        lines.append("")
+
+        # Description (skip auto-generated)
+        if not cmd_def.is_auto_generated:
+            desc = self._translator(cmd_def.description_key, cmd_def.description)
+            if desc:
+                lines.append(desc)
+                lines.append("")
+
+        # Arguments (if leaf command)
+        if cmd_def.arguments:
+            arguments_label = self._translator(
+                "commands.labels.arguments", "Arguments:"
+            )
+            args_help = generate_slack_help_text(
+                cmd_def.arguments,
+                include_types=True,
+                include_defaults=True,
+                indent="  ",
+                include_header=True,
+                header=f"*{arguments_label}*",
+                translate=self._translator,
+            )
+            lines.append(args_help)
+
+        # Examples (skip auto-generated)
+        if not cmd_def.is_auto_generated and cmd_def.examples:
+            examples_label = self._translator("commands.labels.examples", "Examples:")
+            lines.append("")
+            lines.append(f"*{examples_label}*")
+            for example in cmd_def.examples:
+                lines.append(f"  `{example}`")
+
+        # Sub-commands (if parent node)
+        children = self._get_child_commands(command_path)
+        if children:
+            lines.append("")
+            subcommands_label = self._translator(
+                "commands.labels.subcommands", "Sub-commands:"
+            )
+            lines.append(f"*{subcommands_label}*")
+            for child in children:
+                self._append_command_tree_entry(lines, child, indent_level=0)
+
+        return "\n".join(lines)
+
+    def _generate_arguments(self, command_path: str) -> str:
+        """Generate help for arguments only.
+
+        Args:
+            command_path: Full command path
+
+        Returns:
+            Arguments-only help text
+        """
+        cmd_def = self._commands.get(command_path)
+        if not cmd_def or not cmd_def.arguments:
+            return f"Command `{command_path}` has no arguments."
+
+        arguments_label = self._translator("commands.labels.arguments", "Arguments:")
+        return generate_slack_help_text(
+            cmd_def.arguments,
+            include_types=True,
+            include_defaults=True,
+            indent="  ",
+            include_header=True,
+            header=f"*{arguments_label}*",
+            translate=self._translator,
+        )
+
+    def _append_command_tree_entry(
+        self, lines: List[str], cmd_def, indent_level: int
+    ) -> None:
+        """Append command tree entry to help text (DRY method).
+
+        Args:
+            lines: List to append to
+            cmd_def: CommandDefinition to render
+            indent_level: Indentation level (0=root)
+        """
+        indent = "  " * indent_level
+        display_path = build_slack_display_path(cmd_def.full_path)
+
+        # Build bullet point with path and description
+        if not cmd_def.is_auto_generated:
+            desc = self._translator(cmd_def.description_key, cmd_def.description)
+            if desc:
+                lines.append(f"{indent}• /{display_path} - {desc}")
+            else:
+                lines.append(f"{indent}• /{display_path}")
+        else:
+            lines.append(f"{indent}• /{display_path}")
+
+        # Add signature
+        signature = build_slack_command_signature(cmd_def.full_path, cmd_def.usage_hint)
+        lines.append(f"{indent}  `{signature}`")
+        lines.append("")
+
+    def _get_child_commands(self, parent_path: str) -> list:
+        """Get all direct children of a command node.
+
+        Args:
+            parent_path: Parent full path
+
+        Returns:
+            Sorted list of child CommandDefinition objects
+        """
+        children = [cmd for cmd in self._commands.values() if cmd.parent == parent_path]
+        return sorted(children, key=lambda c: c.name)

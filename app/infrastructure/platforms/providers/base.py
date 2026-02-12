@@ -421,17 +421,11 @@ class BasePlatformProvider(ABC):
             locale=user_locale,
         )
 
-        # Check for EXPLICIT help requests (unless in legacy mode)
-        # Legacy mode allows the handler to process help itself
-        text = payload.text.strip().lower() if payload.text else ""
-        help_keywords = self.get_help_keywords()
-        if help_keywords and not cmd_def.legacy_mode and text in help_keywords:
-            # Return help for this specific command only
-            help_text = self.generate_command_help(command_name, locale=user_locale)
-            return CommandResponse(message=help_text, ephemeral=True)
-
         # If command has no handler (auto-generated parent), show help for children
-        # This handles cases like `/sre dev` where `dev` is just a grouping node
+        # This handles cases like `/sre dev` where `dev` is just a grouping node.
+        # Help keyword checking is handled by route_hierarchical_command in
+        # platform-specific providers (e.g., SlackPlatformProvider) to avoid
+        # duplicate checks and keep dispatch focused on execution.
         if cmd_def.handler is None:
             help_text = self.generate_help(
                 locale=user_locale, root_command=command_name

@@ -208,6 +208,120 @@ class TestHierarchicalRouting:
         # Assert
         assert response.message == "--title Database outage in prod"
 
+    def test_route_hierarchical_command_recursive_three_levels(
+        self, slack_settings: object
+    ) -> None:
+        """Should route recursively through multiple command levels (3+)."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=f"received:{payload.text}")
+
+        # Register 3-level hierarchy: sre → groups → add
+        provider.register_command(
+            command="create",
+            parent="sre.groups",
+            handler=handler,
+            description="Create group",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Route through 3 levels
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="groups create admin@example.com",
+            payload=payload,
+        )
+
+        # Assert: Handler receives only the email (arguments, not command names)
+        assert response.message == "received:admin@example.com"
+
+    def test_route_hierarchical_command_recursive_with_options(
+        self, slack_settings: object
+    ) -> None:
+        """Should preserve options and flags through recursive routing."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=f"args:{payload.text}")
+
+        # Register 2-level hierarchy: sre → groups → list
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=handler,
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Route with complex options
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text='groups list --provider aws --managed --name "Security Team"',
+            payload=payload,
+        )
+
+        # Assert: All options passed to leaf handler
+        # Note: Quotes are removed by tokenizer but quoted content is preserved
+        assert "--provider aws --managed --name" in response.message
+        assert "Security Team" in response.message
+
+    def test_route_hierarchical_command_help_keyword_at_root(
+        self, slack_settings: object
+    ) -> None:
+        """Should process help keyword at root level without recursing."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        # Register 2-level hierarchy
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=lambda p: CommandResponse(message="list handler"),
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Help keyword at root
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="help",  # Should not recurse, should show help for "sre"
+            payload=payload,
+        )
+
+        # Assert: Response contains help, not routing error
+        assert response.ephemeral is True
+        assert response.message  # Should have some help text
+
+    def test_route_hierarchical_command_help_keyword_at_intermediate_level(
+        self, slack_settings: object
+    ) -> None:
+        """Should process help keyword at intermediate routing levels."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        # Register 2-level hierarchy
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=lambda p: CommandResponse(message="list handler"),
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Help keyword after routing one level
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="groups help",  # Help after routing to groups
+            payload=payload,
+        )
+
+        # Assert: Response contains help for groups commands
+        assert response.ephemeral is True
+        assert response.message  # Should have some help text
+
     def test_capabilities_socket_mode_false(self, slack_settings_http_mode):
         """Test capabilities metadata when socket_mode is False."""
         provider = SlackPlatformProvider(settings=slack_settings_http_mode)

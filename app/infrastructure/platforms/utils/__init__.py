@@ -4,6 +4,7 @@ Includes help text generation, schema inference, and i18n support.
 """
 
 from infrastructure.platforms.utils.slack_help import (
+    SlackHelpGenerator,
     build_slack_command_signature,
     build_slack_display_path,
     generate_slack_help_text,
@@ -15,6 +16,7 @@ from infrastructure.platforms.utils.schema_inference import (
 )
 
 __all__ = [
+    "SlackHelpGenerator",
     "build_slack_command_signature",
     "build_slack_display_path",
     "generate_slack_help_text",
