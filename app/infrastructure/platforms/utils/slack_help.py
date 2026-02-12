@@ -1,20 +1,59 @@
-"""Automatic help text generation from Argument definitions.
+"""Slack-specific help text generation from Argument definitions.
 
-Provides utilities to generate help text for commands from their
-Argument definitions, with i18n support.
+Provides utilities to generate help text for Slack slash commands from their
+Argument definitions, with optional i18n support.
 """
 
-from typing import List, Optional
+from typing import Callable, List, Optional
+
 from infrastructure.platforms.parsing import Argument
 
+SLACK_HELP_KEYWORDS = frozenset({"help", "aide", "--help", "-h"})
 
-def generate_help_text(
+
+def build_slack_display_path(command_path: str) -> str:
+    """Convert dot-separated command path into space-separated display path.
+
+    Args:
+        command_path: Command path in dot notation (e.g., "sre.dev.aws").
+
+    Returns:
+        Space-separated path (e.g., "sre dev aws").
+    """
+    return command_path.replace(".", " ")
+
+
+def build_slack_command_signature(
+    command_path: str,
+    usage_hint: str = "",
+    prefix: str = "/",
+) -> str:
+    """Build a Slack command signature string with optional usage hints.
+
+    Args:
+        command_path: Command path in dot notation (e.g., "sre.dev.aws").
+        usage_hint: Optional usage string (e.g., "<account_id>").
+        prefix: Optional prefix (default: "/").
+
+    Returns:
+        Command signature (e.g., "/sre dev aws <account_id>").
+    """
+    display_path = build_slack_display_path(command_path)
+    if usage_hint:
+        return f"{prefix}{display_path} {usage_hint}"
+    return f"{prefix}{display_path}"
+
+
+def generate_slack_help_text(
     arguments: List[Argument],
     include_types: bool = True,
     include_defaults: bool = True,
     indent: str = "  ",
+    include_header: bool = False,
+    header: Optional[str] = None,
+    translate: Optional[Callable[[Optional[str], str], str]] = None,
 ) -> str:
-    """Generate help text from Argument definitions.
+    """Generate Slack help text from Argument definitions.
 
     Creates formatted help text showing all arguments, their types, defaults,
     and descriptions for display to users.
@@ -24,6 +63,9 @@ def generate_help_text(
         include_types: Whether to show argument types in help.
         include_defaults: Whether to show default values.
         indent: String to use for indentation (default: 2 spaces).
+        include_header: Whether to include a header line before arguments.
+        header: Optional header string (caller provides formatting).
+        translate: Optional function for translating description keys.
 
     Returns:
         Formatted help text showing all arguments.
@@ -33,7 +75,9 @@ def generate_help_text(
         ...     Argument(name="email", type=ArgumentType.EMAIL, required=True),
         ...     Argument(name="--role", type=ArgumentType.STRING, default="MEMBER"),
         ... ]
-        >>> help_text = generate_help_text(args)
+        >>> help_text = generate_slack_help_text(
+        ...     args, include_header=True, header="Arguments:"
+        ... )
         >>> print(help_text)
         Arguments:
           email (EMAIL, required)
@@ -44,7 +88,11 @@ def generate_help_text(
     if not arguments:
         return ""
 
-    lines = []
+    lines: List[str] = []
+
+    if include_header and header:
+        lines.append(header)
+        lines.append("")
 
     for i, arg in enumerate(arguments):
         # Argument name and syntax
@@ -73,8 +121,14 @@ def generate_help_text(
             lines.append(f"{indent}{indent}Aliases: {aliases_str}")
 
         # Add description
-        if arg.description:
-            lines.append(f"{indent}{indent}{arg.description}")
+        if arg.description or arg.description_key:
+            description = (
+                translate(arg.description_key, arg.description)
+                if translate
+                else arg.description
+            )
+            if description:
+                lines.append(f"{indent}{indent}{description}")
 
         # Add default value if applicable
         if include_defaults and arg.default is not None:
@@ -96,7 +150,7 @@ def generate_usage_line(
     command_path: str,
     arguments: List[Argument],
 ) -> str:
-    """Generate a usage line for a command.
+    """Generate a Slack usage line for a command.
 
     Creates a concise usage example showing command syntax with arguments.
 
@@ -117,10 +171,9 @@ def generate_usage_line(
         >>> print(usage)
         Usage: /sre groups add EMAIL GROUP_ID [--justification TEXT]
     """
-    parts = command_path.split(".")
-    cmd_str = " ".join(parts)
+    display_path = build_slack_display_path(command_path)
 
-    arg_parts = []
+    arg_parts: List[str] = []
     for arg in arguments:
         if arg.is_positional:
             if arg.required:
@@ -140,9 +193,8 @@ def generate_usage_line(
 
     args_str = " ".join(arg_parts)
     if args_str:
-        return f"Usage: /{cmd_str} {args_str}"
-    else:
-        return f"Usage: /{cmd_str}"
+        return f"Usage: /{display_path} {args_str}"
+    return f"Usage: /{display_path}"
 
 
 def get_argument_by_name(
