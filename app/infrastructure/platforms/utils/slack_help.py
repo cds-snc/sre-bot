@@ -4,9 +4,12 @@ Provides utilities to generate help text for Slack slash commands from their
 Argument definitions, with optional i18n support.
 """
 
-from typing import Callable, List, Optional
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 from infrastructure.platforms.parsing import Argument
+
+if TYPE_CHECKING:
+    from infrastructure.platforms.models import CommandDefinition
 
 SLACK_HELP_KEYWORDS = frozenset({"help", "aide", "--help", "-h"})
 
@@ -51,7 +54,8 @@ def generate_slack_help_text(
     indent: str = "  ",
     include_header: bool = False,
     header: Optional[str] = None,
-    translate: Optional[Callable[[Optional[str], str], str]] = None,
+    translate: Optional[Callable[[Optional[str], str, str], str]] = None,
+    locale: str = "en-US",
 ) -> str:
     """Generate Slack help text from Argument definitions.
 
@@ -244,16 +248,16 @@ class SlackHelpGenerator:
     def __init__(
         self,
         commands: dict,
-        translator: Optional[Callable[[Optional[str], str], str]] = None,
+        translator: Optional[Callable[[Optional[str], str, str], str]] = None,
     ):
         """Initialize help generator.
 
         Args:
             commands: Dict of registered CommandDefinition objects
-            translator: Optional i18n translator function
+            translator: Optional i18n translator function (key, fallback, locale) -> str
         """
         self._commands = commands
-        self._translator = translator or (lambda key, fallback: fallback)
+        self._translator = translator or (lambda key, fallback, locale: fallback)
 
     def generate(
         self, command_path: str, mode: str = "command", locale: str = "en-US"
@@ -373,6 +377,7 @@ class SlackHelpGenerator:
                 include_header=True,
                 header=f"*{arguments_label}*",
                 translate=self._translator,
+                locale=locale,
             )
             lines.append(args_help)
 
@@ -426,10 +431,15 @@ class SlackHelpGenerator:
             include_header=True,
             header=f"*{arguments_label}*",
             translate=self._translator,
+            locale=locale,
         )
 
     def _append_command_tree_entry(
-        self, lines: List[str], cmd_def, indent_level: int, locale: str = "en-US"
+        self,
+        lines: List[str],
+        cmd_def: "CommandDefinition",
+        indent_level: int,
+        locale: str = "en-US",
     ) -> None:
         """Append command tree entry to help text (DRY method).
 
@@ -459,7 +469,7 @@ class SlackHelpGenerator:
         lines.append(f"{indent}  `{signature}`")
         lines.append("")
 
-    def _get_child_commands(self, parent_path: str) -> list:
+    def _get_child_commands(self, parent_path: str) -> List["CommandDefinition"]:
         """Get all direct children of a command node.
 
         Args:
