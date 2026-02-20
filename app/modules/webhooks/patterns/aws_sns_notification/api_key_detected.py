@@ -64,9 +64,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[D
         api_key_name = "Unknown Key"
 
     # Attempt to revoke the API key
-    revocation_result = notify.revoke_api_key(
-        api_key, key_type, github_repo, source
-    )
+    revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
 
     if revocation_result == "revoked":
         revoke_api_key_message = (

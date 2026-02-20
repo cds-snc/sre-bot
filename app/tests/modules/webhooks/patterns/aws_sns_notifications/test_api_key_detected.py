@@ -36,9 +36,7 @@ def test_api_key_detected_handler_not_found(revoke_api_key_mock):
     revoke_api_key_mock.return_value = "not_found"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
-    assert any(
-        "was not found" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("was not found" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 @patch("integrations.notify.revoke_api_key")
