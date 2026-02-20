@@ -3,10 +3,11 @@
 Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
-from typing import Any, Callable, Dict, Optional
+import threading
+from typing import Any, Callable, Dict, FrozenSet, List, Optional, cast
 
 import structlog
-from slack_bolt import App
+from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from infrastructure.operations import OperationResult
@@ -21,8 +22,12 @@ from infrastructure.platforms.models import (
     CommandPayload,
     CommandResponse,
 )
+from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
-from infrastructure.platforms.utils.help import generate_help_text
+from infrastructure.platforms.utils.slack_help import (
+    SLACK_HELP_KEYWORDS,
+    SlackHelpGenerator,
+)
 
 logger = structlog.get_logger()
 
@@ -61,6 +66,8 @@ class SlackPlatformProvider(BasePlatformProvider):
         )
     """
 
+    SLACK_HELP_KEYWORDS = SLACK_HELP_KEYWORDS
+
     def __init__(
         self,
         settings,  # SlackPlatformSettings type
@@ -89,6 +96,12 @@ class SlackPlatformProvider(BasePlatformProvider):
         self._app: Optional[App] = None
         self._client: Optional[Any] = None
 
+        # Help generator for unified help text generation
+        self._help_generator = SlackHelpGenerator(
+            commands=self._commands,
+            translator=self._translate_or_fallback,
+        )
+
         self._logger.info(
             "slack_provider_initialized",
             socket_mode=settings.SOCKET_MODE,
@@ -97,6 +110,7 @@ class SlackPlatformProvider(BasePlatformProvider):
         self._handler: Optional[SocketModeHandler] = (
             None  # Socket Mode handler reference
         )
+        self._socket_thread: Optional[threading.Thread] = None
 
     def get_capabilities(self) -> CapabilityDeclaration:
         """Get Slack platform capabilities.
@@ -112,10 +126,12 @@ class SlackPlatformProvider(BasePlatformProvider):
             PlatformCapability.THREADS,
             PlatformCapability.REACTIONS,
             PlatformCapability.FILE_SHARING,
+            PlatformCapability.HIERARCHICAL_TEXT_COMMANDS,
             metadata={
                 "socket_mode": self._settings.SOCKET_MODE,
                 "platform": "slack",
                 "connection_mode": "websocket",
+                "command_parsing": "hierarchical_text",
             },
         )
 
@@ -129,79 +145,9 @@ class SlackPlatformProvider(BasePlatformProvider):
         """
         return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
 
-    def send_message(
-        self,
-        channel: str,
-        message: Dict[str, Any],
-        thread_ts: Optional[str] = None,
-    ) -> OperationResult:
-        """Send a message to a Slack channel.
-
-        Args:
-            channel: Slack channel ID (e.g., "C123456")
-            message: Message content (can include "text" and/or "blocks")
-            thread_ts: Optional thread timestamp for threading
-
-        Returns:
-            OperationResult with message send status and response data
-        """
-        log = self._logger.bind(channel=channel, has_thread=bool(thread_ts))
-        log.info("sending_slack_message")
-
-        if not self.enabled:
-            log.warning("slack_provider_disabled")
-            return OperationResult.permanent_error(
-                message="Slack provider is disabled",
-                error_code="PROVIDER_DISABLED",
-            )
-
-        # Validate required content
-        if not message:
-            log.error("empty_message_content")
-            return OperationResult.permanent_error(
-                message="Message content cannot be empty",
-                error_code="EMPTY_CONTENT",
-            )
-
-        # Build message payload
-        payload = {
-            "channel": channel,
-            **message,
-        }
-
-        # Add thread_ts if threading
-        if thread_ts:
-            payload["thread_ts"] = thread_ts
-
-        # In real implementation, would use Bolt client
-        # For now, return success with mock data
-        log.info("slack_message_sent_success")
-        return OperationResult.success(
-            data={
-                "channel": channel,
-                "ts": "1234567890.123456",  # Mock timestamp
-                "message": payload,
-            },
-            message="Message sent successfully",
-        )
-
-    def format_response(
-        self,
-        data: Dict[str, Any],
-        error: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Format response using SlackBlockKitFormatter.
-
-        Args:
-            data: Response data payload
-            error: Optional error message
-
-        Returns:
-            Formatted response dict with Slack Block Kit blocks
-        """
-        if error:
-            return self._formatter.format_error(message=error)
-        return self._formatter.format_success(data=data)
+    def get_help_keywords(self) -> FrozenSet[str]:
+        """Get Slack-specific help keywords for text commands."""
+        return self.SLACK_HELP_KEYWORDS
 
     def initialize_app(self) -> OperationResult:
         """Initialize Slack Bolt app with Socket Mode handler.
@@ -243,18 +189,20 @@ class SlackPlatformProvider(BasePlatformProvider):
             )
 
         try:
-
             # Create Bolt App instance
             self._app = App(token=self._settings.BOT_TOKEN)
             self._client = self._app.client
             log.debug("slack_app_created")
 
-            # Initialize Socket Mode if enabled
+            # Auto-register root commands with Slack Bolt
+            # Extract unique root commands from registered command tree
+            # (e.g., "sre" from "sre.incident", "sre.webhooks", etc.)
+            self._auto_register_root_commands()
+
+            # Prepare Socket Mode handler if enabled (start happens separately)
             if self._settings.SOCKET_MODE:
-                handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
-                handler.connect()
-                self._handler = handler
-                log.info("socket_mode_handler_started")
+                self._handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
+                log.info("socket_mode_handler_prepared")
             else:
                 log.info("socket_mode_disabled_http_mode")
 
@@ -270,6 +218,212 @@ class SlackPlatformProvider(BasePlatformProvider):
                 message=f"Failed to initialize Slack app: {str(e)}",
                 error_code="INITIALIZATION_ERROR",
             )
+
+    def start(self) -> OperationResult:
+        """Start Slack Socket Mode if enabled."""
+        log = self._logger.bind(socket_mode=self._settings.SOCKET_MODE)
+
+        if not self._settings.SOCKET_MODE:
+            log.info("socket_mode_start_skipped")
+            return OperationResult.success(message="Socket Mode disabled")
+
+        if not self._handler:
+            log.error("socket_mode_handler_missing")
+            return OperationResult.permanent_error(
+                message="Socket Mode handler not initialized",
+                error_code="SOCKET_MODE_HANDLER_MISSING",
+            )
+
+        try:
+            self._socket_thread = threading.Thread(
+                target=self._handler.connect,
+                daemon=True,
+                name="slack-socket-mode",
+            )
+            self._socket_thread.start()
+            log.info("socket_mode_started")
+            return OperationResult.success(message="Socket Mode started")
+        except Exception as e:
+            log.error("socket_mode_start_failed", error=str(e))
+            return OperationResult.permanent_error(
+                message=f"Failed to start Socket Mode: {str(e)}",
+                error_code="SOCKET_MODE_START_FAILED",
+            )
+
+    def stop(self) -> None:
+        """Stop Slack Socket Mode handler if running."""
+        if self._handler:
+            self._handler.close()
+        if self._socket_thread and self._socket_thread.is_alive():
+            self._socket_thread.join(timeout=5)
+
+    def _auto_register_root_commands(self) -> None:
+        """Auto-register root commands with Slack Bolt based on registered command tree.
+
+        Analyzes self._commands to extract unique root commands (e.g., "sre" from "sre.incident")
+        and registers Slack Bolt handlers for them that delegate to route_hierarchical_command().
+
+        This eliminates the need for manual @bot.command("/sre") registrations in modules/.
+
+        Example:
+            After packages register:
+            - provider.register_command("incident", parent="sre", ...)
+            - provider.register_command("webhooks", parent="sre", ...)
+
+            This method auto-detects "/sre" is needed and registers:
+            @bot.command("/sre")
+            def handle_sre(ack, command, respond):
+                # Calls route_hierarchical_command("sre", ...)
+        """
+        if not self._app:
+            self._logger.warning("app_not_initialized_skipping_root_registration")
+            return
+
+        # Extract unique root commands from command tree
+        root_commands = set()
+        for full_path in self._commands.keys():
+            # Extract root from paths like "sre.incident", "sre.webhooks" → "sre"
+            root = full_path.split(".")[0]
+            root_commands.add(root)
+
+        # Register each root command with Slack Bolt
+        for root_command in sorted(root_commands):
+            # Build slash command (e.g., /sre, /geolocate)
+            slash_command = f"/{root_command}"
+
+            # Create handler closure that captures root_command
+            def create_handler(captured_root: str):
+                def handler(ack: Ack, command: Dict[str, Any], respond: Respond):
+                    """Auto-generated root command handler."""
+                    ack()
+
+                    # Create base payload from Slack command
+                    payload = CommandPayload(
+                        text="",  # Will be set by route_hierarchical_command
+                        user_id=command.get("user_id", ""),
+                        user_email=command.get("user_email"),
+                        channel_id=command.get("channel_id"),
+                        user_locale=command.get("locale", "en-US"),
+                        response_url=command.get("response_url"),
+                        platform_metadata=dict(command),
+                    )
+
+                    # Route through provider's hierarchical command handler
+                    response = self.route_hierarchical_command(
+                        root_command=captured_root,
+                        text=command.get("text", ""),
+                        payload=payload,
+                    )
+
+                    # Send response back to Slack
+                    self._send_command_response(response, respond)
+
+                return handler
+
+            # Register the handler with Slack Bolt
+            self._app.command(slash_command)(create_handler(root_command))
+
+            self._logger.info(
+                "auto_registered_root_command",
+                slash_command=slash_command,
+                root=root_command,
+            )
+
+    def _tokenize_command_text(self, text: str) -> List[str]:
+        """Tokenize Slack command text using quote-aware parsing."""
+        parser = CommandArgumentParser([])
+        return parser._tokenize(text)
+
+    def route_hierarchical_command(
+        self, root_command: str, text: str, payload: CommandPayload
+    ) -> CommandResponse:
+        """Route a Slack hierarchical command recursively to leaf command.
+
+        Handles multi-level command hierarchies by recursively routing through
+        the command tree. Uses quote-aware tokenization to preserve arguments
+        with spaces.
+
+        Flow:
+        1. Tokenize text (quote-aware)
+        2. Check if first token is help keyword → generate help
+        3. Check if first token matches child command → recurse
+        4. If no match or no tokens, dispatch to current command
+
+        Args:
+            root_command: Current command path (e.g., "sre" or "sre.groups")
+            text: Flattened text from Slack (e.g., "groups list --managed")
+            payload: CommandPayload with user context
+
+        Returns:
+            CommandResponse from handler or auto-generated help
+
+        Example:
+            User: /sre groups add email@example.com
+            Call: route_hierarchical_command("sre", "groups add email@example.com")
+            Internal routing:
+              - "sre" + "groups" → "sre.groups" (child found, recurse)
+              - "sre.groups" + "add" → "sre.groups.add" (child found, recurse)
+              - "sre.groups.add" + "email@..." → no child (dispatch)
+            Handler receives: text="email@example.com" (arguments only)
+        """
+        if not text or not text.strip():
+            return self.dispatch_command(root_command, payload)
+
+        tokens = self._tokenize_command_text(text)
+        if not tokens:
+            return self.dispatch_command(root_command, payload)
+
+        first_word = tokens[0]
+        remaining_text = " ".join(tokens[1:]) if len(tokens) > 1 else ""
+
+        # Check for help keyword (early exit, don't recurse deeper)
+        if first_word.lower() in self.SLACK_HELP_KEYWORDS:
+            payload.text = first_word
+            return self.dispatch_command(root_command, payload)
+
+        # Try to recurse to child command
+        child_path = f"{root_command}.{first_word}"
+        if child_path in self._commands:
+            payload.text = remaining_text
+            # Recursively route the child to handle arbitrary depth
+            return self.route_hierarchical_command(child_path, remaining_text, payload)
+
+        # No child found, dispatch to current command with full text
+        payload.text = text
+        return self.dispatch_command(root_command, payload)
+
+    def _send_command_response(
+        self, response: CommandResponse, respond: Respond
+    ) -> None:
+        """Send CommandResponse to Slack using respond function.
+
+        Args:
+            response: CommandResponse from handler
+            respond: Slack Bolt respond function
+        """
+        response_type = "ephemeral" if response.ephemeral else "in_channel"
+
+        if response.blocks:
+            respond(
+                text=response.message or "",
+                blocks=response.blocks,
+                response_type=response_type,
+            )
+            return
+
+        if response.attachments:
+            respond(
+                text=response.message or "",
+                attachments=response.attachments,
+                response_type=response_type,
+            )
+            return
+
+        if response.message:
+            respond(text=response.message, response_type=response_type)
+            return
+
+        respond(text="", response_type=response_type)
 
     @property
     def formatter(self) -> SlackBlockKitFormatter:
@@ -302,6 +456,11 @@ class SlackPlatformProvider(BasePlatformProvider):
         """
         return self._app
 
+    @property
+    def socket_mode_handler(self) -> Optional[SocketModeHandler]:
+        """Get the Socket Mode handler if initialized."""
+        return self._handler
+
     def get_user_locale(self, user_id: str) -> str:
         """Get user's locale from Slack API.
 
@@ -331,13 +490,17 @@ class SlackPlatformProvider(BasePlatformProvider):
             user_info = self._client.users_info(user=user_id, include_locale=True)
             if user_info.get("ok") and user_info.get("user"):
                 user_locale = user_info["user"].get("locale")
-                if user_locale and user_locale in supported_locales:
+                if (
+                    user_locale
+                    and isinstance(user_locale, str)
+                    and user_locale in supported_locales
+                ):
                     self._logger.debug(
                         "user_locale_extracted_from_slack",
                         user_id=user_id,
                         locale=user_locale,
                     )
-                    return user_locale
+                    return cast(str, user_locale)
                 else:
                     self._logger.debug(
                         "user_locale_not_supported_or_missing",
@@ -363,7 +526,7 @@ class SlackPlatformProvider(BasePlatformProvider):
     def register_command(
         self,
         command: str,
-        handler: Callable[..., CommandResponse],
+        handler: Optional[Callable[..., CommandResponse]],
         description: str = "",
         description_key: Optional[str] = None,
         usage_hint: str = "",
@@ -452,63 +615,6 @@ class SlackPlatformProvider(BasePlatformProvider):
             has_description=bool(description or description_key),
         )
 
-    def _append_command_help(
-        self,
-        lines: list,
-        cmd_def,  # CommandDefinition
-        indent_level: int,
-        locale: str,
-    ) -> None:
-        """Recursively append command help with hierarchical formatting.
-
-        Args:
-            lines: List of strings to append to
-            cmd_def: CommandDefinition to render
-            indent_level: Current indentation level (0 = root)
-            locale: Locale string for translations
-        """
-        indent = "  " * indent_level
-
-        # Convert dot notation to space-separated for display
-        # e.g., "sre.dev.aws" → "/sre dev aws"
-        display_path = cmd_def.full_path.replace(".", " ")
-
-        # Add description as the bullet point (if not auto-generated)
-        if not cmd_def.is_auto_generated:
-            desc = self._translate_or_fallback(
-                cmd_def.description_key, cmd_def.description, locale
-            )
-            self._logger.debug(
-                "command_help_translation",
-                command=cmd_def.full_path,
-                key=cmd_def.description_key,
-                locale=locale,
-                translated=desc,
-                fallback=cmd_def.description,
-            )
-            if desc:
-                lines.append(f"{indent}• {desc}")
-            else:
-                # Fallback to command name if no description
-                lines.append(f"{indent}• {cmd_def.name}")
-        else:
-            # For auto-generated commands, just show the name
-            lines.append(f"{indent}• {cmd_def.name}")
-
-        # Build and add command signature indented below
-        if cmd_def.usage_hint:
-            signature = f"/{display_path} {cmd_def.usage_hint}"
-            lines.append(f"{indent}  `{signature}`")
-        else:
-            # Show command path even without usage hint
-            lines.append(f"{indent}  `/{display_path}`")
-
-        # Don't show examples when displaying a list of subcommands
-        # Examples are only shown when user requests help for a specific command
-
-        # Add blank line after command
-        lines.append("")
-
     def generate_help(
         self,
         locale: str = "en-US",
@@ -516,7 +622,8 @@ class SlackPlatformProvider(BasePlatformProvider):
     ) -> str:
         """Generate Slack-formatted help text for registered commands.
 
-        Supports hierarchical command display using the new dot notation.
+        Delegates to SlackHelpGenerator for unified help generation.
+        Supports hierarchical command display using the dot notation.
         Uses Slack markdown formatting (backticks, asterisks, bullet points).
 
         Args:
@@ -537,55 +644,16 @@ class SlackPlatformProvider(BasePlatformProvider):
               • `/sre dev aws` - AWS development commands
             ```
         """
-        if not self._commands:
-            msg = self._translate_or_fallback(
-                "commands.errors.no_commands_registered",
-                "No commands registered.",
-                locale,
-            )
-            return msg
-
-        # Translate section header
-        header = self._translate_or_fallback(
-            "commands.labels.available_commands", "Available Commands", locale
-        )
-        lines = [f"*{header}*", ""]
-
-        # Determine which commands to display
         if root_command:
-            # Show children of root_command
-            children = self._get_child_commands(root_command)
-            if not children:
-                msg = self._translate_or_fallback(
-                    "commands.errors.no_commands_under",
-                    f"No commands found under `{root_command}`",
-                    locale,
-                )
-                return msg
-
-            # Render each child command with its subtree
-            for cmd_def in children:
-                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
-        else:
-            # Show all top-level commands (no parent)
-            top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
-
-            if not top_level:
-                msg = self._translate_or_fallback(
-                    "commands.errors.no_top_level_commands",
-                    "No top-level commands registered.",
-                    locale,
-                )
-                return msg
-
-            for cmd_def in sorted(top_level, key=lambda c: c.name):
-                self._append_command_help(lines, cmd_def, indent_level=0, locale=locale)
-
-        return "\n".join(lines)
+            return self._help_generator.generate(
+                root_command, mode="tree", locale=locale
+            )
+        return self._help_generator.generate("", mode="tree", locale=locale)
 
     def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
         """Generate Slack-formatted help text for a specific command.
 
+        Delegates to SlackHelpGenerator for unified help generation.
         Uses Slack markdown formatting (backticks, asterisks, bullet points).
 
         Args:
@@ -595,88 +663,6 @@ class SlackPlatformProvider(BasePlatformProvider):
         Returns:
             Slack-formatted help text for the specified command
         """
-        # Look up command by full_path
-        cmd_def = self._commands.get(command_name)
-        if not cmd_def:
-            return f"Unknown command: `{command_name}`"
-
-        lines = []
-
-        # Convert dot notation to space-separated for display
-        # e.g., "sre.dev.aws" → "/sre dev aws"
-        display_path = cmd_def.full_path.replace(".", " ")
-
-        # Build command signature
-        if cmd_def.usage_hint:
-            signature = f"/{display_path} {cmd_def.usage_hint}"
-        else:
-            signature = f"/{display_path}"
-
-        lines.append(f"*{signature}*")
-        lines.append("")
-
-        # Translate description (skip if auto-generated)
-        if not cmd_def.is_auto_generated:
-            desc = self._translate_or_fallback(
-                cmd_def.description_key, cmd_def.description, locale
-            )
-            if desc:
-                lines.append(desc)
-                lines.append("")
-
-        # Add arguments if present (for leaf commands)
-        if cmd_def.arguments:
-            lines.append("")
-            arguments_label = self._translate_or_fallback(
-                "commands.labels.arguments", "Arguments:", locale
-            )
-            lines.append(f"*{arguments_label}*")
-            # Generate formatted argument help using utility
-            args_help = generate_help_text(
-                cmd_def.arguments,
-                include_types=True,
-                include_defaults=True,
-                indent="  ",
-            )
-            lines.append(args_help)
-
-        # Add examples (skip if auto-generated)
-        if not cmd_def.is_auto_generated and cmd_def.examples:
-            # Translate "Examples:" label
-            examples_label = self._translate_or_fallback(
-                "commands.labels.examples", "Examples:", locale
-            )
-            lines.append("")
-            lines.append(f"*{examples_label}*")
-
-            for i, example in enumerate(cmd_def.examples):
-                # Try to translate example if key available
-                if i < len(cmd_def.example_keys):
-                    example_text = self._translate_or_fallback(
-                        cmd_def.example_keys[i], example, locale
-                    )
-                else:
-                    example_text = example
-
-                example_line = f"`/{display_path} {example_text}`"
-                lines.append(f"• {example_line}")
-
-        # Show sub-commands if any
-        children = self._get_child_commands(cmd_def.full_path)
-        if children:
-            lines.append("")
-            subcommands_label = self._translate_or_fallback(
-                "commands.labels.subcommands", "Sub-commands:", locale
-            )
-            lines.append(f"*{subcommands_label}*")
-            for child in children:
-                child_display = child.full_path.replace(".", " ")
-                lines.append(f"• `/{child_display}`")
-                if not child.is_auto_generated and child.description:
-                    desc = self._translate_or_fallback(
-                        child.description_key, child.description, locale
-                    )
-                    if desc:
-                        lines.append(f"  {desc}")
-
-        return "\n".join(lines)
+        return self._help_generator.generate(
+            command_name, mode="command", locale=locale
+        )

@@ -6,7 +6,6 @@ Adaptive Cards formatting.
 
 import pytest
 
-from infrastructure.operations import OperationStatus
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.providers.teams import TeamsPlatformProvider
 
@@ -106,118 +105,6 @@ class TestGetCapabilities:
         assert capabilities.metadata["framework"] == "botframework"
         assert "connection_mode" in capabilities.metadata
         assert capabilities.metadata["connection_mode"] == "http"
-
-
-@pytest.mark.unit
-class TestSendMessage:
-    """Test send_message() method."""
-
-    def test_send_message_success(self, teams_settings):
-        """Test sending a message successfully."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        result = provider.send_message(
-            channel="19:abcd@thread.tacv2", message={"text": "Hello Teams"}
-        )
-
-        assert result.is_success
-        assert result.data["channel"] == "19:abcd@thread.tacv2"
-        assert "payload" in result.data
-
-    def test_send_message_with_adaptive_card(self, teams_settings):
-        """Test sending a message with Adaptive Card."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-        card = {
-            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-            "type": "AdaptiveCard",
-            "version": "1.4",
-            "body": [{"type": "TextBlock", "text": "Hello"}],
-        }
-
-        result = provider.send_message(
-            channel="19:abcd@thread.tacv2",
-            message={
-                "attachments": [
-                    {
-                        "contentType": "application/vnd.microsoft.card.adaptive",
-                        "content": card,
-                    }
-                ]
-            },
-        )
-
-        assert result.is_success
-
-    def test_send_message_disabled_provider(self, teams_settings_disabled):
-        """Test sending message when provider is disabled."""
-        provider = TeamsPlatformProvider(settings=teams_settings_disabled)
-
-        result = provider.send_message(
-            channel="19:abcd@thread.tacv2", message={"text": "Test"}
-        )
-
-        assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.error_code == "PROVIDER_DISABLED"
-
-    def test_send_message_empty_content(self, teams_settings):
-        """Test sending message with empty content."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        result = provider.send_message(channel="19:abcd@thread.tacv2", message={})
-
-        assert not result.is_success
-        assert result.error_code == "INVALID_MESSAGE"
-
-    def test_send_message_none_content(self, teams_settings):
-        """Test sending message with None content."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        result = provider.send_message(channel="19:abcd@thread.tacv2", message=None)
-
-        assert not result.is_success
-        assert result.error_code == "INVALID_MESSAGE"
-
-
-@pytest.mark.unit
-class TestFormatResponse:
-    """Test format_response() method."""
-
-    def test_format_response_success(self, teams_settings):
-        """Test formatting a success response."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        response = provider.format_response(data={"user_id": "U123"})
-
-        assert response is not None
-
-    def test_format_response_with_error(self, teams_settings):
-        """Test formatting an error response."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        response = provider.format_response(data={}, error="Something went wrong")
-
-        assert response is not None
-
-    def test_format_response_empty_data(self, teams_settings):
-        """Test formatting response with empty data."""
-        provider = TeamsPlatformProvider(settings=teams_settings)
-
-        response = provider.format_response(data={})
-
-        assert response is not None
-
-    def test_format_response_uses_custom_formatter(
-        self, teams_settings, teams_formatter
-    ):
-        """Test that format_response uses the configured formatter."""
-        provider = TeamsPlatformProvider(
-            settings=teams_settings, formatter=teams_formatter
-        )
-
-        provider.format_response(data={"test": "data"})
-
-        assert provider._formatter is teams_formatter
 
 
 @pytest.mark.unit

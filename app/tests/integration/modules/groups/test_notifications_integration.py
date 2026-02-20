@@ -50,17 +50,46 @@ def mock_slack_client(monkeypatch):
 
 @pytest.fixture
 def mock_circuit_breaker(monkeypatch):
-    """Mock circuit breaker to pass through calls."""
-    # Mock at resilience module level, not at channel import level
+    """Mock circuit breaker to track calls while passing through function execution.
+
+    This fixture mocks CircuitBreaker in both:
+    1. The resilience module (where it's defined)
+    2. The channel modules (where it's imported)
+
+    This ensures the mock is used everywhere, while allowing test assertions
+    on call_count to verify circuit breaker interactions.
+    """
     mock_cb_class = MagicMock()
     mock_cb = MagicMock()
-    mock_cb.call.side_effect = lambda func, **kwargs: func(**kwargs)
+    mock_cb.call = MagicMock(
+        side_effect=lambda func, *args, **kwargs: func(*args, **kwargs)
+    )
     mock_cb_class.return_value = mock_cb
+
+    # Patch at resilience module level
     monkeypatch.setattr(
         "infrastructure.resilience.circuit_breaker.CircuitBreaker",
         mock_cb_class,
         raising=False,
     )
+
+    # Patch at channel module import levels
+    monkeypatch.setattr(
+        "infrastructure.notifications.channels.chat.CircuitBreaker",
+        mock_cb_class,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "infrastructure.notifications.channels.email.CircuitBreaker",
+        mock_cb_class,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "infrastructure.notifications.channels.sms.CircuitBreaker",
+        mock_cb_class,
+        raising=False,
+    )
+
     return mock_cb
 
 

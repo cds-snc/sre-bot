@@ -7,8 +7,8 @@ from api.dependencies.rate_limits import setup_rate_limiter, get_limiter
 from infrastructure.services import get_settings
 from server.lifespan import lifespan
 
-settings = get_settings()
 sns_message_validator = SNSMessageValidator()
+settings = get_settings()
 
 
 handler = FastAPI(lifespan=lifespan)
@@ -35,6 +35,5 @@ handler.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 handler.include_router(api_router)

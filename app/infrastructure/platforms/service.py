@@ -34,7 +34,7 @@ Usage:
     service.load_providers()  # Discover and register providers
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 
@@ -170,101 +170,6 @@ class PlatformService:
         """
         return [p for p in self._registry.list_providers() if p.enabled]
 
-    def send(
-        self,
-        platform: str,
-        channel: str,
-        message: Dict[str, Any],
-        **kwargs: Any,
-    ) -> OperationResult:
-        """Send a message through a platform provider.
-
-        Args:
-            platform: Platform name ('slack', 'teams', etc.)
-            channel: Target channel/conversation ID
-            message: Message content (format depends on platform)
-            **kwargs: Additional platform-specific parameters
-
-        Returns:
-            OperationResult with send status
-
-        Raises:
-            ProviderNotFoundError: If platform provider not found
-
-        Example:
-            >>> result = service.send(
-            ...     platform="slack",
-            ...     channel="C123456",
-            ...     message={"text": "Hello!"}
-            ... )
-            >>> if result.is_success:
-            ...     print("Message sent!")
-        """
-        log = self._logger.bind(platform=platform, channel=channel)
-
-        try:
-            provider = self.get_provider(platform)
-        except ProviderNotFoundError as e:
-            log.error("provider_not_found", error=str(e))
-            return OperationResult.permanent_error(
-                message=f"Platform provider not found: {platform}",
-                error_code="PROVIDER_NOT_FOUND",
-            )
-
-        if not provider.enabled:
-            log.warning("provider_disabled")
-            return OperationResult.permanent_error(
-                message=f"Platform provider disabled: {platform}",
-                error_code="PROVIDER_DISABLED",
-            )
-
-        log.debug("sending_message_via_provider")
-        result = provider.send_message(channel=channel, message=message, **kwargs)
-
-        if result.is_success:
-            log.info("message_sent_successfully")
-        else:
-            log.error(
-                "message_send_failed",
-                status=result.status,
-                error_code=result.error_code,
-            )
-
-        return result
-
-    def format_response(
-        self,
-        platform: str,
-        data: Optional[Dict[str, Any]] = None,
-        error: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Format a response using platform-specific formatter.
-
-        Args:
-            platform: Platform name ('slack', 'teams', etc.)
-            data: Optional success data to format
-            error: Optional error message to format
-
-        Returns:
-            Platform-specific formatted response
-
-        Raises:
-            ProviderNotFoundError: If platform provider not found
-
-        Example:
-            >>> response = service.format_response(
-            ...     platform="slack",
-            ...     data={"user_id": "U123"}
-            ... )
-            >>> print(response["blocks"])
-        """
-        provider = self.get_provider(platform)
-        message_type = "error" if error else "success"
-        response_data = data or {}
-        if error:
-            response_data["error"] = error
-        return provider.format_response(data=response_data, message_type=message_type)
-
     def supports_capability(
         self, platform: str, capability: PlatformCapability
     ) -> bool:
@@ -393,6 +298,40 @@ class PlatformService:
         )
 
         return results
+
+    def start_all_providers(self) -> Dict[str, OperationResult]:
+        """Start all enabled platform providers.
+
+        Returns:
+            Dict mapping provider names to start results
+        """
+        results: Dict[str, OperationResult] = {}
+        providers = self.get_enabled_providers()
+
+        self._logger.info("starting_all_providers", count=len(providers))
+
+        for provider in providers:
+            if hasattr(provider, "start"):
+                results[provider.name] = provider.start()
+
+        success_count = sum(1 for r in results.values() if r.is_success)
+        self._logger.info(
+            "provider_start_complete",
+            total=len(results),
+            successful=success_count,
+            failed=len(results) - success_count,
+        )
+
+        return results
+
+    def stop_all_providers(self) -> None:
+        """Stop all enabled platform providers."""
+        providers = self.get_enabled_providers()
+        self._logger.info("stopping_all_providers", count=len(providers))
+
+        for provider in providers:
+            if hasattr(provider, "stop"):
+                provider.stop()
 
     def health_check(self, platform: str) -> OperationResult:
         """Perform health check on a platform provider.

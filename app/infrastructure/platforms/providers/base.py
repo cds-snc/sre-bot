@@ -3,23 +3,23 @@
 All platform-specific providers (Slack, Teams, Discord) inherit from this base class.
 """
 
-import structlog
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional
 
+import structlog
+
+from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import CapabilityDeclaration
 from infrastructure.platforms.models import (
+    CommandDefinition,
     CommandPayload,
     CommandResponse,
-    CommandDefinition,
 )
 from infrastructure.platforms.parsing import (
-    CommandArgumentParser,
     ArgumentParsingError,
+    CommandArgumentParser,
 )
-
-from infrastructure.i18n.models import TranslationKey, Locale
 
 if TYPE_CHECKING:
     from infrastructure.i18n.translator import Translator
@@ -62,7 +62,6 @@ class BasePlatformProvider(ABC):
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: Dict[str, CommandDefinition] = {}
         self._translator: Optional["Translator"] = None
-        self._parent_command: Optional[str] = None  # e.g., "sre" for "/sre geolocate"
 
     @property
     def name(self) -> str:
@@ -85,25 +84,6 @@ class BasePlatformProvider(ABC):
 
         Returns:
             CapabilityDeclaration instance describing supported features.
-        """
-        pass
-
-    @abstractmethod
-    def send_message(
-        self,
-        channel: str,
-        message: Dict[str, Any],
-        thread_ts: Optional[str] = None,
-    ) -> OperationResult:
-        """Send a message to the platform.
-
-        Args:
-            channel: Channel/conversation ID or user ID.
-            message: Platform-specific message payload (Block Kit, Adaptive Card, etc.).
-            thread_ts: Optional thread timestamp for threaded messages.
-
-        Returns:
-            OperationResult with message metadata on success, error on failure.
         """
         pass
 
@@ -137,23 +117,6 @@ class BasePlatformProvider(ABC):
             assert router is None  # No webhooks needed
         """
         return None  # Default: no webhook router (WebSocket mode)
-
-    @abstractmethod
-    def format_response(
-        self,
-        data: Dict[str, Any],
-        message_type: str = "success",
-    ) -> Dict[str, Any]:
-        """Format a response dict into platform-native format.
-
-        Args:
-            data: Data dictionary to format.
-            message_type: Type of message ("success", "error", "info", "warning").
-
-        Returns:
-            Platform-specific message payload (Block Kit, Adaptive Card, Embed, etc.).
-        """
-        pass
 
     def supports_capability(self, capability: str) -> bool:
         """Check if this provider supports a specific capability.
@@ -297,16 +260,17 @@ class BasePlatformProvider(ABC):
 
         return sorted(children, key=lambda c: c.name)
 
-    def set_parent_command(self, parent: str) -> None:
-        """Set parent command prefix for help generation.
+    def get_help_keywords(self) -> FrozenSet[str]:
+        """Get platform-specific help keywords for text commands.
 
-        DEPRECATED: This method is being phased out. Use the `parent` parameter
-        in register_command() instead.
+        Platforms that accept flat text commands can override this to enable
+        automatic help routing in dispatch_command(). Platforms with structured
+        input (cards, slash options) should return an empty set.
 
-        Args:
-            parent: Parent command (e.g., "sre" for "/sre geolocate")
+        Returns:
+            FrozenSet of keywords that should trigger help output.
         """
-        self._parent_command = parent
+        return frozenset()
 
     @abstractmethod
     def get_user_locale(self, user_id: str) -> str:
@@ -421,16 +385,11 @@ class BasePlatformProvider(ABC):
             locale=user_locale,
         )
 
-        # Check for EXPLICIT help requests (unless in legacy mode)
-        # Legacy mode allows the handler to process help itself
-        text = payload.text.strip().lower() if payload.text else ""
-        if not cmd_def.legacy_mode and text in ("help", "aide", "--help", "-h"):
-            # Return help for this specific command only
-            help_text = self.generate_command_help(command_name, locale=user_locale)
-            return CommandResponse(message=help_text, ephemeral=True)
-
         # If command has no handler (auto-generated parent), show help for children
-        # This handles cases like `/sre dev` where `dev` is just a grouping node
+        # This handles cases like `/sre dev` where `dev` is just a grouping node.
+        # Help keyword checking is handled by route_hierarchical_command in
+        # platform-specific providers (e.g., SlackPlatformProvider) to avoid
+        # duplicate checks and keep dispatch focused on execution.
         if cmd_def.handler is None:
             help_text = self.generate_help(
                 locale=user_locale, root_command=command_name

@@ -4,6 +4,8 @@ These tests validate error handling, retry logic, circuit breaker patterns,
 and graceful degradation capabilities.
 """
 
+import time
+
 from modules.groups.api.schemas import AddMemberRequest
 
 
@@ -182,12 +184,11 @@ class TestCircuitBreakerPatterns:
 
     def test_request_creation_completes_quickly(self):
         """Request creation should complete within timeout budget."""
-        import time
-
         request_data = {
             "provider": "google",
             "group_id": "group-123",
             "member_email": "user@example.com",
+            "justification": "Testing circuit breaker validation",
         }
 
         start = time.perf_counter()
@@ -201,8 +202,6 @@ class TestCircuitBreakerPatterns:
 
     def test_validation_error_fails_fast(self):
         """Validation errors should fail fast without excessive retries."""
-        import time
-
         invalid_data = {
             "provider": "invalid_provider",
             "group_id": "group-123",
@@ -276,12 +275,11 @@ class TestTimeoutHandling:
 
     def test_synchronous_validation_no_timeout_risk(self):
         """Synchronous validation should not have timeout risk."""
-        import time
-
         request_data = {
             "provider": "google",
             "group_id": "group-123",
             "member_email": "user@example.com",
+            "justification": "Testing timeout validation",
         }
 
         # Run validation multiple times

@@ -94,7 +94,9 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
 
     # Return captured response
     if captured_response["blocks"]:
-        return CommandResponse(blocks=captured_response["blocks"], ephemeral=True)
+        return CommandResponse(
+            message="", blocks=captured_response["blocks"], ephemeral=True
+        )
     elif captured_response["message"]:
         return CommandResponse(message=captured_response["message"], ephemeral=True)
     else:
@@ -146,18 +148,19 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         """No-op ack - already handled by platform provider."""
         pass
 
-    # Call legacy webhook helper
-    webhook_helper.handle_webhooks_command(
+    # Call legacy webhook helper (note: function name is handle_webhook_command, not handle_webhooks_command)
+    webhook_helper.handle_webhook_command(
         args=args,
         client=client,
         body=body,
         respond=cast(Respond, capture_respond),
-        ack=cast(Ack, noop_ack),
     )
 
     # Return captured response
     if captured_response["blocks"]:
-        return CommandResponse(blocks=captured_response["blocks"], ephemeral=True)
+        return CommandResponse(
+            message="", blocks=captured_response["blocks"], ephemeral=True
+        )
     elif captured_response["message"]:
         return CommandResponse(message=captured_response["message"], ephemeral=True)
     else:
@@ -191,6 +194,12 @@ def handle_groups_command(payload: CommandPayload) -> CommandResponse:
 def register_commands(provider: "SlackPlatformProvider") -> None:
     """Register SRE module commands with Slack provider.
 
+    Note: No need to register explicit "help" handlers - the platform provider
+    automatically generates help when:
+    - User types `/sre` (parent command with no handler)
+    - User types `/sre help` (explicit help request with legacy_mode=False)
+    - User types `/sre <subcommand> help` (subcommand help)
+
     Args:
         provider: Slack platform provider instance
     """
@@ -218,4 +227,13 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         description="Manage webhooks",
         description_key="sre.subcommands.webhooks.description",
         legacy_mode=True,
+    )
+
+    provider.register_command(
+        command="groups",
+        handler=handle_groups_command,
+        parent="sre",
+        description="Manage user groups",
+        description_key="sre.subcommands.groups.description",
+        legacy_mode=True,  # TODO: Migrate to new command architecture
     )
