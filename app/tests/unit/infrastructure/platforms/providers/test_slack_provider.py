@@ -5,6 +5,7 @@ import pytest
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
+from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 
@@ -141,6 +142,14 @@ class TestGetCapabilities:
 
         assert capabilities.supports(PlatformCapability.FILE_SHARING)
 
+    def test_capabilities_include_hierarchical_text_commands(self, slack_settings):
+        """Test that capabilities include HIERARCHICAL_TEXT_COMMANDS."""
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        capabilities = provider.get_capabilities()
+
+        assert capabilities.supports(PlatformCapability.HIERARCHICAL_TEXT_COMMANDS)
+
     def test_capabilities_metadata_includes_socket_mode(self, slack_settings):
         """Test that capabilities metadata includes socket_mode."""
         provider = SlackPlatformProvider(settings=slack_settings)
@@ -158,6 +167,161 @@ class TestGetCapabilities:
 
         assert capabilities.metadata["platform"] == "slack"
 
+    def test_capabilities_metadata_includes_command_parsing(self, slack_settings):
+        """Test that capabilities metadata includes command_parsing."""
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        capabilities = provider.get_capabilities()
+
+        assert capabilities.metadata["command_parsing"] == "hierarchical_text"
+
+
+@pytest.mark.unit
+class TestHierarchicalRouting:
+    """Test Slack hierarchical command routing behavior."""
+
+    def test_route_hierarchical_command_preserves_quoted_args(
+        self, slack_settings: object
+    ) -> None:
+        """Should preserve quoted arguments when routing to subcommands."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=payload.text)
+
+        provider.register_command(
+            command="create",
+            parent="incident",
+            handler=handler,
+            description="Create incident",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act
+        response = provider.route_hierarchical_command(
+            root_command="incident",
+            text='create --title "Database outage in prod"',
+            payload=payload,
+        )
+
+        # Assert
+        assert response.message == "--title Database outage in prod"
+
+    def test_route_hierarchical_command_recursive_three_levels(
+        self, slack_settings: object
+    ) -> None:
+        """Should route recursively through multiple command levels (3+)."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=f"received:{payload.text}")
+
+        # Register 3-level hierarchy: sre → groups → add
+        provider.register_command(
+            command="create",
+            parent="sre.groups",
+            handler=handler,
+            description="Create group",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Route through 3 levels
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="groups create admin@example.com",
+            payload=payload,
+        )
+
+        # Assert: Handler receives only the email (arguments, not command names)
+        assert response.message == "received:admin@example.com"
+
+    def test_route_hierarchical_command_recursive_with_options(
+        self, slack_settings: object
+    ) -> None:
+        """Should preserve options and flags through recursive routing."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        def handler(payload: CommandPayload) -> CommandResponse:
+            return CommandResponse(message=f"args:{payload.text}")
+
+        # Register 2-level hierarchy: sre → groups → list
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=handler,
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Route with complex options
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text='groups list --provider aws --managed --name "Security Team"',
+            payload=payload,
+        )
+
+        # Assert: All options passed to leaf handler
+        # Note: Quotes are removed by tokenizer but quoted content is preserved
+        assert "--provider aws --managed --name" in response.message
+        assert "Security Team" in response.message
+
+    def test_route_hierarchical_command_help_keyword_at_root(
+        self, slack_settings: object
+    ) -> None:
+        """Should process help keyword at root level without recursing."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        # Register 2-level hierarchy
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=lambda p: CommandResponse(message="list handler"),
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Help keyword at root
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="help",  # Should not recurse, should show help for "sre"
+            payload=payload,
+        )
+
+        # Assert: Response contains help, not routing error
+        assert response.ephemeral is True
+        assert response.message  # Should have some help text
+
+    def test_route_hierarchical_command_help_keyword_at_intermediate_level(
+        self, slack_settings: object
+    ) -> None:
+        """Should process help keyword at intermediate routing levels."""
+        # Arrange
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        # Register 2-level hierarchy
+        provider.register_command(
+            command="list",
+            parent="sre.groups",
+            handler=lambda p: CommandResponse(message="list handler"),
+            description="List groups",
+        )
+        payload = CommandPayload(text="", user_id="U123", channel_id="C123")
+
+        # Act: Help keyword after routing one level
+        response = provider.route_hierarchical_command(
+            root_command="sre",
+            text="groups help",  # Help after routing to groups
+            payload=payload,
+        )
+
+        # Assert: Response contains help for groups commands
+        assert response.ephemeral is True
+        assert response.message  # Should have some help text
+
     def test_capabilities_socket_mode_false(self, slack_settings_http_mode):
         """Test capabilities metadata when socket_mode is False."""
         provider = SlackPlatformProvider(settings=slack_settings_http_mode)
@@ -165,141 +329,6 @@ class TestGetCapabilities:
         capabilities = provider.get_capabilities()
 
         assert capabilities.metadata["socket_mode"] is False
-
-
-@pytest.mark.unit
-class TestSendMessage:
-    """Test send_message() method."""
-
-    def test_send_message_success(self, slack_settings):
-        """Test sending a message successfully."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        result = provider.send_message(
-            channel="C123456", message={"text": "Hello World"}
-        )
-
-        assert result.is_success
-        assert result.data["channel"] == "C123456"
-        assert "ts" in result.data
-        assert result.data["message"]["text"] == "Hello World"
-
-    def test_send_message_with_blocks(self, slack_settings):
-        """Test sending a message with blocks."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "Hi"}}]
-
-        result = provider.send_message(channel="C123456", message={"blocks": blocks})
-
-        assert result.is_success
-        assert result.data["message"]["blocks"] == blocks
-
-    def test_send_message_with_thread(self, slack_settings):
-        """Test sending a threaded message."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        result = provider.send_message(
-            channel="C123456",
-            message={"text": "Thread reply"},
-            thread_ts="1234567890.123456",
-        )
-
-        assert result.is_success
-        assert result.data["message"]["thread_ts"] == "1234567890.123456"
-
-    def test_send_message_with_additional_fields(self, slack_settings):
-        """Test sending a message with additional fields in message dict."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        result = provider.send_message(
-            channel="C123456",
-            message={
-                "text": "Test",
-                "unfurl_links": False,
-                "unfurl_media": False,
-            },
-        )
-
-        assert result.is_success
-        assert result.data["message"]["unfurl_links"] is False
-        assert result.data["message"]["unfurl_media"] is False
-
-    def test_send_message_disabled_provider(self, slack_settings_disabled):
-        """Test sending message when provider is disabled."""
-        provider = SlackPlatformProvider(settings=slack_settings_disabled)
-
-        result = provider.send_message(channel="C123456", message={"text": "Test"})
-
-        assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.error_code == "PROVIDER_DISABLED"
-
-    def test_send_message_empty_content(self, slack_settings):
-        """Test sending message with empty content."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        result = provider.send_message(channel="C123456", message={})
-
-        assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.error_code == "EMPTY_CONTENT"
-
-    def test_send_message_none_content(self, slack_settings):
-        """Test sending message with None content."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        result = provider.send_message(channel="C123456", message=None)
-
-        assert not result.is_success
-        assert result.error_code == "EMPTY_CONTENT"
-
-
-@pytest.mark.unit
-class TestFormatResponse:
-    """Test format_response() method."""
-
-    def test_format_response_success(self, slack_settings):
-        """Test formatting a success response."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        response = provider.format_response(data={"user_id": "U123"})
-
-        assert "blocks" in response
-        # Should use formatter's format_success
-        assert response["blocks"][0]["type"] == "section"
-
-    def test_format_response_with_error(self, slack_settings):
-        """Test formatting an error response."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        response = provider.format_response(data={}, error="Something went wrong")
-
-        assert "blocks" in response
-        # Should use formatter's format_error
-        header_text = response["blocks"][0]["text"]["text"]
-        assert ":x:" in header_text
-        assert "Something went wrong" in header_text
-
-    def test_format_response_empty_data(self, slack_settings):
-        """Test formatting response with empty data."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        response = provider.format_response(data={})
-
-        assert "blocks" in response
-
-    def test_format_response_uses_custom_formatter(
-        self, slack_settings, slack_formatter
-    ):
-        """Test that format_response uses the configured formatter."""
-        provider = SlackPlatformProvider(
-            settings=slack_settings, formatter=slack_formatter
-        )
-
-        provider.format_response(data={"test": "data"})
-
-        # Verify custom formatter was used
-        assert provider.formatter is slack_formatter
 
 
 @pytest.mark.unit

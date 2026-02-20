@@ -1,7 +1,7 @@
 """Unit tests for BasePlatformProvider abstract class."""
 
 import pytest
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import (
@@ -33,29 +33,6 @@ class ConcretePlatformProvider(BasePlatformProvider):
     def get_capabilities(self) -> CapabilityDeclaration:
         """Return test capabilities."""
         return self._capabilities
-
-    def send_message(
-        self,
-        channel: str,
-        message: Dict[str, Any],
-        thread_ts: Optional[str] = None,
-    ) -> OperationResult:
-        """Mock send_message implementation."""
-        return OperationResult.success(
-            data={"channel": channel, "message": message, "thread_ts": thread_ts},
-            message="Message sent successfully",
-        )
-
-    def format_response(
-        self,
-        data: Dict[str, Any],
-        message_type: str = "success",
-    ) -> Dict[str, Any]:
-        """Mock format_response implementation."""
-        return {
-            "type": message_type,
-            "data": data,
-        }
 
     def get_user_locale(self, user_id):
         """Mock get_user_locale implementation."""
@@ -133,54 +110,6 @@ class TestBasePlatformProvider:
         assert result.platform_id == PLATFORM_SLACK
         assert PlatformCapability.COMMANDS in result.capabilities
         assert PlatformCapability.VIEWS_MODALS in result.capabilities
-
-    def test_send_message_success(self):
-        """Test send_message() returns OperationResult."""
-        provider = ConcretePlatformProvider()
-        message = {"text": "Hello, world!"}
-
-        result = provider.send_message(
-            channel="C123456",
-            message=message,
-        )
-
-        assert result.is_success
-        assert result.data["channel"] == "C123456"
-        assert result.data["message"] == message
-
-    def test_send_message_with_thread(self):
-        """Test send_message() with thread_ts parameter."""
-        provider = ConcretePlatformProvider()
-        message = {"text": "Reply in thread"}
-
-        result = provider.send_message(
-            channel="C123456",
-            message=message,
-            thread_ts="1234567890.123456",
-        )
-
-        assert result.is_success
-        assert result.data["thread_ts"] == "1234567890.123456"
-
-    def test_format_response_success(self):
-        """Test format_response() with success type."""
-        provider = ConcretePlatformProvider()
-        data = {"user_id": "U123", "status": "completed"}
-
-        result = provider.format_response(data, message_type="success")
-
-        assert result["type"] == "success"
-        assert result["data"] == data
-
-    def test_format_response_error(self):
-        """Test format_response() with error type."""
-        provider = ConcretePlatformProvider()
-        data = {"error": "Something went wrong"}
-
-        result = provider.format_response(data, message_type="error")
-
-        assert result["type"] == "error"
-        assert result["data"] == data
 
     def test_supports_capability_true(self):
         """Test supports_capability() returns True for supported capability."""
@@ -280,45 +209,3 @@ class TestAbstractMethodEnforcement:
             IncompleteProvider(name="Incomplete")  # type: ignore
 
         assert "get_capabilities" in str(exc_info.value)
-
-    def test_missing_send_message_raises_error(self):
-        """Test that missing send_message() raises TypeError."""
-
-        class IncompleteProvider(BasePlatformProvider):
-            def get_capabilities(self):
-                return create_capability_declaration(PLATFORM_SLACK)
-
-            def format_response(self, data, message_type="success"):
-                return {}
-
-            def generate_help(self, locale="en-US", root_command=None):
-                return ""
-
-            def generate_command_help(self, command_name, locale="en-US"):
-                return ""
-
-        with pytest.raises(TypeError) as exc_info:
-            IncompleteProvider(name="Incomplete")  # type: ignore
-
-        assert "send_message" in str(exc_info.value)
-
-    def test_missing_format_response_raises_error(self):
-        """Test that missing format_response() raises TypeError."""
-
-        class IncompleteProvider(BasePlatformProvider):
-            def get_capabilities(self):
-                return create_capability_declaration(PLATFORM_SLACK)
-
-            def send_message(self, channel, message, thread_ts=None):
-                return OperationResult.success(data={})
-
-            def generate_help(self, locale="en-US", root_command=None):
-                return ""
-
-            def generate_command_help(self, command_name, locale="en-US"):
-                return ""
-
-        with pytest.raises(TypeError) as exc_info:
-            IncompleteProvider(name="Incomplete")  # type: ignore
-
-        assert "format_response" in str(exc_info.value)

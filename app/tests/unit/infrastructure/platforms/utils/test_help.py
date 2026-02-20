@@ -1,8 +1,8 @@
 """Tests for automatic help text generation."""
 
 from infrastructure.platforms.parsing import Argument, ArgumentType
-from infrastructure.platforms.utils.help import (
-    generate_help_text,
+from infrastructure.platforms.utils.slack_help import (
+    generate_slack_help_text,
     generate_usage_line,
     get_argument_by_name,
 )
@@ -22,7 +22,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args)
+        help_text = generate_slack_help_text(args)
 
         assert "email" in help_text
         assert "email" in help_text.lower()  # type is lowercase
@@ -40,7 +40,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args)
+        help_text = generate_slack_help_text(args)
 
         assert "--role VALUE" in help_text
         assert "string" in help_text.lower()  # type is lowercase
@@ -59,7 +59,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args)
+        help_text = generate_slack_help_text(args)
 
         assert "provider" in help_text
         assert "choice" in help_text.lower()  # type is lowercase
@@ -78,7 +78,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args)
+        help_text = generate_slack_help_text(args)
 
         assert "--role" in help_text
         assert "-r" in help_text or "aliases" in help_text
@@ -105,7 +105,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args)
+        help_text = generate_slack_help_text(args)
 
         # Should have all arguments
         assert "email" in help_text
@@ -128,7 +128,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args, include_types=False)
+        help_text = generate_slack_help_text(args, include_types=False)
 
         # Should have argument name and description
         assert "email" in help_text
@@ -149,7 +149,7 @@ class TestGenerateHelpText:
             ),
         ]
 
-        help_text = generate_help_text(args, include_defaults=False)
+        help_text = generate_slack_help_text(args, include_defaults=False)
 
         # Should have argument name and description
         assert "--role" in help_text
@@ -165,7 +165,7 @@ class TestGenerateHelpText:
             Argument(name="email", type=ArgumentType.EMAIL, description="Email"),
         ]
 
-        help_text = generate_help_text(args, indent="    ")  # 4 spaces
+        help_text = generate_slack_help_text(args, indent="    ")  # 4 spaces
 
         lines = help_text.split("\n")
         # First line should have custom indent

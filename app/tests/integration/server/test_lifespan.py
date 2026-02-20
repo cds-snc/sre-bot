@@ -1,16 +1,28 @@
 """Integration tests for server.lifespan module."""
 
-from unittest.mock import MagicMock, patch
 import sys
+import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import FastAPI
+
+from server import lifespan as lifespan_module
+from server.lifespan import (
+    _activate_providers,
+    _get_logger,
+    _is_test_environment,
+    _list_configs,
+    _register_legacy_handlers,
+    _start_scheduled_tasks,
+    _stop_scheduled_tasks,
+)
 
 
 @pytest.mark.integration
 def test_lifespan_is_test_environment_detects_pytest():
     """Test that _is_test_environment detects pytest environment."""
     # Arrange
-    from server.lifespan import _is_test_environment
 
     # Act
     is_test = _is_test_environment()
@@ -23,8 +35,6 @@ def test_lifespan_is_test_environment_detects_pytest():
 def test_lifespan_is_test_environment_detects_non_pytest():
     """Test that _is_test_environment returns False when pytest not loaded."""
     # Arrange
-    from server import lifespan as lifespan_module
-
     original_modules = sys.modules.copy()
 
     # Temporarily remove pytest from sys.modules
@@ -46,7 +56,6 @@ def test_lifespan_is_test_environment_detects_non_pytest():
 def test_lifespan_get_logger_returns_logger(mock_settings):
     """Test that _get_logger returns a configured logger."""
     # Arrange
-    from server.lifespan import _get_logger
 
     # Act
     logger = _get_logger(mock_settings)
@@ -59,9 +68,6 @@ def test_lifespan_get_logger_returns_logger(mock_settings):
 def test_lifespan_list_configs_logs_settings(mock_settings):
     """Test that _list_configs logs configuration settings."""
     # Arrange
-    from server.lifespan import _list_configs
-    from unittest.mock import MagicMock
-
     mock_logger = MagicMock()
 
     # Act
@@ -78,8 +84,6 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
 def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_settings):
     """Test that _get_logger calls configure_logging with settings."""
     # Arrange
-    from server.lifespan import _get_logger
-
     mock_logger = MagicMock()
     mock_configure_logging.return_value = mock_logger
 
@@ -95,9 +99,6 @@ def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_set
 def test_lifespan_register_legacy_handlers_calls_register(mock_bot):
     """Test that _register_legacy_handlers calls register on all modules."""
     # Arrange
-    from server.lifespan import _register_legacy_handlers
-    from unittest.mock import MagicMock, patch
-
     mock_logger = MagicMock()
 
     with (
@@ -110,7 +111,6 @@ def test_lifespan_register_legacy_handlers_calls_register(mock_bot):
         patch("server.lifespan.incident") as mock_incident,
         patch("server.lifespan.incident_helper") as mock_incident_helper,
     ):
-
         # Act
         _register_legacy_handlers(mock_bot, mock_logger)
 
@@ -126,34 +126,9 @@ def test_lifespan_register_legacy_handlers_calls_register(mock_bot):
 
 
 @pytest.mark.integration
-@patch("server.lifespan.SocketModeHandler")
-def test_lifespan_start_socket_mode_creates_handler(mock_handler_class, mock_bot):
-    """Test that _start_socket_mode creates and starts SocketModeHandler."""
-    # Arrange
-    from server.lifespan import _start_socket_mode
-    from unittest.mock import MagicMock
-
-    mock_handler = MagicMock()
-    mock_handler_class.return_value = mock_handler
-    mock_logger = MagicMock()
-    app_token = "xapp-test-token"
-
-    # Act
-    handler, thread = _start_socket_mode(mock_bot, app_token, mock_logger)
-
-    # Assert
-    assert handler == mock_handler
-    assert thread is not None
-    assert thread.daemon is True
-    assert thread.name == "slack-socket-mode"
-    mock_logger.info.assert_called_with("socket_mode_started")
-
-
-@pytest.mark.integration
 def test_lifespan_stop_scheduled_tasks_with_none_event():
     """Test that _stop_scheduled_tasks handles None event gracefully."""
     # Arrange
-    from server.lifespan import _stop_scheduled_tasks
 
     # Act
     _stop_scheduled_tasks(None)
@@ -165,9 +140,6 @@ def test_lifespan_stop_scheduled_tasks_with_none_event():
 def test_lifespan_stop_scheduled_tasks_sets_event():
     """Test that _stop_scheduled_tasks sets the stop event."""
     # Arrange
-    from server.lifespan import _stop_scheduled_tasks
-    from unittest.mock import MagicMock
-
     mock_event = MagicMock()
 
     # Act
@@ -178,53 +150,83 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
 
 @pytest.mark.integration
-def test_lifespan_get_bot_returns_none_in_test_environment(mock_settings):
-    """Test that _get_bot returns None in test environment."""
-    # Arrange
-    from server.lifespan import _get_bot
-
-    # Act
-    bot = _get_bot(mock_settings)
-
-    # Assert
-    assert bot is None
-
-
-@pytest.mark.integration
-@patch("server.lifespan._is_test_environment")
-def test_lifespan_get_bot_returns_none_when_no_token(mock_is_test, mock_settings):
-    """Test that _get_bot returns None when SLACK_TOKEN is empty."""
-    # Arrange
-    from server.lifespan import _get_bot
-
-    mock_is_test.return_value = False
-    mock_settings.slack.SLACK_TOKEN = ""
-
-    # Act
-    bot = _get_bot(mock_settings)
-
-    # Assert
-    assert bot is None
-
-
-@pytest.mark.integration
-@patch("server.lifespan.App")
-@patch("server.lifespan._is_test_environment")
-def test_lifespan_get_bot_creates_app_with_token(
-    mock_is_test, mock_app_class, mock_settings
+def test_lifespan_start_scheduled_tasks_skips_when_prefix_not_empty(
+    mock_settings, mock_bot, monkeypatch
 ):
-    """Test that _get_bot creates App instance with token."""
+    """Test that _start_scheduled_tasks skips when PREFIX is not empty."""
     # Arrange
-    from server.lifespan import _get_bot
-
-    mock_is_test.return_value = False
-    mock_settings.slack.SLACK_TOKEN = "xoxb-test-token"
-    mock_app_instance = MagicMock()
-    mock_app_class.return_value = mock_app_instance
+    mock_logger = MagicMock()
+    mock_settings.PREFIX = "dev"
+    init_mock = MagicMock()
+    run_mock = MagicMock()
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
 
     # Act
-    bot = _get_bot(mock_settings)
+    stop_event = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
 
     # Assert
-    assert bot == mock_app_instance
-    mock_app_class.assert_called_once_with(token="xoxb-test-token")
+    assert stop_event is None
+    init_mock.assert_not_called()
+    run_mock.assert_not_called()
+    mock_logger.info.assert_called_with(
+        "scheduled_tasks_skipped",
+        reason="prefix_not_empty",
+    )
+
+
+@pytest.mark.integration
+def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
+    mock_settings, mock_bot, monkeypatch
+):
+    """Test that _start_scheduled_tasks starts when PREFIX is empty."""
+    # Arrange
+    mock_logger = MagicMock()
+    mock_settings.PREFIX = ""
+    init_mock = MagicMock()
+    stop_event = threading.Event()
+    run_mock = MagicMock(return_value=stop_event)
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
+
+    # Act
+    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
+
+    # Assert
+    assert result is stop_event
+    init_mock.assert_called_once_with(mock_bot)
+    run_mock.assert_called_once()
+    mock_logger.info.assert_called_with("scheduled_tasks_started")
+
+
+@pytest.mark.integration
+def test_lifespan_activate_providers_sets_app_state(mock_settings, monkeypatch):
+    """Test that _activate_providers sets provider state on app."""
+    # Arrange
+    app = FastAPI()
+    mock_logger = MagicMock()
+    register_mock = MagicMock()
+    discover_mock = MagicMock()
+    log_mock = MagicMock()
+    load_mock = MagicMock(return_value="primary")
+    active_mock = MagicMock(return_value={"primary": "provider"})
+    primary_mock = MagicMock(return_value="primary")
+
+    monkeypatch.setattr(
+        "server.lifespan.register_infrastructure_handlers", register_mock
+    )
+    monkeypatch.setattr("server.lifespan.discover_and_register_handlers", discover_mock)
+    monkeypatch.setattr("server.lifespan.log_registered_handlers", log_mock)
+    monkeypatch.setattr("server.lifespan.load_providers", load_mock)
+    monkeypatch.setattr("server.lifespan.get_active_providers", active_mock)
+    monkeypatch.setattr("server.lifespan.get_primary_provider_name", primary_mock)
+
+    # Act
+    _activate_providers(app, mock_settings, mock_logger)
+
+    # Assert
+    assert app.state.providers == {"primary": "provider"}
+    assert app.state.primary_provider_name == "primary"
+    register_mock.assert_called_once()
+    discover_mock.assert_called_once_with(base_path="modules", package_root="modules")
+    log_mock.assert_called_once()
