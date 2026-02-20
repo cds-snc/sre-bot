@@ -96,8 +96,14 @@ def post_event(url, payload):
     return response
 
 
-def revoke_api_key(api_key, api_type, github_repo, source):
-    """Function to revoke an api key by calling Notify's revoke api endpoint"""
+def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -> str:
+    """Function to revoke an api key by calling Notify's revoke api endpoint.
+
+    Returns:
+        "revoked" if the key was successfully revoked (201),
+        "not_found" if the key was not found (200),
+        "error" for any other response or failure.
+    """
     log = logger.bind(
         api_key=api_key,
         api_type=api_type,
@@ -108,12 +114,12 @@ def revoke_api_key(api_key, api_type, github_repo, source):
 
     if not settings.is_production:
         log.info("revoke_api_key_skipped", api_key=api_key)
-        return False
+        return "error"
     url = NOTIFY_API_URL
 
     if url is None:
         log.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")
-        return False
+        return "error"
 
     # append the revoke-endpoint to the url
     url = url + "/sre-tools/api-key-revoke"
@@ -128,14 +134,16 @@ def revoke_api_key(api_key, api_type, github_repo, source):
 
     # post the event (ie call the api)
     response = post_event(url, payload)
-    # A successful response has a status code of 201
     if response.status_code == 201:
         log.info("revoke_api_key_success", api_key=api_key)
-        return True
+        return "revoked"
+    elif response.status_code == 200:
+        log.warning("revoke_api_key_not_found", api_key=api_key)
+        return "not_found"
     else:
         log.error(
             "revoke_api_key_error",
             api_key=api_key,
             response_code=response.status_code,
         )
-        return False
+        return "error"

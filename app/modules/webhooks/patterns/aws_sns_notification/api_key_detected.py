@@ -64,15 +64,18 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[D
         api_key_name = "Unknown Key"
 
     # Attempt to revoke the API key
-    revocation_successful = notify.revoke_api_key(
-        api_key, key_type, github_repo, source
-    )
+    revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
 
-    if revocation_successful:
+    if revocation_result == "revoked":
         revoke_api_key_message = (
             f"API key {api_key_name} has been successfully revoked."
         )
         header_text = "🙀 Notify API Key has been exposed and revoked! 😌"
+    elif revocation_result == "not_found":
+        revoke_api_key_message = (
+            f"API key {api_key_name} was not found and may have already been revoked."
+        )
+        header_text = "🙀 Notify API Key has been exposed but was not found! 🤔"
     else:
         revoke_api_key_message = (
             f"API key {api_key_name} could not be revoked due to an error."

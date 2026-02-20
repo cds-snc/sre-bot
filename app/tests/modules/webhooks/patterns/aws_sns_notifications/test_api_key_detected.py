@@ -22,7 +22,7 @@ def mock_api_key_detected():
 @patch("integrations.notify.revoke_api_key")
 def test_api_key_detected_handler_success(revoke_api_key_mock):
     client = MagicMock()
-    revoke_api_key_mock.return_value = True
+    revoke_api_key_mock.return_value = "revoked"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
     assert any(
@@ -31,9 +31,18 @@ def test_api_key_detected_handler_success(revoke_api_key_mock):
 
 
 @patch("integrations.notify.revoke_api_key")
+def test_api_key_detected_handler_not_found(revoke_api_key_mock):
+    client = MagicMock()
+    revoke_api_key_mock.return_value = "not_found"
+    payload = mock_api_key_detected()
+    blocks = api_key_detected.handle_api_key_detected(payload, client)
+    assert any("was not found" in b["text"]["text"] for b in blocks if "text" in b)
+
+
+@patch("integrations.notify.revoke_api_key")
 def test_api_key_detected_handler_failure(revoke_api_key_mock):
     client = MagicMock()
-    revoke_api_key_mock.return_value = False
+    revoke_api_key_mock.return_value = "error"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
     assert any(
@@ -53,7 +62,7 @@ def test_api_key_detected_matcher():
 @patch("integrations.notify.revoke_api_key")
 def test_api_key_detected_handler_sends_message(mock_revoke, mock_send):
     client = MagicMock()
-    mock_revoke.return_value = True
+    mock_revoke.return_value = "revoked"
     payload = mock_api_key_detected()
     api_key_detected.handle_api_key_detected(payload, client)
     mock_send.assert_called_once()
