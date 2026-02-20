@@ -151,7 +151,7 @@ def get_formatter(platform: str) -> SlackFormatter | TeamsFormatter | DiscordFor
 from infrastructure.platforms.formatters import get_formatter
 from modules.groups.service import get_group_details
 
-async def handle_group_details_command(payload: dict, request_id: str) -> dict:
+def handle_group_details_command(payload: dict, request_id: str) -> dict:
     """Handle /group-details command."""
     log = logger.bind(command="group_details", user_id=payload["user_id"], request_id=request_id)
     
@@ -190,7 +190,7 @@ Rules:
 1. External API calls `POST /api/v1/groups/add` (JWT authenticated)
 2. Endpoint processes request → adds user to group
 3. Endpoint returns `200 OK` JSON response to API caller ✅ (always)
-4. Business logic checks config and sends platform notifications asynchronously:
+4. Business logic checks config and sends platform notifications as separate side effects:
    - If Slack enabled AND user has Slack identity → send Slack DM via formatter
    - If Teams enabled AND user has Teams identity → send Teams notification
    - If email configured → send email
@@ -200,9 +200,30 @@ Rules:
 
 Rules:
 - ✅ FastAPI endpoint always returns HTTP response to requester
-- ✅ Platform notifications are async side effects (separate from response)
+- ✅ Platform notifications are side effects (separate from response)
 - ✅ Notifications configured via application settings (which platforms enabled)
 - ✅ Each notification uses same Card + formatter pattern
 - ❌ Never block HTTP response on notification delivery
+
+---
+
+## Footnote: Async Platform Adapters (Future)
+
+Async adapters are deferred until the async-first migration. When that happens,
+use async HTTP clients and await the internal call.
+
+```python
+# Future async example (not current standard)
+import httpx
+
+async def handle_group_details_command(payload: dict, request_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/groups/details",
+            json={"group_id": payload["text"].strip()},
+            headers={"X-Request-ID": request_id},
+        )
+    return response.json()
+```
 - ❌ Never treat platform notifications as alternative responses
 - ❌ Never skip HTTP response to requester
