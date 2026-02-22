@@ -1,5 +1,5 @@
 module "vpc" {
-  source = "github.com/cds-snc/terraform-modules//vpc?ref=v10.10.2"
+  source = "github.com/cds-snc/terraform-modules//vpc?ref=v10.11.0"
   name   = "SREBotVPC"
 
   allow_https_request_in           = true
