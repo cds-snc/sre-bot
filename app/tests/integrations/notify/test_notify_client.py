@@ -159,7 +159,7 @@ def test_revoke_api_key_missing_url(mock_logger):
     bound_logger_mock = mock_logger.bind.return_value
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
 
-    assert result is False
+    assert result == "error"
     bound_logger_mock.error.assert_called_once_with(
         "revoke_api_key_error", error="NOTIFY_API_URL is missing"
     )
@@ -185,7 +185,7 @@ def test_revoke_api_key_success(mock_logger, mock_post_event):
     result = notify.revoke_api_key(api_key, api_type, github_repo, source)
 
     # Verify results
-    assert result is True
+    assert result == "revoked"
 
     # Verify post_event was called with correct parameters
     expected_url = "https://notify.example.com/sre-tools/api-key-revoke"
@@ -223,7 +223,7 @@ def test_revoke_api_key_failure(mock_logger, mock_post_event):
     )
 
     # Verify results
-    assert result is False
+    assert result == "error"
 
     # Verify logger was called correctly
     bound_logger_mock = mock_logger.bind.return_value
@@ -231,4 +231,27 @@ def test_revoke_api_key_failure(mock_logger, mock_post_event):
         "revoke_api_key_error",
         api_key=api_key,
         response_code=400,
+    )
+
+
+# Test API key not found response (status code 200)
+@patch.object(notify, "NOTIFY_API_URL", "https://notify.example.com")
+@patch("integrations.notify.client.post_event")
+@patch("integrations.notify.client.logger")
+def test_revoke_api_key_not_found(mock_logger, mock_post_event):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_post_event.return_value = mock_response
+
+    api_key = "test-api-key-123"
+
+    result = notify.revoke_api_key(
+        api_key, "test-type", "github.com/test/repo", "test-source"
+    )
+
+    assert result == "not_found"
+
+    bound_logger_mock = mock_logger.bind.return_value
+    bound_logger_mock.warning.assert_called_once_with(
+        "revoke_api_key_not_found", api_key=api_key
     )
