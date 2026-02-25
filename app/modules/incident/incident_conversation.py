@@ -13,7 +13,7 @@ from modules.incident.incident_document import (
     replace_text_between_headings,
 )
 from modules.incident import incident_helper, schedule_retro
-from core.logging import get_module_logger
+from structlog import get_logger
 from core.config import settings
 
 
@@ -22,7 +22,7 @@ PREFIX = settings.PREFIX
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def create_incident_conversation(client: WebClient, incident_name: str):

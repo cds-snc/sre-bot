@@ -11,12 +11,12 @@ from integrations.google_workspace.google_calendar import (
     identify_unavailable_users,
 )
 from modules.incident import incident_conversation
-from core.logging import get_module_logger
+from structlog import get_logger
 from core.config import settings
 
 CALENDAR_ID = settings.google_resources.sre_calendar_id
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def schedule_event(client: WebClient, days, users, days_lookup=60):

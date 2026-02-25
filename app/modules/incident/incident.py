@@ -12,7 +12,7 @@ from modules.incident import (
     incident_folder,
     core,
 )
-from core.logging import get_module_logger
+from structlog import get_logger
 from core.config import settings
 
 
@@ -21,7 +21,7 @@ INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
 INCIDENT_HANDBOOK_ID = settings.google_resources.incident_handbook_id
 
-logger = get_module_logger()
+logger = get_logger()
 
 i18n.load_path.append("./locales/")
 

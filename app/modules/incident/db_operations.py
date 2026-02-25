@@ -3,9 +3,9 @@ from boto3.dynamodb.types import TypeSerializer
 
 from models.incidents import Incident
 from integrations.aws import dynamodb
-from core.logging import get_module_logger
+from structlog import get_logger
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def create_incident(incident_data: dict) -> str | None:

@@ -4,13 +4,13 @@ import datetime
 import re
 from integrations.google_workspace import google_docs, google_drive
 from core.config import settings
-from core.logging import get_module_logger
+from structlog import get_logger
 
 INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def create_incident_document(title, folder):

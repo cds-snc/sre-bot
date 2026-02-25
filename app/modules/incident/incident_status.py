@@ -2,9 +2,9 @@ from slack_sdk import WebClient
 from slack_bolt import Respond
 from integrations.google_workspace import google_docs
 from modules.incident import incident_document, incident_folder, db_operations
-from core.logging import get_module_logger
+from structlog import get_logger
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def update_status(
