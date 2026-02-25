@@ -11,9 +11,9 @@ Use structlog with OpenTelemetry semantic conventions. Bind request-scoped conte
 ## Basic Pattern
 
 ```python
-import structlog
+from structlog import get_logger
 
-logger = structlog.get_logger()
+logger = get_logger()
 
 def process_request(user_id: str, request_id: str):
     """Bind request context per-call."""
@@ -32,11 +32,11 @@ def process_request(user_id: str, request_id: str):
 ## Class Pattern
 
 ```python
-import structlog
+from structlog import get_logger
 
 class UserService:
     def __init__(self):
-        self.logger = structlog.get_logger()
+        self.logger = get_logger()
     
     def create_user(self, user_id: str, email: str):
         """Bind context in method."""
