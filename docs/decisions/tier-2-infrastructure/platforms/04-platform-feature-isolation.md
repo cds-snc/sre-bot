@@ -114,13 +114,13 @@ def register_commands(provider):
 """Microsoft Teams platform integration for <feature>."""
 import httpx
 
-async def handle_teams_command(turn_context):
+def handle_teams_command(turn_context):
     """Handle Teams bot command.
     
     Acknowledges immediately, then calls internal HTTP endpoint.
     """
     # Send typing indicator (acknowledgment)
-    await turn_context.send_activity("Processing...")
+    turn_context.send_activity("Processing...")
     
     # Call internal HTTP API
     response = httpx.post(
@@ -129,7 +129,7 @@ async def handle_teams_command(turn_context):
     )
     
     # Format response as Adaptive Card
-    await turn_context.send_activity(
+    turn_context.send_activity(
         format_as_adaptive_card(response.json())
     )
 
@@ -185,6 +185,29 @@ packages/groups/
 - ❌ Never import platform-specific SDK in business logic (service.py)
 - ❌ Never implement platform-specific branching in routes.py
 - ❌ Never call business logic functions directly from platform adapters
+
+---
+
+## Footnote: Async Teams Adapters (Future)
+
+Async adapters are deferred until the async-first migration. When that happens,
+prefer async handlers and await SDK calls.
+
+```python
+# Future async example (not current standard)
+import httpx
+
+async def handle_teams_command(turn_context):
+    await turn_context.send_activity("Processing...")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/<feature>/action",
+            json={"param": turn_context.activity.text},
+        )
+    await turn_context.send_activity(
+        format_as_adaptive_card(response.json())
+    )
+```
 ```
 
 ---
