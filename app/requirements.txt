@@ -5,7 +5,7 @@ Jinja2==3.1.6
 aws-sns-message-validator==0.0.5
 boto3==1.42.52
 botocore==1.42.52
-fastapi==0.129.0
+fastapi==0.131.0
 geoip2==4.8.1
 google-api-python-client==2.190.0
 google-auth-httplib2==0.3.0
