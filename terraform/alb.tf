@@ -71,7 +71,7 @@ resource "aws_alb_listener_rule" "security_txt" {
         Contact: mailto:ZZTBSCYBERS@tbs-sct.gc.ca
         Contact: https://hackerone.com/tbs-sct/
         Canonical: https://cdssandbox.xyz/.well-known/security.txt
-        Expires: 2026-03-02T12:00:00.000Z
+        Expires: 2026-03-29T23:59:59.000Z
         Preferred-Languages: en, fr
       EOT
       status_code  = "200"
