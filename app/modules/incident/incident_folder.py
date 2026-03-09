@@ -15,12 +15,12 @@ from integrations.google_workspace import google_drive, sheets
 from integrations.aws import dynamodb
 from modules.incident import db_operations
 from core.config import settings
-from core.logging import get_module_logger
+from structlog import get_logger
 
 SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
 INCIDENT_LIST = settings.google_resources.incident_list_id
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def list_incident_folders():

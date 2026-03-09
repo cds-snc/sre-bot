@@ -11,7 +11,7 @@ from modules.incident import (
     utils,
 )
 from integrations.google_workspace import google_docs
-from core.logging import get_module_logger
+from structlog import get_logger
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -30,7 +30,7 @@ FIELD_SCHEMA = {
     },
 }
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def open_update_field_view(client: WebClient, body, ack: Ack):

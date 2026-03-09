@@ -3,7 +3,7 @@
 from slack_sdk import WebClient
 
 from core.config import settings
-from core.logging import get_module_logger
+from structlog import get_logger
 from integrations.google_workspace import meet, google_drive
 from models.incidents import IncidentPayload
 from modules.incident import (
@@ -17,7 +17,7 @@ PREFIX = settings.PREFIX
 INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def _get_channel_info_and_topic(client: WebClient, channel_id: str) -> tuple:

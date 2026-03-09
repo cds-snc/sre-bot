@@ -131,7 +131,8 @@ def test_create_incident_with_invalid_data(mock_logger):
     with pytest.raises(ValueError, match="Invalid incident data"):
         db_operations.create_incident(incident_data)
 
-    mock_logger.error.assert_called_once_with(
+    mock_logger.bind.assert_called_once_with(operation="create_incident")
+    mock_logger.bind.return_value.error.assert_called_once_with(
         "incident_creation_failed",
         error=ANY,
     )

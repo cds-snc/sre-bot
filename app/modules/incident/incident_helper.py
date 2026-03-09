@@ -24,7 +24,7 @@ from modules.incident import (
     core,
 )
 from core.config import settings
-from core.logging import get_module_logger
+from structlog import get_logger
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
@@ -36,7 +36,7 @@ VALID_STATUS = [
     "Closed",
 ]
 
-logger = get_module_logger()
+logger = get_logger()
 
 help_text = """
 *SRE Incident Management*

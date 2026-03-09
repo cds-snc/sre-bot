@@ -3,6 +3,9 @@
 from slack_sdk import WebClient
 from integrations.opsgenie import get_on_call_users
 from modules.incident.incident_folder import get_folder_metadata
+from structlog import get_logger
+
+logger = get_logger()
 
 
 def get_on_call_users_from_folder(client: WebClient, folder: str) -> list:
@@ -14,6 +17,7 @@ def get_on_call_users_from_folder(client: WebClient, folder: str) -> list:
     Returns:
         list: List of on call users. If users are found, they will be Slack user objects.
     """
+    log = logger.bind(operation="get_on_call_users_from_folder", folder_id=folder)
     oncall = []
     folder_metadata = get_folder_metadata(folder)
     if isinstance(folder_metadata, dict):
@@ -29,4 +33,5 @@ def get_on_call_users_from_folder(client: WebClient, folder: str) -> list:
             r = client.users_lookupByEmail(email=email)
             if r.get("ok"):
                 oncall.append(r["user"])
+    log.info("oncall_users_resolved", count=len(oncall))
     return oncall
