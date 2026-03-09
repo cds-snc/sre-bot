@@ -2,6 +2,9 @@ import json
 from slack_sdk.web import WebClient
 import re
 from integrations.google_workspace import google_drive
+from structlog import get_logger
+
+logger = get_logger()
 
 
 def save_incident_roles(client: WebClient, ack, view):
@@ -9,9 +12,13 @@ def save_incident_roles(client: WebClient, ack, view):
     selected_ic = view["state"]["values"]["ic_name"]["ic_select"]["selected_user"]
     selected_ol = view["state"]["values"]["ol_name"]["ol_select"]["selected_user"]
     metadata = json.loads(view["private_metadata"])
+    log = logger.bind(
+        operation="save_incident_roles", channel_id=metadata.get("channel_id")
+    )
     file_id = metadata["id"]
     google_drive.add_metadata(file_id, "ic_id", selected_ic)
     google_drive.add_metadata(file_id, "ol_id", selected_ol)
+    log.info("incident_roles_saved", ic=selected_ic, ol=selected_ol)
     if metadata["ic_id"] != selected_ic:
         client.chat_postMessage(
             text=f"<@{selected_ic}> has been assigned as incident commander for this incident.",
@@ -52,6 +59,7 @@ def save_incident_roles(client: WebClient, ack, view):
 
 def manage_roles(client: WebClient, body, ack, respond):
     ack()
+    log = logger.bind(operation="manage_roles", channel_id=body.get("channel_id"))
     channel_name = body["channel_name"]
     channel_name = channel_name[
         channel_name.startswith("incident-") and len("incident-") :
@@ -60,6 +68,7 @@ def manage_roles(client: WebClient, body, ack, respond):
     documents = google_drive.find_files_by_name(channel_name)
 
     if len(documents) == 0:
+        log.warning("no_incident_document_found", channel_name=channel_name)
         respond(
             f"No incident document found for `{channel_name}`. Please make sure the channel matches the document name."
         )
@@ -145,3 +154,4 @@ def manage_roles(client: WebClient, body, ack, respond):
         ),
     }
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
+    log.info("manage_roles_view_opened", document_id=document["id"])

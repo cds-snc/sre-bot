@@ -18,10 +18,11 @@ def create_incident(incident_data: dict) -> str | None:
         str: The incident ID.
     """
 
+    log = logger.bind(operation="create_incident")
     try:
         incident = Incident(**incident_data)
     except ValueError as e:
-        logger.error(
+        log.error(
             "incident_creation_failed",
             error=str(e),
         )
@@ -45,27 +46,27 @@ def create_incident(incident_data: dict) -> str | None:
     if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
         message = f"User `{incident.user_id}` created incident `{incident.name}` in channel `{incident.channel_id}`"
         log_activity(incident.id, message)
-        logger.info(
-            "incident_creation_success",
-            channel=incident.channel_id,
+        log = log.bind(
+            channel_id=incident.channel_id,
             incident_id=incident.id,
-            user=incident.user_id,
+            user_id=incident.user_id,
         )
+        log.info("incident_creation_success")
         return incident.id
     else:
         message = (
             f"Failed to create incident in database for channel `{incident.channel_id}`"
         )
-        logger.error(
-            "incident_creation_failed",
-            channel=incident.channel_id,
-        )
+        log = log.bind(channel_id=getattr(incident, "channel_id", None))
+        log.error("incident_creation_failed")
 
         return None
 
 
 def list_incidents(select="ALL_ATTRIBUTES", **kwargs):
     """List all incidents in the incidents table."""
+    log = logger.bind(operation="list_incidents")
+    log.info("listing_incidents", select=select, filters=kwargs)
     return dynamodb.scan(TableName="incidents", Select=select, **kwargs)
 
 
@@ -76,9 +77,10 @@ def update_incident_field(id, field, value, user_id, type="S"):
 
     Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
     """
+    log = logger.bind(operation="update_incident_field", incident_id=id, field=field)
     protected_fields = ["id", "created_at", "channel_id", "logs"]
     if field in protected_fields:
-        logger.warning(
+        log.warning(
             "incident_update_protected_field",
             field=field,
             incident_id=id,
@@ -105,6 +107,7 @@ def update_incident_field(id, field, value, user_id, type="S"):
 
 def log_activity(incident_id, message):
     """Log an activity in an incident."""
+    log = logger.bind(operation="log_activity", incident_id=incident_id)
     response = dynamodb.update_item(
         TableName="incidents",
         Key={"id": {"S": incident_id}},
@@ -128,8 +131,10 @@ def log_activity(incident_id, message):
     )
 
     if response:
+        log.info("activity_logged", message=message)
         return True
     else:
+        log.error("activity_log_failed")
         return False
 
 

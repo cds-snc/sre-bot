@@ -4,12 +4,19 @@ from slack_bolt import Respond
 from slack_sdk import WebClient
 from models.incidents import Incident
 from modules.incident import db_operations
+from structlog import get_logger
+
+logger = get_logger()
 
 
 def open_incident_info_view(client: WebClient, body, respond: Respond):
     """Open the incident information view. This view displays the incident details where certain fields can be updated."""
+    log = logger.bind(
+        operation="open_incident_info_view", channel_id=body.get("channel_id")
+    )
     incident = db_operations.get_incident_by_channel_id(body["channel_id"])
     if not incident:
+        log.warning("no_incident_record", channel_id=body.get("channel_id"))
         respond(
             "This command is only available in incident channels. No incident records found for this channel."
         )
@@ -19,6 +26,7 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
         incident_data = {k: deserialize.deserialize(v) for k, v in incident.items()}
         view = incident_information_view(Incident(**incident_data))
         client.views_open(trigger_id=body["trigger_id"], view=view)
+        log.info("incident_info_view_opened", incident_id=incident_data.get("id"))
 
 
 def incident_information_view(incident: Incident):
@@ -37,6 +45,7 @@ def incident_information_view(incident: Incident):
     if incident.end_impact_time != "Unknown":
         impact_end_timestamp = f"<!date^{int(float(incident.end_impact_time))}^{{date}} at {{time}}|Unknown>"
 
+    log = logger.bind(operation="incident_information_view", incident_id=incident.id)
     report_string = f"<{incident.report_url}|:memo: Incident Report>"
     meet_string = f"<{incident.meet_url}|:headphones: Google Meet>"
     incident_data = incident.model_dump()
