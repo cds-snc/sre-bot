@@ -10,12 +10,12 @@ resource "aws_wafv2_web_acl" "sre-bot" {
     priority = 0
 
     action {
-      count {}
+      block {}
     }
 
     statement {
       rate_based_statement {
-        limit              = 500
+        limit              = 1500
         aggregate_key_type = "CONSTANT"
 
         scope_down_statement {
