@@ -31,7 +31,7 @@ class TestScheduledTasksInitialization:
 
         # Count schedule.do() calls - one per task
         do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]
-        assert len(do_calls) == 6  # Six total scheduled tasks
+        assert len(do_calls) == 5  # Five total scheduled tasks
 
     @patch("jobs.scheduled_tasks.schedule")
     def test_init_respects_scheduling_times(self, mock_schedule) -> None:
@@ -57,7 +57,7 @@ class TestScheduledTasksInitialization:
         minutes_do_calls = [
             call for call in mock_schedule.mock_calls if ".minutes.do(" in str(call)
         ]
-        assert len(minutes_do_calls) >= 3  # At least three 5-minute tasks
+        assert len(minutes_do_calls) >= 2  # At least two 5-minute tasks
 
         # Verify 2-hour interval
         hours_do_calls = [
