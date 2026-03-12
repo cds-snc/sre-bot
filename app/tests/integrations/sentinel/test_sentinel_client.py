@@ -1,4 +1,5 @@
 from integrations.sentinel import client as sentinel
+from datetime import datetime, timezone
 
 from unittest.mock import patch
 
@@ -26,6 +27,15 @@ def test_send_event(post_data_mock):
     post_data_mock.assert_called_once_with(
         '"SENTINEL_CUSTOMER_ID"', '"SENTINEL_SHARED_KEY"', "{}", '"SENTINEL_LOG_TYPE"'
     )
+
+
+@patch("integrations.sentinel.client.post_data")
+def test_send_event_serializes_datetime(post_data_mock):
+    event = {"created_at": datetime(2026, 3, 12, 16, 30, tzinfo=timezone.utc)}
+
+    assert sentinel.send_event(event) is True
+    body = post_data_mock.call_args[0][2]
+    assert "2026-03-12T16:30:00+00:00" in body
 
 
 def test_build_signature():
@@ -87,6 +97,7 @@ def test_log_to_sentinel_logs_error(logging_mock, send_event_mock):
     send_event_mock.return_value = False
     sentinel.log_to_sentinel("foo", {"bar": "baz"})
     send_event_mock.assert_called_with({"event": "foo", "message": {"bar": "baz"}})
-    bound_logger_mock.error.assert_called_with(
-        "sentinel_event_error", payload={"event": "foo", "message": {"bar": "baz"}}
-    )
+    bound_logger_mock.error.assert_called_once()
+    args, kwargs = bound_logger_mock.error.call_args
+    assert args[0] == "sentinel_event_error"
+    assert kwargs["payload_message_type"] == "dict"
