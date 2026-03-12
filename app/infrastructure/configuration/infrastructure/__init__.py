@@ -2,6 +2,7 @@
 
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
+from infrastructure.configuration.infrastructure.directory import DirectorySettings
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     DevSettings,
@@ -16,6 +17,7 @@ from infrastructure.configuration.infrastructure.platforms import (
 __all__ = [
     "IdempotencySettings",
     "RetrySettings",
+    "DirectorySettings",
     "ServerSettings",
     "DevSettings",
     "PlatformsSettings",

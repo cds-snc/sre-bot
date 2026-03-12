@@ -25,6 +25,7 @@ from infrastructure.platforms.clients import (
     TeamsClientFacade,
     DiscordClientFacade,
 )
+from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.services.providers import (
     get_settings,
     get_identity_service,
@@ -43,6 +44,7 @@ from infrastructure.services.providers import (
     get_slack_client,
     get_teams_client,
     get_discord_client,
+    get_directory_provider,
 )
 
 # Settings dependency
@@ -106,6 +108,9 @@ TeamsClientDep = Annotated[TeamsClientFacade, Depends(get_teams_client)]
 # Discord client facade dependency (placeholder - not implemented)
 DiscordClientDep = Annotated[DiscordClientFacade, Depends(get_discord_client)]
 
+# Directory provider dependency — IDP-agnostic group membership and listing
+DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provider)]
+
 __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
@@ -123,4 +128,5 @@ __all__ = [
     "SlackClientDep",
     "TeamsClientDep",
     "DiscordClientDep",
+    "DirectoryProviderDep",
 ]
