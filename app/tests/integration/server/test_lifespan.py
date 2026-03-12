@@ -5,11 +5,10 @@ import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
 
 from server import lifespan as lifespan_module
 from server.lifespan import (
-    _activate_providers,
+    _register_event_handlers,
     _get_logger,
     _is_test_environment,
     _list_configs,
@@ -200,33 +199,24 @@ def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
 
 
 @pytest.mark.integration
-def test_lifespan_activate_providers_sets_app_state(mock_settings, monkeypatch):
-    """Test that _activate_providers sets provider state on app."""
+def test_register_event_handlers_calls_registration_functions(monkeypatch):
+    """Test that _register_event_handlers registers infrastructure and module handlers."""
     # Arrange
-    app = FastAPI()
     mock_logger = MagicMock()
     register_mock = MagicMock()
     discover_mock = MagicMock()
     log_mock = MagicMock()
-    load_mock = MagicMock(return_value="primary")
-    active_mock = MagicMock(return_value={"primary": "provider"})
-    primary_mock = MagicMock(return_value="primary")
 
     monkeypatch.setattr(
         "server.lifespan.register_infrastructure_handlers", register_mock
     )
     monkeypatch.setattr("server.lifespan.discover_and_register_handlers", discover_mock)
     monkeypatch.setattr("server.lifespan.log_registered_handlers", log_mock)
-    monkeypatch.setattr("server.lifespan.load_providers", load_mock)
-    monkeypatch.setattr("server.lifespan.get_active_providers", active_mock)
-    monkeypatch.setattr("server.lifespan.get_primary_provider_name", primary_mock)
 
     # Act
-    _activate_providers(app, mock_settings, mock_logger)
+    _register_event_handlers(mock_logger)
 
     # Assert
-    assert app.state.providers == {"primary": "provider"}
-    assert app.state.primary_provider_name == "primary"
     register_mock.assert_called_once()
     discover_mock.assert_called_once_with(base_path="modules", package_root="modules")
     log_mock.assert_called_once()

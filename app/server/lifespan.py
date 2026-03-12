@@ -30,11 +30,6 @@ from modules import (
     sre,
     webhook_helper,
 )
-from modules.groups.providers import (
-    get_active_providers,
-    get_primary_provider_name,
-    load_providers,
-)
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
@@ -97,11 +92,7 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
     stop_event.set()
 
 
-def _activate_providers(
-    app: FastAPI,
-    settings: "Settings",
-    logger: BoundLogger,
-) -> None:
+def _register_event_handlers(logger: BoundLogger) -> None:
     try:
         register_infrastructure_handlers()
     except Exception as exc:
@@ -112,19 +103,6 @@ def _activate_providers(
         log_registered_handlers()
     except Exception as exc:
         logger.error("event_handlers_discovery_failed", error=str(exc))
-
-    try:
-        primary = load_providers()
-        app.state.providers = get_active_providers()
-        app.state.primary_provider_name = get_primary_provider_name()
-        logger.info(
-            "group_providers_activated",
-            primary=primary,
-            total=len(app.state.providers),
-        )
-    except Exception as exc:
-        logger.error("group_providers_activation_failed", error=str(exc))
-        raise
 
 
 @asynccontextmanager
@@ -138,7 +116,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("application_startup")
     _list_configs(settings, logger)
 
-    _activate_providers(app, settings, logger)
+    _register_event_handlers(logger)
 
     app.state.command_providers = {}
 
