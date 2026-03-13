@@ -1,39 +1,22 @@
-"""Directory provider factory — explicit dispatch, no runtime discovery.
+"""Directory provider factory — pure backend constructors, no dispatch.
 
-Factory functions receive all external dependencies as arguments.  The
-@lru_cache singleton accessor in infrastructure.services.providers is the
-single point that calls get_settings() and get_google_workspace_clients()
-and passes the results here.
+Each ``build_*`` function is a thin constructor that accepts injected client
+dependencies and returns a configured DirectoryProvider implementation.
+
+Dispatch (which backend to build based on settings.directory.provider) lives
+in ``infrastructure.services.providers``, which owns all client singletons and
+is the single orchestration point for dependency wiring.
+
+Adding a new backend:
+    1. Implement a new DirectoryProvider class in ``infrastructure/directory/``.
+    2. Add a ``build_<name>_directory_provider()`` function here, receiving its
+       client facade(s) as typed arguments.
+    3. Add the dispatch branch in ``infrastructure.services.providers.get_directory_provider``.
 """
 
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
-from infrastructure.configuration import Settings
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.provider import DirectoryProvider
-
-
-def build_directory_provider(
-    settings: Settings,
-    google_clients: GoogleWorkspaceClients,
-) -> DirectoryProvider:
-    """Build a DirectoryProvider for the configured IDP backend.
-
-    Args:
-        settings: Application settings — settings.directory.provider selects
-            which implementation to activate.
-        google_clients: Google Workspace clients facade, passed through to the
-            Google implementation when selected.
-
-    Returns:
-        DirectoryProvider: Configured provider instance.
-
-    Raises:
-        ValueError: When settings.directory.provider names an unimplemented backend.
-    """
-    provider_key = settings.directory.provider
-    if provider_key == "google":
-        return build_google_directory_provider(google_clients=google_clients)
-    raise ValueError(f"Unsupported directory provider: {provider_key!r}")
 
 
 def build_google_directory_provider(

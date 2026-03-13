@@ -1,8 +1,15 @@
 """Google Workspace implementation of DirectoryProvider."""
 
+from typing import Any
+
 import structlog
 
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
+from infrastructure.directory import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
 from infrastructure.operations import OperationResult
 
 logger = structlog.get_logger()
@@ -24,6 +31,28 @@ class GoogleDirectoryProvider:
             google_clients: Configured GoogleWorkspaceClients facade.
         """
         self._directory = google_clients.directory
+
+    def _build_directory_member(self, item: dict[str, Any]) -> DirectoryMember:
+        """Convert a Google member record into a canonical directory member."""
+
+        return DirectoryMember(
+            email=str(item.get("email", "")).lower(),
+            member_id=item.get("id"),
+            role=item.get("role"),
+            provider="google",
+        )
+
+    def _build_directory_group(self, item: dict[str, Any]) -> DirectoryGroup:
+        """Convert a Google group record into a canonical directory group."""
+
+        email = item.get("email")
+        return DirectoryGroup(
+            group_key=str(email or "").lower(),
+            email=email,
+            name=item.get("name"),
+            description=item.get("description"),
+            provider="google",
+        )
 
     def warmup(self) -> OperationResult:
         """Validate connectivity by issuing a minimal list-groups call.
@@ -55,9 +84,18 @@ class GoogleDirectoryProvider:
             group_key: Group email or unique ID — normalised to lowercase.
 
         Returns:
-            OperationResult: success with data as list of member dicts.
+            OperationResult: success with data={"members": list[DirectoryMember]}.
         """
-        return self._directory.list_members(group_key.lower())
+        result = self._directory.list_members(group_key.lower())
+        if not result.is_success:
+            return result
+
+        members = [
+            self._build_directory_member(item)
+            for item in (result.data or [])
+            if item.get("email")
+        ]
+        return OperationResult.success(data={"members": members})
 
     def check_membership(self, group_key: str, email: str) -> OperationResult:
         """Check whether a user is a member of a group.
@@ -70,15 +108,26 @@ class GoogleDirectoryProvider:
             email: User email to check.
 
         Returns:
-            OperationResult: success with data={"is_member": bool}.
+            OperationResult: success with data={"membership": MembershipCheckResult}.
                 Returns the error result unchanged when list_members fails.
         """
-        result = self._directory.list_members(group_key.lower())
+        normalized_group = group_key.lower()
+        normalized_email = email.lower()
+
+        result = self._directory.list_members(normalized_group)
         if not result.is_success:
             return result
-        members = result.data or []
-        is_member = any(m.get("email", "").lower() == email.lower() for m in members)
-        return OperationResult.success(data={"is_member": is_member})
+
+        is_member = any(
+            item.get("email", "").lower() == normalized_email
+            for item in (result.data or [])
+        )
+        membership = MembershipCheckResult(
+            group_key=normalized_group,
+            email=normalized_email,
+            is_member=is_member,
+        )
+        return OperationResult.success(data={"membership": membership})
 
     def list_groups(self, query: str) -> OperationResult:
         """List groups matching a query string.
@@ -87,6 +136,15 @@ class GoogleDirectoryProvider:
             query: IDP-specific query string passed to the Directory API.
 
         Returns:
-            OperationResult: success with data as list of group dicts.
+            OperationResult: success with data={"groups": list[DirectoryGroup]}.
         """
-        return self._directory.list_groups(query=query)
+        result = self._directory.list_groups(query=query)
+        if not result.is_success:
+            return result
+
+        groups = [
+            self._build_directory_group(item)
+            for item in (result.data or [])
+            if item.get("email")
+        ]
+        return OperationResult.success(data={"groups": groups})

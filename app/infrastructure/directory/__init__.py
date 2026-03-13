@@ -8,3 +8,17 @@ Feature packages should access the service via the singleton accessor:
     provider = get_directory_provider()
     result = provider.check_membership("sg-admin@example.com", "user@example.com")
 """
+
+from infrastructure.directory.models import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
+from infrastructure.directory.provider import DirectoryProvider
+
+__all__ = [
+    "DirectoryGroup",
+    "DirectoryMember",
+    "DirectoryProvider",
+    "MembershipCheckResult",
+]

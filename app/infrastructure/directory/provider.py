@@ -1,8 +1,31 @@
 """DirectoryProvider protocol — IDP-agnostic contract for directory operations."""
 
-from typing import Protocol, runtime_checkable
+from typing import Protocol, TypedDict, runtime_checkable
 
+from infrastructure.directory.models import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
 from infrastructure.operations import OperationResult
+
+
+class DirectoryMembersData(TypedDict):
+    """Canonical payload for get_group_members success results."""
+
+    members: list[DirectoryMember]
+
+
+class DirectoryGroupsData(TypedDict):
+    """Canonical payload for list_groups success results."""
+
+    groups: list[DirectoryGroup]
+
+
+class DirectoryMembershipData(TypedDict):
+    """Canonical payload for check_membership success results."""
+
+    membership: MembershipCheckResult
 
 
 @runtime_checkable
@@ -40,7 +63,7 @@ class DirectoryProvider(Protocol):
             group_key: Group email or unique ID (normalised to lowercase).
 
         Returns:
-            OperationResult: success with data as list of member dicts.
+            OperationResult: success with data matching DirectoryMembersData.
         """
         ...
 
@@ -52,7 +75,7 @@ class DirectoryProvider(Protocol):
             email: User email to check (compared case-insensitively).
 
         Returns:
-            OperationResult: success with data={"is_member": bool}.
+            OperationResult: success with data matching DirectoryMembershipData.
         """
         ...
 
@@ -63,6 +86,6 @@ class DirectoryProvider(Protocol):
             query: IDP-specific query string or group email prefix.
 
         Returns:
-            OperationResult: success with data as list of group dicts.
+            OperationResult: success with data matching DirectoryGroupsData.
         """
         ...
