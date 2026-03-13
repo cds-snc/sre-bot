@@ -15,22 +15,71 @@ def clear_directory_provider_cache():
     providers.get_directory_provider.cache_clear()
 
 
+def test_get_directory_provider_returns_google_provider_when_configured(monkeypatch):
+    """Returns a provider built from the Google builder when provider=google."""
+    # Arrange
+    mock_settings = MagicMock()
+    mock_settings.directory.provider = "google"
+    mock_google_clients = MagicMock()
+    built_provider = MagicMock()
+
+    monkeypatch.setattr(
+        providers, "get_settings", MagicMock(return_value=mock_settings)
+    )
+    monkeypatch.setattr(
+        providers,
+        "get_google_workspace_clients",
+        MagicMock(return_value=mock_google_clients),
+    )
+    monkeypatch.setattr(
+        providers,
+        "build_google_directory_provider",
+        MagicMock(return_value=built_provider),
+    )
+
+    # Act
+    result = providers.get_directory_provider()
+
+    # Assert
+    assert result is built_provider
+    providers.build_google_directory_provider.assert_called_once_with(
+        google_clients=mock_google_clients
+    )
+
+
+def test_get_directory_provider_raises_for_unsupported_provider(monkeypatch):
+    """Raises ValueError for unknown provider keys."""
+    # Arrange
+    mock_settings = MagicMock()
+    mock_settings.directory.provider = "unsupported_idp"
+
+    monkeypatch.setattr(
+        providers, "get_settings", MagicMock(return_value=mock_settings)
+    )
+
+    # Act / Assert
+    with pytest.raises(ValueError, match="unsupported_idp"):
+        providers.get_directory_provider()
+
+
 def test_get_directory_provider_returns_cached_instance(monkeypatch):
     """Provider accessor returns same instance across repeated calls."""
     # Arrange
     mock_settings = MagicMock()
+    mock_settings.directory.provider = "google"
     mock_google_clients = MagicMock()
     built_provider = MagicMock()
 
-    get_settings_spy = MagicMock(return_value=mock_settings)
-    get_google_clients_spy = MagicMock(return_value=mock_google_clients)
-    build_provider_spy = MagicMock(return_value=built_provider)
-
-    monkeypatch.setattr(providers, "get_settings", get_settings_spy)
     monkeypatch.setattr(
-        providers, "get_google_workspace_clients", get_google_clients_spy
+        providers, "get_settings", MagicMock(return_value=mock_settings)
     )
-    monkeypatch.setattr(providers, "build_directory_provider", build_provider_spy)
+    monkeypatch.setattr(
+        providers,
+        "get_google_workspace_clients",
+        MagicMock(return_value=mock_google_clients),
+    )
+    build_spy = MagicMock(return_value=built_provider)
+    monkeypatch.setattr(providers, "build_google_directory_provider", build_spy)
 
     # Act
     instance_one = providers.get_directory_provider()
@@ -39,18 +88,14 @@ def test_get_directory_provider_returns_cached_instance(monkeypatch):
     # Assert
     assert instance_one is built_provider
     assert instance_two is built_provider
-    get_settings_spy.assert_called_once_with()
-    get_google_clients_spy.assert_called_once_with()
-    build_provider_spy.assert_called_once_with(
-        settings=mock_settings,
-        google_clients=mock_google_clients,
-    )
+    build_spy.assert_called_once()
 
 
 def test_get_directory_provider_cache_can_be_cleared(monkeypatch):
     """Cache clear forces a fresh factory build."""
     # Arrange
     mock_settings = MagicMock()
+    mock_settings.directory.provider = "google"
     mock_google_clients = MagicMock()
     first_provider = MagicMock()
     second_provider = MagicMock()
@@ -63,8 +108,8 @@ def test_get_directory_provider_cache_can_be_cleared(monkeypatch):
         "get_google_workspace_clients",
         MagicMock(return_value=mock_google_clients),
     )
-    build_provider_spy = MagicMock(side_effect=[first_provider, second_provider])
-    monkeypatch.setattr(providers, "build_directory_provider", build_provider_spy)
+    build_spy = MagicMock(side_effect=[first_provider, second_provider])
+    monkeypatch.setattr(providers, "build_google_directory_provider", build_spy)
 
     # Act
     instance_one = providers.get_directory_provider()
@@ -74,4 +119,4 @@ def test_get_directory_provider_cache_can_be_cleared(monkeypatch):
     # Assert
     assert instance_one is first_provider
     assert instance_two is second_provider
-    assert build_provider_spy.call_count == 2
+    assert build_spy.call_count == 2

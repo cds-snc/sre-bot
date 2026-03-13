@@ -5,6 +5,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.directory.google import GoogleDirectoryProvider
+from infrastructure.directory.models import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
 from infrastructure.operations import OperationResult
 from infrastructure.operations.status import OperationStatus
 
@@ -73,9 +78,12 @@ class TestHealthCheck:
 
 
 class TestGetGroupMembers:
-    def test_returns_members_for_group(self, provider, mock_google_clients):
+    def test_returns_canonical_members_for_group(self, provider, mock_google_clients):
         # Arrange
-        members = [{"email": "user@example.com"}, {"email": "admin@example.com"}]
+        members = [
+            {"email": "user@example.com", "id": "1", "role": "MEMBER"},
+            {"email": "admin@example.com", "id": "2", "role": "OWNER"},
+        ]
         mock_google_clients.directory.list_members.return_value = (
             OperationResult.success(data=members)
         )
@@ -85,7 +93,22 @@ class TestGetGroupMembers:
 
         # Assert
         assert result.is_success
-        assert result.data == members
+        assert result.data == {
+            "members": [
+                DirectoryMember(
+                    email="user@example.com",
+                    member_id="1",
+                    role="MEMBER",
+                    provider="google",
+                ),
+                DirectoryMember(
+                    email="admin@example.com",
+                    member_id="2",
+                    role="OWNER",
+                    provider="google",
+                ),
+            ]
+        }
         mock_google_clients.directory.list_members.assert_called_once_with(
             "sg-admin@example.com"
         )
@@ -134,7 +157,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {"is_member": True}
+        assert result.data == {
+            "membership": MembershipCheckResult(
+                group_key="sg-team@example.com",
+                email="member@example.com",
+                is_member=True,
+            )
+        }
 
     def test_returns_false_when_user_is_not_member(self, provider, mock_google_clients):
         # Arrange
@@ -148,7 +177,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {"is_member": False}
+        assert result.data == {
+            "membership": MembershipCheckResult(
+                group_key="sg-team@example.com",
+                email="absent@example.com",
+                is_member=False,
+            )
+        }
 
     def test_returns_false_when_member_list_is_empty(
         self, provider, mock_google_clients
@@ -163,7 +198,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {"is_member": False}
+        assert result.data == {
+            "membership": MembershipCheckResult(
+                group_key="sg-empty@example.com",
+                email="user@example.com",
+                is_member=False,
+            )
+        }
 
     def test_comparison_is_case_insensitive(self, provider, mock_google_clients):
         # Arrange
@@ -177,7 +218,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {"is_member": True}
+        assert result.data == {
+            "membership": MembershipCheckResult(
+                group_key="sg-team@example.com",
+                email="member@example.com",
+                is_member=True,
+            )
+        }
 
     def test_normalises_group_key_to_lowercase(self, provider, mock_google_clients):
         # Arrange
@@ -217,13 +264,30 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {"is_member": False}
+        assert result.data == {
+            "membership": MembershipCheckResult(
+                group_key="sg-team@example.com",
+                email="user@example.com",
+                is_member=False,
+            )
+        }
 
 
 class TestListGroups:
-    def test_delegates_to_directory_with_query(self, provider, mock_google_clients):
+    def test_returns_canonical_groups_for_query(self, provider, mock_google_clients):
         # Arrange
-        groups = [{"email": "sg-admin@example.com"}, {"email": "sg-devs@example.com"}]
+        groups = [
+            {
+                "email": "sg-admin@example.com",
+                "name": "Admins",
+                "description": "Admin group",
+            },
+            {
+                "email": "sg-devs@example.com",
+                "name": "Developers",
+                "description": "Dev group",
+            },
+        ]
         mock_google_clients.directory.list_groups.return_value = (
             OperationResult.success(data=groups)
         )
@@ -233,7 +297,24 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        assert result.data == groups
+        assert result.data == {
+            "groups": [
+                DirectoryGroup(
+                    group_key="sg-admin@example.com",
+                    email="sg-admin@example.com",
+                    name="Admins",
+                    description="Admin group",
+                    provider="google",
+                ),
+                DirectoryGroup(
+                    group_key="sg-devs@example.com",
+                    email="sg-devs@example.com",
+                    name="Developers",
+                    description="Dev group",
+                    provider="google",
+                ),
+            ]
+        }
         mock_google_clients.directory.list_groups.assert_called_once_with(query="sg-")
 
     def test_propagates_directory_error(self, provider, mock_google_clients):

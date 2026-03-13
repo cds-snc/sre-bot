@@ -65,7 +65,7 @@ class TestSessionProvider:
             "directory_v1",
             credentials=mock_creds,
             cache_discovery=False,
-            static_discovery=False,
+            static_discovery=True,
         )
         assert result == mock_google_service
 
@@ -100,7 +100,7 @@ class TestSessionProvider:
             "directory_v1",
             credentials=mock_delegated_creds,
             cache_discovery=False,
-            static_discovery=False,
+            static_discovery=True,
         )
 
     @patch("infrastructure.clients.google_workspace.session_provider.build")
@@ -160,7 +160,7 @@ class TestSessionProvider:
             "directory_v1",
             credentials=mock_scoped_creds,
             cache_discovery=False,
-            static_discovery=False,
+            static_discovery=True,
         )
 
     @patch("infrastructure.clients.google_workspace.session_provider.build")
@@ -262,5 +262,5 @@ class TestSessionProvider:
             "directory_v1",
             credentials=mock_scoped_creds,
             cache_discovery=False,
-            static_discovery=False,
+            static_discovery=True,
         )

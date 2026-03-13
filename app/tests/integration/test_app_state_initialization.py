@@ -27,6 +27,7 @@ def test_app_state_has_all_required_attributes(app_with_lifespan):
         "logger",
         "bot",  # Can be None if Slack not configured, but must exist
         "command_providers",
+        "directory_provider",
         "socket_mode_handler",
         "scheduled_stop_event",
     ]
@@ -82,6 +83,27 @@ def test_app_state_command_providers_is_initialized(app_with_lifespan):
 
     assert command_providers is not None, "command_providers must not be None"
     assert isinstance(command_providers, dict), "command_providers must be a dict"
+
+
+@pytest.mark.integration
+def test_app_state_directory_provider_is_initialized(app_with_lifespan):
+    """Validate that directory_provider is initialized on app.state."""
+    directory_provider = app_with_lifespan.app.state.directory_provider
+
+    assert directory_provider is not None, "directory_provider must not be None"
+    assert hasattr(directory_provider, "warmup"), "directory_provider missing warmup"
+    assert hasattr(
+        directory_provider, "health_check"
+    ), "directory_provider missing health_check"
+    assert hasattr(
+        directory_provider, "get_group_members"
+    ), "directory_provider missing get_group_members"
+    assert hasattr(
+        directory_provider, "check_membership"
+    ), "directory_provider missing check_membership"
+    assert hasattr(
+        directory_provider, "list_groups"
+    ), "directory_provider missing list_groups"
 
 
 @pytest.mark.integration

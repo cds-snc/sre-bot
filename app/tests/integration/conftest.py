@@ -11,10 +11,13 @@ Integration tests mock at system boundaries to test component interaction
 without testing the mocked components themselves.
 """
 
-import types
-import pytest
 from unittest.mock import MagicMock
 from typing import Any, Dict, List
+import types
+
+import pytest
+
+from infrastructure.operations import OperationResult
 
 
 # ============================================================================
@@ -429,6 +432,14 @@ def app_with_lifespan(monkeypatch):
     """
     from fastapi.testclient import TestClient
     from server.server import handler
+
+    mock_directory_provider = MagicMock()
+    mock_directory_provider.warmup.return_value = OperationResult.success()
+
+    monkeypatch.setattr(
+        "server.lifespan.get_directory_provider",
+        lambda: mock_directory_provider,
+    )
 
     # Create client which triggers lifespan context manager
     with TestClient(handler) as client:

@@ -12,7 +12,7 @@ class TestDirectorySettings:
 
         # Assert
         assert settings.provider == "google"
-        assert settings.require_startup_warmup is True
+        assert settings.require_startup_warmup is False
         assert settings.startup_preload_groups == []
         assert settings.cache_ttl_seconds == 60
 
