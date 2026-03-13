@@ -17,6 +17,9 @@ class DirectorySettings(InfrastructureSettings):
         DIRECTORY_PROVIDER: IDP backend to activate (default: google)
         DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: False)
         DIRECTORY_CACHE_TTL_SECONDS: In-process membership cache TTL (default: 60)
+        DIRECTORY_MANAGED_GROUP_DOMAIN: Authoritative domain for managed sg-* emails
+        DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL: Reject managed groups missing email
+        DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS: Startup warmup timeout in seconds
 
     Example:
         ```python
@@ -49,4 +52,19 @@ class DirectorySettings(InfrastructureSettings):
         default=60,
         alias="DIRECTORY_CACHE_TTL_SECONDS",
         description="In-process membership cache TTL in seconds",
+    )
+    managed_group_domain: str = Field(
+        default="",
+        alias="DIRECTORY_MANAGED_GROUP_DOMAIN",
+        description="Authoritative domain for managed sg-* group emails",
+    )
+    enforce_managed_group_email: bool = Field(
+        default=True,
+        alias="DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL",
+        description="Reject managed groups missing provider-returned email",
+    )
+    startup_warmup_timeout_seconds: int = Field(
+        default=2,
+        alias="DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS",
+        description="Timeout for the lightweight startup warmup probe",
     )

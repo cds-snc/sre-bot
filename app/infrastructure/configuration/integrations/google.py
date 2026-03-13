@@ -1,7 +1,7 @@
 """Google Workspace integration settings."""
 
 import json
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from pydantic import Field, field_validator
 import structlog
@@ -17,7 +17,7 @@ class GoogleWorkspaceSettings(IntegrationSettings):
     Environment Variables:
         GOOGLE_DELEGATED_ADMIN_EMAIL: Admin email for domain-wide delegation
         SRE_BOT_EMAIL: SRE Bot service account email
-        GOOGLE_WORKSPACE_CUSTOMER_ID: Google Workspace customer ID
+        GOOGLE_WORKSPACE_CUSTOMER_ID: Google Workspace customer ID (defaults to "my_customer")
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: Path to service account key file
 
     Example:
@@ -36,7 +36,7 @@ class GoogleWorkspaceSettings(IntegrationSettings):
     )
     SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
     GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
-        default="", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
+        default="my_customer", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
     )
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
         default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
@@ -94,7 +94,7 @@ class GoogleResourcesConfig(IntegrationSettings):
         ```
     """
 
-    resources: Any = Field(
+    resources: dict[str, Any] = Field(
         default_factory=dict,
         alias="GOOGLE_RESOURCES",
         description="Consolidated Google resources in nested dict format",
@@ -102,7 +102,7 @@ class GoogleResourcesConfig(IntegrationSettings):
 
     @field_validator("resources", mode="before")
     @classmethod
-    def _parse_resources(cls, v: Optional[Any]) -> Any:
+    def _parse_resources(cls, v: Optional[Any]) -> dict[str, Any]:
         """Parse GOOGLE_RESOURCES from JSON string or dict."""
         if v is None:
             return {}
@@ -115,7 +115,7 @@ class GoogleResourcesConfig(IntegrationSettings):
             ):
                 s = s[1:-1]
             try:
-                return json.loads(s)
+                return dict(cast(dict[str, Any], json.loads(s)))
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error("failed_to_parse_google_resources", error=str(e))
                 raise ValueError(f"GOOGLE_RESOURCES must be valid JSON: {e}")
