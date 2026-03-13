@@ -15,6 +15,7 @@ from infrastructure.events import (
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
     discover_and_register_platforms,
+    get_directory_provider,
     get_platform_service,
     get_settings,
     get_translation_service,
@@ -105,6 +106,29 @@ def _register_event_handlers(logger: BoundLogger) -> None:
         logger.error("event_handlers_discovery_failed", error=str(exc))
 
 
+def _initialize_directory_provider(
+    app: FastAPI,
+    settings: "Settings",
+    logger: BoundLogger,
+) -> None:
+    """Build, warm up, and store the directory provider on app.state."""
+    log = logger.bind(phase="directory")
+    log.info("directory_provider_initialization_started")
+
+    directory_provider = get_directory_provider()
+
+    if settings.directory.require_startup_warmup:
+        warmup = directory_provider.warmup()
+        if not warmup.is_success:
+            log.error("directory_provider_initialization_failed", error=warmup.message)
+            raise RuntimeError(f"directory_warmup_failed: {warmup.message}")
+    else:
+        log.info("directory_provider_warmup_skipped")
+
+    app.state.directory_provider = directory_provider
+    log.info("directory_provider_initialization_completed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -115,6 +139,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("application_startup")
     _list_configs(settings, logger)
+
+    _initialize_directory_provider(app, settings, logger)
 
     _register_event_handlers(logger)
 
