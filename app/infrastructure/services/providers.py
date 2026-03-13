@@ -570,9 +570,9 @@ def get_directory_provider() -> DirectoryProvider:
         def check_membership(
             directory: DirectoryProviderDep,
             group_key: str,
-            email: str,
+            user_email: str,
         ):
-            result = directory.check_membership(group_key, email)
+            result = directory.check_membership(group_key, user_email)
             if result.is_success:
                 return result.data
 
@@ -588,6 +588,7 @@ def get_directory_provider() -> DirectoryProvider:
     provider_key = settings.directory.provider
     if provider_key == "google":
         return build_google_directory_provider(
-            google_clients=get_google_workspace_clients()
+            google_clients=get_google_workspace_clients(),
+            directory_settings=settings.directory,
         )
     raise ValueError(f"Unsupported directory provider: {provider_key!r}")
