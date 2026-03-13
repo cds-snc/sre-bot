@@ -86,6 +86,23 @@ class TestGoogleWorkspaceClients:
         )
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
+    def test_blank_customer_id_falls_back_to_my_customer(
+        self, mock_session_provider_class, google_credentials_json
+    ):
+        """Test blank customer settings still produce a stable default on the client."""
+        mock_provider_instance = Mock(spec=SessionProvider)
+        mock_session_provider_class.return_value = mock_provider_instance
+
+        custom_settings = Mock()
+        custom_settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = google_credentials_json
+        custom_settings.SRE_BOT_EMAIL = "custom-bot@example.com"
+        custom_settings.GOOGLE_WORKSPACE_CUSTOMER_ID = ""
+
+        facade = GoogleWorkspaceClients(custom_settings)
+
+        assert facade.directory._default_customer_id == "my_customer"
+
+    @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
     def test_logger_binding(
         self, mock_session_provider_class, mock_google_workspace_settings
     ):

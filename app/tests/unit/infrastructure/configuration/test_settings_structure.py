@@ -140,6 +140,14 @@ class TestSettingsStructure:
         for instance in instances:
             assert isinstance(instance, IntegrationSettings)
 
+    def test_google_workspace_settings_defaults_customer_id(self, monkeypatch):
+        """Verify Google Workspace customer ID defaults to the stable customer alias."""
+        monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
+
+        settings = GoogleWorkspaceSettings()
+
+        assert settings.GOOGLE_WORKSPACE_CUSTOMER_ID == "my_customer"
+
     def test_all_feature_settings_classes_instantiable(self):
         """Verify all feature settings classes can be instantiated."""
         # Test that all feature settings classes are functional

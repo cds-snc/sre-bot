@@ -12,9 +12,13 @@ class TestBuildGoogleDirectoryProvider:
         # Arrange
         mock_google_clients = MagicMock()
         mock_google_clients.directory = MagicMock()
+        mock_directory_settings = MagicMock()
 
         # Act
-        provider = build_google_directory_provider(google_clients=mock_google_clients)
+        provider = build_google_directory_provider(
+            google_clients=mock_google_clients,
+            directory_settings=mock_directory_settings,
+        )
 
         # Assert
         assert isinstance(provider, GoogleDirectoryProvider)
@@ -23,9 +27,13 @@ class TestBuildGoogleDirectoryProvider:
         # Arrange
         mock_google_clients = MagicMock()
         mock_google_clients.directory = MagicMock()
+        mock_directory_settings = MagicMock()
 
         # Act
-        provider = build_google_directory_provider(google_clients=mock_google_clients)
+        provider = build_google_directory_provider(
+            google_clients=mock_google_clients,
+            directory_settings=mock_directory_settings,
+        )
 
         # Assert
         assert isinstance(provider, DirectoryProvider)
@@ -34,9 +42,13 @@ class TestBuildGoogleDirectoryProvider:
         # Arrange
         mock_google_clients = MagicMock()
         mock_google_clients.directory = MagicMock()
+        mock_directory_settings = MagicMock()
 
         # Act
-        provider = build_google_directory_provider(google_clients=mock_google_clients)
+        provider = build_google_directory_provider(
+            google_clients=mock_google_clients,
+            directory_settings=mock_directory_settings,
+        )
 
         # Assert — internal _directory attribute is the mocked directory client
         assert provider._directory is mock_google_clients.directory

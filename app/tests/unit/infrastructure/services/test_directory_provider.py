@@ -43,7 +43,8 @@ def test_get_directory_provider_returns_google_provider_when_configured(monkeypa
     # Assert
     assert result is built_provider
     providers.build_google_directory_provider.assert_called_once_with(
-        google_clients=mock_google_clients
+        google_clients=mock_google_clients,
+        directory_settings=mock_settings.directory,
     )
 
 
