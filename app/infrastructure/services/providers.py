@@ -25,7 +25,7 @@ from infrastructure.platforms.clients import (
     TeamsClientFacade,
     DiscordClientFacade,
 )
-from infrastructure.directory.factory import build_directory_provider
+from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
 
 
@@ -585,5 +585,9 @@ def get_directory_provider() -> DirectoryProvider:
             return result
     """
     settings = get_settings()
-    google_clients = get_google_workspace_clients()
-    return build_directory_provider(settings=settings, google_clients=google_clients)
+    provider_key = settings.directory.provider
+    if provider_key == "google":
+        return build_google_directory_provider(
+            google_clients=get_google_workspace_clients()
+        )
+    raise ValueError(f"Unsupported directory provider: {provider_key!r}")
