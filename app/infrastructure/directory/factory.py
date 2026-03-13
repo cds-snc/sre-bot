@@ -14,6 +14,7 @@ Adding a new backend:
     3. Add the dispatch branch in ``infrastructure.services.providers.get_directory_provider``.
 """
 
+from infrastructure.configuration.infrastructure import DirectorySettings
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.provider import DirectoryProvider
@@ -21,13 +22,18 @@ from infrastructure.directory.provider import DirectoryProvider
 
 def build_google_directory_provider(
     google_clients: GoogleWorkspaceClients,
+    directory_settings: DirectorySettings,
 ) -> DirectoryProvider:
     """Build a GoogleDirectoryProvider with injected clients.
 
     Args:
         google_clients: Google Workspace clients facade.
+        directory_settings: Directory provider settings.
 
     Returns:
         DirectoryProvider: GoogleDirectoryProvider instance.
     """
-    return GoogleDirectoryProvider(google_clients=google_clients)
+    return GoogleDirectoryProvider(
+        google_clients=google_clients,
+        directory_settings=directory_settings,
+    )
