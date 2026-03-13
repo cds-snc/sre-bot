@@ -6,9 +6,10 @@ See [application-lifecycle/](./application-lifecycle/) subdirectory for detailed
 
 ---
 
-## Current Implementation
+## Current Implementation (Legacy)
 
 [main.py](/workspace/app/main.py) uses `app.add_event_handler("startup", ...)` for initialization.
+FastAPI recommends lifespan and deprecates startup/shutdown events when lifespan is provided.
 
 ---
 
@@ -32,12 +33,15 @@ See [application-lifecycle/](./application-lifecycle/) subdirectory for detailed
 - ✅ Immutable registries after startup
 - ✅ Structured logging per phase
 - ✅ Graceful shutdown in reverse order
+- ✅ Lifespan-only startup/shutdown (no mixing with startup/shutdown events)
+- ✅ Lifespan teardown runs after connections close and background work finishes
 
 ---
 
 ## Anti-patterns
 
 - ❌ New initialization logic added via `app.add_event_handler("startup", ...)`
+- ❌ Mixing `lifespan` with startup/shutdown events
 - ❌ Skipping or reordering phases
 - ❌ Registering providers after startup
 
