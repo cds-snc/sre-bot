@@ -15,7 +15,7 @@ class DirectorySettings(InfrastructureSettings):
 
     Environment Variables:
         DIRECTORY_PROVIDER: IDP backend to activate (default: google)
-        DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: True)
+        DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: False)
         DIRECTORY_CACHE_TTL_SECONDS: In-process membership cache TTL (default: 60)
 
     Example:
@@ -26,7 +26,7 @@ class DirectorySettings(InfrastructureSettings):
 
         provider = settings.directory.provider
         if settings.directory.require_startup_warmup:
-            # Enforce warmup before accepting traffic
+            # Opt in to fail-fast remote validation before accepting traffic
             ...
         ```
     """
@@ -37,9 +37,9 @@ class DirectorySettings(InfrastructureSettings):
         description="IDP backend - 'google' or 'entra_id'",
     )
     require_startup_warmup: bool = Field(
-        default=True,
+        default=False,
         alias="DIRECTORY_REQUIRE_STARTUP_WARMUP",
-        description="Fail startup when provider warmup fails",
+        description="Opt in to fail-fast startup validation against the remote directory",
     )
     startup_preload_groups: list[str] = Field(
         default_factory=list,
