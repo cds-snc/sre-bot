@@ -81,13 +81,13 @@ class SessionProvider:
             if service_scopes:
                 creds = creds.with_scopes(service_scopes)
 
-            # Build service with static discovery (cached, no network calls)
+            # Use bundled discovery docs to avoid remote discovery fetches.
             return build(
                 service_name,
                 version,
                 credentials=creds,
                 cache_discovery=False,
-                static_discovery=False,
+                static_discovery=True,
             )
 
         except json.JSONDecodeError as e:
