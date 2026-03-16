@@ -51,7 +51,7 @@ class DirectoryProvider(Protocol):
     the boundary.
     """
 
-    def warmup(self) -> OperationResult:
+    def warmup(self) -> OperationResult[None]:
         """Validate connectivity/credentials and prepare hot-path resources.
 
         Returns:
@@ -59,7 +59,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def health_check(self) -> OperationResult:
+    def health_check(self) -> OperationResult[None]:
         """Fast liveness check suitable for readiness/liveness probes.
 
         Must not make expensive remote API calls.
@@ -69,7 +69,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def get_user(self, email: str) -> OperationResult:
+    def get_user(self, email: str) -> OperationResult[DirectoryUserData]:
         """Return a canonical user by email.
 
         Args:
@@ -80,19 +80,24 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult:
+    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[DirectoryUsersData]:
         """Return canonical users for a directory query.
 
         Args:
-            query: Provider-specific query string.
-            limit: Maximum number of canonical users to return.
+            query: Provider-agnostic query expression. Implementors translate
+                this into backend-specific filter/search parameters when
+                supported. Empty string requests an unfiltered list where
+                supported.
+            limit: Maximum number of canonical users to return. Implementors
+                should enforce this at the API layer when possible and
+                truncate locally when provider pagination semantics differ.
 
         Returns:
             OperationResult: success with data matching DirectoryUsersData.
         """
         ...
 
-    def get_group_members(self, group_key: str) -> OperationResult:
+    def get_group_members(self, group_key: str) -> OperationResult[DirectoryMembersData]:
         """Return all members of a group.
 
         Args:
@@ -103,7 +108,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def check_membership(self, group_key: str, user_email: str) -> OperationResult:
+    def check_membership(self, group_key: str, user_email: str) -> OperationResult[DirectoryMembershipData]:
         """Check whether a user is a member of a group.
 
         Args:
@@ -115,11 +120,12 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_groups(self, query: str) -> OperationResult:
-        """List groups matching a query or prefix.
+    def list_groups(self, query: str) -> OperationResult[DirectoryGroupsData]:
+        """List groups matching a query expression.
 
         Args:
-            query: IDP-specific query string or group email prefix.
+            query: Provider-agnostic query expression translated by each
+                implementor into backend-specific list parameters.
 
         Returns:
             OperationResult: success with data matching DirectoryGroupsData.

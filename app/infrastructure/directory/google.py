@@ -1,6 +1,6 @@
 """Google Workspace implementation of DirectoryProvider."""
 
-from typing import Any
+from typing import Any, TypeVar
 
 import structlog
 
@@ -12,9 +12,18 @@ from infrastructure.directory import (
     DirectoryUser,
     MembershipCheckResult,
 )
+from infrastructure.directory.provider import (
+    DirectoryGroupsData,
+    DirectoryMembershipData,
+    DirectoryMembersData,
+    DirectoryUserData,
+    DirectoryUsersData,
+)
 from infrastructure.operations import OperationResult
 
 logger = structlog.get_logger()
+
+T = TypeVar("T")
 
 
 class GoogleDirectoryProvider:
@@ -49,11 +58,90 @@ class GoogleDirectoryProvider:
 
         return value.strip().lower()
 
-    def _build_directory_user(self, item: dict[str, Any]) -> OperationResult:
+    def _extract_email(self, item: dict[str, Any], *keys: str) -> str:
+        """Extract and normalize the first available email-like value."""
+
+        for key in keys:
+            value = str(item.get(key) or "").strip()
+            if value:
+                return self._normalize_email(value)
+
+        emails = item.get("emails")
+        if isinstance(emails, list):
+            first_email = ""
+            for email_item in emails:
+                if not isinstance(email_item, dict):
+                    continue
+
+                address = str(
+                    email_item.get("address") or email_item.get("value") or ""
+                ).strip()
+                if not address:
+                    continue
+
+                normalized_address = self._normalize_email(address)
+                if not first_email:
+                    first_email = normalized_address
+                if email_item.get("primary") is True:
+                    return normalized_address
+
+            if first_email:
+                return first_email
+
+        return ""
+
+    def _extract_display_name(self, item: dict[str, Any]) -> str | None:
+        """Extract a stable display name from provider payload variants."""
+
+        name = item.get("name")
+        if isinstance(name, dict):
+            full_name = str(name.get("fullName") or "").strip()
+            if full_name:
+                return full_name
+
+            display_name = str(name.get("displayName") or "").strip()
+            if display_name:
+                return display_name
+
+            given_name = str(name.get("givenName") or "").strip()
+            family_name = str(name.get("familyName") or "").strip()
+            combined_name = " ".join(
+                part for part in [given_name, family_name] if part
+            ).strip()
+            if combined_name:
+                return combined_name
+
+        if isinstance(name, str):
+            normalized_name = name.strip()
+            if normalized_name:
+                return normalized_name
+
+        for key in ["displayName", "fullName"]:
+            value = str(item.get(key) or "").strip()
+            if value:
+                return value
+
+        return None
+
+    def _typed_error(self, result: OperationResult[Any]) -> OperationResult[T]:
+        """Rebox an error result without leaking provider-native payload data."""
+
+        return OperationResult.error(
+            status=result.status,
+            message=result.message,
+            error_code=result.error_code,
+            retry_after=result.retry_after,
+            provider=result.provider,
+            operation=result.operation,
+        )
+
+    def _build_directory_user(
+        self, item: dict[str, Any]
+    ) -> OperationResult[DirectoryUser]:
         """Convert a Google user record into a canonical directory user."""
 
-        email = self._normalize_email(str(item.get("primaryEmail") or ""))
-        provider_user_id = str(item.get("id") or "").strip()
+        email = self._extract_email(item, "primaryEmail", "email")
+        provider_user_id = str(item.get("id") or item.get("userId") or "").strip()
         if not email:
             return OperationResult.permanent_error(
                 message="Directory user is missing primary email",
@@ -65,61 +153,59 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_USER_ID_REQUIRED",
             )
 
-        display_name = item.get("name")
-        if isinstance(display_name, dict):
-            display_name = display_name.get("fullName")
+        display_name = self._extract_display_name(item)
 
         is_active = None
         if "suspended" in item:
             is_active = not bool(item.get("suspended"))
 
         return OperationResult.success(
-            data={
-                "user": DirectoryUser(
-                    email=email,
-                    provider_user_id=provider_user_id,
-                    display_name=str(display_name) if display_name else None,
-                    is_active=is_active,
-                    provider="google",
-                )
-            }
+            data=DirectoryUser(
+                email=email,
+                provider_user_id=provider_user_id,
+                display_name=display_name,
+                is_active=is_active,
+                provider="google",
+            )
         )
 
-    def _build_directory_member(self, item: dict[str, Any]) -> DirectoryMember:
+    def _build_directory_member(self, item: dict[str, Any]) -> DirectoryMember | None:
         """Convert a Google member record into a canonical directory member."""
 
+        member_email = self._extract_email(item, "email", "primaryEmail")
+        if not member_email:
+            return None
+
         return DirectoryMember(
-            email=self._normalize_email(str(item.get("email") or "")),
-            membership_id=item.get("id"),
+            email=member_email,
+            membership_id=str(item.get("id") or "").strip() or None,
             provider_user_id=None,
             role=item.get("role"),
             provider="google",
         )
 
-    def _build_directory_group(self, item: dict[str, Any]) -> OperationResult:
+    def _build_directory_group(
+        self, item: dict[str, Any]
+    ) -> OperationResult[DirectoryGroup | None]:
         """Convert a Google group record into a canonical directory group."""
 
-        group_email = self._normalize_email(str(item.get("email") or ""))
+        group_email = self._extract_email(item, "email", "groupEmail")
         if not group_email:
             if self._directory_settings.enforce_managed_group_email:
                 return OperationResult.permanent_error(
                     message="Managed directory group is missing provider-returned email",
                     error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
                 )
-            return OperationResult.success(data={"group": None})
+            return OperationResult.success(data=None)
 
         local_part, _, domain = group_email.partition("@")
-        if (
-            self._managed_group_domain
-            and local_part.startswith("sg-")
-            and domain != self._managed_group_domain
-        ):
+        if self._managed_group_domain and domain != self._managed_group_domain:
             return OperationResult.permanent_error(
                 message="Managed directory group email does not match configured domain",
                 error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
             )
 
-        provider_group_id = str(item.get("id") or "").strip()
+        provider_group_id = str(item.get("id") or item.get("groupId") or "").strip()
         if not provider_group_id:
             return OperationResult.permanent_error(
                 message="Managed directory group is missing provider group ID",
@@ -127,19 +213,17 @@ class GoogleDirectoryProvider:
             )
 
         return OperationResult.success(
-            data={
-                "group": DirectoryGroup(
-                    group_email=group_email,
-                    group_slug=local_part,
-                    provider_group_id=provider_group_id,
-                    name=item.get("name"),
-                    description=item.get("description"),
-                    provider="google",
-                )
-            }
+            data=DirectoryGroup(
+                group_email=group_email,
+                group_slug=local_part,
+                provider_group_id=provider_group_id,
+                name=item.get("name") or item.get("displayName"),
+                description=item.get("description"),
+                provider="google",
+            )
         )
 
-    def warmup(self) -> OperationResult:
+    def warmup(self) -> OperationResult[None]:
         """Validate connectivity by fetching the configured customer.
 
         Returns:
@@ -150,11 +234,12 @@ class GoogleDirectoryProvider:
         result = self._directory.health_check()
         if result.is_success:
             log.info("directory_warmup_completed")
-        else:
-            log.error("directory_warmup_failed", error=result.message)
-        return result
+            return OperationResult.success()
 
-    def health_check(self) -> OperationResult:
+        log.error("directory_warmup_failed", error=result.message)
+        return self._typed_error(result)
+
+    def health_check(self) -> OperationResult[None]:
         """Return a fast liveness result without making remote calls.
 
         Returns:
@@ -162,7 +247,7 @@ class GoogleDirectoryProvider:
         """
         return OperationResult.success()
 
-    def get_user(self, email: str) -> OperationResult:
+    def get_user(self, email: str) -> OperationResult[DirectoryUserData]:
         """Return a canonical directory user by email."""
         self._logger.info("getting_user", email=email)
         result = self._directory.get_user(self._normalize_email(email))
@@ -173,10 +258,24 @@ class GoogleDirectoryProvider:
             data=result.data,
         )
         if not result.is_success:
-            return result
-        return self._build_directory_user(result.data or {})
+            return self._typed_error(result)
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult:
+        user_payload = result.data if isinstance(result.data, dict) else {}
+        user_result = self._build_directory_user(user_payload)
+        if not user_result.is_success:
+            return self._typed_error(user_result)
+
+        if user_result.data is None:
+            return OperationResult.permanent_error(
+                message="Directory user mapping returned no canonical user",
+                error_code="DIRECTORY_USER_MAPPING_INVALID",
+            )
+
+        return OperationResult.success(data={"user": user_result.data})
+
+    def list_users(
+        self, query: str = "", limit: int = 100
+    ) -> OperationResult[DirectoryUsersData]:
         """Return canonical users matching a query."""
 
         if limit <= 0:
@@ -188,26 +287,38 @@ class GoogleDirectoryProvider:
 
         result = self._directory.list_users(**list_kwargs)
         if not result.is_success:
-            return result
+            return self._typed_error(result)
 
-        users = []
-        for item in (result.data or [])[:limit]:
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory users payload is not a list",
+                error_code="DIRECTORY_USERS_PAYLOAD_INVALID",
+            )
+
+        users: list[DirectoryUser] = []
+        for item in result.data[:limit]:
+            if not isinstance(item, dict):
+                return OperationResult.permanent_error(
+                    message="Directory users payload contains an invalid entry",
+                    error_code="DIRECTORY_USERS_PAYLOAD_INVALID",
+                )
+
             user_result = self._build_directory_user(item)
             if not user_result.is_success:
-                return user_result
+                return self._typed_error(user_result)
 
-            user_data = user_result.data if isinstance(user_result.data, dict) else {}
-            user = user_data.get("user")
-            if user is None:
+            if user_result.data is None:
                 return OperationResult.permanent_error(
                     message="Directory user mapping returned no canonical user",
                     error_code="DIRECTORY_USER_MAPPING_INVALID",
                 )
-            users.append(user)
+            users.append(user_result.data)
 
         return OperationResult.success(data={"users": users})
 
-    def get_group_members(self, group_key: str) -> OperationResult:
+    def get_group_members(
+        self, group_key: str
+    ) -> OperationResult[DirectoryMembersData]:
         """Return the member list for a group.
 
         Args:
@@ -218,16 +329,27 @@ class GoogleDirectoryProvider:
         """
         result = self._directory.list_members(self._normalize_email(group_key))
         if not result.is_success:
-            return result
+            return self._typed_error(result)
 
-        members = [
-            self._build_directory_member(item)
-            for item in (result.data or [])
-            if item.get("email")
-        ]
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory members payload is not a list",
+                error_code="DIRECTORY_MEMBERS_PAYLOAD_INVALID",
+            )
+
+        members: list[DirectoryMember] = []
+        for item in result.data:
+            if not isinstance(item, dict):
+                continue
+            member = self._build_directory_member(item)
+            if member is not None:
+                members.append(member)
+
         return OperationResult.success(data={"members": members})
 
-    def check_membership(self, group_key: str, user_email: str) -> OperationResult:
+    def check_membership(
+        self, group_key: str, user_email: str
+    ) -> OperationResult[DirectoryMembershipData]:
         """Check whether a user is a member of a group.
 
         Fetches all members and performs a case-insensitive email comparison
@@ -246,11 +368,18 @@ class GoogleDirectoryProvider:
 
         result = self._directory.list_members(normalized_group)
         if not result.is_success:
-            return result
+            return self._typed_error(result)
+
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory members payload is not a list",
+                error_code="DIRECTORY_MEMBERS_PAYLOAD_INVALID",
+            )
 
         is_member = any(
-            self._normalize_email(str(item.get("email") or "")) == normalized_user_email
-            for item in (result.data or [])
+            self._extract_email(item, "email", "primaryEmail") == normalized_user_email
+            for item in result.data
+            if isinstance(item, dict)
         )
         membership = MembershipCheckResult(
             group_email=normalized_group,
@@ -261,7 +390,7 @@ class GoogleDirectoryProvider:
         )
         return OperationResult.success(data={"membership": membership})
 
-    def list_groups(self, query: str) -> OperationResult:
+    def list_groups(self, query: str) -> OperationResult[DirectoryGroupsData]:
         """List groups matching a query string.
 
         Args:
@@ -272,19 +401,27 @@ class GoogleDirectoryProvider:
         """
         result = self._directory.list_groups(query=query)
         if not result.is_success:
-            return result
+            return self._typed_error(result)
 
-        groups = []
-        for item in result.data or []:
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory groups payload is not a list",
+                error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
+            )
+
+        groups: list[DirectoryGroup] = []
+        for item in result.data:
+            if not isinstance(item, dict):
+                return OperationResult.permanent_error(
+                    message="Directory groups payload contains an invalid entry",
+                    error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
+                )
+
             group_result = self._build_directory_group(item)
             if not group_result.is_success:
-                return group_result
+                return self._typed_error(group_result)
 
-            group_data = (
-                group_result.data if isinstance(group_result.data, dict) else {}
-            )
-            group = group_data.get("group")
-            if group is not None:
-                groups.append(group)
+            if group_result.data is not None:
+                groups.append(group_result.data)
 
         return OperationResult.success(data={"groups": groups})
