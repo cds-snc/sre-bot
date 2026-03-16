@@ -53,6 +53,10 @@ def _call_legacy_handler(
     Returns:
         CommandResponse with captured output
     """
+    log = logger.bind(
+        command=payload.text, user_id=payload.user_id, channel_id=payload.channel_id
+    )
+    log.info("calling_legacy_handler", handler=handler.__name__, parsed_payload=payload)
     captured_responses: List[str] = []
 
     def capture_respond(text: str | None = None, **kwargs):
@@ -97,7 +101,12 @@ def handle_google_dev_command(payload: CommandPayload) -> CommandResponse:
     def noop_ack():
         pass
 
-    return _call_legacy_handler(payload, google.google_service_command, noop_ack)
+    return _call_legacy_handler(
+        payload,
+        google.google_service_command,
+        noop_ack,
+        command_payload=payload,
+    )
 
 
 def handle_slack_dev_command(payload: CommandPayload) -> CommandResponse:
