@@ -7,7 +7,7 @@ Implements Railway-Oriented Programming pattern for type-safe error handling.
 See: docs/decisions/tier-1-foundation/ADR-001-operation-result-pattern.md
 """
 
-from typing import Optional, Any, Callable, TypeVar
+from typing import Optional, Any, Callable, TypeVar, Generic
 from dataclasses import dataclass
 
 from infrastructure.operations.status import OperationStatus
@@ -18,7 +18,7 @@ U = TypeVar("U")
 
 
 @dataclass
-class OperationResult:
+class OperationResult(Generic[T]):
     """Uniform result returned from operations.
 
     Implements Railway-Oriented Programming pattern for functional error handling.
@@ -27,7 +27,7 @@ class OperationResult:
     Attributes:
         status: OperationStatus -- high-level outcome
         message: str -- human-friendly message for logs/troubleshooting
-        data: Optional[Any] -- optional payload (can be dict, list, or object)
+        data: Optional[T] -- optional payload for successful results
         error_code: Optional[str] -- optional machine error code
         retry_after: Optional[int] -- seconds until retry when rate-limited
         provider: Optional[str] -- provider name for observability (e.g., 'google', 'aws')
@@ -36,7 +36,7 @@ class OperationResult:
 
     status: OperationStatus
     message: str
-    data: Optional[Any] = None
+    data: Optional[T] = None
     error_code: Optional[str] = None
     retry_after: Optional[int] = None
     provider: Optional[str] = None
@@ -54,11 +54,11 @@ class OperationResult:
     @classmethod
     def success(
         cls,
-        data: Optional[Any] = None,
+        data: Optional[T] = None,
         message: str = "ok",
         provider: Optional[str] = None,
         operation: Optional[str] = None,
-    ) -> "OperationResult":
+    ) -> "OperationResult[T]":
         """Create a SUCCESS OperationResult with optional data.
 
         Args:
@@ -85,10 +85,10 @@ class OperationResult:
         message: str,
         error_code: Optional[str] = None,
         retry_after: Optional[int] = None,
-        data: Optional[Any] = None,
+        data: Optional[T] = None,
         provider: Optional[str] = None,
         operation: Optional[str] = None,
-    ) -> "OperationResult":
+    ) -> "OperationResult[T]":
         """Create an error OperationResult.
 
         Args:
@@ -119,7 +119,7 @@ class OperationResult:
         message: str,
         error_code: Optional[str] = None,
         retry_after: Optional[int] = None,
-    ) -> "OperationResult":
+    ) -> "OperationResult[T]":
         """Create a transient (retryable) error result.
 
         Use for errors that may succeed on retry, such as:
@@ -142,7 +142,7 @@ class OperationResult:
     @classmethod
     def permanent_error(
         cls, message: str, error_code: Optional[str] = None
-    ) -> "OperationResult":
+    ) -> "OperationResult[T]":
         """Create a permanent (non-retryable) error result.
 
         Use for errors that will not succeed on retry, such as:
@@ -160,7 +160,7 @@ class OperationResult:
         """
         return cls.error(OperationStatus.PERMANENT_ERROR, message, error_code)
 
-    def map(self, fn: Callable[[Any], Any]) -> "OperationResult":
+    def map(self, fn: Callable[[T], U]) -> "OperationResult[U]":
         """Apply a function to the success value (Railway-Oriented Programming).
 
         If the result is successful, applies the function to data and returns
@@ -180,16 +180,25 @@ class OperationResult:
             error = OperationResult.permanent_error("failed")
             still_error = error.map(lambda x: x * 2)  # Still an error
         """
-        if self.is_success:
-            return OperationResult.success(
-                data=fn(self.data),
-                message=self.message,
+        if not self.is_success:
+            return self  # type: ignore[return-value]
+
+        if self.data is None:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="No data to map",
                 provider=self.provider,
                 operation=self.operation,
             )
-        return self
 
-    def bind(self, fn: Callable[[Any], "OperationResult"]) -> "OperationResult":
+        return OperationResult.success(
+            data=fn(self.data),
+            message=self.message,
+            provider=self.provider,
+            operation=self.operation,
+        )
+
+    def bind(self, fn: Callable[[T], "OperationResult[U]"]) -> "OperationResult[U]":
         """Chain operations that return OperationResult (Railway-Oriented Programming).
 
         If the result is successful, applies the function to data and returns
@@ -203,12 +212,12 @@ class OperationResult:
             OperationResult from fn, or self if error
 
         Example:
-            def validate_user(user_id: int) -> OperationResult:
+            def validate_user(user_id: int) -> OperationResult[int]:
                 if user_id > 0:
                     return OperationResult.success(data=user_id)
                 return OperationResult.permanent_error("Invalid ID")
 
-            def fetch_user(user_id: int) -> OperationResult:
+            def fetch_user(user_id: int) -> OperationResult[dict]:
                 # ... fetch from database
                 return OperationResult.success(data={"id": user_id, "name": "Alice"})
 
@@ -218,9 +227,17 @@ class OperationResult:
                 .bind(fetch_user)
             )
         """
-        if self.is_success:
-            return fn(self.data)
-        return self
+        if not self.is_success:
+            return self  # type: ignore[return-value]
+
+        if self.data is None:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="No data to bind",
+                provider=self.provider,
+                operation=self.operation,
+            )
+        return fn(self.data)
 
     def unwrap_or(self, default: Any) -> Any:
         """Get the success value or return a default.
