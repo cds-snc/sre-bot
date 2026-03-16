@@ -80,7 +80,9 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[DirectoryUsersData]:
+    def list_users(
+        self, query: str = "", limit: int = 100
+    ) -> OperationResult[DirectoryUsersData]:
         """Return canonical users for a directory query.
 
         Args:
@@ -97,7 +99,9 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def get_group_members(self, group_key: str) -> OperationResult[DirectoryMembersData]:
+    def get_group_members(
+        self, group_key: str
+    ) -> OperationResult[DirectoryMembersData]:
         """Return all members of a group.
 
         Args:
@@ -108,7 +112,9 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def check_membership(self, group_key: str, user_email: str) -> OperationResult[DirectoryMembershipData]:
+    def check_membership(
+        self, group_key: str, user_email: str
+    ) -> OperationResult[DirectoryMembershipData]:
         """Check whether a user is a member of a group.
 
         Args:
