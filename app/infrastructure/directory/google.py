@@ -352,8 +352,9 @@ class GoogleDirectoryProvider:
     ) -> OperationResult[DirectoryMembershipData]:
         """Check whether a user is a member of a group.
 
-        Fetches all members and performs a case-insensitive email comparison
-        locally to avoid a separate get-member API call.
+        Uses the members.hasMember API for a single-call, server-side check
+        that includes transitive membership (users nested inside sub-groups
+        are correctly resolved as members).
 
         Args:
             group_key: Canonical managed-group email — normalised to lowercase.
@@ -361,26 +362,22 @@ class GoogleDirectoryProvider:
 
         Returns:
             OperationResult: success with data={"membership": MembershipCheckResult}.
-                Returns the error result unchanged when list_members fails.
+                Returns the error result unchanged when hasMember fails.
         """
         normalized_group = self._normalize_email(group_key)
         normalized_user_email = self._normalize_email(user_email)
 
-        result = self._directory.list_members(normalized_group)
+        result = self._directory.has_member(normalized_group, normalized_user_email)
         if not result.is_success:
             return self._typed_error(result)
 
-        if not isinstance(result.data, list):
+        if not isinstance(result.data, dict):
             return OperationResult.permanent_error(
-                message="Directory members payload is not a list",
-                error_code="DIRECTORY_MEMBERS_PAYLOAD_INVALID",
+                message="Directory hasMember payload is not a dict",
+                error_code="DIRECTORY_MEMBERSHIP_PAYLOAD_INVALID",
             )
 
-        is_member = any(
-            self._extract_email(item, "email", "primaryEmail") == normalized_user_email
-            for item in result.data
-            if isinstance(item, dict)
-        )
+        is_member = bool(result.data.get("isMember", False))
         membership = MembershipCheckResult(
             group_email=normalized_group,
             group_slug=normalized_group.split("@", 1)[0],
