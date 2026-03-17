@@ -202,6 +202,10 @@ typings/
 .csr
 .pem
 
+# terraform state file
+*.tfstate
+*.tfstate*
+
 .DS_Store
 .terragrunt-cache
 .terraform
