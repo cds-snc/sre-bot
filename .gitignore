@@ -205,6 +205,7 @@ typings/
 .DS_Store
 .terragrunt-cache
 .terraform
+*.tfstate
 *.PublishSettings
 
 package
