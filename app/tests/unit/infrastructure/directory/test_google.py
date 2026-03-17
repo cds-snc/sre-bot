@@ -326,12 +326,8 @@ class TestGetGroupMembers:
 class TestCheckMembership:
     def test_returns_true_when_user_is_member(self, provider, mock_google_clients):
         # Arrange
-        members = [
-            {"email": "member@example.com"},
-            {"email": "other@example.com"},
-        ]
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=members)
+        mock_google_clients.directory.has_member.return_value = OperationResult.success(
+            data={"isMember": True}
         )
 
         # Act
@@ -351,9 +347,8 @@ class TestCheckMembership:
 
     def test_returns_false_when_user_is_not_member(self, provider, mock_google_clients):
         # Arrange
-        members = [{"email": "other@example.com"}]
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=members)
+        mock_google_clients.directory.has_member.return_value = OperationResult.success(
+            data={"isMember": False}
         )
 
         # Act
@@ -371,12 +366,10 @@ class TestCheckMembership:
             )
         }
 
-    def test_returns_false_when_member_list_is_empty(
-        self, provider, mock_google_clients
-    ):
+    def test_returns_false_when_not_a_member(self, provider, mock_google_clients):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=[])
+        mock_google_clients.directory.has_member.return_value = OperationResult.success(
+            data={"isMember": False}
         )
 
         # Act
@@ -394,45 +387,25 @@ class TestCheckMembership:
             )
         }
 
-    def test_comparison_is_case_insensitive(self, provider, mock_google_clients):
+    def test_normalises_group_key_and_email_to_lowercase(
+        self, provider, mock_google_clients
+    ):
         # Arrange
-        members = [{"email": "MEMBER@EXAMPLE.COM"}]
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=members)
+        mock_google_clients.directory.has_member.return_value = OperationResult.success(
+            data={"isMember": False}
         )
 
         # Act
-        result = provider.check_membership("sg-team@example.com", "member@example.com")
+        provider.check_membership("SG-TEAM@EXAMPLE.COM", "USER@EXAMPLE.COM")
 
         # Assert
-        assert result.is_success
-        assert result.data == {
-            "membership": MembershipCheckResult(
-                group_email="sg-team@example.com",
-                group_slug="sg-team",
-                provider_group_id=None,
-                user_email="member@example.com",
-                is_member=True,
-            )
-        }
-
-    def test_normalises_group_key_to_lowercase(self, provider, mock_google_clients):
-        # Arrange
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=[])
-        )
-
-        # Act
-        provider.check_membership("SG-TEAM@EXAMPLE.COM", "user@example.com")
-
-        # Assert
-        mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-team@example.com"
+        mock_google_clients.directory.has_member.assert_called_once_with(
+            "sg-team@example.com", "user@example.com"
         )
 
     def test_propagates_directory_error(self, provider, mock_google_clients):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = (
+        mock_google_clients.directory.has_member.return_value = (
             OperationResult.permanent_error("group_not_found")
         )
 
@@ -443,12 +416,12 @@ class TestCheckMembership:
         assert not result.is_success
         assert result.status == OperationStatus.PERMANENT_ERROR
 
-    def test_returns_error_when_list_members_payload_is_none(
+    def test_returns_error_when_has_member_payload_is_not_dict(
         self, provider, mock_google_clients
     ):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = (
-            OperationResult.success(data=None)
+        mock_google_clients.directory.has_member.return_value = OperationResult.success(
+            data=None
         )
 
         # Act
@@ -456,7 +429,7 @@ class TestCheckMembership:
 
         # Assert
         assert not result.is_success
-        assert result.error_code == "DIRECTORY_MEMBERS_PAYLOAD_INVALID"
+        assert result.error_code == "DIRECTORY_MEMBERSHIP_PAYLOAD_INVALID"
 
 
 class TestListGroups:
