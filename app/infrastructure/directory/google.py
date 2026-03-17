@@ -12,15 +12,6 @@ from infrastructure.directory import (
     DirectoryUser,
     MembershipCheckResult,
 )
-from infrastructure.directory.provider import (
-    DirectoryGroupData,
-    DirectoryGroupsData,
-    DirectoryMemberData,
-    DirectoryMembershipData,
-    DirectoryMembersData,
-    DirectoryUserData,
-    DirectoryUsersData,
-)
 from infrastructure.operations import OperationResult
 
 logger = structlog.get_logger()
@@ -249,7 +240,7 @@ class GoogleDirectoryProvider:
         """
         return OperationResult.success()
 
-    def get_user(self, email: str) -> OperationResult[DirectoryUserData]:
+    def get_user(self, email: str) -> OperationResult[DirectoryUser]:
         """Return a canonical directory user by email."""
         self._logger.info("getting_user", email=email)
         result = self._directory.get_user(self._normalize_email(email))
@@ -273,15 +264,15 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_USER_MAPPING_INVALID",
             )
 
-        return OperationResult.success(data={"user": user_result.data})
+        return OperationResult.success(data=user_result.data)
 
     def list_users(
         self, query: str = "", limit: int = 100
-    ) -> OperationResult[DirectoryUsersData]:
+    ) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users matching a query."""
 
         if limit <= 0:
-            return OperationResult.success(data={"users": []})
+            return OperationResult.success(data=[])
 
         list_kwargs: dict[str, Any] = {"maxResults": limit}
         if query:
@@ -316,18 +307,18 @@ class GoogleDirectoryProvider:
                 )
             users.append(user_result.data)
 
-        return OperationResult.success(data={"users": users})
+        return OperationResult.success(data=users)
 
     def get_group_members(
         self, group_key: str
-    ) -> OperationResult[DirectoryMembersData]:
+    ) -> OperationResult[list[DirectoryMember]]:
         """Return the member list for a group.
 
         Args:
             group_key: Canonical managed-group email — normalised to lowercase.
 
         Returns:
-            OperationResult: success with data={"members": list[DirectoryMember]}.
+            OperationResult: success with the DirectoryMember list for the group.
         """
         result = self._directory.list_members(self._normalize_email(group_key))
         if not result.is_success:
@@ -347,16 +338,16 @@ class GoogleDirectoryProvider:
             if member is not None:
                 members.append(member)
 
-        return OperationResult.success(data={"members": members})
+        return OperationResult.success(data=members)
 
-    def get_group(self, group_key: str) -> OperationResult[DirectoryGroupData]:
+    def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
         """Return a canonical managed group by key.
 
         Args:
             group_key: Canonical managed-group email — normalised to lowercase.
 
         Returns:
-            OperationResult: success with data={"group": DirectoryGroup}.
+            OperationResult: success with the canonical DirectoryGroup.
         """
         normalized_group_key = self._normalize_email(group_key)
         result = self._directory.get_group(normalized_group_key)
@@ -379,14 +370,14 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
             )
 
-        return OperationResult.success(data={"group": group_result.data})
+        return OperationResult.success(data=group_result.data)
 
     def add_group_member(
         self,
         group_key: str,
         user_email: str,
         role: str = "MEMBER",
-    ) -> OperationResult[DirectoryMemberData]:
+    ) -> OperationResult[DirectoryMember]:
         """Add a membership to a managed group.
 
         Args:
@@ -395,7 +386,7 @@ class GoogleDirectoryProvider:
             role: Membership role hint (default: MEMBER, valid values: MEMBER, MANAGER, OWNER).
 
         Returns:
-            OperationResult: success with data={"member": DirectoryMember}.
+            OperationResult: success with the added DirectoryMember.
         """
         normalized_group = self._normalize_email(group_key)
         normalized_user_email = self._normalize_email(user_email)
@@ -428,7 +419,7 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_MEMBER_EMAIL_REQUIRED",
             )
 
-        return OperationResult.success(data={"member": member})
+        return OperationResult.success(data=member)
 
     def remove_group_member(
         self,
@@ -458,7 +449,7 @@ class GoogleDirectoryProvider:
 
     def check_membership(
         self, group_key: str, user_email: str
-    ) -> OperationResult[DirectoryMembershipData]:
+    ) -> OperationResult[MembershipCheckResult]:
         """Check whether a user is a member of a group.
 
         Uses the members.hasMember API for a single-call, server-side check
@@ -470,8 +461,7 @@ class GoogleDirectoryProvider:
             user_email: User email to check.
 
         Returns:
-            OperationResult: success with data={"membership": MembershipCheckResult}.
-                Returns the error result unchanged when hasMember fails.
+            OperationResult: success with the MembershipCheckResult.
         """
         normalized_group = self._normalize_email(group_key)
         normalized_user_email = self._normalize_email(user_email)
@@ -494,16 +484,16 @@ class GoogleDirectoryProvider:
             user_email=normalized_user_email,
             is_member=is_member,
         )
-        return OperationResult.success(data={"membership": membership})
+        return OperationResult.success(data=membership)
 
-    def list_groups(self, query: str) -> OperationResult[DirectoryGroupsData]:
+    def list_groups(self, query: str) -> OperationResult[list[DirectoryGroup]]:
         """List groups matching a query string.
 
         Args:
             query: IDP-specific query string passed to the Directory API.
 
         Returns:
-            OperationResult: success with data={"groups": list[DirectoryGroup]}.
+            OperationResult: success with the matching DirectoryGroup list.
         """
         result = self._directory.list_groups(query=query)
         if not result.is_success:
@@ -530,4 +520,4 @@ class GoogleDirectoryProvider:
             if group_result.data is not None:
                 groups.append(group_result.data)
 
-        return OperationResult.success(data={"groups": groups})
+        return OperationResult.success(data=groups)

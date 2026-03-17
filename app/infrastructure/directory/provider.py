@@ -1,6 +1,6 @@
 """DirectoryProvider protocol — IDP-agnostic contract for directory operations."""
 
-from typing import Protocol, TypedDict, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from infrastructure.directory.models import (
     DirectoryGroup,
@@ -9,48 +9,6 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult
-
-
-class DirectoryUserData(TypedDict):
-    """Canonical payload for get_user success results."""
-
-    user: DirectoryUser
-
-
-class DirectoryUsersData(TypedDict):
-    """Canonical payload for list_users success results."""
-
-    users: list[DirectoryUser]
-
-
-class DirectoryMembersData(TypedDict):
-    """Canonical payload for get_group_members success results."""
-
-    members: list[DirectoryMember]
-
-
-class DirectoryGroupsData(TypedDict):
-    """Canonical payload for list_groups success results."""
-
-    groups: list[DirectoryGroup]
-
-
-class DirectoryGroupData(TypedDict):
-    """Canonical payload for get_group success results."""
-
-    group: DirectoryGroup
-
-
-class DirectoryMemberData(TypedDict):
-    """Canonical payload for add_group_member success results."""
-
-    member: DirectoryMember
-
-
-class DirectoryMembershipData(TypedDict):
-    """Canonical payload for check_membership success results."""
-
-    membership: MembershipCheckResult
 
 
 @runtime_checkable
@@ -81,20 +39,20 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def get_user(self, email: str) -> OperationResult[DirectoryUserData]:
+    def get_user(self, email: str) -> OperationResult[DirectoryUser]:
         """Return a canonical user by email.
 
         Args:
             email: Canonical user email, normalised to lowercase.
 
         Returns:
-            OperationResult: success with data matching DirectoryUserData.
+            OperationResult: success with the canonical DirectoryUser.
         """
         ...
 
     def list_users(
         self, query: str = "", limit: int = 100
-    ) -> OperationResult[DirectoryUsersData]:
+    ) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users for a directory query.
 
         Args:
@@ -107,31 +65,31 @@ class DirectoryProvider(Protocol):
                 truncate locally when provider pagination semantics differ.
 
         Returns:
-            OperationResult: success with data matching DirectoryUsersData.
+            OperationResult: success with the canonical DirectoryUser list.
         """
         ...
 
     def get_group_members(
         self, group_key: str
-    ) -> OperationResult[DirectoryMembersData]:
+    ) -> OperationResult[list[DirectoryMember]]:
         """Return all members of a group.
 
         Args:
             group_key: Canonical managed-group email (normalised to lowercase).
 
         Returns:
-            OperationResult: success with data matching DirectoryMembersData.
+            OperationResult: success with the DirectoryMember list for the group.
         """
         ...
 
-    def get_group(self, group_key: str) -> OperationResult[DirectoryGroupData]:
+    def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
         """Return a canonical managed group by key.
 
         Args:
             group_key: Canonical managed-group email (normalised to lowercase).
 
         Returns:
-            OperationResult: success with data matching DirectoryGroupData.
+            OperationResult: success with the canonical DirectoryGroup.
         """
         ...
 
@@ -140,7 +98,7 @@ class DirectoryProvider(Protocol):
         group_key: str,
         user_email: str,
         role: str = "MEMBER",
-    ) -> OperationResult[DirectoryMemberData]:
+    ) -> OperationResult[DirectoryMember]:
         """Add a user membership to a managed group.
 
         Args:
@@ -149,7 +107,7 @@ class DirectoryProvider(Protocol):
             role: Provider-agnostic membership role hint (default: MEMBER).
 
         Returns:
-            OperationResult: success with data matching DirectoryMemberData.
+            OperationResult: success with the added DirectoryMember.
         """
         ...
 
@@ -171,7 +129,7 @@ class DirectoryProvider(Protocol):
 
     def check_membership(
         self, group_key: str, user_email: str
-    ) -> OperationResult[DirectoryMembershipData]:
+    ) -> OperationResult[MembershipCheckResult]:
         """Check whether a user is a member of a group.
 
         Args:
@@ -179,11 +137,11 @@ class DirectoryProvider(Protocol):
             user_email: User email to check (compared case-insensitively).
 
         Returns:
-            OperationResult: success with data matching DirectoryMembershipData.
+            OperationResult: success with the MembershipCheckResult.
         """
         ...
 
-    def list_groups(self, query: str) -> OperationResult[DirectoryGroupsData]:
+    def list_groups(self, query: str) -> OperationResult[list[DirectoryGroup]]:
         """List groups matching a query expression.
 
         Args:
@@ -191,6 +149,6 @@ class DirectoryProvider(Protocol):
                 implementor into backend-specific list parameters.
 
         Returns:
-            OperationResult: success with data matching DirectoryGroupsData.
+            OperationResult: success with the matching DirectoryGroup list.
         """
         ...

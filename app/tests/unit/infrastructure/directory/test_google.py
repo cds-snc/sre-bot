@@ -107,15 +107,13 @@ class TestGetUser:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "user": DirectoryUser(
-                email="user@example.com",
-                provider_user_id="user-123",
-                display_name="Test User",
-                is_active=True,
-                provider="google",
-            )
-        }
+        assert result.data == DirectoryUser(
+            email="user@example.com",
+            provider_user_id="user-123",
+            display_name="Test User",
+            is_active=True,
+            provider="google",
+        )
         mock_google_clients.directory.get_user.assert_called_once_with(
             "user@example.com"
         )
@@ -142,15 +140,13 @@ class TestGetUser:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "user": DirectoryUser(
-                email="user.alias@example.com",
-                provider_user_id="user-456",
-                display_name="Alias User",
-                is_active=None,
-                provider="google",
-            )
-        }
+        assert result.data == DirectoryUser(
+            email="user.alias@example.com",
+            provider_user_id="user-456",
+            display_name="Alias User",
+            is_active=None,
+            provider="google",
+        )
 
     def test_propagates_get_user_error(self, provider, mock_google_clients):
         # Arrange
@@ -190,17 +186,15 @@ class TestListUsers:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "users": [
-                DirectoryUser(
-                    email="user1@example.com",
-                    provider_user_id="user-1",
-                    display_name="User One",
-                    is_active=None,
-                    provider="google",
-                )
-            ]
-        }
+        assert result.data == [
+            DirectoryUser(
+                email="user1@example.com",
+                provider_user_id="user-1",
+                display_name="User One",
+                is_active=None,
+                provider="google",
+            )
+        ]
         mock_google_clients.directory.list_users.assert_called_once_with(
             maxResults=1,
             query="name:User",
@@ -212,7 +206,7 @@ class TestListUsers:
 
         # Assert
         assert result.is_success
-        assert result.data == {"users": []}
+        assert result.data == []
 
     def test_propagates_list_users_error(self, provider, mock_google_clients):
         # Arrange
@@ -244,24 +238,22 @@ class TestGetGroupMembers:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "members": [
-                DirectoryMember(
-                    email="user@example.com",
-                    membership_id="1",
-                    provider_user_id=None,
-                    role="MEMBER",
-                    provider="google",
-                ),
-                DirectoryMember(
-                    email="admin@example.com",
-                    membership_id="2",
-                    provider_user_id=None,
-                    role="OWNER",
-                    provider="google",
-                ),
-            ]
-        }
+        assert result.data == [
+            DirectoryMember(
+                email="user@example.com",
+                membership_id="1",
+                provider_user_id=None,
+                role="MEMBER",
+                provider="google",
+            ),
+            DirectoryMember(
+                email="admin@example.com",
+                membership_id="2",
+                provider_user_id=None,
+                role="OWNER",
+                provider="google",
+            ),
+        ]
         mock_google_clients.directory.list_members.assert_called_once_with(
             "sg-admin@example.com"
         )
@@ -283,17 +275,15 @@ class TestGetGroupMembers:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "members": [
-                DirectoryMember(
-                    email="user@example.com",
-                    membership_id="1",
-                    provider_user_id=None,
-                    role="MEMBER",
-                    provider="google",
-                ),
-            ]
-        }
+        assert result.data == [
+            DirectoryMember(
+                email="user@example.com",
+                membership_id="1",
+                provider_user_id=None,
+                role="MEMBER",
+                provider="google",
+            ),
+        ]
 
     def test_normalises_group_key_to_lowercase(self, provider, mock_google_clients):
         # Arrange
@@ -340,16 +330,14 @@ class TestGetGroup:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "group": DirectoryGroup(
-                group_email="sg-admin@example.com",
-                group_slug="sg-admin",
-                provider_group_id="group-1",
-                name="Admins",
-                description="Admin group",
-                provider="google",
-            )
-        }
+        assert result.data == DirectoryGroup(
+            group_email="sg-admin@example.com",
+            group_slug="sg-admin",
+            provider_group_id="group-1",
+            name="Admins",
+            description="Admin group",
+            provider="google",
+        )
         mock_google_clients.directory.get_group.assert_called_once_with(
             "sg-admin@example.com"
         )
@@ -404,15 +392,13 @@ class TestAddGroupMember:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "member": DirectoryMember(
-                email="user@example.com",
-                membership_id="member-1",
-                provider_user_id=None,
-                role="OWNER",
-                provider="google",
-            )
-        }
+        assert result.data == DirectoryMember(
+            email="user@example.com",
+            membership_id="member-1",
+            provider_user_id=None,
+            role="OWNER",
+            provider="google",
+        )
         mock_google_clients.directory.add_member.assert_called_once_with(
             "sg-admin@example.com",
             body={
@@ -439,15 +425,13 @@ class TestAddGroupMember:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "member": DirectoryMember(
-                email="user@example.com",
-                membership_id="member-2",
-                provider_user_id=None,
-                role="MEMBER",
-                provider="google",
-            )
-        }
+        assert result.data == DirectoryMember(
+            email="user@example.com",
+            membership_id="member-2",
+            provider_user_id=None,
+            role="MEMBER",
+            provider="google",
+        )
 
     def test_propagates_directory_error(self, provider, mock_google_clients):
         # Arrange
@@ -542,15 +526,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "membership": MembershipCheckResult(
-                group_email="sg-team@example.com",
-                group_slug="sg-team",
-                provider_group_id=None,
-                user_email="member@example.com",
-                is_member=True,
-            )
-        }
+        assert result.data == MembershipCheckResult(
+            group_email="sg-team@example.com",
+            group_slug="sg-team",
+            provider_group_id=None,
+            user_email="member@example.com",
+            is_member=True,
+        )
 
     def test_returns_false_when_user_is_not_member(self, provider, mock_google_clients):
         # Arrange
@@ -563,15 +545,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "membership": MembershipCheckResult(
-                group_email="sg-team@example.com",
-                group_slug="sg-team",
-                provider_group_id=None,
-                user_email="absent@example.com",
-                is_member=False,
-            )
-        }
+        assert result.data == MembershipCheckResult(
+            group_email="sg-team@example.com",
+            group_slug="sg-team",
+            provider_group_id=None,
+            user_email="absent@example.com",
+            is_member=False,
+        )
 
     def test_returns_false_when_not_a_member(self, provider, mock_google_clients):
         # Arrange
@@ -584,15 +564,13 @@ class TestCheckMembership:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "membership": MembershipCheckResult(
-                group_email="sg-empty@example.com",
-                group_slug="sg-empty",
-                provider_group_id=None,
-                user_email="user@example.com",
-                is_member=False,
-            )
-        }
+        assert result.data == MembershipCheckResult(
+            group_email="sg-empty@example.com",
+            group_slug="sg-empty",
+            provider_group_id=None,
+            user_email="user@example.com",
+            is_member=False,
+        )
 
     def test_normalises_group_key_and_email_to_lowercase(
         self, provider, mock_google_clients
@@ -665,26 +643,24 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "groups": [
-                DirectoryGroup(
-                    group_email="sg-admin@example.com",
-                    group_slug="sg-admin",
-                    provider_group_id="group-1",
-                    name="Admins",
-                    description="Admin group",
-                    provider="google",
-                ),
-                DirectoryGroup(
-                    group_email="sg-devs@example.com",
-                    group_slug="sg-devs",
-                    provider_group_id="group-2",
-                    name="Developers",
-                    description="Dev group",
-                    provider="google",
-                ),
-            ]
-        }
+        assert result.data == [
+            DirectoryGroup(
+                group_email="sg-admin@example.com",
+                group_slug="sg-admin",
+                provider_group_id="group-1",
+                name="Admins",
+                description="Admin group",
+                provider="google",
+            ),
+            DirectoryGroup(
+                group_email="sg-devs@example.com",
+                group_slug="sg-devs",
+                provider_group_id="group-2",
+                name="Developers",
+                description="Dev group",
+                provider="google",
+            ),
+        ]
         mock_google_clients.directory.list_groups.assert_called_once_with(query="sg-")
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(
@@ -707,18 +683,16 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        assert result.data == {
-            "groups": [
-                DirectoryGroup(
-                    group_email="sg-ops@example.com",
-                    group_slug="sg-ops",
-                    provider_group_id="group-9",
-                    name="Ops",
-                    description=None,
-                    provider="google",
-                ),
-            ]
-        }
+        assert result.data == [
+            DirectoryGroup(
+                group_email="sg-ops@example.com",
+                group_slug="sg-ops",
+                provider_group_id="group-9",
+                name="Ops",
+                description=None,
+                provider="google",
+            ),
+        ]
 
     def test_returns_error_when_group_email_is_missing(
         self, provider, mock_google_clients
