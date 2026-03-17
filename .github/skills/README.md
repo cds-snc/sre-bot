@@ -64,6 +64,11 @@ These skills documents ensure all code adheres to architectural decisions docume
    - Socket Mode threading
    - Graceful shutdown
 
+9. **[type-model-boundaries-pattern.md](./type-model-boundaries-pattern.md)**
+   - When to use Protocol vs dataclass vs Pydantic vs TypedDict
+   - Internal service contracts vs adapter boundaries
+   - FastAPI endpoint models vs business logic models
+
 ## Usage for Coding Agents
 
 ### Before Generating Code
@@ -168,6 +173,7 @@ Skills implement patterns from architectural decision records:
 | initialization-pattern.md | `application-lifecycle/01-fastapi-lifespan-pattern.md` |
 | no-async-pattern.md | Copilot instructions |
 | type-hints-pattern.md | Copilot instructions |
+| type-model-boundaries-pattern.md | `tier-4-application/09-type-model-boundaries.md` |
 
 ## Validation
 

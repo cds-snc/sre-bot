@@ -2,7 +2,6 @@
 
 Exercises every method exposed by the directory core service so that
 returned canonical models can be visually inspected in logs.
-Not part of production code — remove once the provider is fully validated.
 """
 
 from typing import Any
@@ -65,7 +64,7 @@ def smoke_get_user(user_email: str) -> None:
     log = logger.bind(smoke="get_user", user_email=user_email)
     result = get_directory_provider().get_user(user_email)
     if result.is_success and result.data is not None:
-        user = result.data["user"]
+        user = result.data
         log.info(
             "get_user_ok",
             email=user.email,
@@ -82,7 +81,7 @@ def smoke_list_users() -> None:
     log = logger.bind(smoke="list_users")
     result = get_directory_provider().list_users(limit=3)
     if result.is_success and result.data is not None:
-        users = result.data["users"]
+        users = result.data
         log.info("list_users_ok", count=len(users))
         for user in users:
             log.info("user", email=user.email, is_active=user.is_active)
@@ -95,7 +94,7 @@ def smoke_get_group_members(group_email: str) -> None:
     log = logger.bind(smoke="get_group_members", group_email=group_email)
     result = get_directory_provider().get_group_members(group_email)
     if result.is_success and result.data is not None:
-        members = result.data["members"]
+        members = result.data
         log.info("get_group_members_ok", count=len(members))
         for member in members:
             log.info("member", email=member.email, role=member.role)
@@ -112,7 +111,7 @@ def smoke_check_membership(user_email: str, group_email: str) -> None:
     )
     result = get_directory_provider().check_membership(group_email, user_email)
     if result.is_success and result.data is not None:
-        m = result.data["membership"]
+        m = result.data
         log.info(
             "check_membership_ok",
             is_member=m.is_member,
@@ -127,7 +126,7 @@ def smoke_list_groups(group_email: str) -> str | None:
     log = logger.bind(smoke="list_groups", group_email=group_email)
     result = get_directory_provider().list_groups(query=f"email={group_email}")
     if result.is_success and result.data is not None:
-        groups = result.data["groups"]
+        groups = result.data
         log.info("list_groups_ok", count=len(groups))
         if not groups:
             log.warning("group_not_found", requested_group_email=group_email)

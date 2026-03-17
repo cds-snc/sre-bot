@@ -114,6 +114,8 @@ def add_member(
 
 **Decision**: Business logic is platform-agnostic.
 
+**Reference**: See `09-type-model-boundaries.md` for when internal service inputs and outputs should use dataclasses instead of raw dict payloads.
+
 **Complete Implementation**:
 ```python
 # packages/groups/service.py
@@ -170,12 +172,15 @@ def add_member_to_group(
 
 **Reference**: [Operation Result Pattern](../../decisions/tier-2-infrastructure/03-operation-result-pattern.md)
 
+Note: the example below returns a simple dict payload for brevity. For new shared contracts and reusable package-internal service results, prefer typed dataclass payloads as described in `09-type-model-boundaries.md`.
+
 **Rules**:
 - ✅ TYPE_CHECKING for infrastructure client imports
 - ✅ All dependencies injected as parameters
 - ✅ Module-level logger only
 - ✅ Request-scoped context binding
 - ✅ Return OperationResult (not exceptions)
+- ✅ Prefer `OperationResult[T]` with typed dataclass payloads for new internal service contracts
 - ✅ Check result.is_success (property, not method)
 - ❌ No Settings import outside TYPE_CHECKING
 - ❌ No platform-specific logic
