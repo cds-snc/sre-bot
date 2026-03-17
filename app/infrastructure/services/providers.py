@@ -25,6 +25,8 @@ from infrastructure.platforms.clients import (
     TeamsClientFacade,
     DiscordClientFacade,
 )
+from infrastructure.directory.factory import build_google_directory_provider
+from infrastructure.directory.provider import DirectoryProvider
 
 
 @lru_cache
@@ -544,3 +546,49 @@ def get_discord_client():
     """
     # Discord token not yet in settings - use empty string for placeholder
     return DiscordClientFacade(token="")
+
+
+@lru_cache
+def get_directory_provider() -> DirectoryProvider:
+    """Get application-scoped directory provider singleton.
+
+    Returns a DirectoryProvider instance backed by the IDP configured in
+    settings.directory.provider.  Default is Google Workspace.
+
+    Credentials and client facades are obtained from the centralised
+    infrastructure.services singletons and injected into the provider via the
+    factory — this function is the single point that knows about both.
+
+    Returns:
+        DirectoryProvider: Cached provider instance for directory operations.
+
+    Usage:
+        # FastAPI route handlers (dependency injection)
+        from infrastructure.services import DirectoryProviderDep
+
+        @router.get("/membership")
+        def check_membership(
+            directory: DirectoryProviderDep,
+            group_key: str,
+            user_email: str,
+        ):
+            result = directory.check_membership(group_key, user_email)
+            if result.is_success:
+                return result.data
+
+        # Application code (jobs, services)
+        from infrastructure.services import get_directory_provider
+
+        def sync_access():
+            directory = get_directory_provider()
+            result = directory.get_group_members("sg-ops@example.com")
+            return result
+    """
+    settings = get_settings()
+    provider_key = settings.directory.provider
+    if provider_key == "google":
+        return build_google_directory_provider(
+            google_clients=get_google_workspace_clients(),
+            directory_settings=settings.directory,
+        )
+    raise ValueError(f"Unsupported directory provider: {provider_key!r}")

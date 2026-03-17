@@ -59,7 +59,7 @@ class DirectoryClient:
         default_customer_id: str = "my_customer",
     ) -> None:
         self._session_provider = session_provider
-        self._default_customer_id = default_customer_id
+        self._default_customer_id = default_customer_id or "my_customer"
         self._logger = logger.bind(component="directory_client")
 
     def get_user(
@@ -294,6 +294,44 @@ class DirectoryClient:
             return all_groups
 
         return execute_google_api_call("list_groups", api_call)
+
+    def health_check(
+        self,
+        customer: Optional[str] = None,
+        delegated_email: Optional[str] = None,
+    ) -> OperationResult:
+        """Perform a lightweight remote health probe against the customer.
+
+        This uses the stable customer resource instead of a synthetic list
+        query so warmup validates credentials and Directory API reachability
+        without introducing pagination-specific helper logic.
+
+        Args:
+            customer: Customer ID (defaults to "my_customer")
+            delegated_email: Email for domain-wide delegation
+
+        Returns:
+            OperationResult with customer data in data field
+        """
+        customer_id = customer or self._default_customer_id
+        self._logger.debug(
+            "directory_health_check",
+            customer=customer_id,
+        )
+
+        def api_call() -> dict[str, Any]:
+            service = self._session_provider.get_service(
+                "admin",
+                "directory_v1",
+                scopes=[
+                    "https://www.googleapis.com/auth/admin.directory.customer.readonly"
+                ],
+                delegated_user_email=delegated_email,
+            )
+            request = service.customers().get(customerKey=customer_id)
+            return cast(dict[str, Any], request.execute())
+
+        return execute_google_api_call("directory_health_check", api_call)
 
     def create_group(
         self,

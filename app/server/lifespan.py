@@ -15,6 +15,7 @@ from infrastructure.events import (
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
     discover_and_register_platforms,
+    get_directory_provider,
     get_platform_service,
     get_settings,
     get_translation_service,
@@ -29,11 +30,6 @@ from modules import (
     secret,
     sre,
     webhook_helper,
-)
-from modules.groups.providers import (
-    get_active_providers,
-    get_primary_provider_name,
-    load_providers,
 )
 
 if TYPE_CHECKING:
@@ -97,11 +93,7 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
     stop_event.set()
 
 
-def _activate_providers(
-    app: FastAPI,
-    settings: "Settings",
-    logger: BoundLogger,
-) -> None:
+def _register_event_handlers(logger: BoundLogger) -> None:
     try:
         register_infrastructure_handlers()
     except Exception as exc:
@@ -113,18 +105,28 @@ def _activate_providers(
     except Exception as exc:
         logger.error("event_handlers_discovery_failed", error=str(exc))
 
-    try:
-        primary = load_providers()
-        app.state.providers = get_active_providers()
-        app.state.primary_provider_name = get_primary_provider_name()
-        logger.info(
-            "group_providers_activated",
-            primary=primary,
-            total=len(app.state.providers),
-        )
-    except Exception as exc:
-        logger.error("group_providers_activation_failed", error=str(exc))
-        raise
+
+def _initialize_directory_provider(
+    app: FastAPI,
+    settings: "Settings",
+    logger: BoundLogger,
+) -> None:
+    """Build, warm up, and store the directory provider on app.state."""
+    log = logger.bind(phase="directory")
+    log.info("directory_provider_initialization_started")
+
+    directory_provider = get_directory_provider()
+
+    if settings.directory.require_startup_warmup:
+        warmup = directory_provider.warmup()
+        if not warmup.is_success:
+            log.error("directory_provider_initialization_failed", error=warmup.message)
+            raise RuntimeError(f"directory_warmup_failed: {warmup.message}")
+    else:
+        log.info("directory_provider_warmup_skipped")
+
+    app.state.directory_provider = directory_provider
+    log.info("directory_provider_initialization_completed")
 
 
 @asynccontextmanager
@@ -138,7 +140,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("application_startup")
     _list_configs(settings, logger)
 
-    _activate_providers(app, settings, logger)
+    _initialize_directory_provider(app, settings, logger)
+
+    _register_event_handlers(logger)
 
     app.state.command_providers = {}
 

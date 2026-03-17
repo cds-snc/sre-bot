@@ -24,6 +24,7 @@ from infrastructure.services.dependencies import (
     SlackClientDep,
     TeamsClientDep,
     DiscordClientDep,
+    DirectoryProviderDep,
 )
 from infrastructure.services.providers import (
     get_settings,
@@ -43,6 +44,7 @@ from infrastructure.services.providers import (
     get_slack_client,
     get_teams_client,
     get_discord_client,
+    get_directory_provider,
 )
 
 from infrastructure.platforms import (
@@ -142,6 +144,7 @@ __all__ = [
     "SlackClientDep",
     "TeamsClientDep",
     "DiscordClientDep",
+    "DirectoryProviderDep",
     # Core providers
     "get_settings",
     "get_identity_service",
@@ -157,6 +160,7 @@ __all__ = [
     "get_command_service",
     "get_persistence_service",
     "get_platform_service",
+    "get_directory_provider",
     # Platform client providers
     "get_slack_client",
     "get_teams_client",

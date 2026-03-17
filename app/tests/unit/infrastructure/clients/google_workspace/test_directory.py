@@ -302,6 +302,46 @@ class TestDirectoryClientGroups:
         assert result.data is not None
         assert len(result.data) == 2
 
+    def test_health_check_gets_customer(self, mock_session_provider: Mock):
+        """Test customer-based health probe used for warmup."""
+        mock_service = Mock()
+        mock_request = Mock()
+        mock_request.execute.return_value = {
+            "id": "C123abc",
+            "customerDomain": "example.com",
+        }
+        mock_service.customers().get.return_value = mock_request
+        mock_session_provider.get_service.return_value = mock_service
+
+        client = DirectoryClient(
+            session_provider=mock_session_provider, default_customer_id="my_customer"
+        )
+        result = client.health_check()
+
+        assert result.is_success
+        assert result.data is not None
+        assert result.data["id"] == "C123abc"
+        mock_service.customers().get.assert_called_once_with(customerKey="my_customer")
+
+    def test_health_check_falls_back_to_my_customer_when_default_is_empty(
+        self, mock_session_provider: Mock
+    ):
+        """Test blank configured customer IDs still probe the stable default."""
+        mock_service = Mock()
+        mock_request = Mock()
+        mock_request.execute.return_value = {"id": "C123abc"}
+        mock_service.customers().get.return_value = mock_request
+        mock_session_provider.get_service.return_value = mock_service
+
+        client = DirectoryClient(
+            session_provider=mock_session_provider, default_customer_id=""
+        )
+
+        result = client.health_check()
+
+        assert result.is_success
+        mock_service.customers().get.assert_called_once_with(customerKey="my_customer")
+
     def test_create_group_success(self, mock_session_provider: Mock):
         """Test successful group creation."""
         mock_service = Mock()

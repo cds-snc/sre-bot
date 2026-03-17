@@ -5,11 +5,11 @@ import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
 
 from server import lifespan as lifespan_module
 from server.lifespan import (
-    _activate_providers,
+    _initialize_directory_provider,
+    _register_event_handlers,
     _get_logger,
     _is_test_environment,
     _list_configs,
@@ -200,33 +200,89 @@ def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
 
 
 @pytest.mark.integration
-def test_lifespan_activate_providers_sets_app_state(mock_settings, monkeypatch):
-    """Test that _activate_providers sets provider state on app."""
+def test_register_event_handlers_calls_registration_functions(monkeypatch):
+    """Test that _register_event_handlers registers infrastructure and module handlers."""
     # Arrange
-    app = FastAPI()
     mock_logger = MagicMock()
     register_mock = MagicMock()
     discover_mock = MagicMock()
     log_mock = MagicMock()
-    load_mock = MagicMock(return_value="primary")
-    active_mock = MagicMock(return_value={"primary": "provider"})
-    primary_mock = MagicMock(return_value="primary")
 
     monkeypatch.setattr(
         "server.lifespan.register_infrastructure_handlers", register_mock
     )
     monkeypatch.setattr("server.lifespan.discover_and_register_handlers", discover_mock)
     monkeypatch.setattr("server.lifespan.log_registered_handlers", log_mock)
-    monkeypatch.setattr("server.lifespan.load_providers", load_mock)
-    monkeypatch.setattr("server.lifespan.get_active_providers", active_mock)
-    monkeypatch.setattr("server.lifespan.get_primary_provider_name", primary_mock)
 
     # Act
-    _activate_providers(app, mock_settings, mock_logger)
+    _register_event_handlers(mock_logger)
 
     # Assert
-    assert app.state.providers == {"primary": "provider"}
-    assert app.state.primary_provider_name == "primary"
     register_mock.assert_called_once()
     discover_mock.assert_called_once_with(base_path="modules", package_root="modules")
     log_mock.assert_called_once()
+
+
+@pytest.mark.integration
+def test_initialize_directory_provider_stores_provider_on_app_state(monkeypatch):
+    """Directory provider is warmed and stored on app.state during startup."""
+    # Arrange
+    app = MagicMock()
+    app.state = MagicMock()
+    mock_logger = MagicMock()
+    mock_settings = MagicMock()
+    mock_settings.directory.require_startup_warmup = True
+    mock_provider = MagicMock()
+    mock_provider.warmup.return_value = MagicMock(is_success=True, message="ok")
+
+    monkeypatch.setattr("server.lifespan.get_directory_provider", lambda: mock_provider)
+
+    # Act
+    _initialize_directory_provider(app, mock_settings, mock_logger)
+
+    # Assert
+    assert app.state.directory_provider is mock_provider
+    mock_provider.warmup.assert_called_once_with()
+
+
+@pytest.mark.integration
+def test_initialize_directory_provider_raises_when_required_warmup_fails(monkeypatch):
+    """Startup fails fast when warmup fails and warmup is required."""
+    # Arrange
+    app = MagicMock()
+    app.state = MagicMock()
+    mock_logger = MagicMock()
+    mock_settings = MagicMock()
+    mock_settings.directory.require_startup_warmup = True
+    mock_provider = MagicMock()
+    mock_provider.warmup.return_value = MagicMock(
+        is_success=False,
+        message="credentials_invalid",
+    )
+
+    monkeypatch.setattr("server.lifespan.get_directory_provider", lambda: mock_provider)
+
+    # Act / Assert
+    with pytest.raises(RuntimeError, match="directory_warmup_failed"):
+        _initialize_directory_provider(app, mock_settings, mock_logger)
+
+
+@pytest.mark.integration
+def test_initialize_directory_provider_allows_failed_optional_warmup(monkeypatch):
+    """Startup skips remote warmup when fail-fast warmup is not required."""
+    # Arrange
+    app = MagicMock()
+    app.state = MagicMock()
+    mock_logger = MagicMock()
+    mock_settings = MagicMock()
+    mock_settings.directory.require_startup_warmup = False
+    mock_provider = MagicMock()
+
+    monkeypatch.setattr("server.lifespan.get_directory_provider", lambda: mock_provider)
+
+    # Act
+    _initialize_directory_provider(app, mock_settings, mock_logger)
+
+    # Assert
+    assert app.state.directory_provider is mock_provider
+    mock_provider.warmup.assert_not_called()

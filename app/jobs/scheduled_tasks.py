@@ -11,8 +11,6 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from modules.groups.reconciliation import worker as reconciliation_worker
-
 
 logger = get_logger()
 
@@ -45,9 +43,6 @@ def init(bot):
     )
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
-    schedule.every(5).minutes.do(
-        safe_run(reconciliation_worker.process_reconciliation_batch)
-    )
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
     schedule.every().day.at("00:00").do(
         safe_run(spending.generate_spending_data), logger=logger
