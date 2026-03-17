@@ -35,6 +35,18 @@ class DirectoryGroupsData(TypedDict):
     groups: list[DirectoryGroup]
 
 
+class DirectoryGroupData(TypedDict):
+    """Canonical payload for get_group success results."""
+
+    group: DirectoryGroup
+
+
+class DirectoryMemberData(TypedDict):
+    """Canonical payload for add_group_member success results."""
+
+    member: DirectoryMember
+
+
 class DirectoryMembershipData(TypedDict):
     """Canonical payload for check_membership success results."""
 
@@ -109,6 +121,51 @@ class DirectoryProvider(Protocol):
 
         Returns:
             OperationResult: success with data matching DirectoryMembersData.
+        """
+        ...
+
+    def get_group(self, group_key: str) -> OperationResult[DirectoryGroupData]:
+        """Return a canonical managed group by key.
+
+        Args:
+            group_key: Canonical managed-group email (normalised to lowercase).
+
+        Returns:
+            OperationResult: success with data matching DirectoryGroupData.
+        """
+        ...
+
+    def add_group_member(
+        self,
+        group_key: str,
+        user_email: str,
+        role: str = "MEMBER",
+    ) -> OperationResult[DirectoryMemberData]:
+        """Add a user membership to a managed group.
+
+        Args:
+            group_key: Canonical managed-group email (normalised to lowercase).
+            user_email: User email to add (normalised to lowercase).
+            role: Provider-agnostic membership role hint (default: MEMBER).
+
+        Returns:
+            OperationResult: success with data matching DirectoryMemberData.
+        """
+        ...
+
+    def remove_group_member(
+        self,
+        group_key: str,
+        user_email: str,
+    ) -> OperationResult[None]:
+        """Remove a user membership from a managed group.
+
+        Args:
+            group_key: Canonical managed-group email (normalised to lowercase).
+            user_email: User email to remove (normalised to lowercase).
+
+        Returns:
+            OperationResult: success with no payload when removal completes.
         """
         ...
 

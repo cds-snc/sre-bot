@@ -13,7 +13,9 @@ from infrastructure.directory import (
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import (
+    DirectoryGroupData,
     DirectoryGroupsData,
+    DirectoryMemberData,
     DirectoryMembershipData,
     DirectoryMembersData,
     DirectoryUserData,
@@ -346,6 +348,113 @@ class GoogleDirectoryProvider:
                 members.append(member)
 
         return OperationResult.success(data={"members": members})
+
+    def get_group(self, group_key: str) -> OperationResult[DirectoryGroupData]:
+        """Return a canonical managed group by key.
+
+        Args:
+            group_key: Canonical managed-group email — normalised to lowercase.
+
+        Returns:
+            OperationResult: success with data={"group": DirectoryGroup}.
+        """
+        normalized_group_key = self._normalize_email(group_key)
+        result = self._directory.get_group(normalized_group_key)
+        if not result.is_success:
+            return self._typed_error(result)
+
+        if not isinstance(result.data, dict):
+            return OperationResult.permanent_error(
+                message="Directory group payload is not a dict",
+                error_code="DIRECTORY_GROUP_PAYLOAD_INVALID",
+            )
+
+        group_result = self._build_directory_group(result.data)
+        if not group_result.is_success:
+            return self._typed_error(group_result)
+
+        if group_result.data is None:
+            return OperationResult.permanent_error(
+                message="Managed directory group is missing provider-returned email",
+                error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
+            )
+
+        return OperationResult.success(data={"group": group_result.data})
+
+    def add_group_member(
+        self,
+        group_key: str,
+        user_email: str,
+        role: str = "MEMBER",
+    ) -> OperationResult[DirectoryMemberData]:
+        """Add a membership to a managed group.
+
+        Args:
+            group_key: Canonical managed-group email — normalised to lowercase.
+            user_email: User email to add — normalised to lowercase.
+            role: Membership role hint (default: MEMBER, valid values: MEMBER, MANAGER, OWNER).
+
+        Returns:
+            OperationResult: success with data={"member": DirectoryMember}.
+        """
+        normalized_group = self._normalize_email(group_key)
+        normalized_user_email = self._normalize_email(user_email)
+        normalized_role = role.strip().upper() if role.strip() else "MEMBER"
+
+        result = self._directory.add_member(
+            normalized_group,
+            body={
+                "email": normalized_user_email,
+                "role": normalized_role,
+            },
+        )
+        if not result.is_success:
+            return self._typed_error(result)
+
+        if not isinstance(result.data, dict):
+            return OperationResult.permanent_error(
+                message="Directory member payload is not a dict",
+                error_code="DIRECTORY_MEMBER_PAYLOAD_INVALID",
+            )
+
+        member_payload = dict(result.data)
+        if not str(member_payload.get("role") or "").strip():
+            member_payload["role"] = normalized_role
+
+        member = self._build_directory_member(member_payload)
+        if member is None:
+            return OperationResult.permanent_error(
+                message="Directory member is missing email",
+                error_code="DIRECTORY_MEMBER_EMAIL_REQUIRED",
+            )
+
+        return OperationResult.success(data={"member": member})
+
+    def remove_group_member(
+        self,
+        group_key: str,
+        user_email: str,
+    ) -> OperationResult[None]:
+        """Remove a membership from a managed group.
+
+        Args:
+            group_key: Canonical managed-group email — normalised to lowercase.
+            user_email: User email to remove — normalised to lowercase.
+
+        Returns:
+            OperationResult: success with no payload.
+        """
+        normalized_group = self._normalize_email(group_key)
+        normalized_user_email = self._normalize_email(user_email)
+
+        result = self._directory.remove_member(
+            normalized_group,
+            normalized_user_email,
+        )
+        if not result.is_success:
+            return self._typed_error(result)
+
+        return OperationResult.success()
 
     def check_membership(
         self, group_key: str, user_email: str

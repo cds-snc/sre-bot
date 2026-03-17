@@ -105,6 +105,15 @@ def test_app_state_directory_provider_is_initialized(app_with_lifespan):
         directory_provider, "get_group_members"
     ), "directory_provider missing get_group_members"
     assert hasattr(
+        directory_provider, "get_group"
+    ), "directory_provider missing get_group"
+    assert hasattr(
+        directory_provider, "add_group_member"
+    ), "directory_provider missing add_group_member"
+    assert hasattr(
+        directory_provider, "remove_group_member"
+    ), "directory_provider missing remove_group_member"
+    assert hasattr(
         directory_provider, "check_membership"
     ), "directory_provider missing check_membership"
     assert hasattr(

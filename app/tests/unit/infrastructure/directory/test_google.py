@@ -323,6 +323,213 @@ class TestGetGroupMembers:
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
 
+class TestGetGroup:
+    def test_returns_canonical_group(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_group.return_value = OperationResult.success(
+            data={
+                "email": "SG-ADMIN@EXAMPLE.COM",
+                "id": "group-1",
+                "name": "Admins",
+                "description": "Admin group",
+            }
+        )
+
+        # Act
+        result = provider.get_group("SG-ADMIN@EXAMPLE.COM")
+
+        # Assert
+        assert result.is_success
+        assert result.data == {
+            "group": DirectoryGroup(
+                group_email="sg-admin@example.com",
+                group_slug="sg-admin",
+                provider_group_id="group-1",
+                name="Admins",
+                description="Admin group",
+                provider="google",
+            )
+        }
+        mock_google_clients.directory.get_group.assert_called_once_with(
+            "sg-admin@example.com"
+        )
+
+    def test_propagates_directory_error(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_group.return_value = OperationResult.error(
+            OperationStatus.NOT_FOUND,
+            "group_not_found",
+        )
+
+        # Act
+        result = provider.get_group("sg-ghost@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.NOT_FOUND
+
+    def test_returns_error_when_group_payload_is_not_dict(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.get_group.return_value = OperationResult.success(
+            data=[]
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_GROUP_PAYLOAD_INVALID"
+
+
+class TestAddGroupMember:
+    def test_adds_member_and_returns_canonical_member(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.add_member.return_value = OperationResult.success(
+            data={
+                "email": "USER@EXAMPLE.COM",
+                "id": "member-1",
+                "role": "OWNER",
+            }
+        )
+
+        # Act
+        result = provider.add_group_member(
+            "SG-ADMIN@EXAMPLE.COM", "USER@EXAMPLE.COM", role="owner"
+        )
+
+        # Assert
+        assert result.is_success
+        assert result.data == {
+            "member": DirectoryMember(
+                email="user@example.com",
+                membership_id="member-1",
+                provider_user_id=None,
+                role="OWNER",
+                provider="google",
+            )
+        }
+        mock_google_clients.directory.add_member.assert_called_once_with(
+            "sg-admin@example.com",
+            body={
+                "email": "user@example.com",
+                "role": "OWNER",
+            },
+        )
+
+    def test_falls_back_to_requested_role_when_payload_role_missing(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.add_member.return_value = OperationResult.success(
+            data={
+                "email": "user@example.com",
+                "id": "member-2",
+            }
+        )
+
+        # Act
+        result = provider.add_group_member(
+            "sg-admin@example.com", "user@example.com", role="member"
+        )
+
+        # Assert
+        assert result.is_success
+        assert result.data == {
+            "member": DirectoryMember(
+                email="user@example.com",
+                membership_id="member-2",
+                provider_user_id=None,
+                role="MEMBER",
+                provider="google",
+            )
+        }
+
+    def test_propagates_directory_error(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.add_member.return_value = (
+            OperationResult.transient_error("directory_unavailable")
+        )
+
+        # Act
+        result = provider.add_group_member("sg-admin@example.com", "user@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_returns_error_when_member_payload_is_not_dict(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.add_member.return_value = OperationResult.success(
+            data=[]
+        )
+
+        # Act
+        result = provider.add_group_member("sg-admin@example.com", "user@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_MEMBER_PAYLOAD_INVALID"
+
+    def test_returns_error_when_member_email_missing(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.add_member.return_value = OperationResult.success(
+            data={"id": "member-3"}
+        )
+
+        # Act
+        result = provider.add_group_member("sg-admin@example.com", "user@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_MEMBER_EMAIL_REQUIRED"
+
+
+class TestRemoveGroupMember:
+    def test_removes_member_with_normalized_keys(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.remove_member.return_value = (
+            OperationResult.success()
+        )
+
+        # Act
+        result = provider.remove_group_member(
+            "SG-ADMIN@EXAMPLE.COM",
+            "USER@EXAMPLE.COM",
+        )
+
+        # Assert
+        assert result.is_success
+        assert result.data is None
+        mock_google_clients.directory.remove_member.assert_called_once_with(
+            "sg-admin@example.com",
+            "user@example.com",
+        )
+
+    def test_propagates_directory_error(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.remove_member.return_value = (
+            OperationResult.transient_error("directory_unavailable")
+        )
+
+        # Act
+        result = provider.remove_group_member(
+            "sg-admin@example.com", "user@example.com"
+        )
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+
+
 class TestCheckMembership:
     def test_returns_true_when_user_is_member(self, provider, mock_google_clients):
         # Arrange
