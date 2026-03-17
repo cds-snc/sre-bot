@@ -2,6 +2,8 @@
 
 **Enforcement**: REQUIRED for all functions
 
+**Companion Skill**: See `type-model-boundaries-pattern.md` for choosing between `Protocol`, `@dataclass`, `BaseModel`, and `TypedDict`.
+
 ## Rule
 
 All functions must have type hints for parameters and return values.

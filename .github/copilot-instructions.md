@@ -22,6 +22,9 @@
 - `type-hints-pattern.md` - Type annotations
 - `testing-pattern.md` - Test patterns when writing tests
 
+Additional skill to read when introducing or changing data models or service boundaries:
+- `type-model-boundaries-pattern.md` - Protocol vs dataclass vs Pydantic vs TypedDict
+
 ---
 
 ## Quick Reference
@@ -75,6 +78,7 @@ Detailed patterns with code examples and checklists:
 6. **[no-async-pattern.md](./skills/no-async-pattern.md)**
 7. **[type-hints-pattern.md](./skills/type-hints-pattern.md)**
 8. **[testing-pattern.md](./skills/testing-pattern.md)**
+9. **[type-model-boundaries-pattern.md](./skills/type-model-boundaries-pattern.md)**
 
 **Read skills before implementing patterns.**
 
