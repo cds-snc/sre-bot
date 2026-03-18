@@ -13,7 +13,6 @@ google-auth-oauthlib==0.8.0
 google-api-core==2.30.0
 google-auth==2.48.0
 httpx==0.28.1
-itsdangerous==2.2.0
 pandas==2.3.3
 pluggy==1.6.0
 pydantic-settings==2.13.1
