@@ -1,5 +1,7 @@
 arrow==1.4.0
+awscli==1.44.44
 Authlib==1.6.8
+Jinja2==3.1.6
 aws-sns-message-validator==0.0.5
 boto3==1.42.54
 botocore==1.42.54
@@ -11,13 +13,15 @@ google-auth-oauthlib==0.8.0
 google-api-core==2.30.0
 google-auth==2.48.0
 httpx==0.28.1
+itsdangerous==2.2.0
 pandas==2.3.3
 pluggy==1.6.0
 pydantic-settings==2.13.1
-PyJWT==2.12.0
+PyJWT==2.11.0
 PyYAML!=6.0.0,!=5.4.0,!=5.4.1
 python-dotenv==0.21.1
 python-i18n==0.3.9
+python-jose==3.5.0
 pytz==2023.4
 requests==2.32.5
 slowapi==0.1.9
