@@ -48,9 +48,9 @@
 - Scheduled tasks run when PREFIX == "".
 
 ## Python dependencies (requirements.txt)
-- Web/API: fastapi, uvicorn, httpx, Jinja2, python-dotenv, pydantic-settings
-- Auth/security: Authlib, PyJWT, python-jose, email-validator, itsdangerous
-- AWS/Cloud: boto3, botocore, awscli, aws-sns-message-validator
+- Web/API: fastapi, uvicorn, httpx, python-dotenv, pydantic-settings
+- Auth/security: Authlib, PyJWT, email-validator
+- AWS/Cloud: boto3, botocore, aws-sns-message-validator
 - Google APIs: google-api-python-client, google-api-core, google-auth, google-auth-httplib2, google-auth-oauthlib
 - Slack/notifications: slack-bolt
 - Data/time: pandas, pytz, arrow

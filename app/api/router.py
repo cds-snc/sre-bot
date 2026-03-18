@@ -1,7 +1,6 @@
 import structlog
 from fastapi import APIRouter, Request, Depends
 from api.routes.system import router as system_router
-from api.routes.auth import router as auth_router
 from api.routes.landing import router as landing_router
 from api.v1.router import router as v1_router, legacy_router
 
@@ -31,6 +30,5 @@ def log_legacy_calls(request: Request):
 
 api_router.include_router(landing_router)
 api_router.include_router(system_router)
-api_router.include_router(auth_router)
 api_router.include_router(legacy_router, dependencies=[Depends(log_legacy_calls)])
 api_router.include_router(v1_router, prefix="/api/v1")
