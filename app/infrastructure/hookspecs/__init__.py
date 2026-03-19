@@ -1,5 +1,5 @@
 """Hook specifications for pluggy integration."""
 
-from infrastructure.hookspecs import platforms
+from infrastructure.hookspecs import features
 
-__all__ = ["platforms"]
+__all__ = ["features"]
