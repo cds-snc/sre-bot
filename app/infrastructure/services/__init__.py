@@ -57,8 +57,8 @@ from infrastructure.platforms import (
 # Plugin infrastructure
 from infrastructure.services.plugins import (
     hookimpl,
-    get_platform_plugin_manager,
-    discover_and_register_platforms,
+    get_plugin_manager,
+    discover_and_init_features,
 )
 
 
@@ -173,6 +173,6 @@ __all__ = [
     "get_discord_provider",
     # Plugin infrastructure
     "hookimpl",
-    "get_platform_plugin_manager",
-    "discover_and_register_platforms",
+    "get_plugin_manager",
+    "discover_and_init_features",
 ]
