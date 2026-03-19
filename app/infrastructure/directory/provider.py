@@ -86,7 +86,8 @@ class DirectoryProvider(Protocol):
         """Return a canonical managed group by key.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
 
         Returns:
             OperationResult: success with the canonical DirectoryGroup.
