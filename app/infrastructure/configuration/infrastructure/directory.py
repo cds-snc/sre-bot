@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from infrastructure.configuration.base import InfrastructureSettings
 
@@ -17,7 +17,8 @@ class DirectorySettings(InfrastructureSettings):
         DIRECTORY_PROVIDER: IDP backend to activate (default: google)
         DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: False)
         DIRECTORY_CACHE_TTL_SECONDS: In-process membership cache TTL (default: 60)
-        DIRECTORY_MANAGED_GROUP_DOMAIN: Authoritative domain for managed group emails
+        DIRECTORY_MANAGED_GROUP_DOMAIN: Authoritative domain for managed group emails.
+            Falls back to GROUP_DOMAIN when not explicitly set.
         DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL: Reject managed groups missing email
         DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS: Startup warmup timeout in seconds
 
@@ -55,8 +56,8 @@ class DirectorySettings(InfrastructureSettings):
     )
     managed_group_domain: str = Field(
         default="",
-        alias="DIRECTORY_MANAGED_GROUP_DOMAIN",
-        description="Authoritative domain for managed group emails",
+        validation_alias=AliasChoices("DIRECTORY_MANAGED_GROUP_DOMAIN", "GROUP_DOMAIN"),
+        description="Authoritative domain for managed group emails. Falls back to GROUP_DOMAIN.",
     )
     enforce_managed_group_email: bool = Field(
         default=True,
