@@ -18,7 +18,7 @@ from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
-from infrastructure.persistence.service import PersistenceService
+from infrastructure.storage.service import StorageService
 from infrastructure.platforms import PlatformService
 from infrastructure.platforms.clients import (
     SlackClientFacade,
@@ -363,28 +363,27 @@ def get_command_service() -> CommandService:
 
 
 @lru_cache
-def get_persistence_service() -> PersistenceService:
-    """Get application-scoped persistence service singleton.
+def get_storage_service() -> StorageService:
+    """Get application-scoped storage service singleton.
 
-    Returns a PersistenceService instance for audit trail and operational
-    data storage in DynamoDB.
+    Returns a ``StorageService`` backed by ``DynamoDBClient`` from the AWS
+    clients facade.  Feature packages should define typed repository classes
+    that take ``StorageService`` as a constructor argument instead of calling
+    ``DynamoDBClient`` directly.
 
-    Usage:
-        from infrastructure.services import PersistenceServiceDep
+    Usage::
 
-        @router.post("/audit/write")
-        def write_audit(
-            persistence: PersistenceServiceDep,
-            event: AuditEvent
-        ):
-            success = persistence.write_audit_event(event)
-            return {"written": success}
+        from infrastructure.services import StorageServiceDep
+
+        class SyncRunRepository:
+            def __init__(self, storage: StorageServiceDep) -> None:
+                self._storage = storage
 
     Returns:
-        PersistenceService: Cached persistence service instance
+        StorageService: Cached storage service instance.
     """
-    settings = get_settings()
-    return PersistenceService(settings=settings)
+    aws = get_aws_clients()
+    return StorageService(dynamodb=aws.dynamodb)
 
 
 @lru_cache
