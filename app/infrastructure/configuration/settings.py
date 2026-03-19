@@ -17,6 +17,7 @@ from infrastructure.configuration.integrations import (
 
 # Feature settings
 from infrastructure.configuration.features import (
+    AccessSyncSettings,
     GroupsFeatureSettings,
     CommandsSettings,
     IncidentFeatureSettings,
@@ -93,6 +94,7 @@ class Settings(BaseSettings):
     google_resources: GoogleResourcesConfig
 
     # Feature settings
+    access_sync: AccessSyncSettings
     groups: GroupsFeatureSettings
     commands: CommandsSettings
     feat_incident: IncidentFeatureSettings
@@ -135,6 +137,7 @@ class Settings(BaseSettings):
             "trello": TrelloSettings,
             "google_resources": GoogleResourcesConfig,
             # Features
+            "access_sync": AccessSyncSettings,
             "groups": GroupsFeatureSettings,
             "commands": CommandsSettings,
             "feat_incident": IncidentFeatureSettings,
