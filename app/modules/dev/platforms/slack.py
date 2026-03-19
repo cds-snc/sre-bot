@@ -1,7 +1,7 @@
 """Slack platform implementation for dev module.
 
 Uses decorator-based command registration via auto-discovery.
-Registers all /sre dev subcommands (google, slack, stale, incident, load-incidents, add-incident, aws).
+Registers all /sre dev subcommands (google, slack, stale, incident, load-incidents, add-incident, aws, access-sync, access-sync-reconcile).
 
 Only available in development environment (PREFIX=dev-).
 """
@@ -11,7 +11,12 @@ from typing import TYPE_CHECKING, Callable, Any, Dict, List
 
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.services import get_slack_client, get_settings
-from modules.dev import google, slack as slack_dev, incident
+from modules.dev import (
+    access_sync as access_sync_dev,
+    google,
+    incident,
+    slack as slack_dev,
+)
 from modules.dev.aws_dev import aws_dev_router
 
 if TYPE_CHECKING:
@@ -280,6 +285,52 @@ def handle_aws_dev_command(payload: CommandPayload) -> CommandResponse:
     return CommandResponse(message=message, ephemeral=True)
 
 
+def handle_access_sync_dev_command(payload: CommandPayload) -> CommandResponse:
+    """Handle /sre dev access-sync - run a single-user Access Sync operation.
+
+    Usage:
+      /sre dev access-sync <user_email> <platform> [--dry-run]
+    """
+    logger.info("command_received", command="access-sync", text=payload.text)
+
+    if error := _require_dev_environment(payload):
+        return error
+
+    def noop_ack():
+        pass
+
+    return _call_legacy_handler(
+        payload,
+        access_sync_dev.access_sync_command,
+        noop_ack,
+        command_payload=payload,
+    )
+
+
+def handle_access_sync_reconcile_dev_command(
+    payload: CommandPayload,
+) -> CommandResponse:
+    """Handle /sre dev access-sync-reconcile placeholder command.
+
+    Usage:
+      /sre dev access-sync-reconcile [platform] [--dry-run]
+    """
+    logger.info("command_received", command="access-sync-reconcile", text=payload.text)
+
+    if error := _require_dev_environment(payload):
+        return error
+
+    def noop_ack():
+        pass
+
+    return _call_legacy_handler(
+        payload,
+        access_sync_dev.access_sync_reconcile_command,
+        noop_ack,
+        command_payload=payload,
+    )
+
+
 def register_commands(provider: "SlackPlatformProvider") -> None:
     """Register dev module commands with Slack provider.
 
@@ -349,4 +400,23 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         parent="sre.dev",
         description="Test AWS client integrations (identitystore, organizations, sso, health)",
         description_key="dev.subcommands.aws.description",
+    )
+
+    provider.register_command(
+        command="access-sync",
+        handler=handle_access_sync_dev_command,
+        parent="sre.dev",
+        description="Run Access Sync for one user and platform (dev smoke test)",
+        description_key="dev.subcommands.access_sync.description",
+    )
+
+    provider.register_command(
+        command="access-sync-reconcile",
+        handler=handle_access_sync_reconcile_dev_command,
+        parent="sre.dev",
+        description=(
+            "Access Sync reconcile placeholder: show configured policy/adapters "
+            "until reconciliation engine is implemented"
+        ),
+        description_key="dev.subcommands.access_sync_reconcile.description",
     )
