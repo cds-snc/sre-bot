@@ -1,0 +1,216 @@
+"""Access Sync policy models and planning engine.
+
+This is the single source of truth for all entitlement classification,
+authn-mode semantics, and action planning.  Adapters must not duplicate
+any of this logic.
+"""
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Literal, Optional, Set
+
+
+@dataclass(frozen=True)
+class EntitlementRule:
+    """Mapping from an IDP security group slug to a platform entitlement.
+
+    mode:
+      'sync_managed' - entitlement is always applied/removed by Access Sync.
+      'ephemeral'    - entitlement is managed by Privileged Access; Access Sync
+                       skips it during reconciliation so active grants are not
+                       revoked.
+      'deactivated'  - all SRE Bot automation is suspended for this group.
+                       Access Sync skips apply/remove.  Privileged Access refuses
+                       new grants.  Access Requests rejects intake.  Current
+                       platform entitlement state is frozen until the override is
+                       removed or expires.
+
+    Mode is evaluated per rule, so a single platform policy can mix all three
+    values across different entitlement groups.
+    """
+
+    group_slug: str
+    entitlement_type: str
+    entitlement_id: str
+    mode: str = "sync_managed"  # sync_managed | ephemeral | deactivated
+
+
+@dataclass(frozen=True)
+class PlatformPolicy:
+    """Policy for a single target platform.
+
+    authn_mode:
+      'direct'  - operators typically manage access via direct membership in
+                  sg-<platform>-authn.
+      'derived' - operators typically nest entitlement groups into
+                  sg-<platform>-authn and manage access through those groups.
+
+    In both modes, effective membership in sg-<platform>-authn (direct or
+    indirect) is the authoritative source of truth for whether a user should
+    retain platform access.
+
+    authn_removal_mode:
+      'disable'           - deactivate user account on the platform.
+      'delete'            - remove user from the platform entirely.
+      'entitlement_only'  - remove only managed entitlements; authn account is
+                            left intact (manual follow-up required if the platform
+                            cannot automate account removal).
+    """
+
+    platform: str
+    authn_group_slug: str  # e.g. "sg-aws-authn"
+    authn_mode: str  # direct | derived
+    authn_removal_mode: str  # disable | delete | entitlement_only
+    entitlement_rules: List[EntitlementRule]
+
+    def desired_users_source(self) -> str:
+        """Describe where the sync service reads the desired user set from."""
+        if self.authn_mode == "direct":
+            return (
+                f"effective membership of {self.authn_group_slug} (direct + indirect)"
+            )
+        return (
+            f"effective membership of {self.authn_group_slug} "
+            "(typically entitlement-derived, direct membership also valid)"
+        )
+
+    def sync_managed_rules(self) -> List[EntitlementRule]:
+        """Return only rules that Access Sync is responsible for."""
+        return [r for r in self.entitlement_rules if r.mode == "sync_managed"]
+
+    def ephemeral_entitlement_ids(self) -> Set[str]:
+        """Return entitlement IDs that must be skipped during reconciliation (Privileged Access owns them)."""
+        return {
+            r.entitlement_id for r in self.entitlement_rules if r.mode == "ephemeral"
+        }
+
+    def deactivated_entitlement_ids(self) -> Set[str]:
+        """Return entitlement IDs where all SRE Bot automation is suspended."""
+        return {
+            r.entitlement_id for r in self.entitlement_rules if r.mode == "deactivated"
+        }
+
+    def skip_entitlement_ids(self) -> Set[str]:
+        """Return all entitlement IDs Access Sync must not touch (ephemeral + deactivated)."""
+        return self.ephemeral_entitlement_ids() | self.deactivated_entitlement_ids()
+
+
+@dataclass
+class PolicyRegistry:
+    """Registry of per-platform policies.
+
+    Mutable so that Privileged Access can register ephemeral entitlements at
+    startup via the hookimpl plugin system.
+    """
+
+    policies: Dict[str, PlatformPolicy] = field(default_factory=dict)
+
+    def register_ephemeral_entitlement(
+        self,
+        platform: str,
+        entitlement_type: str,
+        entitlement_id: str,
+    ) -> None:
+        """Register an entitlement as ephemeral (sync-exempt).
+
+        Called by Privileged Access at startup so Access Sync skips those
+        entitlements during reconciliation.
+        """
+        policy = self.policies.get(platform)
+        if policy is None:
+            return
+        rule = EntitlementRule(
+            group_slug="",
+            entitlement_type=entitlement_type,
+            entitlement_id=entitlement_id,
+            mode="ephemeral",
+        )
+        # PlatformPolicy is frozen; rebuild with the new rule appended.
+        updated = PlatformPolicy(
+            platform=policy.platform,
+            authn_group_slug=policy.authn_group_slug,
+            authn_mode=policy.authn_mode,
+            authn_removal_mode=policy.authn_removal_mode,
+            entitlement_rules=list(policy.entitlement_rules) + [rule],
+        )
+        self.policies[platform] = updated
+
+
+@dataclass(frozen=True)
+class AdapterCapabilities:
+    """Execution capabilities declared by a platform adapter.
+
+    The PolicyEngine uses these to select compatible planned actions.
+    """
+
+    supports_disable: bool
+    supports_delete: bool
+    supported_entitlement_types: Set[str]
+
+
+@dataclass(frozen=True)
+class PlannedAction:
+    """A single normalized action produced by the PolicyEngine."""
+
+    action: Literal[
+        "ensure_user",
+        "disable_user",
+        "remove_user",
+        "apply_entitlement",
+        "remove_entitlement",
+    ]
+    entitlement_type: Optional[str] = None
+    entitlement_id: Optional[str] = None
+
+
+class PolicyEngine:
+    """Converts policy + current state into a normalized list of planned actions.
+
+    This class is the single place where policy semantics are interpreted.
+    Adapters receive planned actions and execute them — they never re-implement
+    policy logic.
+    """
+
+    def plan_actions(
+        self,
+        policy: PlatformPolicy,
+        capabilities: AdapterCapabilities,
+        user_should_exist: bool,
+        required_entitlements: List[EntitlementRule],
+    ) -> List[PlannedAction]:
+        """Produce the minimal set of actions needed to converge to desired state.
+
+        Args:
+            policy: Platform policy containing authn/removal modes.
+            capabilities: Adapter execution capabilities.
+            user_should_exist: True when authn-group membership indicates the user
+                should retain platform access.
+            required_entitlements: sync_managed rules that must be applied when
+                the user should exist.  Pass policy.sync_managed_rules() here.
+
+        Returns:
+            Ordered list of PlannedActions to execute.
+        """
+        planned: List[PlannedAction] = []
+
+        if user_should_exist:
+            planned.append(PlannedAction(action="ensure_user"))
+            for rule in required_entitlements:
+                if rule.entitlement_type in capabilities.supported_entitlement_types:
+                    planned.append(
+                        PlannedAction(
+                            action="apply_entitlement",
+                            entitlement_type=rule.entitlement_type,
+                            entitlement_id=rule.entitlement_id,
+                        )
+                    )
+            return planned
+
+        # User should NOT exist — choose deprovision action based on policy + capabilities.
+        if policy.authn_removal_mode == "disable" and capabilities.supports_disable:
+            planned.append(PlannedAction(action="disable_user"))
+        elif policy.authn_removal_mode == "delete" and capabilities.supports_delete:
+            planned.append(PlannedAction(action="remove_user"))
+        # entitlement_only or capability mismatch → no user-lifecycle action needed;
+        # caller is responsible for manual follow-up signalling.
+
+        return planned
