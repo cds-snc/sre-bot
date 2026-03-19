@@ -32,7 +32,7 @@ class TestEvent:
 
         assert event.event_type == "test.event"
         assert event.user_email == ""
-        assert event.metadata == {}
+        assert event.metadata is None
         assert isinstance(event.timestamp, datetime)
         assert event.correlation_id is not None
 
