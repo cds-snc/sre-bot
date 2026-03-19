@@ -9,7 +9,6 @@ import pytest
 from server import lifespan as lifespan_module
 from server.lifespan import (
     _initialize_directory_provider,
-    _register_event_handlers,
     _get_logger,
     _is_test_environment,
     _list_configs,
@@ -197,30 +196,6 @@ def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
     init_mock.assert_called_once_with(mock_bot)
     run_mock.assert_called_once()
     mock_logger.info.assert_called_with("scheduled_tasks_started")
-
-
-@pytest.mark.integration
-def test_register_event_handlers_calls_registration_functions(monkeypatch):
-    """Test that _register_event_handlers registers infrastructure and module handlers."""
-    # Arrange
-    mock_logger = MagicMock()
-    register_mock = MagicMock()
-    discover_mock = MagicMock()
-    log_mock = MagicMock()
-
-    monkeypatch.setattr(
-        "server.lifespan.register_infrastructure_handlers", register_mock
-    )
-    monkeypatch.setattr("server.lifespan.discover_and_register_handlers", discover_mock)
-    monkeypatch.setattr("server.lifespan.log_registered_handlers", log_mock)
-
-    # Act
-    _register_event_handlers(mock_logger)
-
-    # Assert
-    register_mock.assert_called_once()
-    discover_mock.assert_called_once_with(base_path="modules", package_root="modules")
-    log_mock.assert_called_once()
 
 
 @pytest.mark.integration

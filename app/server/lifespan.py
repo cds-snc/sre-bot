@@ -7,11 +7,6 @@ from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
-from infrastructure.events import (
-    discover_and_register_handlers,
-    log_registered_handlers,
-    register_infrastructure_handlers,
-)
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
     discover_and_register_platforms,
@@ -93,19 +88,6 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
     stop_event.set()
 
 
-def _register_event_handlers(logger: BoundLogger) -> None:
-    try:
-        register_infrastructure_handlers()
-    except Exception as exc:
-        logger.error("infrastructure_handlers_registration_failed", error=str(exc))
-
-    try:
-        discover_and_register_handlers(base_path="modules", package_root="modules")
-        log_registered_handlers()
-    except Exception as exc:
-        logger.error("event_handlers_discovery_failed", error=str(exc))
-
-
 def _initialize_directory_provider(
     app: FastAPI,
     settings: "Settings",
@@ -141,8 +123,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _list_configs(settings, logger)
 
     _initialize_directory_provider(app, settings, logger)
-
-    _register_event_handlers(logger)
 
     app.state.command_providers = {}
 
