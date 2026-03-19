@@ -14,7 +14,7 @@ from infrastructure.events import (
 )
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
-    discover_and_register_platforms,
+    discover_and_init_features,
     get_directory_provider,
     get_platform_service,
     get_settings,
@@ -160,13 +160,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         provider_count=len(platform_providers),
     )
 
-    discover_and_register_platforms(
+    discover_and_init_features(
+        app=app,
+        logger=logger,
         slack_provider=platform_providers.get("slack"),
         teams_provider=platform_providers.get("teams"),
         discord_provider=platform_providers.get("discord"),
     )
     logger.info(
-        "platform_commands_registered",
+        "feature_plugins_initialized",
         count=len(platform_providers),
         providers=list(platform_providers.keys()),
     )
