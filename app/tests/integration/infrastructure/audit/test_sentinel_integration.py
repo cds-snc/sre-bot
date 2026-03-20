@@ -10,7 +10,7 @@ Tests cover:
 import json
 import pytest
 from unittest.mock import MagicMock
-from infrastructure.audit.models import AuditEvent, create_audit_event
+from infrastructure.audit.models import AuditEvent
 from integrations.sentinel.client import log_audit_event
 
 
@@ -99,7 +99,7 @@ class TestAuditEventToSentinel:
 
     def test_log_audit_event_payload_is_flat(self, monkeypatch):
         """log_audit_event payload has flat structure for Sentinel queryability."""
-        audit_event = create_audit_event(
+        audit_event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="group_created",
             resource_type="group",
@@ -138,9 +138,9 @@ class TestAuditEventToSentinel:
         assert "audit_meta_retry_count" in payload
         assert "audit_meta_source" in payload
 
-    def test_log_audit_event_with_factory_function(self, monkeypatch):
-        """log_audit_event integrates well with create_audit_event factory."""
-        event = create_audit_event(
+    def test_log_audit_event_with_from_metadata(self, monkeypatch):
+        """log_audit_event integrates well with AuditEvent.from_metadata()."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-factory",
             action="member_added",
             resource_type="group",
@@ -331,7 +331,7 @@ class TestSentinelPayloadFormat:
 
     def test_sentinel_payload_all_string_values(self, monkeypatch):
         """Sentinel payload values are string-compatible for Sentinel ingestion."""
-        event = create_audit_event(
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="member_added",
             resource_type="group",

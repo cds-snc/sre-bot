@@ -1,27 +1,22 @@
-"""Bootstrap and register infrastructure event handlers at startup.
+"""Bootstrap for infrastructure event handlers.
 
-This module registers system-level event handlers like audit that should
-be active for all event types.
+The event system is currently disabled pending a design decision on durable
+event delivery (SQS-backed).  Audit records are written synchronously via
+``AuditTrailService.write_from_payload()`` in each feature service.
+
+This module is kept so the lifespan import chain does not break and can be
+re-enabled without touching call sites.
 """
 
 import structlog
-from infrastructure.events.dispatcher import register_event_handler
-from infrastructure.events.handlers import handle_audit_event
 
 logger = structlog.get_logger()
 
 
 def register_infrastructure_handlers() -> None:
-    """Register all infrastructure event handlers.
+    """No-op — event system is temporarily disabled.
 
-    Registers handlers for all event types via the wildcard "*" event type.
-    These handlers are infrastructure-level and should be active regardless
-    of specific event types.
-
-    This should be called once at application startup before any events
-    are dispatched.
+    When re-enabled, register audit and other infrastructure handlers here
+    and restore the call in ``server/lifespan.py``.
     """
-    # Register audit handler for all events via wildcard
-    register_event_handler("*")(handle_audit_event)
-    log = logger.bind(handlers=["audit"])
-    log.info("infrastructure_handlers_registered")
+    logger.info("infrastructure_event_handlers_disabled")

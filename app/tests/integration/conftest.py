@@ -130,7 +130,7 @@ def _autouse_mock_dynamodb_audit(monkeypatch):
     """
     mock = MagicMock()
     monkeypatch.setattr(
-        "infrastructure.events.handlers.audit.dynamodb_audit.write_audit_event",
+        "infrastructure.audit.service.AuditTrailService.write_audit_event",
         mock,
         raising=False,
     )
@@ -162,9 +162,9 @@ def _autouse_mock_sentinel_client(monkeypatch):
         mock,
         raising=False,
     )
-    # Patch where it's imported in the audit handler
+    # Patch where sentinel is called from the audit service
     monkeypatch.setattr(
-        "infrastructure.events.handlers.audit.sentinel_client.log_audit_event",
+        "integrations.sentinel.client.log_audit_event",
         mock,
         raising=False,
     )

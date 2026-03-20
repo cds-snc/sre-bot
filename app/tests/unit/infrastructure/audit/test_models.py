@@ -11,7 +11,7 @@ Tests cover:
 import pytest
 from datetime import datetime
 from pydantic import ValidationError
-from infrastructure.audit.models import AuditEvent, create_audit_event
+from infrastructure.audit.models import AuditEvent
 
 
 @pytest.mark.unit
@@ -19,7 +19,26 @@ class TestAuditEventCreation:
     """Tests for AuditEvent model creation and validation."""
 
     def test_audit_event_minimal_creation(self):
-        """AuditEvent can be created with required fields only."""
+        """AuditEvent can be created with absolutely minimal fields."""
+        event = AuditEvent(
+            correlation_id="req-123",
+            action="member_added",
+            user_email="alice@example.com",
+            result="success",
+        )
+
+        assert event.correlation_id == "req-123"
+        assert event.action == "member_added"
+        assert event.user_email == "alice@example.com"
+        assert event.result == "success"
+        assert event.resource_type is None
+        assert event.resource_id is None
+        assert event.error_type is None
+        assert event.error_message is None
+        assert event.provider is None
+
+    def test_audit_event_with_resources(self):
+        """AuditEvent can optionally include resource tracking."""
         event = AuditEvent(
             correlation_id="req-123",
             action="member_added",
@@ -29,13 +48,8 @@ class TestAuditEventCreation:
             result="success",
         )
 
-        assert event.correlation_id == "req-123"
-        assert event.action == "member_added"
         assert event.resource_type == "group"
-        assert event.result == "success"
-        assert event.error_type is None
-        assert event.error_message is None
-        assert event.provider is None
+        assert event.resource_id == "eng@example.com"
 
     def test_audit_event_with_optional_fields(self, sample_audit_event):
         """AuditEvent can be created with all optional fields."""
@@ -109,7 +123,6 @@ class TestAuditEventValidation:
         with pytest.raises(ValidationError):
             AuditEvent(
                 correlation_id="req-123",
-                # Missing required fields
             )
 
     def test_audit_event_with_metadata_fields(self, sample_audit_event_with_metadata):
@@ -207,12 +220,12 @@ class TestSentinelPayloadConversion:
 
 
 @pytest.mark.unit
-class TestCreateAuditEventFactory:
-    """Tests for create_audit_event factory function."""
+class TestAuditEventFromMetadata:
+    """Tests for AuditEvent.from_metadata() classmethod."""
 
-    def test_create_audit_event_minimal(self):
-        """create_audit_event creates event with required parameters."""
-        event = create_audit_event(
+    def test_from_metadata_minimal(self):
+        """from_metadata creates event with required parameters."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="test_action",
             resource_type="test",
@@ -225,9 +238,9 @@ class TestCreateAuditEventFactory:
         assert event.correlation_id == "req-123"
         assert event.result == "success"
 
-    def test_create_audit_event_with_all_parameters(self):
-        """create_audit_event creates event with all optional parameters."""
-        event = create_audit_event(
+    def test_from_metadata_with_all_parameters(self):
+        """from_metadata creates event with all optional parameters."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="member_added",
             resource_type="group",
@@ -241,9 +254,9 @@ class TestCreateAuditEventFactory:
         assert event.provider == "google"
         assert event.duration_ms == 1500
 
-    def test_create_audit_event_failure_scenario(self):
-        """create_audit_event creates failure event with error details."""
-        event = create_audit_event(
+    def test_from_metadata_failure_scenario(self):
+        """from_metadata creates failure event with error details."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-456",
             action="member_removed",
             resource_type="group",
@@ -258,10 +271,10 @@ class TestCreateAuditEventFactory:
         assert event.error_type == "permanent"
         assert event.error_message == "User not found in directory"
 
-    def test_create_audit_event_invalid_result(self):
-        """create_audit_event raises ValueError for invalid result."""
+    def test_from_metadata_invalid_result(self):
+        """from_metadata raises ValueError for invalid result."""
         with pytest.raises(ValueError) as exc_info:
-            create_audit_event(
+            AuditEvent.from_metadata(
                 correlation_id="req-123",
                 action="test",
                 resource_type="test",
@@ -273,15 +286,15 @@ class TestCreateAuditEventFactory:
         assert "success" in str(exc_info.value)
         assert "failure" in str(exc_info.value)
 
-    def test_create_audit_event_flattens_metadata(self):
-        """create_audit_event flattens metadata with audit_meta_ prefix."""
+    def test_from_metadata_flattens_metadata(self):
+        """from_metadata flattens metadata with audit_meta_ prefix."""
         metadata = {
             "propagation_count": 2,
             "retry_count": 1,
             "source": "api",
         }
 
-        event = create_audit_event(
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="test",
             resource_type="test",
@@ -295,8 +308,8 @@ class TestCreateAuditEventFactory:
         assert event.audit_meta_retry_count == "1"
         assert event.audit_meta_source == "api"
 
-    def test_create_audit_event_metadata_converts_to_strings(self):
-        """create_audit_event converts all metadata values to strings."""
+    def test_from_metadata_converts_metadata_to_strings(self):
+        """from_metadata converts all metadata values to strings."""
         metadata = {
             "count": 42,
             "ratio": 3.14,
@@ -304,7 +317,7 @@ class TestCreateAuditEventFactory:
             "items": None,
         }
 
-        event = create_audit_event(
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="test",
             resource_type="test",
@@ -319,9 +332,9 @@ class TestCreateAuditEventFactory:
         assert event.audit_meta_enabled == "True"
         assert event.audit_meta_items is None
 
-    def test_create_audit_event_empty_metadata(self):
-        """create_audit_event handles empty metadata dict."""
-        event = create_audit_event(
+    def test_from_metadata_empty_metadata(self):
+        """from_metadata handles empty metadata dict."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="test",
             resource_type="test",
@@ -333,9 +346,9 @@ class TestCreateAuditEventFactory:
 
         assert isinstance(event, AuditEvent)
 
-    def test_create_audit_event_none_metadata(self):
-        """create_audit_event handles None metadata."""
-        event = create_audit_event(
+    def test_from_metadata_none_metadata(self):
+        """from_metadata handles None metadata."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="test",
             resource_type="test",
@@ -347,9 +360,9 @@ class TestCreateAuditEventFactory:
 
         assert isinstance(event, AuditEvent)
 
-    def test_create_audit_event_roundtrip(self):
-        """create_audit_event result can be converted to Sentinel payload."""
-        event = create_audit_event(
+    def test_from_metadata_roundtrip(self):
+        """from_metadata result can be converted to Sentinel payload."""
+        event = AuditEvent.from_metadata(
             correlation_id="req-123",
             action="member_added",
             resource_type="group",

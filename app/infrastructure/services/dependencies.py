@@ -19,6 +19,7 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.storage.service import StorageService
+from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients import (
     SlackClientFacade,
@@ -40,6 +41,7 @@ from infrastructure.services.providers import (
     get_notification_service,
     get_command_service,
     get_storage_service,
+    get_audit_trail_service,
     get_platform_service,
     get_slack_client,
     get_teams_client,
@@ -94,6 +96,9 @@ CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
 
 # Storage service dependency
 StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
+
+# Audit trail service dependency
+AuditTrailServiceDep = Annotated[AuditTrailService, Depends(get_audit_trail_service)]
 
 # Platform service dependency
 PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]

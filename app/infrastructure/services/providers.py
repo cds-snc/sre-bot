@@ -19,6 +19,7 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.storage.service import StorageService
+from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms import PlatformService
 from infrastructure.platforms.clients import (
     SlackClientFacade,
@@ -384,6 +385,31 @@ def get_storage_service() -> StorageService:
     """
     aws = get_aws_clients()
     return StorageService(dynamodb=aws.dynamodb)
+
+
+@lru_cache
+def get_audit_trail_service() -> AuditTrailService:
+    """Get application-scoped audit trail service singleton.
+
+    Returns an AuditTrailService instance for writing and querying audit
+    events in DynamoDB.
+
+    Usage:
+        from infrastructure.services import AuditTrailServiceDep
+
+        @router.post("/audit/write")
+        def write_audit(
+            audit_trail: AuditTrailServiceDep,
+            event: AuditEvent
+        ):
+            success = audit_trail.write_audit_event(event)
+            return {"written": success}
+
+    Returns:
+        AuditTrailService: Cached audit trail service instance
+    """
+    storage = get_storage_service()
+    return AuditTrailService(storage=storage)
 
 
 @lru_cache
