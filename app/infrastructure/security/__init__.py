@@ -16,10 +16,13 @@ from infrastructure.security.jwt import (
     get_issuer_from_token,
     validate_jwt_token,
 )
+from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 
 __all__ = [
     "JWKSManager",
     "get_issuer_from_token",
     "extract_user_info_from_token",
     "validate_jwt_token",
+    "get_limiter",
+    "setup_rate_limiter",
 ]

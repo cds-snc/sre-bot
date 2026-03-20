@@ -5,7 +5,7 @@ from fastapi import Request, FastAPI
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from api.dependencies import rate_limits
+from infrastructure.security import rate_limiter as rate_limits
 from api.routes.system import router as system_router
 
 
@@ -15,7 +15,7 @@ def test_header_exists_and_not_empty():
     mock_request.headers = {"X-Sentinel-Source": "some_value"}
 
     # Call the function
-    result = rate_limits.sentinel_key_func(mock_request)
+    result = rate_limits._sentinel_key_func(mock_request)
 
     # Assert that the result is None (no rate limiting)
     assert result is None
@@ -31,7 +31,7 @@ def test_header_not_present():
 
     # Mock the get_remote_address function to return a specific value
     with patch("slowapi.util.get_remote_address", return_value="192.168.1.1"):
-        result = rate_limits.sentinel_key_func(mock_request)
+        result = rate_limits._sentinel_key_func(mock_request)
     # Assert that the result is the IP address (rate limiting applied)
     assert result == "192.168.1.1"
 
@@ -46,7 +46,7 @@ def test_header_empty():
 
     # Mock the get_remote_address function to return a specific value
     with patch("slowapi.util.get_remote_address", return_value="192.168.1.1"):
-        result = rate_limits.sentinel_key_func(mock_request)
+        result = rate_limits._sentinel_key_func(mock_request)
 
     # Assert that the result is the IP address (rate limiting applied)
     assert result == "192.168.1.1"
@@ -61,7 +61,7 @@ async def test_rate_limit_handler():
     mock_exception = Mock(spec=RateLimitExceeded)
 
     # Call the handler function
-    response = await rate_limits.rate_limit_handler(mock_request, mock_exception)
+    response = await rate_limits._rate_limit_handler(mock_request, mock_exception)
 
     # Assert the response is a JSONResponse
     assert isinstance(response, JSONResponse)

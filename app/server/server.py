@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sns_message_validator import SNSMessageValidator  # type: ignore
 
 from api.router import api_router
-from api.dependencies.rate_limits import setup_rate_limiter, get_limiter
-from infrastructure.services import get_settings
+from infrastructure.services import get_settings, setup_rate_limiter
 from server.lifespan import lifespan
 
 sns_message_validator = SNSMessageValidator()
@@ -13,7 +12,6 @@ settings = get_settings()
 
 handler = FastAPI(lifespan=lifespan)
 setup_rate_limiter(handler)
-limiter = get_limiter()
 
 
 class ConfigurationError(Exception):

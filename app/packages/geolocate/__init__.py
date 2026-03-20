@@ -27,6 +27,16 @@ def register_teams_commands(provider):
     teams.register_commands(provider)
 
 
+@hookimpl
+def register_routes(app):
+    """Register geolocate HTTP routes.
+
+    Args:
+        app: FastAPI application instance.
+    """
+    app.include_router(geolocate_router)
+
+
 # Discord provider not implemented - out of scope
 
 

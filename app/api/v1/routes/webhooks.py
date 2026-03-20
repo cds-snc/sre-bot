@@ -5,7 +5,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request, Body
 from slack_sdk import WebClient
 
-from api.dependencies.rate_limits import get_limiter
+from infrastructure.services import get_limiter
 from integrations.sentinel import log_to_sentinel
 from models.webhooks import WebhookPayload
 from modules.slack import webhooks
@@ -14,7 +14,7 @@ from modules.webhooks.slack import map_emails_to_slack_users
 
 
 logger = structlog.get_logger()
-router = APIRouter(tags=["Access"])
+router = APIRouter(tags=["Webhooks"])
 limiter = get_limiter()
 
 
