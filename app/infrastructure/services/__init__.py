@@ -46,6 +46,7 @@ from infrastructure.services.providers import (
     get_discord_client,
     get_directory_provider,
 )
+from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 
 from infrastructure.platforms import (
     PlatformService,
@@ -175,4 +176,7 @@ __all__ = [
     "hookimpl",
     "get_plugin_manager",
     "discover_and_init_features",
+    # Rate limiting
+    "get_limiter",
+    "setup_rate_limiter",
 ]
