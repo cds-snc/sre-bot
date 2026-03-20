@@ -103,13 +103,14 @@ class TestI18nResourceRegistry:
         assert registry.get_resource_count() == 1
         assert registry.list_specs() == [spec1]
 
-    def test_registry_validate_paths_all_exist(self) -> None:
+    def test_registry_validate_paths_all_exist(self, tmp_path: Path) -> None:
         """Test validation when all required paths exist."""
         registry = I18nResourceRegistry()
 
-        # Use existing temp directories
-        temp_dir1 = Path("/tmp")
-        temp_dir2 = Path("/var")
+        temp_dir1 = tmp_path / "core_locales"
+        temp_dir2 = tmp_path / "pkg_locales"
+        temp_dir1.mkdir()
+        temp_dir2.mkdir()
 
         spec1 = I18nResourceSpec(
             owner="core",
@@ -159,14 +160,17 @@ class TestI18nResourceRegistry:
 class TestI18nResourceRegistryIntegration:
     """Integration tests for i18n resource registry."""
 
-    def test_registry_workflow(self) -> None:
+    def test_registry_workflow(self, tmp_path: Path) -> None:
         """Test complete registry workflow: register, list, validate."""
         registry = I18nResourceRegistry()
 
         # Register core resources
+        core_dir = tmp_path / "core_locales"
+        core_dir.mkdir()
+
         core_spec = I18nResourceSpec(
             owner="core",
-            path=str(Path("/tmp")),
+            path=str(core_dir),
             required=True,
             domain="core",
         )
@@ -180,14 +184,19 @@ class TestI18nResourceRegistryIntegration:
         validation = registry.validate_paths()
         assert validation.is_success
 
-    def test_registry_collection_from_multiple_sources(self) -> None:
+    def test_registry_collection_from_multiple_sources(self, tmp_path: Path) -> None:
         """Test collecting specs from multiple simulated sources."""
         registry = I18nResourceRegistry()
 
         # Simulate multiple packages registering
+        pkg_a_dir = tmp_path / "pkg_a_locales"
+        pkg_b_dir = tmp_path / "pkg_b_locales"
+        pkg_a_dir.mkdir()
+        pkg_b_dir.mkdir()
+
         packages = [
-            I18nResourceSpec(owner="pkg.a", path=str(Path("/tmp")), domain="a"),
-            I18nResourceSpec(owner="pkg.b", path=str(Path("/var")), domain="b"),
+            I18nResourceSpec(owner="pkg.a", path=str(pkg_a_dir), domain="a"),
+            I18nResourceSpec(owner="pkg.b", path=str(pkg_b_dir), domain="b"),
         ]
 
         for spec in packages:
@@ -195,5 +204,5 @@ class TestI18nResourceRegistryIntegration:
 
         assert registry.get_resource_count() == 2
         paths = registry.list_paths()
-        assert str(Path("/tmp")) in paths
-        assert str(Path("/var")) in paths
+        assert str(pkg_a_dir) in paths
+        assert str(pkg_b_dir) in paths

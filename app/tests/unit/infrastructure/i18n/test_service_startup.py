@@ -29,7 +29,7 @@ class TestTranslationServiceInitialization:
         assert result.is_success
         assert service._is_initialized is True
 
-    def test_initialize_loads_all_locales(self) -> None:
+    def test_initialize_loads_all_locales(self, tmp_path: Path) -> None:
         """Test that initialize processes registered resource paths."""
         service = TranslationService()
         service._translator = Mock()
@@ -38,8 +38,11 @@ class TestTranslationServiceInitialization:
             return_value=[Locale.EN_US, Locale.FR_FR]
         )
 
-        spec = I18nResourceSpec(owner="core", path=str(Path("/tmp")))
-        # /tmp exists but has no YAML files — path is processed, ValueError silently skipped
+        core_dir = tmp_path / "core_locales"
+        core_dir.mkdir()
+
+        spec = I18nResourceSpec(owner="core", path=str(core_dir))
+        # Existing directory has no YAML files — path is processed, ValueError skipped.
         result = service.initialize(resources=[spec], strict=True)
 
         assert result.is_success
@@ -77,13 +80,16 @@ class TestTranslationServiceInitialization:
         assert result.is_success
         assert service._is_initialized is True
 
-    def test_initialize_translator_exception(self) -> None:
+    def test_initialize_translator_exception(self, tmp_path: Path) -> None:
         """Test initialization captures unexpected loader exceptions."""
         service = TranslationService()
         service._translator = Mock()
         service._translator.catalogs = {}
 
-        spec = I18nResourceSpec(owner="core", path=str(Path("/tmp")))
+        core_dir = tmp_path / "core_locales"
+        core_dir.mkdir()
+
+        spec = I18nResourceSpec(owner="core", path=str(core_dir))
         with patch(
             "infrastructure.i18n.service.YAMLTranslationLoader"
         ) as mock_loader_cls:
@@ -148,7 +154,7 @@ class TestTranslationServiceHealthCheck:
 class TestTranslationServiceLifecycle:
     """Test complete TranslationService lifecycle."""
 
-    def test_full_startup_flow(self) -> None:
+    def test_full_startup_flow(self, tmp_path: Path) -> None:
         """Test complete startup: create -> initialize -> healthcheck."""
         # Create service (side-effect safe)
         service = TranslationService()
@@ -160,7 +166,10 @@ class TestTranslationServiceLifecycle:
         service._translator.get_available_locales = Mock(return_value=[Locale.EN_US])
 
         # Initialize with resources
-        spec = I18nResourceSpec(owner="core", path=str(Path("/tmp")))
+        core_dir = tmp_path / "core_locales"
+        core_dir.mkdir()
+
+        spec = I18nResourceSpec(owner="core", path=str(core_dir))
         init_result = service.initialize(resources=[spec], strict=True)
         assert init_result.is_success
         assert service._is_initialized is True
