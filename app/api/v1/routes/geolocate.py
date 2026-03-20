@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from integrations import maxmind
-from api.dependencies.rate_limits import get_limiter
+from infrastructure.services import get_limiter
 
 router = APIRouter(tags=["Geolocation"])
 limiter = get_limiter()

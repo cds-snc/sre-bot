@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from core.config import settings
-from api.dependencies.rate_limits import get_limiter
+from infrastructure.services import get_limiter
 
 router = APIRouter(tags=["System"])
 limiter = get_limiter()
