@@ -61,7 +61,7 @@ async def test_rate_limit_handler():
     mock_exception = Mock(spec=RateLimitExceeded)
 
     # Call the handler function
-    response = await rate_limits.rate_limit_handler(mock_request, mock_exception)
+    response = await rate_limits._rate_limit_handler(mock_request, mock_exception)
 
     # Assert the response is a JSONResponse
     assert isinstance(response, JSONResponse)
