@@ -14,7 +14,7 @@ from modules.webhooks.slack import map_emails_to_slack_users
 
 
 logger = structlog.get_logger()
-router = APIRouter(tags=["Access"])
+router = APIRouter(tags=["Webhooks"])
 limiter = get_limiter()
 
 
