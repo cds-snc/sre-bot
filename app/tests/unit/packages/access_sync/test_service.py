@@ -143,6 +143,7 @@ def test_sync_user_member_applies_ensure_user():
     result = service.sync_user("alice@example.com", "aws")
 
     assert result.is_success
+    assert "ensure_user" in result.data.planned_actions
     assert "ensure_user" in result.data.applied_actions
     assert any(c[0] == "ensure_user" for c in adapter.calls)
 
@@ -154,6 +155,7 @@ def test_sync_user_non_member_removes_user():
     result = service.sync_user("alice@example.com", "aws")
 
     assert result.is_success
+    assert "remove_user" in result.data.planned_actions
     assert "remove_user" in result.data.applied_actions
 
 
@@ -252,7 +254,9 @@ def test_sync_user_dry_run_returns_planned_actions():
 
     assert result.is_success
     assert isinstance(result.data, SyncOutcome)
-    assert len(result.data.applied_actions) >= 1
+    assert len(result.data.planned_actions) >= 1
+    assert "ensure_user" in result.data.planned_actions
+    assert result.data.applied_actions == []
     # No adapter calls should have been made (only get_current_entitlement_ids is OK)
     execution_calls = [
         c for c in adapter.calls if c[0] != "get_current_entitlement_ids"

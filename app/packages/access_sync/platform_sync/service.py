@@ -12,7 +12,7 @@ Phase 4: Emit PLATFORM_SYNC_STARTED / PLATFORM_SYNC_COMPLETED domain events.
 """
 
 import uuid
-from typing import Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Dict, List, Mapping, Optional, Set, TYPE_CHECKING
 
 import structlog
 
@@ -124,16 +124,36 @@ class PlatformSyncService:
         idp_members: Set[str] = set(desired_state.keys())
 
         # Phase 2: orphan detection.
+        provisioned: Set[str] = set()
+        provisioned_known = False
         provisioned_result = adapter.list_all_provisioned_users()
         orphans: Set[str] = set()
         if provisioned_result.is_success and provisioned_result.data is not None:
-            provisioned: Set[str] = provisioned_result.data
+            provisioned = provisioned_result.data
+            provisioned_known = True
             orphans = provisioned - idp_members
             log.info("orphans_detected", count=len(orphans))
         else:
             log.warning("orphan_detection_skipped", error=provisioned_result.message)
 
-        all_subjects: Set[str] = idp_members | orphans
+        # Phase 2.5: platform-side group membership prefetch.
+        precomputed_current_ids: Dict[str, Set[str]] = {}
+        prefetch_complete = False
+        prefetch_result = self._prefetch_current_entitlements(policy, adapter)
+        if prefetch_result.is_success and isinstance(prefetch_result.data, dict):
+            precomputed_current_ids = prefetch_result.data
+            prefetch_complete = True
+            log.info(
+                "prefetched_current_entitlements",
+                users=len(precomputed_current_ids),
+            )
+        else:
+            log.warning(
+                "prefetch_current_entitlements_skipped",
+                error=prefetch_result.message,
+            )
+
+        all_subjects: Set[str] = idp_members | orphans | set(precomputed_current_ids)
 
         # Phase 3: per-user sync via UserSyncService.sync_user_from_context.
         # MembershipContext carries the pre-fetched IDP state built in Phase 1,
@@ -149,10 +169,21 @@ class PlatformSyncService:
                 user_should_exist=email in idp_members,
                 required_entitlements=desired_state.get(email, []),
             )
+            current_ids_for_user: Optional[Set[str]] = None
+            if prefetch_complete:
+                current_ids_for_user = precomputed_current_ids.get(email, set())
+            precomputed_exists: Optional[bool] = None
+            if provisioned_known:
+                precomputed_exists = email in provisioned
+            elif current_ids_for_user is not None:
+                precomputed_exists = bool(current_ids_for_user)
+
             result = self._sync_service.sync_user_from_context(
                 user_email=email,
                 platform=platform,
                 context=context,
+                current_entitlement_ids=current_ids_for_user,
+                platform_user_exists=precomputed_exists,
                 dry_run=dry_run,
                 request_id=reconcile_id,
             )
@@ -204,6 +235,84 @@ class PlatformSyncService:
             )
 
         return OperationResult.success(data=reconciliation_outcome)
+
+    def _prefetch_current_entitlements(
+        self,
+        policy: PlatformPolicy,
+        adapter,
+    ) -> OperationResult:
+        """Build email -> current entitlement IDs from platform group memberships.
+
+        Performs group-driven reads for all sync-managed group entitlements and
+        avoids per-user platform membership lookups in batch reconciliation.
+        """
+        managed_group_ids: Set[str] = {
+            rule.entitlement_id
+            for rule in policy.sync_managed_rules()
+            if rule.entitlement_type == "group"
+        }
+        if not managed_group_ids:
+            return OperationResult.success(data={})
+
+        # Adapter-specific fast path: single bulk read for many groups.
+        if hasattr(adapter, "list_members_for_groups"):
+            response = adapter.list_members_for_groups(managed_group_ids)
+            if not response.is_success:
+                return OperationResult.error(
+                    response.status,
+                    message=response.message,
+                    error_code=response.error_code,
+                )
+
+            data = response.data
+            if not isinstance(data, Mapping):
+                return OperationResult.error(
+                    OperationStatus.PERMANENT_ERROR,
+                    message="Invalid list_members_for_groups payload",
+                    error_code="INVALID_PLATFORM_RESPONSE",
+                )
+
+            return self._invert_group_membership_map(data)
+
+        # Generic fallback: one call per group via adapter contract.
+        group_to_members: Dict[str, Set[str]] = {}
+        for group_id in managed_group_ids:
+            response = adapter.list_group_members(group_id)
+            if not response.is_success:
+                return OperationResult.error(
+                    response.status,
+                    message=response.message,
+                    error_code=response.error_code,
+                )
+            if not isinstance(response.data, set):
+                return OperationResult.error(
+                    OperationStatus.PERMANENT_ERROR,
+                    message="Invalid list_group_members payload",
+                    error_code="INVALID_PLATFORM_RESPONSE",
+                )
+            group_to_members[group_id] = {
+                email for email in response.data if isinstance(email, str)
+            }
+
+        return self._invert_group_membership_map(group_to_members)
+
+    @staticmethod
+    def _invert_group_membership_map(group_to_members: Mapping) -> OperationResult:
+        """Convert group->members mapping into email->entitlement IDs."""
+        by_user: Dict[str, Set[str]] = {}
+        for group_id, members in group_to_members.items():
+            if not isinstance(group_id, str):
+                continue
+            if not isinstance(members, (set, list, tuple)):
+                continue
+            for email in members:
+                if not isinstance(email, str):
+                    continue
+                normalized_email = email.lower()
+                if normalized_email not in by_user:
+                    by_user[normalized_email] = set()
+                by_user[normalized_email].add(group_id)
+        return OperationResult.success(data=by_user)
 
     def _build_desired_state(self, policy: PlatformPolicy) -> OperationResult:
         """Batch-read IDP group membership for all policy groups.

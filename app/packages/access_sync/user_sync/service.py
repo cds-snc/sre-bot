@@ -132,6 +132,8 @@ class UserSyncService:
             policy=policy,
             user_should_exist=user_should_exist,
             required_entitlements=required_entitlements,
+            precomputed_current_entitlement_ids=None,
+            precomputed_platform_user_exists=None,
             dry_run=dry_run,
             run_id=run_id,
             request_id=request_id,
@@ -143,6 +145,8 @@ class UserSyncService:
         user_email: str,
         platform: str,
         context: MembershipContext,
+        current_entitlement_ids: Optional[Set[str]] = None,
+        platform_user_exists: Optional[bool] = None,
         dry_run: bool = False,
         request_id: str = "",
     ) -> OperationResult:
@@ -191,6 +195,8 @@ class UserSyncService:
             policy=policy,
             user_should_exist=context.user_should_exist,
             required_entitlements=context.required_entitlements,
+            precomputed_current_entitlement_ids=current_entitlement_ids,
+            precomputed_platform_user_exists=platform_user_exists,
             dry_run=dry_run,
             run_id=run_id,
             request_id=request_id,
@@ -224,6 +230,8 @@ class UserSyncService:
         policy: PlatformPolicy,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
+        precomputed_current_entitlement_ids: Optional[Set[str]],
+        precomputed_platform_user_exists: Optional[bool],
         dry_run: bool,
         run_id: str,
         request_id: str,
@@ -232,15 +240,30 @@ class UserSyncService:
         """Shared plan-and-execute path for both sync_user and sync_user_from_context."""
         # Current platform state for delta planning.
         current_ids: Set[str] = set()
-        current_result = adapter.get_current_entitlement_ids(user_email)
-        platform_user_exists = current_result.is_success
-        if current_result.is_success and current_result.data is not None:
-            if isinstance(current_result.data, set):
-                current_ids = {
-                    value for value in current_result.data if isinstance(value, str)
-                }
-        elif current_result.status == OperationStatus.NOT_FOUND:
-            log.info("platform_user_absent")
+        platform_user_exists = False
+
+        if precomputed_current_entitlement_ids is not None:
+            current_ids = {
+                value
+                for value in precomputed_current_entitlement_ids
+                if isinstance(value, str)
+            }
+            if precomputed_platform_user_exists is not None:
+                platform_user_exists = precomputed_platform_user_exists
+            else:
+                platform_user_exists = bool(current_ids)
+            if not platform_user_exists:
+                log.info("platform_user_absent")
+        else:
+            current_result = adapter.get_current_entitlement_ids(user_email)
+            platform_user_exists = current_result.is_success
+            if current_result.is_success and current_result.data is not None:
+                if isinstance(current_result.data, set):
+                    current_ids = {
+                        value for value in current_result.data if isinstance(value, str)
+                    }
+            elif current_result.status == OperationStatus.NOT_FOUND:
+                log.info("platform_user_absent")
 
         planned = self._engine.plan_actions(
             policy=policy,
@@ -328,7 +351,8 @@ class UserSyncService:
         return OperationResult.success(
             data=SyncOutcome(
                 planned_actions=planned_actions,
-                applied_actions=applied, requires_manual_action=requires_manual_action
+                applied_actions=applied,
+                requires_manual_action=requires_manual_action,
             )
         )
 
