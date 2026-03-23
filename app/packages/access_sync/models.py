@@ -40,14 +40,17 @@ class SyncOutcome:
     """Business outcome of a completed or dry-run sync_user call.
 
     Attributes:
-        applied_actions: Ordered list of adapter action names executed (or
-            planned, for dry-run).
+        planned_actions: Ordered list of adapter action names selected by the
+            planner for this run.
+        applied_actions: Ordered list of adapter action names actually executed.
+            Empty for dry-run responses.
         requires_manual_action: True when one or more policy-mandated actions
             could not be automated (e.g. AWS IC disable unsupported).  The
             sync still succeeded for the actions that were automatable.
     """
 
-    applied_actions: List[str]
+    planned_actions: List[str] = field(default_factory=list)
+    applied_actions: List[str] = field(default_factory=list)
     requires_manual_action: bool = False
 
 
