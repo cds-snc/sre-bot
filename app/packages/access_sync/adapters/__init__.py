@@ -7,9 +7,14 @@ All adapter methods are idempotent: calling them with the same inputs more than
 once must produce the same result.  When an action cannot be automated, adapters
 return a non-success OperationResult with a machine-readable error_code so the
 service can mark the run as manual_action_required.
+
+v1 supported entitlement_type: "group"
+  entitlement_id = platform-native group identifier (e.g. AWS IC GroupId)
+
+Future: "permission_set" for temporary elevated account assignments.
 """
 
-from typing import Protocol, Set, TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING
 
 from infrastructure.operations import OperationResult
 
@@ -57,7 +62,10 @@ class AccessSyncAdapter(Protocol):
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Apply an entitlement to a user (idempotent; no-op if already held)."""
+        """Apply an entitlement to a user (idempotent; no-op if already held).
+
+        v1: entitlement_type="group", entitlement_id=<platform group id>
+        """
         ...
 
     def remove_entitlement(
@@ -66,7 +74,10 @@ class AccessSyncAdapter(Protocol):
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Remove an entitlement from a user (idempotent; no-op if already absent)."""
+        """Remove an entitlement from a user (idempotent; no-op if already absent).
+
+        v1: entitlement_type="group", entitlement_id=<platform group id>
+        """
         ...
 
     def fetch_current_state(self, user_email: str) -> OperationResult:
@@ -83,5 +94,31 @@ class AccessSyncAdapter(Protocol):
             ``OperationResult[Set[str]]`` with the entitlement ID set, or error.
             Returns an empty set (success) when the user exists but holds nothing.
             Returns NOT_FOUND when the user does not exist on the platform.
+        """
+        ...
+
+    def list_all_provisioned_users(self) -> OperationResult:
+        """Return a set of all user emails currently provisioned on this platform.
+
+        Used by reconciliation for orphan detection: users on the platform
+        whose IDP authn-group membership has since been revoked.
+
+        Returns:
+            ``OperationResult[Set[str]]`` of lowercase user emails, or error.
+            Adapters that cannot enumerate their user base return NOT_IMPLEMENTED.
+        """
+        ...
+
+    def list_group_members(self, group_id: str) -> OperationResult:
+        """Return the set of user emails that are members of the given platform group.
+
+        Used by reconciliation batch read phase to get platform-side group
+        membership without per-user API calls.
+
+        Args:
+            group_id: Platform-native group identifier (e.g. AWS IC GroupId).
+
+        Returns:
+            ``OperationResult[Set[str]]`` of lowercase member emails, or error.
         """
         ...

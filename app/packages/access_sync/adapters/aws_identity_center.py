@@ -1,22 +1,24 @@
-"""AWS Identity Center adapter.
+"""AWS Identity Center adapter — v1: group membership sync only.
 
-Maps normalized Access Sync actions to AWS IdentityStore and SSO Admin API calls.
+Maps normalized Access Sync actions to AWS IdentityStore API calls.
 All external API calls are wrapped in try/except and return OperationResult.
 Clients are injected from infrastructure.services — never instantiated locally.
 
-Entitlement ID format for permission_set type:
-    "<account_id>/<permission_set_name>"
-    e.g. "123456789012/AWSAdministratorAccess"
+v1 entitlement model: entitlement_type="group"
+    entitlement_id = AWS Identity Store GroupId (UUID)
+    e.g. "a1b2c3d4-1234-5678-abcd-ef0123456789"
 
-This adapter handles the user-lifecycle contract (ensure_user, disable_user,
-remove_user) and delegates entitlement management to SSO Admin account
-assignments.  AWS IC has no native "disable" state at the identity-store level;
-disable_user is therefore not supported and signals manual_action_required.
+Group sync maps IDP security groups → AWS IC groups via group membership.
+Direct user→account permission-set assignments are deferred to a future
+"temporary elevated privileges" feature.
+
+AWS IC has no native "disable" state at the identity-store level; disable_user
+is therefore not supported and signals manual_action_required.
 """
 
 import structlog
 
-from typing import Set
+from typing import Dict, Set
 
 from infrastructure.clients.aws import AWSClients
 from infrastructure.operations import OperationResult, OperationStatus
@@ -47,7 +49,7 @@ class AwsIdentityCenterAdapter:
         return AdapterCapabilities(
             supports_disable=False,  # AWS IC has no native identity-store disable
             supports_delete=True,
-            supported_entitlement_types={"permission_set"},
+            supported_entitlement_types={"group"},  # v1: group membership sync only
         )
 
     def _find_user_id(self, user_email: str) -> OperationResult:
@@ -154,9 +156,9 @@ class AwsIdentityCenterAdapter:
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Apply a permission-set account assignment (idempotent).
+        """Add a user to an AWS IC group (idempotent).
 
-        entitlement_id must be formatted as "<account_id>/<permission_set_arn>".
+        v1: entitlement_type must be "group"; entitlement_id is the AWS IC GroupId.
         """
         log = logger.bind(
             user_email=user_email,
@@ -166,39 +168,36 @@ class AwsIdentityCenterAdapter:
         )
         log.info("apply_entitlement_started")
 
-        if entitlement_type != "permission_set":
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message=f"Unsupported entitlement_type: {entitlement_type}",
-                error_code="UNSUPPORTED_ENTITLEMENT_TYPE",
-            )
-
-        parts = entitlement_id.split("/", 1)
-        if len(parts) != 2:
+        if entitlement_type != "group":
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
                 message=(
-                    "entitlement_id must be '<account_id>/<permission_set_arn>', "
-                    f"got: {entitlement_id}"
+                    f"Unsupported entitlement_type: {entitlement_type}. "
+                    "v1 only supports 'group' (direct account assignments deferred)."
                 ),
-                error_code="INVALID_ENTITLEMENT_ID",
+                error_code="UNSUPPORTED_ENTITLEMENT_TYPE",
             )
-
-        account_id, permission_set_arn = parts
 
         id_result = self._find_user_id(user_email)
         if not id_result.is_success:
             return id_result
         user_id: str = (id_result.data or {}).get("user_id", "")
 
-        result = self._aws.sso_admin.create_account_assignment(
-            permission_set_arn=permission_set_arn,
-            principal_id=user_id,
-            principal_type="USER",
-            target_id=account_id,
+        # Check if already a member (idempotency).
+        membership_result = self._aws.identitystore.get_group_membership_id(
+            group_id=entitlement_id,
+            member_id={"UserId": user_id},
+        )
+        if membership_result.is_success:
+            log.info("apply_entitlement_already_member", group_id=entitlement_id)
+            return OperationResult.success(message="group_membership_already_exists")
+
+        result = self._aws.identitystore.create_group_membership(
+            GroupId=entitlement_id,
+            MemberId={"UserId": user_id},
         )
         if result.is_success:
-            log.info("apply_entitlement_assigned", account_id=account_id)
+            log.info("apply_entitlement_added", group_id=entitlement_id)
         else:
             log.error("apply_entitlement_failed", error=result.message)
         return result
@@ -209,9 +208,9 @@ class AwsIdentityCenterAdapter:
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Remove a permission-set account assignment (idempotent).
+        """Remove a user from an AWS IC group (idempotent).
 
-        entitlement_id must be formatted as "<account_id>/<permission_set_arn>".
+        v1: entitlement_type must be "group"; entitlement_id is the AWS IC GroupId.
         """
         log = logger.bind(
             user_email=user_email,
@@ -221,25 +220,12 @@ class AwsIdentityCenterAdapter:
         )
         log.info("remove_entitlement_started")
 
-        if entitlement_type != "permission_set":
+        if entitlement_type != "group":
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
                 message=f"Unsupported entitlement_type: {entitlement_type}",
                 error_code="UNSUPPORTED_ENTITLEMENT_TYPE",
             )
-
-        parts = entitlement_id.split("/", 1)
-        if len(parts) != 2:
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message=(
-                    "entitlement_id must be '<account_id>/<permission_set_arn>', "
-                    f"got: {entitlement_id}"
-                ),
-                error_code="INVALID_ENTITLEMENT_ID",
-            )
-
-        account_id, permission_set_arn = parts
 
         id_result = self._find_user_id(user_email)
         if not id_result.is_success:
@@ -249,24 +235,34 @@ class AwsIdentityCenterAdapter:
                     message="user_absent_entitlement_skipped"
                 )
             return id_result
-        user_id = (id_result.data or {}).get("user_id", "")
+        user_id: str = (id_result.data or {}).get("user_id", "")
 
-        result = self._aws.sso_admin.delete_account_assignment(
-            permission_set_arn=permission_set_arn,
-            principal_id=user_id,
-            principal_type="USER",
-            target_id=account_id,
+        membership_result = self._aws.identitystore.get_group_membership_id(
+            group_id=entitlement_id,
+            member_id={"UserId": user_id},
+        )
+        if not membership_result.is_success:
+            if membership_result.status == OperationStatus.NOT_FOUND:
+                log.info("remove_entitlement_not_member", group_id=entitlement_id)
+                return OperationResult.success(
+                    message="group_membership_already_absent"
+                )
+            return membership_result
+
+        membership_id: str = (membership_result.data or {}).get("MembershipId", "")
+        result = self._aws.identitystore.delete_group_membership(
+            membership_id=membership_id,
         )
         if result.is_success:
-            log.info("remove_entitlement_deleted", account_id=account_id)
+            log.info("remove_entitlement_removed", group_id=entitlement_id)
         else:
             log.error("remove_entitlement_failed", error=result.message)
         return result
 
     def fetch_current_state(self, user_email: str) -> OperationResult:
-        """Fetch all current account assignments for a user.
+        """Fetch all current group memberships for a user.
 
-        Returns SUCCESS with data={"user_id": str, "assignments": list}.
+        Returns SUCCESS with data={"user_id": str, "group_ids": list[str]}.
         """
         log = logger.bind(user_email=user_email, adapter="aws_identity_center")
         log.info("fetch_current_state_started")
@@ -276,30 +272,29 @@ class AwsIdentityCenterAdapter:
             return id_result
         user_id = (id_result.data or {}).get("user_id", "")
 
-        result = self._aws.sso_admin.list_account_assignments(
-            principal_id=user_id,
-            principal_type="USER",
+        result = self._aws.identitystore.list_group_memberships_for_member(
+            member_id={"UserId": user_id},
         )
         if not result.is_success:
             log.error("fetch_current_state_failed", error=result.message)
             return result
 
-        assignments_data: dict = result.data if isinstance(result.data, dict) else {}
-        assignments = assignments_data.get("AccountAssignments", [])
-        log.info("fetch_current_state_ok", assignment_count=len(assignments))
+        memberships: list = result.data if isinstance(result.data, list) else []
+        group_ids = [m.get("GroupId", "") for m in memberships if m.get("GroupId")]
+        log.info("fetch_current_state_ok", group_count=len(group_ids))
         return OperationResult.success(
-            data={"user_id": user_id, "assignments": assignments}
+            data={"user_id": user_id, "group_ids": group_ids}
         )
 
     def get_current_entitlement_ids(self, user_email: str) -> OperationResult:
-        """Return the normalised set of entitlement IDs the user currently holds.
+        """Return the set of AWS IC GroupIds the user currently belongs to.
 
-        Each assignment is rendered as ``"{account_id}/{permission_set_arn}"`` ,
-        matching ``EntitlementRule.entitlement_id`` format so the PolicyEngine
-        can compute the desired-vs-current delta without any extra parsing.
+        Entitlement IDs match ``EntitlementRule.entitlement_id`` (AWS IC GroupId)
+        so the PolicyEngine can compute the desired-vs-current delta without
+        additional parsing.
 
         Returns:
-            ``OperationResult[Set[str]]`` with the normalised ID set, or error.
+            ``OperationResult[Set[str]]`` with the group ID set, or error.
             Returns NOT_FOUND when the user does not exist in Identity Store.
         """
         log = logger.bind(user_email=user_email, adapter="aws_identity_center")
@@ -308,13 +303,101 @@ class AwsIdentityCenterAdapter:
         if not state_result.is_success:
             return state_result
 
-        assignments = (state_result.data or {}).get("assignments", [])
-        ids: Set[str] = set()
-        for assignment in assignments:
-            account_id = assignment.get("AccountId", "")
-            permission_set_arn = assignment.get("PermissionSetArn", "")
-            if account_id and permission_set_arn:
-                ids.add(f"{account_id}/{permission_set_arn}")
+        group_ids: Set[str] = set((state_result.data or {}).get("group_ids", []))
+        log.info("get_current_entitlement_ids_ok", count=len(group_ids))
+        return OperationResult.success(data=group_ids)
 
-        log.info("get_current_entitlement_ids_ok", count=len(ids))
-        return OperationResult.success(data=ids)
+    def list_all_provisioned_users(self) -> OperationResult:
+        """Return the set of all user emails provisioned in AWS Identity Store.
+
+        Used by reconciliation for orphan detection.  Iterates all users once
+        and extracts the primary email from each record.
+
+        Returns:
+            ``OperationResult[Set[str]]`` of lowercase emails, or error.
+        """
+        log = logger.bind(adapter="aws_identity_center")
+        log.info("list_all_provisioned_users_started")
+
+        result = self._aws.identitystore.list_users()
+        if not result.is_success:
+            log.error("list_all_provisioned_users_failed", error=result.message)
+            return result
+
+        users: list = result.data if isinstance(result.data, list) else []
+        emails: Set[str] = set()
+        for user in users:
+            for email_entry in user.get("Emails", []):
+                if email_entry.get("Primary") and email_entry.get("Value"):
+                    emails.add(email_entry["Value"].strip().lower())
+                    break
+
+        log.info("list_all_provisioned_users_ok", count=len(emails))
+        return OperationResult.success(data=emails)
+
+    def list_group_members(self, group_id: str) -> OperationResult:
+        """Return the set of user emails that are members of an AWS IC group.
+
+        Used by reconciliation batch read phase.  Resolves UserId → email via
+        a single list_users call to avoid N per-user describe calls.
+
+        Args:
+            group_id: AWS IC GroupId.
+
+        Returns:
+            ``OperationResult[Set[str]]`` of lowercase member emails, or error.
+        """
+        log = logger.bind(group_id=group_id, adapter="aws_identity_center")
+        log.info("list_group_members_started")
+
+        memberships_result = self._aws.identitystore.list_group_memberships(
+            group_id=group_id
+        )
+        if not memberships_result.is_success:
+            log.error("list_group_memberships_failed", error=memberships_result.message)
+            return memberships_result
+
+        memberships: list = (
+            memberships_result.data if isinstance(memberships_result.data, list) else []
+        )
+        member_user_ids: Set[str] = {
+            m.get("MemberId", {}).get("UserId", "")
+            for m in memberships
+            if m.get("MemberId", {}).get("UserId")
+        }
+
+        if not member_user_ids:
+            return OperationResult.success(data=set())
+
+        map_result = self._build_user_id_email_map()
+        if not map_result.is_success:
+            return map_result
+        user_id_to_email: Dict[str, str] = map_result.data or {}
+
+        member_emails: Set[str] = {
+            user_id_to_email[uid] for uid in member_user_ids if uid in user_id_to_email
+        }
+        log.info("list_group_members_ok", count=len(member_emails))
+        return OperationResult.success(data=member_emails)
+
+    def _build_user_id_email_map(self) -> OperationResult:
+        """Build a UserId → primary email mapping from all identity store users.
+
+        Returns:
+            ``OperationResult[Dict[str, str]]`` mapping UserId → lowercase email.
+        """
+        result = self._aws.identitystore.list_users()
+        if not result.is_success:
+            return result
+
+        users: list = result.data if isinstance(result.data, list) else []
+        mapping: Dict[str, str] = {}
+        for user in users:
+            user_id = user.get("UserId", "")
+            if not user_id:
+                continue
+            for email_entry in user.get("Emails", []):
+                if email_entry.get("Primary") and email_entry.get("Value"):
+                    mapping[user_id] = email_entry["Value"].strip().lower()
+                    break
+        return OperationResult.success(data=mapping)
