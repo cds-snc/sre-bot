@@ -17,13 +17,13 @@ from infrastructure.services import (
 from packages.access_sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access_sync.config import (
     AccessSyncRuntimeConfig,
+    AccessSyncSettings,
     get_access_sync_config_loader,
 )
 from packages.access_sync.platform_sync.service import PlatformSyncService
 from packages.access_sync.policies import PolicyRegistry
 from packages.access_sync.registry import AccessSyncRegistry
 from packages.access_sync.service import AccessSyncService
-from packages.access_sync.settings import AccessSyncSettings
 from packages.access_sync.store import SyncRunRepository
 from packages.access_sync.user_sync.service import UserSyncService
 

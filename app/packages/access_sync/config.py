@@ -1,25 +1,81 @@
-"""Access Sync runtime configuration models and config loader.
+"""Access Sync bootstrap settings and runtime configuration.
 
-Runtime config is loaded from one external source selected by bootstrap settings
-(ACCESS_SYNC_CONFIG_SOURCE).  This keeps per-group policy out of env vars and
-allows changes without a code deploy.
+AccessSyncSettings reads env vars that select the runtime config source and
+control feature flags. Runtime config is loaded from the selected external
+source, keeping per-group policy out of env vars so policies can change without
+a code deploy.
 
 Config loader sources:
-  bundle   - Built-in default policy bundle defined in code.  Useful for local
-             development and as a safe fallback.
-  dynamodb - Load from a DynamoDB item (not yet implemented; reserved).
-  s3       - Load from an S3 object (not yet implemented; reserved).
-  ssm      - Load from an SSM parameter (not yet implemented; reserved).
+    bundle   - Built-in empty bundle. Default for local development.
+    dynamodb - Load from a DynamoDB item (reserved; not yet implemented).
+    s3       - Load from an S3 object (reserved; not yet implemented).
+    ssm      - Load from an SSM parameter (reserved; not yet implemented).
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Literal, Optional, Protocol
 
-from infrastructure.operations import OperationResult
-from packages.access_sync.policies import PlatformPolicy
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.policies import EntitlementRule, PlatformPolicy
+
+
+class AccessSyncSettings(BaseSettings):
+    """Bootstrap settings for Access Sync runtime config loading.
+
+    Environment Variables:
+        ACCESS_SYNC_ENABLED: Master on/off switch. Default: false.
+        ACCESS_SYNC_CONFIG_SOURCE: Where to load runtime config from
+            (bundle | inline_json | file_json | dynamodb | s3 | ssm). Default: bundle.
+        ACCESS_SYNC_CONFIG_REF: Reference key for the config document
+            (table row PK, S3 key, SSM path, or bundle name).
+        ACCESS_SYNC_CONFIG_REFRESH_SECONDS: How often to refresh runtime
+            config in seconds (reserved for future cache invalidation).
+        ACCESS_SYNC_RECONCILIATION_ENABLED: Enable scheduled full-platform
+            sync. Default: false.
+        ACCESS_SYNC_RECONCILIATION_SCHEDULE: Daily sync run time in "HH:MM"
+            format (UTC). Default: "03:00".
+    """
+
+    enabled: bool = Field(
+        default=False,
+        alias="ACCESS_SYNC_ENABLED",
+    )
+    config_source: Literal[
+        "bundle", "inline_json", "file_json", "dynamodb", "s3", "ssm"
+    ] = Field(
+        default="bundle",
+        alias="ACCESS_SYNC_CONFIG_SOURCE",
+    )
+    config_ref: str = Field(
+        default="default",
+        alias="ACCESS_SYNC_CONFIG_REF",
+    )
+    config_refresh_seconds: int = Field(
+        default=300,
+        alias="ACCESS_SYNC_CONFIG_REFRESH_SECONDS",
+    )
+    reconciliation_enabled: bool = Field(
+        default=False,
+        alias="ACCESS_SYNC_RECONCILIATION_ENABLED",
+    )
+    reconciliation_schedule: str = Field(
+        default="03:00",
+        alias="ACCESS_SYNC_RECONCILIATION_SCHEDULE",
+    )
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 @dataclass(frozen=True)
@@ -103,11 +159,193 @@ class BundleConfigLoader:
         )
 
 
+class InlineJsonConfigLoader:
+    """Config loader that parses runtime policy from ACCESS_SYNC_CONFIG_REF JSON."""
+
+    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+        """Parse *ref* as JSON and build AccessSyncRuntimeConfig.
+
+        Expected shape:
+            {
+              "policies": {
+                "aws": {
+                  "platform": "aws",
+                  "authn_group_slug": "sg-aws-authn",
+                  "authn_mode": "derived",
+                  "authn_removal_mode": "delete",
+                  "entitlement_rules": []
+                }
+              }
+            }
+        """
+        try:
+            payload = json.loads(ref)
+        except json.JSONDecodeError as exc:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"inline_json_config_invalid_json: {exc.msg}",
+                error_code="CONFIG_INVALID_JSON",
+            )
+
+        if not isinstance(payload, dict):
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="inline_json_config_invalid_payload: top-level object required",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        raw_policies = payload.get("policies", {})
+        if not isinstance(raw_policies, dict):
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="inline_json_config_invalid_policies: object required",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        policies: Dict[str, PlatformPolicy] = {}
+        try:
+            for fallback_key, raw_policy in raw_policies.items():
+                if not isinstance(raw_policy, dict):
+                    raise ValueError("policy entry must be an object")
+
+                raw_rules = raw_policy.get("entitlement_rules", [])
+                if not isinstance(raw_rules, list):
+                    raise ValueError("entitlement_rules must be a list")
+
+                entitlement_rules: List[EntitlementRule] = []
+                for rule in raw_rules:
+                    if not isinstance(rule, dict):
+                        raise ValueError("entitlement rule must be an object")
+                    entitlement_rules.append(
+                        EntitlementRule(
+                            group_slug=str(rule["group_slug"]),
+                            entitlement_type=str(rule["entitlement_type"]),
+                            entitlement_id=str(rule["entitlement_id"]),
+                            mode=str(rule.get("mode", "sync_managed")),
+                        )
+                    )
+
+                policy = PlatformPolicy(
+                    platform=str(raw_policy["platform"]),
+                    authn_group_slug=str(raw_policy["authn_group_slug"]),
+                    authn_mode=str(raw_policy["authn_mode"]),
+                    authn_removal_mode=str(raw_policy["authn_removal_mode"]),
+                    entitlement_rules=entitlement_rules,
+                )
+                policies[str(policy.platform or fallback_key)] = policy
+        except (KeyError, TypeError, ValueError) as exc:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"inline_json_config_invalid_policy: {exc}",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        config = AccessSyncRuntimeConfig(policies=policies)
+        return OperationResult.success(
+            data=config,
+            message=f"inline_json_config_loaded policies={len(policies)}",
+        )
+
+
+class FileJsonConfigLoader:
+    """Config loader that parses runtime policy from a JSON file path in ref."""
+
+    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+        """Read *ref* as a JSON file path and build AccessSyncRuntimeConfig."""
+        path = Path(ref)
+        if not path.exists():
+            return OperationResult.error(
+                status=OperationStatus.NOT_FOUND,
+                message=f"file_json_config_not_found: {path}",
+                error_code="CONFIG_NOT_FOUND",
+            )
+        if not path.is_file():
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"file_json_config_invalid_path: not a file: {path}",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            return OperationResult.error(
+                status=OperationStatus.TRANSIENT_ERROR,
+                message=f"file_json_config_read_failed: {exc}",
+                error_code="CONFIG_READ_FAILED",
+            )
+        except json.JSONDecodeError as exc:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"file_json_config_invalid_json: {exc.msg}",
+                error_code="CONFIG_INVALID_JSON",
+            )
+
+        if not isinstance(payload, dict):
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="file_json_config_invalid_payload: top-level object required",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        raw_policies = payload.get("policies", {})
+        if not isinstance(raw_policies, dict):
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="file_json_config_invalid_policies: object required",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        policies: Dict[str, PlatformPolicy] = {}
+        try:
+            for fallback_key, raw_policy in raw_policies.items():
+                if not isinstance(raw_policy, dict):
+                    raise ValueError("policy entry must be an object")
+
+                raw_rules = raw_policy.get("entitlement_rules", [])
+                if not isinstance(raw_rules, list):
+                    raise ValueError("entitlement_rules must be a list")
+
+                entitlement_rules: List[EntitlementRule] = []
+                for rule in raw_rules:
+                    if not isinstance(rule, dict):
+                        raise ValueError("entitlement rule must be an object")
+                    entitlement_rules.append(
+                        EntitlementRule(
+                            group_slug=str(rule["group_slug"]),
+                            entitlement_type=str(rule["entitlement_type"]),
+                            entitlement_id=str(rule["entitlement_id"]),
+                            mode=str(rule.get("mode", "sync_managed")),
+                        )
+                    )
+
+                policy = PlatformPolicy(
+                    platform=str(raw_policy["platform"]),
+                    authn_group_slug=str(raw_policy["authn_group_slug"]),
+                    authn_mode=str(raw_policy["authn_mode"]),
+                    authn_removal_mode=str(raw_policy["authn_removal_mode"]),
+                    entitlement_rules=entitlement_rules,
+                )
+                policies[str(policy.platform or fallback_key)] = policy
+        except (KeyError, TypeError, ValueError) as exc:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"file_json_config_invalid_policy: {exc}",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        config = AccessSyncRuntimeConfig(policies=policies)
+        return OperationResult.success(
+            data=config,
+            message=f"file_json_config_loaded path={path} policies={len(policies)}",
+        )
+
+
 def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
     """Return the config loader for the given source string.
 
     Args:
-        source: One of 'bundle', 'dynamodb', 's3', 'ssm'.
+        source: One of 'bundle', 'inline_json', 'file_json', 'dynamodb', 's3', 'ssm'.
 
     Returns:
         An AccessSyncConfigLoader instance.
@@ -118,7 +356,13 @@ def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
     if source == "bundle":
         return BundleConfigLoader()
 
+    if source == "inline_json":
+        return InlineJsonConfigLoader()
+
+    if source == "file_json":
+        return FileJsonConfigLoader()
+
     raise NotImplementedError(
         f"Access Sync config source '{source}' is not yet implemented. "
-        "Use ACCESS_SYNC_CONFIG_SOURCE=bundle for local development."
+        "Use ACCESS_SYNC_CONFIG_SOURCE=bundle, inline_json, or file_json for local development."
     )
