@@ -20,11 +20,10 @@ def test_bundle_loader_returns_empty_config():
     # Assert
     assert result.is_success
     assert isinstance(result.data, AccessSyncRuntimeConfig)
-    # Bundle loader now includes default AWS policy
-    assert "aws" in result.data.policies
-    assert result.data.policies["aws"].platform == "aws"
-    assert result.data.policies["aws"].authn_group_slug == "sg-aws-authn"
+    # Bundle loader returns empty policies — feature is in "waiting mode"
+    assert result.data.policies == {}
     assert result.data.entitlement_mode_overrides == []
+    assert "waiting mode" in result.message
 
 
 @pytest.mark.unit

@@ -10,7 +10,7 @@ Exports the FastAPI router for registration in the main application.
 from infrastructure.events import register_event_handler
 from infrastructure.services import hookimpl
 from packages.access_sync.platforms import slack
-from packages.access_sync.providers import get_access_sync_service
+from packages.access_sync.providers import get_user_sync_service
 from packages.access_sync.routes import router as access_sync_router
 
 
@@ -23,11 +23,21 @@ def register_slack_commands(provider) -> None:
 @register_event_handler("access_request_approved")
 def on_access_request_approved(event) -> None:
     """Trigger on-demand sync when an access request is approved."""
-    get_access_sync_service().sync_user(
+    get_user_sync_service().sync_user(
         user_email=event.user_email,
         platform=event.metadata.get("platform", ""),
         request_id=str(getattr(event, "correlation_id", "")),
     )
+
+
+@hookimpl
+def register_routes(app):
+    """Register geolocate HTTP routes.
+
+    Args:
+        app: FastAPI application instance.
+    """
+    app.include_router(access_sync_router)
 
 
 __all__ = ["access_sync_router"]

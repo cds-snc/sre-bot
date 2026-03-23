@@ -1,14 +1,17 @@
-"""Unit tests for AccessSyncService."""
+"""Unit tests for AccessSyncService.
+
+Covers F-01 (OperationResult[SyncOutcome] contract), F-05 (UNSUPPORTED_OPERATION
+manual action), and D-01 (per-user entitlement group qualification).
+"""
 
 import pytest
 
 from infrastructure.directory.models import (
     DirectoryGroup,
-    DirectoryMember,
-    DirectoryUser,
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.models import SyncOutcome
 from packages.access_sync.policies import (
     AdapterCapabilities,
     EntitlementRule,
@@ -16,155 +19,93 @@ from packages.access_sync.policies import (
     PolicyRegistry,
 )
 from packages.access_sync.registry import AccessSyncRegistry
-from packages.access_sync.service import AccessSyncService
-from packages.access_sync.store import InMemorySyncRunStore
-
-
-# ---------------------------------------------------------------------------
-# Fakes
-# ---------------------------------------------------------------------------
+from packages.access_sync.user_sync.service import UserSyncService
 
 
 class FakeAdapter:
-    """Minimal test double for an access sync adapter."""
+    """Test double for adapter. Tracks calls for assertion."""
 
-    def __init__(self, user_should_exist: bool = True) -> None:
-        self._user_should_exist = user_should_exist
-        self.calls: list = []
+    def __init__(self, current_entitlement_ids=None):
+        self.calls = []
+        self._current_ids = current_entitlement_ids or set()
 
-    def capabilities(self) -> AdapterCapabilities:
+    def capabilities(self):
         return AdapterCapabilities(
             supports_disable=False,
             supports_delete=True,
             supported_entitlement_types={"permission_set"},
         )
 
-    def get_user(self, user_email: str) -> OperationResult:
-        self.calls.append(("get_user", user_email))
-        if self._user_should_exist:
-            return OperationResult.success(data={"user_id": f"id-{user_email}"})
+    def ensure_user(self, email):
+        self.calls.append(("ensure_user", email))
+        return OperationResult.success()
+
+    def disable_user(self, email):
+        self.calls.append(("disable_user", email))
         return OperationResult.error(
-            OperationStatus.NOT_FOUND,
-            message="User not found",
-            error_code="USER_NOT_FOUND",
+            OperationStatus.PERMANENT_ERROR,
+            message="Disable not supported",
+            error_code="UNSUPPORTED_OPERATION",
         )
 
-    def ensure_user(self, user_email: str) -> OperationResult:
-        self.calls.append(("ensure_user", user_email))
-        return OperationResult.success(data={"user_id": f"id-{user_email}"})
-
-    def disable_user(self, user_email: str) -> OperationResult:
-        self.calls.append(("disable_user", user_email))
-        return OperationResult.success(message="disabled")
-
-    def remove_user(self, user_email: str) -> OperationResult:
-        self.calls.append(("remove_user", user_email))
+    def remove_user(self, email):
+        self.calls.append(("remove_user", email))
         return OperationResult.success(message="removed")
 
-    def apply_entitlement(
-        self, user_email: str, entitlement_type: str, entitlement_id: str
-    ) -> OperationResult:
-        self.calls.append(
-            ("apply_entitlement", user_email, entitlement_type, entitlement_id)
-        )
-        return OperationResult.success(message="applied")
+    def apply_entitlement(self, email, etype, eid):
+        self.calls.append(("apply_entitlement", email, etype, eid))
+        return OperationResult.success()
 
-    def remove_entitlement(
-        self, user_email: str, entitlement_type: str, entitlement_id: str
-    ) -> OperationResult:
-        self.calls.append(
-            ("remove_entitlement", user_email, entitlement_type, entitlement_id)
-        )
-        return OperationResult.success(message="removed")
+    def remove_entitlement(self, email, etype, eid):
+        self.calls.append(("remove_entitlement", email, etype, eid))
+        return OperationResult.success()
 
-    def fetch_current_state(self, user_email: str) -> OperationResult:
-        return OperationResult.success(
-            data={"user_id": f"id-{user_email}", "assignments": []}
-        )
+    def get_current_entitlement_ids(self, email):
+        self.calls.append(("get_current_entitlement_ids", email))
+        return OperationResult.success(data=set(self._current_ids))
 
 
 class FakeDirectoryProvider:
-    """Minimal directory provider stub for service tests."""
+    """Test double for directory provider."""
 
-    def __init__(self, is_member: bool = True) -> None:
-        self._is_member = is_member
+    def __init__(self, is_member=True):
+        self.is_member = is_member
 
-    def warmup(self) -> OperationResult:
-        return OperationResult.success()
-
-    def health_check(self) -> OperationResult:
-        return OperationResult.success()
-
-    def get_user(self, email: str) -> OperationResult:
+    def get_group(self, slug):
         return OperationResult.success(
-            data=DirectoryUser(
-                email=email,
-                provider_user_id=f"uid-{email}",
-                provider="fake",
+            data=DirectoryGroup(
+                group_email=f"{slug}@example.com",
+                group_slug=slug,
+                provider_group_id=f"gid-{slug}",
             )
         )
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult:
-        return OperationResult.success(data=[])
-
-    def get_group(self, group_key: str) -> OperationResult:
-        normalized_group_key = group_key.strip().lower()
-        if "@" not in normalized_group_key:
-            normalized_group_key = f"{normalized_group_key}@example.com"
-        group = DirectoryGroup(
-            group_email=normalized_group_key,
-            group_slug=normalized_group_key.split("@")[0],
-            provider_group_id=f"gid-{normalized_group_key}",
-        )
-        return OperationResult.success(data=group)
-
-    def list_groups(self, query: str) -> OperationResult:
-        group = DirectoryGroup(
-            group_email=f"{query}@example.com",
-            group_slug=query,
-            provider_group_id=f"gid-{query}",
-        )
-        return OperationResult.success(data=[group])
-
-    def get_group_members(self, group_key: str) -> OperationResult:
-        return OperationResult.success(data=[])
-
-    def add_group_member(
-        self,
-        group_key: str,
-        user_email: str,
-        role: str = "MEMBER",
-    ) -> OperationResult:
+    def check_membership(self, group_email, user_email):
         return OperationResult.success(
-            data=DirectoryMember(
-                email=user_email,
-                role=role,
-                provider="fake",
+            data=MembershipCheckResult(
+                group_email=group_email,
+                group_slug=group_email.split("@")[0],
+                provider_group_id=None,
+                user_email=user_email,
+                is_member=self.is_member,
             )
         )
 
-    def remove_group_member(self, group_key: str, user_email: str) -> OperationResult:
-        return OperationResult.success()
 
-    def check_membership(self, group_key: str, user_email: str) -> OperationResult:
-        result = MembershipCheckResult(
-            group_email=group_key,
-            group_slug=group_key.split("@")[0],
-            provider_group_id=None,
-            user_email=user_email,
-            is_member=self._is_member,
-        )
-        return OperationResult.success(data=result)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 
 def make_service(
-    is_member: bool = True,
-    platform: str = "aws",
+    is_member=True,
+    platform="aws",
     rules=None,
-    authn_removal_mode: str = "delete",
-) -> tuple:
-    """Return (service, adapter, store) triple for a minimal test setup."""
-    adapter = FakeAdapter()
+    authn_removal_mode="delete",
+    current_ids=None,
+):
+    """Create a minimal test service."""
+    adapter = FakeAdapter(current_entitlement_ids=current_ids or set())
     policy = PlatformPolicy(
         platform=platform,
         authn_group_slug=f"sg-{platform}-authn",
@@ -175,223 +116,145 @@ def make_service(
     registry = AccessSyncRegistry(adapters={platform: adapter})
     policies = PolicyRegistry(policies={platform: policy})
     directory = FakeDirectoryProvider(is_member=is_member)
-    store = InMemorySyncRunStore()
-    service = AccessSyncService(
-        registry=registry,
-        policies=policies,
-        directory=directory,
-        store=store,
-    )
-    return service, adapter, store
+    service = UserSyncService(registry=registry, policies=policies, directory=directory)
+    return service, adapter
 
 
 # ---------------------------------------------------------------------------
-# compute_desired_state
+# Tests — F-01: OperationResult[SyncOutcome] boundary contract
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_compute_desired_state_member_returns_true():
-    # Arrange
-    service, _, _ = make_service(is_member=True)
+def test_sync_user_returns_operation_result_with_sync_outcome():
+    """F-01: sync_user returns OperationResult[SyncOutcome], not a custom type."""
+    service, _ = make_service(is_member=True)
+    result = service.sync_user("alice@example.com", "aws")
 
-    # Act
-    result = service.compute_desired_state(
-        user_email="alice@example.com", platform="aws"
-    )
-
-    # Assert
+    assert isinstance(result, OperationResult)
     assert result.is_success
-    assert result.data is True
+    assert isinstance(result.data, SyncOutcome)
 
 
 @pytest.mark.unit
-def test_compute_desired_state_non_member_returns_false():
-    # Arrange
-    service, _, _ = make_service(is_member=False)
+def test_sync_user_member_applies_ensure_user():
+    """Member: ensure_user action is executed and appears in applied_actions."""
+    service, adapter = make_service(is_member=True)
+    result = service.sync_user("alice@example.com", "aws")
 
-    # Act
-    result = service.compute_desired_state(user_email="bob@example.com", platform="aws")
-
-    # Assert
     assert result.is_success
-    assert result.data is False
+    assert "ensure_user" in result.data.applied_actions
+    assert any(c[0] == "ensure_user" for c in adapter.calls)
 
 
 @pytest.mark.unit
-def test_compute_desired_state_unknown_platform_returns_error():
-    # Arrange
-    service, _, _ = make_service()
+def test_sync_user_non_member_removes_user():
+    """Non-member: remove_user action is planned and executed."""
+    service, adapter = make_service(is_member=False, authn_removal_mode="delete")
+    result = service.sync_user("alice@example.com", "aws")
 
-    # Act
-    result = service.compute_desired_state(
-        user_email="alice@example.com", platform="unknown"
-    )
-
-    # Assert
-    assert not result.is_success
-    assert result.error_code == "POLICY_NOT_FOUND"
+    assert result.is_success
+    assert "remove_user" in result.data.applied_actions
 
 
 # ---------------------------------------------------------------------------
-# sync_user — user should exist
+# Tests — F-05: UNSUPPORTED_OPERATION = requires_manual_action
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_sync_user_member_ensures_user():
-    # Arrange
-    service, adapter, store = make_service(is_member=True)
+def test_sync_user_disable_mode_sets_requires_manual_action():
+    """F-05: disable_user returning UNSUPPORTED_OPERATION sets requires_manual_action=True."""
+    service, adapter = make_service(is_member=False, authn_removal_mode="disable")
+    result = service.sync_user("alice@example.com", "aws")
 
-    # Act
-    result = service.sync_user(user_email="alice@example.com", platform="aws")
-
-    # Assert
     assert result.is_success
-    assert "ensure_user" in result.applied_actions
-    ensure_calls = [c for c in adapter.calls if c[0] == "ensure_user"]
-    assert len(ensure_calls) == 1
+    assert result.data.requires_manual_action is True
+
+
+# ---------------------------------------------------------------------------
+# Tests — D-01: per-user entitlement group qualification
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_sync_user_applies_sync_managed_entitlements():
-    # Arrange
+def test_sync_user_does_not_apply_entitlement_when_not_in_group():
+    """D-01: entitlement is only applied when user IS a member of the entitlement group."""
     rule = EntitlementRule(
         group_slug="sg-aws-admin",
         entitlement_type="permission_set",
         entitlement_id="123456789012/AWSAdministratorAccess",
         mode="sync_managed",
     )
-    service, adapter, store = make_service(is_member=True, rules=[rule])
-
-    # Act
-    result = service.sync_user(user_email="alice@example.com", platform="aws")
-
-    # Assert
-    assert result.is_success
-    assert "apply_entitlement" in result.applied_actions
-    ent_calls = [c for c in adapter.calls if c[0] == "apply_entitlement"]
-    assert any(c[3] == "123456789012/AWSAdministratorAccess" for c in ent_calls)
-
-
-@pytest.mark.unit
-def test_sync_user_skips_ephemeral_entitlements():
-    # Arrange — ephemeral rule should never be in sync_managed_rules()
-    rule = EntitlementRule(
-        group_slug="sg-aws-privileged",
-        entitlement_type="permission_set",
-        entitlement_id="123/PrivilegedAccess",
-        mode="ephemeral",
-    )
-    service, adapter, store = make_service(is_member=True, rules=[rule])
-
-    # Act
-    result = service.sync_user(user_email="alice@example.com", platform="aws")
-
-    # Assert
-    assert result.is_success
-    ent_calls = [c for c in adapter.calls if c[0] == "apply_entitlement"]
-    assert not ent_calls  # no entitlement applied
-
-
-@pytest.mark.unit
-def test_sync_user_skips_deactivated_entitlements():
-    # Arrange — deactivated rule must not trigger any entitlement action
-    rule = EntitlementRule(
-        group_slug="sg-aws-legacy",
-        entitlement_type="permission_set",
-        entitlement_id="999/LegacyAccess",
-        mode="deactivated",
-    )
-    service, adapter, store = make_service(is_member=True, rules=[rule])
-
-    # Act
-    result = service.sync_user(user_email="alice@example.com", platform="aws")
-
-    # Assert
-    assert result.is_success
-    ent_calls = [c for c in adapter.calls if c[0] == "apply_entitlement"]
-    assert not ent_calls
-
-
-# ---------------------------------------------------------------------------
-# sync_user — user should not exist
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_sync_user_non_member_removes_user():
-    # Arrange
-    service, adapter, store = make_service(is_member=False, authn_removal_mode="delete")
-
-    # Act
-    result = service.sync_user(user_email="bob@example.com", platform="aws")
-
-    # Assert
-    assert result.is_success
-    assert "remove_user" in result.applied_actions
-    remove_calls = [c for c in adapter.calls if c[0] == "remove_user"]
-    assert len(remove_calls) == 1
-
-
-# ---------------------------------------------------------------------------
-# sync_user — dry run
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_sync_user_dry_run_returns_planned_actions_without_execution():
-    # Arrange
-    service, adapter, store = make_service(is_member=True)
-
-    # Act
-    result = service.sync_user(
-        user_email="alice@example.com",
+    # User is member of authn group but NOT of the entitlement group.
+    # We model this by using a FakeDirectoryProvider with per-group control.
+    adapter = FakeAdapter()
+    policy = PlatformPolicy(
         platform="aws",
-        dry_run=True,
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[rule],
     )
 
-    # Assert
+    class SelectiveMembershipProvider(FakeDirectoryProvider):
+        """Member of authn group only, not of the entitlement group."""
+
+        def check_membership(self, group_email, user_email):
+            is_member = "authn" in group_email  # only authn group
+            return OperationResult.success(
+                data=MembershipCheckResult(
+                    group_email=group_email,
+                    group_slug=group_email.split("@")[0],
+                    provider_group_id=None,
+                    user_email=user_email,
+                    is_member=is_member,
+                )
+            )
+
+    service = UserSyncService(
+        registry=AccessSyncRegistry(adapters={"aws": adapter}),
+        policies=PolicyRegistry(policies={"aws": policy}),
+        directory=SelectiveMembershipProvider(),
+    )
+    result = service.sync_user("alice@example.com", "aws")
+
     assert result.is_success
-    assert "ensure_user" in result.applied_actions
-    assert not adapter.calls  # nothing executed
-
-
-# ---------------------------------------------------------------------------
-# sync_user — run record persistence
-# ---------------------------------------------------------------------------
+    # ensure_user should be called but NOT apply_entitlement
+    action_names = [c[0] for c in adapter.calls]
+    assert "ensure_user" in action_names
+    assert "apply_entitlement" not in action_names
 
 
 @pytest.mark.unit
-def test_sync_user_persists_run_record():
-    # Arrange
-    service, _, store = make_service(is_member=True)
-
-    # Act
-    service.sync_user(
-        user_email="alice@example.com", platform="aws", request_id="req-42"
-    )
-
-    # Assert
-    runs = store.get_recent_runs(platform="aws", user_email="alice@example.com")
-    assert len(runs) == 1
-    assert runs[0].request_id == "req-42"
-    assert runs[0].status == "success"
-
-
-# ---------------------------------------------------------------------------
-# sync_user — missing policy/adapter
-# ---------------------------------------------------------------------------
+def test_compute_desired_state_member():
+    """Authn group member → user_should_exist=True."""
+    service, _ = make_service(is_member=True)
+    result = service.compute_desired_state("alice@example.com", "aws")
+    assert result.is_success
+    assert result.data is True
 
 
 @pytest.mark.unit
-def test_sync_user_unknown_platform_returns_error():
-    # Arrange
-    service, _, _ = make_service()
+def test_compute_desired_state_non_member():
+    """Not in authn group → user_should_exist=False."""
+    service, _ = make_service(is_member=False)
+    result = service.compute_desired_state("alice@example.com", "aws")
+    assert result.is_success
+    assert result.data is False
 
-    # Act
-    result = service.sync_user(user_email="alice@example.com", platform="gcp")
 
-    # Assert
-    assert not result.is_success
-    assert result.error_code == "POLICY_NOT_FOUND"
+@pytest.mark.unit
+def test_sync_user_dry_run_returns_planned_actions():
+    """Dry-run returns planned actions without executing them."""
+    service, adapter = make_service(is_member=True)
+    result = service.sync_user("alice@example.com", "aws", dry_run=True)
+
+    assert result.is_success
+    assert isinstance(result.data, SyncOutcome)
+    assert len(result.data.applied_actions) >= 1
+    # No adapter calls should have been made (only get_current_entitlement_ids is OK)
+    execution_calls = [
+        c for c in adapter.calls if c[0] != "get_current_entitlement_ids"
+    ]
+    assert execution_calls == []

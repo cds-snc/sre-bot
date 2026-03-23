@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional, Protocol
 
 from infrastructure.operations import OperationResult
-from packages.access_sync.policies import PlatformPolicy, EntitlementRule
+from packages.access_sync.policies import PlatformPolicy
 
 
 @dataclass(frozen=True)
@@ -78,30 +78,28 @@ class AccessSyncConfigLoader(Protocol):
 
 
 class BundleConfigLoader:
-    """Config loader that returns a built-in default bundle.
+    """Config loader that returns an empty bundle (no policies configured).
 
-    Returns built-in default policy bundle suitable for local development and testing.
-    For production, operators can switch to an external config source
-    (dynamodb / s3 / ssm) to manage policies without code deploys.
+    Access Sync enters "waiting mode" when no policies are configured: no
+    platforms are registered and sync_user returns POLICY_NOT_FOUND gracefully.
+    Operators wire real policies via an external source (dynamodb / s3 / ssm).
     """
 
     def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
-        """Return the default bundle config with policies.
+        """Return an empty bundle config with no pre-configured policies.
 
         Args:
-            ref: Bundle name (currently 'default' is the only supported ref).
+            ref: Bundle name (ignored; kept for protocol compatibility).
 
         Returns:
-            OperationResult with AccessSyncRuntimeConfig containing populated
-            policies dict. Infrastructure clients (AWS, Google Workspace, etc.)
-            are obtained separately from infrastructure.services and come
-            pre-configured with all bootstrap settings.
+            OperationResult with AccessSyncRuntimeConfig containing an empty
+            policies dict. The feature will be in waiting mode until an
+            external config source provides platform policies.
         """
-        policies = _get_default_policies()
-        config = AccessSyncRuntimeConfig(policies=policies)
+        config = AccessSyncRuntimeConfig(policies={})
         return OperationResult.success(
             data=config,
-            message=f"bundle_config_loaded ref={ref} policies={len(policies)}",
+            message=f"bundle_config_loaded ref={ref} policies=0 (waiting mode)",
         )
 
 
@@ -124,32 +122,3 @@ def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
         f"Access Sync config source '{source}' is not yet implemented. "
         "Use ACCESS_SYNC_CONFIG_SOURCE=bundle for local development."
     )
-
-
-def _get_default_policies() -> Dict[str, PlatformPolicy]:
-    """Return built-in default platform policies for bundle loader.
-
-    v1 includes AWS with basic authn and entitlement groups for dev testing.
-    """
-    return {
-        "aws": PlatformPolicy(
-            platform="aws",
-            authn_group_slug="sg-aws-authn",
-            authn_mode="derived",
-            authn_removal_mode="disable",
-            entitlement_rules=[
-                EntitlementRule(
-                    group_slug="sg-aws-product-prd-admin",
-                    entitlement_type="permission_set",
-                    entitlement_id="AWSAdmin",
-                    mode="sync_managed",
-                ),
-                EntitlementRule(
-                    group_slug="sg-aws-observability-prd-read",
-                    entitlement_type="permission_set",
-                    entitlement_id="ReadOnlyAccess",
-                    mode="sync_managed",
-                ),
-            ],
-        ),
-    }

@@ -102,15 +102,28 @@ def handle_sync_command(
     )
 
     if result.is_success:
-        actions = result.data or []
+        outcome = result.data
+        applied_actions = outcome.applied_actions if outcome else []
         prefix = (
-            "🔍 Dry-run — planned actions"
+            "Dry-run — planned actions"
             if dry_run
-            else "✅ Sync complete — actions applied"
+            else "Sync complete — actions applied"
         )
-        actions_text = "\n".join(f"• `{a}`" for a in actions) if actions else "_(none)_"
+        actions_text = (
+            "\n".join(f"• `{a}`" for a in applied_actions)
+            if applied_actions
+            else "_(none)_"
+        )
+        manual_note = (
+            "\n⚠️ Some actions require manual follow-up."
+            if outcome and outcome.requires_manual_action
+            else ""
+        )
         return CommandResponse(
-            message=(f"{prefix} for *{user_email}* on *{platform}*:\n{actions_text}"),
+            message=(
+                f"{prefix} for *{user_email}* on *{platform}*:"
+                f"\n{actions_text}{manual_note}"
+            ),
             ephemeral=False,
         )
 

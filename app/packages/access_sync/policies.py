@@ -176,6 +176,7 @@ class PolicyEngine:
         capabilities: AdapterCapabilities,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
+        current_entitlement_ids: Optional[Set[str]] = None,
     ) -> List[PlannedAction]:
         """Produce the minimal set of actions needed to converge to desired state.
 
@@ -184,16 +185,32 @@ class PolicyEngine:
             capabilities: Adapter execution capabilities.
             user_should_exist: True when authn-group membership indicates the user
                 should retain platform access.
-            required_entitlements: sync_managed rules that must be applied when
-                the user should exist.  Pass policy.sync_managed_rules() here.
+            required_entitlements: sync_managed rules *for which the user is an
+                effective IDP group member*.  Caller resolves membership before
+                passing this list — do not pass all rules unconditionally.
+            current_entitlement_ids: Set of entitlement IDs the user currently
+                holds on the target platform (from adapter.get_current_entitlement_ids).
+                Used to compute removals.  Pass ``None`` or empty when unknown;
+                the engine will skip removal planning in that case.
 
         Returns:
-            Ordered list of PlannedActions to execute.
+            Ordered list of PlannedActions to execute.  Entitlement removals
+            always precede user-lifecycle actions so the platform records are
+            clean before any account deactivation.
         """
         planned: List[PlannedAction] = []
+        current_ids: Set[str] = current_entitlement_ids or set()
+
+        # Build a lookup: entitlement_id → EntitlementRule for all sync_managed rules.
+        # Used to resolve type + id pairs for removal planning.
+        sync_managed_by_id: Dict[str, EntitlementRule] = {
+            r.entitlement_id: r for r in policy.sync_managed_rules()
+        }
 
         if user_should_exist:
             planned.append(PlannedAction(action="ensure_user"))
+
+            desired_ids: Set[str] = set()
             for rule in required_entitlements:
                 if rule.entitlement_type in capabilities.supported_entitlement_types:
                     planned.append(
@@ -203,14 +220,49 @@ class PolicyEngine:
                             entitlement_id=rule.entitlement_id,
                         )
                     )
+                    desired_ids.add(rule.entitlement_id)
+
+            # Remove sync-managed entitlements user holds but is no longer qualified for.
+            for ent_id in sorted(current_ids):
+                if ent_id in sync_managed_by_id and ent_id not in desired_ids:
+                    rule = sync_managed_by_id[ent_id]
+                    if (
+                        rule.entitlement_type
+                        in capabilities.supported_entitlement_types
+                    ):
+                        planned.append(
+                            PlannedAction(
+                                action="remove_entitlement",
+                                entitlement_type=rule.entitlement_type,
+                                entitlement_id=ent_id,
+                            )
+                        )
             return planned
 
-        # User should NOT exist — choose deprovision action based on policy + capabilities.
-        if policy.authn_removal_mode == "disable" and capabilities.supports_disable:
+        # User should NOT exist.
+        # Step 1: strip all sync-managed entitlements the user currently holds
+        # before any account-level deactivation.
+        for ent_id in sorted(current_ids):
+            if ent_id in sync_managed_by_id:
+                rule = sync_managed_by_id[ent_id]
+                if rule.entitlement_type in capabilities.supported_entitlement_types:
+                    planned.append(
+                        PlannedAction(
+                            action="remove_entitlement",
+                            entitlement_type=rule.entitlement_type,
+                            entitlement_id=ent_id,
+                        )
+                    )
+
+        # Step 2: user lifecycle action per policy.
+        # Always plan the policy-mandated action.  Adapters that cannot automate
+        # it return UNSUPPORTED_OPERATION; the service then marks
+        # requires_manual_action so an operator can act.
+        if policy.authn_removal_mode == "disable":
             planned.append(PlannedAction(action="disable_user"))
-        elif policy.authn_removal_mode == "delete" and capabilities.supports_delete:
+        elif policy.authn_removal_mode == "delete":
             planned.append(PlannedAction(action="remove_user"))
-        # entitlement_only or capability mismatch → no user-lifecycle action needed;
-        # caller is responsible for manual follow-up signalling.
+        # authn_removal_mode == "entitlement_only": entitlement removals above
+        # are sufficient; no account-level action is needed.
 
         return planned

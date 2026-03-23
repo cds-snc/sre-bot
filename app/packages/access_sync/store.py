@@ -1,39 +1,66 @@
-"""Access Sync persistent run state store.
+"""Access Sync persistent run state repository.
 
-Stores sync run records and reconciliation checkpoints for audit trails and
-drift detection.  This is a v1 stub — a production implementation would
-persist to DynamoDB via the centralized AWSClients service.
+Wraps ``StorageService`` to persist and retrieve ``SyncRunRecord`` objects.
+Access Sync owns its key scheme and serialization; all DynamoDB I/O is
+delegated to the infrastructure storage service.
 
-Each sync operation should write a SyncRunRecord so operators can review
-what actions were taken, when, and with what result.
+Key scheme in ``sre_bot_access``:
+    PK = ``SYNC_RUN#{platform}#{user_email}``
+    SK = ``{created_at_iso}#{run_id}``
+
+This allows efficient per-user, per-platform pagination (newest first via
+``ScanIndexForward=False``).
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Literal, Optional, Protocol
+from typing import List, Optional
+
+import structlog
+
+from infrastructure.storage.service import StorageService
+from packages.access_sync.models import SyncRunRecord
+
+logger = structlog.get_logger()
 
 
-@dataclass
-class SyncRunRecord:
-    """Record of a single sync operation for one user + platform."""
+class SyncRunRepository:
+    """DynamoDB-backed repository for sync run records.
 
-    run_id: str
-    user_email: str
-    platform: str
-    actions_applied: List[str]
-    status: Literal["success", "partial", "failed", "manual_action_required"]
-    dry_run: bool = False
-    request_id: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    Constructed once at startup in ``providers.py`` using the centralized
+    ``StorageService`` singleton from ``infrastructure.services``.
 
+    Args:
+        storage: Configured ``StorageService`` instance injected by provider.
+    """
 
-class SyncRunStore(Protocol):
-    """Contract for sync run persistence backends."""
+    TABLE = "sre_bot_access"
 
-    def save_run(self, record: SyncRunRecord) -> None:
-        """Persist a sync run record."""
-        ...
+    def __init__(self, storage: StorageService) -> None:
+        self._storage = storage
+
+    def save(self, record: SyncRunRecord) -> None:
+        """Persist a sync run record.  Failure is logged but not propagated."""
+        sk = f"{record.created_at.isoformat()}#{record.run_id}"
+        item = {
+            "PK": f"SYNC_RUN#{record.platform}#{record.user_email}",
+            "SK": sk,
+            "run_id": record.run_id,
+            "user_email": record.user_email,
+            "platform": record.platform,
+            "actions_applied": record.actions_applied,
+            "status": record.status,
+            "dry_run": record.dry_run,
+            "request_id": record.request_id,
+            "error_message": record.error_message,
+            "created_at": record.created_at.isoformat(),
+        }
+        result = self._storage.put(self.TABLE, item)
+        if not result.is_success:
+            logger.error(
+                "sync_run_save_failed",
+                run_id=record.run_id,
+                error=result.message,
+            )
 
     def get_recent_runs(
         self,
@@ -42,30 +69,40 @@ class SyncRunStore(Protocol):
         limit: int = 10,
     ) -> List[SyncRunRecord]:
         """Return recent runs for the given platform + user, newest first."""
-        ...
+        pk = f"SYNC_RUN#{platform}#{user_email}"
+        result = self._storage.query(
+            self.TABLE,
+            key_condition="PK = :pk",
+            expression_values={":pk": pk},
+            ScanIndexForward=False,
+            Limit=limit,
+        )
+        if not result.is_success:
+            logger.error(
+                "sync_run_query_failed",
+                platform=platform,
+                user_email=user_email,
+                error=result.message,
+            )
+            return []
+        return [self._deserialize(item) for item in (result.data or [])]
 
-
-class InMemorySyncRunStore:
-    """In-memory SyncRunStore for local development and testing.
-
-    Not suitable for production — data is lost on restart.
-    """
-
-    def __init__(self) -> None:
-        self._records: List[SyncRunRecord] = []
-
-    def save_run(self, record: SyncRunRecord) -> None:
-        self._records.append(record)
-
-    def get_recent_runs(
-        self,
-        platform: str,
-        user_email: str,
-        limit: int = 10,
-    ) -> List[SyncRunRecord]:
-        matching = [
-            r
-            for r in reversed(self._records)
-            if r.platform == platform and r.user_email == user_email
-        ]
-        return matching[:limit]
+    @staticmethod
+    def _deserialize(item: dict) -> SyncRunRecord:
+        created_raw: Optional[str] = item.get("created_at")
+        created_at = (
+            datetime.fromisoformat(created_raw)
+            if created_raw
+            else datetime.now(timezone.utc)
+        )
+        return SyncRunRecord(
+            run_id=item.get("run_id", ""),
+            user_email=item.get("user_email", ""),
+            platform=item.get("platform", ""),
+            actions_applied=list(item.get("actions_applied", [])),
+            status=item.get("status", "success"),  # type: ignore[arg-type]
+            dry_run=bool(item.get("dry_run", False)),
+            request_id=item.get("request_id"),
+            error_message=item.get("error_message"),
+            created_at=created_at,
+        )
