@@ -57,8 +57,8 @@ AccessSyncRequest = Annotated[
 class AccessSyncResponse(BaseModel):
     """Unified response for any sync operation.
 
-    User-sync specific fields (user_email, actions_applied, requires_manual_action)
-    are populated when sync_type='user'. Platform-sync fields
+    User-sync specific fields (user_email, actions_planned, actions_applied,
+    requires_manual_action) are populated when sync_type='user'. Platform-sync fields
     (users_synced, users_converged, orphans_found, requires_manual_action_count)
     are populated when sync_type='platform'.
     """
@@ -69,6 +69,7 @@ class AccessSyncResponse(BaseModel):
     dry_run: bool = False
     # user-sync fields
     user_email: Optional[str] = None
+    actions_planned: List[str] = Field(default_factory=list)
     actions_applied: List[str] = Field(default_factory=list)
     requires_manual_action: bool = False
     # platform-sync fields
