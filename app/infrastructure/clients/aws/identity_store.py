@@ -63,7 +63,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "create_group_membership",
@@ -101,7 +101,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "create_user",
@@ -136,7 +136,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "delete_group_membership",
@@ -171,7 +171,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "delete_user",
@@ -205,7 +205,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "describe_group",
@@ -278,7 +278,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "describe_user",
@@ -437,7 +437,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             service_name="identitystore",
             method="get_group_id",
@@ -478,7 +478,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "get_group_membership_id",
@@ -513,7 +513,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             service_name="identitystore",
             method="get_user_id",
@@ -542,7 +542,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_users",
@@ -577,7 +577,7 @@ class IdentityStoreClient:
                 message="identity_store_id is required",
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_group_memberships_for_member",
@@ -612,7 +612,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_group_memberships",
@@ -646,7 +646,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_group_memberships_for_member",
@@ -678,7 +678,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_groups",
@@ -823,7 +823,7 @@ class IdentityStoreClient:
                 error_code="MISSING_IDENTITY_STORE_ID",
             )
 
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "identitystore",
             "list_users",
