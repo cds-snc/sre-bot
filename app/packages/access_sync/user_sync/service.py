@@ -16,9 +16,16 @@ import structlog
 
 from infrastructure.events import Event, EventDispatcher
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.adapters import AccessSyncAdapter
 from packages.access_sync import events as sync_events
 from packages.access_sync.models import MembershipContext, SyncOutcome, SyncRunRecord
-from packages.access_sync.policies import EntitlementRule, PolicyEngine, PolicyRegistry
+from packages.access_sync.policies import (
+    EntitlementRule,
+    PlannedAction,
+    PlatformPolicy,
+    PolicyEngine,
+    PolicyRegistry,
+)
 from packages.access_sync.registry import AccessSyncRegistry
 
 if TYPE_CHECKING:
@@ -103,7 +110,13 @@ class UserSyncService:
         authn_result = self._check_group_membership(policy.authn_group_slug, user_email)
         if not authn_result.is_success:
             return authn_result
-        user_should_exist: bool = authn_result.data
+        if not isinstance(authn_result.data, bool):
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message="Invalid authn membership result",
+                error_code="INVALID_MEMBERSHIP_RESULT",
+            )
+        user_should_exist = authn_result.data
 
         # Per-user entitlement group membership resolution.
         required_entitlements: List[EntitlementRule] = []
@@ -207,8 +220,8 @@ class UserSyncService:
         self,
         user_email: str,
         platform: str,
-        adapter,
-        policy,
+        adapter: AccessSyncAdapter,
+        policy: PlatformPolicy,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
         dry_run: bool,
@@ -220,8 +233,14 @@ class UserSyncService:
         # Current platform state for delta planning.
         current_ids: Set[str] = set()
         current_result = adapter.get_current_entitlement_ids(user_email)
+        platform_user_exists = current_result.is_success
         if current_result.is_success and current_result.data is not None:
-            current_ids = current_result.data
+            if isinstance(current_result.data, set):
+                current_ids = {
+                    value for value in current_result.data if isinstance(value, str)
+                }
+        elif current_result.status == OperationStatus.NOT_FOUND:
+            log.info("platform_user_absent")
 
         planned = self._engine.plan_actions(
             policy=policy,
@@ -230,11 +249,24 @@ class UserSyncService:
             required_entitlements=required_entitlements,
             current_entitlement_ids=current_ids,
         )
-        log.info("actions_planned", count=len(planned))
+        planned_actions = [str(planned_action.action) for planned_action in planned]
+        log.info(
+            "actions_planned",
+            count=len(planned_actions),
+            actions=planned_actions,
+            platform_user_exists=platform_user_exists,
+            current_entitlement_count=len(current_ids),
+            user_should_exist=user_should_exist,
+        )
 
         if dry_run:
+            log.info(
+                "dry_run_plan_ready",
+                actions=planned_actions,
+                platform_user_exists=platform_user_exists,
+            )
             return OperationResult.success(
-                data=SyncOutcome(applied_actions=[p.action for p in planned])
+                data=SyncOutcome(planned_actions=planned_actions, applied_actions=[])
             )
 
         applied: List[str] = []
@@ -295,6 +327,7 @@ class UserSyncService:
                 )
         return OperationResult.success(
             data=SyncOutcome(
+                planned_actions=planned_actions,
                 applied_actions=applied, requires_manual_action=requires_manual_action
             )
         )
@@ -353,7 +386,12 @@ class UserSyncService:
                 )
         return qualified
 
-    def _execute_action(self, adapter, action, user_email: str) -> OperationResult:
+    def _execute_action(
+        self,
+        adapter: AccessSyncAdapter,
+        action: PlannedAction,
+        user_email: str,
+    ) -> OperationResult:
         """Dispatch a single planned action to the adapter."""
         if action.action == "ensure_user":
             return adapter.ensure_user(user_email)
@@ -362,10 +400,22 @@ class UserSyncService:
         if action.action == "remove_user":
             return adapter.remove_user(user_email)
         if action.action == "apply_entitlement":
+            if action.entitlement_type is None or action.entitlement_id is None:
+                return OperationResult.error(
+                    OperationStatus.PERMANENT_ERROR,
+                    message="Missing entitlement metadata for apply_entitlement",
+                    error_code="INVALID_PLANNED_ACTION",
+                )
             return adapter.apply_entitlement(
                 user_email, action.entitlement_type, action.entitlement_id
             )
         if action.action == "remove_entitlement":
+            if action.entitlement_type is None or action.entitlement_id is None:
+                return OperationResult.error(
+                    OperationStatus.PERMANENT_ERROR,
+                    message="Missing entitlement metadata for remove_entitlement",
+                    error_code="INVALID_PLANNED_ACTION",
+                )
             return adapter.remove_entitlement(
                 user_email, action.entitlement_type, action.entitlement_id
             )
