@@ -14,7 +14,7 @@ v1 supported entitlement_type: "group"
 Future: "permission_set" for temporary elevated account assignments.
 """
 
-from typing import Protocol, TYPE_CHECKING
+from typing import Protocol, Set, TYPE_CHECKING, runtime_checkable
 
 from infrastructure.operations import OperationResult
 
@@ -121,4 +121,17 @@ class AccessSyncAdapter(Protocol):
         Returns:
             ``OperationResult[Set[str]]`` of lowercase member emails, or error.
         """
+        ...
+
+
+@runtime_checkable
+class BulkGroupMembershipAdapter(Protocol):
+    """Optional high-throughput membership read capability.
+
+    Adapters implement this protocol when they can fetch members for many
+    groups in one optimized call path, reducing reconciliation read costs.
+    """
+
+    def list_members_for_groups(self, group_ids: Set[str]) -> OperationResult:
+        """Return mapping of group_id -> set of lowercase member emails."""
         ...

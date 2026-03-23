@@ -6,6 +6,26 @@
       "authn_mode": "derived",
       "authn_removal_mode": "delete",
       "entitlement_rules": []
+    },
+    "fake": {
+      "platform": "fake",
+      "authn_group_slug": "sg-fake-authn",
+      "authn_mode": "derived",
+      "authn_removal_mode": "delete",
+      "entitlement_rules": [
+        {
+          "group_slug": "sg-fake-admin",
+          "entitlement_type": "group",
+          "entitlement_id": "fake-group-admin",
+          "mode": "sync_managed"
+        },
+        {
+          "group_slug": "sg-fake-read",
+          "entitlement_type": "group",
+          "entitlement_id": "fake-group-read",
+          "mode": "sync_managed"
+        }
+      ]
     }
   }
 }

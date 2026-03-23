@@ -5,7 +5,7 @@ All clients are obtained from infrastructure.services — never instantiated loc
 """
 
 from functools import lru_cache
-from typing import Optional
+from typing import Dict, Optional
 
 from infrastructure.events import EventDispatcher
 from infrastructure.operations import OperationResult
@@ -15,6 +15,8 @@ from infrastructure.services import (
     get_storage_service,
 )
 from packages.access_sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
+from packages.access_sync.adapters.fake_platform import FakePlatformAdapter
+from packages.access_sync.adapters import AccessSyncAdapter
 from packages.access_sync.config import (
     AccessSyncRuntimeConfig,
     AccessSyncSettings,
@@ -68,10 +70,17 @@ def get_access_sync_registry() -> AccessSyncRegistry:
     fully configured with all bootstrap settings (e.g., AWS_SSO_INSTANCE_ID).
     Feature configuration handles only policy definitions, not infra setup.
     """
-    adapters = {}
+    adapters: Dict[str, AccessSyncAdapter] = {}
+    runtime_config = get_access_sync_runtime_config()
 
-    aws_clients = get_aws_clients()
-    adapters["aws"] = AwsIdentityCenterAdapter(aws_clients=aws_clients)
+    for platform_key, policy in runtime_config.policies.items():
+        platform = str(policy.platform or platform_key).strip().lower()
+        if platform == "aws":
+            aws_clients = get_aws_clients()
+            adapters[platform_key] = AwsIdentityCenterAdapter(aws_clients=aws_clients)
+            continue
+        if platform == "fake":
+            adapters[platform_key] = FakePlatformAdapter()
 
     return AccessSyncRegistry(adapters=adapters)
 

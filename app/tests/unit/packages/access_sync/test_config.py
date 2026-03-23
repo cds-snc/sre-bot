@@ -75,6 +75,32 @@ def test_inline_json_loader_parses_aws_policy():
 
 
 @pytest.mark.unit
+def test_inline_json_loader_parses_fake_policy_with_entitlements():
+    # Arrange
+    loader = InlineJsonConfigLoader()
+    ref = (
+        '{"policies":{"fake":{"platform":"fake","authn_group_slug":"sg-fake-authn",'
+        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":['
+        '{"group_slug":"sg-fake-admin","entitlement_type":"group",'
+        '"entitlement_id":"fake-group-admin","mode":"sync_managed"},'
+        '{"group_slug":"sg-fake-read","entitlement_type":"group",'
+        '"entitlement_id":"fake-group-read","mode":"sync_managed"}]}}}'
+    )
+
+    # Act
+    result = loader.load(ref=ref)
+
+    # Assert
+    assert result.is_success
+    assert result.data is not None
+    assert "fake" in result.data.policies
+    fake_policy = result.data.policies["fake"]
+    assert fake_policy.platform == "fake"
+    assert len(fake_policy.entitlement_rules) == 2
+    assert fake_policy.entitlement_rules[0].entitlement_id == "fake-group-admin"
+
+
+@pytest.mark.unit
 def test_inline_json_loader_rejects_invalid_json():
     # Arrange
     loader = InlineJsonConfigLoader()

@@ -18,6 +18,7 @@ import structlog
 
 from infrastructure.events import Event, EventDispatcher
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.adapters import AccessSyncAdapter, BulkGroupMembershipAdapter
 from packages.access_sync import events as sync_events
 from packages.access_sync.models import (
     MembershipContext,
@@ -239,7 +240,7 @@ class PlatformSyncService:
     def _prefetch_current_entitlements(
         self,
         policy: PlatformPolicy,
-        adapter,
+        adapter: AccessSyncAdapter,
     ) -> OperationResult:
         """Build email -> current entitlement IDs from platform group memberships.
 
@@ -255,7 +256,7 @@ class PlatformSyncService:
             return OperationResult.success(data={})
 
         # Adapter-specific fast path: single bulk read for many groups.
-        if hasattr(adapter, "list_members_for_groups"):
+        if isinstance(adapter, BulkGroupMembershipAdapter):
             response = adapter.list_members_for_groups(managed_group_ids)
             if not response.is_success:
                 return OperationResult.error(
