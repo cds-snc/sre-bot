@@ -18,6 +18,7 @@ from packages.access_sync.providers import (
     get_access_sync_service,
     get_access_sync_registry,
 )
+from packages.access_sync.schemas import UserSyncRequest
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
@@ -94,11 +95,16 @@ def handle_sync_command(
     dry_run = bool(parsed_args.get("dry_run", False))
 
     service = get_access_sync_service()
-    result = service.sync_user(
-        user_email=user_email,
-        platform=platform,
-        dry_run=dry_run,
-        request_id=payload.correlation_id if hasattr(payload, "correlation_id") else "",
+    result = service.sync(
+        UserSyncRequest(
+            sync_type="user",
+            user_email=user_email,
+            platform=platform,
+            dry_run=dry_run,
+            request_id=(
+                payload.correlation_id if hasattr(payload, "correlation_id") else ""
+            ),
+        )
     )
 
     if result.is_success:
@@ -139,10 +145,7 @@ def handle_sync_command(
     )
 
 
-def handle_status_command(
-    payload: CommandPayload,
-    parsed_args: Dict[str, Any],
-) -> CommandResponse:
+def handle_status_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre access-sync-status."""
     registry = get_access_sync_registry()
     platforms = registry.registered_platforms()
