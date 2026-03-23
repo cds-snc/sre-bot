@@ -7,7 +7,7 @@ No business logic lives here.
 import structlog
 from fastapi import APIRouter, HTTPException
 
-from infrastructure.operations import OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.models import ReconciliationOutcome, SyncOutcome
 from packages.access_sync.providers import (
     get_access_sync_registry,
@@ -58,12 +58,33 @@ def sync_endpoint(
     if result.is_success:
         return _build_response(request, result.data)
 
-    if result.status == OperationStatus.NOT_FOUND:
-        raise HTTPException(status_code=404, detail=result.message)
-    if result.status == OperationStatus.PERMANENT_ERROR:
-        raise HTTPException(status_code=400, detail=result.message)
+    status_code, detail = _to_public_error(result)
+    if status_code >= 500:
+        log.error(
+            "sync_request_failed",
+            status=str(result.status),
+            error_code=result.error_code,
+            error=result.message,
+        )
+    else:
+        log.warning(
+            "sync_request_failed",
+            status=str(result.status),
+            error_code=result.error_code,
+            error=result.message,
+        )
+    raise HTTPException(status_code=status_code, detail=detail)
 
-    raise HTTPException(status_code=500, detail=result.message)
+
+def _to_public_error(result: OperationResult) -> tuple[int, str]:
+    """Map internal OperationResult errors to safe public API responses."""
+    if result.status == OperationStatus.NOT_FOUND:
+        return 404, "Requested access sync resource was not found"
+    if result.status == OperationStatus.UNAUTHORIZED:
+        return 403, "Not authorized to perform this access sync action"
+    if result.status == OperationStatus.PERMANENT_ERROR:
+        return 400, "Access sync request could not be completed"
+    return 500, "Access sync request failed due to an internal error"
 
 
 def _build_response(
@@ -78,6 +99,7 @@ def _build_response(
             platform=request.platform,
             user_email=request.user_email,
             dry_run=request.dry_run,
+            actions_planned=outcome.planned_actions if outcome else [],
             actions_applied=outcome.applied_actions if outcome else [],
             requires_manual_action=outcome.requires_manual_action if outcome else False,
         )
