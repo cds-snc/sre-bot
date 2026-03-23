@@ -12,6 +12,13 @@ from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
 
+# Disabled for now since the access sync command is not yet available and we don't want to run empty reconciliations until then. Will re-enable when the command is ready.
+# from packages.access_sync.providers import (
+#     get_access_sync_registry,
+#     get_access_sync_settings,
+#     get_platform_sync_service,
+# )
+
 logger = get_logger()
 
 
@@ -47,6 +54,15 @@ def init(bot):
     schedule.every().day.at("00:00").do(
         safe_run(spending.generate_spending_data), logger=logger
     )
+
+    # access_sync_settings = get_access_sync_settings()
+    # if access_sync_settings.enabled and access_sync_settings.reconciliation_enabled:
+    #     reconcile_time = access_sync_settings.reconciliation_schedule
+    #     schedule.every().day.at(reconcile_time).do(safe_run(reconcile_access_sync))
+    #     logger.info(
+    #         "access_sync_reconciliation_scheduled",
+    #         time=reconcile_time,
+    #     )
 
 
 def scheduler_heartbeat():
@@ -116,3 +132,12 @@ def run_continuously(interval=1):
     continuous_thread = ScheduleThread()
     continuous_thread.start()
     return cease_continuous_run
+
+
+# def reconcile_access_sync() -> None:
+#     """Run full-platform Access Sync batch sync for all registered platforms."""
+#     logger.info("reconcile_access_sync_started", module="scheduled_tasks")
+#     platform_sync = get_platform_sync_service()
+#     registry = get_access_sync_registry()
+#     for platform in registry.registered_platforms():
+#         platform_sync.sync_platform(platform=platform, dry_run=False)
