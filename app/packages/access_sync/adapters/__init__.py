@@ -9,7 +9,7 @@ return a non-success OperationResult with a machine-readable error_code so the
 service can mark the run as manual_action_required.
 """
 
-from typing import Protocol, TYPE_CHECKING
+from typing import Protocol, Set, TYPE_CHECKING
 
 from infrastructure.operations import OperationResult
 
@@ -71,4 +71,17 @@ class AccessSyncAdapter(Protocol):
 
     def fetch_current_state(self, user_email: str) -> OperationResult:
         """Fetch all current entitlements and account status for a user."""
+        ...
+
+    def get_current_entitlement_ids(self, user_email: str) -> OperationResult:
+        """Return the normalized set of entitlement IDs the user currently holds.
+
+        Entitlement IDs must use the same format as ``EntitlementRule.entitlement_id``
+        so the PolicyEngine can compute the delta against the desired set.
+
+        Returns:
+            ``OperationResult[Set[str]]`` with the entitlement ID set, or error.
+            Returns an empty set (success) when the user exists but holds nothing.
+            Returns NOT_FOUND when the user does not exist on the platform.
+        """
         ...

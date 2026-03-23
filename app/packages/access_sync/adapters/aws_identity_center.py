@@ -16,6 +16,8 @@ disable_user is therefore not supported and signals manual_action_required.
 
 import structlog
 
+from typing import Set
+
 from infrastructure.clients.aws import AWSClients
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.policies import AdapterCapabilities
@@ -121,7 +123,7 @@ class AwsIdentityCenterAdapter:
                 f"AWS Identity Center does not support native disable. "
                 f"Manual action required for user: {user_email}"
             ),
-            error_code="DISABLE_NOT_SUPPORTED",
+            error_code="UNSUPPORTED_OPERATION",
         )
 
     def remove_user(self, user_email: str) -> OperationResult:
@@ -262,7 +264,7 @@ class AwsIdentityCenterAdapter:
         return result
 
     def fetch_current_state(self, user_email: str) -> OperationResult:
-        """Fetch all account assignments for a user.
+        """Fetch all current account assignments for a user.
 
         Returns SUCCESS with data={"user_id": str, "assignments": list}.
         """
@@ -288,3 +290,31 @@ class AwsIdentityCenterAdapter:
         return OperationResult.success(
             data={"user_id": user_id, "assignments": assignments}
         )
+
+    def get_current_entitlement_ids(self, user_email: str) -> OperationResult:
+        """Return the normalised set of entitlement IDs the user currently holds.
+
+        Each assignment is rendered as ``"{account_id}/{permission_set_arn}"`` ,
+        matching ``EntitlementRule.entitlement_id`` format so the PolicyEngine
+        can compute the desired-vs-current delta without any extra parsing.
+
+        Returns:
+            ``OperationResult[Set[str]]`` with the normalised ID set, or error.
+            Returns NOT_FOUND when the user does not exist in Identity Store.
+        """
+        log = logger.bind(user_email=user_email, adapter="aws_identity_center")
+
+        state_result = self.fetch_current_state(user_email)
+        if not state_result.is_success:
+            return state_result
+
+        assignments = (state_result.data or {}).get("assignments", [])
+        ids: Set[str] = set()
+        for assignment in assignments:
+            account_id = assignment.get("AccountId", "")
+            permission_set_arn = assignment.get("PermissionSetArn", "")
+            if account_id and permission_set_arn:
+                ids.add(f"{account_id}/{permission_set_arn}")
+
+        log.info("get_current_entitlement_ids_ok", count=len(ids))
+        return OperationResult.success(data=ids)
