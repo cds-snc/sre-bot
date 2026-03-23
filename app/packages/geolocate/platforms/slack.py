@@ -7,6 +7,7 @@ import structlog
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
+from infrastructure.services import t
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
@@ -77,61 +78,81 @@ def handle_geolocate_command(
     if result.is_success:
         # Build GeolocateResponse from result data
         data = GeolocateResponse(ip_address=ip_address, **result.data)
-        blocks = _format_success_blocks(data)
+        locale = payload.user_locale or "en-US"
+        blocks = _format_success_blocks(data, locale=locale)
         return CommandResponse(message="", ephemeral=False, blocks=blocks)
     elif result.status == OperationStatus.NOT_FOUND:
-        return CommandResponse(
-            message=f"❌ Location not found for IP: {ip_address}",
-            ephemeral=True,
+        locale = payload.user_locale or "en-US"
+        msg = t(
+            "geolocate.result.not_found",
+            locale,
+            f"❌ Location not found for IP: {ip_address}",
+            ip_address=ip_address,
         )
+        return CommandResponse(message=msg, ephemeral=True)
     elif result.status == OperationStatus.PERMANENT_ERROR:
         return CommandResponse(message=f"❌ {result.message}", ephemeral=True)
     else:
         log.error("service_error", status=result.status, error=result.message)
-        return CommandResponse(
-            message="❌ Geolocation service error. Please try again.",
-            ephemeral=True,
+        locale = payload.user_locale or "en-US"
+        msg = t(
+            "geolocate.result.service_error",
+            locale,
+            "❌ Geolocation service error. Please try again.",
         )
+        return CommandResponse(message=msg, ephemeral=True)
 
 
-def _format_success_blocks(data: GeolocateResponse) -> list[Dict[str, Any]]:
+def _format_success_blocks(
+    data: GeolocateResponse, locale: str = "en-US"
+) -> list[Dict[str, Any]]:
     """Format successful geolocation as Slack blocks."""
     fields = []
 
     if data.city:
-        fields.append({"type": "mrkdwn", "text": f"*City:*\n{data.city}"})
+        label = t("geolocate.result.city_label", locale, "City")
+        fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.city}"})
     if data.country:
-        fields.append({"type": "mrkdwn", "text": f"*Country:*\n{data.country}"})
+        label = t("geolocate.result.country_label", locale, "Country")
+        fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.country}"})
     if data.country_code:
-        fields.append(
-            {"type": "mrkdwn", "text": f"*Country Code:*\n{data.country_code}"}
-        )
+        label = t("geolocate.result.country_code_label", locale, "Country Code")
+        fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.country_code}"})
     if data.postal_code:
-        fields.append({"type": "mrkdwn", "text": f"*Postal Code:*\n{data.postal_code}"})
+        label = t("geolocate.result.postal_code_label", locale, "Postal Code")
+        fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.postal_code}"})
     if data.latitude and data.longitude:
+        label = t("geolocate.result.coordinates_label", locale, "Coordinates")
         fields.append(
             {
                 "type": "mrkdwn",
-                "text": f"*Coordinates:*\n{data.latitude}, {data.longitude}",
+                "text": f"*{label}:*\n{data.latitude}, {data.longitude}",
             }
         )
     if data.time_zone:
-        fields.append({"type": "mrkdwn", "text": f"*Time Zone:*\n{data.time_zone}"})
+        label = t("geolocate.result.time_zone_label", locale, "Time Zone")
+        fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.time_zone}"})
 
     if not fields:
-        fields.append(
-            {
-                "type": "mrkdwn",
-                "text": "*Details:*\nNo location data available for this IP.",
-            }
+        no_data = t(
+            "geolocate.result.no_data",
+            locale,
+            "No location data available for this IP.",
         )
+        fields.append({"type": "mrkdwn", "text": f"*Details:*\n{no_data}"})
 
+    header_text = t(
+        "geolocate.result.header",
+        locale,
+        f"📍 Location for {data.ip_address}",
+        ip_address=data.ip_address,
+    )
     return [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"📍 Location for {data.ip_address}",
+                "text": header_text,
             },
         },
         {"type": "section", "fields": fields},

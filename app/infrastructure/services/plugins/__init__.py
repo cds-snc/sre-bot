@@ -5,6 +5,8 @@ import pluggy
 from infrastructure.services.plugins.manager import (
     get_plugin_manager,
     discover_and_init_features,
+    collect_feature_i18n_resources,
+    register_feature_integrations,
 )
 
 # Singleton hookimpl marker for entire application
@@ -14,4 +16,6 @@ __all__ = [
     "hookimpl",
     "get_plugin_manager",
     "discover_and_init_features",
+    "collect_feature_i18n_resources",
+    "register_feature_integrations",
 ]

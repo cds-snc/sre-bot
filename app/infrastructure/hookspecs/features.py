@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
+    from infrastructure.i18n.resources import I18nResourceRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
 
@@ -72,4 +73,35 @@ def startup_warmup(logger: "BoundLogger") -> None:
 
     Args:
         logger: Structured logger for recording initialization events.
+    """
+
+
+@hookspec
+def register_i18n_resources(registry: "I18nResourceRegistry") -> None:
+    """Register feature translation resource locations.
+
+    Called during plugin discovery to allow features to register their
+    translation file locations. This enables co-location of translation YAML
+    files with feature packages.
+
+    Implement to call registry.register() with I18nResourceSpec for each
+    translation directory your feature provides.
+
+    Omit if the feature has no translations.
+
+    Args:
+        registry: I18nResourceRegistry for registering resource specifications.
+
+    Example:
+        @hookimpl
+        def register_i18n_resources(registry):
+            registry.register(
+                I18nResourceSpec(
+                    owner="packages.geolocate",
+                    path="packages/geolocate/locales",
+                    required=False,
+                    format="yaml",
+                    domain="geolocate",
+                )
+            )
     """

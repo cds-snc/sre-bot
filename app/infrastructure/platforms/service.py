@@ -34,7 +34,7 @@ Usage:
     service.load_providers()  # Discover and register providers
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import structlog
 
@@ -56,6 +56,9 @@ from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 # from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter  # Out of scope
 # from infrastructure.platforms.formatters.discord import DiscordEmbedFormatter  # Out of scope
 from infrastructure.platforms.registry import PlatformRegistry, get_platform_registry
+
+if TYPE_CHECKING:
+    from infrastructure.i18n.service import TranslationService
 
 
 logger = structlog.get_logger()
@@ -135,6 +138,31 @@ class PlatformService:
             providers=list(providers.keys()),
         )
         return providers
+
+    def inject_translation_service(
+        self, translation_service: "TranslationService"
+    ) -> None:
+        """Inject an initialized translation service into all registered providers.
+
+        Sets the translator on every provider (enabling help-text translation) and
+        wires the service into their formatters (enabling translated format_* calls).
+        Call this after translation_service.initialize() and before
+        register_feature_integrations() so that description_key translations are
+        available at command-registration time.
+
+        Args:
+            translation_service: Initialized TranslationService singleton.
+        """
+        translator = translation_service.translator
+        providers = self._registry.list_providers()
+        for provider in providers:
+            provider.set_translator(translator)
+            if hasattr(provider, "_formatter") and provider._formatter is not None:
+                provider._formatter._translation_service = translation_service
+        self._logger.info(
+            "translation_service_injected_into_providers",
+            provider_count=len(providers),
+        )
 
     def get_provider(self, name: str) -> BasePlatformProvider:
         """Get platform provider by name.

@@ -5,6 +5,10 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
+from typing import Any
+from infrastructure.platforms.exceptions import ProviderNotFoundError
+from typing import cast
+
 
 from infrastructure.configuration import Settings
 from infrastructure.identity.service import IdentityService
@@ -13,6 +17,7 @@ from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.i18n.service import TranslationService
+from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
@@ -21,6 +26,11 @@ from infrastructure.commands.service import CommandService
 from infrastructure.storage.service import StorageService
 from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms import PlatformService
+from infrastructure.platforms.providers import (
+    SlackPlatformProvider,
+    TeamsPlatformProvider,
+    DiscordPlatformProvider,
+)
 from infrastructure.platforms.clients import (
     SlackClientFacade,
     TeamsClientFacade,
@@ -30,7 +40,7 @@ from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
     Get application-scoped settings singleton.
@@ -55,7 +65,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_identity_service() -> IdentityService:
     """
     Get application-scoped identity service singleton.
@@ -84,7 +94,7 @@ def get_identity_service() -> IdentityService:
     return IdentityService(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_jwks_manager() -> JWKSManager:
     """
     Get application-scoped JWKSManager singleton.
@@ -99,7 +109,7 @@ def get_jwks_manager() -> JWKSManager:
     return JWKSManager(issuer_config=issuer_config)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_aws_clients() -> AWSClients:
     """Provider for AWS clients facade with all service operations.
 
@@ -128,7 +138,7 @@ def get_aws_clients() -> AWSClients:
     return AWSClients(aws_settings=settings.aws)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_google_workspace_clients() -> GoogleWorkspaceClients:
     """Provider for Google Workspace clients facade with all service operations.
 
@@ -169,7 +179,7 @@ def get_google_workspace_clients() -> GoogleWorkspaceClients:
     return GoogleWorkspaceClients(google_settings=settings.google_workspace)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_maxmind_client() -> MaxMindClient:
     """Provider for MaxMind GeoIP2 client.
 
@@ -205,7 +215,7 @@ def get_maxmind_client() -> MaxMindClient:
     return MaxMindClient(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_event_dispatcher() -> EventDispatcher:
     """Get application-scoped event dispatcher singleton.
 
@@ -226,7 +236,7 @@ def get_event_dispatcher() -> EventDispatcher:
     return EventDispatcher()
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_translation_service() -> TranslationService:
     """Get application-scoped translation service singleton.
 
@@ -248,7 +258,32 @@ def get_translation_service() -> TranslationService:
     return TranslationService()
 
 
-@lru_cache
+def t(key: str, locale: str, fallback: str = "", **variables: Any) -> str:
+    """Translate a key safely, designed for use in command handlers and feature packages.
+
+    Wraps the application-scoped translation singleton with a fallback so callers
+    never have to guard against uninitialized state or missing keys.
+
+    Args:
+        key: Dot-separated translation key (e.g. "geolocate.result.city_label").
+        locale: Locale string such as "en-US" or "fr-FR".
+        fallback: Returned as-is when the key is missing or the service is not yet ready.
+        **variables: Interpolation variables for ``{{variable}}`` placeholders.
+
+    Returns:
+        Translated and interpolated string, or *fallback* on any error.
+    """
+    try:
+        return get_translation_service().translate(
+            key=TranslationKey.from_string(key),
+            locale=Locale.from_string(locale),
+            variables=variables or None,
+        )
+    except Exception:
+        return fallback
+
+
+@lru_cache(maxsize=1)
 def get_idempotency_service() -> IdempotencyService:
     """Get application-scoped idempotency service singleton.
 
@@ -278,7 +313,7 @@ def get_idempotency_service() -> IdempotencyService:
     return IdempotencyService(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_resilience_service() -> ResilienceService:
     """Get application-scoped resilience service singleton.
 
@@ -303,7 +338,7 @@ def get_resilience_service() -> ResilienceService:
     return ResilienceService(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_notification_service() -> NotificationService:
     """Get application-scoped notification service singleton.
 
@@ -340,7 +375,7 @@ def get_notification_service() -> NotificationService:
     )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_command_service() -> CommandService:
     """Get application-scoped command service singleton.
 
@@ -363,7 +398,7 @@ def get_command_service() -> CommandService:
     return CommandService(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_storage_service() -> StorageService:
     """Get application-scoped storage service singleton.
 
@@ -387,7 +422,7 @@ def get_storage_service() -> StorageService:
     return StorageService(dynamodb=aws.dynamodb)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_audit_trail_service() -> AuditTrailService:
     """Get application-scoped audit trail service singleton.
 
@@ -412,7 +447,7 @@ def get_audit_trail_service() -> AuditTrailService:
     return AuditTrailService(storage=storage)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_platform_service():
     """Get application-scoped platform service singleton.
 
@@ -455,7 +490,7 @@ def get_platform_service():
     return PlatformService(settings=settings)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_slack_client():
     """Get application-scoped Slack client facade singleton.
 
@@ -496,7 +531,7 @@ def get_slack_client():
     return SlackClientFacade(token=settings.slack.SLACK_TOKEN)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_teams_client():
     """Get application-scoped Teams client facade singleton.
 
@@ -547,7 +582,7 @@ def get_teams_client():
     )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_discord_client():
     """Get application-scoped Discord client facade singleton.
 
@@ -573,7 +608,7 @@ def get_discord_client():
     return DiscordClientFacade(token="")
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_directory_provider() -> DirectoryProvider:
     """Get application-scoped directory provider singleton.
 
@@ -617,3 +652,51 @@ def get_directory_provider() -> DirectoryProvider:
             directory_settings=settings.directory,
         )
     raise ValueError(f"Unsupported directory provider: {provider_key!r}")
+
+
+def get_slack_provider() -> SlackPlatformProvider:
+    """Get Slack platform provider from the platform service registry.
+
+    Ergonomic single-call accessor replacing the two-step
+    ``get_platform_service().get_provider('slack')`` pattern.
+
+    Returns:
+        SlackPlatformProvider instance.
+
+    Raises:
+        ProviderNotFoundError: If Slack provider has not been registered.
+    """
+    provider = get_platform_service()._registry.get_provider("slack")
+    if provider is None:
+        raise ProviderNotFoundError("No provider registered with name 'slack'")
+    return cast(SlackPlatformProvider, provider)
+
+
+def get_teams_provider() -> TeamsPlatformProvider:
+    """Get Microsoft Teams platform provider from the platform service registry.
+
+    Returns:
+        TeamsPlatformProvider instance.
+
+    Raises:
+        ProviderNotFoundError: If Teams provider has not been registered.
+    """
+    provider = get_platform_service()._registry.get_provider("teams")
+    if provider is None:
+        raise ProviderNotFoundError("No provider registered with name 'teams'")
+    return cast(TeamsPlatformProvider, provider)
+
+
+def get_discord_provider() -> DiscordPlatformProvider:
+    """Get Discord platform provider from the platform service registry.
+
+    Returns:
+        DiscordPlatformProvider instance.
+
+    Raises:
+        ProviderNotFoundError: If Discord provider has not been registered.
+    """
+    provider = get_platform_service()._registry.get_provider("discord")
+    if provider is None:
+        raise ProviderNotFoundError("No provider registered with name 'discord'")
+    return cast(DiscordPlatformProvider, provider)
