@@ -35,6 +35,7 @@ class AccessSyncResponse(BaseModel):
     user_email: str
     dry_run: bool = False
     actions_applied: List[str] = Field(default_factory=list)
+    requires_manual_action: bool = False
 
 
 class SyncStatusResponse(BaseModel):
