@@ -1,11 +1,13 @@
 """Audit infrastructure for compliance and SIEM integration.
 
 This package provides:
-- AuditEvent: Pydantic model for structured audit events
-- Sentinel integration utilities
-- Standard audit fields for compliance
+- AuditEvent: Pydantic model for structured audit events. Use
+  ``AuditEvent.from_metadata()`` to construct events from feature data.
+- AuditTrailService: Service for writing/querying the audit trail in DynamoDB.
+  Inject via ``AuditTrailServiceDep`` from ``infrastructure.services``.
 """
 
 from infrastructure.audit.models import AuditEvent
+from infrastructure.audit.service import AuditTrailService
 
-__all__ = ["AuditEvent"]
+__all__ = ["AuditEvent", "AuditTrailService"]

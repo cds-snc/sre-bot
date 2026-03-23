@@ -1,4 +1,6 @@
-# Infrastructure Commands Framework
+# Infrastructure Commands Framework (DEPRECATED)
+
+WARNING: This commands framework is deprecated and will be removed in a future release. Please do not use or build on this framework for new development. The infrastructure/platforms package is the recommended approach for new command implementations, providing a more flexible and platform-agnostic foundation.
 
 ## Overview
 

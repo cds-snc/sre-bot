@@ -18,7 +18,8 @@ from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
-from infrastructure.persistence.service import PersistenceService
+from infrastructure.storage.service import StorageService
+from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients import (
     SlackClientFacade,
@@ -39,7 +40,8 @@ from infrastructure.services.providers import (
     get_resilience_service,
     get_notification_service,
     get_command_service,
-    get_persistence_service,
+    get_storage_service,
+    get_audit_trail_service,
     get_platform_service,
     get_slack_client,
     get_teams_client,
@@ -92,8 +94,11 @@ NotificationServiceDep = Annotated[
 # Command service dependency
 CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
 
-# Persistence service dependency
-PersistenceServiceDep = Annotated[PersistenceService, Depends(get_persistence_service)]
+# Storage service dependency
+StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
+
+# Audit trail service dependency
+AuditTrailServiceDep = Annotated[AuditTrailService, Depends(get_audit_trail_service)]
 
 # Platform service dependency
 PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]
@@ -123,7 +128,7 @@ __all__ = [
     "ResilienceServiceDep",
     "NotificationServiceDep",
     "CommandServiceDep",
-    "PersistenceServiceDep",
+    "StorageServiceDep",
     "PlatformServiceDep",
     "SlackClientDep",
     "TeamsClientDep",

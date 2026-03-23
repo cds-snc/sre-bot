@@ -2,7 +2,7 @@ from typing import Optional
 
 import httpx
 from fastapi import FastAPI
-from api.dependencies.rate_limits import setup_rate_limiter
+from infrastructure.security import setup_rate_limiter
 
 
 def create_test_app(routers, middlewares=None) -> FastAPI:

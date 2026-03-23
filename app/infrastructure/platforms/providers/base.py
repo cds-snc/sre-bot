@@ -4,7 +4,7 @@ All platform-specific providers (Slack, Teams, Discord) inherit from this base c
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional
 
 import structlog
 
@@ -143,6 +143,7 @@ class BasePlatformProvider(ABC):
         key: Optional[str],
         fallback: str,
         locale: str = "en-US",
+        variables: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Translate a key or return fallback if translation unavailable.
 
@@ -150,6 +151,7 @@ class BasePlatformProvider(ABC):
             key: Translation key (e.g., "commands.geolocate.description")
             fallback: Fallback text if key is None or translation missing
             locale: Locale string (e.g., "en-US", "fr-FR")
+            variables: Optional interpolation variables for the message template
 
         Returns:
             Translated text or fallback
@@ -175,7 +177,7 @@ class BasePlatformProvider(ABC):
 
             # Attempt translation
             result = self._translator.translate_message(
-                translation_key, locale_enum, variables=None
+                translation_key, locale_enum, variables=variables
             )
 
             # Return translation if successful, otherwise fallback

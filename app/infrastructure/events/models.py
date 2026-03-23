@@ -5,16 +5,20 @@ Provides generic Event base class and protocol for event handlers.
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Generic, Optional, TypeVar
 from uuid import UUID, uuid4
+
+T = TypeVar("T")
 
 
 @dataclass
-class Event:
+class Event(Generic[T]):
     """Base class for all events in the system.
 
     Events are immutable records of something that happened, used for
     audit trails, notifications, and cross-module communication.
+
+    The generic parameter ``T`` is the typed payload carried in ``metadata``.
     """
 
     event_type: str
@@ -29,11 +33,15 @@ class Event:
     user_email: str = ""
     """User who triggered the event."""
 
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    """Custom metadata for this event type."""
+    metadata: Optional[T] = None
+    """Typed payload for this event."""
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize event to dictionary.
+
+        Typed payloads (dataclasses) are converted recursively via ``asdict``.
+        Dict payloads are included as-is.  ``None`` metadata is serialized as
+        an empty dict for downstream compatibility.
 
         Returns:
             Dictionary representation of the event with ISO format timestamp
@@ -44,17 +52,20 @@ class Event:
         data["timestamp"] = self.timestamp.isoformat()
         # Convert UUID to string
         data["correlation_id"] = str(self.correlation_id)
+        # Normalise None metadata to empty dict for wire compatibility
+        if data.get("metadata") is None:
+            data["metadata"] = {}
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Event":
-        """Deserialize event from dictionary.
+    def from_dict(cls, data: Dict[str, Any]) -> "Event[Dict[str, Any]]":
+        """Deserialize event from a dictionary (always produces dict metadata).
 
         Args:
             data: Dictionary with event fields.
 
         Returns:
-            Event instance.
+            Event instance with ``metadata`` as a plain dict.
 
         Raises:
             ValueError: If required fields are missing or invalid.
@@ -73,12 +84,12 @@ class Event:
             elif correlation_id is None:
                 correlation_id = uuid4()
 
-            return cls(
+            return Event(  # type: ignore[return-value]
                 event_type=data["event_type"],
                 timestamp=timestamp,
                 correlation_id=correlation_id,
                 user_email=data.get("user_email", ""),
-                metadata=data.get("metadata", {}),
+                metadata=data.get("metadata"),
             )
         except (KeyError, ValueError) as e:
             raise ValueError(f"Invalid event data: {e}")

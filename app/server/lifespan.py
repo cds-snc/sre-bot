@@ -1,25 +1,23 @@
 from contextlib import asynccontextmanager
 import sys
 import threading
+from pathlib import Path
 from typing import AsyncIterator, Optional, TYPE_CHECKING, cast
 
 from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
-from infrastructure.events import (
-    discover_and_register_handlers,
-    log_registered_handlers,
-    register_infrastructure_handlers,
-)
 from infrastructure.logging.setup import configure_logging
 from infrastructure.services import (
-    discover_and_register_platforms,
+    collect_feature_i18n_resources,
+    register_feature_integrations,
     get_directory_provider,
     get_platform_service,
     get_settings,
     get_translation_service,
 )
+from infrastructure.i18n.resources import I18nResourceSpec
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -93,19 +91,6 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
     stop_event.set()
 
 
-def _register_event_handlers(logger: BoundLogger) -> None:
-    try:
-        register_infrastructure_handlers()
-    except Exception as exc:
-        logger.error("infrastructure_handlers_registration_failed", error=str(exc))
-
-    try:
-        discover_and_register_handlers(base_path="modules", package_root="modules")
-        log_registered_handlers()
-    except Exception as exc:
-        logger.error("event_handlers_discovery_failed", error=str(exc))
-
-
 def _initialize_directory_provider(
     app: FastAPI,
     settings: "Settings",
@@ -142,8 +127,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _initialize_directory_provider(app, settings, logger)
 
-    _register_event_handlers(logger)
-
     app.state.command_providers = {}
 
     platform_service = get_platform_service()
@@ -151,25 +134,64 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.platform_service = platform_service
     app.state.platform_providers = platform_providers
 
-    # Inject translator into platform providers for i18n support
-    translation_service = get_translation_service()
-    for provider in platform_providers.values():
-        provider.set_translator(translation_service._translator)
-    logger.info(
-        "translation_service_injected_into_providers",
-        provider_count=len(platform_providers),
+    # Phase 1: Discover feature plugins and collect i18n resource registrations.
+    # This must happen before translation service initialization so that all
+    # feature-package locale paths are included in the loaded catalogs.
+    log = logger.bind(phase="i18n_resource_collection")
+    i18n_registry = collect_feature_i18n_resources(logger=logger)
+    log.info(
+        "i18n_resources_collected",
+        i18n_resource_count=i18n_registry.get_resource_count(),
     )
 
-    discover_and_register_platforms(
+    # Phase 2: Initialize translation service with all registered resources.
+    log = logger.bind(phase="i18n_initialization")
+    translation_service = get_translation_service()
+    i18n_resources = i18n_registry.list_specs()
+
+    # Add default core locales path as required resource
+    app_root = Path(__file__).resolve().parents[1]
+    core_locales_path = app_root / "locales"
+    if core_locales_path.exists():
+        core_resource = I18nResourceSpec(
+            owner="core",
+            path=str(core_locales_path),
+            required=True,
+            format="yaml",
+            domain="core",
+        )
+        all_resources = [core_resource] + i18n_resources
+    else:
+        all_resources = i18n_resources
+
+    init_result = translation_service.initialize(resources=all_resources, strict=True)
+    if not init_result.is_success:
+        log.error("i18n_initialization_failed", error=init_result.message)
+        raise RuntimeError(f"i18n initialization failed: {init_result.message}")
+
+    health_result = translation_service.health_check()
+    if not health_result.is_success:
+        log.error("i18n_healthcheck_failed", error=health_result.message)
+        raise RuntimeError(f"i18n health check failed: {health_result.message}")
+
+    log.info("i18n_initialization_completed_and_healthy")
+
+    # Inject translation service into all platform providers and their formatters
+    # before command registration so help-text translations work at startup.
+    platform_service.inject_translation_service(translation_service)
+
+    # Phase 3: Register feature commands, routes, and run startup warmup.
+    # Providers now have the translator set, so description_key translations
+    # resolve correctly at registration time.
+    log = logger.bind(phase="feature_registration")
+    register_feature_integrations(
+        app=app,
+        logger=logger,
         slack_provider=platform_providers.get("slack"),
         teams_provider=platform_providers.get("teams"),
         discord_provider=platform_providers.get("discord"),
     )
-    logger.info(
-        "platform_commands_registered",
-        count=len(platform_providers),
-        providers=list(platform_providers.keys()),
-    )
+    log.info("feature_integrations_registered")
 
     init_results = platform_service.initialize_all_providers()
     failed = [name for name, result in init_results.items() if not result.is_success]
