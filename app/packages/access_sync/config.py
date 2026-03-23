@@ -7,6 +7,8 @@ a code deploy.
 
 Config loader sources:
     bundle   - Built-in empty bundle. Default for local development.
+    inline_json - Parse ACCESS_SYNC_CONFIG_REF as inline JSON text.
+    file_json - Read ACCESS_SYNC_CONFIG_REF as a path to a local JSON file.
     dynamodb - Load from a DynamoDB item (reserved; not yet implemented).
     s3       - Load from an S3 object (reserved; not yet implemented).
     ssm      - Load from an SSM parameter (reserved; not yet implemented).
@@ -20,13 +22,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Protocol
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, ValidationError
+from pydantic_settings import BaseSettings, JsonConfigSettingsSource, SettingsConfigDict
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.policies import EntitlementRule, PlatformPolicy
 
 
+# ---------------------------------------------------------------------------
+# Bootstrap Settings
+# ---------------------------------------------------------------------------
 class AccessSyncSettings(BaseSettings):
     """Bootstrap settings for Access Sync runtime config loading.
 
@@ -78,6 +83,9 @@ class AccessSyncSettings(BaseSettings):
     )
 
 
+# ---------------------------------------------------------------------------
+# Runtime Domain Models
+# ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class EntitlementModeOverride:
     """Runtime per-group entitlement mode override record.
@@ -114,6 +122,41 @@ class AccessSyncRuntimeConfig:
     )
 
 
+# ---------------------------------------------------------------------------
+# Runtime Config Input Models (JSON)
+# ---------------------------------------------------------------------------
+class EntitlementRuleConfigModel(BaseModel):
+    """Typed schema for one entitlement rule in runtime config JSON."""
+
+    group_slug: str
+    entitlement_type: str
+    entitlement_id: str
+    mode: str = "sync_managed"
+
+
+class PlatformPolicyConfigModel(BaseModel):
+    """Typed schema for one platform policy in runtime config JSON."""
+
+    platform: str
+    authn_group_slug: str
+    authn_mode: str
+    authn_removal_mode: str
+    entitlement_rules: List[EntitlementRuleConfigModel] = Field(default_factory=list)
+
+
+class RuntimeConfigJsonSettings(BaseSettings):
+    """Settings model used with JsonConfigSettingsSource for file-based configs."""
+
+    policies: Dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
+
+    model_config = SettingsConfigDict(
+        extra="ignore",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Loader Contract + Shared Conversion
+# ---------------------------------------------------------------------------
 class AccessSyncConfigLoader(Protocol):
     """Protocol for Access Sync config loaders.
 
@@ -133,6 +176,39 @@ class AccessSyncConfigLoader(Protocol):
         ...
 
 
+def _build_runtime_config(
+    policies_model: Dict[str, PlatformPolicyConfigModel],
+) -> AccessSyncRuntimeConfig:
+    """Convert validated JSON policy models into AccessSyncRuntimeConfig."""
+    policies: Dict[str, PlatformPolicy] = {}
+
+    for fallback_key, raw_policy in policies_model.items():
+        entitlement_rules: List[EntitlementRule] = []
+        for rule in raw_policy.entitlement_rules:
+            entitlement_rules.append(
+                EntitlementRule(
+                    group_slug=rule.group_slug,
+                    entitlement_type=rule.entitlement_type,
+                    entitlement_id=rule.entitlement_id,
+                    mode=rule.mode,
+                )
+            )
+
+        policy = PlatformPolicy(
+            platform=raw_policy.platform,
+            authn_group_slug=raw_policy.authn_group_slug,
+            authn_mode=raw_policy.authn_mode,
+            authn_removal_mode=raw_policy.authn_removal_mode,
+            entitlement_rules=entitlement_rules,
+        )
+        policies[str(policy.platform or fallback_key)] = policy
+
+    return AccessSyncRuntimeConfig(policies=policies)
+
+
+# ---------------------------------------------------------------------------
+# Config Loaders
+# ---------------------------------------------------------------------------
 class BundleConfigLoader:
     """Config loader that returns an empty bundle (no policies configured).
 
@@ -187,63 +263,19 @@ class InlineJsonConfigLoader:
                 error_code="CONFIG_INVALID_JSON",
             )
 
-        if not isinstance(payload, dict):
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="inline_json_config_invalid_payload: top-level object required",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        raw_policies = payload.get("policies", {})
-        if not isinstance(raw_policies, dict):
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="inline_json_config_invalid_policies: object required",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        policies: Dict[str, PlatformPolicy] = {}
         try:
-            for fallback_key, raw_policy in raw_policies.items():
-                if not isinstance(raw_policy, dict):
-                    raise ValueError("policy entry must be an object")
-
-                raw_rules = raw_policy.get("entitlement_rules", [])
-                if not isinstance(raw_rules, list):
-                    raise ValueError("entitlement_rules must be a list")
-
-                entitlement_rules: List[EntitlementRule] = []
-                for rule in raw_rules:
-                    if not isinstance(rule, dict):
-                        raise ValueError("entitlement rule must be an object")
-                    entitlement_rules.append(
-                        EntitlementRule(
-                            group_slug=str(rule["group_slug"]),
-                            entitlement_type=str(rule["entitlement_type"]),
-                            entitlement_id=str(rule["entitlement_id"]),
-                            mode=str(rule.get("mode", "sync_managed")),
-                        )
-                    )
-
-                policy = PlatformPolicy(
-                    platform=str(raw_policy["platform"]),
-                    authn_group_slug=str(raw_policy["authn_group_slug"]),
-                    authn_mode=str(raw_policy["authn_mode"]),
-                    authn_removal_mode=str(raw_policy["authn_removal_mode"]),
-                    entitlement_rules=entitlement_rules,
-                )
-                policies[str(policy.platform or fallback_key)] = policy
-        except (KeyError, TypeError, ValueError) as exc:
+            validated = RuntimeConfigJsonSettings.model_validate(payload)
+        except ValidationError as exc:
             return OperationResult.error(
                 status=OperationStatus.PERMANENT_ERROR,
                 message=f"inline_json_config_invalid_policy: {exc}",
                 error_code="CONFIG_INVALID_SHAPE",
             )
 
-        config = AccessSyncRuntimeConfig(policies=policies)
+        config = _build_runtime_config(validated.policies)
         return OperationResult.success(
             data=config,
-            message=f"inline_json_config_loaded policies={len(policies)}",
+            message=f"inline_json_config_loaded policies={len(config.policies)}",
         )
 
 
@@ -267,7 +299,13 @@ class FileJsonConfigLoader:
             )
 
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
+            source = JsonConfigSettingsSource(
+                RuntimeConfigJsonSettings,
+                json_file=path,
+                json_file_encoding="utf-8",
+            )
+            data = source()
+            validated = RuntimeConfigJsonSettings.model_validate(data)
         except OSError as exc:
             return OperationResult.error(
                 status=OperationStatus.TRANSIENT_ERROR,
@@ -280,67 +318,23 @@ class FileJsonConfigLoader:
                 message=f"file_json_config_invalid_json: {exc.msg}",
                 error_code="CONFIG_INVALID_JSON",
             )
-
-        if not isinstance(payload, dict):
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="file_json_config_invalid_payload: top-level object required",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        raw_policies = payload.get("policies", {})
-        if not isinstance(raw_policies, dict):
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="file_json_config_invalid_policies: object required",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        policies: Dict[str, PlatformPolicy] = {}
-        try:
-            for fallback_key, raw_policy in raw_policies.items():
-                if not isinstance(raw_policy, dict):
-                    raise ValueError("policy entry must be an object")
-
-                raw_rules = raw_policy.get("entitlement_rules", [])
-                if not isinstance(raw_rules, list):
-                    raise ValueError("entitlement_rules must be a list")
-
-                entitlement_rules: List[EntitlementRule] = []
-                for rule in raw_rules:
-                    if not isinstance(rule, dict):
-                        raise ValueError("entitlement rule must be an object")
-                    entitlement_rules.append(
-                        EntitlementRule(
-                            group_slug=str(rule["group_slug"]),
-                            entitlement_type=str(rule["entitlement_type"]),
-                            entitlement_id=str(rule["entitlement_id"]),
-                            mode=str(rule.get("mode", "sync_managed")),
-                        )
-                    )
-
-                policy = PlatformPolicy(
-                    platform=str(raw_policy["platform"]),
-                    authn_group_slug=str(raw_policy["authn_group_slug"]),
-                    authn_mode=str(raw_policy["authn_mode"]),
-                    authn_removal_mode=str(raw_policy["authn_removal_mode"]),
-                    entitlement_rules=entitlement_rules,
-                )
-                policies[str(policy.platform or fallback_key)] = policy
-        except (KeyError, TypeError, ValueError) as exc:
+        except ValidationError as exc:
             return OperationResult.error(
                 status=OperationStatus.PERMANENT_ERROR,
                 message=f"file_json_config_invalid_policy: {exc}",
                 error_code="CONFIG_INVALID_SHAPE",
             )
 
-        config = AccessSyncRuntimeConfig(policies=policies)
+        config = _build_runtime_config(validated.policies)
         return OperationResult.success(
             data=config,
-            message=f"file_json_config_loaded path={path} policies={len(policies)}",
+            message=f"file_json_config_loaded path={path} policies={len(config.policies)}",
         )
 
 
+# ---------------------------------------------------------------------------
+# Loader Factory
+# ---------------------------------------------------------------------------
 def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
     """Return the config loader for the given source string.
 
