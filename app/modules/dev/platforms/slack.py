@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Callable, Any, Dict, List
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.services import get_slack_client, get_settings
 from modules.dev import (
-    access_sync as access_sync_dev,
     google,
     incident,
     slack as slack_dev,
