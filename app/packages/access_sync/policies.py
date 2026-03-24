@@ -62,17 +62,6 @@ class PlatformPolicy:
     authn_removal_mode: str  # disable | delete | entitlement_only
     entitlement_rules: List[EntitlementRule]
 
-    def desired_users_source(self) -> str:
-        """Describe where the sync service reads the desired user set from."""
-        if self.authn_mode == "direct":
-            return (
-                f"effective membership of {self.authn_group_slug} (direct + indirect)"
-            )
-        return (
-            f"effective membership of {self.authn_group_slug} "
-            "(typically entitlement-derived, direct membership also valid)"
-        )
-
     def sync_managed_rules(self) -> List[EntitlementRule]:
         """Return only rules that Access Sync is responsible for."""
         return [r for r in self.entitlement_rules if r.mode == "sync_managed"]

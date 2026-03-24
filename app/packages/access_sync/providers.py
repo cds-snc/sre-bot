@@ -5,7 +5,7 @@ All clients are obtained from infrastructure.services — never instantiated loc
 """
 
 from functools import lru_cache
-from typing import Dict, Optional
+from typing import Dict, Mapping, Optional
 
 from infrastructure.events import EventDispatcher
 from infrastructure.operations import OperationResult
@@ -23,8 +23,7 @@ from packages.access_sync.config import (
     get_access_sync_config_loader,
 )
 from packages.access_sync.platform_sync.service import PlatformSyncService
-from packages.access_sync.policies import PolicyRegistry
-from packages.access_sync.registry import AccessSyncRegistry
+from packages.access_sync.policies import PlatformPolicy
 from packages.access_sync.service import AccessSyncService
 from packages.access_sync.store import SyncRunRepository
 from packages.access_sync.user_sync.service import UserSyncService
@@ -63,8 +62,8 @@ def get_access_sync_runtime_config() -> AccessSyncRuntimeConfig:
 
 
 @lru_cache(maxsize=1)
-def get_access_sync_registry() -> AccessSyncRegistry:
-    """Create the adapter registry from centralized pre-configured service clients.
+def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
+    """Create the adapter mapping from centralized pre-configured service clients.
 
     Infrastructure clients are obtained from infrastructure.services and come
     fully configured with all bootstrap settings (e.g., AWS_SSO_INSTANCE_ID).
@@ -82,7 +81,12 @@ def get_access_sync_registry() -> AccessSyncRegistry:
         if platform == "fake":
             adapters[platform_key] = FakePlatformAdapter()
 
-    return AccessSyncRegistry(adapters=adapters)
+    return adapters
+
+
+def get_access_sync_policies() -> Mapping[str, PlatformPolicy]:
+    """Return the current platform policy mapping from runtime config."""
+    return get_access_sync_runtime_config().policies
 
 
 @lru_cache(maxsize=1)
@@ -90,20 +94,17 @@ def get_user_sync_service() -> UserSyncService:
     """Return the singleton UserSyncService for on-demand single-user sync.
 
     Wires together:
-    - Adapter registry from runtime config + centralized clients.
-    - PolicyRegistry from runtime config.
+    - Adapter mapping from runtime config + centralized clients.
+    - Policy mapping from runtime config.
     - DirectoryProvider from infrastructure.services (IDP-agnostic).
     - SyncRunRepository backed by the storage service.
     - EventDispatcher for domain event emission.
     """
-    runtime_config = get_access_sync_runtime_config()
-    registry = get_access_sync_registry()
-    policies = PolicyRegistry(policies=runtime_config.policies)
     directory = get_directory_provider()
     repository = SyncRunRepository(storage=get_storage_service())
     return UserSyncService(
-        registry=registry,
-        policies=policies,
+        adapters=get_access_sync_adapters(),
+        policies=get_access_sync_policies(),
         directory=directory,
         repository=repository,
         dispatcher=EventDispatcher(),
@@ -117,12 +118,10 @@ def get_platform_sync_service() -> PlatformSyncService:
     Batch-reads IDP group membership once per platform sync run (O(groups))
     and delegates per-user convergence to UserSyncService.sync_user_from_context.
     """
-    runtime_config = get_access_sync_runtime_config()
-    policies = PolicyRegistry(policies=runtime_config.policies)
     return PlatformSyncService(
         sync_service=get_user_sync_service(),
-        registry=get_access_sync_registry(),
-        policies=policies,
+        adapters=get_access_sync_adapters(),
+        policies=get_access_sync_policies(),
         directory=get_directory_provider(),
         dispatcher=EventDispatcher(),
     )
@@ -136,6 +135,7 @@ def get_access_sync_service() -> AccessSyncService:
     sync(request) interface keyed on the request discriminator.
     """
     return AccessSyncService(
+        settings=get_access_sync_settings(),
         user_sync_service=get_user_sync_service(),
         platform_sync_service=get_platform_sync_service(),
     )

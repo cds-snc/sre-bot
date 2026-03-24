@@ -10,14 +10,15 @@ from fastapi import APIRouter, HTTPException
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.models import ReconciliationOutcome, SyncOutcome
 from packages.access_sync.providers import (
-    get_access_sync_registry,
+    get_access_sync_adapters,
     get_access_sync_service,
-    get_access_sync_settings,
 )
 from packages.access_sync.schemas import (
     AccessSyncRequest,
     AccessSyncResponse,
+    PlatformSyncResponse,
     SyncStatusResponse,
+    UserSyncResponse,
     UserSyncRequest,
 )
 
@@ -40,10 +41,6 @@ def sync_endpoint(
     request: AccessSyncRequest,
 ) -> AccessSyncResponse:
     """Trigger an on-demand user sync or a full platform sync."""
-    settings = get_access_sync_settings()
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Sync is not enabled")
-
     log = logger.bind(
         sync_type=request.sync_type,
         platform=request.platform,
@@ -78,6 +75,8 @@ def sync_endpoint(
 
 def _to_public_error(result: OperationResult) -> tuple[int, str]:
     """Map internal OperationResult errors to safe public API responses."""
+    if result.error_code == "FEATURE_DISABLED":
+        return 503, "Access Sync is not enabled"
     if result.status == OperationStatus.NOT_FOUND:
         return 404, "Requested access sync resource was not found"
     if result.status == OperationStatus.UNAUTHORIZED:
@@ -90,12 +89,11 @@ def _to_public_error(result: OperationResult) -> tuple[int, str]:
 def _build_response(
     request: AccessSyncRequest, data: object  # type: ignore[valid-type]
 ) -> AccessSyncResponse:
-    """Map service result data to the unified AccessSyncResponse."""
+    """Map service result data to the correct response model."""
     if isinstance(request, UserSyncRequest):
         outcome: SyncOutcome = data  # type: ignore[assignment]
-        return AccessSyncResponse(
+        return UserSyncResponse(
             success=True,
-            sync_type="user",
             platform=request.platform,
             user_email=request.user_email,
             dry_run=request.dry_run,
@@ -104,9 +102,8 @@ def _build_response(
             requires_manual_action=outcome.requires_manual_action if outcome else False,
         )
     recon: ReconciliationOutcome = data  # type: ignore[assignment]
-    return AccessSyncResponse(
+    return PlatformSyncResponse(
         success=True,
-        sync_type="platform",
         platform=request.platform,
         dry_run=request.dry_run,
         users_synced=recon.users_synced if recon else 0,
@@ -126,8 +123,8 @@ def _build_response(
 )
 def get_status_endpoint() -> SyncStatusResponse:
     """Return service health and registered platforms."""
-    registry = get_access_sync_registry()
+    platforms = sorted(get_access_sync_adapters().keys())
     return SyncStatusResponse(
         healthy=True,
-        registered_platforms=registry.registered_platforms(),
+        registered_platforms=platforms,
     )

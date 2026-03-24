@@ -11,28 +11,24 @@ and never produce a ``SyncOutcome``.
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Set
 
 from packages.access_sync.policies import EntitlementRule
 
 
 @dataclass(frozen=True)
-class MembershipContext:
-    """Pre-fetched IDP membership result for a single user on one platform.
+class DesiredUserState:
+    """Resolved desired and current state for one user on one platform.
 
-    Built once per platform sync run by ``PlatformSyncService._build_desired_state``
-    and passed directly to ``UserSyncService.sync_user_from_context``.
-    Eliminates all per-user IDP membership calls during batch platform sync —
-    directory reads are O(groups) for the whole run, not O(users × groups).
-
-    Attributes:
-        user_should_exist: True if the user is a member of the platform authn group.
-        required_entitlements: Entitlement rules the user individually qualifies
-            for, derived from pre-fetched membership in each entitlement group.
+    Built from directory membership data for on-demand sync and enriched with
+    pre-fetched platform state during batch sync so planning and execution run
+    through one shared internal shape.
     """
 
     user_should_exist: bool
-    required_entitlements: List[EntitlementRule]
+    required_entitlements: List[EntitlementRule] = field(default_factory=list)
+    current_entitlement_ids: Optional[Set[str]] = None
+    platform_user_exists: Optional[bool] = None
 
 
 @dataclass(frozen=True)

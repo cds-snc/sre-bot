@@ -4,6 +4,8 @@ Covers F-01 (OperationResult[SyncOutcome] contract), F-05 (UNSUPPORTED_OPERATION
 manual action), and D-01 (per-user entitlement group qualification).
 """
 
+from typing import Any
+
 import pytest
 
 from infrastructure.directory.models import (
@@ -16,9 +18,7 @@ from packages.access_sync.policies import (
     AdapterCapabilities,
     EntitlementRule,
     PlatformPolicy,
-    PolicyRegistry,
 )
-from packages.access_sync.registry import AccessSyncRegistry
 from packages.access_sync.user_sync.service import UserSyncService
 
 
@@ -105,7 +105,7 @@ def make_service(
     current_ids=None,
 ):
     """Create a minimal test service."""
-    adapter = FakeAdapter(current_entitlement_ids=current_ids or set())
+    adapter: Any = FakeAdapter(current_entitlement_ids=current_ids or set())
     policy = PlatformPolicy(
         platform=platform,
         authn_group_slug=f"sg-{platform}-authn",
@@ -113,10 +113,12 @@ def make_service(
         authn_removal_mode=authn_removal_mode,
         entitlement_rules=rules or [],
     )
-    registry = AccessSyncRegistry(adapters={platform: adapter})
-    policies = PolicyRegistry(policies={platform: policy})
     directory = FakeDirectoryProvider(is_member=is_member)
-    service = UserSyncService(registry=registry, policies=policies, directory=directory)
+    service = UserSyncService(
+        adapters={platform: adapter},
+        policies={platform: policy},
+        directory=directory,
+    )
     return service, adapter
 
 
@@ -190,7 +192,7 @@ def test_sync_user_does_not_apply_entitlement_when_not_in_group():
     )
     # User is member of authn group but NOT of the entitlement group.
     # We model this by using a FakeDirectoryProvider with per-group control.
-    adapter = FakeAdapter()
+    adapter: Any = FakeAdapter()
     policy = PlatformPolicy(
         platform="aws",
         authn_group_slug="sg-aws-authn",
@@ -215,8 +217,8 @@ def test_sync_user_does_not_apply_entitlement_when_not_in_group():
             )
 
     service = UserSyncService(
-        registry=AccessSyncRegistry(adapters={"aws": adapter}),
-        policies=PolicyRegistry(policies={"aws": policy}),
+        adapters={"aws": adapter},
+        policies={"aws": policy},
         directory=SelectiveMembershipProvider(),
     )
     result = service.sync_user("alice@example.com", "aws")
@@ -226,24 +228,6 @@ def test_sync_user_does_not_apply_entitlement_when_not_in_group():
     action_names = [c[0] for c in adapter.calls]
     assert "ensure_user" in action_names
     assert "apply_entitlement" not in action_names
-
-
-@pytest.mark.unit
-def test_compute_desired_state_member():
-    """Authn group member → user_should_exist=True."""
-    service, _ = make_service(is_member=True)
-    result = service.compute_desired_state("alice@example.com", "aws")
-    assert result.is_success
-    assert result.data is True
-
-
-@pytest.mark.unit
-def test_compute_desired_state_non_member():
-    """Not in authn group → user_should_exist=False."""
-    service, _ = make_service(is_member=False)
-    result = service.compute_desired_state("alice@example.com", "aws")
-    assert result.is_success
-    assert result.data is False
 
 
 @pytest.mark.unit

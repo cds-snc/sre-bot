@@ -15,8 +15,8 @@ from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
 from packages.access_sync.providers import (
+    get_access_sync_adapters,
     get_access_sync_service,
-    get_access_sync_registry,
 )
 from packages.access_sync.schemas import UserSyncRequest
 
@@ -147,8 +147,7 @@ def handle_sync_command(
 
 def handle_status_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre access-sync-status."""
-    registry = get_access_sync_registry()
-    platforms = registry.registered_platforms()
+    platforms = sorted(get_access_sync_adapters().keys())
     if platforms:
         platform_list = ", ".join(f"`{p}`" for p in platforms)
         text = f"Access Sync — registered platforms: {platform_list}"

@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
-from pydantic_settings import BaseSettings, JsonConfigSettingsSource, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.policies import EntitlementRule, PlatformPolicy
@@ -206,6 +206,27 @@ def _build_runtime_config(
     return AccessSyncRuntimeConfig(policies=policies)
 
 
+def _validate_runtime_config_payload(
+    payload: object,
+    error_prefix: str,
+) -> OperationResult[AccessSyncRuntimeConfig]:
+    """Validate parsed JSON payload and build runtime config."""
+    try:
+        validated = RuntimeConfigJsonSettings.model_validate(payload)
+    except ValidationError as exc:
+        return OperationResult.error(
+            status=OperationStatus.PERMANENT_ERROR,
+            message=f"{error_prefix}_invalid_policy: {exc}",
+            error_code="CONFIG_INVALID_SHAPE",
+        )
+
+    config = _build_runtime_config(validated.policies)
+    return OperationResult.success(
+        data=config,
+        message=f"{error_prefix}_loaded policies={len(config.policies)}",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Config Loaders
 # ---------------------------------------------------------------------------
@@ -262,20 +283,9 @@ class InlineJsonConfigLoader:
                 message=f"inline_json_config_invalid_json: {exc.msg}",
                 error_code="CONFIG_INVALID_JSON",
             )
-
-        try:
-            validated = RuntimeConfigJsonSettings.model_validate(payload)
-        except ValidationError as exc:
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message=f"inline_json_config_invalid_policy: {exc}",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        config = _build_runtime_config(validated.policies)
-        return OperationResult.success(
-            data=config,
-            message=f"inline_json_config_loaded policies={len(config.policies)}",
+        return _validate_runtime_config_payload(
+            payload=payload,
+            error_prefix="inline_json_config",
         )
 
 
@@ -299,13 +309,7 @@ class FileJsonConfigLoader:
             )
 
         try:
-            source = JsonConfigSettingsSource(
-                RuntimeConfigJsonSettings,
-                json_file=path,
-                json_file_encoding="utf-8",
-            )
-            data = source()
-            validated = RuntimeConfigJsonSettings.model_validate(data)
+            payload = json.loads(path.read_text(encoding="utf-8"))
         except OSError as exc:
             return OperationResult.error(
                 status=OperationStatus.TRANSIENT_ERROR,
@@ -318,17 +322,18 @@ class FileJsonConfigLoader:
                 message=f"file_json_config_invalid_json: {exc.msg}",
                 error_code="CONFIG_INVALID_JSON",
             )
-        except ValidationError as exc:
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message=f"file_json_config_invalid_policy: {exc}",
-                error_code="CONFIG_INVALID_SHAPE",
-            )
-
-        config = _build_runtime_config(validated.policies)
+        result = _validate_runtime_config_payload(
+            payload=payload,
+            error_prefix="file_json_config",
+        )
+        if not result.is_success:
+            return result
         return OperationResult.success(
-            data=config,
-            message=f"file_json_config_loaded path={path} policies={len(config.policies)}",
+            data=result.data,
+            message=(
+                f"file_json_config_loaded path={path} "
+                f"policies={len(result.data.policies) if result.data else 0}"
+            ),
         )
 
 

@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Union
 
 import structlog
 
-from infrastructure.operations import OperationResult
+from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.config import AccessSyncSettings
 from packages.access_sync.schemas import PlatformSyncRequest, UserSyncRequest
 
 if TYPE_CHECKING:
@@ -32,9 +33,11 @@ class AccessSyncService:
 
     def __init__(
         self,
+        settings: AccessSyncSettings,
         user_sync_service: "UserSyncService",
         platform_sync_service: "PlatformSyncService",
     ) -> None:
+        self._settings = settings
         self._user_sync = user_sync_service
         self._platform_sync = platform_sync_service
 
@@ -48,6 +51,12 @@ class AccessSyncService:
             OperationResult[SyncOutcome] for UserSyncRequest.
             OperationResult[ReconciliationOutcome] for PlatformSyncRequest.
         """
+        if not self._settings.enabled:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message="Access Sync is not enabled",
+                error_code="FEATURE_DISABLED",
+            )
         if isinstance(request, UserSyncRequest):
             return self._user_sync.sync_user(
                 user_email=request.user_email,
@@ -58,4 +67,5 @@ class AccessSyncService:
         return self._platform_sync.sync_platform(
             platform=request.platform,
             dry_run=request.dry_run,
+            run_id=request.request_id or "",
         )

@@ -1,13 +1,13 @@
 """Unit tests for PlatformSyncService bulk reconciliation behavior."""
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, cast, Set
 
 import pytest
 
 from infrastructure.directory.models import DirectoryGroup, DirectoryMember
 from infrastructure.operations import OperationResult
 from packages.access_sync.models import (
-    MembershipContext,
+    DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
 )
@@ -15,9 +15,7 @@ from packages.access_sync.platform_sync.service import PlatformSyncService
 from packages.access_sync.policies import (
     EntitlementRule,
     PlatformPolicy,
-    PolicyRegistry,
 )
-from packages.access_sync.registry import AccessSyncRegistry
 
 
 class FakeDirectoryProvider:
@@ -81,9 +79,7 @@ class FakeUserSyncService:
         self,
         user_email: str,
         platform: str,
-        context: MembershipContext,
-        current_entitlement_ids: Optional[Set[str]] = None,
-        platform_user_exists: Optional[bool] = None,
+        desired_state: DesiredUserState,
         dry_run: bool = False,
         request_id: str = "",
     ) -> OperationResult:
@@ -91,9 +87,7 @@ class FakeUserSyncService:
             {
                 "user_email": user_email,
                 "platform": platform,
-                "context": context,
-                "current_entitlement_ids": current_entitlement_ids,
-                "platform_user_exists": platform_user_exists,
+                "desired_state": desired_state,
                 "dry_run": dry_run,
                 "request_id": request_id,
             }
@@ -127,8 +121,8 @@ def test_sync_platform_prefetches_current_entitlements_from_group_memberships() 
     directory_any: Any = FakeDirectoryProvider()
     platform_sync = PlatformSyncService(
         sync_service=sync_service_any,
-        registry=AccessSyncRegistry(adapters={"aws": adapter_any}),
-        policies=PolicyRegistry(policies={"aws": policy}),
+        adapters={"aws": adapter_any},
+        policies={"aws": policy},
         directory=directory_any,
     )
 
@@ -141,15 +135,24 @@ def test_sync_platform_prefetches_current_entitlements_from_group_memberships() 
 
     calls_by_email = {call["user_email"]: call for call in sync_service.calls}
 
-    assert calls_by_email["alice@example.com"]["current_entitlement_ids"] == {
-        "group-admin"
-    }
-    assert calls_by_email["alice@example.com"]["platform_user_exists"] is True
+    alice_state: DesiredUserState = cast(
+        DesiredUserState,
+        calls_by_email["alice@example.com"]["desired_state"],
+    )
+    bob_state: DesiredUserState = cast(
+        DesiredUserState,
+        calls_by_email["bob@example.com"]["desired_state"],
+    )
+    carol_state: DesiredUserState = cast(
+        DesiredUserState,
+        calls_by_email["carol@example.com"]["desired_state"],
+    )
 
-    assert calls_by_email["bob@example.com"]["current_entitlement_ids"] == set()
-    assert calls_by_email["bob@example.com"]["platform_user_exists"] is False
+    assert alice_state.current_entitlement_ids == {"group-admin"}
+    assert alice_state.platform_user_exists is True
 
-    assert calls_by_email["carol@example.com"]["current_entitlement_ids"] == {
-        "group-admin"
-    }
-    assert calls_by_email["carol@example.com"]["platform_user_exists"] is True
+    assert bob_state.current_entitlement_ids == set()
+    assert bob_state.platform_user_exists is False
+
+    assert carol_state.current_entitlement_ids == {"group-admin"}
+    assert carol_state.platform_user_exists is True

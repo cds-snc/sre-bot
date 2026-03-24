@@ -1,7 +1,5 @@
 """Unit tests for access sync route error sanitization."""
 
-from types import SimpleNamespace
-
 import pytest
 from fastapi import HTTPException
 
@@ -20,15 +18,6 @@ class _FakeService:
         return self._result
 
 
-def _enable_access_sync(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patch feature settings as enabled for route tests."""
-    monkeypatch.setattr(
-        routes,
-        "get_access_sync_settings",
-        lambda: SimpleNamespace(enabled=True),
-    )
-
-
 def _make_request() -> UserSyncRequest:
     """Create a valid user-sync request payload."""
     return UserSyncRequest(
@@ -43,7 +32,6 @@ def _make_request() -> UserSyncRequest:
 @pytest.mark.unit
 def test_sync_endpoint_not_found_masks_internal_error(monkeypatch: pytest.MonkeyPatch):
     """Route should not expose provider details for NOT_FOUND responses."""
-    _enable_access_sync(monkeypatch)
     monkeypatch.setattr(
         routes,
         "get_access_sync_service",
@@ -68,7 +56,6 @@ def test_sync_endpoint_permanent_error_masks_internal_error(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Route should return a generic 400 message for permanent errors."""
-    _enable_access_sync(monkeypatch)
     monkeypatch.setattr(
         routes,
         "get_access_sync_service",
@@ -96,7 +83,6 @@ def test_sync_endpoint_unauthorized_masks_internal_error(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Route should map unauthorized results to 403 with safe detail."""
-    _enable_access_sync(monkeypatch)
     monkeypatch.setattr(
         routes,
         "get_access_sync_service",
@@ -121,7 +107,6 @@ def test_sync_endpoint_internal_error_masks_internal_error(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Route should return generic 500 message for unexpected failures."""
-    _enable_access_sync(monkeypatch)
     monkeypatch.setattr(
         routes,
         "get_access_sync_service",
@@ -141,3 +126,27 @@ def test_sync_endpoint_internal_error_masks_internal_error(
     assert (
         exc_info.value.detail == "Access sync request failed due to an internal error"
     )
+
+
+@pytest.mark.unit
+def test_sync_endpoint_feature_disabled_returns_service_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Route should surface feature-disabled errors as HTTP 503."""
+    monkeypatch.setattr(
+        routes,
+        "get_access_sync_service",
+        lambda: _FakeService(
+            OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message="Access Sync is not enabled",
+                error_code="FEATURE_DISABLED",
+            )
+        ),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        routes.sync_endpoint(_make_request())
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail == "Access Sync is not enabled"

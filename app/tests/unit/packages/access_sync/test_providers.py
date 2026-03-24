@@ -24,9 +24,9 @@ def _make_policy(platform: str) -> PlatformPolicy:
 def test_get_access_sync_registry_registers_aws_and_fake(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Registry wiring includes both aws and fake adapters when configured."""
+    """Adapter wiring includes both aws and fake adapters when configured."""
     # Arrange
-    providers.get_access_sync_registry.cache_clear()
+    providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
         policies={
             "aws": _make_policy("aws"),
@@ -41,14 +41,14 @@ def test_get_access_sync_registry_registers_aws_and_fake(
     monkeypatch.setattr(providers, "get_aws_clients", lambda: object())
 
     # Act
-    registry = providers.get_access_sync_registry()
+    adapters = providers.get_access_sync_adapters()
 
     # Assert
-    assert registry.registered_platforms() == ["aws", "fake"]
-    assert isinstance(registry.get_adapter("aws"), AwsIdentityCenterAdapter)
-    assert isinstance(registry.get_adapter("fake"), FakePlatformAdapter)
+    assert sorted(adapters.keys()) == ["aws", "fake"]
+    assert isinstance(adapters["aws"], AwsIdentityCenterAdapter)
+    assert isinstance(adapters["fake"], FakePlatformAdapter)
 
-    providers.get_access_sync_registry.cache_clear()
+    providers.get_access_sync_adapters.cache_clear()
 
 
 @pytest.mark.unit
@@ -57,7 +57,7 @@ def test_get_access_sync_registry_ignores_unknown_platforms(
 ):
     """Unsupported platform policy keys should not register an adapter."""
     # Arrange
-    providers.get_access_sync_registry.cache_clear()
+    providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
         policies={
             "fake": _make_policy("fake"),
@@ -71,9 +71,9 @@ def test_get_access_sync_registry_ignores_unknown_platforms(
     )
 
     # Act
-    registry = providers.get_access_sync_registry()
+    adapters = providers.get_access_sync_adapters()
 
     # Assert
-    assert registry.registered_platforms() == ["fake"]
+    assert sorted(adapters.keys()) == ["fake"]
 
-    providers.get_access_sync_registry.cache_clear()
+    providers.get_access_sync_adapters.cache_clear()
