@@ -48,8 +48,10 @@ class GoogleDirectoryProvider:
 
     def _normalize_email(self, value: str) -> str:
         """Normalize email-form identifiers used by the shared contract."""
-
-        return value.strip().lower()
+        normalized = value.strip().lower()
+        if normalized and "@" not in normalized and self._managed_group_domain:
+            return f"{normalized}@{self._managed_group_domain}"
+        return normalized
 
     def _extract_email(self, item: dict[str, Any], *keys: str) -> str:
         """Extract and normalize the first available email-like value."""
