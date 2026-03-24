@@ -456,8 +456,6 @@ class TestGetGroupMembers:
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
-<<<<<<< Updated upstream
-=======
     def test_composes_group_email_from_slug(self, provider, mock_google_clients):
         # Arrange
         mock_google_clients.directory.list_members.return_value = (
@@ -473,7 +471,6 @@ class TestGetGroupMembers:
             includeDerivedMembership=True,
         )
 
->>>>>>> Stashed changes
 
 class TestGetGroup:
     def test_returns_canonical_group(self, provider, mock_google_clients):
