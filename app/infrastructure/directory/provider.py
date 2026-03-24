@@ -70,12 +70,17 @@ class DirectoryProvider(Protocol):
         ...
 
     def get_group_members(
-        self, group_key: str
+        self,
+        group_key: str,
+        include_member_types: set[str] | None = None,
     ) -> OperationResult[list[DirectoryMember]]:
         """Return all members of a group.
 
         Args:
             group_key: Canonical managed-group email (normalised to lowercase).
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``, ``{"GROUP"}``, or both). If not
+                provided, providers should return all member types.
 
         Returns:
             OperationResult: success with the DirectoryMember list for the group.
