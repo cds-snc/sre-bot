@@ -13,6 +13,7 @@ from packages.access_sync.models import (
 )
 from packages.access_sync.platform_sync.service import PlatformSyncService
 from packages.access_sync.policies import (
+    AdapterCapabilities,
     EntitlementRule,
     PlatformPolicy,
 )
@@ -47,7 +48,11 @@ class FakeDirectoryProvider:
     def get_group(self, slug: str) -> OperationResult:
         return OperationResult.success(data=self._groups.get(slug))
 
-    def get_group_members(self, group_email: str) -> OperationResult:
+    def get_group_members(
+        self,
+        group_email: str,
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult:
         return OperationResult.success(data=self._members.get(group_email, []))
 
 
@@ -56,6 +61,14 @@ class FakeAdapter:
 
     def __init__(self) -> None:
         self.calls: List[str] = []
+
+    def capabilities(self) -> AdapterCapabilities:
+        return AdapterCapabilities(
+            supports_disable=False,
+            supports_delete=True,
+            supported_entitlement_types={"group"},
+            supports_bulk_user_delta=True,
+        )
 
     def list_all_provisioned_users(self) -> OperationResult:
         self.calls.append("list_all_provisioned_users")
@@ -151,8 +164,41 @@ def test_sync_platform_prefetches_current_entitlements_from_group_memberships() 
     assert alice_state.current_entitlement_ids == {"group-admin"}
     assert alice_state.platform_user_exists is True
 
-    assert bob_state.current_entitlement_ids == set()
+    assert bob_state.current_entitlement_ids is None
     assert bob_state.platform_user_exists is False
 
     assert carol_state.current_entitlement_ids == {"group-admin"}
     assert carol_state.platform_user_exists is True
+
+
+@pytest.mark.unit
+def test_sync_platform_lifecycle_only_processes_delta_users_only() -> None:
+    """Lifecycle-only policies should process add/remove delta users only."""
+    policy = PlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[],
+    )
+
+    adapter = FakeAdapter()
+    sync_service = FakeUserSyncService()
+    adapter_any: Any = adapter
+    sync_service_any: Any = sync_service
+    directory_any: Any = FakeDirectoryProvider()
+    platform_sync = PlatformSyncService(
+        sync_service=sync_service_any,
+        adapters={"aws": adapter_any},
+        policies={"aws": policy},
+        directory=directory_any,
+    )
+
+    result = platform_sync.sync_platform("aws", dry_run=True, run_id="run-2")
+
+    assert result.is_success
+    assert isinstance(result.data, ReconciliationOutcome)
+    assert result.data.users_synced == 2
+    synced_emails = {str(call["user_email"]) for call in sync_service.calls}
+    assert synced_emails == {"bob@example.com", "carol@example.com"}
+    assert "list_members_for_groups" not in adapter.calls

@@ -26,7 +26,14 @@ from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access_sync.policies import EntitlementRule, PlatformPolicy
+from packages.access_sync.policies import (
+    DefaultEntitlementStrategy,
+    EntitlementMode,
+    EntitlementStrategyKind,
+    EntitlementRule,
+    PatternEntitlementMapping,
+    PlatformPolicy,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +138,30 @@ class EntitlementRuleConfigModel(BaseModel):
     group_slug: str
     entitlement_type: str
     entitlement_id: str
-    mode: str = "sync_managed"
+    mode: EntitlementMode = "sync_managed"
+
+
+class PatternEntitlementMappingConfigModel(BaseModel):
+    """Typed schema for one wildcard group->entitlement mapping."""
+
+    source_group_pattern: str
+    entitlement_type: str
+    entitlement_id: str
+    mode: EntitlementMode = "sync_managed"
+
+
+class DefaultEntitlementStrategyConfigModel(BaseModel):
+    """Typed schema for platform-level default entitlement strategy."""
+
+    kind: EntitlementStrategyKind = "explicit_rules_only"
+    source_group_prefix: str = ""
+    exclude_group_slugs: List[str] = Field(default_factory=list)
+    default_entitlement_type: str = "group"
+    entitlement_id_template: str = "{token}"
+    mode: EntitlementMode = "sync_managed"
+    pattern_mappings: List[PatternEntitlementMappingConfigModel] = Field(
+        default_factory=list
+    )
 
 
 class PlatformPolicyConfigModel(BaseModel):
@@ -142,6 +172,7 @@ class PlatformPolicyConfigModel(BaseModel):
     authn_mode: str
     authn_removal_mode: str
     entitlement_rules: List[EntitlementRuleConfigModel] = Field(default_factory=list)
+    default_entitlement_strategy: Optional[DefaultEntitlementStrategyConfigModel] = None
 
 
 class RuntimeConfigJsonSettings(BaseSettings):
@@ -200,6 +231,35 @@ def _build_runtime_config(
             authn_mode=raw_policy.authn_mode,
             authn_removal_mode=raw_policy.authn_removal_mode,
             entitlement_rules=entitlement_rules,
+            default_entitlement_strategy=(
+                DefaultEntitlementStrategy(
+                    kind=raw_policy.default_entitlement_strategy.kind,
+                    source_group_prefix=(
+                        raw_policy.default_entitlement_strategy.source_group_prefix
+                    ),
+                    exclude_group_slugs=list(
+                        raw_policy.default_entitlement_strategy.exclude_group_slugs
+                    ),
+                    default_entitlement_type=(
+                        raw_policy.default_entitlement_strategy.default_entitlement_type
+                    ),
+                    entitlement_id_template=(
+                        raw_policy.default_entitlement_strategy.entitlement_id_template
+                    ),
+                    mode=raw_policy.default_entitlement_strategy.mode,
+                    pattern_mappings=[
+                        PatternEntitlementMapping(
+                            source_group_pattern=mapping.source_group_pattern,
+                            entitlement_type=mapping.entitlement_type,
+                            entitlement_id=mapping.entitlement_id,
+                            mode=mapping.mode,
+                        )
+                        for mapping in raw_policy.default_entitlement_strategy.pattern_mappings
+                    ],
+                )
+                if raw_policy.default_entitlement_strategy is not None
+                else None
+            ),
         )
         policies[str(policy.platform or fallback_key)] = policy
 

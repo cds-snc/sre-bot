@@ -4,7 +4,10 @@ import pytest
 
 from packages.access_sync.policies import (
     AdapterCapabilities,
+    DefaultEntitlementStrategy,
+    EntitlementMode,
     EntitlementRule,
+    PatternEntitlementMapping,
     PlatformPolicy,
     PolicyEngine,
     PolicyRegistry,
@@ -34,7 +37,7 @@ def make_rule(
     group_slug: str = "sg-aws-admin",
     entitlement_type: str = "permission_set",
     entitlement_id: str = "123456789012/AWSAdministratorAccess",
-    mode: str = "sync_managed",
+    mode: EntitlementMode = "sync_managed",
 ) -> EntitlementRule:
     return EntitlementRule(
         group_slug=group_slug,
@@ -109,6 +112,74 @@ def test_skip_entitlement_ids_union():
 
     # Assert
     assert ids == {"111/E", "222/F"}
+
+
+@pytest.mark.unit
+def test_effective_rules_default_prefix_adds_discovered_groups():
+    # Arrange
+    policy = PlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[],
+        default_entitlement_strategy=DefaultEntitlementStrategy(
+            kind="default_prefix",
+            source_group_prefix="sg-aws-",
+            exclude_group_slugs=["sg-aws-authn"],
+            default_entitlement_type="group",
+            entitlement_id_template="{token}",
+        ),
+    )
+
+    # Act
+    rules = policy.sync_managed_rules(
+        discovered_group_slugs={"sg-aws-authn", "sg-aws-team1-admin"}
+    )
+
+    # Assert
+    assert len(rules) == 1
+    assert rules[0].group_slug == "sg-aws-team1-admin"
+    assert rules[0].entitlement_id == "team1-admin"
+
+
+@pytest.mark.unit
+def test_effective_rules_pattern_map_supports_wildcards():
+    # Arrange
+    policy = PlatformPolicy(
+        platform="appname2",
+        authn_group_slug="sg-appname2-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[],
+        default_entitlement_strategy=DefaultEntitlementStrategy(
+            kind="pattern_map",
+            pattern_mappings=[
+                PatternEntitlementMapping(
+                    source_group_pattern="sg-appname2-first-pattern*",
+                    entitlement_type="group",
+                    entitlement_id="entitlement-x",
+                ),
+                PatternEntitlementMapping(
+                    source_group_pattern="sg-appname2-second-pattern*",
+                    entitlement_type="group",
+                    entitlement_id="entitlement-y",
+                ),
+            ],
+        ),
+    )
+
+    # Act
+    rules = policy.sync_managed_rules(
+        discovered_group_slugs={
+            "sg-appname2-first-pattern-prod",
+            "sg-appname2-second-pattern-dev",
+        }
+    )
+
+    # Assert
+    ids = {rule.entitlement_id for rule in rules}
+    assert ids == {"entitlement-x", "entitlement-y"}
 
 
 # ---------------------------------------------------------------------------

@@ -108,6 +108,7 @@ class PlatformSyncService:
 
         policy = resolved_result.data.policy
         adapter = resolved_result.data.adapter
+        adapter_capabilities = adapter.capabilities()
 
         # Phase 1: batch IDP state — O(groups) not O(users).
         desired_state_result = self._membership_builder.build_platform_states(policy)
@@ -132,6 +133,7 @@ class PlatformSyncService:
         # Phase 2.5: platform-side group membership prefetch.
         precomputed_current_ids: Dict[str, Set[str]] = {}
         prefetch_complete = False
+        has_sync_managed_entitlements = bool(policy.sync_managed_rules())
         prefetch_result = self._prefetch_current_entitlements(policy, adapter)
         if prefetch_result.is_success and isinstance(prefetch_result.data, dict):
             precomputed_current_ids = prefetch_result.data
@@ -146,7 +148,32 @@ class PlatformSyncService:
                 error=prefetch_result.message,
             )
 
-        all_subjects: Set[str] = idp_members | orphans | set(precomputed_current_ids)
+        # Lifecycle-only policies can converge using delta subjects only.
+        # This avoids per-user no-op evaluations for users already in-sync.
+        candidate_subjects: Set[str] = (
+            idp_members | orphans | set(precomputed_current_ids)
+        )
+        lifecycle_delta_optimized = False
+        if (
+            not has_sync_managed_entitlements
+            and provisioned_known
+            and adapter_capabilities.supports_bulk_user_delta
+        ):
+            all_subjects: Set[str] = (idp_members - provisioned) | orphans
+            lifecycle_delta_optimized = True
+            log.info("lifecycle_delta_subjects_selected", count=len(all_subjects))
+        else:
+            all_subjects = candidate_subjects
+
+        log.info(
+            "platform_sync_subject_counts",
+            subjects_total=len(candidate_subjects),
+            subjects_processed=len(all_subjects),
+            subjects_delta_processed=max(
+                len(candidate_subjects) - len(all_subjects), 0
+            ),
+            lifecycle_delta_optimized=lifecycle_delta_optimized,
+        )
 
         # Phase 3: per-user sync via UserSyncService.sync_user_from_context.
         # DesiredUserState carries the pre-fetched IDP state built in Phase 1,
@@ -163,7 +190,7 @@ class PlatformSyncService:
             )
             current_ids_for_user: Optional[Set[str]] = None
             if prefetch_complete:
-                current_ids_for_user = precomputed_current_ids.get(email, set())
+                current_ids_for_user = precomputed_current_ids.get(email)
             precomputed_exists: Optional[bool] = None
             if provisioned_known:
                 precomputed_exists = email in provisioned
@@ -226,6 +253,13 @@ class PlatformSyncService:
                         "orphans_found": len(orphans),
                         "requires_manual_action_count": requires_manual_action_count,
                         "dry_run": dry_run,
+                        "subjects_total": len(candidate_subjects),
+                        "subjects_processed": len(all_subjects),
+                        "subjects_delta_processed": max(
+                            len(candidate_subjects) - len(all_subjects),
+                            0,
+                        ),
+                        "lifecycle_delta_optimized": lifecycle_delta_optimized,
                     },
                 )
             )

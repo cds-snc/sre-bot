@@ -31,6 +31,7 @@ class FakePlatformAdapter:
             supports_disable=True,
             supports_delete=True,
             supported_entitlement_types={"group"},
+            supports_bulk_user_delta=True,
         )
 
     def get_user(self, user_email: str) -> OperationResult:

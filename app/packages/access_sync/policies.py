@@ -6,7 +6,17 @@ any of this logic.
 """
 
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from typing import Dict, List, Literal, Optional, Set
+
+
+EntitlementMode = Literal["sync_managed", "ephemeral", "deactivated"]
+EntitlementStrategyKind = Literal[
+    "none",
+    "explicit_rules_only",
+    "default_prefix",
+    "pattern_map",
+]
 
 
 @dataclass(frozen=True)
@@ -31,7 +41,97 @@ class EntitlementRule:
     group_slug: str
     entitlement_type: str
     entitlement_id: str
-    mode: str = "sync_managed"  # sync_managed | ephemeral | deactivated
+    mode: EntitlementMode = "sync_managed"
+
+
+@dataclass(frozen=True)
+class PatternEntitlementMapping:
+    """Map source-group wildcard patterns to one platform entitlement."""
+
+    source_group_pattern: str
+    entitlement_type: str
+    entitlement_id: str
+    mode: EntitlementMode = "sync_managed"
+
+
+@dataclass(frozen=True)
+class DefaultEntitlementStrategy:
+    """Platform-level default discovery and mapping strategy.
+
+    kind:
+      'none'                - no entitlements for this platform.
+      'explicit_rules_only' - only explicit EntitlementRule entries are used.
+      'default_prefix'      - groups matching source_group_prefix map to a default
+                              entitlement shape using entitlement_id_template.
+      'pattern_map'         - groups are matched against pattern_mappings.
+    """
+
+    kind: EntitlementStrategyKind = "explicit_rules_only"
+    source_group_prefix: str = ""
+    exclude_group_slugs: List[str] = field(default_factory=list)
+    default_entitlement_type: str = "group"
+    entitlement_id_template: str = "{token}"
+    mode: EntitlementMode = "sync_managed"
+    pattern_mappings: List[PatternEntitlementMapping] = field(default_factory=list)
+
+    def applies_to_group(self, group_slug: str) -> bool:
+        """Return True when the strategy should consider *group_slug*."""
+        normalized = group_slug.strip().lower()
+        if normalized in {
+            slug.strip().lower() for slug in self.exclude_group_slugs if slug
+        }:
+            return False
+
+        if self.kind == "default_prefix":
+            prefix = self.source_group_prefix.strip().lower()
+            return bool(prefix) and normalized.startswith(prefix)
+
+        if self.kind == "pattern_map":
+            return any(
+                fnmatch(normalized, mapping.source_group_pattern.strip().lower())
+                for mapping in self.pattern_mappings
+                if mapping.source_group_pattern
+            )
+
+        return False
+
+    def build_rule_for_group(self, group_slug: str) -> Optional[EntitlementRule]:
+        """Build a default rule candidate for *group_slug* when configured."""
+        normalized = group_slug.strip().lower()
+        if not normalized:
+            return None
+
+        if self.kind == "default_prefix":
+            prefix = self.source_group_prefix.strip().lower()
+            if not prefix or not normalized.startswith(prefix):
+                return None
+            token = normalized[len(prefix) :]
+            if not token:
+                return None
+            entitlement_id = self.entitlement_id_template.replace("{token}", token)
+            if not entitlement_id:
+                return None
+            return EntitlementRule(
+                group_slug=normalized,
+                entitlement_type=self.default_entitlement_type,
+                entitlement_id=entitlement_id,
+                mode=self.mode,
+            )
+
+        if self.kind == "pattern_map":
+            for mapping in self.pattern_mappings:
+                pattern = mapping.source_group_pattern.strip().lower()
+                if not pattern:
+                    continue
+                if fnmatch(normalized, pattern):
+                    return EntitlementRule(
+                        group_slug=normalized,
+                        entitlement_type=mapping.entitlement_type,
+                        entitlement_id=mapping.entitlement_id,
+                        mode=mapping.mode,
+                    )
+
+        return None
 
 
 @dataclass(frozen=True)
@@ -61,10 +161,54 @@ class PlatformPolicy:
     authn_mode: str  # direct | derived
     authn_removal_mode: str  # disable | delete | entitlement_only
     entitlement_rules: List[EntitlementRule]
+    default_entitlement_strategy: Optional[DefaultEntitlementStrategy] = None
 
-    def sync_managed_rules(self) -> List[EntitlementRule]:
+    def effective_rules(
+        self,
+        discovered_group_slugs: Optional[Set[str]] = None,
+    ) -> List[EntitlementRule]:
+        """Return explicit rules plus strategy-generated defaults.
+
+        Explicit rules always win over strategy-generated candidates for the
+        same source group slug.
+        """
+        explicit_by_slug: Dict[str, EntitlementRule] = {
+            rule.group_slug.strip().lower(): rule
+            for rule in self.entitlement_rules
+            if rule.group_slug
+        }
+
+        if not discovered_group_slugs:
+            return list(self.entitlement_rules)
+
+        strategy = self.default_entitlement_strategy
+        if strategy is None or strategy.kind in {"none", "explicit_rules_only"}:
+            return list(self.entitlement_rules)
+
+        generated: List[EntitlementRule] = []
+        for slug in sorted(group_slug.lower() for group_slug in discovered_group_slugs):
+            if slug == self.authn_group_slug.lower():
+                continue
+            if slug in explicit_by_slug:
+                continue
+            if not strategy.applies_to_group(slug):
+                continue
+            rule = strategy.build_rule_for_group(slug)
+            if rule is not None:
+                generated.append(rule)
+
+        return list(self.entitlement_rules) + generated
+
+    def sync_managed_rules(
+        self,
+        discovered_group_slugs: Optional[Set[str]] = None,
+    ) -> List[EntitlementRule]:
         """Return only rules that Access Sync is responsible for."""
-        return [r for r in self.entitlement_rules if r.mode == "sync_managed"]
+        return [
+            rule
+            for rule in self.effective_rules(discovered_group_slugs)
+            if rule.mode == "sync_managed"
+        ]
 
     def ephemeral_entitlement_ids(self) -> Set[str]:
         """Return entitlement IDs that must be skipped during reconciliation (Privileged Access owns them)."""
@@ -134,6 +278,7 @@ class AdapterCapabilities:
     supports_disable: bool
     supports_delete: bool
     supported_entitlement_types: Set[str]
+    supports_bulk_user_delta: bool = False
 
 
 @dataclass(frozen=True)

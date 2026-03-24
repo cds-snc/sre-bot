@@ -135,3 +135,16 @@ class BulkGroupMembershipAdapter(Protocol):
     def list_members_for_groups(self, group_ids: Set[str]) -> OperationResult:
         """Return mapping of group_id -> set of lowercase member emails."""
         ...
+
+
+@runtime_checkable
+class EntitlementCanonicalizingAdapter(Protocol):
+    """Optional capability for converting entitlement references to canonical IDs."""
+
+    def canonicalize_entitlement_id(
+        self,
+        entitlement_type: str,
+        entitlement_id: str,
+    ) -> OperationResult:
+        """Return canonical entitlement ID representation for planner execution."""
+        ...

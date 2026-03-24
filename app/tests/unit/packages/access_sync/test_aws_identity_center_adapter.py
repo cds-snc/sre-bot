@@ -35,6 +35,10 @@ class FakeIdentityStoreClient:
         self.list_group_memberships_result: OperationResult = OperationResult.success(
             data=[]
         )
+        self.describe_group_result: OperationResult = OperationResult.success(data={})
+        self.get_group_id_by_group_name_result: OperationResult = (
+            OperationResult.success(data={"GroupId": "group-123"})
+        )
         self.list_groups_with_memberships_result: OperationResult = (
             OperationResult.success(data=[])
         )
@@ -72,6 +76,14 @@ class FakeIdentityStoreClient:
     def list_group_memberships(self, **kwargs: Any) -> OperationResult:
         self.calls.append(("list_group_memberships", kwargs))
         return self.list_group_memberships_result
+
+    def describe_group(self, **kwargs: Any) -> OperationResult:
+        self.calls.append(("describe_group", kwargs))
+        return self.describe_group_result
+
+    def get_group_id_by_group_name(self, **kwargs: Any) -> OperationResult:
+        self.calls.append(("get_group_id_by_group_name", kwargs))
+        return self.get_group_id_by_group_name_result
 
     def list_users(self, **kwargs: Any) -> OperationResult:
         self.calls.append(("list_users", kwargs))
@@ -280,3 +292,30 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
     assert result.is_success
     assert result.data == {"group-1": {"alice@example.com"}}
     assert any(call[0] == "list_group_memberships" for call in client.calls)
+
+
+@pytest.mark.unit
+def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
+    """Group-name entitlement IDs should resolve via central identity store client."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND,
+        message="group id not found",
+        error_code="GROUP_NOT_FOUND",
+    )
+    client.get_group_id_by_group_name_result = OperationResult.success(
+        data={"GroupId": "resolved-group-id"}
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.apply_entitlement(
+        "alice@example.com",
+        "group",
+        "team1-prd-admin",
+    )
+
+    assert result.is_success
+    create_call = next(
+        call for call in client.calls if call[0] == "create_group_membership"
+    )
+    assert create_call[1]["GroupId"] == "resolved-group-id"

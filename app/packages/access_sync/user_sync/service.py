@@ -10,6 +10,7 @@ PlatformSyncService to keep batch platform sync at O(groups) IDP calls total.
 """
 
 import uuid
+from dataclasses import replace
 from typing import List, Mapping, Optional, Set, TYPE_CHECKING
 
 import structlog
@@ -17,10 +18,14 @@ import structlog
 from infrastructure.events import Event, EventDispatcher
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync import events as sync_events
-from packages.access_sync.adapters import AccessSyncAdapter
+from packages.access_sync.adapters import (
+    AccessSyncAdapter,
+    EntitlementCanonicalizingAdapter,
+)
 from packages.access_sync.membership import DirectoryMembershipBuilder
 from packages.access_sync.models import DesiredUserState, SyncOutcome, SyncRunRecord
 from packages.access_sync.policies import (
+    EntitlementRule,
     PlannedAction,
     PlatformPolicy,
     PolicyEngine,
@@ -208,11 +213,20 @@ class UserSyncService:
             elif current_result.status == OperationStatus.NOT_FOUND:
                 log.info("platform_user_absent")
 
-        planned = self._engine.plan_actions(
+        canonicalized_result = self._canonicalize_entitlements(
+            adapter=adapter,
             policy=policy,
+            desired_state=desired_state,
+        )
+        if not canonicalized_result.is_success or canonicalized_result.data is None:
+            return canonicalized_result
+        canonicalized = canonicalized_result.data
+
+        planned = self._engine.plan_actions(
+            policy=canonicalized.policy,
             capabilities=adapter.capabilities(),
             user_should_exist=desired_state.user_should_exist,
-            required_entitlements=desired_state.required_entitlements,
+            required_entitlements=canonicalized.required_entitlements,
             current_entitlement_ids=current_ids,
         )
         planned_actions = [str(planned_action.action) for planned_action in planned]
@@ -306,6 +320,78 @@ class UserSyncService:
             )
         )
 
+    def _canonicalize_entitlements(
+        self,
+        adapter: AccessSyncAdapter,
+        policy: PlatformPolicy,
+        desired_state: DesiredUserState,
+    ) -> "OperationResult[_CanonicalizedEntitlements]":
+        """Canonicalize entitlement IDs for stable planner comparisons."""
+        if not isinstance(adapter, EntitlementCanonicalizingAdapter):
+            return OperationResult.success(
+                data=_CanonicalizedEntitlements(
+                    policy=policy,
+                    required_entitlements=desired_state.required_entitlements,
+                )
+            )
+
+        rule_by_key: dict[tuple[str, str, str], EntitlementRule] = {}
+        for rule in policy.entitlement_rules:
+            canonical_result = adapter.canonicalize_entitlement_id(
+                entitlement_type=rule.entitlement_type,
+                entitlement_id=rule.entitlement_id,
+            )
+            if not canonical_result.is_success or not isinstance(
+                canonical_result.data, str
+            ):
+                return OperationResult.error(
+                    canonical_result.status,
+                    message=canonical_result.message,
+                    error_code=canonical_result.error_code,
+                )
+            canonical_rule_entry = EntitlementRule(
+                group_slug=rule.group_slug,
+                entitlement_type=rule.entitlement_type,
+                entitlement_id=canonical_result.data,
+                mode=rule.mode,
+            )
+            rule_by_key[
+                (rule.group_slug, rule.entitlement_type, rule.entitlement_id)
+            ] = canonical_rule_entry
+
+        canonical_required: List[EntitlementRule] = []
+        for rule in desired_state.required_entitlements:
+            canonical_rule: Optional[EntitlementRule] = rule_by_key.get(
+                (rule.group_slug, rule.entitlement_type, rule.entitlement_id)
+            )
+            if canonical_rule is None:
+                canonical_id_result = adapter.canonicalize_entitlement_id(
+                    entitlement_type=rule.entitlement_type,
+                    entitlement_id=rule.entitlement_id,
+                )
+                if not canonical_id_result.is_success or not isinstance(
+                    canonical_id_result.data, str
+                ):
+                    return OperationResult.error(
+                        canonical_id_result.status,
+                        message=canonical_id_result.message,
+                        error_code=canonical_id_result.error_code,
+                    )
+                canonical_rule = EntitlementRule(
+                    group_slug=rule.group_slug,
+                    entitlement_type=rule.entitlement_type,
+                    entitlement_id=canonical_id_result.data,
+                    mode=rule.mode,
+                )
+            canonical_required.append(canonical_rule)
+
+        return OperationResult.success(
+            data=_CanonicalizedEntitlements(
+                policy=replace(policy, entitlement_rules=list(rule_by_key.values())),
+                required_entitlements=canonical_required,
+            )
+        )
+
     def _execute_action(
         self,
         adapter: AccessSyncAdapter,
@@ -371,3 +457,15 @@ class UserSyncService:
                 error_message=error_message,
             )
         )
+
+
+class _CanonicalizedEntitlements:
+    """Canonical entitlement IDs used for policy planning and execution."""
+
+    def __init__(
+        self,
+        policy: PlatformPolicy,
+        required_entitlements: List[EntitlementRule],
+    ) -> None:
+        self.policy = policy
+        self.required_entitlements = required_entitlements

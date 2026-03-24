@@ -1,6 +1,6 @@
 """Directory-driven desired-state builders for Access Sync."""
 
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List, Set, TYPE_CHECKING
 
 import structlog
 
@@ -28,7 +28,11 @@ class DirectoryMembershipBuilder:
         """Resolve one user's desired state from authn and entitlement groups."""
         authn_result = self._check_group_membership(policy.authn_group_slug, user_email)
         if not authn_result.is_success:
-            return authn_result
+            return OperationResult.error(
+                authn_result.status,
+                message=authn_result.message,
+                error_code=authn_result.error_code,
+            )
         if not isinstance(authn_result.data, bool):
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
@@ -38,10 +42,12 @@ class DirectoryMembershipBuilder:
 
         required_entitlements: List[EntitlementRule] = []
         if authn_result.data:
+            discovered_group_slugs = self._discover_group_slugs(policy)
+            effective_rules = policy.sync_managed_rules(discovered_group_slugs)
             required_entitlements = self._resolve_member_entitlements(
                 user_email=user_email,
                 platform=policy.platform,
-                rules=policy.sync_managed_rules(),
+                rules=effective_rules,
             )
 
         return OperationResult.success(
@@ -67,7 +73,10 @@ class DirectoryMembershipBuilder:
             )
 
         authn_email = authn_group_result.data.group_email
-        authn_members_result = self._directory.get_group_members(authn_email)
+        authn_members_result = self._directory.get_group_members(
+            authn_email,
+            include_member_types={"USER"},
+        )
         if not authn_members_result.is_success:
             return OperationResult.error(
                 authn_members_result.status,
@@ -81,7 +90,10 @@ class DirectoryMembershipBuilder:
         }
         log.info("build_desired_state_authn_members", count=len(desired))
 
-        for rule in policy.sync_managed_rules():
+        discovered_group_slugs = self._discover_group_slugs(policy)
+        effective_rules = policy.sync_managed_rules(discovered_group_slugs)
+
+        for rule in effective_rules:
             group_result = self._directory.get_group(rule.group_slug)
             if not group_result.is_success or not group_result.data:
                 log.warning(
@@ -91,7 +103,8 @@ class DirectoryMembershipBuilder:
                 continue
 
             rule_members_result = self._directory.get_group_members(
-                group_result.data.group_email
+                group_result.data.group_email,
+                include_member_types={"USER"},
             )
             if not rule_members_result.is_success:
                 log.warning(
@@ -112,6 +125,28 @@ class DirectoryMembershipBuilder:
                 )
 
         return OperationResult.success(data=desired)
+
+    def _discover_group_slugs(self, policy: PlatformPolicy) -> Set[str]:
+        """Discover candidate group slugs for strategy-driven entitlement rules."""
+        strategy = policy.default_entitlement_strategy
+        if strategy is None or strategy.kind in {"none", "explicit_rules_only"}:
+            return set()
+
+        query = strategy.source_group_prefix or ""
+        list_result = self._directory.list_groups(query=query)
+        if not list_result.is_success:
+            logger.bind(platform=policy.platform).warning(
+                "discover_groups_failed",
+                error=list_result.message,
+            )
+            return set()
+
+        groups = list_result.data if isinstance(list_result.data, list) else []
+        return {
+            group.group_slug.strip().lower()
+            for group in groups
+            if group.group_slug and isinstance(group.group_slug, str)
+        }
 
     def _check_group_membership(
         self,

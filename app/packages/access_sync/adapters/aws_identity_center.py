@@ -45,6 +45,7 @@ class AwsIdentityCenterAdapter:
 
     def __init__(self, aws_clients: AWSClients) -> None:
         self._aws = aws_clients
+        self._group_id_cache: Dict[str, str] = {}
 
     @staticmethod
     def _build_identitystore_name(user_email: str) -> Dict[str, str]:
@@ -98,7 +99,65 @@ class AwsIdentityCenterAdapter:
             supports_disable=False,  # AWS IC has no native identity-store disable
             supports_delete=True,
             supported_entitlement_types={"group"},  # v1: group membership sync only
+            supports_bulk_user_delta=True,
         )
+
+    def canonicalize_entitlement_id(
+        self,
+        entitlement_type: str,
+        entitlement_id: str,
+    ) -> OperationResult:
+        """Canonicalize entitlement IDs for planner comparisons.
+
+        For AWS group entitlements this accepts either a GroupId or a
+        display-name token and always returns the GroupId.
+        """
+        if entitlement_type != "group":
+            return OperationResult.success(data=entitlement_id)
+
+        return self._resolve_group_id(entitlement_id)
+
+    def _resolve_group_id(self, entitlement_id: str) -> OperationResult:
+        """Resolve a group identifier to canonical AWS Identity Store GroupId."""
+        candidate = entitlement_id.strip()
+        if not candidate:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message="Entitlement ID is required",
+                error_code="INVALID_ENTITLEMENT_ID",
+            )
+
+        cached = self._group_id_cache.get(candidate)
+        if cached is not None:
+            return OperationResult.success(data=cached)
+
+        describe_result = self._aws.identitystore.describe_group(group_id=candidate)
+        if describe_result.is_success:
+            self._group_id_cache[candidate] = candidate
+            return OperationResult.success(data=candidate)
+
+        lookup_result = self._aws.identitystore.get_group_id_by_group_name(
+            group_name=candidate,
+        )
+        if not lookup_result.is_success:
+            return OperationResult.error(
+                lookup_result.status,
+                message=lookup_result.message,
+                error_code=lookup_result.error_code,
+            )
+        group_id = (
+            lookup_result.data.get("GroupId", "")
+            if isinstance(lookup_result.data, dict)
+            else ""
+        )
+        if not isinstance(group_id, str) or not group_id:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"GroupId not found for entitlement: {candidate}",
+                error_code="GROUP_ID_NOT_FOUND",
+            )
+        self._group_id_cache[candidate] = group_id
+        return OperationResult.success(data=group_id)
 
     def _find_user_id(self, user_email: str) -> OperationResult:
         """Resolve a user email to an Identity Store user ID.
@@ -244,23 +303,28 @@ class AwsIdentityCenterAdapter:
             return id_result
         user_id: str = (id_result.data or {}).get("user_id", "")
 
+        group_id_result = self._resolve_group_id(entitlement_id)
+        if not group_id_result.is_success:
+            return group_id_result
+        group_id = str(group_id_result.data)
+
         # Check if already a member (idempotency).
         membership_result = self._aws.identitystore.get_group_membership_id(
-            group_id=entitlement_id,
+            group_id=group_id,
             member_id={"UserId": user_id},
         )
         if membership_result.is_success:
-            log.info("apply_entitlement_already_member", group_id=entitlement_id)
+            log.info("apply_entitlement_already_member", group_id=group_id)
             return OperationResult.success(message="group_membership_already_exists")
         if membership_result.status != OperationStatus.NOT_FOUND:
             return membership_result
 
         result = self._aws.identitystore.create_group_membership(
-            GroupId=entitlement_id,
+            GroupId=group_id,
             MemberId={"UserId": user_id},
         )
         if result.is_success:
-            log.info("apply_entitlement_added", group_id=entitlement_id)
+            log.info("apply_entitlement_added", group_id=group_id)
         else:
             log.error("apply_entitlement_failed", error=result.message)
         return result
@@ -300,13 +364,18 @@ class AwsIdentityCenterAdapter:
             return id_result
         user_id: str = (id_result.data or {}).get("user_id", "")
 
+        group_id_result = self._resolve_group_id(entitlement_id)
+        if not group_id_result.is_success:
+            return group_id_result
+        group_id = str(group_id_result.data)
+
         membership_result = self._aws.identitystore.get_group_membership_id(
-            group_id=entitlement_id,
+            group_id=group_id,
             member_id={"UserId": user_id},
         )
         if not membership_result.is_success:
             if membership_result.status == OperationStatus.NOT_FOUND:
-                log.info("remove_entitlement_not_member", group_id=entitlement_id)
+                log.info("remove_entitlement_not_member", group_id=group_id)
                 return OperationResult.success(
                     message="group_membership_already_absent"
                 )
@@ -317,7 +386,7 @@ class AwsIdentityCenterAdapter:
             membership_id=membership_id,
         )
         if result.is_success:
-            log.info("remove_entitlement_removed", group_id=entitlement_id)
+            log.info("remove_entitlement_removed", group_id=group_id)
         else:
             log.error("remove_entitlement_failed", error=result.message)
         return result
@@ -418,11 +487,16 @@ class AwsIdentityCenterAdapter:
         Returns:
             ``OperationResult[Set[str]]`` of lowercase member emails, or error.
         """
-        log = logger.bind(group_id=group_id, adapter="aws_identity_center")
+        resolved_group_id_result = self._resolve_group_id(group_id)
+        if not resolved_group_id_result.is_success:
+            return resolved_group_id_result
+        resolved_group_id = str(resolved_group_id_result.data)
+
+        log = logger.bind(group_id=resolved_group_id, adapter="aws_identity_center")
         log.info("list_group_members_started")
 
         memberships_result = self._aws.identitystore.list_group_memberships(
-            group_id=group_id
+            group_id=resolved_group_id
         )
         if not memberships_result.is_success:
             log.error("list_group_memberships_failed", error=memberships_result.message)
@@ -467,52 +541,31 @@ class AwsIdentityCenterAdapter:
         if not group_ids:
             return OperationResult.success(data={})
 
-        log = logger.bind(adapter="aws_identity_center", group_count=len(group_ids))
-        identitystore = self._aws.identitystore
+        resolved_group_ids_result = self._resolve_group_ids(group_ids)
+        if not resolved_group_ids_result.is_success or not isinstance(
+            resolved_group_ids_result.data, set
+        ):
+            return resolved_group_ids_result
+        resolved_group_ids = resolved_group_ids_result.data
 
-        if hasattr(identitystore, "list_groups_with_memberships"):
-            target_ids = set(group_ids)
-            bulk_result = identitystore.list_groups_with_memberships(
-                groups_filters=[
-                    lambda group: isinstance(group, dict)
-                    and group.get("GroupId") in target_ids
-                ]
-            )
-            if bulk_result.is_success and isinstance(bulk_result.data, list):
-                mapping: Dict[str, Set[str]] = {}
-                for group in bulk_result.data:
-                    if not isinstance(group, dict):
-                        continue
-                    group_id = group.get("GroupId")
-                    if not isinstance(group_id, str) or group_id not in target_ids:
-                        continue
-
-                    members = group.get("GroupMemberships", [])
-                    emails: Set[str] = set()
-                    if isinstance(members, list):
-                        for membership in members:
-                            if not isinstance(membership, dict):
-                                continue
-                            details = membership.get("UserDetails")
-                            if isinstance(details, dict):
-                                email = self._extract_primary_email(details)
-                                if email is not None:
-                                    emails.add(email)
-                    mapping[group_id] = emails
-
-                for group_id in target_ids:
-                    mapping.setdefault(group_id, set())
-
-                log.info("list_members_for_groups_ok", groups=len(mapping))
-                return OperationResult.success(data=mapping)
-
+        log = logger.bind(
+            adapter="aws_identity_center",
+            group_count=len(resolved_group_ids),
+        )
+        bulk_mapping_result = self._list_members_for_groups_bulk(resolved_group_ids)
+        if bulk_mapping_result.is_success and isinstance(
+            bulk_mapping_result.data, dict
+        ):
+            log.info("list_members_for_groups_ok", groups=len(bulk_mapping_result.data))
+            return bulk_mapping_result
+        if not bulk_mapping_result.is_success:
             log.warning(
                 "list_members_for_groups_bulk_failed",
-                error=bulk_result.message,
+                error=bulk_mapping_result.message,
             )
 
         fallback_mapping: Dict[str, Set[str]] = {}
-        for group_id in group_ids:
+        for group_id in resolved_group_ids:
             result = self.list_group_members(group_id)
             if not result.is_success:
                 return result
@@ -523,6 +576,66 @@ class AwsIdentityCenterAdapter:
 
         log.info("list_members_for_groups_ok_fallback", groups=len(fallback_mapping))
         return OperationResult.success(data=fallback_mapping)
+
+    def _resolve_group_ids(self, group_ids: Set[str]) -> OperationResult:
+        """Resolve many group identifiers to canonical GroupIds."""
+        resolved_group_ids: Set[str] = set()
+        for group_identifier in group_ids:
+            resolved_result = self._resolve_group_id(group_identifier)
+            if not resolved_result.is_success or not isinstance(
+                resolved_result.data, str
+            ):
+                return resolved_result
+            resolved_group_ids.add(resolved_result.data)
+        return OperationResult.success(data=resolved_group_ids)
+
+    def _list_members_for_groups_bulk(self, group_ids: Set[str]) -> OperationResult:
+        """Attempt one bulk list path for many groups."""
+        identitystore = self._aws.identitystore
+        if not hasattr(identitystore, "list_groups_with_memberships"):
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message="bulk_memberships_unsupported",
+                error_code="BULK_MEMBERSHIPS_UNSUPPORTED",
+            )
+
+        target_ids = set(group_ids)
+        bulk_result = identitystore.list_groups_with_memberships(
+            groups_filters=[
+                lambda group: isinstance(group, dict)
+                and group.get("GroupId") in target_ids
+            ]
+        )
+        if not bulk_result.is_success or not isinstance(bulk_result.data, list):
+            return bulk_result
+
+        mapping: Dict[str, Set[str]] = {}
+        for group in bulk_result.data:
+            if not isinstance(group, dict):
+                continue
+            group_identifier = group.get("GroupId")
+            if (
+                not isinstance(group_identifier, str)
+                or group_identifier not in target_ids
+            ):
+                continue
+            members = group.get("GroupMemberships", [])
+            emails: Set[str] = set()
+            if isinstance(members, list):
+                for membership in members:
+                    if not isinstance(membership, dict):
+                        continue
+                    details = membership.get("UserDetails")
+                    if isinstance(details, dict):
+                        email = self._extract_primary_email(details)
+                        if email is not None:
+                            emails.add(email)
+            mapping[group_identifier] = emails
+
+        for group_identifier in target_ids:
+            mapping.setdefault(group_identifier, set())
+
+        return OperationResult.success(data=mapping)
 
     def _build_user_id_email_map(self) -> OperationResult:
         """Build a UserId → primary email mapping from all identity store users.
