@@ -26,6 +26,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     effect = "Allow"
     actions = [
       "ssm:GetParameters",
+      "ssm:GetParameter",
     ]
     resources = [
       "arn:aws:ssm:ca-central-1:${data.aws_caller_identity.current.account_id}:parameter/sre-bot-config",
