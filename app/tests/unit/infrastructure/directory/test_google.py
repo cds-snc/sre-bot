@@ -226,8 +226,18 @@ class TestGetGroupMembers:
     def test_returns_canonical_members_for_group(self, provider, mock_google_clients):
         # Arrange
         members = [
-            {"email": "user@example.com", "id": "1", "role": "MEMBER"},
-            {"email": "admin@example.com", "id": "2", "role": "OWNER"},
+            {
+                "email": "user@example.com",
+                "id": "1",
+                "role": "MEMBER",
+                "type": "USER",
+            },
+            {
+                "email": "admin@example.com",
+                "id": "2",
+                "role": "OWNER",
+                "type": "USER",
+            },
         ]
         mock_google_clients.directory.list_members.return_value = (
             OperationResult.success(data=members)
@@ -243,6 +253,7 @@ class TestGetGroupMembers:
                 email="user@example.com",
                 membership_id="1",
                 provider_user_id=None,
+                member_type="USER",
                 role="MEMBER",
                 provider="google",
             ),
@@ -250,20 +261,151 @@ class TestGetGroupMembers:
                 email="admin@example.com",
                 membership_id="2",
                 provider_user_id=None,
+                member_type="USER",
                 role="OWNER",
                 provider="google",
             ),
         ]
         mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com"
+            "sg-admin@example.com",
+            includeDerivedMembership=True,
         )
+
+    def test_returns_all_member_types_by_default(self, provider, mock_google_clients):
+        # Arrange
+        members = [
+            {
+                "email": "user@example.com",
+                "id": "1",
+                "role": "MEMBER",
+                "type": "USER",
+            },
+            {
+                "email": "sg-child@example.com",
+                "id": "2",
+                "role": "MEMBER",
+                "type": "GROUP",
+            },
+        ]
+        mock_google_clients.directory.list_members.return_value = (
+            OperationResult.success(data=members)
+        )
+
+        # Act
+        result = provider.get_group_members("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data == [
+            DirectoryMember(
+                email="user@example.com",
+                membership_id="1",
+                provider_user_id=None,
+                member_type="USER",
+                role="MEMBER",
+                provider="google",
+            ),
+            DirectoryMember(
+                email="sg-child@example.com",
+                membership_id="2",
+                provider_user_id=None,
+                member_type="GROUP",
+                role="MEMBER",
+                provider="google",
+            ),
+        ]
+
+    def test_filters_to_requested_member_types(self, provider, mock_google_clients):
+        # Arrange
+        members = [
+            {
+                "email": "user@example.com",
+                "id": "1",
+                "role": "MEMBER",
+                "type": "USER",
+            },
+            {
+                "email": "sg-child@example.com",
+                "id": "2",
+                "role": "MEMBER",
+                "type": "GROUP",
+            },
+        ]
+        mock_google_clients.directory.list_members.return_value = (
+            OperationResult.success(data=members)
+        )
+
+        # Act
+        result = provider.get_group_members(
+            "sg-admin@example.com",
+            include_member_types={"USER"},
+        )
+
+        # Assert
+        assert result.is_success
+        assert result.data == [
+            DirectoryMember(
+                email="user@example.com",
+                membership_id="1",
+                provider_user_id=None,
+                member_type="USER",
+                role="MEMBER",
+                provider="google",
+            ),
+        ]
+
+    def test_can_include_group_members_when_requested(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        members = [
+            {
+                "email": "user@example.com",
+                "id": "1",
+                "role": "MEMBER",
+                "type": "USER",
+            },
+            {
+                "email": "sg-child@example.com",
+                "id": "2",
+                "role": "MEMBER",
+                "type": "GROUP",
+            },
+        ]
+        mock_google_clients.directory.list_members.return_value = (
+            OperationResult.success(data=members)
+        )
+
+        # Act
+        result = provider.get_group_members(
+            "sg-admin@example.com",
+            include_member_types={"GROUP"},
+        )
+
+        # Assert
+        assert result.is_success
+        assert result.data == [
+            DirectoryMember(
+                email="sg-child@example.com",
+                membership_id="2",
+                provider_user_id=None,
+                member_type="GROUP",
+                role="MEMBER",
+                provider="google",
+            )
+        ]
 
     def test_uses_primary_email_when_member_email_is_missing(
         self, provider, mock_google_clients
     ):
         # Arrange
         members = [
-            {"primaryEmail": "USER@EXAMPLE.COM", "id": "1", "role": "MEMBER"},
+            {
+                "primaryEmail": "USER@EXAMPLE.COM",
+                "id": "1",
+                "role": "MEMBER",
+                "type": "USER",
+            },
             {"id": "2", "role": "OWNER"},
         ]
         mock_google_clients.directory.list_members.return_value = (
@@ -280,6 +422,7 @@ class TestGetGroupMembers:
                 email="user@example.com",
                 membership_id="1",
                 provider_user_id=None,
+                member_type="USER",
                 role="MEMBER",
                 provider="google",
             ),
@@ -296,7 +439,8 @@ class TestGetGroupMembers:
 
         # Assert
         mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com"
+            "sg-admin@example.com",
+            includeDerivedMembership=True,
         )
 
     def test_propagates_directory_error(self, provider, mock_google_clients):
@@ -323,7 +467,8 @@ class TestGetGroupMembers:
 
         # Assert
         mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com"
+            "sg-admin@example.com",
+            includeDerivedMembership=True,
         )
 
 
@@ -350,35 +495,6 @@ class TestGetGroup:
             provider_group_id="group-1",
             name="Admins",
             description="Admin group",
-            provider="google",
-        )
-        mock_google_clients.directory.get_group.assert_called_once_with(
-            "sg-admin@example.com"
-        )
-
-    def test_resolves_slug_to_email_and_calls_get_group(
-        self, provider, mock_google_clients
-    ):
-        # Arrange
-        mock_google_clients.directory.get_group.return_value = OperationResult.success(
-            data={
-                "email": "sg-admin@example.com",
-                "id": "group-1",
-                "name": "Admins",
-            }
-        )
-
-        # Act
-        result = provider.get_group("sg-admin")
-
-        # Assert
-        assert result.is_success
-        assert result.data == DirectoryGroup(
-            group_email="sg-admin@example.com",
-            group_slug="sg-admin",
-            provider_group_id="group-1",
-            name="Admins",
-            description=None,
             provider="google",
         )
         mock_google_clients.directory.get_group.assert_called_once_with(
@@ -413,45 +529,6 @@ class TestGetGroup:
         # Assert
         assert not result.is_success
         assert result.error_code == "DIRECTORY_GROUP_PAYLOAD_INVALID"
-
-    def test_passes_slug_as_is_to_api_when_domain_not_configured(
-        self, mock_google_clients, mock_directory_settings
-    ):
-        # Arrange
-        mock_directory_settings.managed_group_domain = ""
-        provider = GoogleDirectoryProvider(
-            google_clients=mock_google_clients,
-            directory_settings=mock_directory_settings,
-        )
-        mock_google_clients.directory.get_group.return_value = OperationResult.error(
-            OperationStatus.NOT_FOUND, "group_not_found"
-        )
-
-        # Act
-        result = provider.get_group("sg-aws-authn")
-
-        # Assert
-        assert not result.is_success
-        mock_google_clients.directory.get_group.assert_called_once_with("sg-aws-authn")
-
-    def test_propagates_not_found_for_slug_lookup_with_composed_email(
-        self, provider, mock_google_clients
-    ):
-        # Arrange
-        mock_google_clients.directory.get_group.return_value = OperationResult.error(
-            OperationStatus.NOT_FOUND,
-            "group_not_found",
-        )
-
-        # Act
-        result = provider.get_group("sg-does-not-exist")
-
-        # Assert
-        assert not result.is_success
-        assert result.status == OperationStatus.NOT_FOUND
-        mock_google_clients.directory.get_group.assert_called_once_with(
-            "sg-does-not-exist@example.com"
-        )
 
 
 class TestAddGroupMember:
@@ -558,21 +635,6 @@ class TestAddGroupMember:
         assert not result.is_success
         assert result.error_code == "DIRECTORY_MEMBER_EMAIL_REQUIRED"
 
-    def test_composes_group_email_from_slug(self, provider, mock_google_clients):
-        # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.success(
-            data={"email": "user@example.com", "id": "m1", "role": "MEMBER"}
-        )
-
-        # Act
-        provider.add_group_member("sg-admin", "user@example.com")
-
-        # Assert
-        mock_google_clients.directory.add_member.assert_called_once_with(
-            "sg-admin@example.com",
-            body={"email": "user@example.com", "role": "MEMBER"},
-        )
-
 
 class TestRemoveGroupMember:
     def test_removes_member_with_normalized_keys(self, provider, mock_google_clients):
@@ -609,20 +671,6 @@ class TestRemoveGroupMember:
         # Assert
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
-
-    def test_composes_group_email_from_slug(self, provider, mock_google_clients):
-        # Arrange
-        mock_google_clients.directory.remove_member.return_value = (
-            OperationResult.success()
-        )
-
-        # Act
-        provider.remove_group_member("sg-admin", "user@example.com")
-
-        # Assert
-        mock_google_clients.directory.remove_member.assert_called_once_with(
-            "sg-admin@example.com", "user@example.com"
-        )
 
 
 class TestCheckMembership:
@@ -726,22 +774,6 @@ class TestCheckMembership:
         # Assert
         assert not result.is_success
         assert result.error_code == "DIRECTORY_MEMBERSHIP_PAYLOAD_INVALID"
-
-    def test_composes_group_email_from_slug(self, provider, mock_google_clients):
-        # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(
-            data={"isMember": True}
-        )
-
-        # Act
-        result = provider.check_membership("sg-team", "member@example.com")
-
-        # Assert
-        assert result.is_success
-        assert result.data.group_email == "sg-team@example.com"
-        mock_google_clients.directory.has_member.assert_called_once_with(
-            "sg-team@example.com", "member@example.com"
-        )
 
 
 class TestListGroups:

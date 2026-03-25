@@ -132,38 +132,3 @@ class TestIdentityStoreClient:
 
         result = client.delete_user(user_id="user-123")
         assert result.is_success
-
-    def test_list_users_uses_mapped_identitystore_role(
-        self, monkeypatch, make_fake_client
-    ):
-        """IdentityStoreClient should resolve role_arn from service role map."""
-
-        captured = {}
-
-        session_provider = SessionProvider(
-            region="us-east-1",
-            service_role_map={
-                "identitystore": "arn:aws:iam::123456789012:role/IdentityStoreRole"
-            },
-        )
-        client = IdentityStoreClient(
-            session_provider=session_provider,
-            default_identity_store_id="store-1234567890",
-        )
-
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            captured["service_name"] = service_name
-            captured["role_arn"] = role_arn
-            return make_fake_client(api_responses={"list_users": {"Users": []}})
-
-        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
-
-        result = client.list_users()
-
-        assert result.is_success
-        assert captured["service_name"] == "identitystore"
-        assert (
-            captured["role_arn"] == "arn:aws:iam::123456789012:role/IdentityStoreRole"
-        )

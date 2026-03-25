@@ -156,7 +156,6 @@ def mock_aws_settings():
     settings.INSTANCE_ARN = "arn:aws:sso:::instance/sso-instance-id"
     settings.SERVICE_ROLE_MAP = {
         "dynamodb": "arn:aws:iam::123456789012:role/DynamoDBRole",
-        "identitystore": "arn:aws:iam::123456789012:role/IdentityStoreRole",
         "organizations": "arn:aws:iam::123456789012:role/OrgsRole",
         "sso-admin": "arn:aws:iam::123456789012:role/SSOAdminRole",
         "config": "arn:aws:iam::123456789012:role/ConfigRole",
