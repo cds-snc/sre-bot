@@ -70,12 +70,17 @@ class DirectoryProvider(Protocol):
         ...
 
     def get_group_members(
-        self, group_key: str
+        self,
+        group_key: str,
+        include_member_types: set[str] | None = None,
     ) -> OperationResult[list[DirectoryMember]]:
         """Return all members of a group.
 
         Args:
             group_key: Canonical managed-group email (normalised to lowercase).
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``, ``{"GROUP"}``, or both). If not
+                provided, providers should return all member types.
 
         Returns:
             OperationResult: success with the DirectoryMember list for the group.
@@ -103,7 +108,8 @@ class DirectoryProvider(Protocol):
         """Add a user membership to a managed group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to add (normalised to lowercase).
             role: Provider-agnostic membership role hint (default: MEMBER).
 
@@ -120,7 +126,8 @@ class DirectoryProvider(Protocol):
         """Remove a user membership from a managed group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to remove (normalised to lowercase).
 
         Returns:
@@ -134,7 +141,8 @@ class DirectoryProvider(Protocol):
         """Check whether a user is a member of a group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to check (compared case-insensitively).
 
         Returns:
