@@ -29,6 +29,7 @@ class DirectoryMember:
     email: str
     membership_id: Optional[str] = None
     provider_user_id: Optional[str] = None
+    member_type: Optional[str] = None
     role: Optional[str] = None
     provider: Optional[str] = None
 

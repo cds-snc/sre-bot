@@ -48,8 +48,10 @@ class GoogleDirectoryProvider:
 
     def _normalize_email(self, value: str) -> str:
         """Normalize email-form identifiers used by the shared contract."""
-
-        return value.strip().lower()
+        normalized = value.strip().lower()
+        if normalized and "@" not in normalized and self._managed_group_domain:
+            return f"{normalized}@{self._managed_group_domain}"
+        return normalized
 
     def _extract_email(self, item: dict[str, Any], *keys: str) -> str:
         """Extract and normalize the first available email-like value."""
@@ -173,6 +175,7 @@ class GoogleDirectoryProvider:
             email=member_email,
             membership_id=str(item.get("id") or "").strip() or None,
             provider_user_id=None,
+            member_type=(str(item.get("type") or "").strip().upper() or None),
             role=item.get("role"),
             provider="google",
         )
@@ -310,17 +313,25 @@ class GoogleDirectoryProvider:
         return OperationResult.success(data=users)
 
     def get_group_members(
-        self, group_key: str
+        self,
+        group_key: str,
+        include_member_types: set[str] | None = None,
     ) -> OperationResult[list[DirectoryMember]]:
         """Return the member list for a group.
 
         Args:
             group_key: Canonical managed-group email — normalised to lowercase.
+            include_member_types: Optional set of member types to include
+                (for example {"USER"}, {"GROUP"}, or both). Defaults to no
+                filtering.
 
         Returns:
             OperationResult: success with the DirectoryMember list for the group.
         """
-        result = self._directory.list_members(self._normalize_email(group_key))
+        result = self._directory.list_members(
+            self._normalize_email(group_key),
+            includeDerivedMembership=True,
+        )
         if not result.is_success:
             return self._typed_error(result)
 
@@ -330,10 +341,33 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_MEMBERS_PAYLOAD_INVALID",
             )
 
+        allowed_member_types = None
+        if include_member_types is not None:
+            allowed_member_types = {
+                str(member_type).strip().upper()
+                for member_type in include_member_types
+                if str(member_type).strip()
+            }
+
+        if include_member_types is not None and not allowed_member_types:
+            return OperationResult.permanent_error(
+                message="include_member_types must contain at least one type",
+                error_code="DIRECTORY_MEMBER_TYPES_INVALID",
+            )
+
         members: list[DirectoryMember] = []
         for item in result.data:
             if not isinstance(item, dict):
                 continue
+
+            member_type = str(item.get("type") or "").strip().upper()
+            if (
+                allowed_member_types is not None
+                and member_type
+                and member_type not in allowed_member_types
+            ):
+                continue
+
             member = self._build_directory_member(item)
             if member is not None:
                 members.append(member)
