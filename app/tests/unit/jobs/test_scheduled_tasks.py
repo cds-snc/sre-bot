@@ -6,7 +6,7 @@ executing the actual scheduled work.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from jobs.scheduled_tasks import safe_run, scheduler_heartbeat
+from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, reconcile_access_sync
 
 
 class TestSafeRun:
@@ -107,3 +107,79 @@ class TestSchedulerHeartbeat:
         scheduler_heartbeat()
 
         mock_time.ctime.assert_called_once()
+
+
+class TestReconcileAccessSync:
+    """Tests for the reconcile_access_sync scheduled job."""
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_platform_sync_service")
+    @patch("jobs.scheduled_tasks.logger")
+    def test_reconcile_syncs_each_registered_platform(
+        self, mock_logger, mock_get_platform_sync, mock_get_policies
+    ) -> None:
+        """reconcile_access_sync calls sync_platform once per policy entry."""
+        mock_platform_sync = MagicMock()
+        mock_get_platform_sync.return_value = mock_platform_sync
+        mock_get_policies.return_value = {"aws": MagicMock(), "fake": MagicMock()}
+
+        reconcile_access_sync()
+
+        assert mock_platform_sync.sync_platform.call_count == 2
+        called_platforms = {
+            call.kwargs["platform"]
+            for call in mock_platform_sync.sync_platform.call_args_list
+        }
+        assert called_platforms == {"aws", "fake"}
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_platform_sync_service")
+    @patch("jobs.scheduled_tasks.logger")
+    def test_reconcile_runs_with_dry_run_false(
+        self, mock_logger, mock_get_platform_sync, mock_get_policies
+    ) -> None:
+        """reconcile_access_sync always executes with dry_run=False."""
+        mock_platform_sync = MagicMock()
+        mock_get_platform_sync.return_value = mock_platform_sync
+        mock_get_policies.return_value = {"aws": MagicMock()}
+
+        reconcile_access_sync()
+
+        mock_platform_sync.sync_platform.assert_called_once_with(
+            platform="aws", dry_run=False
+        )
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_platform_sync_service")
+    @patch("jobs.scheduled_tasks.logger")
+    def test_reconcile_no_platforms_does_nothing(
+        self, mock_logger, mock_get_platform_sync, mock_get_policies
+    ) -> None:
+        """reconcile_access_sync with an empty policy map calls sync_platform zero times."""
+        mock_platform_sync = MagicMock()
+        mock_get_platform_sync.return_value = mock_platform_sync
+        mock_get_policies.return_value = {}
+
+        reconcile_access_sync()
+
+        mock_platform_sync.sync_platform.assert_not_called()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_platform_sync_service")
+    @patch("jobs.scheduled_tasks.logger")
+    def test_reconcile_logs_started(
+        self, mock_logger, mock_get_platform_sync, mock_get_policies
+    ) -> None:
+        """reconcile_access_sync emits a start log entry."""
+        mock_get_platform_sync.return_value = MagicMock()
+        mock_get_policies.return_value = {}
+
+        reconcile_access_sync()
+
+        mock_logger.info.assert_called_once_with(
+            "reconcile_access_sync_started", module="scheduled_tasks"
+        )

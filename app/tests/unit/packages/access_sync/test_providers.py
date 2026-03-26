@@ -21,7 +21,7 @@ def _make_policy(platform: str) -> PlatformPolicy:
 
 
 @pytest.mark.unit
-def test_get_access_sync_registry_registers_aws_and_fake(
+def test_get_access_sync_adapters_registers_aws_and_fake(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Adapter wiring includes both aws and fake adapters when configured."""
@@ -52,7 +52,7 @@ def test_get_access_sync_registry_registers_aws_and_fake(
 
 
 @pytest.mark.unit
-def test_get_access_sync_registry_ignores_unknown_platforms(
+def test_get_access_sync_adapters_ignores_unknown_platforms(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Unsupported platform policy keys should not register an adapter."""
