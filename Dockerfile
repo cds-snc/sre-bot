@@ -7,8 +7,8 @@ WORKDIR /app
 ARG git_sha
 ENV GIT_SHA=$git_sha
 
-COPY app/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY app/pyproject.toml app/uv.lock* ./
+RUN pip install uv && uv pip install --system -e .
 
 COPY app/ .
 
