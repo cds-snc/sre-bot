@@ -10,7 +10,7 @@
 			"extensions": [
 				"ms-python.python",
 				"ms-python.vscode-pylance",
-				"ms-python.flake8",
+				"charliermarsh.ruff",
 				"ms-python.mypy-type-checker",
 				"mtxr.sqltools",
 				"mtxr.sqltools-driver-pg",
@@ -23,16 +23,14 @@
 			"settings": {
 				"python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
-				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
-				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
-				"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+				"ruff.cwd": "${workspaceFolder}/app",
 				"mypy-type-checker.cwd": "${workspaceFolder}/app",
-				"flake8.cwd": "${workspaceFolder}/app",
 				"python.analysis.extraPaths": [
 					"${workspaceFolder}/app"
 				],
 				"[python]": {
-					"editor.formatOnSave": true
+					"editor.formatOnSave": true,
+					"editor.defaultFormatter": "ms-python.black-formatter"
 				},
 				"[terraform]": {
 					"editor.formatOnSave": true
@@ -41,6 +39,7 @@
 		}
 	},
 	"features": {
+		"ghcr.io/va-h/devcontainers-features/uv:1": {},
 		"ghcr.io/devcontainers/features/aws-cli:1": {
 			"version": "2.32.6"
 		},

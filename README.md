@@ -93,7 +93,7 @@ This project uses [Visual Studio Code Remote - Containers](https://code.visualst
 3. Install Python dependencies:
 
   ```sh
-  cd app && pip install --no-cache-dir -r requirements.txt
+  cd app && uv sync --extra dev
   ```
 
 4. Add a `.env` file to the `/workspace/app` folder (Contact SRE team for the project-specific .env setup)
