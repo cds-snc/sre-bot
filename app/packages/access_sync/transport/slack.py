@@ -16,9 +16,8 @@ from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
 from packages.access_sync.providers import (
     get_access_sync_adapters,
-    get_access_sync_service,
+    get_access_sync_coordinator,
 )
-from packages.access_sync.schemas import UserSyncRequest
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
@@ -94,17 +93,14 @@ def handle_sync_command(
     platform = str(parsed_args.get("platform", "")).strip().lower()
     dry_run = bool(parsed_args.get("dry_run", False))
 
-    service = get_access_sync_service()
-    result = service.sync(
-        UserSyncRequest(
-            sync_type="user",
-            user_email=user_email,
-            platform=platform,
-            dry_run=dry_run,
-            request_id=(
-                payload.correlation_id if hasattr(payload, "correlation_id") else ""
-            ),
-        )
+    coordinator = get_access_sync_coordinator()
+    result = coordinator.sync_user(
+        user_email=user_email,
+        platform=platform,
+        dry_run=dry_run,
+        request_id=(
+            payload.correlation_id if hasattr(payload, "correlation_id") else ""
+        ),
     )
 
     if result.is_success:

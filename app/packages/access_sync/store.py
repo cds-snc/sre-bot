@@ -18,7 +18,7 @@ from typing import List, Optional
 import structlog
 
 from infrastructure.storage.service import StorageService
-from packages.access_sync.models import SyncRunRecord
+from packages.access_sync.domain import SyncRunRecord
 
 logger = structlog.get_logger()
 

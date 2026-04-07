@@ -5,14 +5,17 @@ No business logic lives here.
 """
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Annotated, Dict, Protocol
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access_sync.models import ReconciliationOutcome, SyncOutcome
+from packages.access_sync.coordinator import AccessSyncCoordinatorPort
 from packages.access_sync.providers import (
     get_access_sync_adapters,
-    get_access_sync_service,
+    get_access_sync_coordinator,
+    get_access_sync_settings,
 )
+from packages.access_sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access_sync.schemas import (
     AccessSyncRequest,
     AccessSyncResponse,
@@ -24,6 +27,12 @@ from packages.access_sync.schemas import (
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access-sync", tags=["access-sync"])
+
+
+class _AccessSyncSettingsPort(Protocol):
+    """Structural contract for the settings object consumed by route handlers."""
+
+    enabled: bool
 
 
 @router.post(
@@ -39,6 +48,10 @@ router = APIRouter(prefix="/access-sync", tags=["access-sync"])
 )
 def sync_endpoint(
     request: AccessSyncRequest,
+    coordinator: Annotated[
+        AccessSyncCoordinatorPort, Depends(get_access_sync_coordinator)
+    ],
+    settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
 ) -> AccessSyncResponse:
     """Trigger an on-demand user sync or a full platform sync."""
     log = logger.bind(
@@ -49,8 +62,22 @@ def sync_endpoint(
     )
     log.info("sync_request")
 
-    service = get_access_sync_service()
-    result = service.sync(request)
+    if not settings.enabled:
+        raise HTTPException(status_code=503, detail="Access Sync is not enabled")
+
+    if isinstance(request, UserSyncRequest):
+        result = coordinator.sync_user(
+            user_email=str(request.user_email),
+            platform=request.platform,
+            dry_run=request.dry_run,
+            request_id=request.request_id or "",
+        )
+    else:
+        result = coordinator.sync_platform(
+            platform=request.platform,
+            dry_run=request.dry_run,
+            request_id=request.request_id or "",
+        )
 
     if result.is_success:
         return _build_response(request, result.data)
@@ -121,9 +148,11 @@ def _build_response(
     summary="Access Sync status",
     description="Return the list of registered platform adapters.",
 )
-def get_status_endpoint() -> SyncStatusResponse:
+def get_status_endpoint(
+    adapters: Annotated[Dict, Depends(get_access_sync_adapters)],
+) -> SyncStatusResponse:
     """Return service health and registered platforms."""
-    platforms = sorted(get_access_sync_adapters().keys())
+    platforms = sorted(adapters.keys())
     return SyncStatusResponse(
         healthy=True,
         registered_platforms=platforms,

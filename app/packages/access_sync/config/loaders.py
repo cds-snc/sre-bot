@@ -1,9 +1,8 @@
-"""Access Sync bootstrap settings and runtime configuration.
+"""Access Sync config loaders.
 
-AccessSyncSettings reads env vars that select the runtime config source and
-control feature flags. Runtime config is loaded from the selected external
-source, keeping per-group policy out of env vars so policies can change without
-a code deploy.
+Loader contract (AccessSyncConfigLoader protocol), all built-in loader
+implementations, JSON input models, shared validation helpers, and the
+loader factory.
 
 Config loader sources:
     bundle   - Built-in empty bundle. Default for local development.
@@ -17,15 +16,14 @@ Config loader sources:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 from packages.access_sync.policies import (
     DefaultEntitlementStrategy,
     EntitlementMode,
@@ -37,96 +35,15 @@ from packages.access_sync.policies import (
 
 
 # ---------------------------------------------------------------------------
-# Bootstrap Settings
+# Key Normalization
 # ---------------------------------------------------------------------------
-class AccessSyncSettings(BaseSettings):
-    """Bootstrap settings for Access Sync runtime config loading.
+def normalize_target_key(value: str) -> str:
+    """Return the canonical form of a target-system key.
 
-    Environment Variables:
-        ACCESS_SYNC_ENABLED: Master on/off switch. Default: false.
-        ACCESS_SYNC_CONFIG_SOURCE: Where to load runtime config from
-            (bundle | inline_json | file_json | dynamodb | s3 | ssm). Default: bundle.
-        ACCESS_SYNC_CONFIG_REF: Reference key for the config document
-            (table row PK, S3 key, SSM path, or bundle name).
-        ACCESS_SYNC_CONFIG_REFRESH_SECONDS: How often to refresh runtime
-            config in seconds (reserved for future cache invalidation).
-        ACCESS_SYNC_RECONCILIATION_ENABLED: Enable scheduled full-platform
-            sync. Default: false.
-        ACCESS_SYNC_RECONCILIATION_SCHEDULE: Daily sync run time in "HH:MM"
-            format (UTC). Default: "03:00".
+    All policy and adapter maps must use this normalized value as their key so
+    that lookups behave consistently regardless of input casing or whitespace.
     """
-
-    enabled: bool = Field(
-        default=False,
-        alias="ACCESS_SYNC_ENABLED",
-    )
-    config_source: Literal[
-        "bundle", "inline_json", "file_json", "dynamodb", "s3", "ssm"
-    ] = Field(
-        default="bundle",
-        alias="ACCESS_SYNC_CONFIG_SOURCE",
-    )
-    config_ref: str = Field(
-        default="default",
-        alias="ACCESS_SYNC_CONFIG_REF",
-    )
-    config_refresh_seconds: int = Field(
-        default=300,
-        alias="ACCESS_SYNC_CONFIG_REFRESH_SECONDS",
-    )
-    reconciliation_enabled: bool = Field(
-        default=False,
-        alias="ACCESS_SYNC_RECONCILIATION_ENABLED",
-    )
-    reconciliation_schedule: str = Field(
-        default="03:00",
-        alias="ACCESS_SYNC_RECONCILIATION_SCHEDULE",
-    )
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
-
-
-# ---------------------------------------------------------------------------
-# Runtime Domain Models
-# ---------------------------------------------------------------------------
-@dataclass(frozen=True)
-class EntitlementModeOverride:
-    """Runtime per-group entitlement mode override record.
-
-    Written by Access Sync Admin and consumed by the runtime config loader to
-    amend the effective mode of individual entitlement groups at runtime without
-    code deploys.
-    """
-
-    platform: str
-    group_slug: str
-    mode: Literal["sync_managed", "ephemeral", "deactivated"]
-    reason: Optional[str] = None
-    requested_by: Optional[str] = None
-    expires_at: Optional[datetime] = None
-
-
-@dataclass(frozen=True)
-class AccessSyncRuntimeConfig:
-    """Fully-resolved runtime configuration for Access Sync.
-
-    Loaded once at startup via the config loader selected by bootstrap settings.
-    Contains all per-platform policies and optional runtime overrides.
-
-    Infrastructure clients (AWS, Google Workspace, etc.) are obtained separately
-    from infrastructure.services and come pre-configured with all needed bootstrap
-    settings (e.g., AWS_SSO_INSTANCE_ID). Feature configuration is limited to
-    policy definitions and per-group overrides.
-    """
-
-    policies: Dict[str, PlatformPolicy]
-    entitlement_mode_overrides: List[EntitlementModeOverride] = field(
-        default_factory=list
-    )
+    return value.strip().lower()
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +178,7 @@ def _build_runtime_config(
                 else None
             ),
         )
-        policies[str(policy.platform or fallback_key)] = policy
+        policies[normalize_target_key(str(policy.platform or fallback_key))] = policy
 
     return AccessSyncRuntimeConfig(policies=policies)
 

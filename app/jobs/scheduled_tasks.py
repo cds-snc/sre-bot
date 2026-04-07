@@ -13,9 +13,9 @@ from modules.incident.notify_stale_incident_channels import (
 )
 
 from packages.access_sync.providers import (
+    get_access_sync_coordinator,
     get_access_sync_policies,
     get_access_sync_settings,
-    get_platform_sync_service,
 )
 
 logger = get_logger()
@@ -136,7 +136,7 @@ def run_continuously(interval=1):
 def reconcile_access_sync() -> None:
     """Run full-platform Access Sync batch sync for all registered platforms."""
     logger.info("reconcile_access_sync_started", module="scheduled_tasks")
-    platform_sync = get_platform_sync_service()
+    coordinator = get_access_sync_coordinator()
     policies = get_access_sync_policies()
     for platform in policies:
-        platform_sync.sync_platform(platform=platform, dry_run=False)
+        coordinator.sync_platform(platform=platform, dry_run=False)

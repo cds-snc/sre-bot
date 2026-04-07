@@ -5,12 +5,13 @@ import pytest
 from packages.access_sync.policies import (
     AdapterCapabilities,
     DefaultEntitlementStrategy,
+    EffectivePlatformPolicy,
     EntitlementMode,
     EntitlementRule,
     PatternEntitlementMapping,
     PlatformPolicy,
     PolicyEngine,
-    PolicyRegistry,
+    resolve_effective_policy,
 )
 
 
@@ -292,31 +293,139 @@ def test_plan_actions_unsupported_entitlement_type_skipped():
 
 
 # ---------------------------------------------------------------------------
-# PolicyRegistry.register_ephemeral_entitlement
+# PlatformPolicy.with_ephemeral_entitlement
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_register_ephemeral_entitlement_adds_rule():
+def test_with_ephemeral_entitlement_preserves_all_fields():
+    """Regression: with_ephemeral_entitlement must not drop default_entitlement_strategy."""
     # Arrange
-    registry = PolicyRegistry(policies={"aws": make_policy(platform="aws")})
+    strategy = DefaultEntitlementStrategy(
+        kind="default_prefix",
+        source_group_prefix="sg-aws-",
+    )
+    policy = PlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[],
+        default_entitlement_strategy=strategy,
+    )
 
     # Act
-    registry.register_ephemeral_entitlement(
-        platform="aws",
+    updated = policy.with_ephemeral_entitlement(
         entitlement_type="permission_set",
         entitlement_id="999/Privileged",
     )
 
-    # Assert
-    policy = registry.policies["aws"]
-    assert "999/Privileged" in policy.ephemeral_entitlement_ids()
+    # Assert — strategy preserved, new ephemeral rule added, original unchanged
+    assert updated.default_entitlement_strategy == strategy
+    assert "999/Privileged" in updated.ephemeral_entitlement_ids()
+    assert "999/Privileged" not in policy.ephemeral_entitlement_ids()
+    assert updated is not policy
 
 
 @pytest.mark.unit
-def test_register_ephemeral_entitlement_unknown_platform_is_noop():
+def test_with_ephemeral_entitlement_returns_new_policy():
+    """PlatformPolicy.with_ephemeral_entitlement must return a new frozen instance."""
     # Arrange
-    registry = PolicyRegistry(policies={})
+    policy = make_policy(platform="aws")
 
-    # Act / Assert — must not raise
-    registry.register_ephemeral_entitlement("nonexistent", "permission_set", "999/X")
+    # Act
+    updated = policy.with_ephemeral_entitlement(
+        entitlement_type="permission_set",
+        entitlement_id="123/EphemeralGrant",
+    )
+
+    # Assert — original unchanged, new instance has the rule
+    assert updated is not policy
+    assert "123/EphemeralGrant" in updated.ephemeral_entitlement_ids()
+    assert "123/EphemeralGrant" not in policy.ephemeral_entitlement_ids()
+
+
+# ---------------------------------------------------------------------------
+# EffectivePlatformPolicy and resolve_effective_policy
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_no_strategy_returns_explicit_rules():
+    """With no strategy, effective policy contains only the explicitly declared rules."""
+    rule = make_rule()
+    policy = make_policy(rules=[rule])
+    effective = resolve_effective_policy(policy)
+    assert effective.entitlement_rules == [rule]
+    assert effective.platform == policy.platform
+    assert effective.authn_removal_mode == policy.authn_removal_mode
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_with_strategy_includes_discovered_rules():
+    """Strategy-generated rules are folded into effective policy when group slugs are supplied."""
+    policy = PlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[],
+        default_entitlement_strategy=DefaultEntitlementStrategy(
+            kind="default_prefix",
+            source_group_prefix="sg-aws-",
+            exclude_group_slugs=["sg-aws-authn"],
+            default_entitlement_type="group",
+            entitlement_id_template="{token}",
+        ),
+    )
+    effective = resolve_effective_policy(
+        policy, discovered_group_slugs={"sg-aws-team1"}
+    )
+    assert len(effective.sync_managed_rules()) == 1
+    assert effective.sync_managed_rules()[0].group_slug == "sg-aws-team1"
+
+
+@pytest.mark.unit
+def test_effective_policy_sync_managed_rules_no_args():
+    """EffectivePlatformPolicy.sync_managed_rules() requires no arguments."""
+    rules = [
+        EntitlementRule("sg-a", "group", "id-1", "sync_managed"),
+        EntitlementRule("sg-b", "group", "id-2", "ephemeral"),
+    ]
+    effective = EffectivePlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=rules,
+    )
+    assert effective.sync_managed_rules() == [rules[0]]
+    assert effective.ephemeral_entitlement_ids() == {"id-2"}
+    assert effective.skip_entitlement_ids() == {"id-2"}
+
+
+@pytest.mark.unit
+def test_policy_engine_plan_actions_accepts_effective_policy():
+    """PolicyEngine.plan_actions() must work when passed an EffectivePlatformPolicy."""
+    rule = EntitlementRule("sg-a", "permission_set", "123/Admin", "sync_managed")
+    effective = EffectivePlatformPolicy(
+        platform="aws",
+        authn_group_slug="sg-aws-authn",
+        authn_mode="derived",
+        authn_removal_mode="delete",
+        entitlement_rules=[rule],
+    )
+    caps = AdapterCapabilities(
+        supports_disable=True,
+        supports_delete=True,
+        supported_entitlement_types={"permission_set"},
+    )
+    engine = PolicyEngine()
+    actions = engine.plan_actions(
+        policy=effective,
+        capabilities=caps,
+        user_should_exist=True,
+        required_entitlements=effective.sync_managed_rules(),
+    )
+    assert any(a.action == "ensure_user" for a in actions)
+    assert any(a.action == "apply_entitlement" for a in actions)

@@ -9,12 +9,12 @@ Exports the FastAPI router for registration in the main application.
 
 from infrastructure.events import register_event_handler
 from infrastructure.services import hookimpl
-from packages.access_sync.platforms import slack
+from packages.access_sync.transport import slack
 from packages.access_sync.providers import (
+    get_access_sync_coordinator,
     get_access_sync_settings,
-    get_user_sync_service,
 )
-from packages.access_sync.routes import router as access_sync_router
+from packages.access_sync.transport.routes import router as access_sync_router
 
 
 @hookimpl
@@ -26,7 +26,7 @@ def register_slack_commands(provider) -> None:
 @register_event_handler("access_request_approved")
 def on_access_request_approved(event) -> None:
     """Trigger on-demand sync when an access request is approved."""
-    get_user_sync_service().sync_user(
+    get_access_sync_coordinator().sync_user(
         user_email=event.user_email,
         platform=event.metadata.get("platform", ""),
         request_id=str(getattr(event, "correlation_id", "")),
@@ -35,7 +35,13 @@ def on_access_request_approved(event) -> None:
 
 @hookimpl
 def startup_warmup(logger) -> None:
-    """Log effective Access Sync settings at startup."""
+    """Log effective Access Sync settings at startup.
+
+    Also eagerly initializes the coordinator and all providers when the feature
+    is enabled, so the first sync request is not delayed by config loading,
+    adapter construction, and directory-provider wiring. Failures are logged
+    with actionable hints but do not crash the process.
+    """
     settings = get_access_sync_settings()
     logger.info(
         "access_sync_settings_loaded",
@@ -49,6 +55,17 @@ def startup_warmup(logger) -> None:
         logger.warning(
             "access_sync_disabled",
             hint="Set ACCESS_SYNC_ENABLED=true to enable the feature.",
+        )
+        return
+
+    try:
+        get_access_sync_coordinator()
+        logger.info("access_sync_providers_warmed")
+    except Exception as exc:
+        logger.error(
+            "access_sync_provider_warmup_failed",
+            error=str(exc),
+            hint="Check ACCESS_SYNC_CONFIG_SOURCE and ACCESS_SYNC_CONFIG_REF.",
         )
 
 

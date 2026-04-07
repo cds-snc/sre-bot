@@ -36,14 +36,6 @@ class AccessSyncAdapter(Protocol):
         """
         ...
 
-    def get_user(self, user_email: str) -> OperationResult:
-        """Look up a user.
-
-        Returns:
-            SUCCESS with data if found, NOT_FOUND if the user does not exist.
-        """
-        ...
-
     def ensure_user(self, user_email: str) -> OperationResult:
         """Ensure a user account exists; create it if missing (idempotent)."""
         ...
@@ -78,10 +70,6 @@ class AccessSyncAdapter(Protocol):
 
         v1: entitlement_type="group", entitlement_id=<platform group id>
         """
-        ...
-
-    def fetch_current_state(self, user_email: str) -> OperationResult:
-        """Fetch all current entitlements and account status for a user."""
         ...
 
     def get_current_entitlement_ids(self, user_email: str) -> OperationResult:

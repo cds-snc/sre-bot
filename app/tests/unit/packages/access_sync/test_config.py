@@ -8,6 +8,7 @@ from packages.access_sync.config import (
     FileJsonConfigLoader,
     InlineJsonConfigLoader,
     get_access_sync_config_loader,
+    normalize_target_key,
 )
 
 
@@ -176,3 +177,31 @@ def test_get_access_sync_config_loader_unknown_raises():
     # Act / Assert
     with pytest.raises(NotImplementedError, match="not yet implemented"):
         get_access_sync_config_loader("dynamodb")
+
+
+# ---------------------------------------------------------------------------
+# normalize_target_key
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_normalize_target_key_lowercases_and_strips():
+    assert normalize_target_key("  AWS  ") == "aws"
+    assert normalize_target_key("FakePlatform") == "fakeplatform"
+    assert normalize_target_key("aws") == "aws"
+
+
+@pytest.mark.unit
+def test_inline_json_loader_normalizes_policy_key():
+    """Policy map key must be normalized regardless of how the platform field is cased."""
+    loader = InlineJsonConfigLoader()
+    ref = (
+        '{"policies":{"AWS":{"platform":"AWS","authn_group_slug":"sg-aws-authn",'
+        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":[]}}}'
+    )
+    result = loader.load(ref=ref)
+    assert result.is_success
+    assert result.data is not None
+    # Key must be normalized: stored as "aws", not "AWS"
+    assert "aws" in result.data.policies
+    assert "AWS" not in result.data.policies

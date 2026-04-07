@@ -21,12 +21,12 @@ from packages.access_sync.config import (
     AccessSyncRuntimeConfig,
     AccessSyncSettings,
     get_access_sync_config_loader,
+    normalize_target_key,
 )
-from packages.access_sync.platform_sync.service import PlatformSyncService
 from packages.access_sync.policies import PlatformPolicy
-from packages.access_sync.service import AccessSyncService
 from packages.access_sync.store import SyncRunRepository
-from packages.access_sync.user_sync.service import UserSyncService
+from packages.access_sync.coordinator import AccessSyncCoordinator
+from packages.access_sync.desired_state import DirectoryMembershipBuilder
 
 
 @lru_cache(maxsize=1)
@@ -73,7 +73,7 @@ def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
     runtime_config = get_access_sync_runtime_config()
 
     for platform_key, policy in runtime_config.policies.items():
-        platform = str(policy.platform or platform_key).strip().lower()
+        platform = normalize_target_key(str(policy.platform or platform_key))
         if platform == "aws":
             aws_clients = get_aws_clients()
             adapters[platform_key] = AwsIdentityCenterAdapter(aws_clients=aws_clients)
@@ -90,52 +90,23 @@ def get_access_sync_policies() -> Mapping[str, PlatformPolicy]:
 
 
 @lru_cache(maxsize=1)
-def get_user_sync_service() -> UserSyncService:
-    """Return the singleton UserSyncService for on-demand single-user sync.
+def get_access_sync_coordinator() -> AccessSyncCoordinator:
+    """Return the singleton AccessSyncCoordinator.
 
     Wires together:
     - Adapter mapping from runtime config + centralized clients.
     - Policy mapping from runtime config.
-    - DirectoryProvider from infrastructure.services (IDP-agnostic).
+    - DirectoryMembershipBuilder from infrastructure.services (IDP-agnostic).
     - SyncRunRepository backed by the storage service.
     - EventDispatcher for domain event emission.
     """
     directory = get_directory_provider()
+    membership_builder = DirectoryMembershipBuilder(directory)
     repository = SyncRunRepository(storage=get_storage_service())
-    return UserSyncService(
+    return AccessSyncCoordinator(
         adapters=get_access_sync_adapters(),
         policies=get_access_sync_policies(),
-        directory=directory,
+        membership_builder=membership_builder,
         repository=repository,
         dispatcher=EventDispatcher(),
-    )
-
-
-@lru_cache(maxsize=1)
-def get_platform_sync_service() -> PlatformSyncService:
-    """Return the singleton PlatformSyncService for batch platform-wide sync.
-
-    Batch-reads IDP group membership once per platform sync run (O(groups))
-    and delegates per-user convergence to UserSyncService.sync_user_from_context.
-    """
-    return PlatformSyncService(
-        sync_service=get_user_sync_service(),
-        adapters=get_access_sync_adapters(),
-        policies=get_access_sync_policies(),
-        directory=get_directory_provider(),
-        dispatcher=EventDispatcher(),
-    )
-
-
-@lru_cache(maxsize=1)
-def get_access_sync_service() -> AccessSyncService:
-    """Return the singleton AccessSyncService facade.
-
-    Wraps UserSyncService and PlatformSyncService behind a unified
-    sync(request) interface keyed on the request discriminator.
-    """
-    return AccessSyncService(
-        settings=get_access_sync_settings(),
-        user_sync_service=get_user_sync_service(),
-        platform_sync_service=get_platform_sync_service(),
     )

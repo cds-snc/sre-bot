@@ -1,12 +1,22 @@
-"""Directory-driven desired-state builders for Access Sync."""
+"""Desired-state builders for the access sync lifecycle.
+
+Reads identity group membership from the directory provider to compute what
+access state each user should hold on each target system. No adapter calls
+live here — this module is pure IDP reads mapped to a typed state shape.
+"""
 
 from typing import Dict, List, Set, TYPE_CHECKING
 
 import structlog
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access_sync.models import DesiredUserState
-from packages.access_sync.policies import EntitlementRule, PlatformPolicy
+from packages.access_sync.domain import DesiredUserState
+from packages.access_sync.policies import (
+    EffectivePlatformPolicy,
+    EntitlementRule,
+    PlatformPolicy,
+    resolve_effective_policy,
+)
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
@@ -42,12 +52,12 @@ class DirectoryMembershipBuilder:
 
         required_entitlements: List[EntitlementRule] = []
         if authn_result.data:
-            discovered_group_slugs = self._discover_group_slugs(policy)
-            effective_rules = policy.sync_managed_rules(discovered_group_slugs)
+            discovered = self.discover_group_slugs(policy)
+            effective = resolve_effective_policy(policy, discovered)
             required_entitlements = self._resolve_member_entitlements(
                 user_email=user_email,
-                platform=policy.platform,
-                rules=effective_rules,
+                platform=effective.platform,
+                rules=effective.sync_managed_rules(),
             )
 
         return OperationResult.success(
@@ -61,14 +71,73 @@ class DirectoryMembershipBuilder:
         self,
         policy: PlatformPolicy,
     ) -> OperationResult[Dict[str, DesiredUserState]]:
-        """Batch-read authn and entitlement groups into per-user desired state."""
-        log = logger.bind(platform=policy.platform)
+        """Batch-read authn and entitlement groups into per-user desired state.
 
-        authn_group_result = self._directory.get_group(policy.authn_group_slug)
+        Convenience wrapper: discovers group slugs and resolves effective policy,
+        then delegates to build_platform_states_from_effective.
+        """
+        discovered = self.discover_group_slugs(policy)
+        effective = resolve_effective_policy(policy, discovered)
+        return self.build_platform_states_from_effective(effective)
+
+    def build_user_state_from_effective(
+        self,
+        user_email: str,
+        effective: EffectivePlatformPolicy,
+    ) -> OperationResult[DesiredUserState]:
+        """Build desired user state from an already-resolved EffectivePlatformPolicy.
+
+        Skips group discovery — the coordinator resolved effective policy once
+        before calling this method.
+        """
+        authn_result = self._check_group_membership(
+            effective.authn_group_slug, user_email
+        )
+        if not authn_result.is_success:
+            return OperationResult.error(
+                authn_result.status,
+                message=authn_result.message,
+                error_code=authn_result.error_code,
+            )
+        if not isinstance(authn_result.data, bool):
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message="Invalid authn membership result",
+                error_code="INVALID_MEMBERSHIP_RESULT",
+            )
+
+        required_entitlements: List[EntitlementRule] = []
+        if authn_result.data:
+            required_entitlements = self._resolve_member_entitlements(
+                user_email=user_email,
+                platform=effective.platform,
+                rules=effective.sync_managed_rules(),
+            )
+
+        return OperationResult.success(
+            data=DesiredUserState(
+                user_should_exist=authn_result.data,
+                required_entitlements=required_entitlements,
+            )
+        )
+
+    def build_platform_states_from_effective(
+        self,
+        effective: EffectivePlatformPolicy,
+    ) -> OperationResult[Dict[str, DesiredUserState]]:
+        """Batch-read authn and entitlement groups into per-user desired state.
+
+        Accepts pre-resolved EffectivePlatformPolicy so the coordinator can
+        resolve effective policy once and reuse it across state building,
+        prefetch, and engine planning.
+        """
+        log = logger.bind(platform=effective.platform)
+
+        authn_group_result = self._directory.get_group(effective.authn_group_slug)
         if not authn_group_result.is_success or not authn_group_result.data:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
-                message=f"Authn group not found: {policy.authn_group_slug}",
+                message=f"Authn group not found: {effective.authn_group_slug}",
                 error_code="GROUP_NOT_FOUND",
             )
 
@@ -90,10 +159,7 @@ class DirectoryMembershipBuilder:
         }
         log.info("build_desired_state_authn_members", count=len(desired))
 
-        discovered_group_slugs = self._discover_group_slugs(policy)
-        effective_rules = policy.sync_managed_rules(discovered_group_slugs)
-
-        for rule in effective_rules:
+        for rule in effective.sync_managed_rules():
             group_result = self._directory.get_group(rule.group_slug)
             if not group_result.is_success or not group_result.data:
                 log.warning(
@@ -126,7 +192,7 @@ class DirectoryMembershipBuilder:
 
         return OperationResult.success(data=desired)
 
-    def _discover_group_slugs(self, policy: PlatformPolicy) -> Set[str]:
+    def discover_group_slugs(self, policy: PlatformPolicy) -> Set[str]:
         """Discover candidate group slugs for strategy-driven entitlement rules."""
         strategy = policy.default_entitlement_strategy
         if strategy is None or strategy.kind in {"none", "explicit_rules_only"}:

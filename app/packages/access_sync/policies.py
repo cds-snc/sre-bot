@@ -5,9 +5,9 @@ authn-mode semantics, and action planning.  Adapters must not duplicate
 any of this logic.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fnmatch import fnmatch
-from typing import Dict, List, Literal, Optional, Set
+from typing import Dict, List, Literal, Optional, Set, Union
 
 
 EntitlementMode = Literal["sync_managed", "ephemeral", "deactivated"]
@@ -226,46 +226,94 @@ class PlatformPolicy:
         """Return all entitlement IDs Access Sync must not touch (ephemeral + deactivated)."""
         return self.ephemeral_entitlement_ids() | self.deactivated_entitlement_ids()
 
-
-@dataclass
-class PolicyRegistry:
-    """Registry of per-platform policies.
-
-    Mutable so that Privileged Access can register ephemeral entitlements at
-    startup via the hookimpl plugin system.
-    """
-
-    policies: Dict[str, PlatformPolicy] = field(default_factory=dict)
-
-    def register_ephemeral_entitlement(
+    def with_ephemeral_entitlement(
         self,
-        platform: str,
         entitlement_type: str,
         entitlement_id: str,
-    ) -> None:
-        """Register an entitlement as ephemeral (sync-exempt).
+    ) -> "PlatformPolicy":
+        """Return a new PlatformPolicy with one additional ephemeral rule appended.
 
-        Called by Privileged Access at startup so Access Sync skips those
-        entitlements during reconciliation.
+        Uses dataclasses.replace() so all fields — including
+        default_entitlement_strategy — are preserved automatically.
         """
-        policy = self.policies.get(platform)
-        if policy is None:
-            return
-        rule = EntitlementRule(
-            group_slug="",
-            entitlement_type=entitlement_type,
-            entitlement_id=entitlement_id,
-            mode="ephemeral",
+        return replace(
+            self,
+            entitlement_rules=[
+                *self.entitlement_rules,
+                EntitlementRule(
+                    group_slug="",
+                    entitlement_type=entitlement_type,
+                    entitlement_id=entitlement_id,
+                    mode="ephemeral",
+                ),
+            ],
         )
-        # PlatformPolicy is frozen; rebuild with the new rule appended.
-        updated = PlatformPolicy(
-            platform=policy.platform,
-            authn_group_slug=policy.authn_group_slug,
-            authn_mode=policy.authn_mode,
-            authn_removal_mode=policy.authn_removal_mode,
-            entitlement_rules=list(policy.entitlement_rules) + [rule],
-        )
-        self.policies[platform] = updated
+
+
+@dataclass(frozen=True)
+class EffectivePlatformPolicy:
+    """Policy resolved for one sync run.
+
+    entitlement_rules includes both the explicit rules from the base
+    PlatformPolicy and any strategy-generated rules discovered from the IDP.
+    All callers use the same rule set, eliminating the class of bug where
+    strategy-generated rules are included in membership building but absent
+    from PolicyEngine removal planning.
+    """
+
+    platform: str
+    authn_group_slug: str
+    authn_mode: str
+    authn_removal_mode: str
+    entitlement_rules: List[EntitlementRule]
+
+    def sync_managed_rules(self) -> List[EntitlementRule]:
+        """Return rules that Access Sync is responsible for managing."""
+        return [r for r in self.entitlement_rules if r.mode == "sync_managed"]
+
+    def ephemeral_entitlement_ids(self) -> Set[str]:
+        """Return entitlement IDs owned by Privileged Access (skip during reconciliation)."""
+        return {
+            r.entitlement_id for r in self.entitlement_rules if r.mode == "ephemeral"
+        }
+
+    def deactivated_entitlement_ids(self) -> Set[str]:
+        """Return entitlement IDs where all SRE Bot automation is suspended."""
+        return {
+            r.entitlement_id for r in self.entitlement_rules if r.mode == "deactivated"
+        }
+
+    def skip_entitlement_ids(self) -> Set[str]:
+        """Return all entitlement IDs Access Sync must not touch."""
+        return self.ephemeral_entitlement_ids() | self.deactivated_entitlement_ids()
+
+
+def resolve_effective_policy(
+    policy: "PlatformPolicy",
+    discovered_group_slugs: Optional[Set[str]] = None,
+) -> EffectivePlatformPolicy:
+    """Compute the fully-resolved policy for one sync run.
+
+    Call this once after IDP group discovery.  Pass the result to
+    membership builders, PolicyEngine, and all planning steps so every
+    phase operates on the same entitlement rule set.
+
+    Args:
+        policy: The base platform policy from runtime config.
+        discovered_group_slugs: Group slugs discovered from the IDP for
+            strategy-driven entitlement expansion.  Pass None or empty
+            when no strategy is configured or no groups were found.
+
+    Returns:
+        EffectivePlatformPolicy with all rules (explicit + strategy-generated).
+    """
+    return EffectivePlatformPolicy(
+        platform=policy.platform,
+        authn_group_slug=policy.authn_group_slug,
+        authn_mode=policy.authn_mode,
+        authn_removal_mode=policy.authn_removal_mode,
+        entitlement_rules=policy.effective_rules(discovered_group_slugs),
+    )
 
 
 @dataclass(frozen=True)
@@ -306,7 +354,7 @@ class PolicyEngine:
 
     def plan_actions(
         self,
-        policy: PlatformPolicy,
+        policy: Union[PlatformPolicy, EffectivePlatformPolicy],
         capabilities: AdapterCapabilities,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
