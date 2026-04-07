@@ -3,7 +3,7 @@
 Pydantic models for FastAPI endpoint validation and serialisation.
 These are the only types that cross the HTTP boundary.
 
-A single POST /access-sync/sync endpoint accepts both sync modes.
+A single POST /api/v1/access/sync-runs endpoint accepts both sync modes.
 The `sync_type` Literal field acts as a Pydantic discriminator so the
 correct schema is validated before the request reaches the service layer.
 """
@@ -84,10 +84,3 @@ AccessSyncResponse = Annotated[
     Union[UserSyncResponse, PlatformSyncResponse],
     Field(discriminator="sync_type"),
 ]
-
-
-class SyncStatusResponse(BaseModel):
-    """Summary of the access sync service status."""
-
-    healthy: bool
-    registered_platforms: List[str]

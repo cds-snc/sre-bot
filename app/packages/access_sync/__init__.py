@@ -71,12 +71,8 @@ def startup_warmup(logger) -> None:
 
 @hookimpl
 def register_routes(app):
-    """Register access sync HTTP routes.
-
-    Args:
-        app: FastAPI application instance.
-    """
-    app.include_router(access_sync_router)
+    """Register access sync HTTP routes under /api/v1."""
+    app.include_router(access_sync_router, prefix="/api/v1")
 
 
 __all__ = ["access_sync_router"]

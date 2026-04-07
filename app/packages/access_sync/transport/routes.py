@@ -6,12 +6,11 @@ No business logic lives here.
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Annotated, Dict, Protocol
+from typing import Annotated, Protocol
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.coordinator import AccessSyncCoordinatorPort
 from packages.access_sync.providers import (
-    get_access_sync_adapters,
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
@@ -20,13 +19,12 @@ from packages.access_sync.schemas import (
     AccessSyncRequest,
     AccessSyncResponse,
     PlatformSyncResponse,
-    SyncStatusResponse,
     UserSyncResponse,
     UserSyncRequest,
 )
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/access-sync", tags=["access-sync"])
+router = APIRouter(prefix="/access", tags=["access-sync"])
 
 
 class _AccessSyncSettingsPort(Protocol):
@@ -36,7 +34,7 @@ class _AccessSyncSettingsPort(Protocol):
 
 
 @router.post(
-    "/sync",
+    "/sync-runs",
     response_model=AccessSyncResponse,
     summary="Sync access",
     description=(
@@ -58,7 +56,7 @@ def sync_endpoint(
         sync_type=request.sync_type,
         platform=request.platform,
         dry_run=request.dry_run,
-        endpoint="POST /access-sync/sync",
+        endpoint="POST /api/v1/access/sync-runs",
     )
     log.info("sync_request")
 
@@ -139,21 +137,4 @@ def _build_response(
         requires_manual_action_count=(
             recon.requires_manual_action_count if recon else 0
         ),
-    )
-
-
-@router.get(
-    "/status",
-    response_model=SyncStatusResponse,
-    summary="Access Sync status",
-    description="Return the list of registered platform adapters.",
-)
-def get_status_endpoint(
-    adapters: Annotated[Dict, Depends(get_access_sync_adapters)],
-) -> SyncStatusResponse:
-    """Return service health and registered platforms."""
-    platforms = sorted(adapters.keys())
-    return SyncStatusResponse(
-        healthy=True,
-        registered_platforms=platforms,
     )
