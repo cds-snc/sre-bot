@@ -24,7 +24,7 @@ from packages.access_sync.schemas import (
 )
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/access", tags=["access-sync"])
+router = APIRouter(prefix="/access", tags=["Access Management"])
 
 
 class _AccessSyncSettingsPort(Protocol):
