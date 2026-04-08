@@ -1,7 +1,10 @@
 """Access Sync domain event name constants.
 
-Event dispatch must use EventDispatcher from infrastructure.events.
-This module contains only string constants — no logic, no imports.
+Use these constants when dispatching or subscribing to Access Sync events
+via ``EventDispatcher`` from ``infrastructure.events``.  String literals
+must not be used directly in coordinator or transport code.
+
+This module contains string constants only — no imports, no logic.
 """
 
 SYNC_COMPLETED = "access_sync.sync_completed"

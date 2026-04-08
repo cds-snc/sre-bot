@@ -1,7 +1,13 @@
 """Access Sync singleton provider functions.
 
-Uses @lru_cache to create one instance of each service per process.
-All clients are obtained from infrastructure.services — never instantiated locally.
+Each function here is decorated with ``@lru_cache(maxsize=1)`` to ensure a
+single instance per process lifetime.  All infrastructure clients
+(AWS, directory, storage) are obtained from ``infrastructure.services`` —
+never instantiated directly — so bootstrap config is applied centrally.
+
+These providers are the only place that assembles the object graph for the
+access sync feature.  To substitute a dependency in tests, patch the
+provider function itself (e.g. ``providers.get_access_sync_coordinator``).
 """
 
 from functools import lru_cache

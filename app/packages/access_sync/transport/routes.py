@@ -1,7 +1,14 @@
-"""Access Sync FastAPI route handlers.
+"""Access Sync FastAPI route handlers — HTTP transport layer only.
 
-Thin handlers: validate input, call service, map result to HTTP response.
-No business logic lives here.
+Defines the single POST /api/v1/access/sync-runs endpoint.  Handlers here
+do three things: validate the incoming request schema, delegate to the
+coordinator, and map the ``OperationResult`` to an HTTP response.  No
+business logic — all decisions belong in ``policies.py`` and
+``coordinator.py``.
+
+FastAPI ``Depends`` factories for the coordinator and settings are declared
+in ``providers.py``.  Route handlers consume them through type-annotated
+protocols so they are test-substitutable without monkey-patching FastAPI.
 """
 
 import structlog

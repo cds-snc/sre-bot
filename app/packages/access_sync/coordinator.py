@@ -81,8 +81,14 @@ class AccessSyncCoordinatorPort(Protocol):
 class AccessSyncCoordinator:
     """Orchestrates the full access sync lifecycle.
 
-    Owns no business logic itself — it wires together the policy engine,
-    membership builder, and adapter to produce a single, readable flow.
+    Wires ``PolicyEngine``, ``DirectoryMembershipBuilder``, and the platform
+    adapter together.  All business logic stays in ``policies.py``; all IDP
+    reads stay in ``desired_state.py``; all platform mutations stay in the
+    adapter.  The coordinator's own role is sequencing.
+
+    Constructed once per process by ``providers.get_access_sync_coordinator``
+    and injected into HTTP route handlers and the scheduled task via FastAPI
+    ``Depends``.
     """
 
     def __init__(

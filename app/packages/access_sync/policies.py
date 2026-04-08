@@ -1,8 +1,24 @@
 """Access Sync policy models and planning engine.
 
-This is the single source of truth for all entitlement classification,
-authn-mode semantics, and action planning.  Adapters must not duplicate
-any of this logic.
+This module is the single source of truth for all access-sync business rules.
+New developers should read this file before any other in the package.
+
+Three layers of policy are defined here:
+
+1. Configuration models (``EntitlementRule``, ``PlatformPolicy``) — loaded once
+   at startup from the external config source and held immutably for the
+   lifetime of the process.
+
+2. Runtime-resolved policy (``EffectivePlatformPolicy``) — computed once per
+   sync run after the IDP group discovery step.  Both the desired-state builder
+   and the PolicyEngine receive this same resolved object so every phase of a
+   run operates on an identical entitlement rule set.
+
+3. Planning (``PolicyEngine``) — pure, side-effect-free translation of desired
+   state + current state into a minimal ordered list of ``PlannedAction``
+   values that the coordinator dispatches to the adapter.
+
+Adapters must not duplicate any logic from this module.
 """
 
 from dataclasses import dataclass, field, replace
@@ -21,21 +37,26 @@ EntitlementStrategyKind = Literal[
 
 @dataclass(frozen=True)
 class EntitlementRule:
-    """Mapping from an IDP security group slug to a platform entitlement.
+    """Mapping from a single IDP security group slug to a platform entitlement.
 
-    mode:
-      'sync_managed' - entitlement is always applied/removed by Access Sync.
-      'ephemeral'    - entitlement is managed by Privileged Access; Access Sync
-                       skips it during reconciliation so active grants are not
-                       revoked.
-      'deactivated'  - all SRE Bot automation is suspended for this group.
-                       Access Sync skips apply/remove.  Privileged Access refuses
-                       new grants.  Access Requests rejects intake.  Current
-                       platform entitlement state is frozen until the override is
-                       removed or expires.
+    Each rule says: "if a user is an effective member of ``group_slug`` in the
+    IDP, they should hold ``entitlement_id`` of type ``entitlement_type`` on
+    the target platform."
 
-    Mode is evaluated per rule, so a single platform policy can mix all three
-    values across different entitlement groups.
+    ``mode`` controls how Access Sync treats the entitlement:
+
+    * ``sync_managed``  — standard lifecycle: Access Sync applies and removes
+      this entitlement automatically based on IDP membership.
+    * ``ephemeral``     — Privileged Access owns the grant lifecycle. Access
+      Sync skips this entitlement during reconciliation so time-bound grants
+      are not prematurely revoked.
+    * ``deactivated``   — all SRE Bot automation is suspended. Access Sync
+      skips apply/remove, Privileged Access refuses new grants, Access Requests
+      rejects intake, and the current platform state is frozen until the
+      override is removed or expires.
+
+    Mode evaluation is per-rule: one platform policy can mix all three values
+    across different entitlement groups.
     """
 
     group_slug: str
@@ -56,14 +77,26 @@ class PatternEntitlementMapping:
 
 @dataclass(frozen=True)
 class DefaultEntitlementStrategy:
-    """Platform-level default discovery and mapping strategy.
+    """Platform-level strategy for auto-generating entitlement rules from IDP groups.
 
-    kind:
-      'none'                - no entitlements for this platform.
-      'explicit_rules_only' - only explicit EntitlementRule entries are used.
-      'default_prefix'      - groups matching source_group_prefix map to a default
-                              entitlement shape using entitlement_id_template.
-      'pattern_map'         - groups are matched against pattern_mappings.
+    Used when a platform has many entitlement groups that follow a predictable
+    naming pattern and listing them all explicitly in config would be
+    impractical.  The strategy is evaluated once per run during IDP group
+    discovery (``desired_state.DirectoryMembershipBuilder.discover_group_slugs``).
+
+    ``kind`` selects the matching algorithm:
+
+    * ``none``                — no entitlements managed for this platform.
+    * ``explicit_rules_only`` — use only ``PlatformPolicy.entitlement_rules``.
+    * ``default_prefix``      — any IDP group whose slug starts with
+      ``source_group_prefix`` generates a rule using
+      ``entitlement_id_template``.  The ``{token}`` placeholder is replaced
+      with the slug suffix after the prefix is stripped.
+    * ``pattern_map``         — each group slug is matched against
+      ``pattern_mappings`` using ``fnmatch``-style wildcards.
+
+    ``exclude_group_slugs`` is applied before pattern evaluation and always
+    takes precedence over both ``default_prefix`` and ``pattern_map``.
     """
 
     kind: EntitlementStrategyKind = "explicit_rules_only"
@@ -75,7 +108,12 @@ class DefaultEntitlementStrategy:
     pattern_mappings: List[PatternEntitlementMapping] = field(default_factory=list)
 
     def applies_to_group(self, group_slug: str) -> bool:
-        """Return True when the strategy should consider *group_slug*."""
+        """Return True when this strategy should generate a rule for ``group_slug``.
+
+        Groups in ``exclude_group_slugs`` are always rejected regardless of
+        prefix or pattern match.  Returns False for ``none`` and
+        ``explicit_rules_only`` kinds — those kinds produce no generated rules.
+        """
         normalized = group_slug.strip().lower()
         if normalized in {
             slug.strip().lower() for slug in self.exclude_group_slugs if slug
@@ -96,7 +134,12 @@ class DefaultEntitlementStrategy:
         return False
 
     def build_rule_for_group(self, group_slug: str) -> Optional[EntitlementRule]:
-        """Build a default rule candidate for *group_slug* when configured."""
+        """Build a generated ``EntitlementRule`` for ``group_slug``, or return None.
+
+        Called only after ``applies_to_group`` returns True.  Returns None
+        when the slug does not produce a valid entitlement ID (e.g. empty token
+        after stripping the prefix).
+        """
         normalized = group_slug.strip().lower()
         if not normalized:
             return None
@@ -136,24 +179,33 @@ class DefaultEntitlementStrategy:
 
 @dataclass(frozen=True)
 class PlatformPolicy:
-    """Policy for a single target platform.
+    """Declarative policy for a single target platform, loaded from runtime config.
 
-    authn_mode:
-      'direct'  - operators typically manage access via direct membership in
-                  sg-<platform>-authn.
-      'derived' - operators typically nest entitlement groups into
-                  sg-<platform>-authn and manage access through those groups.
+    A ``PlatformPolicy`` is immutable and process-scoped.  The coordinator
+    calls ``resolve_effective_policy`` at the start of each run to produce an
+    ``EffectivePlatformPolicy`` that includes any IDP-discovered dynamic rules.
+    The base ``PlatformPolicy`` is never mutated.
 
-    In both modes, effective membership in sg-<platform>-authn (direct or
-    indirect) is the authoritative source of truth for whether a user should
-    retain platform access.
+    ``authn_group_slug`` — e.g. ``sg-aws-authn``.  Effective membership
+    (direct or via nested groups) in this IDP group is the authoritative source
+    of truth for whether a user should retain access on the target platform.
 
-    authn_removal_mode:
-      'disable'           - deactivate user account on the platform.
-      'delete'            - remove user from the platform entirely.
-      'entitlement_only'  - remove only managed entitlements; authn account is
-                            left intact (manual follow-up required if the platform
-                            cannot automate account removal).
+    ``authn_mode``:
+
+    * ``direct``  — operators manage access via direct membership in the authn group.
+    * ``derived`` — operators nest entitlement groups into the authn group; access
+      follows from entitlement group membership.
+
+    In both modes, effective membership in the authn group determines whether the
+    user should exist.  The mode is informational for operators and adapters; it
+    does not change Access Sync's convergence logic.
+
+    ``authn_removal_mode`` — what to do when a user leaves the authn group:
+
+    * ``disable``           — deactivate the user account on the platform.
+    * ``delete``            — remove the user from the platform entirely.
+    * ``entitlement_only``  — remove only managed entitlements; the account is
+      left intact and flagged for manual follow-up.
     """
 
     platform: str
@@ -167,10 +219,16 @@ class PlatformPolicy:
         self,
         discovered_group_slugs: Optional[Set[str]] = None,
     ) -> List[EntitlementRule]:
-        """Return explicit rules plus strategy-generated defaults.
+        """Return the full set of entitlement rules for this policy.
 
-        Explicit rules always win over strategy-generated candidates for the
-        same source group slug.
+        Combines explicit ``entitlement_rules`` with rules auto-generated by
+        ``default_entitlement_strategy`` for any slugs in
+        ``discovered_group_slugs``.  Explicit rules always win: if a discovered
+        slug already has an explicit rule, the strategy-generated candidate is
+        discarded.  The authn group slug is also excluded from generation.
+
+        Pass ``discovered_group_slugs=None`` (or omit it) when no strategy is
+        configured or no IDP groups were found; only explicit rules are returned.
         """
         explicit_by_slug: Dict[str, EntitlementRule] = {
             rule.group_slug.strip().lower(): rule
@@ -252,13 +310,18 @@ class PlatformPolicy:
 
 @dataclass(frozen=True)
 class EffectivePlatformPolicy:
-    """Policy resolved for one sync run.
+    """Policy resolved once at the start of a sync run.
 
-    entitlement_rules includes both the explicit rules from the base
-    PlatformPolicy and any strategy-generated rules discovered from the IDP.
-    All callers use the same rule set, eliminating the class of bug where
-    strategy-generated rules are included in membership building but absent
-    from PolicyEngine removal planning.
+    Produced by ``resolve_effective_policy``.  Combines the base
+    ``PlatformPolicy`` with any IDP-discovered dynamic rules so that every
+    phase of a run — desired-state building, entitlement prefetch, and
+    ``PolicyEngine`` planning — operates on the exact same rule set.
+
+    This eliminates the class of bug where strategy-generated rules are
+    included in membership building but absent from removal planning.
+
+    ``EffectivePlatformPolicy`` is immutable and run-scoped.  Create one per
+    ``sync_user`` or ``sync_platform`` call; never reuse across runs.
     """
 
     platform: str
@@ -320,7 +383,14 @@ def resolve_effective_policy(
 class AdapterCapabilities:
     """Execution capabilities declared by a platform adapter.
 
-    The PolicyEngine uses these to select compatible planned actions.
+    The coordinator queries ``adapter.capabilities()`` once per run and passes
+    the result to ``PolicyEngine.plan_actions``.  The engine cross-references
+    capabilities against the desired actions to skip unsupported operations and
+    set ``requires_manual_action`` on the outcome instead.
+
+    ``supports_bulk_user_delta`` enables an optimisation in ``sync_platform``:
+    when True and no entitlement rules are configured, users already on the
+    platform and in the IDP authn group are skipped entirely (zero-diff path).
     """
 
     supports_disable: bool
@@ -331,7 +401,13 @@ class AdapterCapabilities:
 
 @dataclass(frozen=True)
 class PlannedAction:
-    """A single normalized action produced by the PolicyEngine."""
+    """A single normalized action produced by ``PolicyEngine.plan_actions``.
+
+    The coordinator iterates the planned list and dispatches each action to the
+    adapter.  ``entitlement_type`` and ``entitlement_id`` are populated for
+    ``apply_entitlement`` and ``remove_entitlement`` actions; they are ``None``
+    for lifecycle actions (``ensure_user``, ``disable_user``, ``remove_user``).
+    """
 
     action: Literal[
         "ensure_user",
@@ -345,11 +421,14 @@ class PlannedAction:
 
 
 class PolicyEngine:
-    """Converts policy + current state into a normalized list of planned actions.
+    """Translates policy + current state into a minimal ordered list of actions.
 
-    This class is the single place where policy semantics are interpreted.
-    Adapters receive planned actions and execute them — they never re-implement
-    policy logic.
+    This is the only place in the codebase where policy semantics are
+    interpreted.  It is pure (no I/O, no side effects) and deterministic: the
+    same inputs always produce the same output.
+
+    Adapters receive ``PlannedAction`` values and execute them.  They must not
+    re-implement lifecycle or entitlement classification logic here.
     """
 
     def plan_actions(

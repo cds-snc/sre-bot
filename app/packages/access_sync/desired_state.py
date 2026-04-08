@@ -1,8 +1,25 @@
 """Desired-state builders for the access sync lifecycle.
 
-Reads identity group membership from the directory provider to compute what
-access state each user should hold on each target system. No adapter calls
-live here — this module is pure IDP reads mapped to a typed state shape.
+This module translates IDP group membership data into the typed
+``DesiredUserState`` shape consumed by the coordinator and ``PolicyEngine``.
+It makes no adapter calls — all I/O is read-only directory queries.
+
+Two execution paths are supported:
+
+* **On-demand (single user)** — ``build_user_state`` / ``build_user_state_from_effective``.
+  The coordinator calls these during ``sync_user`` to determine whether one
+  user should exist and which entitlements they qualify for.
+
+* **Batch (platform reconciliation)** — ``build_platform_states`` /
+  ``build_platform_states_from_effective``.
+  The coordinator calls these during ``sync_platform``.  One
+  ``get_group_members`` call per policy group returns membership for all users
+  simultaneously, reducing IDP calls from O(users × groups) to O(groups).
+
+Both paths accept either a raw ``PlatformPolicy`` (which triggers an internal
+``discover_group_slugs`` + ``resolve_effective_policy`` call) or a
+pre-resolved ``EffectivePlatformPolicy`` (when the coordinator has already
+resolved effective policy once and wishes to reuse it).
 """
 
 from typing import Dict, List, Set, TYPE_CHECKING
@@ -25,7 +42,15 @@ logger = structlog.get_logger()
 
 
 class DirectoryMembershipBuilder:
-    """Build desired access state from directory group membership."""
+    """Build desired access state from IDP directory group membership.
+
+    Injected into ``AccessSyncCoordinator`` at startup via ``providers.py``.
+    Calls ``DirectoryProvider`` (the IDP abstraction from
+    ``infrastructure.services``) exclusively; it never touches platform adapters.
+
+    All public methods return ``OperationResult`` so callers can handle IDP
+    failures through the standard result contract without catching exceptions.
+    """
 
     def __init__(self, directory: "DirectoryProvider") -> None:
         self._directory = directory
@@ -35,7 +60,18 @@ class DirectoryMembershipBuilder:
         user_email: str,
         policy: PlatformPolicy,
     ) -> OperationResult[DesiredUserState]:
-        """Resolve one user's desired state from authn and entitlement groups."""
+        """Resolve one user's desired state against a raw ``PlatformPolicy``.
+
+        Internally calls ``discover_group_slugs`` and ``resolve_effective_policy``
+        before checking membership.  Use ``build_user_state_from_effective`` in
+        the coordinator when effective policy has already been resolved for the
+        run, to avoid redundant IDP discovery calls.
+
+        Returns ``OperationResult[DesiredUserState]`` — success with
+        ``user_should_exist=True/False`` and the list of entitlement rules the
+        user qualifies for.  Returns an error result if the authn group cannot
+        be resolved or a membership check fails.
+        """
         authn_result = self._check_group_membership(policy.authn_group_slug, user_email)
         if not authn_result.is_success:
             return OperationResult.error(
