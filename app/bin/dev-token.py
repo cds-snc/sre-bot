@@ -12,7 +12,7 @@ Then in a separate terminal, configure your .env and start the app:
     DEV_JWKS_PORT defaults to 8001.
 
 .env snippet (add or replace ISSUER_CONFIG):
-    ISSUER_CONFIG={"http://localhost:8001": {"jwks_uri": "http://localhost:8001/.well-known/jwks.json", "algorithms": ["ES256"], "audience": "sre-bot-dev"}}
+    ISSUER_CONFIG={"http://127.0.0.1:8001": {"jwks_uri": "http://127.0.0.1:8001/.well-known/jwks.json", "algorithms": ["ES256"], "audience": "sre-bot-dev"}}
 
 Then smoke test:
     curl -s -X POST http://localhost:8000/api/v1/access/sync-runs \\
@@ -52,7 +52,8 @@ except ImportError:
 
 
 PORT = int(os.environ.get("DEV_JWKS_PORT", "8001"))
-ISSUER = f"http://localhost:{PORT}"
+ISSUER = f"http://127.0.0.1:{PORT}"
+BIND_HOST = "127.0.0.1"
 AUDIENCE = "sre-bot-dev"
 SUBJECT = "dev-user"
 EMAIL = os.environ.get("DEV_TOKEN_EMAIL", "dev@local")
@@ -114,7 +115,7 @@ def _check_port_free(port: int) -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            s.bind(("", port))
+            s.bind((BIND_HOST, port))
         except OSError:
             print(
                 f"\nERROR: Port {port} is already in use.\n"
@@ -151,7 +152,7 @@ def make_jwks_server(jwk: dict, port: int) -> http.server.HTTPServer:
     class _Server(http.server.HTTPServer):
         allow_reuse_address = True
 
-    return _Server(("", port), _Handler)
+    return _Server((BIND_HOST, port), _Handler)
 
 
 def main() -> None:

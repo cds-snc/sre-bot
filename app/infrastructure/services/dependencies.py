@@ -5,10 +5,12 @@ Provides annotated type hints for common infrastructure dependencies.
 """
 
 from typing import Annotated
-from fastapi import Depends
+from fastapi import Depends, Security
 from infrastructure.configuration import Settings
+from infrastructure.identity.models import User
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
+from infrastructure.security.current_user import get_current_user
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
@@ -57,6 +59,16 @@ IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
 
 # JWKS manager dependency
 JWKSManagerDep = Annotated[JWKSManager, Depends(get_jwks_manager)]
+
+# Authenticated principal dependency — requires a valid JWT Bearer token.
+# Use Security(get_current_user) for authentication-only endpoints.
+# Use Security(get_current_user, scopes=["sre-bot:<resource>"]) to enforce scopes.
+# Example:
+#   from fastapi import Security
+#   from infrastructure.services import CurrentUserDep
+#   @router.post("/sync-runs")
+#   def sync(current_user: CurrentUserDep): ...
+CurrentUserDep = Annotated[User, Security(get_current_user)]
 
 # AWS clients facade dependency - provides attribute-based access to all AWS services
 # Usage: aws.dynamodb.get_item(...), aws.identitystore.list_users(...), etc.
@@ -120,6 +132,7 @@ __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
+    "CurrentUserDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "EventDispatcherDep",

@@ -86,3 +86,17 @@ class JWKSManager:
             self.jwks_clients.pop(issuer, None)
         else:
             self.jwks_clients.clear()
+
+    def warmup(self) -> None:
+        """Pre-initialize JWKS clients for all configured issuers.
+
+        Called during application startup to eagerly construct a PyJWKClient
+        for every issuer in the configuration.  Keys are not fetched from the
+        JWKS URI here; that happens on the first token validation.  Warmup only
+        ensures the client objects are created and cached so there is no
+        object-construction overhead on the first authenticated request.
+        """
+        for issuer in list(self.issuer_config.keys()):
+            self.get_jwks_client(issuer)
+        log = logger.bind(issuer_count=len(self.issuer_config))
+        log.info("jwks_clients_warmed_up")
