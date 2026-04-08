@@ -47,7 +47,12 @@ class GoogleDirectoryProvider:
         self._logger = logger.bind(provider="google")
 
     def _normalize_email(self, value: str) -> str:
-        """Normalize email-form identifiers used by the shared contract."""
+        """Normalize email-form identifiers used by the shared contract.
+
+        Group-key values that do not contain ``@`` are treated as
+        managed-group slugs and composed into ``{slug}@{domain}`` when
+        ``DIRECTORY_MANAGED_GROUP_DOMAIN`` is configured.
+        """
         normalized = value.strip().lower()
         if normalized and "@" not in normalized and self._managed_group_domain:
             return f"{normalized}@{self._managed_group_domain}"
@@ -378,7 +383,9 @@ class GoogleDirectoryProvider:
         """Return a canonical managed group by key.
 
         Args:
-            group_key: Canonical managed-group email — normalised to lowercase.
+            group_key: Canonical managed-group email or managed-group slug.
+                Slugs are composed into canonical email form using
+                ``DIRECTORY_MANAGED_GROUP_DOMAIN``.
 
         Returns:
             OperationResult: success with the canonical DirectoryGroup.

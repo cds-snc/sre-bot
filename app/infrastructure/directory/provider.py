@@ -91,7 +91,8 @@ class DirectoryProvider(Protocol):
         """Return a canonical managed group by key.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
 
         Returns:
             OperationResult: success with the canonical DirectoryGroup.
@@ -107,7 +108,8 @@ class DirectoryProvider(Protocol):
         """Add a user membership to a managed group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to add (normalised to lowercase).
             role: Provider-agnostic membership role hint (default: MEMBER).
 
@@ -124,7 +126,8 @@ class DirectoryProvider(Protocol):
         """Remove a user membership from a managed group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to remove (normalised to lowercase).
 
         Returns:
@@ -138,7 +141,8 @@ class DirectoryProvider(Protocol):
         """Check whether a user is a member of a group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Canonical managed-group email or provider-agnostic
+                managed-group slug (for example, ``sg-aws-authn``).
             user_email: User email to check (compared case-insensitively).
 
         Returns:
