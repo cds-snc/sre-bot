@@ -6,9 +6,9 @@ from infrastructure.configuration.infrastructure.directory import DirectorySetti
 class TestDirectorySettings:
     """DirectorySettings defaults and env alias behaviour."""
 
-    def test_directory_settings_defaults(self):
-        # Arrange / Act - create settings with no env vars (ignore env vars for this test)
-        settings = DirectorySettings(_env_file=None)  # ignore env vars for this test
+    def test_directory_settings_defaults(self, monkeypatch):
+        # Arrange / Act — _env_file=None prevents pydantic-settings from reading .env
+        settings = DirectorySettings(_env_file=None)
 
         # Assert
         assert settings.provider == "google"
