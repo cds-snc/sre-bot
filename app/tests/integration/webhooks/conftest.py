@@ -18,14 +18,14 @@ from unittest.mock import MagicMock, PropertyMock
 @pytest.fixture
 def webhook_id():
     """Standard webhook ID for testing."""
-    return "ed44d4a4-ec32-4210-bca2-a98305503b04"
+    return "804ec756-5dba-4277-bda7-40dd8dbbb78b"
 
 
 @pytest.fixture
 def webhook_record():
     """Standard webhook database record."""
     return {
-        "id": {"S": "ed44d4a4-ec32-4210-bca2-a98305503b04"},
+        "id": {"S": "804ec756-5dba-4277-bda7-40dd8dbbb78b"},
         "channel": {"S": "test-channel"},
         "hook_type": {"S": "alert"},
         "active": {"BOOL": True},
@@ -176,7 +176,7 @@ def mock_webhook_lookup(monkeypatch):
     """
     mock = MagicMock()
     mock.return_value = {
-        "id": {"S": "ed44d4a4-ec32-4210-bca2-a98305503b04"},
+        "id": {"S": "804ec756-5dba-4277-bda7-40dd8dbbb78b"},
         "channel": {"S": "test-channel"},
         "hook_type": {"S": "alert"},
         "active": {"BOOL": True},
