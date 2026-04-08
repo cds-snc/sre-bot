@@ -2,72 +2,98 @@
 
 ## Routes in Feature Packages
 
-**Decision**: Routes live in feature packages, NOT centralized `api/`.
+**Decision**: Routes live in feature packages under `packages/{feature}/transport/routes.py`. The main application never imports feature routes — each feature registers itself via hookimpl.
 
-**Implementation**:
+**Router declaration** — feature owns its path prefix:
+
 ```python
-# modules/groups/api/routes.py
+# packages/feature/transport/routes.py
 from fastapi import APIRouter
-from infrastructure.services import CommandServiceDep, SettingsDep
 
-router = APIRouter(
-    prefix="/api/v1/groups",  # ✅ Feature owns its prefix
-    tags=["groups"],
-)
-
-@router.post("/add")
-def add_member(
-    request: AddMemberRequest,
-    command_service: CommandServiceDep,
-    settings: SettingsDep,
-):
-    """Add member to group."""
-    # Implementation...
+router = APIRouter(prefix="/feature", tags=["Feature"])
 ```
 
-**Main Application Registration**:
+**Registration via hookimpl** — `/api/v1` prefix applied once at include time:
+
 ```python
-# server/main.py
-from fastapi import FastAPI
-# Current: import from modules/ (legacy directory name)
-from modules.groups import router as groups_router
-from modules.incident import router as incident_router
-# Future: import from packages/ (correct Python term)
-# from packages.groups import router as groups_router
+# packages/feature/__init__.py
+from infrastructure.services import hookimpl
+from packages.feature.transport.routes import router as feature_router
 
-app = FastAPI(title="SRE Bot API")
 
-# ✅ Register feature routers
-app.include_router(groups_router)
-app.include_router(incident_router)
-
-# api/ package only for shared/cross-cutting concerns
-from api.routes.health import router as health_router
-from api.routes.auth import router as auth_router
-app.include_router(health_router, prefix="/api/v1")
-app.include_router(auth_router, prefix="/api/v1")
+@hookimpl
+def register_routes(app) -> None:
+    app.include_router(feature_router, prefix="/api/v1")
 ```
 
 **Rules**:
-- ✅ Routes in `modules/{feature}/api/routes.py` (current) or `packages/{feature}/api/routes.py` (future)
-- ✅ Feature package exports `router` from `__init__.py`
-- ✅ Main app registers via `app.include_router()`
-- ✅ Centralized `api/` only for shared routes (health, auth)
-- ❌ Never put feature routes in centralized `api/v1/`
+- ✅ Feature router declares its own sub-prefix (e.g. `/feature`)
+- ✅ `/api/v1` versioning prefix applied once in `register_routes` hookimpl
+- ✅ `api/` is for cross-cutting concerns only: health checks, auth endpoints
+- ❌ No feature routes in centralized `api/`
+- ❌ No `app.include_router()` calls outside hookimpl implementations
+- ❌ Features do not export bare routers for external import
+
+---
+
+## Dependency Injection in Routes
+
+**Decision**: Route handlers consume services and settings via `Annotated[Protocol, Depends(factory)]`. Factory functions come from `providers.py`.
+
+Each route file declares a local structural Protocol for each dependency, exposing only the surface the handler needs. This decouples the handler from the concrete implementation and makes test substitution straightforward — patch `providers.get_*` at module scope.
+
+```python
+# packages/feature/transport/routes.py
+from typing import Annotated, Protocol
+
+from fastapi import APIRouter, Depends
+
+from infrastructure.operations import OperationResult
+from packages.feature.providers import get_feature_service, get_feature_settings
+from packages.feature.schemas import FeatureRequest, FeatureResponse
+
+router = APIRouter(prefix="/feature", tags=["Feature"])
+
+
+class _FeatureSettingsPort(Protocol):
+    enabled: bool
+
+
+class _FeatureServicePort(Protocol):
+    def do_action(self, param: str) -> OperationResult: ...
+
+
+@router.post("/actions", response_model=FeatureResponse)
+def action_endpoint(
+    request: FeatureRequest,
+    service: Annotated[_FeatureServicePort, Depends(get_feature_service)],
+    settings: Annotated[_FeatureSettingsPort, Depends(get_feature_settings)],
+) -> FeatureResponse:
+    ...
+```
+
+**Rules**:
+- ✅ `Annotated[Protocol, Depends(factory)]` for all service and settings dependencies
+- ✅ Factory functions imported from the feature's `providers.py`
+- ✅ Local Protocol declares only the surface the route actually consumes
+- ❌ No direct service instantiation in routes
+- ❌ No `SettingsDep` or infrastructure client deps imported directly in route handlers
 
 ---
 
 ## What Lives Where
 
 | Component | Location | Responsibility |
-|-----------|----------|----------------|
-| **Feature Routes** | `modules/{feature}/api/routes.py` (current)<br>`packages/{feature}/api/routes.py` (future) | Feature-specific HTTP endpoints |
-| **Request/Response Models** | `{feature}/api/schemas.py` | Pydantic models for HTTP |
-| **Command Handlers** | `{feature}/commands/handlers.py` | Business logic |
-| **Domain Logic** | `{feature}/core/` | Provider-agnostic operations |
-| **Health Checks** | `api/routes/health.py` | System health endpoints |
-| **Authentication** | `api/routes/auth.py` | Auth/OIDC endpoints |
-| **Middleware** | `api/middleware/` | Request/response middleware |
+|---|---|---|
+| HTTP routes | `packages/{feature}/transport/routes.py` | FastAPI route handlers |
+| Chat command handlers | `packages/{feature}/transport/slack.py` | Slack/Teams command dispatch |
+| Request/response schemas | `packages/{feature}/schemas.py` | Pydantic HTTP models |
+| Business logic / orchestration | `packages/{feature}/service.py` or `coordinator.py` | Platform-agnostic operations |
+| Domain models | `packages/{feature}/domain.py` | Internal frozen dataclasses |
+| DI assembly | `packages/{feature}/providers.py` | `@lru_cache` factory functions |
+| Health checks | `api/routes/health.py` | System health endpoints |
+| Authentication | `api/routes/auth.py` | Auth/OIDC endpoints |
+| Middleware | `api/middleware/` | Request/response middleware |
 
 **Rules**:
 - ✅ Feature packages own complete vertical slices
