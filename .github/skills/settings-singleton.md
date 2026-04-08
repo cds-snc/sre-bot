@@ -1,16 +1,23 @@
 # Settings Singleton Pattern
 
-**Reference**: `docs/decisions/tier-1-foundation/application-lifecycle/02-settings-singleton.md`
+**Reference**: `docs/decisions/tier-1-foundation/07-settings-partitioned-model.md` (supersedes ADR-02 rules for feature packages)
 
-## Pattern
+## Two-Tier Model
 
-Settings loaded once at startup via `@lru_cache` singleton. Always access via provider function.
+Settings are split by ownership:
+
+| Tier | Owner | Where it lives | Access pattern |
+|------|-------|----------------|----------------|
+| **Core** — integration credentials + infrastructure behavior | `infrastructure/` | `infrastructure/configuration/settings.py` | `get_settings()` in `providers.py`; `SettingsDep` in routes |
+| **Feature** — business config for one package | `packages/<name>/` | `packages/<name>/settings.py` | `get_<name>_settings()` defined in the same file |
+
+Feature settings **never** appear in the central `Settings` class. The central class contains only integration credentials (`SlackSettings`, `AwsSettings`, etc.) and infrastructure behavior (`RetrySettings`, `IdempotencySettings`, etc.).
 
 ---
 
-## Implementation
+## Core Settings Usage
 
-### Provider Function (Already Exists)
+### Provider Function (Already Exists — Do Not Modify)
 
 ```python
 # infrastructure/services/providers.py
@@ -23,93 +30,176 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-**Do NOT modify this function.**
+Providers extract a slice and pass it to the service — never pass the whole `Settings`:
 
----
+```python
+@lru_cache(maxsize=1)
+def get_aws_clients() -> AWSClients:
+    settings = get_settings()
+    return AWSClients(aws_settings=settings.aws)   # ← slice only
+```
 
-### Usage in Routes
+### Routes
 
 ```python
 # modules/*/controllers.py
-from fastapi import APIRouter
 from infrastructure.services import SettingsDep
-
-router = APIRouter()
 
 @router.get("/config")
 def get_config(settings: SettingsDep):
-    """Settings injected as dependency."""
-    return {
-        "environment": settings.environment,
-        "region": settings.aws.aws_region,
-    }
+    return {"region": settings.aws.aws_region}
 ```
 
-**Pattern**: Use `SettingsDep` type annotation for FastAPI dependency injection.
+**Pattern**: `SettingsDep` type annotation for FastAPI DI.
+
+### Legacy modules / jobs
+
+```python
+# modules/*/service.py  or  jobs/*.py
+from infrastructure.services import get_settings
+
+def sync_job():
+    settings = get_settings()   # call once, store in local variable
+    if settings.PREFIX != "":
+        return
+```
 
 ---
 
-### Usage in Services/Jobs
+## Feature Package Settings
 
-```python
-# modules/*/service.py or jobs/*.py
-from infrastructure.services import get_settings
+Every `packages/<name>/` defines its own settings in `packages/<name>/settings.py`. Choose the pattern based on whether env vars already exist in production SSM.
 
-class MyService:
-    def __init__(self, settings: Settings):
-        """Receive settings via dependency injection."""
-        self.settings = settings
-    
-    def process(self):
-        return self.settings.environment
+**Decision rule:**
+- New package, no existing SSM keys → **Pattern A** (`env_prefix`, dedicated SSM parameter)
+- Migrating an existing module with keys already in SSM → **Pattern B** (`Field(alias=...)` for each existing key)
 
-# Instantiation
-service = MyService(settings=get_settings())
+### Pattern A — New package, no existing env vars
+
+Use `env_prefix` directly. All env vars for this package go into a **new dedicated SSM parameter** (e.g., `sre-bot-my-feature`). Add one line to `entry.sh` and one `aws_ssm_parameter` Terraform resource.
+
+```sh
+# entry.sh — add one line per new SSM parameter source
+aws ssm get-parameter --region ca-central-1 --with-decryption \
+  --name sre-bot-my-feature --query 'Parameter.Value' --output text >> ".env"
 ```
 
-**Pattern**: Services receive `Settings` in `__init__`, caller passes `get_settings()`.
-
----
-
-### Usage in Standalone Functions
-
 ```python
-# jobs/sync_groups.py
-from infrastructure.services import get_settings
+# packages/my_feature/settings.py
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-def sync_groups_job():
-    """Job function calls get_settings directly."""
-    settings = get_settings()
-    
-    if settings.environment == "development":
-        return  # Skip in dev
-    
-    # Process...
+class MyFeatureSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+        env_prefix="MY_FEATURE_",
+    )
+    api_key: str              # reads MY_FEATURE_API_KEY
+    dry_run: bool = False     # reads MY_FEATURE_DRY_RUN
+
+@lru_cache(maxsize=1)
+def get_my_feature_settings() -> MyFeatureSettings:
+    return MyFeatureSettings()
 ```
 
-**Pattern**: Call `get_settings()` once at function start, store in local variable.
+No `Field(alias=...)` needed. The `env_prefix` handles the namespace for all fields.
+
+### Pattern B — Migrating an existing module with env vars already in SSM
+
+Do **not** set `env_prefix` on the class. Use `Field(alias=)` for every field to map to the exact deployed env var name. The SSM parameters do not change.
+
+```python
+# packages/incident/settings.py  (migrated from modules/incident)
+from functools import lru_cache
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class IncidentSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+    # Existing SSM keys — alias must exactly match the deployed var name.
+    # Do NOT change the alias until the SSM parameter is updated.
+    channel: str = Field(default="", alias="INCIDENT_CHANNEL")
+    security_group_id: str = Field(default="", alias="SLACK_SECURITY_USER_GROUP_ID")
+    # New fields not yet in SSM also use an explicit alias to establish namespace.
+    retry_limit: int = Field(default=3, alias="INCIDENT_RETRY_LIMIT")
+
+@lru_cache(maxsize=1)
+def get_incident_settings() -> IncidentSettings:
+    return IncidentSettings()
+```
+
+A field that also exists in `SlackSettings` (e.g., `INCIDENT_CHANNEL`) is an accepted temporary duplicate during migration. Remove the legacy field from the integration settings class in the **same PR** that retires the old `modules/incident` code.
+
+Validated at startup via `startup_warmup` hookimpl:
+
+```python
+# packages/my_feature/__init__.py
+from packages.my_feature.settings import get_my_feature_settings
+
+@hookimpl
+def startup_warmup(logger) -> None:
+    s = get_my_feature_settings()   # ValidationError → startup aborts (fail-fast)
+    logger.info("my_feature_settings_loaded", dry_run=s.dry_run)
+```
+
+The feature's service receives its own settings type:
+
+```python
+# packages/my_feature/service.py
+from packages.my_feature.settings import MyFeatureSettings
+
+class MyFeatureService:
+    def __init__(self, settings: MyFeatureSettings):
+        self._settings = settings
+```
 
 ---
 
 ## Forbidden Patterns
 
 ```python
-# ❌ Direct instantiation
+# ❌ Direct instantiation of the central Settings
 from infrastructure.configuration import Settings
 settings = Settings()  # WRONG
 
-# ❌ Import settings object
-from infrastructure.configuration import settings  # WRONG - doesn't exist
+# ❌ Feature package importing central get_settings
+from infrastructure.services import get_settings    # WRONG inside packages/<name>/
+settings = get_settings().some_feature_section      # WRONG
 
-# ❌ Call get_settings in service __init__
-class Service:
-    def __init__(self):
-        self.settings = get_settings()  # WRONG - receive via parameter
+# ❌ Feature settings added to infrastructure/configuration/settings.py
+class Settings(BaseSettings):
+    my_feature: MyFeatureSettings   # WRONG — feature settings belong in the package
 
-# ❌ Call get_settings repeatedly
+# ❌ Passing full Settings to a service that needs only a slice
+return MyService(settings=get_settings())           # WRONG — pass settings.my_section
+
+# ❌ Core service accepting the full Settings
+class AWSClients:
+    def __init__(self, settings: Settings):         # WRONG — accept AwsSettings instead
+        self._region = settings.aws.aws_region
+
+# ❌ Pattern A class with no env_prefix — env var ownership is ambiguous
+class MyFeatureSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", ...)
+    api_key: str                                    # WRONG — which service owns API_KEY?
+
+# ❌ Pattern B class dropping the alias for an existing SSM key
+class IncidentSettings(BaseSettings):
+    channel: str                                    # WRONG — INCIDENT_CHANNEL is already in SSM
+
+# ❌ Changing an existing alias to rename a deployed SSM key
+channel: str = Field(alias="INCIDENT__CHANNEL")    # WRONG — the old key breaks in prod
+
+# ❌ Call get_settings repeatedly in one scope
 def process():
     region = get_settings().aws.aws_region
-    env = get_settings().environment  # WRONG - call once, store
+    env = get_settings().environment                # WRONG — call once, store
 ```
 
 ---
@@ -117,23 +207,30 @@ def process():
 ## Environment Variables
 
 ```bash
-# .env file uses double underscore for nested config
-AWS__AWS_REGION=us-east-1
-AWS__AWS_ACCOUNT_ID=123456789012
-GOOGLE__CREDENTIALS_BASE64=...
+# Core settings (existing SSM keys — do not rename without a deployment plan)
+SLACK_TOKEN=xoxb-token
+AWS_REGION=ca-central-1
+
+# Pattern A: new package with dedicated SSM param — vars follow env_prefix naming
+MY_FEATURE_API_KEY=secret
+MY_FEATURE_DRY_RUN=true
+
+# Pattern B: migrated module — vars keep their original deployed name
+INCIDENT_CHANNEL=C01234567
 ```
 
-**Pattern**: `DOMAIN__SETTING_NAME` for nested configuration.
+**Rule — Pattern A (new package):** set `env_prefix="PACKAGE_NAME_"` on `SettingsConfigDict`. Plain field names; no aliases. Vars go into a new dedicated SSM parameter.
+
+**Rule — Pattern B (migration):** no `env_prefix` on the class. Every field uses `Field(alias="EXACT_DEPLOYED_NAME")`. Do not change an alias value without updating the SSM parameter in the same deployment.
 
 ---
 
 ## Validation
 
-Settings validate on first `get_settings()` call. Invalid config raises `ValidationError` and terminates process.
+Both tiers validate at construction time. `ValidationError` terminates the process.
 
-```python
-# Pydantic validation happens automatically
-settings = get_settings()  # ValidationError if AWS__AWS_REGION missing
-```
+- Core: validated on the first `get_settings()` call in `lifespan()`.
+- Feature: validated in `startup_warmup` hookimpl, called from lifespan before traffic is accepted.
 
-**This is correct behavior - fail fast on invalid config.**
+Both give the same fail-fast guarantee: misconfigured services never start.
+

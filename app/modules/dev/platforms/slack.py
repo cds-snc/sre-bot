@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, Callable, Any, Dict, List
 
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.services import get_slack_client, get_settings
-from modules.dev import google, slack as slack_dev, incident
+from modules.dev import (
+    google,
+    incident,
+    slack as slack_dev,
+)
 from modules.dev.aws_dev import aws_dev_router
 
 if TYPE_CHECKING:

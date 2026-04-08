@@ -51,13 +51,13 @@ else
   echo "✓ aws_access_requests table created"
 fi
 
-# sre_bot_data table - Generic PK/SK pattern
-if table_exists "sre_bot_data"; then
-  echo "✓ sre_bot_data table already exists"
+# sre_bot_access table - Generic PK/SK pattern
+if table_exists "sre_bot_access"; then
+  echo "✓ sre_bot_access table already exists"
 else
-  echo "Creating sre_bot_data table..."
+  echo "Creating sre_bot_access table..."
   aws dynamodb create-table \
-    --table-name sre_bot_data \
+    --table-name sre_bot_access \
     --attribute-definitions \
       AttributeName=PK,AttributeType=S \
       AttributeName=SK,AttributeType=S \
@@ -67,7 +67,7 @@ else
     --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
     --endpoint-url "$ENDPOINT" \
     --no-cli-pager >/dev/null
-  echo "✓ sre_bot_data table created"
+  echo "✓ sre_bot_access table created"
 fi
 
 # incidents table - Simple hash key

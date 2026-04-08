@@ -13,7 +13,7 @@ Usage (feature-level repository)::
     from infrastructure.services import StorageServiceDep
 
     class SyncRunRepository:
-        TABLE = "sre_bot_data"
+        TABLE = "sre_bot_access"
 
         def __init__(self, storage: StorageService) -> None:
             self._storage = storage
