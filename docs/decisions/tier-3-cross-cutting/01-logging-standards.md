@@ -14,7 +14,7 @@ logger = structlog.get_logger()
 def process_request(user_id: str, group_id: str, request_id: str):
     """Process request with structured logging.
     
-    Bind ONLY request-scoped context. Code location (filepath, function, line)
+    Bind ONLY request-scoped context. Code location (file path, function name, line)
     is added automatically by OpenTelemetry processors.
     """
     # ✅ Bind request-scoped context per-call
@@ -42,9 +42,9 @@ def add_member(request: AddMemberRequest, settings: SettingsDep):
     """Add member with request-scoped logging.
     
     OpenTelemetry automatically captures:
-    - code.filepath: "api/v1/groups/routes.py"
-    - code.function: "add_member"
-    - code.lineno: <line number>
+    - code.file.path: "api/v1/groups/routes.py"
+    - code.function.name: "add_member"
+    - code.line.number: <line number>
     """
     # ✅ Bind only request-scoped context
     log = logger.bind(
@@ -125,10 +125,10 @@ def execute_api_call(service: str, operation: str, **kwargs) -> dict:
 - ✅ Dynamic state: `status`, `duration_ms`, `error_code`
 
 **What NOT to Bind** (Automatic via OpenTelemetry):
-- ❌ Code location: `code.filepath`, `code.function`, `code.lineno` (automatic)
-- ❌ Component/module names: `component=`, `module=` (use code.filepath instead)
-- ❌ Endpoint names: `endpoint=` (use code.function instead)
-- ❌ Manual namespace: `code_namespace=` (automatic)
+- ❌ Code location: `code.file.path`, `code.function.name`, `code.line.number` (automatic)
+- ❌ Component/module names: `component=`, `module=` (use code.file.path instead)
+- ❌ Endpoint names: `endpoint=` (use code.function.name instead)
+- ❌ Manual namespace: `code.namespace` (automatic)
 
 **Patterns**:
 - ✅ Use `structlog.get_logger()` at module/class level (no arguments)
@@ -152,9 +152,9 @@ def execute_api_call(service: str, operation: str, **kwargs) -> dict:
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| `code.filepath` | Relative file path from project root | `api/v1/groups/routes.py` |
-| `code.function` | Function or method name | `add_member` |
-| `code.lineno` | Line number where log call occurred | `42` |
+| `code.file.path` | Source file path | `api/v1/groups/routes.py` |
+| `code.function.name` | Fully-qualified function or method name | `add_member` |
+| `code.line.number` | Line number where log call occurred | `42` |
 | `timestamp` | ISO 8601 timestamp | `2026-02-05T14:23:45.123Z` |
 | `level` | Log level | `info` |
 | `event` | Log event name | `request_received` |
@@ -171,9 +171,9 @@ def execute_api_call(service: str, operation: str, **kwargs) -> dict:
   "event": "processing_started",
   "timestamp": "2026-02-05T14:23:45.123Z",
   "level": "info",
-  "code.filepath": "modules/groups/service.py",
-  "code.function": "add_member",
-  "code.lineno": 45,
+    "code.file.path": "modules/groups/service.py",
+    "code.function.name": "add_member",
+    "code.line.number": 45,
   "user_id": "user@example.com",
   "group_id": "abc123",
   "request_id": "req-xyz789"
