@@ -30,8 +30,10 @@ def my_function():
 
 ### 2. Settings Import Pattern
 
+**Core infrastructure** (`infrastructure/`, `server/`, legacy `modules/`) — use the central `Settings` singleton via `infrastructure.services`:
+
 ```python
-# ✅ Routes/Controllers
+# ✅ HTTP route handlers — use FastAPI DI type alias
 from infrastructure.services import SettingsDep
 
 @router.get("/endpoint")
@@ -40,23 +42,69 @@ def handler(settings: SettingsDep):
 ```
 
 ```python
-# ✅ Jobs/Modules/Services
-from infrastructure.services import get_settings
+# ✅ providers.py only — extract a slice and inject into the service
+# infrastructure/services/providers.py
+from infrastructure.services.providers import get_settings
 
-def process():
+@lru_cache(maxsize=1)
+def get_aws_clients() -> AWSClients:
     settings = get_settings()
-    return settings.environment
+    return AWSClients(aws_settings=settings.aws)  # pass the slice, not settings
+```
+
+**Feature packages** (`packages/<name>/`) — define their own `BaseSettings`. Two patterns depending on whether env vars already exist in production SSM. Never import `get_settings` from `infrastructure.services`:
+
+```python
+# ✅ packages/my_feature/settings.py — Pattern A: new package, dedicated SSM parameter
+# env_prefix handles the namespace; no Field(alias) needed
+from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class MyFeatureSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="MY_FEATURE_")
+    api_key: str        # reads MY_FEATURE_API_KEY
+    dry_run: bool = False
+
+@lru_cache(maxsize=1)
+def get_my_feature_settings() -> MyFeatureSettings:
+    return MyFeatureSettings()
 ```
 
 ```python
-# ❌ FORBIDDEN - Direct Settings import
+# ✅ packages/incident/settings.py — Pattern B: migrated module, keys already in SSM
+# No env_prefix; Field(alias) maps each field to its exact deployed env var name
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class IncidentSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+    channel: str = Field(default="", alias="INCIDENT_CHANNEL")
+```
+
+```python
+# ✅ packages/my_feature/service.py  — consume feature settings locally
+from packages.my_feature.settings import get_my_feature_settings
+
+def do_something():
+    settings = get_my_feature_settings()
+    return settings.api_key
+```
+
+```python
+# ❌ FORBIDDEN - Direct Settings instantiation
 from infrastructure.configuration import Settings
 settings = Settings()  # WRONG
 
-from infrastructure.configuration import settings  # WRONG - doesn't exist
+# ❌ FORBIDDEN - Feature package importing the central get_settings
+# packages/my_feature/anything.py
+from infrastructure.services import get_settings  # WRONG in feature packages
+settings = get_settings().my_feature_section      # WRONG
+
+# ❌ FORBIDDEN - Passing the full Settings to a service that needs only a slice
+return MyService(settings=get_settings())  # WRONG — pass settings.my_section
 ```
 
-**Enforcement**: Only import `SettingsDep` or `get_settings` from `infrastructure.services`.
+**Enforcement**: `get_settings()` from `infrastructure.services` is only called inside `providers.py`. Feature packages own their settings via a local `BaseSettings` + `@lru_cache` provider.
 
 ---
 
