@@ -7,7 +7,7 @@ All dependencies are injected via constructor - no global state.
 """
 
 import structlog
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from infrastructure.identity.models import IdentitySource, SlackUser, User
 
@@ -40,7 +40,9 @@ class IdentityResolver:
         self._slack_client_manager = slack_client_manager
         self._logger = logger.bind(component="identity_resolver")
 
-    def resolve_from_slack(self, slack_user_id: str) -> SlackUser:
+    def resolve_from_slack(
+        self, slack_user_id: str, slack_team_id: Optional[str] = None
+    ) -> SlackUser:
         """Resolve Slack user to normalized identity.
 
         Args:

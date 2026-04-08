@@ -6,11 +6,11 @@ Provides a class-based interface to the identity resolution system for easier DI
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from infrastructure.identity.models import User
+from infrastructure.identity.resolver import IdentityResolver
+from integrations.slack.client import SlackClientManager
 
 if TYPE_CHECKING:
-    from infrastructure.identity.resolver import IdentityResolver
     from infrastructure.configuration import Settings
-    from integrations.slack.client import SlackClientManager
 
 
 class IdentityService:
@@ -48,8 +48,8 @@ class IdentityService:
     def __init__(
         self,
         settings: "Settings",
-        resolver: Optional["IdentityResolver"] = None,
-        slack_client_manager: Optional["SlackClientManager"] = None,
+        resolver: Optional[IdentityResolver] = None,
+        slack_client_manager: Optional[type] = None,
     ):
         """Initialize identity service.
 
@@ -61,13 +61,7 @@ class IdentityService:
                                  Used only if resolver is not provided.
         """
         if resolver is None:
-            # Import here to avoid circular dependency
-            from infrastructure.identity.resolver import IdentityResolver
-
-            # If slack_client_manager not provided, import it
             if slack_client_manager is None:
-                from integrations.slack.client import SlackClientManager
-
                 slack_client_manager = SlackClientManager
 
             resolver = IdentityResolver(slack_client_manager=slack_client_manager)

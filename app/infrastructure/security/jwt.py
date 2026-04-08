@@ -7,14 +7,13 @@ and user information extraction from token claims.
 from typing import Any, Dict, Optional, Tuple
 
 import structlog
-from fastapi import HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from jwt import PyJWTError, decode
 
 from infrastructure.security.jwks import JWKSManager
 
 logger = structlog.get_logger()
-security = HTTPBearer()
 
 
 def get_issuer_from_token(token: str) -> Optional[str]:
@@ -67,7 +66,7 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
 
 def validate_jwt_token(
     jwks_manager: JWKSManager,
-    credentials: HTTPAuthorizationCredentials = Security(security),
+    credentials: HTTPAuthorizationCredentials,
 ) -> Dict[str, Any]:
     """Validate JWT token and extract payload.
 
@@ -127,4 +126,4 @@ def validate_jwt_token(
     except (PyJWTError, Exception) as e:
         log = logger.bind(issuer=issuer, error=str(e))
         log.warning("jwt_validation_failed")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}") from e
+        raise HTTPException(status_code=401, detail="Invalid token") from e
