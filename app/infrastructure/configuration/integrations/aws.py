@@ -59,6 +59,7 @@ class AwsSettings(IntegrationSettings):
         return {
             "audit": self.AUDIT_ROLE_ARN,
             "organizations": self.ORG_ROLE_ARN,
+            "identitystore": self.ORG_ROLE_ARN,
             "sso-admin": self.ORG_ROLE_ARN,
             "logging": self.LOGGING_ROLE_ARN,
             "ce": self.ORG_ROLE_ARN,
