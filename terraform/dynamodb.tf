@@ -28,8 +28,8 @@ resource "aws_dynamodb_table" "aws_access_requests_table" {
   }
 }
 
-resource "aws_dynamodb_table" "sre_bot_data" {
-  name           = "sre_bot_data"
+resource "aws_dynamodb_table" "sre_bot_access" {
+  name           = "sre_bot_access"
   hash_key       = "PK"
   range_key      = "SK"
   read_capacity  = 2
@@ -213,7 +213,7 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
 
   # Add all the tables we have created to the backup plan.
   resources = [
-    aws_dynamodb_table.sre_bot_data.arn,
+    aws_dynamodb_table.sre_bot_access.arn,
     aws_dynamodb_table.webhooks_table.arn,
     aws_dynamodb_table.aws_access_requests_table.arn,
     aws_dynamodb_table.incidents_table.arn,
