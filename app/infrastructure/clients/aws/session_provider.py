@@ -110,7 +110,7 @@ class SessionProvider:
         Returns:
             Configured boto3 client instance
         """
-        kw = self.build_client_kwargs(role_arn)
+        kw = self.build_client_kwargs(service_name=service_name, role_arn=role_arn)
         return get_boto3_client(
             service_name,
             session_config=kw["session_config"],
