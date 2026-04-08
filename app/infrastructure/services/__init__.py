@@ -8,6 +8,7 @@ from infrastructure.services.dependencies import (
     SettingsDep,
     IdentityServiceDep,
     JWKSManagerDep,
+    CurrentUserDep,
     AWSClientsDep,
     GoogleWorkspaceClientsDep,
     MaxMindClientDep,
@@ -51,6 +52,7 @@ from infrastructure.services.providers import (
     t,
 )
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
+from infrastructure.security.current_user import get_current_user
 
 
 # Plugin infrastructure
@@ -68,6 +70,7 @@ __all__ = [
     "SettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
+    "CurrentUserDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "MaxMindClientDep",
@@ -112,13 +115,14 @@ __all__ = [
     "get_discord_provider",
     # Translation helper
     "t",
+    # Security utilities
+    "get_current_user",
+    "get_limiter",
+    "setup_rate_limiter",
     # Plugin infrastructure
     "hookimpl",
     "get_plugin_manager",
     "discover_and_init_features",
     "collect_feature_i18n_resources",
     "register_feature_integrations",
-    # Rate limiting
-    "get_limiter",
-    "setup_rate_limiter",
 ]

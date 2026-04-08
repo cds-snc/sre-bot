@@ -7,8 +7,8 @@ class TestDirectorySettings:
     """DirectorySettings defaults and env alias behaviour."""
 
     def test_directory_settings_defaults(self):
-        # Arrange / Act
-        settings = DirectorySettings()
+        # Arrange / Act - create settings with no env vars (ignore env vars for this test)
+        settings = DirectorySettings(_env_file=None)  # ignore env vars for this test
 
         # Assert
         assert settings.provider == "google"

@@ -13,6 +13,8 @@ from infrastructure.services import (
     collect_feature_i18n_resources,
     register_feature_integrations,
     get_directory_provider,
+    get_identity_service,
+    get_jwks_manager,
     get_platform_service,
     get_settings,
     get_translation_service,
@@ -91,6 +93,36 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
     stop_event.set()
 
 
+def _initialize_security_services(
+    app: FastAPI,
+    settings: "Settings",
+    logger: BoundLogger,
+) -> None:
+    """Pre-initialize JWT/JWKS security infrastructure at startup.
+
+    If ISSUER_CONFIG is not set the application starts in a degraded state:
+    authenticated endpoints will return 500 at runtime.  A startup warning is
+    logged so the misconfiguration is visible without blocking the process.
+    """
+    log = logger.bind(phase="security")
+    log.info("security_services_initialization_started")
+
+    if not settings.server.ISSUER_CONFIG:
+        log.warning(
+            "security_services_no_issuer_config",
+            detail="ISSUER_CONFIG not set; authenticated endpoints will fail at runtime",
+        )
+        return
+
+    jwks_manager = get_jwks_manager()
+    jwks_manager.warmup()
+    get_identity_service()
+    log.info(
+        "security_services_initialized",
+        issuer_count=len(settings.server.ISSUER_CONFIG),
+    )
+
+
 def _initialize_directory_provider(
     app: FastAPI,
     settings: "Settings",
@@ -125,6 +157,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("application_startup")
     _list_configs(settings, logger)
 
+    _initialize_security_services(app, settings, logger)
     _initialize_directory_provider(app, settings, logger)
 
     app.state.command_providers = {}

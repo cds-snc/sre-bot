@@ -17,6 +17,9 @@ class ServerSettings(InfrastructureSettings):
         GOOGLE_CLIENT_SECRET: Google OAuth client secret
         SESSION_SECRET_KEY: Secret key for session encryption
         ISSUER_CONFIG: JSON dict of JWT issuer configurations
+        DEV_BYPASS_TOKEN: Static bearer token accepted in non-production environments
+            only. Allows local smoke testing without a real Backstage instance.
+            Must be a long random string. NEVER set in production.
 
     Example:
         ```python
@@ -40,6 +43,10 @@ class ServerSettings(InfrastructureSettings):
     ISSUER_CONFIG: Optional[Dict[str, Dict[str, Any]]] = Field(
         default=None,
         alias="ISSUER_CONFIG",
+    )
+    DEV_BYPASS_TOKEN: Optional[str] = Field(
+        default=None,
+        alias="DEV_BYPASS_TOKEN",
     )
 
     @field_validator("ISSUER_CONFIG", mode="before")
