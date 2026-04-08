@@ -91,62 +91,48 @@ def list_accounts(settings: SettingsDep):
 
 ---
 
-## Error Response Consistency
+## Error Mapping Helper
 
-**Decision**: All error responses include structured information.
+**Decision**: Extract OperationResult → HTTP status code mapping into a private `_to_public_error` function. This keeps route handlers readable, ensures the mapping is applied consistently across all endpoints in a module, and prevents internal error details from leaking into responses.
 
-**Required Fields**:
-- `detail` (string): Human-readable error message from OperationResult
-- `error_code` (optional string): Code from `result.error_code` for categorization
-- HTTP status code: Mapped from `result.status`
-
-**Implementation**:
 ```python
-import structlog
-from fastapi import HTTPException
-from infrastructure.operations import OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 
-logger = structlog.get_logger()
 
-@router.post("/members/add")
-def add_member(request: AddMemberRequest, settings: SettingsDep):
-    """Add member to group with structured error responses."""
-    log = logger.bind(group_id=request.group_id, member_email=request.member_email)
-    log.info("request_received")
-    
-    result = add_member_operation(request)
-    
-    # ✅ CORRECT - Map to HTTPException with all status variants
-    if not result.is_success:
-        error_detail = {
-            "message": result.message,
-            "error_code": result.error_code or "OPERATION_FAILED"
-        }
-        
-        if result.status == OperationStatus.UNAUTHORIZED:
-            log.error("auth_failed", error_code=result.error_code)
-            raise HTTPException(status_code=401, detail=error_detail["message"])
-        elif result.status == OperationStatus.NOT_FOUND:
-            log.warning("resource_not_found", error_code=result.error_code)
-            raise HTTPException(status_code=404, detail=error_detail["message"])
-        elif result.status == OperationStatus.TRANSIENT_ERROR:
-            log.warning("transient_error", error_code=result.error_code,
-                       retry_after=getattr(result, 'retry_after', None))
-            raise HTTPException(status_code=503, detail=error_detail["message"])
-        else:  # PERMANENT_ERROR
-            log.error("operation_failed", error_code=result.error_code)
-            raise HTTPException(status_code=400, detail=error_detail["message"])
-    
-    log.info("request_completed", status="success")
-    return {"member_email": request.member_email, "added": True}
+def _to_public_error(result: OperationResult) -> tuple[int, str]:
+    """Map an OperationResult error to a safe HTTP status code and message.
+
+    Never expose raw internal messages directly. Return a caller-safe string.
+    """
+    if result.status == OperationStatus.NOT_FOUND:
+        return 404, result.message or "Resource not found"
+    if result.status == OperationStatus.UNAUTHORIZED:
+        return 403, "Not authorized"
+    if result.status == OperationStatus.PERMANENT_ERROR:
+        return 400, result.message or "Request could not be completed"
+    # TRANSIENT_ERROR and any unexpected status → 500
+    return 500, "An internal error occurred"
+
+
+@router.post("/actions", response_model=ActionResponse)
+def action_endpoint(request: ActionRequest, service: ...) -> ActionResponse:
+    result = service.do_action(param=request.param)
+
+    if result.is_success:
+        return ActionResponse(success=True, data=result.data)
+
+    status_code, detail = _to_public_error(result)
+    if status_code >= 500:
+        log.error("action_failed", error=result.message, error_code=result.error_code)
+    else:
+        log.warning("action_failed", error=result.message, error_code=result.error_code)
+    raise HTTPException(status_code=status_code, detail=detail)
 ```
 
 **Rules**:
-- ✅ Include `error_code` from OperationResult for client-side routing
-- ✅ Use `result.message` for human-readable detail in HTTPException
-- ✅ Log structured context including error codes for troubleshooting
-- ✅ Handle rate-limit scenario with `retry_after` in logs
-- ✅ Never raise HTTPException(500) for handled operation failures
-- ❌ Don't expose internal stack traces in HTTP responses
-- ❌ Don't log secrets in error context
-- ❌ Don't use generic "Operation failed" without error_code
+- ✅ One `_to_public_error` per route module — shared across all handlers in the file
+- ✅ Log `result.message` and `result.error_code` internally before discarding them
+- ✅ Return a caller-safe string from `_to_public_error` — never `result.message` directly for 5xx responses
+- ✅ Log at `error` level for 5xx, `warning` for 4xx
+- ❌ Do not inline the full status→code mapping in every handler
+- ❌ Do not expose stack traces or internal error codes in the HTTP response body

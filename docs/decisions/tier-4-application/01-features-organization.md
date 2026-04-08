@@ -2,402 +2,424 @@
 
 ## Feature Package Structure
 
-**Decision**: Feature packages follow vertical slice architecture.
+**Decision**: Feature packages follow vertical slice architecture. Each package is self-contained and registers itself with the application via hookimpl — the main application has no knowledge of individual features.
 
-**Structure**:
+**Full layout** (for features with adapters, orchestration, or external config):
 ```
-packages/groups/
-├── __init__.py
-├── routes.py              # FastAPI routes (HTTP interface)
-├── service.py             # Business logic (platform-agnostic)
-├── schemas.py             # Pydantic request/response models
-└── platforms/             # Platform-specific adapters
-    ├── __init__.py
-    ├── slack.py           # Slack command/view handlers
-    └── teams.py           # Teams command/view handlers
+packages/feature/
+├── __init__.py          — hookimpl registrations and startup wiring
+├── schemas.py           — Pydantic HTTP request/response models
+├── domain.py            — internal frozen dataclass models
+├── coordinator.py       — orchestration layer (sequence of steps across modules)
+├── policies.py          — business rules and planning logic
+├── providers.py         — @lru_cache DI factory functions
+├── store.py             — persistence layer
+├── events.py            — domain event name constants
+├── adapters/            — Protocol-defined external integrations
+│   ├── __init__.py      — adapter Protocol contract
+│   └── <platform>.py   — platform-specific implementation
+├── config/              — feature settings and config loaders
+│   ├── __init__.py
+│   └── settings.py
+└── transport/           — HTTP and chat platform handlers
+    ├── routes.py        — FastAPI route handlers
+    └── slack.py         — Slack command handlers
 ```
 
-**Package Export**:
-```python
-# packages/groups/__init__.py
-from packages.groups.routes import router
-
-__all__ = ["router"]
+**Lean layout** (for simpler features without adapters or complex orchestration):
+```
+packages/feature/
+├── __init__.py          — hookimpl registrations
+├── schemas.py           — Pydantic models
+├── domain.py            — internal dataclasses
+├── service.py           — business logic
+├── providers.py         — @lru_cache factory functions
+└── transport/
+    └── routes.py        — FastAPI route handlers
 ```
 
 **Rules**:
-- ✅ Each package is complete vertical slice
-- ✅ Routes in `routes.py` (HTTP interface, platform-agnostic)
-- ✅ Business logic in `service.py` (platform-agnostic functions)
-- ✅ Platform adapters in `platforms/` (call routes internally)
-- ✅ Export router for FastAPI registration
-- ✅ Enforce tier-1, tier-2, tier-3 standards (TYPE_CHECKING, logging, OperationResult)
-- ❌ No cross-package dependencies (use infrastructure services)
+- ✅ Each package is a complete vertical slice — no cross-package feature imports
+- ✅ HTTP schemas (Pydantic) in `schemas.py`; internal models (frozen dataclasses) in `domain.py`
+- ✅ Platform adapters conform to a Protocol defined in `adapters/__init__.py`
+- ✅ `providers.py` is the only place that assembles the object graph
+- ✅ Package registers itself via hookimpl in `__init__.py` — no bare router export
+- ✅ Infrastructure clients come from `infrastructure.services` only
+- ❌ No cross-package dependencies between feature packages
+- ❌ No business logic in route handlers
 
 ---
 
 ## Routes Pattern (HTTP Interface)
 
-**Decision**: Routes are platform-agnostic HTTP endpoints.
+**Decision**: Route handlers validate input, call the service, and map the result to an HTTP response. No business logic.
 
-**Complete Implementation**:
+Routes consume services and settings through Protocol-typed `Annotated[..., Depends(factory)]` parameters. Each route file declares a local structural Protocol for each dependency — this decouples the handler from the concrete implementation and makes test substitution straightforward. Factory functions come from `providers.py`.
+
 ```python
-# packages/groups/routes.py
-from typing import TYPE_CHECKING
+# packages/feature/transport/routes.py
+from typing import Annotated, Protocol
+
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
-
-from infrastructure.services import SettingsDep, AWSClientsDep
-from packages.groups.schemas import AddMemberRequest, AddMemberResponse
-from packages.groups.service import add_member_to_group
+from infrastructure.operations import OperationResult, OperationStatus
+from packages.feature.providers import get_feature_service, get_feature_settings
+from packages.feature.schemas import FeatureRequest, FeatureResponse
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/groups", tags=["groups"])
+router = APIRouter(prefix="/feature", tags=["Feature"])
 
-@router.post("/members")
-def add_member(
-    request: AddMemberRequest,
-    aws_clients: AWSClientsDep,
-    settings: SettingsDep,
-) -> AddMemberResponse:
-    """Add member to group (platform-agnostic).
-    
-    Called by:
-    - External API (JWT auth)
-    - Slack adapter (internal call)
-    - Teams adapter (internal call)
-    """
-    import uuid
-    request_id = str(uuid.uuid4())
-    
-    log = logger.bind(
-        group_id=request.group_id,
-        user_email=request.user_email,
-        request_id=request_id,
-    )
-    log.info("add_member_request")
-    
-    result = add_member_to_group(
-        group_id=request.group_id,
-        user_email=request.user_email,
-        aws_clients=aws_clients,
-        request_id=request_id,
-    )
-    
+
+class _FeatureSettingsPort(Protocol):
+    """Structural contract for settings consumed by route handlers."""
+
+    enabled: bool
+
+
+class _FeatureServicePort(Protocol):
+    """Structural contract for the service consumed by route handlers."""
+
+    def do_action(self, param: str, request_id: str = "") -> OperationResult: ...
+
+
+@router.post("/actions", response_model=FeatureResponse)
+def action_endpoint(
+    request: FeatureRequest,
+    service: Annotated[_FeatureServicePort, Depends(get_feature_service)],
+    settings: Annotated[_FeatureSettingsPort, Depends(get_feature_settings)],
+) -> FeatureResponse:
+    """Perform a feature action."""
+    log = logger.bind(param=request.param)
+    log.info("action_request")
+
+    if not settings.enabled:
+        raise HTTPException(status_code=503, detail="Feature is not enabled")
+
+    result = service.do_action(param=request.param)
+
     if result.is_success:
-        log.info("member_added")
-        return AddMemberResponse(success=True, data=result.data)
-    
-    log.error("add_member_failed", error=result.message)
-    return AddMemberResponse(success=False, message=result.message)
+        return FeatureResponse(success=True, data=result.data)
+
+    status_code, detail = _to_public_error(result)
+    log.warning("action_failed", error=result.message, error_code=result.error_code)
+    raise HTTPException(status_code=status_code, detail=detail)
+
+
+def _to_public_error(result: OperationResult) -> tuple[int, str]:
+    """Map OperationResult errors to safe public HTTP responses."""
+    if result.status == OperationStatus.NOT_FOUND:
+        return 404, result.message or "Resource not found"
+    if result.status == OperationStatus.UNAUTHORIZED:
+        return 403, "Not authorized"
+    if result.status == OperationStatus.PERMANENT_ERROR:
+        return 400, result.message or "Request could not be completed"
+    return 500, "An internal error occurred"
 ```
 
-**Reference**: [Platform Integration Conventions](../../decisions/tier-2-infrastructure/04-command-framework-platform-abstraction.md)
-
 **Rules**:
-- ✅ TYPE_CHECKING for Settings class import
-- ✅ Settings injected via SettingsDep
-- ✅ Infrastructure clients injected (AWSClientsDep, etc.)
-- ✅ Module-level logger only
-- ✅ Request-scoped context binding (request_id, group_id, user_email)
-- ✅ Business logic returns OperationResult
-- ✅ Route converts OperationResult to Pydantic response
-- ❌ No platform-specific logic (Slack, Teams) in routes
-- ❌ No self.logger in classes
+- ✅ `Annotated[Protocol, Depends(factory)]` for all service and settings dependencies
+- ✅ Factory functions imported from `providers.py`
+- ✅ Local Protocol declares only the surface the route actually uses
+- ✅ Error mapping extracted to a private `_to_public_error` helper — never expose raw internal messages
+- ✅ Module-level logger; request-scoped context via `logger.bind()`
+- ✅ Route returns Pydantic response model — no raw dict returns
+- ❌ No business logic in route handlers
+- ❌ No direct service instantiation in routes
+- ❌ No platform-specific logic (Slack, Teams) in route handlers
 
 ---
 
-## Service Pattern (Business Logic)
+## Providers Pattern (DI Assembly)
 
-**Decision**: Business logic is platform-agnostic.
+**Decision**: `providers.py` assembles the object graph using `@lru_cache(maxsize=1)` singleton factories. It is the only file that calls `infrastructure.services` to obtain clients.
 
-**Reference**: See `09-type-model-boundaries.md` for when internal service inputs and outputs should use dataclasses instead of raw dict payloads.
+Provider functions are the patch target in tests. Patching `providers.get_feature_service` is sufficient to substitute the entire service tree without touching infrastructure singletons.
 
-**Complete Implementation**:
 ```python
-# packages/groups/service.py
-from typing import TYPE_CHECKING
+# packages/feature/providers.py
+from functools import lru_cache
+
+from infrastructure.services import get_directory_provider, get_storage_service
+from packages.feature.config.settings import FeatureSettings
+from packages.feature.service import FeatureService
+
+
+@lru_cache(maxsize=1)
+def get_feature_settings() -> FeatureSettings:
+    """Return the singleton feature settings instance."""
+    return FeatureSettings()
+
+
+@lru_cache(maxsize=1)
+def get_feature_service() -> FeatureService:
+    """Return the singleton feature service.
+
+    Infrastructure clients are obtained from infrastructure.services.
+    To substitute dependencies in tests, patch this function at module scope.
+    """
+    return FeatureService(
+        directory=get_directory_provider(),
+        storage=get_storage_service(),
+        settings=get_feature_settings(),
+    )
+```
+
+**Rules**:
+- ✅ One `@lru_cache(maxsize=1)` per singleton
+- ✅ All infrastructure clients from `infrastructure.services`
+- ✅ Provider functions are the sole patch target in tests
+- ❌ Do not instantiate infrastructure clients directly
+- ❌ Do not call `get_settings()` or `get_*_clients()` inside service constructors
+
+---
+
+## Service / Coordinator Pattern (Business Logic)
+
+**Decision**: Business logic is platform-agnostic. Services hold injected dependencies as constructor arguments. Features with multiple distinct logic stages use a `coordinator.py` to sequence those stages; simpler features use a single `service.py`.
+
+Internal inputs and outputs use frozen dataclasses, not Pydantic models. Pydantic is used only at the HTTP boundary in `schemas.py`.
+
+```python
+# packages/feature/domain.py
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ActionResult:
+    item_id: str
+    status: str
+```
+
+```python
+# packages/feature/service.py
 import structlog
 
-if TYPE_CHECKING:
-    from infrastructure.clients.aws import AWSClients
+from infrastructure.operations import OperationResult
+from packages.feature.domain import ActionResult
+
+logger = structlog.get_logger()
+
+
+class FeatureService:
+    def __init__(self, directory, storage, settings) -> None:
+        self._directory = directory
+        self._storage = storage
+        self._settings = settings
+
+    def do_action(
+        self, param: str, request_id: str = ""
+    ) -> OperationResult[ActionResult]:
+        log = logger.bind(param=param, request_id=request_id)
+        log.info("action_started")
+
+        lookup = self._directory.get_item(param)
+        if not lookup.is_success or lookup.data is None:
+            return lookup
+
+        log.info("action_completed")
+        return OperationResult.success(
+            data=ActionResult(item_id=lookup.data.id, status="complete")
+        )
+```
+
+**Rules**:
+- ✅ All dependencies injected via `__init__` — never call `get_*()` inside service methods
+- ✅ Internal result shapes use `@dataclass(frozen=True)` in `domain.py`
+- ✅ Return `OperationResult[T]` — never raise exceptions across service boundaries
+- ✅ Check `result.is_success` (property, not method)
+- ✅ Module-level logger; request-scoped context via `logger.bind()`
+- ❌ No Pydantic models as internal service inputs or outputs
+- ❌ No platform-specific logic
+
+---
+
+## Platform Adapters (Protocol Contract)
+
+**Decision**: Platform adapters are defined by a `Protocol` in `adapters/__init__.py`. Concrete implementations live in `adapters/<platform>.py`. Providers inject the correct implementation — services and coordinators never instantiate adapters directly.
+
+All adapter methods are idempotent and return `OperationResult`. Adapters execute actions; they never implement business rules.
+
+```python
+# packages/feature/adapters/__init__.py
+from typing import Protocol
 
 from infrastructure.operations import OperationResult
 
-logger = structlog.get_logger()
 
-def add_member_to_group(
-    group_id: str,
-    user_email: str,
-    aws_clients: "AWSClients",
-    request_id: str,
-) -> OperationResult:
-    """Add member to group (platform-agnostic business logic).
-    
-    Args:
-        group_id: Group identifier
-        user_email: User email to add
-        aws_clients: AWS clients facade
-        request_id: Request ID for logging
-    
-    Returns:
-        OperationResult with member data or error
+class FeatureAdapter(Protocol):
+    """Contract for all external platform integrations.
+
+    All methods are idempotent and return OperationResult.
+    Adapters must not implement business logic.
     """
-    log = logger.bind(
-        group_id=group_id,
-        user_email=user_email,
-        request_id=request_id,
-    )
-    log.info("adding_member")
-    
-    result = aws_clients.iam.add_user_to_group(
-        group_id=group_id,
-        user_email=user_email,
-        request_id=request_id,
-    )
-    
-    if not result.is_success:
-        log.error("aws_add_failed", error=result.message)
-        return result
-    
-    log.info("member_added")
-    return OperationResult.success(
-        data={"group_id": group_id, "user_email": user_email},
-        message="Member added successfully",
-    )
+
+    def ensure_item(self, item_id: str) -> OperationResult: ...
+    def remove_item(self, item_id: str) -> OperationResult: ...
 ```
 
-**Reference**: [Operation Result Pattern](../../decisions/tier-2-infrastructure/03-operation-result-pattern.md)
-
-Note: the example below returns a simple dict payload for brevity. For new shared contracts and reusable package-internal service results, prefer typed dataclass payloads as described in `09-type-model-boundaries.md`.
-
 **Rules**:
-- ✅ TYPE_CHECKING for infrastructure client imports
-- ✅ All dependencies injected as parameters
-- ✅ Module-level logger only
-- ✅ Request-scoped context binding
-- ✅ Return OperationResult (not exceptions)
-- ✅ Prefer `OperationResult[T]` with typed dataclass payloads for new internal service contracts
-- ✅ Check result.is_success (property, not method)
-- ❌ No Settings import outside TYPE_CHECKING
-- ❌ No platform-specific logic
-- ❌ No calling get_settings() or get_*_clients()
+- ✅ Protocol defined in `adapters/__init__.py`
+- ✅ Concrete implementations injected by `providers.py`
+- ✅ All methods idempotent and returning `OperationResult`
+- ❌ No business logic in adapters — they execute, not decide
+- ❌ Do not instantiate adapters inside service or coordinator methods
 
 ---
 
-## Platform Adapters
+## Schemas Pattern (HTTP Boundary)
 
-**Decision**: Platform adapters call internal HTTP endpoints.
+**Decision**: Pydantic models are used only at the HTTP boundary in `schemas.py` — request validation and response serialisation. Internal business logic uses frozen dataclasses in `domain.py`.
 
-**Complete Implementation**:
 ```python
-# packages/groups/platforms/slack.py
-from typing import TYPE_CHECKING
-import structlog
-import httpx
-
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
-
-from infrastructure.platforms.formatters import get_formatter
-from infrastructure.platforms.models import Card
-
-logger = structlog.get_logger()
-
-async def handle_add_member_command(
-    payload: dict,
-    request_id: str,
-    settings: "Settings",
-) -> dict:
-    """Handle Slack command event (received via WebSocket).
-    
-    Flow:
-    1. Slack sends command via WebSocket Events API
-    2. Adapter receives event, acknowledges within 3 seconds
-    3. Adapter calls internal HTTP endpoint (platform-agnostic business logic)
-    4. Adapter formats response for Slack
-    
-    Args:
-        payload: Slack command payload (from WebSocket event)
-        request_id: Request ID for logging
-        settings: Application settings
-    
-    Returns:
-        Slack Block Kit response
-    """
-    log = logger.bind(
-        command="add_member",
-        user_id=payload["user_id"],
-        request_id=request_id,
-    )
-    log.info("slack_command_received")
-    
-    args = payload["text"].split()
-    if len(args) != 2:
-        return {"text": "Usage: /add-member <group_id> <user_email>"}
-    
-    group_id, user_email = args
-    
-    # Call internal HTTP endpoint (platform-agnostic business logic)
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{settings.server.BASE_URL}/api/v1/groups/members",
-            json={"group_id": group_id, "user_email": user_email},
-            headers={"X-Request-ID": request_id},
-        )
-    
-    result = response.json()
-    
-    if result.get("success"):
-        card = Card(
-            title="Member Added",
-            description=f"{user_email} added to {group_id}",
-            color="success",
-        )
-    else:
-        card = Card(
-            title="Error",
-            description=result.get("message", "Failed to add member"),
-            color="error",
-        )
-    
-    formatter = get_formatter("slack", settings)
-    return formatter.format_card(card)
-```
-
-**Why httpx for Internal Calls**:
-- Slack events received via WebSocket (Events API)
-- Adapter acknowledges Slack within 3 seconds (WebSocket response)
-- Business logic executed via internal HTTP call (platform-agnostic)
-- Ensures single HTTP endpoint serves API, Slack, Teams, Discord
-
-**Reference**: [Response Format Abstraction](../../decisions/tier-2-infrastructure/05-response-format-abstraction.md)
-
-**Rules**:
-- ✅ TYPE_CHECKING for Settings import
-- ✅ Module-level logger only
-- ✅ Request-scoped context binding
-- ✅ Platform events received via WebSocket (Slack), HTTP (Teams), etc.
-- ✅ Business logic executed via internal HTTP endpoint
-- ✅ Use platform formatters for response conversion
-- ✅ Platform-agnostic Card model
-- ❌ No direct business logic calls
-- ❌ No platform-specific response models in business logic
-
----
-
-## 1.5 Schemas Pattern
-
-**Decision**: Pydantic models for request/response validation.
-
-**Complete Implementation**:
-```python
-# packages/groups/schemas.py
+# packages/feature/schemas.py
 from pydantic import BaseModel, Field
 
-class AddMemberRequest(BaseModel):
-    """Add member to group request."""
-    
-    group_id: str = Field(..., description="Group identifier")
-    user_email: str = Field(..., description="User email to add")
 
-class AddMemberResponse(BaseModel):
-    """Add member to group response."""
-    
-    success: bool = Field(..., description="Operation success status")
-    message: str | None = Field(None, description="Error message if failed")
-    data: dict | None = Field(None, description="Result data if successful")
+class FeatureRequest(BaseModel):
+    """Feature action request."""
+
+    param: str = Field(..., description="Target resource identifier.")
+    dry_run: bool = Field(default=False, description="If true, plan without executing.")
+
+
+class FeatureResponse(BaseModel):
+    """Feature action response."""
+
+    success: bool = Field(..., description="Whether the operation succeeded.")
+    data: dict | None = Field(None, description="Result payload on success.")
+    message: str | None = Field(None, description="Error message on failure.")
 ```
 
 **Rules**:
-- ✅ All fields have type hints
-- ✅ All fields have descriptions
-- ✅ Use Field(...) for required fields
-- ✅ Use Field(None) for optional fields
+- ✅ All fields have type hints and descriptions
+- ✅ `Field(...)` for required fields; `Field(default=...)` for optional
 - ✅ Platform-agnostic models only
+- ❌ No Pydantic models outside `schemas.py` — use frozen dataclasses for internal shapes
 - ❌ No platform-specific fields (Block Kit, Adaptive Cards)
 
 ---
 
-## 1.6 Package Registration
+## Package Registration (hookimpl)
 
-**Decision**: Feature packages register routers with FastAPI at application startup.
+**Decision**: Feature packages register themselves via hookimpl in `__init__.py`. The main application invokes hookspecs; each package responds. No feature router is imported by `main.py`.
 
-**Complete Implementation**:
 ```python
-# app/main.py
-from fastapi import FastAPI
-from packages.groups import router as groups_router
-from packages.incident import router as incident_router
+# packages/feature/__init__.py
+from infrastructure.services import hookimpl
+from packages.feature.providers import get_feature_settings, get_feature_service
+from packages.feature.transport.routes import router as feature_router
+from packages.feature.transport import slack
 
-app = FastAPI()
 
-app.include_router(groups_router, prefix="/api/v1")
-app.include_router(incident_router, prefix="/api/v1")
+@hookimpl
+def startup_warmup(logger) -> None:
+    """Log settings and eagerly initialize providers at startup."""
+    settings = get_feature_settings()
+    logger.info("feature_settings_loaded", enabled=settings.enabled)
+    if settings.enabled:
+        get_feature_service()  # warm the singleton on startup
+
+
+@hookimpl
+def register_routes(app) -> None:
+    """Register HTTP routes under /api/v1."""
+    app.include_router(feature_router, prefix="/api/v1")
+
+
+@hookimpl
+def register_slack_commands(provider) -> None:
+    """Register Slack commands for this feature."""
+    slack.register_commands(provider)
 ```
 
 **Rules**:
-- ✅ Import router from package __init__.py
-- ✅ Register with app.include_router()
-- ✅ Use /api/v1 prefix for versioning
-- ❌ No manual route registration
+- ✅ `register_routes` applies the `/api/v1` prefix at include time
+- ✅ `startup_warmup` warms provider singletons so the first request is not delayed
+- ✅ `__init__.py` does not export a bare `router`
+- ❌ No `app.include_router()` calls outside hookimpl implementations
+- ❌ Do not import feature `__init__.py` from other packages
 
 ---
 
-## 1.7 Testing Pattern
+## Testing Pattern
 
-**Decision**: Feature package tests located in `app/tests/unit/packages/<feature>/`.
-
-**Reference**: [Testing Standards](../../decisions/tier-3-cross-cutting/02-testing-standards.md)
+**Decision**: Feature package tests are in `app/tests/unit/packages/<feature>/`.
 
 **Structure**:
 ```
-app/tests/unit/packages/groups/
+app/tests/unit/packages/feature/
 ├── __init__.py
-├── test_groups_routes.py
-├── test_groups_service.py
-└── test_groups_platforms.py
+├── test_feature_routes.py
+├── test_feature_service.py
+└── test_feature_adapters.py
 ```
 
-**Naming Convention**: Feature-prefix test files (`test_<feature>_<module>.py`) for clarity in isolation.
+**Naming**: `test_<feature>_<module>.py`.
 
-**Complete Test Example**:
+**Service test** — inject mocks directly as constructor arguments:
+
 ```python
-# app/tests/unit/packages/groups/test_groups_service.py
+# tests/unit/packages/feature/test_feature_service.py
 from unittest.mock import MagicMock
-from infrastructure.operations import OperationResult
-from packages.groups.service import add_member_to_group
 
-def test_add_member_success():
-    """Test successful member addition."""
-    mock_aws = MagicMock()
-    mock_aws.iam.add_user_to_group.return_value = OperationResult.success(
-        data={"user": "test@example.com"}
+from infrastructure.operations import OperationResult
+from packages.feature.service import FeatureService
+
+
+def test_do_action_success():
+    mock_directory = MagicMock()
+    mock_directory.get_item.return_value = OperationResult.success(
+        data=MagicMock(id="item-1")
     )
-    
-    result = add_member_to_group(
-        group_id="test-group",
-        user_email="test@example.com",
-        aws_clients=mock_aws,
-        request_id="test-123",
+
+    service = FeatureService(
+        directory=mock_directory,
+        storage=MagicMock(),
+        settings=MagicMock(enabled=True),
     )
-    
+    result = service.do_action(param="item-1", request_id="test-123")
+
     assert result.is_success
-    assert result.data["group_id"] == "test-group"
+    assert result.data.item_id == "item-1"
 ```
 
-**Route Test Example**:
+**Route test** — patch provider functions, use `TestClient`:
+
 ```python
-# app/tests/unit/packages/groups/test_groups_routes.py
+# tests/unit/packages/feature/test_feature_routes.py
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
-from infrastructure.services import get_aws_clients
+
+from infrastructure.operations import OperationResult
 from server.main import app
 
-def test_add_member_route(monkeypatch):
-    """Test add member route."""
+client = TestClient(app)
+
+
+def test_action_endpoint_success():
+    mock_service = MagicMock()
+    mock_service.do_action.return_value = OperationResult.success(
+        data=MagicMock(item_id="item-1", status="complete")
+    )
+    mock_settings = MagicMock(enabled=True)
+
+    with (
+        patch("packages.feature.providers.get_feature_service", return_value=mock_service),
+        patch("packages.feature.providers.get_feature_settings", return_value=mock_settings),
+    ):
+        response = client.post("/api/v1/feature/actions", json={"param": "item-1"})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+```
+
+**Rules**:
+- ✅ Service tests inject mocks directly as constructor arguments
+- ✅ Route tests patch `providers.get_*` functions at module scope
+- ✅ Use `OperationResult.success()` / `OperationResult.error()` for mock return values
+- ❌ Do not patch `infrastructure.services` directly in route tests — patch providers instead
     from unittest.mock import MagicMock
     from infrastructure.operations import OperationResult
     

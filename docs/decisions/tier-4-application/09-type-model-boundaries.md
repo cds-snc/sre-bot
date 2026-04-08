@@ -1,14 +1,5 @@
 # Type Model Boundaries
 
-**Status**: Draft guidance for the ongoing modernization of internal services and feature packages.
-
-**Reference**:
-- `01-features-organization.md`
-- `03-validation-patterns.md`
-- `04-http-response-patterns.md`
-
----
-
 ## Decision
 
 Use different type mechanisms for different boundaries:
@@ -100,7 +91,7 @@ Rules:
 
 ### Result Shapes
 
-For new contracts, prefer direct typed payloads in `OperationResult[T]`.
+For new contracts, prefer typed payloads directly in `OperationResult[T]`.
 
 Preferred:
 
@@ -123,17 +114,13 @@ class GroupMembersResult:
     members: list[DirectoryMember]
 ```
 
-Avoid for new shared contracts:
+Avoid `TypedDict` envelopes for shared contracts:
 
 ```python
 class GroupMembersData(TypedDict):
     group: DirectoryGroup
     members: list[DirectoryMember]
 ```
-
-Transitional guidance:
-- Existing stable interfaces that already use `TypedDict` envelopes do not need immediate churn.
-- New internal services and newly introduced contract methods must prefer direct dataclass payloads.
 
 ### TypedDict Usage
 
@@ -176,7 +163,7 @@ Rules:
 
 ### Business Logic Modules
 
-Feature business logic should use dataclasses, primitives, and protocols.
+Feature business logic uses dataclasses, primitives, and protocols.
 
 ```python
 from dataclasses import dataclass
@@ -253,24 +240,3 @@ Use:
 Do not use:
 - route request models as service-layer arguments
 - Pydantic validators as the main expression of business rules
-
----
-
-## Practical Migration Rule
-
-Going forward:
-
-- New shared infrastructure contracts should prefer `Protocol` plus dataclasses.
-- New feature endpoints should keep using Pydantic for HTTP schemas.
-- New feature business logic should prefer dataclass inputs and outputs.
-- Existing dict-envelope contracts may remain until an explicit migration is scheduled.
-
-This means the current repo can evolve incrementally without forcing churn in every existing service at once.
-
----
-
-## Impact on Existing Docs
-
-Some older examples still return raw dict payloads from service modules or use `TypedDict` envelopes as a first choice. Treat those as transitional examples unless the contract is already published and stable.
-
-For new code, this document is the preferred model-selection rule.
