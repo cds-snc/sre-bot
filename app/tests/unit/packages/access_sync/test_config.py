@@ -160,12 +160,13 @@ def test_file_json_loader_parses_aws_policy(tmp_path):
 
 
 @pytest.mark.unit
-def test_file_json_loader_missing_file_returns_not_found():
+def test_file_json_loader_missing_file_returns_not_found(tmp_path):
     # Arrange
     loader = FileJsonConfigLoader()
+    missing_path = str(tmp_path / "does-not-exist-access-sync.json")
 
     # Act
-    result = loader.load(ref="/tmp/does-not-exist-access-sync.json")
+    result = loader.load(ref=missing_path)
 
     # Assert
     assert not result.is_success
