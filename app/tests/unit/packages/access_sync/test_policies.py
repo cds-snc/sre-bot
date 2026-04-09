@@ -2,13 +2,11 @@
 
 import pytest
 
+from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 from packages.access_sync.policies import (
     AdapterCapabilities,
-    DefaultEntitlementStrategy,
     EffectivePlatformPolicy,
-    EntitlementMode,
     EntitlementRule,
-    PatternEntitlementMapping,
     PlatformPolicy,
     PolicyEngine,
     resolve_effective_policy,
@@ -16,19 +14,40 @@ from packages.access_sync.policies import (
 
 
 # ---------------------------------------------------------------------------
-# PlatformPolicy helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 
-def make_policy(
+def make_config(
     platform: str = "aws",
-    authn_removal_mode: str = "disable",
-    rules=None,
-) -> PlatformPolicy:
-    return PlatformPolicy(
+    authn_token: str = "authn",
+    authn_removal_mode: str = "delete",
+    dir_prefix: str = "sg",
+    dir_separator: str = "-",
+    mode_overrides: dict | None = None,
+) -> AccessSyncRuntimeConfig:
+    return AccessSyncRuntimeConfig(
+        dir_prefix=dir_prefix,
+        dir_separator=dir_separator,
+        platforms={
+            platform: PlatformPolicy(
+                authn_token=authn_token,
+                authn_removal_mode=authn_removal_mode,
+                mode_overrides=mode_overrides or {},
+            )
+        },
+    )
+
+
+def make_effective(
+    platform: str = "aws",
+    authn_group_slug: str = "sg-aws-authn",
+    authn_removal_mode: str = "delete",
+    rules: list | None = None,
+) -> EffectivePlatformPolicy:
+    return EffectivePlatformPolicy(
         platform=platform,
-        authn_group_slug=f"sg-{platform}-authn",
-        authn_mode="derived",
+        authn_group_slug=authn_group_slug,
         authn_removal_mode=authn_removal_mode,
         entitlement_rules=rules or [],
     )
@@ -36,194 +55,222 @@ def make_policy(
 
 def make_rule(
     group_slug: str = "sg-aws-admin",
-    entitlement_type: str = "permission_set",
-    entitlement_id: str = "123456789012/AWSAdministratorAccess",
-    mode: EntitlementMode = "sync_managed",
+    entitlement_id: str = "admin",
+    entitlement_type: str = "group",
+    mode: str = "sync_managed",
 ) -> EntitlementRule:
     return EntitlementRule(
         group_slug=group_slug,
-        entitlement_type=entitlement_type,
         entitlement_id=entitlement_id,
+        entitlement_type=entitlement_type,
         mode=mode,
     )
 
 
-@pytest.mark.unit
-def test_sync_managed_rules_filters_correctly():
-    # Arrange
-    rules = [
-        make_rule(mode="sync_managed"),
-        make_rule(entitlement_id="111/Ephemeral", mode="ephemeral"),
-        make_rule(entitlement_id="222/Deactivated", mode="deactivated"),
-    ]
-    policy = make_policy(rules=rules)
-
-    # Act
-    result = policy.sync_managed_rules()
-
-    # Assert
-    assert len(result) == 1
-    assert result[0].mode == "sync_managed"
+# ---------------------------------------------------------------------------
+# PlatformPolicy
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_ephemeral_entitlement_ids():
-    # Arrange
-    rules = [
-        make_rule(entitlement_id="111/A", mode="sync_managed"),
-        make_rule(entitlement_id="222/B", mode="ephemeral"),
-    ]
-    policy = make_policy(rules=rules)
-
-    # Act
-    ids = policy.ephemeral_entitlement_ids()
-
-    # Assert
-    assert ids == {"222/B"}
+def test_platform_policy_defaults():
+    policy = PlatformPolicy()
+    assert policy.authn_token == "authn"
+    assert policy.authn_removal_mode == "delete"
+    assert policy.mode_overrides == {}
 
 
 @pytest.mark.unit
-def test_deactivated_entitlement_ids():
-    # Arrange
-    rules = [
-        make_rule(entitlement_id="111/C", mode="deactivated"),
-        make_rule(entitlement_id="222/D", mode="sync_managed"),
-    ]
-    policy = make_policy(rules=rules)
-
-    # Act
-    ids = policy.deactivated_entitlement_ids()
-
-    # Assert
-    assert ids == {"111/C"}
-
-
-@pytest.mark.unit
-def test_skip_entitlement_ids_union():
-    # Arrange
-    rules = [
-        make_rule(entitlement_id="111/E", mode="ephemeral"),
-        make_rule(entitlement_id="222/F", mode="deactivated"),
-        make_rule(entitlement_id="333/G", mode="sync_managed"),
-    ]
-    policy = make_policy(rules=rules)
-
-    # Act
-    ids = policy.skip_entitlement_ids()
-
-    # Assert
-    assert ids == {"111/E", "222/F"}
-
-
-@pytest.mark.unit
-def test_effective_rules_default_prefix_adds_discovered_groups():
-    # Arrange
+def test_platform_policy_custom_values():
     policy = PlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[],
-        default_entitlement_strategy=DefaultEntitlementStrategy(
-            kind="default_prefix",
-            source_group_prefix="sg-aws-",
-            exclude_group_slugs=["sg-aws-authn"],
-            default_entitlement_type="group",
-            entitlement_id_template="{token}",
-        ),
+        authn_token="login",
+        authn_removal_mode="disable",
+        mode_overrides={"breakglass": "ephemeral"},
     )
-
-    # Act
-    rules = policy.sync_managed_rules(
-        discovered_group_slugs={"sg-aws-authn", "sg-aws-team1-admin"}
-    )
-
-    # Assert
-    assert len(rules) == 1
-    assert rules[0].group_slug == "sg-aws-team1-admin"
-    assert rules[0].entitlement_id == "team1-admin"
-
-
-@pytest.mark.unit
-def test_effective_rules_pattern_map_supports_wildcards():
-    # Arrange
-    policy = PlatformPolicy(
-        platform="appname2",
-        authn_group_slug="sg-appname2-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[],
-        default_entitlement_strategy=DefaultEntitlementStrategy(
-            kind="pattern_map",
-            pattern_mappings=[
-                PatternEntitlementMapping(
-                    source_group_pattern="sg-appname2-first-pattern*",
-                    entitlement_type="group",
-                    entitlement_id="entitlement-x",
-                ),
-                PatternEntitlementMapping(
-                    source_group_pattern="sg-appname2-second-pattern*",
-                    entitlement_type="group",
-                    entitlement_id="entitlement-y",
-                ),
-            ],
-        ),
-    )
-
-    # Act
-    rules = policy.sync_managed_rules(
-        discovered_group_slugs={
-            "sg-appname2-first-pattern-prod",
-            "sg-appname2-second-pattern-dev",
-        }
-    )
-
-    # Assert
-    ids = {rule.entitlement_id for rule in rules}
-    assert ids == {"entitlement-x", "entitlement-y"}
+    assert policy.authn_token == "login"
+    assert policy.authn_removal_mode == "disable"
+    assert policy.mode_overrides == {"breakglass": "ephemeral"}
 
 
 # ---------------------------------------------------------------------------
-# PolicyEngine.plan_actions
+# AccessSyncRuntimeConfig slug derivation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_group_prefix_derives_from_dir_prefix_and_platform():
+    config = make_config(platform="aws", dir_prefix="sg", dir_separator="-")
+    assert config.group_prefix("aws") == "sg-aws-"
+
+
+@pytest.mark.unit
+def test_group_prefix_custom_separator():
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="corp",
+        dir_separator=".",
+        platforms={"gcp": PlatformPolicy()},
+    )
+    assert config.group_prefix("gcp") == "corp.gcp."
+
+
+@pytest.mark.unit
+def test_authn_group_slug_derives_correctly():
+    config = make_config(platform="aws", authn_token="authn")
+    assert config.authn_group_slug("aws") == "sg-aws-authn"
+
+
+@pytest.mark.unit
+def test_authn_group_slug_custom_token():
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        dir_separator="-",
+        platforms={"aws": PlatformPolicy(authn_token="login")},
+    )
+    assert config.authn_group_slug("aws") == "sg-aws-login"
+
+
+# ---------------------------------------------------------------------------
+# resolve_effective_policy
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_excludes_authn_group():
+    config = make_config(platform="aws", authn_token="authn")
+    discovered = {"sg-aws-authn", "sg-aws-admin"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    slugs = {r.group_slug for r in effective.entitlement_rules}
+    assert "sg-aws-authn" not in slugs
+    assert "sg-aws-admin" in slugs
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_excludes_non_platform_slugs():
+    config = make_config(platform="aws")
+    discovered = {"sg-aws-admin", "sg-gcp-viewer", "other-group"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    slugs = {r.group_slug for r in effective.entitlement_rules}
+    assert all(s.startswith("sg-aws-") for s in slugs)
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_strips_prefix_for_entitlement_id():
+    config = make_config(platform="aws")
+    discovered = {"sg-aws-finops-readonly"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    assert len(effective.entitlement_rules) == 1
+    assert effective.entitlement_rules[0].entitlement_id == "finops-readonly"
+    assert effective.entitlement_rules[0].group_slug == "sg-aws-finops-readonly"
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_excludes_ephemeral_override():
+    config = make_config(
+        platform="aws",
+        mode_overrides={"breakglass-admin": "ephemeral"},
+    )
+    discovered = {"sg-aws-admin", "sg-aws-breakglass-admin"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    slugs = {r.group_slug for r in effective.entitlement_rules}
+    assert "sg-aws-breakglass-admin" not in slugs
+    assert "sg-aws-admin" in slugs
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_excludes_deactivated_override():
+    config = make_config(
+        platform="aws",
+        mode_overrides={"legacy-access": "deactivated"},
+    )
+    discovered = {"sg-aws-legacy-access", "sg-aws-finops"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    slugs = {r.group_slug for r in effective.entitlement_rules}
+    assert "sg-aws-legacy-access" not in slugs
+    assert "sg-aws-finops" in slugs
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_returns_correct_metadata():
+    config = make_config(
+        platform="aws",
+        authn_token="authn",
+        authn_removal_mode="delete",
+    )
+    discovered = {"sg-aws-admin"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    assert effective.platform == "aws"
+    assert effective.authn_group_slug == "sg-aws-authn"
+    assert effective.authn_removal_mode == "delete"
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_empty_discovery():
+    config = make_config(platform="aws")
+    effective = resolve_effective_policy(config, "aws", set())
+    assert effective.entitlement_rules == []
+
+
+@pytest.mark.unit
+def test_resolve_effective_policy_normalizes_slug_case():
+    config = make_config(platform="aws")
+    discovered = {"SG-AWS-Admin"}
+    effective = resolve_effective_policy(config, "aws", discovered)
+    slugs = {r.group_slug for r in effective.entitlement_rules}
+    assert "sg-aws-admin" in slugs
+
+
+# ---------------------------------------------------------------------------
+# PolicyEngine.plan_actions -- uses EffectivePlatformPolicy
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 def test_plan_actions_user_should_exist_with_entitlements():
-    # Arrange
-    rule = make_rule(
-        entitlement_type="permission_set",
-        entitlement_id="123/AdminAccess",
-        mode="sync_managed",
-    )
-    policy = make_policy(rules=[rule])
+    rule = make_rule(entitlement_type="group", entitlement_id="admin")
+    effective = make_effective(authn_removal_mode="delete", rules=[rule])
     capabilities = AdapterCapabilities(
         supports_disable=False,
         supports_delete=True,
-        supported_entitlement_types={"permission_set"},
+        supported_entitlement_types={"group"},
     )
     engine = PolicyEngine()
-
-    # Act
     actions = engine.plan_actions(
-        policy=policy,
+        policy=effective,
         capabilities=capabilities,
         user_should_exist=True,
-        required_entitlements=policy.sync_managed_rules(),
+        required_entitlements=[rule],
+        platform_user_exists=False,
     )
 
-    # Assert
-    assert any(a.action == "ensure_user" for a in actions)
+    assert any(a.action == "provision_user" for a in actions)
     assert any(
-        a.action == "apply_entitlement" and a.entitlement_id == "123/AdminAccess"
-        for a in actions
+        a.action == "apply_entitlement" and a.entitlement_id == "admin" for a in actions
     )
 
 
 @pytest.mark.unit
+def test_plan_actions_user_should_not_exist_delete():
+    effective = make_effective(authn_removal_mode="delete")
+    capabilities = AdapterCapabilities(
+        supports_disable=False,
+        supports_delete=True,
+        supported_entitlement_types=set(),
+    )
+    engine = PolicyEngine()
+
+    actions = engine.plan_actions(
+        policy=effective,
+        capabilities=capabilities,
+        user_should_exist=False,
+        required_entitlements=[],
+    )
+    assert any(a.action == "remove_user" for a in actions)
+    assert not any(a.action == "disable_user" for a in actions)
+
+
+@pytest.mark.unit
 def test_plan_actions_user_should_not_exist_disable():
-    # Arrange
-    policy = make_policy(authn_removal_mode="disable")
+    effective = make_effective(authn_removal_mode="disable")
     capabilities = AdapterCapabilities(
         supports_disable=True,
         supports_delete=True,
@@ -231,201 +278,82 @@ def test_plan_actions_user_should_not_exist_disable():
     )
     engine = PolicyEngine()
 
-    # Act
     actions = engine.plan_actions(
-        policy=policy,
+        policy=effective,
         capabilities=capabilities,
         user_should_exist=False,
         required_entitlements=[],
     )
 
-    # Assert
     assert any(a.action == "disable_user" for a in actions)
     assert not any(a.action == "remove_user" for a in actions)
 
 
 @pytest.mark.unit
-def test_plan_actions_user_should_not_exist_delete():
-    # Arrange
-    policy = make_policy(authn_removal_mode="delete")
+def test_plan_actions_removes_stale_entitlements():
+    rule = make_rule(entitlement_id="admin")
+    effective = make_effective(rules=[rule])
     capabilities = AdapterCapabilities(
-        supports_disable=False,
+        supports_disable=True,
+        supports_delete=True,
+        supported_entitlement_types={"group"},
+    )
+    engine = PolicyEngine()
+
+    actions = engine.plan_actions(
+        policy=effective,
+        capabilities=capabilities,
+        user_should_exist=True,
+        required_entitlements=[],
+        current_entitlement_ids={"admin"},
+        platform_user_exists=True,
+    )
+    assert any(
+        a.action == "remove_entitlement" and a.entitlement_id == "admin"
+        for a in actions
+    )
+
+
+@pytest.mark.unit
+def test_plan_actions_no_removal_when_current_ids_unknown():
+    rule = make_rule(entitlement_id="admin")
+    effective = make_effective(rules=[rule])
+    capabilities = AdapterCapabilities(
+        supports_disable=True,
+        supports_delete=True,
+        supported_entitlement_types={"group"},
+    )
+    engine = PolicyEngine()
+    actions = engine.plan_actions(
+        policy=effective,
+        capabilities=capabilities,
+        user_should_exist=True,
+        required_entitlements=[],
+        current_entitlement_ids=None,
+        platform_user_exists=True,
+    )
+
+    assert not any(a.action == "remove_entitlement" for a in actions)
+
+
+@pytest.mark.unit
+def test_plan_actions_entitlement_only_removal_mode_no_lifecycle():
+    """entitlement_only mode: no lifecycle action planned when user should not exist."""
+    effective = make_effective(authn_removal_mode="entitlement_only")
+    capabilities = AdapterCapabilities(
+        supports_disable=True,
         supports_delete=True,
         supported_entitlement_types=set(),
     )
     engine = PolicyEngine()
 
-    # Act
     actions = engine.plan_actions(
-        policy=policy,
+        policy=effective,
         capabilities=capabilities,
         user_should_exist=False,
         required_entitlements=[],
     )
-
-    # Assert
-    assert any(a.action == "remove_user" for a in actions)
-
-
-@pytest.mark.unit
-def test_plan_actions_unsupported_entitlement_type_skipped():
-    # Arrange: adapter only supports 'license', not 'permission_set'
-    rule = make_rule(entitlement_type="permission_set", entitlement_id="123/Admin")
-    policy = make_policy(rules=[rule])
-    capabilities = AdapterCapabilities(
-        supports_disable=False,
-        supports_delete=True,
-        supported_entitlement_types={"license"},
-    )
-    engine = PolicyEngine()
-
-    # Act
-    actions = engine.plan_actions(
-        policy=policy,
-        capabilities=capabilities,
-        user_should_exist=True,
-        required_entitlements=policy.sync_managed_rules(),
-    )
-
-    # Assert: ensure_user planned but no entitlement action
-    assert any(a.action == "ensure_user" for a in actions)
-    assert not any(a.action == "apply_entitlement" for a in actions)
-
-
-# ---------------------------------------------------------------------------
-# PlatformPolicy.with_ephemeral_entitlement
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_with_ephemeral_entitlement_preserves_all_fields():
-    """Regression: with_ephemeral_entitlement must not drop default_entitlement_strategy."""
-    # Arrange
-    strategy = DefaultEntitlementStrategy(
-        kind="default_prefix",
-        source_group_prefix="sg-aws-",
-    )
-    policy = PlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[],
-        default_entitlement_strategy=strategy,
-    )
-
-    # Act
-    updated = policy.with_ephemeral_entitlement(
-        entitlement_type="permission_set",
-        entitlement_id="999/Privileged",
-    )
-
-    # Assert — strategy preserved, new ephemeral rule added, original unchanged
-    assert updated.default_entitlement_strategy == strategy
-    assert "999/Privileged" in updated.ephemeral_entitlement_ids()
-    assert "999/Privileged" not in policy.ephemeral_entitlement_ids()
-    assert updated is not policy
-
-
-@pytest.mark.unit
-def test_with_ephemeral_entitlement_returns_new_policy():
-    """PlatformPolicy.with_ephemeral_entitlement must return a new frozen instance."""
-    # Arrange
-    policy = make_policy(platform="aws")
-
-    # Act
-    updated = policy.with_ephemeral_entitlement(
-        entitlement_type="permission_set",
-        entitlement_id="123/EphemeralGrant",
-    )
-
-    # Assert — original unchanged, new instance has the rule
-    assert updated is not policy
-    assert "123/EphemeralGrant" in updated.ephemeral_entitlement_ids()
-    assert "123/EphemeralGrant" not in policy.ephemeral_entitlement_ids()
-
-
-# ---------------------------------------------------------------------------
-# EffectivePlatformPolicy and resolve_effective_policy
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_resolve_effective_policy_no_strategy_returns_explicit_rules():
-    """With no strategy, effective policy contains only the explicitly declared rules."""
-    rule = make_rule()
-    policy = make_policy(rules=[rule])
-    effective = resolve_effective_policy(policy)
-    assert effective.entitlement_rules == [rule]
-    assert effective.platform == policy.platform
-    assert effective.authn_removal_mode == policy.authn_removal_mode
-
-
-@pytest.mark.unit
-def test_resolve_effective_policy_with_strategy_includes_discovered_rules():
-    """Strategy-generated rules are folded into effective policy when group slugs are supplied."""
-    policy = PlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[],
-        default_entitlement_strategy=DefaultEntitlementStrategy(
-            kind="default_prefix",
-            source_group_prefix="sg-aws-",
-            exclude_group_slugs=["sg-aws-authn"],
-            default_entitlement_type="group",
-            entitlement_id_template="{token}",
-        ),
-    )
-    effective = resolve_effective_policy(
-        policy, discovered_group_slugs={"sg-aws-team1"}
-    )
-    assert len(effective.sync_managed_rules()) == 1
-    assert effective.sync_managed_rules()[0].group_slug == "sg-aws-team1"
-
-
-@pytest.mark.unit
-def test_effective_policy_sync_managed_rules_no_args():
-    """EffectivePlatformPolicy.sync_managed_rules() requires no arguments."""
-    rules = [
-        EntitlementRule("sg-a", "group", "id-1", "sync_managed"),
-        EntitlementRule("sg-b", "group", "id-2", "ephemeral"),
+    lifecycle = [
+        a.action for a in actions if a.action in {"disable_user", "remove_user"}
     ]
-    effective = EffectivePlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=rules,
-    )
-    assert effective.sync_managed_rules() == [rules[0]]
-    assert effective.ephemeral_entitlement_ids() == {"id-2"}
-    assert effective.skip_entitlement_ids() == {"id-2"}
-
-
-@pytest.mark.unit
-def test_policy_engine_plan_actions_accepts_effective_policy():
-    """PolicyEngine.plan_actions() must work when passed an EffectivePlatformPolicy."""
-    rule = EntitlementRule("sg-a", "permission_set", "123/Admin", "sync_managed")
-    effective = EffectivePlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[rule],
-    )
-    caps = AdapterCapabilities(
-        supports_disable=True,
-        supports_delete=True,
-        supported_entitlement_types={"permission_set"},
-    )
-    engine = PolicyEngine()
-    actions = engine.plan_actions(
-        policy=effective,
-        capabilities=caps,
-        user_should_exist=True,
-        required_entitlements=effective.sync_managed_rules(),
-    )
-    assert any(a.action == "ensure_user" for a in actions)
-    assert any(a.action == "apply_entitlement" for a in actions)
+    assert lifecycle == []

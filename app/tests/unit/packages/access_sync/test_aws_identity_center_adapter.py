@@ -5,7 +5,10 @@ from typing import Any, cast
 import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access_sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
+from packages.access_sync.adapters.aws_identity_center import (
+    AwsIdentityCenterAdapter,
+    normalize_group_name,
+)
 
 
 class FakeIdentityStoreClient:
@@ -42,6 +45,7 @@ class FakeIdentityStoreClient:
         self.list_groups_with_memberships_result: OperationResult = (
             OperationResult.success(data=[])
         )
+        self.list_groups_result: OperationResult = OperationResult.success(data=[])
         self.list_users_result: OperationResult = OperationResult.success(data=[])
         self.delete_user_result: OperationResult = OperationResult.success()
 
@@ -93,6 +97,10 @@ class FakeIdentityStoreClient:
         self.calls.append(("list_groups_with_memberships", kwargs))
         return self.list_groups_with_memberships_result
 
+    def list_groups(self, **kwargs: Any) -> OperationResult:
+        self.calls.append(("list_groups", kwargs))
+        return self.list_groups_result
+
     def delete_user(self, **kwargs: Any) -> OperationResult:
         self.calls.append(("delete_user", kwargs))
         return self.delete_user_result
@@ -105,9 +113,13 @@ class FakeAWSClients:
         self.identitystore = identitystore
 
 
-def make_adapter(client: FakeIdentityStoreClient) -> AwsIdentityCenterAdapter:
+def make_adapter(
+    client: FakeIdentityStoreClient,
+) -> AwsIdentityCenterAdapter:
     """Create an adapter with a fake AWS facade."""
-    return AwsIdentityCenterAdapter(cast(Any, FakeAWSClients(client)))
+    return AwsIdentityCenterAdapter(
+        cast(Any, FakeAWSClients(client)),
+    )
 
 
 @pytest.mark.unit
@@ -210,7 +222,9 @@ def test_list_all_provisioned_users_collects_primary_emails() -> None:
             },
             {
                 "UserId": "user-2",
-                "Emails": [{"Value": "Bob@example.com", "Primary": True}],
+                "Emails": [
+                    {"Value": "bob@example.com", "Primary": True},
+                ],
             },
         ]
     )
@@ -296,15 +310,15 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
 
 @pytest.mark.unit
 def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
-    """Group-name entitlement IDs should resolve via central identity store client."""
+    """Group-name entitlement IDs should resolve via the group index."""
     client = FakeIdentityStoreClient()
     client.describe_group_result = OperationResult.error(
         OperationStatus.NOT_FOUND,
         message="group id not found",
         error_code="GROUP_NOT_FOUND",
     )
-    client.get_group_id_by_group_name_result = OperationResult.success(
-        data={"GroupId": "resolved-group-id"}
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("team1-prd-admin", "resolved-group-id"))
     )
     adapter = make_adapter(client)
 
@@ -319,3 +333,194 @@ def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
         call for call in client.calls if call[0] == "create_group_membership"
     )
     assert create_call[1]["GroupId"] == "resolved-group-id"
+
+
+# ---------------------------------------------------------------------------
+# Module-level helper tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_normalize_group_name_strips_and_casesfolds() -> None:
+    assert normalize_group_name("  Admin  ") == "admin"
+    assert normalize_group_name("SG-AWS-FinOps") == "sg-aws-finops"
+    assert normalize_group_name("ec2-ReadOnly") == "ec2-readonly"
+
+
+# ---------------------------------------------------------------------------
+# Group index resolution tests
+# ---------------------------------------------------------------------------
+
+
+def _make_group_list(*name_id_pairs: tuple[str, str]) -> list[dict[str, str]]:
+    return [{"GroupId": gid, "DisplayName": name} for name, gid in name_id_pairs]
+
+
+@pytest.mark.unit
+def test_resolve_group_id_uuid_passthrough() -> None:
+    """A UUID that describe_group confirms should be returned as-is without index."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.success(
+        data={"GroupId": "uuid-aaa", "DisplayName": "Admin"}
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "uuid-aaa")
+
+    assert result.is_success
+    assert result.data == "uuid-aaa"
+    # list_groups should NOT have been called for UUID resolution
+    assert all(call[0] != "list_groups" for call in client.calls)
+
+
+@pytest.mark.unit
+def test_resolve_group_id_exact_display_name() -> None:
+    """A token that exactly matches an AWS IC display name resolves via the index."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("admin", "group-admin-id"))
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "admin")
+
+    assert result.is_success
+    assert result.data == "group-admin-id"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_normalized_display_name() -> None:
+    """A token whose casefold matches an AWS IC group resolves via the index."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("FinOps-ReadOnly", "group-finops-id"))
+    )
+    adapter = make_adapter(client)
+
+    # Token "finops-readonly" normalizes via casefold to "finops-readonly"
+    # Group "FinOps-ReadOnly" normalizes to "finops-readonly" — should match
+    result = adapter.canonicalize_entitlement_id("group", "finops-readonly")
+
+    assert result.is_success
+    assert result.data == "group-finops-id"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_ambiguous_name_returns_error() -> None:
+    """When normalized token matches multiple groups, AMBIGUOUS_GROUP_NAME is returned."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(
+            ("Admin", "group-admin-1"),
+            ("ADMIN", "group-admin-2"),
+        )
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "admin")
+
+    assert not result.is_success
+    assert result.error_code == "AMBIGUOUS_GROUP_NAME"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_not_found_returns_error() -> None:
+    """When no group matches the token, GROUP_ID_NOT_FOUND is returned."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("other-group", "group-other-id"))
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "missing")
+
+    assert not result.is_success
+    assert result.error_code == "GROUP_ID_NOT_FOUND"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_caches_result() -> None:
+    """Repeated resolution of the same token should not re-call list_groups."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("admin", "group-cached-id"))
+    )
+    adapter = make_adapter(client)
+
+    result1 = adapter.canonicalize_entitlement_id("group", "admin")
+    result2 = adapter.canonicalize_entitlement_id("group", "admin")
+
+    assert result1.is_success and result2.is_success
+    assert result1.data == result2.data == "group-cached-id"
+    assert sum(1 for call in client.calls if call[0] == "list_groups") == 1
+
+
+@pytest.mark.unit
+def test_resolve_group_id_list_groups_failure_propagates() -> None:
+    """If list_groups fails, the error propagates from canonicalize_entitlement_id."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="throttled",
+        error_code="THROTTLED",
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "admin")
+
+    assert not result.is_success
+    assert result.error_code == "THROTTLED"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_no_prefix_matches_full_slug() -> None:
+    """Token passed directly (pre-stripped) resolves via exact display-name match."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("platform-admin", "group-platform-admin-id"))
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "platform-admin")
+
+    assert result.is_success
+    assert result.data == "group-platform-admin-id"
+
+
+@pytest.mark.unit
+def test_resolve_group_id_token_direct_lookup() -> None:
+    """Pre-stripped token resolves directly without any prefix handling."""
+    client = FakeIdentityStoreClient()
+    client.describe_group_result = OperationResult.error(
+        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
+    )
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("ops-team", "group-ops-id"))
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "ops-team")
+
+    assert result.is_success
+    assert result.data == "group-ops-id"

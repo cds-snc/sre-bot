@@ -13,6 +13,7 @@ from packages.access_sync.config.settings import (
 from packages.access_sync.config.loaders import (
     AccessSyncConfigLoader,
     BundleConfigLoader,
+    EnvConfigLoader,
     FileJsonConfigLoader,
     InlineJsonConfigLoader,
     get_access_sync_config_loader,
@@ -27,6 +28,7 @@ __all__ = [
     # loaders
     "AccessSyncConfigLoader",
     "BundleConfigLoader",
+    "EnvConfigLoader",
     "FileJsonConfigLoader",
     "InlineJsonConfigLoader",
     "get_access_sync_config_loader",

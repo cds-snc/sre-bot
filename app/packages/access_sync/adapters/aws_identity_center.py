@@ -17,6 +17,7 @@ is therefore not supported and signals manual_action_required.
 """
 
 import re
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Set
 
 import structlog
@@ -26,6 +27,20 @@ from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.policies import AdapterCapabilities
 
 logger = structlog.get_logger()
+
+
+def normalize_group_name(value: str) -> str:
+    """Normalize a group display name for case-insensitive comparison."""
+    return value.strip().casefold()
+
+
+@dataclass(frozen=True)
+class _AwsGroupIndex:
+    """Immutable index of AWS Identity Center groups built from a single list call."""
+
+    by_id: Dict[str, str] = field(default_factory=dict)
+    by_display_name_exact: Dict[str, str] = field(default_factory=dict)
+    by_display_name_norm: Dict[str, Set[str]] = field(default_factory=dict)
 
 
 class AwsIdentityCenterAdapter:
@@ -46,6 +61,7 @@ class AwsIdentityCenterAdapter:
     def __init__(self, aws_clients: AWSClients) -> None:
         self._aws = aws_clients
         self._group_id_cache: Dict[str, str] = {}
+        self._group_index: Optional[_AwsGroupIndex] = None
 
     @staticmethod
     def _build_identitystore_name(user_email: str) -> Dict[str, str]:
@@ -117,8 +133,76 @@ class AwsIdentityCenterAdapter:
 
         return self._resolve_group_id(entitlement_id)
 
+    def _build_group_index(self) -> OperationResult:
+        """Build and cache a one-time group name index from list_groups.
+
+        The index supports exact and normalized (casefold) display-name lookups
+        and is stored on the adapter instance for its lifetime.
+
+        Returns:
+            OperationResult[_AwsGroupIndex] or error.
+        """
+        log = logger.bind(adapter="aws_identity_center")
+        log.info("build_group_index_started")
+
+        result = self._aws.identitystore.list_groups()
+        if not result.is_success:
+            log.error("build_group_index_failed", error=result.message)
+            return result
+
+        groups: List[Mapping[str, Any]] = (
+            [item for item in result.data if isinstance(item, dict)]
+            if isinstance(result.data, list)
+            else []
+        )
+
+        by_id: Dict[str, str] = {}
+        by_display_name_exact: Dict[str, str] = {}
+        by_display_name_norm: Dict[str, Set[str]] = {}
+
+        for group in groups:
+            group_id = group.get("GroupId")
+            display_name = group.get("DisplayName")
+            if not isinstance(group_id, str) or not group_id:
+                continue
+            if not isinstance(display_name, str) or not display_name:
+                continue
+
+            by_id[group_id] = display_name
+            by_display_name_exact[display_name] = group_id
+
+            norm = normalize_group_name(display_name)
+            by_display_name_norm.setdefault(norm, set()).add(group_id)
+
+        index = _AwsGroupIndex(
+            by_id=by_id,
+            by_display_name_exact=by_display_name_exact,
+            by_display_name_norm=by_display_name_norm,
+        )
+        self._group_index = index
+        log.info("build_group_index_ok", group_count=len(by_id))
+        return OperationResult.success(data=index)
+
+    def _get_group_index(self) -> OperationResult:
+        """Return the cached group index, building it on first access."""
+        if self._group_index is not None:
+            return OperationResult.success(data=self._group_index)
+        return self._build_group_index()
+
     def _resolve_group_id(self, entitlement_id: str) -> OperationResult:
-        """Resolve a group identifier to canonical AWS Identity Store GroupId."""
+        """Resolve a group identifier to canonical AWS Identity Store GroupId.
+
+        Tokens arrive pre-stripped by ``resolve_effective_policy`` (e.g.
+        ``"finops-readonly"`` not ``"sg-aws-finops-readonly"``).  Resolution
+        precedence:
+
+        1. UUID-shaped input: verify via describe_group and return as-is.
+        2. Exact display-name match in group index.
+        3. Normalized (casefold) display-name match — single result only.
+        4. Multiple normalized matches -> AMBIGUOUS_GROUP_NAME error.
+        5. No match -> GROUP_ID_NOT_FOUND error.
+        """
+        log = logger.bind(adapter="aws_identity_center", entitlement_id=entitlement_id)
         candidate = entitlement_id.strip()
         if not candidate:
             return OperationResult.error(
@@ -131,33 +215,73 @@ class AwsIdentityCenterAdapter:
         if cached is not None:
             return OperationResult.success(data=cached)
 
+        # Step 1: UUID — verify with describe_group.
         describe_result = self._aws.identitystore.describe_group(group_id=candidate)
         if describe_result.is_success:
             self._group_id_cache[candidate] = candidate
+            log.info("resolve_group_id_uuid", group_id=candidate)
             return OperationResult.success(data=candidate)
 
-        lookup_result = self._aws.identitystore.get_group_id_by_group_name(
-            group_name=candidate,
-        )
-        if not lookup_result.is_success:
-            return OperationResult.error(
-                lookup_result.status,
-                message=lookup_result.message,
-                error_code=lookup_result.error_code,
-            )
-        group_id = (
-            lookup_result.data.get("GroupId", "")
-            if isinstance(lookup_result.data, dict)
-            else ""
-        )
-        if not isinstance(group_id, str) or not group_id:
+        # Steps 2-5: name-based lookup via group index.
+        index_result = self._get_group_index()
+        if not index_result.is_success:
+            return index_result
+        if not isinstance(index_result.data, _AwsGroupIndex):
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=f"GroupId not found for entitlement: {candidate}",
-                error_code="GROUP_ID_NOT_FOUND",
+                message="Unexpected group index type",
+                error_code="INVALID_GROUP_INDEX",
             )
-        self._group_id_cache[candidate] = group_id
-        return OperationResult.success(data=group_id)
+        index: _AwsGroupIndex = index_result.data
+
+        # Step 2: exact display-name match (case-sensitive).
+        token = candidate
+        exact_group_id = index.by_display_name_exact.get(token)
+        if exact_group_id is not None:
+            self._group_id_cache[candidate] = exact_group_id
+            log.info(
+                "resolve_group_id_exact_name", group_id=exact_group_id, token=token
+            )
+            return OperationResult.success(data=exact_group_id)
+
+        # Step 3 & 4: normalized display-name match.
+        norm_token = normalize_group_name(token)
+        matching_ids = index.by_display_name_norm.get(norm_token, set())
+
+        if len(matching_ids) == 1:
+            group_id = next(iter(matching_ids))
+            self._group_id_cache[candidate] = group_id
+            log.warning(
+                "resolve_group_id_normalized_name",
+                group_id=group_id,
+                token=token,
+                norm_token=norm_token,
+            )
+            return OperationResult.success(data=group_id)
+
+        if len(matching_ids) > 1:
+            log.error(
+                "resolve_group_id_ambiguous",
+                token=token,
+                norm_token=norm_token,
+                matching_count=len(matching_ids),
+            )
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=(
+                    f"Ambiguous group name '{token}': {len(matching_ids)} AWS IC groups "
+                    f"normalize to the same token."
+                ),
+                error_code="AMBIGUOUS_GROUP_NAME",
+            )
+
+        # Step 5: not found.
+        log.error("resolve_group_id_not_found", token=token)
+        return OperationResult.error(
+            OperationStatus.PERMANENT_ERROR,
+            message=f"No AWS IC group found for entitlement token: {token}",
+            error_code="GROUP_ID_NOT_FOUND",
+        )
 
     def _find_user_id(self, user_email: str) -> OperationResult:
         """Resolve a user email to an Identity Store user ID.

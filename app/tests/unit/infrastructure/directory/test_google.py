@@ -820,7 +820,9 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        mock_google_clients.directory.list_groups.assert_called_once_with(query="sg-")
+        mock_google_clients.directory.list_groups.assert_called_once_with(
+            query="email:sg-*"
+        )
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(
         self, provider, mock_google_clients
@@ -838,10 +840,13 @@ class TestListGroups:
         )
 
         # Act
-        result = provider.list_groups(query="sg-")
+        result = provider.list_groups(query="email:sg-*")
 
         # Assert
         assert result.is_success
+        mock_google_clients.directory.list_groups.assert_called_once_with(
+            query="email:sg-*"
+        )
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -888,6 +893,10 @@ class TestListGroups:
         result = provider.list_groups(query="name:Admins")
 
         # Assert
+        # name:Admins is a Google query expression — passed through unchanged
+        mock_google_clients.directory.list_groups.assert_called_once_with(
+            query="name:Admins"
+        )
         assert not result.is_success
         assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
 

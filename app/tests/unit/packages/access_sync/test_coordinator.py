@@ -18,12 +18,12 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 from packages.access_sync.coordinator import AccessSyncCoordinator
 from packages.access_sync.desired_state import DirectoryMembershipBuilder
 from packages.access_sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access_sync.policies import (
     AdapterCapabilities,
-    EntitlementRule,
     PlatformPolicy,
 )
 
@@ -36,10 +36,13 @@ from packages.access_sync.policies import (
 class FakeAdapter:
     """Records all calls; configurable return values per method."""
 
-    def __init__(self, current_entitlement_ids: Set[str] | None = None) -> None:
+    def __init__(
+        self, current_entitlement_ids: Set[str] | None = None, user_exists: bool = True
+    ) -> None:
         self.calls: List[tuple] = []
         self._current_ids: Set[str] = current_entitlement_ids or set()
         self._disable_fails = False
+        self._user_exists = user_exists
 
     def set_disable_fails(self) -> None:
         self._disable_fails = True
@@ -80,6 +83,12 @@ class FakeAdapter:
 
     def get_current_entitlement_ids(self, email: str) -> OperationResult:
         self.calls.append(("get_current_entitlement_ids", email))
+        if not self._user_exists:
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message="User not found",
+                error_code="USER_NOT_FOUND",
+            )
         return OperationResult.success(data=set(self._current_ids))
 
     def list_all_provisioned_users(self) -> OperationResult:
@@ -96,11 +105,16 @@ class FakeAdapter:
 
 
 class FakeDirectory:
-    """Static group/member fixtures. Configurable per-group membership."""
+    """Static group/member fixtures. Configurable per-group membership and list_groups."""
 
-    def __init__(self, is_member: bool = True) -> None:
+    def __init__(
+        self,
+        is_member: bool = True,
+        groups: Set[str] | None = None,
+    ) -> None:
         self._is_member = is_member
         self._per_group: Dict[str, bool] = {}
+        self._groups: Set[str] = groups or set()
 
     def set_membership(self, group_slug: str, value: bool) -> None:
         self._per_group[group_slug] = value
@@ -133,31 +147,52 @@ class FakeDirectory:
         return OperationResult.success(data=[])
 
     def list_groups(self, query: str = "") -> OperationResult:
-        return OperationResult.success(data=[])
+        matching = [
+            DirectoryGroup(
+                group_email=f"{slug}@example.com",
+                group_slug=slug,
+                provider_group_id=f"gid-{slug}",
+            )
+            for slug in self._groups
+            if not query or slug.startswith(query)
+        ]
+        return OperationResult.success(data=matching)
+
+
+def _make_config(
+    platform: str = "aws",
+    authn_removal_mode: str = "delete",
+) -> AccessSyncRuntimeConfig:
+    return AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        platforms={
+            platform: PlatformPolicy(
+                authn_token="authn",
+                authn_removal_mode=authn_removal_mode,
+            )
+        },
+    )
 
 
 def make_coordinator(
     platform: str = "aws",
-    rules: List[EntitlementRule] | None = None,
     authn_removal_mode: str = "delete",
     is_member: bool = True,
     current_ids: Set[str] | None = None,
+    user_exists: bool = True,
     adapter: FakeAdapter | None = None,
+    discovered_groups: Set[str] | None = None,
 ) -> tuple[AccessSyncCoordinator, FakeAdapter]:
     if adapter is None:
-        adapter = FakeAdapter(current_entitlement_ids=current_ids or set())
-    policy = PlatformPolicy(
-        platform=platform,
-        authn_group_slug=f"sg-{platform}-authn",
-        authn_mode="derived",
-        authn_removal_mode=authn_removal_mode,
-        entitlement_rules=rules or [],
-    )
-    directory = FakeDirectory(is_member=is_member)
+        adapter = FakeAdapter(
+            current_entitlement_ids=current_ids or set(), user_exists=user_exists
+        )
+    config = _make_config(platform=platform, authn_removal_mode=authn_removal_mode)
+    directory = FakeDirectory(is_member=is_member, groups=discovered_groups or set())
     membership_builder = DirectoryMembershipBuilder(directory)
     coordinator = AccessSyncCoordinator(
         adapters={platform: adapter},
-        policies={platform: policy},
+        config=config,
         membership_builder=membership_builder,
     )
     return coordinator, adapter
@@ -178,12 +213,21 @@ def test_sync_user_returns_operation_result_with_sync_outcome():
 
 
 @pytest.mark.unit
-def test_sync_user_member_ensures_user():
-    coordinator, adapter = make_coordinator(is_member=True)
+def test_sync_user_existing_member_no_lifecycle_action():
+    coordinator, adapter = make_coordinator(is_member=True, user_exists=True)
     result = coordinator.sync_user("alice@example.com", "aws")
     assert result.is_success
-    assert "ensure_user" in result.data.planned_actions
-    assert "ensure_user" in result.data.applied_actions
+    assert "provision_user" not in result.data.planned_actions
+    assert not any(c[0] == "ensure_user" for c in adapter.calls)
+
+
+@pytest.mark.unit
+def test_sync_user_new_member_provisions_user():
+    coordinator, adapter = make_coordinator(is_member=True, user_exists=False)
+    result = coordinator.sync_user("alice@example.com", "aws")
+    assert result.is_success
+    assert "provision_user" in result.data.planned_actions
+    assert "provision_user" in result.data.applied_actions
     assert any(c[0] == "ensure_user" for c in adapter.calls)
 
 
@@ -213,16 +257,13 @@ def test_sync_user_policy_not_found():
 
 @pytest.mark.unit
 def test_sync_user_adapter_not_found():
-    policy = PlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[],
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        platforms={"aws": PlatformPolicy()},
     )
     coordinator = AccessSyncCoordinator(
         adapters={},  # no adapter registered
-        policies={"aws": policy},
+        config=config,
         membership_builder=DirectoryMembershipBuilder(FakeDirectory()),
     )
     result = coordinator.sync_user("alice@example.com", "aws")
@@ -241,8 +282,7 @@ def test_sync_user_dry_run_no_action_calls():
     result = coordinator.sync_user("alice@example.com", "aws", dry_run=True)
     assert result.is_success
     assert result.data.applied_actions == []
-    assert "ensure_user" in result.data.planned_actions
-    # Only get_current_entitlement_ids is allowed before dry-run stops
+    assert "provision_user" not in result.data.planned_actions
     exec_calls = [
         c for c in adapter.calls if c[0] not in {"get_current_entitlement_ids"}
     ]
@@ -276,32 +316,20 @@ def test_sync_user_disable_unsupported_sets_requires_manual_action():
 @pytest.mark.unit
 def test_sync_user_entitlement_not_applied_when_not_in_group():
     """Entitlement is only applied when user is a member of the entitlement group."""
-    rule = EntitlementRule(
-        group_slug="sg-aws-admin",
-        entitlement_type="permission_set",
-        entitlement_id="123/AdminAccess",
-        mode="sync_managed",
-    )
     adapter = FakeAdapter()
-    policy = PlatformPolicy(
-        platform="aws",
-        authn_group_slug="sg-aws-authn",
-        authn_mode="derived",
-        authn_removal_mode="delete",
-        entitlement_rules=[rule],
-    )
-    directory = FakeDirectory(is_member=True)
+    directory = FakeDirectory(is_member=True, groups={"sg-aws-admin"})
     # Member of authn but NOT of entitlement group
     directory.set_membership("sg-aws-admin", False)
+    config = _make_config()
     coordinator = AccessSyncCoordinator(
         adapters={"aws": adapter},
-        policies={"aws": policy},
+        config=config,
         membership_builder=DirectoryMembershipBuilder(directory),
     )
     result = coordinator.sync_user("alice@example.com", "aws")
     assert result.is_success
     call_names = [c[0] for c in adapter.calls]
-    assert "ensure_user" in call_names
+    assert "ensure_user" not in call_names
     assert "apply_entitlement" not in call_names
 
 
