@@ -10,6 +10,7 @@ from packages.access_sync.config import (
     get_access_sync_config_loader,
     normalize_target_key,
 )
+from packages.access_sync.policies import PlatformPolicy
 
 
 @pytest.mark.unit
@@ -23,36 +24,26 @@ def test_bundle_loader_returns_empty_config():
     # Assert
     assert result.is_success
     assert isinstance(result.data, AccessSyncRuntimeConfig)
-    # Bundle loader returns empty policies — feature is in "waiting mode"
-    assert result.data.policies == {}
+    assert result.data.platforms == {}
     assert result.data.entitlement_mode_overrides == []
     assert "waiting mode" in result.message
 
 
 @pytest.mark.unit
 def test_get_access_sync_config_loader_bundle():
-    # Arrange / Act
     loader = get_access_sync_config_loader("bundle")
-
-    # Assert
     assert isinstance(loader, BundleConfigLoader)
 
 
 @pytest.mark.unit
 def test_get_access_sync_config_loader_inline_json():
-    # Arrange / Act
     loader = get_access_sync_config_loader("inline_json")
-
-    # Assert
     assert isinstance(loader, InlineJsonConfigLoader)
 
 
 @pytest.mark.unit
 def test_get_access_sync_config_loader_file_json():
-    # Arrange / Act
     loader = get_access_sync_config_loader("file_json")
-
-    # Assert
     assert isinstance(loader, FileJsonConfigLoader)
 
 
@@ -61,8 +52,8 @@ def test_inline_json_loader_parses_aws_policy():
     # Arrange
     loader = InlineJsonConfigLoader()
     ref = (
-        '{"policies":{"aws":{"platform":"aws","authn_group_slug":"sg-aws-authn",'
-        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":[]}}}'
+        '{"dir_prefix":"sg","dir_separator":"-",' 
+        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
     )
 
     # Act
@@ -71,21 +62,20 @@ def test_inline_json_loader_parses_aws_policy():
     # Assert
     assert result.is_success
     assert result.data is not None
-    assert "aws" in result.data.policies
-    assert result.data.policies["aws"].platform == "aws"
+    assert "aws" in result.data.platforms
+    policy = result.data.platforms["aws"]
+    assert isinstance(policy, PlatformPolicy)
+    assert policy.authn_token == "authn"
+    assert policy.authn_removal_mode == "delete"
 
 
 @pytest.mark.unit
-def test_inline_json_loader_parses_fake_policy_with_entitlements():
+def test_inline_json_loader_slug_derivation():
     # Arrange
     loader = InlineJsonConfigLoader()
     ref = (
-        '{"policies":{"fake":{"platform":"fake","authn_group_slug":"sg-fake-authn",'
-        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":['
-        '{"group_slug":"sg-fake-admin","entitlement_type":"group",'
-        '"entitlement_id":"fake-group-admin","mode":"sync_managed"},'
-        '{"group_slug":"sg-fake-read","entitlement_type":"group",'
-        '"entitlement_id":"fake-group-read","mode":"sync_managed"}]}}}'
+        '{"dir_prefix":"sg","dir_separator":"-",'
+        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
     )
 
     # Act
@@ -93,25 +83,18 @@ def test_inline_json_loader_parses_fake_policy_with_entitlements():
 
     # Assert
     assert result.is_success
-    assert result.data is not None
-    assert "fake" in result.data.policies
-    fake_policy = result.data.policies["fake"]
-    assert fake_policy.platform == "fake"
-    assert len(fake_policy.entitlement_rules) == 2
-    assert fake_policy.entitlement_rules[0].entitlement_id == "fake-group-admin"
+    config = result.data
+    assert config.group_prefix("aws") == "sg-aws-"
+    assert config.authn_group_slug("aws") == "sg-aws-authn"
 
 
 @pytest.mark.unit
-def test_inline_json_loader_parses_default_entitlement_strategy():
+def test_inline_json_loader_mode_overrides():
     # Arrange
     loader = InlineJsonConfigLoader()
     ref = (
-        '{"policies":{"aws":{"platform":"aws","authn_group_slug":"sg-aws-authn",'
-        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":[],'
-        '"default_entitlement_strategy":{"kind":"default_prefix",'
-        '"source_group_prefix":"sg-aws-","exclude_group_slugs":["sg-aws-authn"],'
-        '"default_entitlement_type":"group","entitlement_id_template":"{token}",'
-        '"mode":"sync_managed"}}}}'
+        '{"dir_prefix":"sg","platforms":{"aws":{"authn_token":"authn",'
+        '"authn_removal_mode":"delete","mode_overrides":{"breakglass":"ephemeral"}}}}'
     )
 
     # Act
@@ -119,11 +102,8 @@ def test_inline_json_loader_parses_default_entitlement_strategy():
 
     # Assert
     assert result.is_success
-    assert result.data is not None
-    strategy = result.data.policies["aws"].default_entitlement_strategy
-    assert strategy is not None
-    assert strategy.kind == "default_prefix"
-    assert strategy.source_group_prefix == "sg-aws-"
+    policy = result.data.platforms["aws"]
+    assert policy.mode_overrides == {"breakglass": "ephemeral"}
 
 
 @pytest.mark.unit
@@ -140,13 +120,26 @@ def test_inline_json_loader_rejects_invalid_json():
 
 
 @pytest.mark.unit
+def test_inline_json_loader_rejects_missing_dir_prefix():
+    # Arrange
+    loader = InlineJsonConfigLoader()
+
+    # Act
+    result = loader.load(ref='{"platforms":{}}')
+
+    # Assert
+    assert not result.is_success
+    assert result.error_code == "CONFIG_INVALID_SHAPE"
+
+
+@pytest.mark.unit
 def test_file_json_loader_parses_aws_policy(tmp_path):
     # Arrange
     loader = FileJsonConfigLoader()
     config_file = tmp_path / "access-sync.json"
     config_file.write_text(
-        '{"policies":{"aws":{"platform":"aws","authn_group_slug":"sg-aws-authn",'
-        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":[]}}}',
+        '{"dir_prefix":"sg","dir_separator":"-",'
+        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}',
         encoding="utf-8",
     )
 
@@ -156,7 +149,7 @@ def test_file_json_loader_parses_aws_policy(tmp_path):
     # Assert
     assert result.is_success
     assert result.data is not None
-    assert "aws" in result.data.policies
+    assert "aws" in result.data.platforms
 
 
 @pytest.mark.unit
@@ -193,16 +186,14 @@ def test_normalize_target_key_lowercases_and_strips():
 
 
 @pytest.mark.unit
-def test_inline_json_loader_normalizes_policy_key():
-    """Policy map key must be normalized regardless of how the platform field is cased."""
+def test_inline_json_loader_normalizes_platform_key():
+    """Platform map key must be normalized regardless of JSON casing."""
     loader = InlineJsonConfigLoader()
     ref = (
-        '{"policies":{"AWS":{"platform":"AWS","authn_group_slug":"sg-aws-authn",'
-        '"authn_mode":"derived","authn_removal_mode":"delete","entitlement_rules":[]}}}'
+        '{"dir_prefix":"sg","platforms":{"AWS":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
     )
     result = loader.load(ref=ref)
     assert result.is_success
     assert result.data is not None
-    # Key must be normalized: stored as "aws", not "AWS"
-    assert "aws" in result.data.policies
-    assert "AWS" not in result.data.policies
+    assert "aws" in result.data.platforms
+    assert "AWS" not in result.data.platforms

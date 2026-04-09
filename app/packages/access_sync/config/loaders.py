@@ -5,19 +5,19 @@ implementations, JSON input models, shared validation helpers, and the
 loader factory.
 
 Config loader sources:
-    bundle   - Built-in empty bundle. Default for local development.
+    bundle      - Built-in empty bundle. Default for local development.
     inline_json - Parse ACCESS_SYNC_CONFIG_REF as inline JSON text.
-    file_json - Read ACCESS_SYNC_CONFIG_REF as a path to a local JSON file.
-    dynamodb - Load from a DynamoDB item (reserved; not yet implemented).
-    s3       - Load from an S3 object (reserved; not yet implemented).
-    ssm      - Load from an SSM parameter (reserved; not yet implemented).
+    file_json   - Read ACCESS_SYNC_CONFIG_REF as a path to a local JSON file.
+    dynamodb    - Load from a DynamoDB item (reserved; not yet implemented).
+    s3          - Load from an S3 object (reserved; not yet implemented).
+    ssm         - Load from an SSM parameter (reserved; not yet implemented).
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol
+from typing import Dict, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,11 +25,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 from packages.access_sync.policies import (
-    DefaultEntitlementStrategy,
     EntitlementMode,
-    EntitlementStrategyKind,
-    EntitlementRule,
-    PatternEntitlementMapping,
     PlatformPolicy,
 )
 
@@ -37,6 +33,8 @@ from packages.access_sync.policies import (
 # ---------------------------------------------------------------------------
 # Key Normalization
 # ---------------------------------------------------------------------------
+
+
 def normalize_target_key(value: str) -> str:
     """Return the canonical form of a target-system key.
 
@@ -49,62 +47,61 @@ def normalize_target_key(value: str) -> str:
 # ---------------------------------------------------------------------------
 # Runtime Config Input Models (JSON)
 # ---------------------------------------------------------------------------
-class EntitlementRuleConfigModel(BaseModel):
-    """Typed schema for one entitlement rule in runtime config JSON."""
-
-    group_slug: str
-    entitlement_type: str
-    entitlement_id: str
-    mode: EntitlementMode = "sync_managed"
-
-
-class PatternEntitlementMappingConfigModel(BaseModel):
-    """Typed schema for one wildcard group->entitlement mapping."""
-
-    source_group_pattern: str
-    entitlement_type: str
-    entitlement_id: str
-    mode: EntitlementMode = "sync_managed"
-
-
-class DefaultEntitlementStrategyConfigModel(BaseModel):
-    """Typed schema for platform-level default entitlement strategy."""
-
-    kind: EntitlementStrategyKind = "explicit_rules_only"
-    source_group_prefix: str = ""
-    exclude_group_slugs: List[str] = Field(default_factory=list)
-    default_entitlement_type: str = "group"
-    entitlement_id_template: str = "{token}"
-    mode: EntitlementMode = "sync_managed"
-    pattern_mappings: List[PatternEntitlementMappingConfigModel] = Field(
-        default_factory=list
-    )
 
 
 class PlatformPolicyConfigModel(BaseModel):
-    """Typed schema for one platform policy in runtime config JSON."""
+    """Typed schema for one platform policy in runtime config JSON.
 
-    platform: str
-    authn_group_slug: str
-    authn_mode: str
-    authn_removal_mode: str
-    entitlement_rules: List[EntitlementRuleConfigModel] = Field(default_factory=list)
-    default_entitlement_strategy: Optional[DefaultEntitlementStrategyConfigModel] = None
+    ``authn_token`` -- token segment for the lifecycle (authn) group.
+    ``authn_removal_mode`` -- action on authn-group departure.
+    ``mode_overrides`` -- static config-time mode overrides for specific tokens.
+    """
+
+    authn_token: str = "authn"
+    authn_removal_mode: str = "delete"
+    mode_overrides: Dict[str, EntitlementMode] = Field(default_factory=dict)
 
 
-class RuntimeConfigJsonSettings(BaseSettings):
-    """Settings model used with JsonConfigSettingsSource for file-based configs."""
+class RuntimeConfigJsonSettings(BaseModel):
+    """Top-level schema for the Access Sync runtime config JSON document.
 
-    policies: Dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
+    Expected shape::
 
-    model_config = SettingsConfigDict(
-        extra="ignore",
-    )
+        {
+          "dir_prefix": "sg",
+          "dir_separator": "-",
+          "platforms": {
+            "aws": {
+              "authn_token": "authn",
+              "authn_removal_mode": "delete",
+              "mode_overrides": {
+                "breakglass-admin": "ephemeral"
+              }
+            }
+          }
+        }
+
+    Slug derivation (all in ``AccessSyncRuntimeConfig``)::
+
+        config.group_prefix("aws")     -> "sg-aws-"
+        config.authn_group_slug("aws") -> "sg-aws-authn"
+
+    IDP groups matching ``{dir_prefix}{dir_separator}{platform}{dir_separator}*``
+    are discovered at runtime by the coordinator.  The authn token group and any
+    token declared in ``mode_overrides`` as ephemeral or deactivated are excluded
+    from the effective rule set.
+    """
+
+    dir_prefix: str
+    dir_separator: str = "-"
+    platforms: Dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Loader Contract + Shared Conversion
 # ---------------------------------------------------------------------------
+
+
 class AccessSyncConfigLoader(Protocol):
     """Protocol for Access Sync config loaders.
 
@@ -125,62 +122,26 @@ class AccessSyncConfigLoader(Protocol):
 
 
 def _build_runtime_config(
-    policies_model: Dict[str, PlatformPolicyConfigModel],
+    dir_prefix: str,
+    dir_separator: str,
+    platforms_model: Dict[str, PlatformPolicyConfigModel],
 ) -> AccessSyncRuntimeConfig:
-    """Convert validated JSON policy models into AccessSyncRuntimeConfig."""
-    policies: Dict[str, PlatformPolicy] = {}
+    """Convert validated JSON platform models into ``AccessSyncRuntimeConfig``."""
+    platforms: Dict[str, PlatformPolicy] = {}
 
-    for fallback_key, raw_policy in policies_model.items():
-        entitlement_rules: List[EntitlementRule] = []
-        for rule in raw_policy.entitlement_rules:
-            entitlement_rules.append(
-                EntitlementRule(
-                    group_slug=rule.group_slug,
-                    entitlement_type=rule.entitlement_type,
-                    entitlement_id=rule.entitlement_id,
-                    mode=rule.mode,
-                )
-            )
-
+    for key, raw_policy in platforms_model.items():
         policy = PlatformPolicy(
-            platform=raw_policy.platform,
-            authn_group_slug=raw_policy.authn_group_slug,
-            authn_mode=raw_policy.authn_mode,
+            authn_token=raw_policy.authn_token,
             authn_removal_mode=raw_policy.authn_removal_mode,
-            entitlement_rules=entitlement_rules,
-            default_entitlement_strategy=(
-                DefaultEntitlementStrategy(
-                    kind=raw_policy.default_entitlement_strategy.kind,
-                    source_group_prefix=(
-                        raw_policy.default_entitlement_strategy.source_group_prefix
-                    ),
-                    exclude_group_slugs=list(
-                        raw_policy.default_entitlement_strategy.exclude_group_slugs
-                    ),
-                    default_entitlement_type=(
-                        raw_policy.default_entitlement_strategy.default_entitlement_type
-                    ),
-                    entitlement_id_template=(
-                        raw_policy.default_entitlement_strategy.entitlement_id_template
-                    ),
-                    mode=raw_policy.default_entitlement_strategy.mode,
-                    pattern_mappings=[
-                        PatternEntitlementMapping(
-                            source_group_pattern=mapping.source_group_pattern,
-                            entitlement_type=mapping.entitlement_type,
-                            entitlement_id=mapping.entitlement_id,
-                            mode=mapping.mode,
-                        )
-                        for mapping in raw_policy.default_entitlement_strategy.pattern_mappings
-                    ],
-                )
-                if raw_policy.default_entitlement_strategy is not None
-                else None
-            ),
+            mode_overrides=dict(raw_policy.mode_overrides),
         )
-        policies[normalize_target_key(str(policy.platform or fallback_key))] = policy
+        platforms[normalize_target_key(key)] = policy
 
-    return AccessSyncRuntimeConfig(policies=policies)
+    return AccessSyncRuntimeConfig(
+        dir_prefix=dir_prefix,
+        dir_separator=dir_separator,
+        platforms=platforms,
+    )
 
 
 def _validate_runtime_config_payload(
@@ -197,39 +158,45 @@ def _validate_runtime_config_payload(
             error_code="CONFIG_INVALID_SHAPE",
         )
 
-    config = _build_runtime_config(validated.policies)
+    config = _build_runtime_config(
+        dir_prefix=validated.dir_prefix,
+        dir_separator=validated.dir_separator,
+        platforms_model=validated.platforms,
+    )
     return OperationResult.success(
         data=config,
-        message=f"{error_prefix}_loaded policies={len(config.policies)}",
+        message=f"{error_prefix}_loaded platforms={len(config.platforms)}",
     )
 
 
 # ---------------------------------------------------------------------------
 # Config Loaders
 # ---------------------------------------------------------------------------
-class BundleConfigLoader:
-    """Config loader that returns an empty bundle (no policies configured).
 
-    Access Sync enters "waiting mode" when no policies are configured: no
-    platforms are registered and sync_user returns POLICY_NOT_FOUND gracefully.
-    Operators wire real policies via an external source (dynamodb / s3 / ssm).
+
+class BundleConfigLoader:
+    """Config loader that returns an empty bundle (no platforms configured).
+
+    Access Sync enters "waiting mode" when no platforms are configured: no
+    adapters are registered and sync_user returns POLICY_NOT_FOUND gracefully.
+    Operators wire real platforms via an external source (dynamodb / s3 / ssm).
     """
 
     def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
-        """Return an empty bundle config with no pre-configured policies.
+        """Return an empty bundle config with no pre-configured platforms.
 
         Args:
             ref: Bundle name (ignored; kept for protocol compatibility).
 
         Returns:
             OperationResult with AccessSyncRuntimeConfig containing an empty
-            policies dict. The feature will be in waiting mode until an
+            platforms dict. The feature will be in waiting mode until an
             external config source provides platform policies.
         """
-        config = AccessSyncRuntimeConfig(policies={})
+        config = AccessSyncRuntimeConfig(dir_prefix="", platforms={})
         return OperationResult.success(
             data=config,
-            message=f"bundle_config_loaded ref={ref} policies=0 (waiting mode)",
+            message=f"bundle_config_loaded ref={ref} platforms=0 (waiting mode)",
         )
 
 
@@ -239,15 +206,15 @@ class InlineJsonConfigLoader:
     def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
         """Parse *ref* as JSON and build AccessSyncRuntimeConfig.
 
-        Expected shape:
+        Expected shape::
+
             {
-              "policies": {
+              "dir_prefix": "sg",
+              "dir_separator": "-",
+              "platforms": {
                 "aws": {
-                  "platform": "aws",
-                  "authn_group_slug": "sg-aws-authn",
-                  "authn_mode": "derived",
-                  "authn_removal_mode": "delete",
-                  "entitlement_rules": []
+                  "authn_token": "authn",
+                  "authn_removal_mode": "delete"
                 }
               }
             }
@@ -263,6 +230,62 @@ class InlineJsonConfigLoader:
         return _validate_runtime_config_payload(
             payload=payload,
             error_prefix="inline_json_config",
+        )
+
+
+class EnvConfigLoader:
+    """Config loader that builds AccessSyncRuntimeConfig from individual env vars.
+
+    Reads the following environment variables (populated into .env by entry.sh
+    from the SSM parameter bundle at container startup):
+
+        ACCESS_SYNC_DIR_PREFIX    — organization-wide IDP group prefix (e.g. ``sg``)
+        ACCESS_SYNC_DIR_SEPARATOR — segment separator; default ``-``
+        ACCESS_SYNC_PLATFORMS_JSON — platforms block as a JSON string, e.g.::
+
+            '{"aws": {"authn_token": "authn", "authn_removal_mode": "delete"}}'
+
+    The ``ref`` argument passed by the provider is ignored; config comes
+    entirely from the environment.
+    """
+
+    class _EnvModel(BaseSettings):
+        dir_prefix: str = Field(default="", alias="ACCESS_SYNC_DIR_PREFIX")
+        dir_separator: str = Field(default="-", alias="ACCESS_SYNC_DIR_SEPARATOR")
+        platforms_json: str = Field(default="{}", alias="ACCESS_SYNC_PLATFORMS_JSON")
+
+        model_config = SettingsConfigDict(
+            env_file=".env",
+            case_sensitive=True,
+            extra="ignore",
+        )
+
+    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+        env = self._EnvModel()
+
+        if not env.dir_prefix:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="env_config_missing_dir_prefix: ACCESS_SYNC_DIR_PREFIX must be set",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
+
+        try:
+            platforms_payload = json.loads(env.platforms_json)
+        except json.JSONDecodeError as exc:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message=f"env_config_invalid_platforms_json: {exc.msg}",
+                error_code="CONFIG_INVALID_JSON",
+            )
+
+        return _validate_runtime_config_payload(
+            payload={
+                "dir_prefix": env.dir_prefix,
+                "dir_separator": env.dir_separator,
+                "platforms": platforms_payload,
+            },
+            error_prefix="env_config",
         )
 
 
@@ -309,7 +332,7 @@ class FileJsonConfigLoader:
             data=result.data,
             message=(
                 f"file_json_config_loaded path={path} "
-                f"policies={len(result.data.policies) if result.data else 0}"
+                f"platforms={len(result.data.platforms) if result.data else 0}"
             ),
         )
 
@@ -317,11 +340,14 @@ class FileJsonConfigLoader:
 # ---------------------------------------------------------------------------
 # Loader Factory
 # ---------------------------------------------------------------------------
+
+
 def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
     """Return the config loader for the given source string.
 
     Args:
-        source: One of 'bundle', 'inline_json', 'file_json', 'dynamodb', 's3', 'ssm'.
+        source: One of 'bundle', 'inline_json', 'file_json', 'env',
+            'dynamodb', 's3', 'ssm'.
 
     Returns:
         An AccessSyncConfigLoader instance.
@@ -338,7 +364,10 @@ def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
     if source == "file_json":
         return FileJsonConfigLoader()
 
+    if source == "env":
+        return EnvConfigLoader()
+
     raise NotImplementedError(
         f"Access Sync config source '{source}' is not yet implemented. "
-        "Use ACCESS_SYNC_CONFIG_SOURCE=bundle, inline_json, or file_json for local development."
+        "Use ACCESS_SYNC_CONFIG_SOURCE=bundle, inline_json, file_json, or env."
     )

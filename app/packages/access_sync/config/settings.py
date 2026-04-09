@@ -44,7 +44,7 @@ class AccessSyncSettings(BaseSettings):
         alias="ACCESS_SYNC_ENABLED",
     )
     config_source: Literal[
-        "bundle", "inline_json", "file_json", "dynamodb", "s3", "ssm"
+        "bundle", "inline_json", "file_json", "env", "dynamodb", "s3", "ssm"
     ] = Field(
         default="bundle",
         alias="ACCESS_SYNC_CONFIG_SOURCE",
@@ -101,15 +101,34 @@ class AccessSyncRuntimeConfig:
     """Fully-resolved runtime configuration for Access Sync.
 
     Loaded once at startup via the config loader selected by bootstrap settings.
-    Contains all per-platform policies and optional runtime overrides.
+    Contains the organization-wide group naming convention and per-platform
+    policies.  Slug construction -- platform prefix, authn group slug -- is
+    derived from ``dir_prefix``, ``dir_separator``, and the per-platform
+    ``PlatformPolicy.authn_token`` rather than stored explicitly.
 
     Infrastructure clients (AWS, Google Workspace, etc.) are obtained separately
     from infrastructure.services and come pre-configured with all needed bootstrap
     settings (e.g., AWS_SSO_INSTANCE_ID). Feature configuration is limited to
-    policy definitions and per-group overrides.
+    group naming and policy definitions.
     """
 
-    policies: Dict[str, PlatformPolicy]
+    dir_prefix: str
+    dir_separator: str = "-"
+    platforms: Dict[str, PlatformPolicy] = field(default_factory=dict)
     entitlement_mode_overrides: List[EntitlementModeOverride] = field(
         default_factory=list
     )
+
+    def group_prefix(self, platform: str) -> str:
+        """Return the IDP group slug prefix for a given platform.
+
+        Example: dir_prefix="sg", dir_separator="-", platform="aws" -> "sg-aws-".
+        """
+        return f"{self.dir_prefix}{self.dir_separator}{platform}{self.dir_separator}"
+
+    def authn_group_slug(self, platform: str) -> str:
+        """Return the full authn group slug for a given platform.
+
+        Example: "sg-aws-authn" when authn_token="authn".
+        """
+        return f"{self.group_prefix(platform)}{self.platforms[platform].authn_token}"
