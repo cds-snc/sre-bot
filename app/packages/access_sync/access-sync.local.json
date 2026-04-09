@@ -1,0 +1,18 @@
+{
+  "policies": {
+    "aws": {
+      "platform": "aws",
+      "authn_group_slug": "sg-aws-authn",
+      "authn_mode": "derived",
+      "authn_removal_mode": "delete",
+      "entitlement_rules": []
+    },
+    "fake": {
+      "platform": "fake",
+      "authn_group_slug": "sg-fake-authn",
+      "authn_mode": "derived",
+      "authn_removal_mode": "delete",
+      "entitlement_rules": []
+    }
+  }
+}
