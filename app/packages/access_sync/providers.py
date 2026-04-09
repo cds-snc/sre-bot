@@ -11,7 +11,7 @@ provider function itself (e.g. ``providers.get_access_sync_coordinator``).
 """
 
 from functools import lru_cache
-from typing import Dict, Mapping, Optional
+from typing import Dict, Optional
 
 from infrastructure.events import EventDispatcher
 from infrastructure.operations import OperationResult
@@ -27,9 +27,7 @@ from packages.access_sync.config import (
     AccessSyncRuntimeConfig,
     AccessSyncSettings,
     get_access_sync_config_loader,
-    normalize_target_key,
 )
-from packages.access_sync.policies import PlatformPolicy
 from packages.access_sync.store import SyncRunRepository
 from packages.access_sync.coordinator import AccessSyncCoordinator
 from packages.access_sync.desired_state import DirectoryMembershipBuilder
@@ -78,21 +76,17 @@ def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
     adapters: Dict[str, AccessSyncAdapter] = {}
     runtime_config = get_access_sync_runtime_config()
 
-    for platform_key, policy in runtime_config.policies.items():
-        platform = normalize_target_key(str(policy.platform or platform_key))
-        if platform == "aws":
+    for platform_key in runtime_config.platforms:
+        if platform_key == "aws":
             aws_clients = get_aws_clients()
-            adapters[platform_key] = AwsIdentityCenterAdapter(aws_clients=aws_clients)
+            adapters[platform_key] = AwsIdentityCenterAdapter(
+                aws_clients=aws_clients,
+            )
             continue
-        if platform == "fake":
+        if platform_key == "fake":
             adapters[platform_key] = FakePlatformAdapter()
 
     return adapters
-
-
-def get_access_sync_policies() -> Mapping[str, PlatformPolicy]:
-    """Return the current platform policy mapping from runtime config."""
-    return get_access_sync_runtime_config().policies
 
 
 @lru_cache(maxsize=1)
@@ -109,9 +103,10 @@ def get_access_sync_coordinator() -> AccessSyncCoordinator:
     directory = get_directory_provider()
     membership_builder = DirectoryMembershipBuilder(directory)
     repository = SyncRunRepository(storage=get_storage_service())
+    runtime_config = get_access_sync_runtime_config()
     return AccessSyncCoordinator(
         adapters=get_access_sync_adapters(),
-        policies=get_access_sync_policies(),
+        config=runtime_config,
         membership_builder=membership_builder,
         repository=repository,
         dispatcher=EventDispatcher(),

@@ -9,14 +9,11 @@ from packages.access_sync.config import AccessSyncRuntimeConfig
 from packages.access_sync.policies import PlatformPolicy
 
 
-def _make_policy(platform: str) -> PlatformPolicy:
+def _make_policy() -> PlatformPolicy:
     """Build a minimal platform policy for registry wiring tests."""
     return PlatformPolicy(
-        platform=platform,
-        authn_group_slug=f"sg-{platform}-authn",
-        authn_mode="derived",
+        authn_token="authn",
         authn_removal_mode="delete",
-        entitlement_rules=[],
     )
 
 
@@ -28,9 +25,10 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
     # Arrange
     providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
-        policies={
-            "aws": _make_policy("aws"),
-            "fake": _make_policy("fake"),
+        dir_prefix="sg",
+        platforms={
+            "aws": _make_policy(),
+            "fake": _make_policy(),
         }
     )
     monkeypatch.setattr(
@@ -59,9 +57,10 @@ def test_get_access_sync_adapters_ignores_unknown_platforms(
     # Arrange
     providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
-        policies={
-            "fake": _make_policy("fake"),
-            "custom": _make_policy("custom"),
+        dir_prefix="sg",
+        platforms={
+            "fake": _make_policy(),
+            "custom": _make_policy(),
         }
     )
     monkeypatch.setattr(
