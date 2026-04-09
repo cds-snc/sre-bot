@@ -113,16 +113,18 @@ class TestReconcileAccessSync:
     """Tests for the reconcile_access_sync scheduled job."""
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_syncs_each_registered_platform(
-        self, mock_logger, mock_get_coordinator, mock_get_policies
+        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
     ) -> None:
-        """reconcile_access_sync calls sync_platform once per policy entry."""
+        """reconcile_access_sync calls sync_platform once per platform in config."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
-        mock_get_policies.return_value = {"aws": MagicMock(), "fake": MagicMock()}
+        mock_runtime_config = MagicMock()
+        mock_runtime_config.platforms = {"aws": MagicMock(), "fake": MagicMock()}
+        mock_get_runtime_config.return_value = mock_runtime_config
 
         reconcile_access_sync()
 
@@ -134,16 +136,18 @@ class TestReconcileAccessSync:
         assert called_platforms == {"aws", "fake"}
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_runs_with_dry_run_false(
-        self, mock_logger, mock_get_coordinator, mock_get_policies
+        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
     ) -> None:
         """reconcile_access_sync always executes with dry_run=False."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
-        mock_get_policies.return_value = {"aws": MagicMock()}
+        mock_runtime_config = MagicMock()
+        mock_runtime_config.platforms = {"aws": MagicMock()}
+        mock_get_runtime_config.return_value = mock_runtime_config
 
         reconcile_access_sync()
 
@@ -152,31 +156,35 @@ class TestReconcileAccessSync:
         )
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_no_platforms_does_nothing(
-        self, mock_logger, mock_get_coordinator, mock_get_policies
+        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
     ) -> None:
-        """reconcile_access_sync with an empty policy map calls sync_platform zero times."""
+        """reconcile_access_sync with an empty platforms map calls sync_platform zero times."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
-        mock_get_policies.return_value = {}
+        mock_runtime_config = MagicMock()
+        mock_runtime_config.platforms = {}
+        mock_get_runtime_config.return_value = mock_runtime_config
 
         reconcile_access_sync()
 
         mock_coordinator.sync_platform.assert_not_called()
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_policies")
+    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_logs_started(
-        self, mock_logger, mock_get_coordinator, mock_get_policies
+        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
     ) -> None:
         """reconcile_access_sync emits a start log entry."""
         mock_get_coordinator.return_value = MagicMock()
-        mock_get_policies.return_value = {}
+        mock_runtime_config = MagicMock()
+        mock_runtime_config.platforms = {}
+        mock_get_runtime_config.return_value = mock_runtime_config
 
         reconcile_access_sync()
 
