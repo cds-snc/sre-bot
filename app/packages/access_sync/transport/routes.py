@@ -12,10 +12,12 @@ protocols so they are test-substitutable without monkey-patching FastAPI.
 """
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Security
 from typing import Annotated, Protocol
 
+from infrastructure.identity.models import User
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.services import get_current_user
 from packages.access_sync.coordinator import AccessSyncCoordinatorPort
 from packages.access_sync.providers import (
     get_access_sync_coordinator,
@@ -57,12 +59,16 @@ def sync_endpoint(
         AccessSyncCoordinatorPort, Depends(get_access_sync_coordinator)
     ],
     settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=["sre-bot:access-sync"])
+    ],
 ) -> AccessSyncResponse:
     """Trigger an on-demand user sync or a full platform sync."""
     log = logger.bind(
         sync_type=request.sync_type,
         platform=request.platform,
         dry_run=request.dry_run,
+        requested_by=current_user.email,
         endpoint="POST /api/v1/access/sync-runs",
     )
     log.info("sync_request")

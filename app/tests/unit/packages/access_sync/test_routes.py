@@ -3,6 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
+from infrastructure.identity.models import IdentitySource, User
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access_sync.transport.routes import sync_endpoint
 from packages.access_sync.schemas import UserSyncRequest
@@ -50,6 +51,17 @@ def _make_request() -> UserSyncRequest:
     )
 
 
+def _make_user() -> User:
+    """Create a stub authenticated user for direct route invocation."""
+    return User(
+        user_id="svc-account@example.com",
+        email="svc-account@example.com",
+        display_name="Test Service Account",
+        source=IdentitySource.API_JWT,
+        platform_id="svc-account",
+    )
+
+
 @pytest.mark.unit
 def test_sync_endpoint_not_found_masks_internal_error():
     """Route should not expose provider details for NOT_FOUND responses."""
@@ -64,6 +76,7 @@ def test_sync_endpoint_not_found_masks_internal_error():
                 )
             ),
             settings=_Settings(enabled=True),
+            current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 404
@@ -84,6 +97,7 @@ def test_sync_endpoint_permanent_error_masks_internal_error():
                 )
             ),
             settings=_Settings(enabled=True),
+            current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 400
@@ -104,6 +118,7 @@ def test_sync_endpoint_unauthorized_masks_internal_error():
                 )
             ),
             settings=_Settings(enabled=True),
+            current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 403
@@ -124,6 +139,7 @@ def test_sync_endpoint_internal_error_masks_internal_error():
                 )
             ),
             settings=_Settings(enabled=True),
+            current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 500
@@ -140,6 +156,7 @@ def test_sync_endpoint_feature_disabled_returns_service_unavailable():
             _make_request(),
             coordinator=_FakeCoordinator(OperationResult.success()),
             settings=_Settings(enabled=False),
+            current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 503
