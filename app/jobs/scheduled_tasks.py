@@ -12,6 +12,12 @@ from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
 
+from packages.access_sync.providers import (
+    get_access_sync_coordinator,
+    get_access_sync_policies,
+    get_access_sync_settings,
+)
+
 logger = get_logger()
 
 
@@ -47,6 +53,15 @@ def init(bot):
     schedule.every().day.at("00:00").do(
         safe_run(spending.generate_spending_data), logger=logger
     )
+
+    access_sync_settings = get_access_sync_settings()
+    if access_sync_settings.enabled and access_sync_settings.reconciliation_enabled:
+        reconcile_time = access_sync_settings.reconciliation_schedule
+        schedule.every().day.at(reconcile_time).do(safe_run(reconcile_access_sync))
+        logger.info(
+            "access_sync_reconciliation_scheduled",
+            time=reconcile_time,
+        )
 
 
 def scheduler_heartbeat():
@@ -116,3 +131,12 @@ def run_continuously(interval=1):
     continuous_thread = ScheduleThread()
     continuous_thread.start()
     return cease_continuous_run
+
+
+def reconcile_access_sync() -> None:
+    """Run full-platform Access Sync batch sync for all registered platforms."""
+    logger.info("reconcile_access_sync_started", module="scheduled_tasks")
+    coordinator = get_access_sync_coordinator()
+    policies = get_access_sync_policies()
+    for platform in policies:
+        coordinator.sync_platform(platform=platform, dry_run=False)
