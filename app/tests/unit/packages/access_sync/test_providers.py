@@ -29,7 +29,7 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
         platforms={
             "aws": _make_policy(),
             "fake": _make_policy(),
-        }
+        },
     )
     monkeypatch.setattr(
         providers,
@@ -61,7 +61,7 @@ def test_get_access_sync_adapters_ignores_unknown_platforms(
         platforms={
             "fake": _make_policy(),
             "custom": _make_policy(),
-        }
+        },
     )
     monkeypatch.setattr(
         providers,

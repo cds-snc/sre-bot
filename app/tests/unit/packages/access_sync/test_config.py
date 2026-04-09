@@ -52,7 +52,7 @@ def test_inline_json_loader_parses_aws_policy():
     # Arrange
     loader = InlineJsonConfigLoader()
     ref = (
-        '{"dir_prefix":"sg","dir_separator":"-",' 
+        '{"dir_prefix":"sg","dir_separator":"-",'
         '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
     )
 
@@ -189,9 +189,7 @@ def test_normalize_target_key_lowercases_and_strips():
 def test_inline_json_loader_normalizes_platform_key():
     """Platform map key must be normalized regardless of JSON casing."""
     loader = InlineJsonConfigLoader()
-    ref = (
-        '{"dir_prefix":"sg","platforms":{"AWS":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
-    )
+    ref = '{"dir_prefix":"sg","platforms":{"AWS":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
     result = loader.load(ref=ref)
     assert result.is_success
     assert result.data is not None

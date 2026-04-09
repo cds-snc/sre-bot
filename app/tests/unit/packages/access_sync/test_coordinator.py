@@ -24,7 +24,6 @@ from packages.access_sync.desired_state import DirectoryMembershipBuilder
 from packages.access_sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access_sync.policies import (
     AdapterCapabilities,
-    EntitlementRule,
     PlatformPolicy,
 )
 
@@ -37,7 +36,9 @@ from packages.access_sync.policies import (
 class FakeAdapter:
     """Records all calls; configurable return values per method."""
 
-    def __init__(self, current_entitlement_ids: Set[str] | None = None, user_exists: bool = True) -> None:
+    def __init__(
+        self, current_entitlement_ids: Set[str] | None = None, user_exists: bool = True
+    ) -> None:
         self.calls: List[tuple] = []
         self._current_ids: Set[str] = current_entitlement_ids or set()
         self._disable_fails = False
@@ -183,7 +184,9 @@ def make_coordinator(
     discovered_groups: Set[str] | None = None,
 ) -> tuple[AccessSyncCoordinator, FakeAdapter]:
     if adapter is None:
-        adapter = FakeAdapter(current_entitlement_ids=current_ids or set(), user_exists=user_exists)
+        adapter = FakeAdapter(
+            current_entitlement_ids=current_ids or set(), user_exists=user_exists
+        )
     config = _make_config(platform=platform, authn_removal_mode=authn_removal_mode)
     directory = FakeDirectory(is_member=is_member, groups=discovered_groups or set())
     membership_builder = DirectoryMembershipBuilder(directory)

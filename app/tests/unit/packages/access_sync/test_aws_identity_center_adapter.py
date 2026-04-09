@@ -222,7 +222,9 @@ def test_list_all_provisioned_users_collects_primary_emails() -> None:
             },
             {
                 "UserId": "user-2",
-                "Emails": [{"Value": "Bob@example.com", "Primary": True}],
+                "Emails": [
+                    {"Value": "bob@example.com", "Primary": True},
+                ],
             },
         ]
     )
@@ -468,10 +470,6 @@ def test_resolve_group_id_caches_result() -> None:
     assert sum(1 for call in client.calls if call[0] == "list_groups") == 1
 
 
-@pytest.mark.unit
-def test_resolve_group_id_list_groups_failure_propagates() -> None:
-    """If list_groups fails, the error propagates from canonicalize_entitlement_id."""
-    client = FakeIdentityStoreClient()
 @pytest.mark.unit
 def test_resolve_group_id_list_groups_failure_propagates() -> None:
     """If list_groups fails, the error propagates from canonicalize_entitlement_id."""

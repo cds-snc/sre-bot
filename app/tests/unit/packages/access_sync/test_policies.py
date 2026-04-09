@@ -244,8 +244,7 @@ def test_plan_actions_user_should_exist_with_entitlements():
 
     assert any(a.action == "provision_user" for a in actions)
     assert any(
-        a.action == "apply_entitlement" and a.entitlement_id == "admin"
-        for a in actions
+        a.action == "apply_entitlement" and a.entitlement_id == "admin" for a in actions
     )
 
 
@@ -354,5 +353,7 @@ def test_plan_actions_entitlement_only_removal_mode_no_lifecycle():
         user_should_exist=False,
         required_entitlements=[],
     )
-    lifecycle = [a.action for a in actions if a.action in {"disable_user", "remove_user"}]
+    lifecycle = [
+        a.action for a in actions if a.action in {"disable_user", "remove_user"}
+    ]
     assert lifecycle == []

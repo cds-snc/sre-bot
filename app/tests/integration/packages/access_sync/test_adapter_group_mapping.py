@@ -51,7 +51,7 @@ def test_resolve_effective_policy_strips_prefix_to_token(
 ):
     """sg-aws-{token} → entitlement_id={token} after resolve_effective_policy."""
     discovered = {
-        "sg-aws-authn",             # excluded — this is the authn group
+        "sg-aws-authn",  # excluded — this is the authn group
         "sg-aws-my-security-group",
         "sg-aws-finops-readonly",
     }
@@ -83,9 +83,9 @@ def test_resolve_effective_policy_excludes_non_platform_slugs(
     """Groups from other platforms must not bleed into an aws effective policy."""
     discovered = {
         "sg-aws-admin",
-        "sg-gcp-viewer",        # different platform
-        "sg-fake-operator",     # different platform
-        "unrelated-group",      # no matching prefix at all
+        "sg-gcp-viewer",  # different platform
+        "sg-fake-operator",  # different platform
+        "unrelated-group",  # no matching prefix at all
     }
     effective = resolve_effective_policy(aws_config, "aws", discovered)
 
@@ -106,9 +106,11 @@ def test_adapter_resolves_token_to_group_id_exact_match(
     discovered = {"sg-aws-my-security-group"}
     effective = resolve_effective_policy(aws_config, "aws", discovered)
 
-    adapter, _ = make_adapter([
-        {"GroupId": "aaa-111-uuid", "DisplayName": "my-security-group"},
-    ])
+    adapter, _ = make_adapter(
+        [
+            {"GroupId": "aaa-111-uuid", "DisplayName": "my-security-group"},
+        ]
+    )
 
     rule = effective.entitlement_rules[0]
     assert rule.entitlement_id == "my-security-group"
@@ -127,9 +129,11 @@ def test_adapter_resolves_token_to_group_id_normalized_match(
     discovered = {"sg-aws-finops-readonly"}
     effective = resolve_effective_policy(aws_config, "aws", discovered)
 
-    adapter, _ = make_adapter([
-        {"GroupId": "bbb-222-uuid", "DisplayName": "FinOps-ReadOnly"},
-    ])
+    adapter, _ = make_adapter(
+        [
+            {"GroupId": "bbb-222-uuid", "DisplayName": "FinOps-ReadOnly"},
+        ]
+    )
 
     rule = effective.entitlement_rules[0]
     assert rule.entitlement_id == "finops-readonly"
@@ -158,11 +162,13 @@ def test_full_pipeline_multiple_groups(aws_config: AccessSyncRuntimeConfig):
     }
     effective = resolve_effective_policy(aws_config, "aws", discovered)
 
-    adapter, _ = make_adapter([
-        {"GroupId": "aaa-111-uuid", "DisplayName": "my-security-group"},
-        {"GroupId": "bbb-222-uuid", "DisplayName": "FinOps-ReadOnly"},
-        {"GroupId": "ccc-333-uuid", "DisplayName": "breakglass-admin"},
-    ])
+    adapter, _ = make_adapter(
+        [
+            {"GroupId": "aaa-111-uuid", "DisplayName": "my-security-group"},
+            {"GroupId": "bbb-222-uuid", "DisplayName": "FinOps-ReadOnly"},
+            {"GroupId": "ccc-333-uuid", "DisplayName": "breakglass-admin"},
+        ]
+    )
 
     expected = {
         "my-security-group": "aaa-111-uuid",

@@ -137,7 +137,9 @@ class AccessSyncCoordinator:
 
         assert policy is not None and adapter is not None  # narrowing
 
-        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
+        discovered = self._membership_builder.discover_group_slugs(
+            self._config, platform
+        )
         effective = resolve_effective_policy(self._config, platform, discovered)
 
         desired_result = self._membership_builder.build_user_state_from_effective(
@@ -198,7 +200,9 @@ class AccessSyncCoordinator:
         assert policy is not None and adapter is not None  # narrowing
 
         # Resolve effective policy once for the entire run.
-        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
+        discovered = self._membership_builder.discover_group_slugs(
+            self._config, platform
+        )
         effective = resolve_effective_policy(self._config, platform, discovered)
 
         adapter_capabilities = adapter.capabilities()
@@ -228,15 +232,17 @@ class AccessSyncCoordinator:
         has_sync_managed = bool(effective.sync_managed_rules())
 
         # Lifecycle-only policies can skip users already in sync.
-        candidate_subjects, all_subjects, lifecycle_delta_optimized = self._select_subjects(
-            idp_members=idp_members,
-            orphans=orphans,
-            precomputed_current_ids=precomputed_current_ids,
-            provisioned=provisioned,
-            provisioned_known=provisioned_known,
-            has_sync_managed=has_sync_managed,
-            adapter_capabilities=adapter_capabilities,
-            log=log,
+        candidate_subjects, all_subjects, lifecycle_delta_optimized = (
+            self._select_subjects(
+                idp_members=idp_members,
+                orphans=orphans,
+                precomputed_current_ids=precomputed_current_ids,
+                provisioned=provisioned,
+                provisioned_known=provisioned_known,
+                has_sync_managed=has_sync_managed,
+                adapter_capabilities=adapter_capabilities,
+                log=log,
+            )
         )
 
         # Phase 4: per-user convergence — zero additional IDP calls.
@@ -366,7 +372,9 @@ class AccessSyncCoordinator:
         log,
     ) -> tuple[Set[str], Set[str], bool]:
         """Select all candidate users and the subset to process this run."""
-        candidate_subjects: Set[str] = idp_members | orphans | set(precomputed_current_ids)
+        candidate_subjects: Set[str] = (
+            idp_members | orphans | set(precomputed_current_ids)
+        )
         lifecycle_delta_optimized = False
 
         if (
