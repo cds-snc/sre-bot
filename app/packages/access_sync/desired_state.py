@@ -4,22 +4,12 @@ This module translates IDP group membership data into the typed
 ``DesiredUserState`` shape consumed by the coordinator and ``PolicyEngine``.
 It makes no adapter calls — all I/O is read-only directory queries.
 
-Two execution paths are supported:
-
-* **On-demand (single user)** — ``build_user_state`` / ``build_user_state_from_effective``.
-  The coordinator calls these during ``sync_user`` to determine whether one
-  user should exist and which entitlements they qualify for.
-
-* **Batch (platform reconciliation)** — ``build_platform_states`` /
-  ``build_platform_states_from_effective``.
-  The coordinator calls these during ``sync_platform``.  One
-  ``get_group_members`` call per policy group returns membership for all users
-  simultaneously, reducing IDP calls from O(users × groups) to O(groups).
-
-Both paths accept either a raw ``PlatformPolicy`` (which triggers an internal
-``discover_group_slugs`` + ``resolve_effective_policy`` call) or a
-pre-resolved ``EffectivePlatformPolicy`` (when the coordinator has already
-resolved effective policy once and wishes to reuse it).
+The coordinator resolves effective policy once per run via
+``resolve_effective_policy`` and passes the result to
+``build_user_state_from_effective`` (single-user) or
+``build_platform_states_from_effective`` (batch reconciliation).  Discovery
+of IDP groups is handled by ``discover_group_slugs`` which queries the
+directory with the platform prefix and returns matching slugs.
 """
 
 from typing import Dict, List, Set, TYPE_CHECKING
@@ -31,12 +21,11 @@ from packages.access_sync.domain import DesiredUserState
 from packages.access_sync.policies import (
     EffectivePlatformPolicy,
     EntitlementRule,
-    PlatformPolicy,
-    resolve_effective_policy,
 )
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
+    from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 
 logger = structlog.get_logger()
 
@@ -54,67 +43,6 @@ class DirectoryMembershipBuilder:
 
     def __init__(self, directory: "DirectoryProvider") -> None:
         self._directory = directory
-
-    def build_user_state(
-        self,
-        user_email: str,
-        policy: PlatformPolicy,
-    ) -> OperationResult[DesiredUserState]:
-        """Resolve one user's desired state against a raw ``PlatformPolicy``.
-
-        Internally calls ``discover_group_slugs`` and ``resolve_effective_policy``
-        before checking membership.  Use ``build_user_state_from_effective`` in
-        the coordinator when effective policy has already been resolved for the
-        run, to avoid redundant IDP discovery calls.
-
-        Returns ``OperationResult[DesiredUserState]`` — success with
-        ``user_should_exist=True/False`` and the list of entitlement rules the
-        user qualifies for.  Returns an error result if the authn group cannot
-        be resolved or a membership check fails.
-        """
-        authn_result = self._check_group_membership(policy.authn_group_slug, user_email)
-        if not authn_result.is_success:
-            return OperationResult.error(
-                authn_result.status,
-                message=authn_result.message,
-                error_code=authn_result.error_code,
-            )
-        if not isinstance(authn_result.data, bool):
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message="Invalid authn membership result",
-                error_code="INVALID_MEMBERSHIP_RESULT",
-            )
-
-        required_entitlements: List[EntitlementRule] = []
-        if authn_result.data:
-            discovered = self.discover_group_slugs(policy)
-            effective = resolve_effective_policy(policy, discovered)
-            required_entitlements = self._resolve_member_entitlements(
-                user_email=user_email,
-                platform=effective.platform,
-                rules=effective.sync_managed_rules(),
-            )
-
-        return OperationResult.success(
-            data=DesiredUserState(
-                user_should_exist=authn_result.data,
-                required_entitlements=required_entitlements,
-            )
-        )
-
-    def build_platform_states(
-        self,
-        policy: PlatformPolicy,
-    ) -> OperationResult[Dict[str, DesiredUserState]]:
-        """Batch-read authn and entitlement groups into per-user desired state.
-
-        Convenience wrapper: discovers group slugs and resolves effective policy,
-        then delegates to build_platform_states_from_effective.
-        """
-        discovered = self.discover_group_slugs(policy)
-        effective = resolve_effective_policy(policy, discovered)
-        return self.build_platform_states_from_effective(effective)
 
     def build_user_state_from_effective(
         self,
@@ -228,16 +156,21 @@ class DirectoryMembershipBuilder:
 
         return OperationResult.success(data=desired)
 
-    def discover_group_slugs(self, policy: PlatformPolicy) -> Set[str]:
-        """Discover candidate group slugs for strategy-driven entitlement rules."""
-        strategy = policy.default_entitlement_strategy
-        if strategy is None or strategy.kind in {"none", "explicit_rules_only"}:
-            return set()
+    def discover_group_slugs(
+        self,
+        config: "AccessSyncRuntimeConfig",
+        platform: str,
+    ) -> Set[str]:
+        """Discover IDP group slugs for a platform by querying with the platform prefix.
 
-        query = strategy.source_group_prefix or ""
-        list_result = self._directory.list_groups(query=query)
+        Uses ``config.group_prefix(platform)`` as the query and filters results
+        to slugs that start with that prefix.  Returns an empty set on IDP
+        failure (non-fatal; the coordinator proceeds with an empty rule set).
+        """
+        prefix = config.group_prefix(platform)
+        list_result = self._directory.list_groups(query=prefix)
         if not list_result.is_success:
-            logger.bind(platform=policy.platform).warning(
+            logger.bind(platform=platform).warning(
                 "discover_groups_failed",
                 error=list_result.message,
             )
@@ -247,7 +180,9 @@ class DirectoryMembershipBuilder:
         return {
             group.group_slug.strip().lower()
             for group in groups
-            if group.group_slug and isinstance(group.group_slug, str)
+            if group.group_slug
+            and isinstance(group.group_slug, str)
+            and group.group_slug.strip().lower().startswith(prefix.lower())
         }
 
     def _check_group_membership(

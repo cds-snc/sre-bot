@@ -32,6 +32,7 @@ from packages.access_sync.adapters import (
     BulkGroupMembershipAdapter,
     EntitlementCanonicalizingAdapter,
 )
+from packages.access_sync.config.settings import AccessSyncRuntimeConfig
 from packages.access_sync.desired_state import DirectoryMembershipBuilder
 from packages.access_sync.domain import (
     DesiredUserState,
@@ -94,13 +95,13 @@ class AccessSyncCoordinator:
     def __init__(
         self,
         adapters: Mapping[str, AccessSyncAdapter],
-        policies: Mapping[str, PlatformPolicy],
+        config: AccessSyncRuntimeConfig,
         membership_builder: DirectoryMembershipBuilder,
         repository: "Optional[SyncRunRepository]" = None,
         dispatcher: Optional[EventDispatcher] = None,
     ) -> None:
         self._adapters = adapters
-        self._policies = policies
+        self._config = config
         self._membership_builder = membership_builder
         self._repository = repository
         self._dispatcher = dispatcher
@@ -136,8 +137,8 @@ class AccessSyncCoordinator:
 
         assert policy is not None and adapter is not None  # narrowing
 
-        discovered = self._membership_builder.discover_group_slugs(policy)
-        effective = resolve_effective_policy(policy, discovered)
+        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
+        effective = resolve_effective_policy(self._config, platform, discovered)
 
         desired_result = self._membership_builder.build_user_state_from_effective(
             user_email=user_email,
@@ -197,8 +198,8 @@ class AccessSyncCoordinator:
         assert policy is not None and adapter is not None  # narrowing
 
         # Resolve effective policy once for the entire run.
-        discovered = self._membership_builder.discover_group_slugs(policy)
-        effective = resolve_effective_policy(policy, discovered)
+        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
+        effective = resolve_effective_policy(self._config, platform, discovered)
 
         adapter_capabilities = adapter.capabilities()
 
@@ -212,9 +213,113 @@ class AccessSyncCoordinator:
         idp_members: Set[str] = set(desired_states.keys())
 
         # Phase 2: orphan detection.
+        provisioned, provisioned_known, orphans = self._detect_orphans(
+            adapter=adapter,
+            idp_members=idp_members,
+            log=log,
+        )
+
+        # Phase 3: current entitlement prefetch for delta planning.
+        precomputed_current_ids, prefetch_complete = self._prefetch_current_ids(
+            effective=effective,
+            adapter=adapter,
+            log=log,
+        )
+        has_sync_managed = bool(effective.sync_managed_rules())
+
+        # Lifecycle-only policies can skip users already in sync.
+        candidate_subjects, all_subjects, lifecycle_delta_optimized = self._select_subjects(
+            idp_members=idp_members,
+            orphans=orphans,
+            precomputed_current_ids=precomputed_current_ids,
+            provisioned=provisioned,
+            provisioned_known=provisioned_known,
+            has_sync_managed=has_sync_managed,
+            adapter_capabilities=adapter_capabilities,
+            log=log,
+        )
+
+        # Phase 4: per-user convergence — zero additional IDP calls.
+        (
+            users_synced,
+            users_converged,
+            requires_manual_action_count,
+            per_user,
+        ) = self._sync_platform_users(
+            all_subjects=all_subjects,
+            platform=platform,
+            adapter=adapter,
+            effective=effective,
+            desired_states=desired_states,
+            dry_run=dry_run,
+            reconcile_id=reconcile_id,
+            prefetch_complete=prefetch_complete,
+            precomputed_current_ids=precomputed_current_ids,
+            provisioned_known=provisioned_known,
+            provisioned=provisioned,
+            log=log,
+        )
+
+        reconciliation_outcome = ReconciliationOutcome(
+            platform=platform,
+            users_synced=users_synced,
+            users_converged=users_converged,
+            orphans_found=len(orphans),
+            requires_manual_action_count=requires_manual_action_count,
+            dry_run=dry_run,
+            per_user=per_user,
+        )
+
+        # Build action breakdown from per-user planned actions for a single
+        # queryable summary line — avoids scanning N per-user log lines to
+        # answer "what would this run actually do?".
+        actions_breakdown: Dict[str, int] = {}
+        for outcome in per_user.values():
+            for action in outcome.planned_actions:
+                actions_breakdown[action] = actions_breakdown.get(action, 0) + 1
+        planned_actions_total = sum(actions_breakdown.values())
+
+        log.info(
+            "sync_platform_completed",
+            users_synced=users_synced,
+            users_converged=users_converged,
+            orphans_found=len(orphans),
+            requires_manual_action=requires_manual_action_count,
+            planned_actions_total=planned_actions_total,
+            planned_actions_breakdown=actions_breakdown,
+        )
+
+        if self._dispatcher:
+            self._dispatcher.dispatch_background(
+                Event(
+                    event_type=sync_events.PLATFORM_SYNC_COMPLETED,
+                    metadata={
+                        "platform": platform,
+                        "users_synced": users_synced,
+                        "users_converged": users_converged,
+                        "orphans_found": len(orphans),
+                        "requires_manual_action_count": requires_manual_action_count,
+                        "dry_run": dry_run,
+                        "subjects_total": len(candidate_subjects),
+                        "subjects_processed": len(all_subjects),
+                        "lifecycle_delta_optimized": lifecycle_delta_optimized,
+                    },
+                )
+            )
+
+        return OperationResult.success(data=reconciliation_outcome)
+
+    def _detect_orphans(
+        self,
+        adapter: AccessSyncAdapter,
+        idp_members: Set[str],
+        log,
+    ) -> tuple[Set[str], bool, Set[str]]:
+        """Return provisioned users, whether that set is known, and orphan users."""
         provisioned: Set[str] = set()
         provisioned_known = False
         orphans: Set[str] = set()
+
         provisioned_result = adapter.list_all_provisioned_users()
         if provisioned_result.is_success and provisioned_result.data is not None:
             provisioned = provisioned_result.data
@@ -224,29 +329,46 @@ class AccessSyncCoordinator:
         else:
             log.warning("orphan_detection_skipped", error=provisioned_result.message)
 
-        # Phase 3: current entitlement prefetch for delta planning.
+        return provisioned, provisioned_known, orphans
+
+    def _prefetch_current_ids(
+        self,
+        effective: EffectivePlatformPolicy,
+        adapter: AccessSyncAdapter,
+        log,
+    ) -> tuple[Dict[str, Set[str]], bool]:
+        """Prefetch and return platform entitlement IDs by user."""
         precomputed_current_ids: Dict[str, Set[str]] = {}
-        prefetch_complete = False
-        has_sync_managed = bool(effective.sync_managed_rules())
         prefetch_result = self._prefetch_current_entitlements(effective, adapter)
         if prefetch_result.is_success and isinstance(prefetch_result.data, dict):
             precomputed_current_ids = prefetch_result.data
-            prefetch_complete = True
             log.info(
                 "prefetched_current_entitlements",
                 users=len(precomputed_current_ids),
             )
-        else:
-            log.warning(
-                "prefetch_current_entitlements_skipped",
-                error=prefetch_result.message,
-            )
+            return precomputed_current_ids, True
 
-        # Lifecycle-only policies can skip users already in sync.
-        candidate_subjects: Set[str] = (
-            idp_members | orphans | set(precomputed_current_ids)
+        log.warning(
+            "prefetch_current_entitlements_skipped",
+            error=prefetch_result.message,
         )
+        return precomputed_current_ids, False
+
+    def _select_subjects(
+        self,
+        idp_members: Set[str],
+        orphans: Set[str],
+        precomputed_current_ids: Dict[str, Set[str]],
+        provisioned: Set[str],
+        provisioned_known: bool,
+        has_sync_managed: bool,
+        adapter_capabilities,
+        log,
+    ) -> tuple[Set[str], Set[str], bool]:
+        """Select all candidate users and the subset to process this run."""
+        candidate_subjects: Set[str] = idp_members | orphans | set(precomputed_current_ids)
         lifecycle_delta_optimized = False
+
         if (
             not has_sync_managed
             and provisioned_known
@@ -264,8 +386,24 @@ class AccessSyncCoordinator:
             subjects_processed=len(all_subjects),
             lifecycle_delta_optimized=lifecycle_delta_optimized,
         )
+        return candidate_subjects, all_subjects, lifecycle_delta_optimized
 
-        # Phase 4: per-user convergence — zero additional IDP calls.
+    def _sync_platform_users(
+        self,
+        all_subjects: Set[str],
+        platform: str,
+        adapter: AccessSyncAdapter,
+        effective: EffectivePlatformPolicy,
+        desired_states: Dict[str, DesiredUserState],
+        dry_run: bool,
+        reconcile_id: str,
+        prefetch_complete: bool,
+        precomputed_current_ids: Dict[str, Set[str]],
+        provisioned_known: bool,
+        provisioned: Set[str],
+        log,
+    ) -> tuple[int, int, int, Dict[str, SyncOutcome]]:
+        """Run per-user convergence over all selected subjects."""
         users_synced = 0
         users_converged = 0
         requires_manual_action_count = 0
@@ -274,15 +412,19 @@ class AccessSyncCoordinator:
         for email in sorted(all_subjects):
             user_run_id = reconcile_id
             user_log = logger.bind(
-                user_email=email, platform=platform, run_id=user_run_id
+                user_email=email,
+                platform=platform,
+                run_id=user_run_id,
             )
             desired_state = desired_states.get(
                 email,
                 DesiredUserState(user_should_exist=False),
             )
+
             current_ids_for_user: Optional[Set[str]] = None
             if prefetch_complete:
                 current_ids_for_user = precomputed_current_ids.get(email)
+
             precomputed_exists: Optional[bool] = None
             if provisioned_known:
                 precomputed_exists = email in provisioned
@@ -321,42 +463,7 @@ class AccessSyncCoordinator:
                     error_code=result.error_code,
                 )
 
-        reconciliation_outcome = ReconciliationOutcome(
-            platform=platform,
-            users_synced=users_synced,
-            users_converged=users_converged,
-            orphans_found=len(orphans),
-            requires_manual_action_count=requires_manual_action_count,
-            dry_run=dry_run,
-            per_user=per_user,
-        )
-        log.info(
-            "sync_platform_completed",
-            users_synced=users_synced,
-            users_converged=users_converged,
-            orphans_found=len(orphans),
-            requires_manual_action=requires_manual_action_count,
-        )
-
-        if self._dispatcher:
-            self._dispatcher.dispatch_background(
-                Event(
-                    event_type=sync_events.PLATFORM_SYNC_COMPLETED,
-                    metadata={
-                        "platform": platform,
-                        "users_synced": users_synced,
-                        "users_converged": users_converged,
-                        "orphans_found": len(orphans),
-                        "requires_manual_action_count": requires_manual_action_count,
-                        "dry_run": dry_run,
-                        "subjects_total": len(candidate_subjects),
-                        "subjects_processed": len(all_subjects),
-                        "lifecycle_delta_optimized": lifecycle_delta_optimized,
-                    },
-                )
-            )
-
-        return OperationResult.success(data=reconciliation_outcome)
+        return users_synced, users_converged, requires_manual_action_count, per_user
 
     # ------------------------------------------------------------------
     # Private: target resolution
@@ -370,7 +477,7 @@ class AccessSyncCoordinator:
 
         Returns (policy, adapter, None) on success or (None, None, error) on failure.
         """
-        policy = self._policies.get(platform)
+        policy = self._config.platforms.get(platform)
         if policy is None:
             return (
                 None,
@@ -454,6 +561,7 @@ class AccessSyncCoordinator:
             user_should_exist=desired_state.user_should_exist,
             required_entitlements=canon.required_entitlements,
             current_entitlement_ids=current_ids,
+            platform_user_exists=platform_user_exists,
         )
         planned_actions = [str(a.action) for a in planned]
         log.info(
@@ -632,7 +740,7 @@ class AccessSyncCoordinator:
         user_email: str,
     ) -> OperationResult:
         """Dispatch a single planned action to the adapter."""
-        if action.action == "ensure_user":
+        if action.action == "provision_user":
             return adapter.ensure_user(user_email)
         if action.action == "disable_user":
             return adapter.disable_user(user_email)
