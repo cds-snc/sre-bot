@@ -528,15 +528,22 @@ class GoogleDirectoryProvider:
         return OperationResult.success(data=membership)
 
     def list_groups(self, query: str) -> OperationResult[list[DirectoryGroup]]:
-        """List groups matching a query string.
+        """List groups matching a Google Admin Directory query.
 
         Args:
-            query: IDP-specific query string passed to the Directory API.
+            query: Google Admin Directory search clause(s).  Bare strings
+                without a field operator are translated to ``email:{query}*``.
+                Queries containing ``:`` or ``=`` are passed through unchanged.
 
         Returns:
             OperationResult: success with the matching DirectoryGroup list.
         """
-        result = self._directory.list_groups(query=query)
+        if ":" not in query and "=" not in query:
+            google_query = f"email:{query}*"
+        else:
+            google_query = query
+
+        result = self._directory.list_groups(query=google_query)
         if not result.is_success:
             return self._typed_error(result)
 
