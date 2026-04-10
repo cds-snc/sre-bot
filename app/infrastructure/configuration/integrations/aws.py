@@ -1,5 +1,7 @@
 """AWS integration settings."""
 
+from typing import Optional
+
 from pydantic import Field
 
 from infrastructure.configuration.base import IntegrationSettings
@@ -41,6 +43,14 @@ class AwsSettings(IntegrationSettings):
     LOGGING_ROLE_ARN: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
     INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
     INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
+    ENDPOINT_URL: Optional[str] = Field(
+        default=None,
+        alias="AWS_ENDPOINT_URL",
+        description=(
+            "Override endpoint URL for all AWS clients. "
+            "Set to http://dynamodb-local:8000 for local development."
+        ),
+    )
 
     THROTTLING_ERRS: list[str] = [
         "Throttling",
