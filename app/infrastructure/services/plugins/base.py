@@ -39,10 +39,14 @@ def auto_discover_plugins(
 
         logger.debug("scanning_base_path", path=str(path))
 
-        # Discover all packages in this base path
-        for pkg_info in pkgutil.iter_modules([str(path)]):
+        # Discover all packages in this base path, recursively.
+        # walk_packages descends into sub-packages so that namespace packages
+        # (e.g. packages/access/) are traversed and their feature sub-packages
+        # (e.g. packages/access/sync/, packages/access/catalog/) are registered.
+        # The prefix argument produces fully-qualified module names directly.
+        for pkg_info in pkgutil.walk_packages([str(path)], prefix=f"{base_path}."):
             if pkg_info.ispkg:
-                module_name = f"{base_path}.{pkg_info.name}"
+                module_name = pkg_info.name  # already fully qualified by walk_packages
                 try:
                     # Import the package - this executes __init__.py
                     # If __init__.py has @hookimpl functions, they get registered

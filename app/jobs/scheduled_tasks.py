@@ -12,7 +12,7 @@ from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
 
-from packages.access_sync.providers import (
+from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_runtime_config,
     get_access_sync_settings,
