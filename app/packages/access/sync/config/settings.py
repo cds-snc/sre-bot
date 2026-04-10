@@ -28,9 +28,9 @@ class AccessSyncSettings(BaseSettings):
 
     Environment Variables:
         ACCESS_SYNC_ENABLED: Master on/off switch. Default: false.
-        ACCESS_SYNC_CONFIG_SOURCE: Where to load runtime config from
+        ACCESS_CONFIG_SOURCE: Where to load runtime config from
             (bundle | inline_json | file_json | dynamodb | s3 | ssm). Default: bundle.
-        ACCESS_SYNC_CONFIG_REF: Reference key for the config document
+        ACCESS_CONFIG_REF: Reference key for the config document
             (table row PK, S3 key, SSM path, or bundle name).
         ACCESS_SYNC_CONFIG_REFRESH_SECONDS: How often to refresh runtime
             config in seconds (reserved for future cache invalidation).
@@ -48,11 +48,11 @@ class AccessSyncSettings(BaseSettings):
         "bundle", "inline_json", "file_json", "env", "dynamodb", "s3", "ssm"
     ] = Field(
         default="bundle",
-        alias="ACCESS_SYNC_CONFIG_SOURCE",
+        alias="ACCESS_CONFIG_SOURCE",
     )
     config_ref: str = Field(
         default="default",
-        alias="ACCESS_SYNC_CONFIG_REF",
+        alias="ACCESS_CONFIG_REF",
     )
     config_refresh_seconds: int = Field(
         default=300,

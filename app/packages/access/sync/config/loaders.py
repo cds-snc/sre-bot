@@ -6,8 +6,8 @@ loader factory.
 
 Config loader sources:
     bundle      - Built-in empty bundle. Default for local development.
-    inline_json - Parse ACCESS_SYNC_CONFIG_REF as inline JSON text.
-    file_json   - Read ACCESS_SYNC_CONFIG_REF as a path to a local JSON file.
+    inline_json - Parse ACCESS_CONFIG_REF as inline JSON text.
+    file_json   - Read ACCESS_CONFIG_REF as a path to a local JSON file.
     dynamodb    - Load from a DynamoDB item (reserved; not yet implemented).
     s3          - Load from an S3 object (reserved; not yet implemented).
     ssm         - Load from an SSM parameter (reserved; not yet implemented).
@@ -186,7 +186,7 @@ class BundleConfigLoader:
 
 
 class InlineJsonConfigLoader:
-    """Config loader that parses runtime policy from ACCESS_SYNC_CONFIG_REF JSON."""
+    """Config loader that parses runtime policy from ACCESS_CONFIG_REF JSON."""
 
     def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
         """Parse *ref* as JSON and build AccessSyncRuntimeConfig.
@@ -354,5 +354,5 @@ def get_access_sync_config_loader(source: str) -> AccessConfigLoader:
 
     raise NotImplementedError(
         f"Access Sync config source '{source}' is not yet implemented. "
-        "Use ACCESS_SYNC_CONFIG_SOURCE=bundle, inline_json, file_json, or env."
+        "Use ACCESS_CONFIG_SOURCE=bundle, inline_json, file_json, or env."
     )

@@ -148,7 +148,5 @@ def handle_status_command(payload: CommandPayload) -> CommandResponse:
         platform_list = ", ".join(f"`{p}`" for p in platforms)
         text = f"Access Sync — registered platforms: {platform_list}"
     else:
-        text = (
-            "Access Sync — no platforms registered (check ACCESS_SYNC_CONFIG_SOURCE)."
-        )
+        text = "Access Sync — no platforms registered (check ACCESS_CONFIG_SOURCE)."
     return CommandResponse(message=text, ephemeral=True)
