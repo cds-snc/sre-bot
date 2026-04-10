@@ -46,6 +46,28 @@ resource "aws_dynamodb_table" "sre_bot_access" {
   }
 }
 
+# Dedicated table for Access Requests lifecycle records.
+# Key scheme: PK = ACCESS_REQUEST#{request_id}, SK = REQUEST | DECISION#... | AUDIT#...
+# Kept separate from sre_bot_access (Access Sync audit runs) to allow independent
+# scaling, access policies, and retention settings.
+resource "aws_dynamodb_table" "sre_bot_access_requests" {
+  name           = "sre_bot_access_requests"
+  hash_key       = "PK"
+  range_key      = "SK"
+  read_capacity  = 2
+  write_capacity = 2
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+}
+
 
 resource "aws_dynamodb_table" "incidents_table" {
   name           = "incidents"
