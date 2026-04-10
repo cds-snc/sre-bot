@@ -25,7 +25,7 @@ from packages.access.sync.policies import (
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
-    from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+    from packages.access.common.config import AccessRuntimeConfig
 
 logger = structlog.get_logger()
 
@@ -158,7 +158,7 @@ class DirectoryMembershipBuilder:
 
     def discover_group_slugs(
         self,
-        config: "AccessSyncRuntimeConfig",
+        config: "AccessRuntimeConfig",
         platform: str,
     ) -> Set[str]:
         """Discover IDP group slugs for a platform by querying with the platform prefix.

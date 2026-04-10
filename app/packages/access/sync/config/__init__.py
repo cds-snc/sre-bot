@@ -10,6 +10,7 @@ from packages.access.sync.config.settings import (
     AccessSyncSettings,
     EntitlementModeOverride,
 )
+from packages.access.common.config import AccessRuntimeConfig
 from packages.access.sync.config.loaders import (
     AccessSyncConfigLoader,
     BundleConfigLoader,
@@ -23,6 +24,7 @@ from packages.access.sync.config.loaders import (
 __all__ = [
     # settings
     "AccessSyncSettings",
+    "AccessRuntimeConfig",
     "AccessSyncRuntimeConfig",
     "EntitlementModeOverride",
     # loaders

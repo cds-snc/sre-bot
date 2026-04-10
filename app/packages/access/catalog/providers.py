@@ -20,7 +20,7 @@ from packages.access.catalog.parsers import (
     FallbackCatalogSlugParser,
 )
 from packages.access.catalog.service import CatalogService
-from packages.access.sync.providers import get_access_sync_runtime_config
+from packages.access.sync.providers import get_access_runtime_config
 
 
 class CatalogSettings(BaseSettings):
@@ -56,7 +56,7 @@ def _build_parser_map() -> Dict[str, CatalogSlugParser]:
     block in the Access Sync runtime config JSON when present.  Platforms
     without parser config fall back to ``FallbackCatalogSlugParser``.
     """
-    runtime_config = get_access_sync_runtime_config()
+    runtime_config = get_access_runtime_config()
     catalog_ext = getattr(runtime_config, "catalog", None)
     parsers: Dict[str, CatalogSlugParser] = {}
 
@@ -86,7 +86,7 @@ def get_catalog_service() -> CatalogService:
     - Parser map (token decomposition per platform).
     - Display names from catalog extension config (optional).
     """
-    runtime_config = get_access_sync_runtime_config()
+    runtime_config = get_access_runtime_config()
     directory = get_directory_provider()
     parser_map = _build_parser_map()
 
