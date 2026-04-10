@@ -1,22 +1,23 @@
-"""Access Sync bootstrap settings and runtime domain models.
+"""Access Sync bootstrap settings and compatibility aliases.
 
 AccessSyncSettings reads env vars that select the runtime config source and
 control feature flags.
 
-Runtime domain models (AccessSyncRuntimeConfig, EntitlementModeOverride) live
-here because they depend only on policies.py and stdlib — no loader logic needed.
+Runtime domain models were moved to ``packages.access.common.config`` and are
+re-exported here for compatibility during the transition.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from packages.access.sync.policies import PlatformPolicy
+from packages.access.common.config import (
+    AccessRuntimeConfig,
+    EntitlementModeOverride as CommonEntitlementModeOverride,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -77,58 +78,7 @@ class AccessSyncSettings(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-# Runtime Domain Models
+# Compatibility aliases (transition)
 # ---------------------------------------------------------------------------
-@dataclass(frozen=True)
-class EntitlementModeOverride:
-    """Runtime per-group entitlement mode override record.
-
-    Written by Access Sync Admin and consumed by the runtime config loader to
-    amend the effective mode of individual entitlement groups at runtime without
-    code deploys.
-    """
-
-    platform: str
-    group_slug: str
-    mode: Literal["sync_managed", "ephemeral", "deactivated"]
-    reason: Optional[str] = None
-    requested_by: Optional[str] = None
-    expires_at: Optional[datetime] = None
-
-
-@dataclass(frozen=True)
-class AccessSyncRuntimeConfig:
-    """Fully-resolved runtime configuration for Access Sync.
-
-    Loaded once at startup via the config loader selected by bootstrap settings.
-    Contains the organization-wide group naming convention and per-platform
-    policies.  Slug construction -- platform prefix, authn group slug -- is
-    derived from ``dir_prefix``, ``dir_separator``, and the per-platform
-    ``PlatformPolicy.authn_token`` rather than stored explicitly.
-
-    Infrastructure clients (AWS, Google Workspace, etc.) are obtained separately
-    from infrastructure.services and come pre-configured with all needed bootstrap
-    settings (e.g., AWS_SSO_INSTANCE_ID). Feature configuration is limited to
-    group naming and policy definitions.
-    """
-
-    dir_prefix: str
-    dir_separator: str = "-"
-    platforms: Dict[str, PlatformPolicy] = field(default_factory=dict)
-    entitlement_mode_overrides: List[EntitlementModeOverride] = field(
-        default_factory=list
-    )
-
-    def group_prefix(self, platform: str) -> str:
-        """Return the IDP group slug prefix for a given platform.
-
-        Example: dir_prefix="sg", dir_separator="-", platform="aws" -> "sg-aws-".
-        """
-        return f"{self.dir_prefix}{self.dir_separator}{platform}{self.dir_separator}"
-
-    def authn_group_slug(self, platform: str) -> str:
-        """Return the full authn group slug for a given platform.
-
-        Example: "sg-aws-authn" when authn_token="authn".
-        """
-        return f"{self.group_prefix(platform)}{self.platforms[platform].authn_token}"
+AccessSyncRuntimeConfig = AccessRuntimeConfig
+EntitlementModeOverride = CommonEntitlementModeOverride

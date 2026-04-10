@@ -4,11 +4,16 @@ Use these constants when dispatching or subscribing to Access Sync events
 via ``EventDispatcher`` from ``infrastructure.events``.  String literals
 must not be used directly in coordinator or transport code.
 
-This module contains string constants only — no imports, no logic.
+This module contains event name constants only.
 """
 
-SYNC_COMPLETED = "access_sync.sync_completed"
-SYNC_FAILED = "access_sync.sync_failed"
+from packages.access.common.events import (
+    SYNC_COMPLETED as COMMON_SYNC_COMPLETED,
+    SYNC_FAILED as COMMON_SYNC_FAILED,
+)
+
+SYNC_COMPLETED = COMMON_SYNC_COMPLETED
+SYNC_FAILED = COMMON_SYNC_FAILED
 
 PLATFORM_SYNC_STARTED = "access_sync.platform_sync_started"
 PLATFORM_SYNC_COMPLETED = "access_sync.platform_sync_completed"

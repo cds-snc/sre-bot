@@ -17,14 +17,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Protocol
+from typing import Dict
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
-from packages.access.sync.policies import (
+from packages.access.common.config import (
+    AccessConfigLoader,
+    AccessRuntimeConfig,
     EntitlementMode,
     PlatformPolicy,
 )
@@ -102,31 +103,15 @@ class RuntimeConfigJsonSettings(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AccessSyncConfigLoader(Protocol):
-    """Protocol for Access Sync config loaders.
-
-    Each loader knows how to fetch and deserialise one runtime config document
-    from its backing store.
-    """
-
-    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
-        """Load the runtime config identified by *ref*.
-
-        Args:
-            ref: Source-specific reference (table PK, S3 key, SSM path, bundle name).
-
-        Returns:
-            OperationResult[AccessSyncRuntimeConfig] — success with data, or error.
-        """
-        ...
+AccessSyncConfigLoader = AccessConfigLoader
 
 
 def _build_runtime_config(
     dir_prefix: str,
     dir_separator: str,
     platforms_model: Dict[str, PlatformPolicyConfigModel],
-) -> AccessSyncRuntimeConfig:
-    """Convert validated JSON platform models into ``AccessSyncRuntimeConfig``."""
+) -> AccessRuntimeConfig:
+    """Convert validated JSON platform models into ``AccessRuntimeConfig``."""
     platforms: Dict[str, PlatformPolicy] = {}
 
     for key, raw_policy in platforms_model.items():
@@ -137,7 +122,7 @@ def _build_runtime_config(
         )
         platforms[normalize_target_key(key)] = policy
 
-    return AccessSyncRuntimeConfig(
+    return AccessRuntimeConfig(
         dir_prefix=dir_prefix,
         dir_separator=dir_separator,
         platforms=platforms,
@@ -147,7 +132,7 @@ def _build_runtime_config(
 def _validate_runtime_config_payload(
     payload: object,
     error_prefix: str,
-) -> OperationResult[AccessSyncRuntimeConfig]:
+) -> OperationResult[AccessRuntimeConfig]:
     """Validate parsed JSON payload and build runtime config."""
     try:
         validated = RuntimeConfigJsonSettings.model_validate(payload)
@@ -182,7 +167,7 @@ class BundleConfigLoader:
     Operators wire real platforms via an external source (dynamodb / s3 / ssm).
     """
 
-    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+    def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
         """Return an empty bundle config with no pre-configured platforms.
 
         Args:
@@ -193,7 +178,7 @@ class BundleConfigLoader:
             platforms dict. The feature will be in waiting mode until an
             external config source provides platform policies.
         """
-        config = AccessSyncRuntimeConfig(dir_prefix="", platforms={})
+        config = AccessRuntimeConfig(dir_prefix="", platforms={})
         return OperationResult.success(
             data=config,
             message=f"bundle_config_loaded ref={ref} platforms=0 (waiting mode)",
@@ -203,7 +188,7 @@ class BundleConfigLoader:
 class InlineJsonConfigLoader:
     """Config loader that parses runtime policy from ACCESS_SYNC_CONFIG_REF JSON."""
 
-    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+    def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
         """Parse *ref* as JSON and build AccessSyncRuntimeConfig.
 
         Expected shape::
@@ -260,7 +245,7 @@ class EnvConfigLoader:
             extra="ignore",
         )
 
-    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+    def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
         env = self._EnvModel()
 
         if not env.dir_prefix:
@@ -292,7 +277,7 @@ class EnvConfigLoader:
 class FileJsonConfigLoader:
     """Config loader that parses runtime policy from a JSON file path in ref."""
 
-    def load(self, ref: str) -> OperationResult[AccessSyncRuntimeConfig]:
+    def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
         """Read *ref* as a JSON file path and build AccessSyncRuntimeConfig."""
         path = Path(ref)
         if not path.exists():
@@ -342,7 +327,7 @@ class FileJsonConfigLoader:
 # ---------------------------------------------------------------------------
 
 
-def get_access_sync_config_loader(source: str) -> AccessSyncConfigLoader:
+def get_access_sync_config_loader(source: str) -> AccessConfigLoader:
     """Return the config loader for the given source string.
 
     Args:

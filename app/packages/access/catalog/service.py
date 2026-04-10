@@ -22,7 +22,7 @@ from packages.access.catalog.parsers import CatalogSlugParser, FallbackCatalogSl
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
-    from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+    from packages.access.common.config import AccessRuntimeConfig
 
 logger = structlog.get_logger()
 
@@ -55,7 +55,7 @@ class CatalogService:
 
     def __init__(
         self,
-        runtime_config: "AccessSyncRuntimeConfig",
+        runtime_config: "AccessRuntimeConfig",
         directory: "DirectoryProvider",
         parsers: Dict[str, CatalogSlugParser],
         display_names: Optional[Dict[str, str]] = None,

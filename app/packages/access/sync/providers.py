@@ -20,11 +20,11 @@ from infrastructure.services import (
     get_directory_provider,
     get_storage_service,
 )
+from packages.access.common.config import AccessRuntimeConfig
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.adapters import AccessSyncAdapter
 from packages.access.sync.config import (
-    AccessSyncRuntimeConfig,
     AccessSyncSettings,
     get_access_sync_config_loader,
 )
@@ -40,7 +40,7 @@ def get_access_sync_settings() -> AccessSyncSettings:
 
 
 @lru_cache(maxsize=1)
-def get_access_sync_runtime_config() -> AccessSyncRuntimeConfig:
+def get_access_runtime_config() -> AccessRuntimeConfig:
     """Load typed runtime config from the source selected by bootstrap settings.
 
     Returns feature-level configuration (policies, per-group overrides).
@@ -56,13 +56,19 @@ def get_access_sync_runtime_config() -> AccessSyncRuntimeConfig:
     loader = get_access_sync_config_loader(
         source=settings.config_source,
     )
-    result: OperationResult[AccessSyncRuntimeConfig] = loader.load(
+    result: OperationResult[AccessRuntimeConfig] = loader.load(
         ref=settings.config_ref,
     )
-    config: Optional[AccessSyncRuntimeConfig] = result.data
+    config: Optional[AccessRuntimeConfig] = result.data
     if not result.is_success or config is None:
         raise RuntimeError(f"access_sync_config_load_failed: {result.message}")
     return config
+
+
+@lru_cache(maxsize=1)
+def get_access_sync_runtime_config() -> AccessRuntimeConfig:
+    """Compatibility wrapper for renamed runtime config provider."""
+    return get_access_runtime_config()
 
 
 @lru_cache(maxsize=1)

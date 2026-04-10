@@ -26,71 +26,21 @@ Two layers of policy are defined here:
 Adapters must not duplicate any logic from this module.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING
 
+from packages.access.common.config import (
+    EntitlementMode,
+    EntitlementRule,
+    PlatformPolicy,
+)
+
 if TYPE_CHECKING:
-    from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+    from packages.access.common.config import AccessRuntimeConfig
 
-
-EntitlementMode = Literal["sync_managed", "ephemeral", "deactivated"]
-
-
-@dataclass(frozen=True)
-class EntitlementRule:
-    """Runtime binding of an IDP group slug to one platform entitlement.
-
-    ``group_slug`` -- the full IDP security group slug (e.g.
-    ``sg-aws-finops-readonly``).  Used by the desired-state builder to check
-    membership via the IDP directory.
-
-    ``entitlement_id`` -- the platform token (e.g. ``finops-readonly``).
-    Passed to the adapter which resolves it to a platform-native identifier
-    (e.g. an AWS IC GroupId via the group index).
-
-    ``entitlement_type`` -- platform capability type; defaults to ``"group"``
-    (v1 only supports group membership sync).
-
-    ``mode`` -- always ``"sync_managed"`` in the effective policy; ephemeral
-    and deactivated tokens are excluded at resolution time.
-    """
-
-    group_slug: str
-    entitlement_id: str
-    entitlement_type: str = "group"
-    mode: EntitlementMode = "sync_managed"
-
-
-@dataclass(frozen=True)
-class PlatformPolicy:
-    """Minimal per-platform configuration loaded from runtime config.
-
-    All slug construction is delegated to ``AccessSyncRuntimeConfig`` which
-    holds the organization-wide ``dir_prefix`` and ``dir_separator``.
-
-    ``authn_token`` -- the token segment identifying the lifecycle (authn)
-    group.  Combined with ``dir_prefix``, ``dir_separator``, and platform name
-    to derive the full authn group slug.  Defaults to ``"authn"``.
-
-    ``authn_removal_mode`` -- what to do when a user leaves the authn group:
-
-    * ``disable``           -- deactivate the user account on the platform.
-    * ``delete``            -- remove the user from the platform entirely.
-    * ``entitlement_only``  -- remove only managed entitlements; account left
-      intact and flagged for manual follow-up.
-
-    ``mode_overrides`` -- static config-time overrides for specific entitlement
-    tokens.  A token declared here with mode ``ephemeral`` or ``deactivated``
-    is silently excluded from the effective rule set; Access Sync will not
-    observe or touch those platform groups.  This is the only place where
-    token-level lifecycle exceptions are declared; there is no zero-config
-    auto-discovery -- the platform entry itself is the security authorization
-    decision.
-    """
-
-    authn_token: str = "authn"
-    authn_removal_mode: str = "delete"  # disable | delete | entitlement_only
-    mode_overrides: Dict[str, EntitlementMode] = field(default_factory=dict)
+# Backward-compatible re-exports for existing imports.
+PolicyEntitlementMode = EntitlementMode
+PolicyPlatformPolicy = PlatformPolicy
 
 
 @dataclass(frozen=True)
@@ -118,7 +68,7 @@ class EffectivePlatformPolicy:
 
 
 def resolve_effective_policy(
-    config: "AccessSyncRuntimeConfig",
+    config: "AccessRuntimeConfig",
     platform: str,
     discovered_slugs: Set[str],
 ) -> EffectivePlatformPolicy:

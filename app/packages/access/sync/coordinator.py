@@ -26,13 +26,13 @@ import structlog
 
 from infrastructure.events import Event, EventDispatcher
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access.common.config import AccessRuntimeConfig
 from packages.access.sync import events as sync_events
 from packages.access.sync.adapters import (
     AccessSyncAdapter,
     BulkGroupMembershipAdapter,
     EntitlementCanonicalizingAdapter,
 )
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     DesiredUserState,
@@ -95,7 +95,7 @@ class AccessSyncCoordinator:
     def __init__(
         self,
         adapters: Mapping[str, AccessSyncAdapter],
-        config: AccessSyncRuntimeConfig,
+        config: AccessRuntimeConfig,
         membership_builder: DirectoryMembershipBuilder,
         repository: "Optional[SyncRunRepository]" = None,
         dispatcher: Optional[EventDispatcher] = None,
