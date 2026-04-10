@@ -23,7 +23,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Optional, Protocol, TYPE_CHECKING
+from typing import Optional, Protocol, TYPE_CHECKING, Union
 
 import structlog
 
@@ -47,6 +47,7 @@ from packages.access.request.policies import (
 from packages.access.request.store import AccessRequestRepository
 
 if TYPE_CHECKING:
+    from infrastructure.directory.models import DirectoryMember
     from infrastructure.directory.provider import DirectoryProvider
 
 logger = structlog.get_logger()
@@ -381,6 +382,7 @@ class AccessRequestService:
         # Step 8: for auto-approved requests, write the membership change to the
         # IDP immediately. Direction is determined by request_type.
         if auto_approved:
+            idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
             if request_type == "grant":
                 idp_result = self._directory.add_group_member(
                     directory_group.group_email, user_email
@@ -559,6 +561,7 @@ class AccessRequestService:
         if meets_minimum_approver_count(all_decisions, self._min_approver_count):
             # Write the membership change to the IDP — source of truth — before
             # publishing the event. Direction is determined by request_type.
+            idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
             if request.request_type == "grant":
                 idp_result = self._directory.add_group_member(
                     request.group_email, request.user_email
@@ -831,6 +834,7 @@ class AccessRequestService:
 
         now = datetime.now(tz=timezone.utc)
 
+        idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
         if request.request_type == "grant":
             idp_result = self._directory.add_group_member(
                 request.group_email, request.user_email
