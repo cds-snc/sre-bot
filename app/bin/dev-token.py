@@ -57,7 +57,7 @@ BIND_HOST = "127.0.0.1"
 AUDIENCE = "sre-bot-dev"
 SUBJECT = "dev-user"
 EMAIL = os.environ.get("DEV_TOKEN_EMAIL", "dev@local")
-SCOPE = "sre-bot:access-sync"
+SCOPE = "sre-bot:access-sync sre-bot:access-catalog"
 TTL_SECONDS = 3600
 
 
