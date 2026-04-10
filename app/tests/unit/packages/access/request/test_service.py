@@ -71,15 +71,15 @@ class FakeRepository:
     """In-memory repository stub."""
 
     def __init__(self) -> None:
-        self._requests: dict[str, AccessRequest] = {}
+        self._store: dict[str, AccessRequest] = {}
         self._decisions: dict[str, List[ApprovalDecision]] = {}
         self._audit: list = []
 
     def save_request(self, request: AccessRequest) -> None:
-        self._requests[request.request_id] = request
+        self._store[request.request_id] = request
 
     def get_request(self, request_id: str) -> Optional[AccessRequest]:
-        return self._requests.get(request_id)
+        return self._store.get(request_id)
 
     def save_decision(self, decision: ApprovalDecision) -> None:
         self._decisions.setdefault(decision.request_id, []).append(decision)
@@ -94,7 +94,7 @@ class FakeRepository:
         self, request_id: str
     ) -> tuple[Optional[AccessRequest], List[ApprovalDecision]]:
         return (
-            self._requests.get(request_id),
+            self._store.get(request_id),
             self._decisions.get(request_id, []),
         )
 
@@ -181,7 +181,7 @@ def test_submit_request_should_succeed_for_valid_self_request():
     assert result.is_success
     assert result.data is not None
     assert result.data.status == "pending_approval"
-    assert result.data.request_id in repo._requests
+    assert result.data.request_id in repo._store
 
 
 @pytest.mark.unit
@@ -371,8 +371,8 @@ def test_approve_request_should_reject_self_approval():
     # Force actor into resolved_approvers for this test
     from dataclasses import replace
 
-    req = repo._requests[submit.data.request_id]
-    repo._requests[submit.data.request_id] = replace(
+    req = repo._store[submit.data.request_id]
+    repo._store[submit.data.request_id] = replace(
         req, resolved_approvers=["actor@example.com"]
     )
 
@@ -474,7 +474,7 @@ def test_approve_request_should_fail_when_idp_write_fails():
 
     assert not result.is_success
     assert result.error_code == "IDP_WRITE_FAILED"
-    assert repo._requests[request_id].status == "failed"
+    assert repo._store[request_id].status == "failed"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" not in event_types
 
@@ -512,7 +512,7 @@ def test_submit_request_auto_approve_should_fail_when_idp_write_fails():
 
     assert not result.is_success
     assert result.error_code == "IDP_WRITE_FAILED"
-    stored = list(repo._requests.values())
+    stored = list(repo._store.values())
     assert len(stored) == 1
     assert stored[0].status == "failed"
     event_types = [e.event_type for e in dispatcher.dispatched]
@@ -638,7 +638,7 @@ def test_advance_from_sync_result_transitions_to_completed():
     )
     service.advance_from_sync_result(sync_event)
 
-    assert repo._requests[request_id].status == "completed"
+    assert repo._store[request_id].status == "completed"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_requests.request_completed" in event_types
 
@@ -669,7 +669,7 @@ def test_advance_from_sync_result_transitions_to_failed():
     )
     service.advance_from_sync_result(sync_event)
 
-    assert repo._requests[request_id].status == "failed"
+    assert repo._store[request_id].status == "failed"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_requests.request_failed" in event_types
 
@@ -713,12 +713,12 @@ def test_advance_from_sync_result_is_idempotent_for_completed_request():
         metadata={"request_id": request_id, "platform": "aws"},
     )
     service.advance_from_sync_result(sync_event)
-    assert repo._requests[request_id].status == "completed"
+    assert repo._store[request_id].status == "completed"
 
     dispatcher.dispatched.clear()
     # Second delivery — should be silent no-op
     service.advance_from_sync_result(sync_event)
-    assert repo._requests[request_id].status == "completed"
+    assert repo._store[request_id].status == "completed"
     assert dispatcher.dispatched == []
 
 
@@ -767,7 +767,7 @@ def test_retry_request_should_succeed_and_transition_to_approved():
     )
 
     assert result.is_success
-    assert repo._requests[request_id].status == "approved"
+    assert repo._store[request_id].status == "approved"
     assert any(
         e.event_type == "access_requests.request_approved"
         or e.event_type == "access_request_approved"
@@ -865,7 +865,7 @@ def test_retry_request_should_keep_failed_state_when_idp_write_fails_again():
     assert not result.is_success
     assert result.error_code == "IDP_WRITE_FAILED"
     # Status remains failed
-    assert repo._requests[request_id].status == "failed"
+    assert repo._store[request_id].status == "failed"
     # Audit event recorded
     assert any(
         getattr(e, "event_type", None) == "access_request_retry_failed"
