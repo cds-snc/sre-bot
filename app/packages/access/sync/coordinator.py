@@ -135,7 +135,12 @@ class AccessSyncCoordinator:
         if error is not None:
             return error
 
-        assert policy is not None and adapter is not None  # narrowing
+        if policy is None or adapter is None:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"No policy or adapter resolved for platform '{platform}'.",
+                error_code="PLATFORM_NOT_CONFIGURED",
+            )
 
         discovered = self._membership_builder.discover_group_slugs(
             self._config, platform
@@ -197,7 +202,12 @@ class AccessSyncCoordinator:
         if error is not None:
             return error
 
-        assert policy is not None and adapter is not None  # narrowing
+        if policy is None or adapter is None:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"No policy or adapter resolved for platform '{platform}'.",
+                error_code="PLATFORM_NOT_CONFIGURED",
+            )
 
         # Resolve effective policy once for the entire run.
         discovered = self._membership_builder.discover_group_slugs(
@@ -616,6 +626,7 @@ class AccessSyncCoordinator:
                             metadata={
                                 "platform": platform,
                                 "error_code": result.error_code,
+                                "request_id": request_id,
                             },
                         )
                     )
@@ -640,6 +651,7 @@ class AccessSyncCoordinator:
                         "platform": platform,
                         "applied": len(applied),
                         "dry_run": dry_run,
+                        "request_id": request_id,
                     },
                 )
             )

@@ -42,7 +42,7 @@ def startup_warmup(logger) -> None:
         logger.error(
             "access_catalog_provider_warmup_failed",
             error=str(exc),
-            hint="Check ACCESS_SYNC_CONFIG_SOURCE / ACCESS_SYNC_CONFIG_REF.",
+            hint="Check ACCESS_CONFIG_SOURCE / ACCESS_CONFIG_REF.",
         )
 
 

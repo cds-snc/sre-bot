@@ -6,7 +6,7 @@ Synchronizes user access between the Identity Provider (IDP) and external platfo
 
 ## How it works
 
-1. **Config loads** at startup from the source selected by `ACCESS_SYNC_CONFIG_SOURCE`. It defines the organization-wide group naming convention (`dir_prefix`, `dir_separator`) and one `PlatformPolicy` per platform.
+1. **Config loads** at startup from the source selected by `ACCESS_CONFIG_SOURCE`. It defines the organization-wide group naming convention (`dir_prefix`, `dir_separator`) and one `PlatformPolicy` per platform.
 2. **Group slugs are derived** from the config — not stored. For a platform `aws` with `dir_prefix=sg` and `dir_separator=-`, the prefix is `sg-aws-` and the authn group slug is `sg-aws-authn`.
 3. **Desired state is built** by querying the IDP for group membership under that prefix. Each IDP group `sg-aws-{token}` maps to `entitlement_id={token}`.
 4. **Current state is fetched** from the platform via its adapter.
@@ -47,7 +47,7 @@ Runtime config is a JSON document with this shape:
 
 ### Config sources (set via env vars)
 
-| `ACCESS_SYNC_CONFIG_SOURCE` | `ACCESS_SYNC_CONFIG_REF` | When to use |
+| `ACCESS_CONFIG_SOURCE` | `ACCESS_CONFIG_REF` | When to use |
 |---|---|---|
 | `bundle` (default) | ignored | Local dev — no platforms configured, feature in waiting mode |
 | `file_json` | Absolute path to a local JSON file | Local dev with a real config (e.g. `access-sync.local.json`) |
@@ -57,10 +57,10 @@ Runtime config is a JSON document with this shape:
 
 ### env source (production)
 
-When `ACCESS_SYNC_CONFIG_SOURCE=env`, no JSON file or inline document is needed. The loader reads three env vars that `entry.sh` populates from the SSM parameter bundle at container startup:
+When `ACCESS_CONFIG_SOURCE=env`, no JSON file or inline document is needed. The loader reads three env vars that `entry.sh` populates from the SSM parameter bundle at container startup:
 
 ```
-ACCESS_SYNC_CONFIG_SOURCE=env
+ACCESS_CONFIG_SOURCE=env
 ACCESS_SYNC_DIR_PREFIX=sg
 ACCESS_SYNC_DIR_SEPARATOR=-
 ACCESS_SYNC_PLATFORMS_JSON={"aws": {"authn_token": "authn", "authn_removal_mode": "delete"}}
@@ -71,8 +71,8 @@ ACCESS_SYNC_PLATFORMS_JSON={"aws": {"authn_token": "authn", "authn_removal_mode"
 **For local development**, use `file_json` instead:
 
 ```
-ACCESS_SYNC_CONFIG_SOURCE=file_json
-ACCESS_SYNC_CONFIG_REF=/workspace/app/packages/access/sync/access-sync.local.json
+ACCESS_CONFIG_SOURCE=file_json
+ACCESS_CONFIG_REF=/workspace/app/packages/access/access.local.json
 ```
 
 ### Scheduled reconciliation
