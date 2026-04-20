@@ -90,6 +90,59 @@ class GoogleDirectoryProvider:
 
         return ""
 
+    def _extract_group_aliases(self, item: dict[str, Any]) -> list[str]:
+        """Return normalized group aliases from Google group payload variants."""
+
+        aliases: list[str] = []
+        for key in ["aliases", "nonEditableAliases"]:
+            raw_aliases = item.get(key)
+            if not isinstance(raw_aliases, list):
+                continue
+            for raw_alias in raw_aliases:
+                if not isinstance(raw_alias, str):
+                    continue
+                normalized_alias = self._normalize_email(raw_alias)
+                if normalized_alias and normalized_alias not in aliases:
+                    aliases.append(normalized_alias)
+        return aliases
+
+    def _extract_managed_group_email(self, item: dict[str, Any]) -> str:
+        """Return the canonical managed-group email, preferring sg-* aliases."""
+
+        primary_email = self._extract_email(item, "email", "groupEmail")
+        aliases = self._extract_group_aliases(item)
+
+        for alias in aliases:
+            local_part, _, domain = alias.partition("@")
+            if not local_part.startswith("sg-"):
+                continue
+            if self._managed_group_domain and domain != self._managed_group_domain:
+                continue
+            return alias
+
+        return primary_email
+
+    def _managed_group_query_prefix(self, query: str) -> str | None:
+        """Return a managed-group prefix for alias-aware discovery queries."""
+
+        normalized_query = query.strip().lower()
+        if not normalized_query:
+            return None
+        if ":" not in normalized_query and "=" not in normalized_query:
+            return normalized_query if normalized_query.startswith("sg-") else None
+        if normalized_query.startswith("email:") and normalized_query.endswith("*"):
+            prefix = normalized_query[len("email:") : -1]
+            return prefix if prefix.startswith("sg-") else None
+        return None
+
+    def _matches_managed_group_prefix(self, item: dict[str, Any], prefix: str) -> bool:
+        """Return whether the group's primary email or aliases match a prefix."""
+
+        candidates = [self._extract_email(item, "email", "groupEmail")]
+        candidates.extend(self._extract_group_aliases(item))
+        normalized_prefix = prefix.strip().lower()
+        return any(candidate.startswith(normalized_prefix) for candidate in candidates)
+
     def _extract_display_name(self, item: dict[str, Any]) -> str | None:
         """Extract a stable display name from provider payload variants."""
 
@@ -190,7 +243,7 @@ class GoogleDirectoryProvider:
     ) -> OperationResult[DirectoryGroup | None]:
         """Convert a Google group record into a canonical directory group."""
 
-        group_email = self._extract_email(item, "email", "groupEmail")
+        group_email = self._extract_managed_group_email(item)
         if not group_email:
             if self._directory_settings.enforce_managed_group_email:
                 return OperationResult.permanent_error(
@@ -538,12 +591,20 @@ class GoogleDirectoryProvider:
         Returns:
             OperationResult: success with the matching DirectoryGroup list.
         """
-        if ":" not in query and "=" not in query:
-            google_query = f"email:{query}*"
+        managed_prefix = self._managed_group_query_prefix(query)
+        if managed_prefix is not None:
+            self._logger.info(
+                "listing_groups_alias_aware",
+                query=query,
+                managed_prefix=managed_prefix,
+            )
+            result = self._directory.list_groups()
         else:
-            google_query = query
-
-        result = self._directory.list_groups(query=google_query)
+            if ":" not in query and "=" not in query:
+                google_query = f"email:{query}*"
+            else:
+                google_query = query
+            result = self._directory.list_groups(query=google_query)
         if not result.is_success:
             return self._typed_error(result)
 
@@ -553,8 +614,17 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
             )
 
+        raw_groups = result.data
+        if managed_prefix is not None:
+            raw_groups = [
+                item
+                for item in raw_groups
+                if isinstance(item, dict)
+                and self._matches_managed_group_prefix(item, managed_prefix)
+            ]
+
         groups: list[DirectoryGroup] = []
-        for item in result.data:
+        for item in raw_groups:
             if not isinstance(item, dict):
                 return OperationResult.permanent_error(
                     message="Directory groups payload contains an invalid entry",

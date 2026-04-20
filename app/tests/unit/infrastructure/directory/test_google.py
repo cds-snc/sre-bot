@@ -820,9 +820,7 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        mock_google_clients.directory.list_groups.assert_called_once_with(
-            query="email:sg-*"
-        )
+        mock_google_clients.directory.list_groups.assert_called_once_with()
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(
         self, provider, mock_google_clients
@@ -844,9 +842,7 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        mock_google_clients.directory.list_groups.assert_called_once_with(
-            query="email:sg-*"
-        )
+        mock_google_clients.directory.list_groups.assert_called_once_with()
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -858,7 +854,41 @@ class TestListGroups:
             ),
         ]
 
-    def test_returns_error_when_group_email_is_missing(
+    def test_prefers_managed_alias_when_primary_email_uses_old_pattern(
+        self, provider, mock_google_clients
+    ):
+        # Arrange
+        mock_google_clients.directory.list_groups.return_value = (
+            OperationResult.success(
+                data=[
+                    {
+                        "email": "aws-finops@example.com",
+                        "aliases": ["sg-aws-finops@example.com"],
+                        "id": "group-10",
+                        "name": "FinOps",
+                    }
+                ]
+            )
+        )
+
+        # Act
+        result = provider.list_groups(query="sg-aws-")
+
+        # Assert
+        assert result.is_success
+        mock_google_clients.directory.list_groups.assert_called_once_with()
+        assert result.data == [
+            DirectoryGroup(
+                group_email="sg-aws-finops@example.com",
+                group_slug="sg-aws-finops",
+                provider_group_id="group-10",
+                name="FinOps",
+                description=None,
+                provider="google",
+            )
+        ]
+
+    def test_skips_groups_when_email_is_missing_for_alias_aware_discovery(
         self, provider, mock_google_clients
     ):
         # Arrange
@@ -870,8 +900,9 @@ class TestListGroups:
         result = provider.list_groups(query="sg-")
 
         # Assert
-        assert not result.is_success
-        assert result.error_code == "DIRECTORY_GROUP_EMAIL_REQUIRED"
+        assert result.is_success
+        assert result.data == []
+        mock_google_clients.directory.list_groups.assert_called_once_with()
 
     def test_returns_error_when_managed_group_domain_mismatches(
         self, provider, mock_google_clients
