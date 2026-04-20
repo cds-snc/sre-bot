@@ -80,6 +80,34 @@ class PlatformSyncResponse(BaseModel):
     requires_manual_action_count: Optional[int] = None
 
 
+class PlatformSyncJobAcceptedResponse(BaseModel):
+    """HTTP 202 response returned immediately when a platform sync job is enqueued."""
+
+    success: bool
+    sync_type: Literal["platform"] = "platform"
+    job_id: str
+    platform: str
+    dry_run: bool = False
+    status: Literal["in_progress"] = "in_progress"
+    started_at: str
+
+
+class PlatformSyncJobStatusResponse(BaseModel):
+    """HTTP response for polling the status of an enqueued platform sync job."""
+
+    job_id: str
+    platform: str
+    dry_run: bool
+    status: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    users_synced: Optional[int] = None
+    users_converged: Optional[int] = None
+    orphans_found: Optional[int] = None
+    requires_manual_action_count: Optional[int] = None
+    error: Optional[str] = None
+
+
 AccessSyncResponse = Annotated[
     Union[UserSyncResponse, PlatformSyncResponse],
     Field(discriminator="sync_type"),
