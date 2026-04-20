@@ -392,6 +392,22 @@ def test_resolve_group_id_exact_display_name() -> None:
 
 
 @pytest.mark.unit
+def test_resolve_group_id_non_uuid_skips_describe_group() -> None:
+    """Display-name tokens should not trigger describe_group UUID validation calls."""
+    client = FakeIdentityStoreClient()
+    client.list_groups_result = OperationResult.success(
+        data=_make_group_list(("scratch", "group-scratch-id"))
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.canonicalize_entitlement_id("group", "scratch")
+
+    assert result.is_success
+    assert result.data == "group-scratch-id"
+    assert all(call[0] != "describe_group" for call in client.calls)
+
+
+@pytest.mark.unit
 def test_resolve_group_id_normalized_display_name() -> None:
     """A token whose casefold matches an AWS IC group resolves via the index."""
     client = FakeIdentityStoreClient()

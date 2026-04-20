@@ -28,10 +28,19 @@ from packages.access.sync.policies import AdapterCapabilities
 
 logger = structlog.get_logger()
 
+_AWS_GROUP_ID_PATTERN = re.compile(
+    r"^([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$"
+)
+
 
 def normalize_group_name(value: str) -> str:
     """Normalize a group display name for case-insensitive comparison."""
     return value.strip().casefold()
+
+
+def _looks_like_group_id(value: str) -> bool:
+    """Return whether the token matches AWS Identity Store GroupId shape."""
+    return bool(_AWS_GROUP_ID_PATTERN.match(value.strip()))
 
 
 @dataclass(frozen=True)
@@ -215,12 +224,13 @@ class AwsIdentityCenterAdapter:
         if cached is not None:
             return OperationResult.success(data=cached)
 
-        # Step 1: UUID — verify with describe_group.
-        describe_result = self._aws.identitystore.describe_group(group_id=candidate)
-        if describe_result.is_success:
-            self._group_id_cache[candidate] = candidate
-            log.info("resolve_group_id_uuid", group_id=candidate)
-            return OperationResult.success(data=candidate)
+        # Step 1: UUID-shaped token — verify with describe_group.
+        if _looks_like_group_id(candidate):
+            describe_result = self._aws.identitystore.describe_group(group_id=candidate)
+            if describe_result.is_success:
+                self._group_id_cache[candidate] = candidate
+                log.info("resolve_group_id_uuid", group_id=candidate)
+                return OperationResult.success(data=candidate)
 
         # Steps 2-5: name-based lookup via group index.
         index_result = self._get_group_index()
