@@ -200,7 +200,11 @@ def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> Non
     )
     adapter = make_adapter(client)
 
-    result = adapter.apply_entitlement("alice@example.com", "group", "group-123")
+    result = adapter.apply_entitlement(
+        "alice@example.com",
+        "group",
+        "11111111-2222-3333-4444-555555555555",
+    )
 
     assert not result.is_success
     assert result.error_code == "ACCESS_DENIED"
@@ -240,10 +244,12 @@ def test_list_all_provisioned_users_collects_primary_emails() -> None:
 def test_list_members_for_groups_uses_bulk_path() -> None:
     """Bulk group read should map GroupMemberships.UserDetails to email sets."""
     client = FakeIdentityStoreClient()
+    group_1_id = "11111111-2222-3333-4444-555555555555"
+    group_2_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
     client.list_groups_with_memberships_result = OperationResult.success(
         data=[
             {
-                "GroupId": "group-1",
+                "GroupId": group_1_id,
                 "GroupMemberships": [
                     {
                         "MemberId": {"UserId": "u-1"},
@@ -260,19 +266,19 @@ def test_list_members_for_groups_uses_bulk_path() -> None:
                 ],
             },
             {
-                "GroupId": "group-2",
+                "GroupId": group_2_id,
                 "GroupMemberships": [],
             },
         ]
     )
     adapter = make_adapter(client)
 
-    result = adapter.list_members_for_groups({"group-1", "group-2"})
+    result = adapter.list_members_for_groups({group_1_id, group_2_id})
 
     assert result.is_success
     assert result.data == {
-        "group-1": {"alice@example.com"},
-        "group-2": set(),
+        group_1_id: {"alice@example.com"},
+        group_2_id: set(),
     }
     assert any(call[0] == "list_groups_with_memberships" for call in client.calls)
 
@@ -281,6 +287,7 @@ def test_list_members_for_groups_uses_bulk_path() -> None:
 def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
     """Fallback should call list_group_members when bulk orchestration fails."""
     client = FakeIdentityStoreClient()
+    group_1_id = "11111111-2222-3333-4444-555555555555"
     client.list_groups_with_memberships_result = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR,
         message="temporary failure",
@@ -301,10 +308,10 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
     )
     adapter = make_adapter(client)
 
-    result = adapter.list_members_for_groups({"group-1"})
+    result = adapter.list_members_for_groups({group_1_id})
 
     assert result.is_success
-    assert result.data == {"group-1": {"alice@example.com"}}
+    assert result.data == {group_1_id: {"alice@example.com"}}
     assert any(call[0] == "list_group_memberships" for call in client.calls)
 
 
@@ -360,15 +367,16 @@ def _make_group_list(*name_id_pairs: tuple[str, str]) -> list[dict[str, str]]:
 def test_resolve_group_id_uuid_passthrough() -> None:
     """A UUID that describe_group confirms should be returned as-is without index."""
     client = FakeIdentityStoreClient()
+    group_id = "11111111-2222-3333-4444-555555555555"
     client.describe_group_result = OperationResult.success(
-        data={"GroupId": "uuid-aaa", "DisplayName": "Admin"}
+        data={"GroupId": group_id, "DisplayName": "Admin"}
     )
     adapter = make_adapter(client)
 
-    result = adapter.canonicalize_entitlement_id("group", "uuid-aaa")
+    result = adapter.canonicalize_entitlement_id("group", group_id)
 
     assert result.is_success
-    assert result.data == "uuid-aaa"
+    assert result.data == group_id
     # list_groups should NOT have been called for UUID resolution
     assert all(call[0] != "list_groups" for call in client.calls)
 
