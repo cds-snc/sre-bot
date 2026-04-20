@@ -1,0 +1,29 @@
+access:
+  description: "Commandes de gestion des accès."
+
+access_sync:
+  description: "Commandes de synchronisation des accès — convergence des accès utilisateurs ou de plateforme selon la politique des groupes IDP."
+  user.description: "Synchroniser l'accès d'un utilisateur sur une plateforme et retourner un résumé des actions appliquées."
+  platform.description: "Soumettre un travail de synchronisation complet pour une plateforme et retourner un identifiant pour consulter le statut."
+  status.description: "Consulter le statut d'un travail de synchronisation de plateforme via son identifiant."
+
+  examples.sync_user: "`/sre access sync user user@example.com aws` - Synchroniser user@example.com sur la plateforme aws."
+  examples.sync_user_dry_run: "`/sre access sync user user@example.com aws --dry-run` - Prévisualiser les actions planifiées sans les exécuter."
+  examples.sync_platform: "`/sre access sync platform aws` - Soumettre une synchronisation complète pour la plateforme aws."
+  examples.sync_platform_dry_run: "`/sre access sync platform aws --dry-run` - Prévisualiser une synchronisation de plateforme sans l'exécuter."
+  examples.sync_status: "`/sre access sync status 550e8400-e29b-41d4-a716-446655440000` - Consulter le statut d'un travail de synchronisation."
+
+  user.result.sync_prefix: "Synchronisation terminée — actions appliquées"
+  user.result.dry_run_prefix: "Simulation — actions planifiées"
+  user.result.no_actions: "_(aucune)_"
+  user.result.manual_action_required: "⚠️ Certaines actions nécessitent une intervention manuelle."
+  user.result.not_found: "⚠️ Utilisateur ou plateforme introuvable\u00a0: {message}"
+  user.result.error: "❌ Synchronisation échouée\u00a0: {message}"
+
+  platform.result.enqueued: "✅ Travail de synchronisation soumis pour *{platform}*.\nIdentifiant\u00a0: `{job_id}`\nConsulter le statut\u00a0: `/sre access sync status {job_id}`"
+
+  status.result.not_found: "⚠️ Aucun travail de synchronisation trouvé avec l'identifiant\u00a0: `{job_id}`"
+  status.result.running: "⏳ Le travail `{job_id}` est *en cours* pour la plateforme *{platform}*.\nDémarré\u00a0: {started_at}"
+  status.result.completed: "✅ Le travail `{job_id}` est *terminé* pour la plateforme *{platform}*.\nUtilisateurs synchronisés\u00a0: {users_synced} | Convergés\u00a0: {users_converged} | Orphelins\u00a0: {orphans_found} | Actions manuelles\u00a0: {requires_manual_action_count}\nTerminé\u00a0: {completed_at}"
+  status.result.failed: "❌ Le travail `{job_id}` a *échoué* pour la plateforme *{platform}*.\nErreur\u00a0: {error}"
+  status.result.unknown: "❓ Le travail `{job_id}` a un statut inconnu\u00a0: *{status}*"

@@ -686,7 +686,14 @@ class AccessSyncCoordinator:
 
         Only runs when the adapter implements EntitlementCanonicalizingAdapter.
         Returns the effective policy and required entitlements with canonical IDs.
+
+        Entitlement rules that the platform cannot resolve (GROUP_ID_NOT_FOUND,
+        AMBIGUOUS_GROUP_NAME) are skipped with a warning so that config drift on
+        one group does not block the entire user sync.  All other errors are
+        still treated as hard failures.
         """
+        _SKIP_CODES = frozenset({"GROUP_ID_NOT_FOUND", "AMBIGUOUS_GROUP_NAME"})
+
         if not isinstance(adapter, EntitlementCanonicalizingAdapter):
             return OperationResult.success(
                 data=_Canon(
@@ -695,6 +702,8 @@ class AccessSyncCoordinator:
                 )
             )
 
+        log = logger.bind(platform=effective.platform)
+
         rule_by_key: dict = {}
         for rule in effective.entitlement_rules:
             result = adapter.canonicalize_entitlement_id(
@@ -702,6 +711,15 @@ class AccessSyncCoordinator:
                 entitlement_id=rule.entitlement_id,
             )
             if not result.is_success or not isinstance(result.data, str):
+                if result.error_code in _SKIP_CODES:
+                    log.error(
+                        "canonicalize_entitlement_skipped",
+                        entitlement_id=rule.entitlement_id,
+                        group_slug=rule.group_slug,
+                        error_code=result.error_code,
+                        reason=result.message,
+                    )
+                    continue
                 return OperationResult.error(
                     result.status,
                     message=result.message,
@@ -727,6 +745,15 @@ class AccessSyncCoordinator:
                     entitlement_id=rule.entitlement_id,
                 )
                 if not result.is_success or not isinstance(result.data, str):
+                    if result.error_code in _SKIP_CODES:
+                        log.error(
+                            "canonicalize_required_entitlement_skipped",
+                            entitlement_id=rule.entitlement_id,
+                            group_slug=rule.group_slug,
+                            error_code=result.error_code,
+                            reason=result.message,
+                        )
+                        continue
                     return OperationResult.error(
                         result.status,
                         message=result.message,

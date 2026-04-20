@@ -1,0 +1,29 @@
+access:
+  description: "Access management commands."
+
+access_sync:
+  description: "Access sync commands — converge user or platform access to IDP group membership policy."
+  user.description: "Sync a single user's access on a platform and return a summary of applied actions."
+  platform.description: "Enqueue a full platform-wide access sync job and return a job ID for status polling."
+  status.description: "Check the status of a platform sync job by its job ID."
+
+  examples.sync_user: "`/sre access sync user user@example.com aws` - Sync user@example.com on the aws platform."
+  examples.sync_user_dry_run: "`/sre access sync user user@example.com aws --dry-run` - Preview planned actions without executing."
+  examples.sync_platform: "`/sre access sync platform aws` - Enqueue a full sync for the aws platform."
+  examples.sync_platform_dry_run: "`/sre access sync platform aws --dry-run` - Preview a platform sync without executing."
+  examples.sync_status: "`/sre access sync status 550e8400-e29b-41d4-a716-446655440000` - Check the status of a sync job."
+
+  user.result.sync_prefix: "Sync complete — actions applied"
+  user.result.dry_run_prefix: "Dry-run — planned actions"
+  user.result.no_actions: "_(none)_"
+  user.result.manual_action_required: "⚠️ Some actions require manual follow-up."
+  user.result.not_found: "⚠️ User or platform not found: {message}"
+  user.result.error: "❌ Sync failed: {message}"
+
+  platform.result.enqueued: "✅ Platform sync job enqueued for *{platform}*.\nJob ID: `{job_id}`\nPoll status: `/sre access sync status {job_id}`"
+
+  status.result.not_found: "⚠️ No sync job found with ID: `{job_id}`"
+  status.result.running: "⏳ Sync job `{job_id}` is *running* for platform *{platform}*.\nStarted: {started_at}"
+  status.result.completed: "✅ Sync job `{job_id}` *completed* for platform *{platform}*.\nUsers synced: {users_synced} | Converged: {users_converged} | Orphans: {orphans_found} | Manual actions: {requires_manual_action_count}\nCompleted: {completed_at}"
+  status.result.failed: "❌ Sync job `{job_id}` *failed* for platform *{platform}*.\nError: {error}"
+  status.result.unknown: "❓ Sync job `{job_id}` has unknown status: *{status}*"

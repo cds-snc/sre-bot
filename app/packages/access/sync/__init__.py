@@ -7,7 +7,10 @@ trigger an immediate on-demand sync.
 Exports the FastAPI router for registration in the main application.
 """
 
+from pathlib import Path
+
 from infrastructure.events import register_event_handler
+from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.services import hookimpl
 from packages.access.common.events import REQUEST_APPROVED
 from packages.access.sync.transport import slack
@@ -74,6 +77,23 @@ def startup_warmup(logger) -> None:
 def register_routes(app):
     """Register access sync HTTP routes under /api/v1."""
     app.include_router(access_sync_router, prefix="/api/v1")
+
+
+@hookimpl
+def register_i18n_resources(registry) -> None:
+    """Register access sync translation resource locations."""
+    package_root = Path(__file__).parent
+    locales_path = package_root / "locales"
+
+    registry.register(
+        I18nResourceSpec(
+            owner="packages.access.sync",
+            path=str(locales_path),
+            required=False,
+            format="yaml",
+            domain="access_sync",
+        )
+    )
 
 
 __all__ = ["access_sync_router"]
