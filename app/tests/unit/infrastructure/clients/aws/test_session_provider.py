@@ -75,3 +75,21 @@ class TestSessionProvider:
 
         assert captured["service_name"] == "identitystore"
         assert captured["role_arn"] == "arn:aws:iam::123456789012:role/Mapped"
+
+    def test_build_client_kwargs_applies_endpoint_override_only_to_dynamodb(self):
+        """Custom endpoints should be scoped to DynamoDB local development only."""
+        provider = SessionProvider(
+            region="ca-central-1",
+            endpoint_url="http://dynamodb-local:8000",
+        )
+
+        dynamodb_kwargs = provider.build_client_kwargs(service_name="dynamodb")
+        identitystore_kwargs = provider.build_client_kwargs(
+            service_name="identitystore"
+        )
+
+        assert dynamodb_kwargs["client_config"] == {
+            "region_name": "ca-central-1",
+            "endpoint_url": "http://dynamodb-local:8000",
+        }
+        assert identitystore_kwargs["client_config"] == {"region_name": "ca-central-1"}

@@ -35,6 +35,16 @@ class SessionProvider:
         self.service_role_map = service_role_map
         self.endpoint_url = endpoint_url
 
+    @staticmethod
+    def _should_apply_endpoint_override(service_name: Optional[str]) -> bool:
+        """Return whether a custom endpoint override applies to the service.
+
+        The shared AWS endpoint override is reserved for local DynamoDB testing.
+        Applying it to all services routes calls like Identity Store to DynamoDB
+        Local, which fails with AWS API `InvalidAction` errors.
+        """
+        return service_name == "dynamodb"
+
     def get_role_arn_for_service(self, service_name: str) -> Optional[str]:
         """Get the role ARN to assume for the given AWS service.
 
@@ -83,7 +93,7 @@ class SessionProvider:
             session_config["region_name"] = self.region
             client_config["region_name"] = self.region
 
-        if self.endpoint_url:
+        if self.endpoint_url and self._should_apply_endpoint_override(service_name):
             client_config["endpoint_url"] = self.endpoint_url
 
         logger.debug(
