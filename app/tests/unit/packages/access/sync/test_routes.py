@@ -1,7 +1,7 @@
 """Unit tests for access sync route error sanitization."""
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 
 from infrastructure.identity.models import IdentitySource, User
 from infrastructure.operations import OperationResult, OperationStatus
@@ -68,6 +68,7 @@ def test_sync_endpoint_not_found_masks_internal_error():
     with pytest.raises(HTTPException) as exc_info:
         sync_endpoint(
             _make_request(),
+            response=Response(),
             coordinator=_FakeCoordinator(
                 OperationResult.error(
                     OperationStatus.NOT_FOUND,
@@ -89,6 +90,7 @@ def test_sync_endpoint_permanent_error_masks_internal_error():
     with pytest.raises(HTTPException) as exc_info:
         sync_endpoint(
             _make_request(),
+            response=Response(),
             coordinator=_FakeCoordinator(
                 OperationResult.error(
                     OperationStatus.PERMANENT_ERROR,
@@ -110,6 +112,7 @@ def test_sync_endpoint_unauthorized_masks_internal_error():
     with pytest.raises(HTTPException) as exc_info:
         sync_endpoint(
             _make_request(),
+            response=Response(),
             coordinator=_FakeCoordinator(
                 OperationResult.error(
                     OperationStatus.UNAUTHORIZED,
@@ -131,6 +134,7 @@ def test_sync_endpoint_internal_error_masks_internal_error():
     with pytest.raises(HTTPException) as exc_info:
         sync_endpoint(
             _make_request(),
+            response=Response(),
             coordinator=_FakeCoordinator(
                 OperationResult.error(
                     OperationStatus.TRANSIENT_ERROR,
@@ -154,6 +158,7 @@ def test_sync_endpoint_feature_disabled_returns_service_unavailable():
     with pytest.raises(HTTPException) as exc_info:
         sync_endpoint(
             _make_request(),
+            response=Response(),
             coordinator=_FakeCoordinator(OperationResult.success()),
             settings=_Settings(enabled=False),
             current_user=_make_user(),
