@@ -224,7 +224,11 @@ class DynamoDBClient:
         Performs a cheap `list_tables` call to verify the service is reachable.
         Returns OperationResult.success on success, or an error OperationResult.
         """
-        client_kwargs = self._session_provider.build_client_kwargs(role_arn=role_arn)
+        effective_role = role_arn or self._default_role_arn
+        client_kwargs = self._session_provider.build_client_kwargs(
+            service_name=self._service_name,
+            role_arn=effective_role,
+        )
         return execute_aws_api_call(
             "dynamodb",
             "list_tables",

@@ -78,6 +78,17 @@ class DirectoryMembershipBuilder:
                 rules=effective.sync_managed_rules(),
             )
 
+        logger.bind(user_email=user_email, platform=effective.platform).info(
+            "build_user_state_completed",
+            user_should_exist=authn_result.data,
+            required_entitlement_count=len(required_entitlements),
+            required_entitlement_group_slugs=[
+                rule.group_slug for rule in required_entitlements
+            ],
+            required_entitlement_ids=[
+                rule.entitlement_id for rule in required_entitlements
+            ],
+        )
         return OperationResult.success(
             data=DesiredUserState(
                 user_should_exist=authn_result.data,
@@ -168,22 +179,29 @@ class DirectoryMembershipBuilder:
         failure (non-fatal; the coordinator proceeds with an empty rule set).
         """
         prefix = config.group_prefix(platform)
+        log = logger.bind(platform=platform, group_prefix=prefix)
         list_result = self._directory.list_groups(query=prefix)
         if not list_result.is_success:
-            logger.bind(platform=platform).warning(
+            log.warning(
                 "discover_groups_failed",
                 error=list_result.message,
             )
             return set()
 
         groups = list_result.data if isinstance(list_result.data, list) else []
-        return {
+        discovered = {
             group.group_slug.strip().lower()
             for group in groups
             if group.group_slug
             and isinstance(group.group_slug, str)
             and group.group_slug.strip().lower().startswith(prefix.lower())
         }
+        log.info(
+            "discover_groups_completed",
+            discovered_count=len(discovered),
+            discovered_group_slugs=sorted(discovered),
+        )
+        return discovered
 
     def _check_group_membership(
         self,

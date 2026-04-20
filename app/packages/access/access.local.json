@@ -4,7 +4,10 @@
   "platforms": {
     "aws": {
       "authn_token": "authn",
-      "authn_removal_mode": "delete"
+      "authn_removal_mode": "delete",
+      "mode_overrides": {
+        "scratch": "deactivated"
+      }
     },
     "fake": {
       "authn_token": "authn",

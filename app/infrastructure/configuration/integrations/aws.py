@@ -47,7 +47,7 @@ class AwsSettings(IntegrationSettings):
         default=None,
         alias="AWS_ENDPOINT_URL",
         description=(
-            "Override endpoint URL for all AWS clients. "
+            "Override endpoint URL for DynamoDB clients only. "
             "Set to http://dynamodb-local:8000 for local development."
         ),
     )

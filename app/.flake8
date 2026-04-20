@@ -5,7 +5,7 @@
 # In most cases Black follows the rules below, but there are some exceptions
 # E203: whitespace before ':'
 # E501: line too long
-exclude = venv*, __pycache__, node_modules, cache, migrations, build
+exclude = venv*, .venv, __pycache__, node_modules, cache, migrations, build
 ignore = W503, W504, E203, E501
 per-file-ignores =
     # E704: Protocol stub methods use single-line `...` form (black-formatted)

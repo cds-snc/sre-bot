@@ -126,13 +126,26 @@ class TestAWSClientsFacade:
         assert clients.organizations._default_role_arn is None
 
     def test_facade_endpoint_url_configuration(self, mock_aws_settings):
-        """Test AWSClients passes endpoint_url configuration to SessionProvider."""
+        """Test AWSClients scopes endpoint_url configuration to DynamoDB clients."""
         mock_aws_settings.ENDPOINT_URL = "https://dynamodb.example.com"
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        # SessionProvider should have endpoint_url set
+        dynamodb_kwargs = clients._session_provider.build_client_kwargs(
+            service_name="dynamodb"
+        )
+        identitystore_kwargs = clients._session_provider.build_client_kwargs(
+            service_name="identitystore"
+        )
+
         assert clients._session_provider.endpoint_url == "https://dynamodb.example.com"
+        assert dynamodb_kwargs["client_config"] == {
+            "region_name": mock_aws_settings.AWS_REGION,
+            "endpoint_url": "https://dynamodb.example.com",
+        }
+        assert identitystore_kwargs["client_config"] == {
+            "region_name": mock_aws_settings.AWS_REGION,
+        }
 
     def test_facade_region_configuration(self, mock_aws_settings):
         """Test AWSClients passes region configuration to SessionProvider."""
