@@ -3,10 +3,12 @@
 Validates AWS Identity Store operations with default identity_store_id fallback.
 """
 
+from botocore.exceptions import ClientError
 import pytest
 
 from infrastructure.clients.aws import executor as aws_client
 from infrastructure.clients.aws.identity_store import IdentityStoreClient
+from infrastructure.operations import OperationStatus
 from infrastructure.clients.aws.session_provider import SessionProvider
 
 
@@ -132,3 +134,42 @@ class TestIdentityStoreClient:
 
         result = client.delete_user(user_id="user-123")
         assert result.is_success
+
+    def test_get_group_membership_id_maps_resource_not_found_to_not_found(
+        self, monkeypatch
+    ):
+        """Membership lookup misses should normalize to NOT_FOUND for adapter idempotency."""
+
+        session_provider = SessionProvider(region="us-east-1")
+        client = IdentityStoreClient(
+            session_provider=session_provider,
+            default_identity_store_id="store-1234567890",
+        )
+
+        def mock_boto3_client(
+            service_name, session_config=None, client_config=None, role_arn=None
+        ):
+            class FakeClient:
+                def get_group_membership_id(self, **kwargs):
+                    raise ClientError(
+                        {
+                            "Error": {
+                                "Code": "ResourceNotFoundException",
+                                "Message": "Group membership not found for given Pool/Group/Member.",
+                            }
+                        },
+                        "GetGroupMembershipId",
+                    )
+
+            return FakeClient()
+
+        monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
+
+        result = client.get_group_membership_id(
+            group_id="11111111-2222-3333-4444-555555555555",
+            member_id={"UserId": "user-123"},
+        )
+
+        assert not result.is_success
+        assert result.status == OperationStatus.NOT_FOUND
+        assert result.error_code == "GROUP_MEMBERSHIP_NOT_FOUND"

@@ -11,6 +11,7 @@ import structlog
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
 from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.operations import OperationStatus
 from infrastructure.operations.result import OperationResult
 
 logger = structlog.get_logger()
@@ -495,7 +496,7 @@ class IdentityStoreClient:
         client_kwargs = self._session_provider.build_client_kwargs(
             service_name=self._service_name, role_arn=role_arn
         )
-        return execute_aws_api_call(
+        result = execute_aws_api_call(
             "identitystore",
             "get_group_membership_id",
             IdentityStoreId=store_id,
@@ -504,6 +505,13 @@ class IdentityStoreClient:
             **client_kwargs,
             **kwargs,
         )
+        if result.error_code == "ResourceNotFoundException":
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message="Group membership not found",
+                error_code="GROUP_MEMBERSHIP_NOT_FOUND",
+            )
+        return result
 
     def get_user_id_by_username(
         self,
