@@ -51,36 +51,42 @@ class DirectoryMembershipBuilder:
     ) -> OperationResult[DesiredUserState]:
         """Build desired user state from an already-resolved EffectivePlatformPolicy.
 
+        Uses a single inverse group lookup (``get_user_groups``) to fetch all
+        managed groups the user belongs to, then checks authn and each
+        entitlement rule locally — replacing the previous 3 + 2N sequential
+        ``hasMember`` + ``get_group`` round trips with a single API call
+        regardless of the number of entitlement rules.
+
         Skips group discovery — the coordinator resolved effective policy once
         before calling this method.
         """
-        authn_result = self._check_group_membership(
-            effective.authn_group_slug, user_email
-        )
-        if not authn_result.is_success:
+        user_groups_result = self._directory.get_user_groups(user_email)
+        if not user_groups_result.is_success:
             return OperationResult.error(
-                authn_result.status,
-                message=authn_result.message,
-                error_code=authn_result.error_code,
-            )
-        if not isinstance(authn_result.data, bool):
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message="Invalid authn membership result",
-                error_code="INVALID_MEMBERSHIP_RESULT",
+                user_groups_result.status,
+                message=user_groups_result.message,
+                error_code=user_groups_result.error_code,
             )
 
+        user_group_slugs: Set[str] = {
+            group.group_slug.lower()
+            for group in (user_groups_result.data or [])
+            if group.group_slug
+        }
+
+        user_should_exist = effective.authn_group_slug.lower() in user_group_slugs
+
         required_entitlements: List[EntitlementRule] = []
-        if authn_result.data:
-            required_entitlements = self._resolve_member_entitlements(
-                user_email=user_email,
-                platform=effective.platform,
-                rules=effective.sync_managed_rules(),
-            )
+        if user_should_exist:
+            required_entitlements = [
+                rule
+                for rule in effective.sync_managed_rules()
+                if rule.group_slug.lower() in user_group_slugs
+            ]
 
         logger.bind(user_email=user_email, platform=effective.platform).info(
             "build_user_state_completed",
-            user_should_exist=authn_result.data,
+            user_should_exist=user_should_exist,
             required_entitlement_count=len(required_entitlements),
             required_entitlement_group_slugs=[
                 rule.group_slug for rule in required_entitlements
@@ -91,7 +97,7 @@ class DirectoryMembershipBuilder:
         )
         return OperationResult.success(
             data=DesiredUserState(
-                user_should_exist=authn_result.data,
+                user_should_exist=user_should_exist,
                 required_entitlements=required_entitlements,
             )
         )
