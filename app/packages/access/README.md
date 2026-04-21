@@ -15,6 +15,36 @@ The `access` package contains all business logic for managing user access to ext
 
 ---
 
+## Feature settings
+
+All access feature settings are unified under a single `AccessSettings` object (defined in `packages/access/common/settings.py`, loaded once via `get_access_settings()`).
+
+| Env var | Default | Description |
+|---|---|---|
+| `ACCESS_CONFIG_SOURCE` | `bundle` | Runtime config source: `bundle`, `file_json`, `inline_json`, `env` |
+| `ACCESS_CONFIG_REF` | `default` | Path or key for the config source |
+| `ACCESS_CONFIG_REFRESH_SECONDS` | `300` | How often to re-read a dynamic config source |
+| `ACCESS_SYNC_ENABLED` | `false` | Enable the sync feature |
+| `ACCESS_SYNC_RECONCILIATION_ENABLED` | `false` | Enable scheduled batch reconciliation |
+| `ACCESS_SYNC_RECONCILIATION_SCHEDULE` | `03:00` | Daily reconciliation time (UTC, HH:MM) |
+| `ACCESS_SYNC_JOB_TTL_SECONDS` | `86400` | Retention for completed/failed sync records |
+| `ACCESS_SYNC_LOCK_STALE_SECONDS` | `14400` | Lock age before a running job is treated as stale |
+| `ACCESS_REQUESTS_ENABLED` | `false` | Enable the access requests feature |
+| `ACCESS_REQUESTS_MANAGER_GROUP_SLUG` | `sg-managers` | Primary approver group |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `sg-org-admins` | Fallback approver group |
+| `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `1` | Approvals needed before a request is approved |
+| `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `72` | Hours before an open request expires |
+| `ACCESS_CATALOG_ENABLED` | `false` | Enable the catalog browse feature |
+
+Sub-feature settings may also be set via a single JSON env var:
+
+```bash
+ACCESS_SYNC='{"enabled": true, "job_ttl_seconds": 3600}'
+ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
+```
+
+---
+
 ## Shared runtime config
 
 All sub-packages share a single `AccessRuntimeConfig` instance loaded once at startup. It defines the IDP group naming convention and per-platform policy.
