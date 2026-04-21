@@ -19,8 +19,11 @@ access_sync:
   user.result.manual_action_required: "⚠️ Some actions require manual follow-up."
   user.result.not_found: "⚠️ User or platform not found: {message}"
   user.result.error: "❌ Sync failed: {message}"
+  user.result.enqueued: "⏳ User sync enqueued for *{user_email}* on *{platform}*.\nJob ID: `{job_id}`\nPoll status: `/sre access sync status {job_id}`"
+  user.result.already_running: "⏳ User sync already in progress for *{user_email}* on *{platform}*.\nJob ID: `{job_id}`\nPoll status: `/sre access sync status {job_id}`"
 
   platform.result.enqueued: "✅ Platform sync job enqueued for *{platform}*.\nJob ID: `{job_id}`\nPoll status: `/sre access sync status {job_id}`"
+  platform.result.already_running: "⏳ Platform sync already in progress for *{platform}*.\nJob ID: `{job_id}`\nPoll status: `/sre access sync status {job_id}`"
 
   status.result.not_found: "⚠️ No sync job found with ID: `{job_id}`"
   status.result.running: "⏳ Sync job `{job_id}` is *running* for platform *{platform}*.\nStarted: {started_at}"

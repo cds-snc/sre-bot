@@ -19,8 +19,11 @@ access_sync:
   user.result.manual_action_required: "⚠️ Certaines actions nécessitent une intervention manuelle."
   user.result.not_found: "⚠️ Utilisateur ou plateforme introuvable\u00a0: {message}"
   user.result.error: "❌ Synchronisation échouée\u00a0: {message}"
+  user.result.enqueued: "⏳ Synchronisation utilisateur soumise pour *{user_email}* sur *{platform}*.\nIdentifiant\u00a0: `{job_id}`\nConsulter le statut\u00a0: `/sre access sync status {job_id}`"
+  user.result.already_running: "⏳ Synchronisation utilisateur déjà en cours pour *{user_email}* sur *{platform}*.\nIdentifiant\u00a0: `{job_id}`\nConsulter le statut\u00a0: `/sre access sync status {job_id}`"
 
   platform.result.enqueued: "✅ Travail de synchronisation soumis pour *{platform}*.\nIdentifiant\u00a0: `{job_id}`\nConsulter le statut\u00a0: `/sre access sync status {job_id}`"
+  platform.result.already_running: "⏳ Synchronisation de plateforme déjà en cours pour *{platform}*.\nIdentifiant\u00a0: `{job_id}`\nConsulter le statut\u00a0: `/sre access sync status {job_id}`"
 
   status.result.not_found: "⚠️ Aucun travail de synchronisation trouvé avec l'identifiant\u00a0: `{job_id}`"
   status.result.running: "⏳ Le travail `{job_id}` est *en cours* pour la plateforme *{platform}*.\nDémarré\u00a0: {started_at}"
