@@ -16,21 +16,25 @@ from typing import Any, Dict, TYPE_CHECKING
 
 import structlog
 
-from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
 from infrastructure.services import get_idempotency_service, t
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
+    get_access_sync_settings,
+)
+from packages.access.sync.platform_lock import (
+    acquire_lock,
+    check_lock,
+    platform_lock_key,
+    release_lock,
+    user_lock_key,
 )
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 logger = structlog.get_logger()
-
-# TTL for platform sync job records in the idempotency store (24 h)
-_PLATFORM_SYNC_JOB_TTL_SECONDS = 86400
 
 
 def register_commands(provider: "SlackPlatformProvider") -> None:
@@ -151,6 +155,83 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
     )
 
 
+def _run_user_sync_background(
+    coordinator: Any,
+    job_id: str,
+    user_email: str,
+    platform: str,
+    dry_run: bool,
+    started_at: str,
+    job_ttl_seconds: int,
+) -> None:
+    """Background thread target: run user sync and persist the outcome."""
+    idempotency = get_idempotency_service()
+    log = logger.bind(
+        job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run
+    )
+
+    payload: Dict[str, Any]
+    try:
+        result = coordinator.sync_user(
+            user_email=user_email,
+            platform=platform,
+            dry_run=dry_run,
+            request_id=job_id,
+        )
+
+        if result.is_success and result.data is not None:
+            outcome = result.data
+            payload = {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": user_email,
+                "platform": platform,
+                "dry_run": dry_run,
+                "status": "completed",
+                "started_at": started_at,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "actions_planned": outcome.planned_actions,
+                "actions_applied": outcome.applied_actions,
+                "requires_manual_action": outcome.requires_manual_action,
+            }
+            log.info(
+                "user_sync_job_completed",
+                applied=len(outcome.applied_actions),
+            )
+        else:
+            payload = {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": user_email,
+                "platform": platform,
+                "dry_run": dry_run,
+                "status": "failed",
+                "started_at": started_at,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "error": result.message or "Sync returned no outcome",
+            }
+            log.warning("user_sync_job_failed", error=result.message)
+
+    except Exception as exc:
+        payload = {
+            "job_id": job_id,
+            "sync_type": "user",
+            "user_email": user_email,
+            "platform": platform,
+            "dry_run": dry_run,
+            "status": "failed",
+            "started_at": started_at,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "error": str(exc),
+        }
+        log.error("user_sync_job_error", error=str(exc))
+
+    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(
+        user_lock_key(platform, user_email), payload, idempotency, job_ttl_seconds
+    )
+
+
 def handle_sync_user_command(
     payload: CommandPayload,
     parsed_args: Dict[str, Any],
@@ -175,72 +256,94 @@ def handle_sync_user_command(
     log.info("slack_command_received", text=payload.text)
 
     coordinator = get_access_sync_coordinator()
-    result = coordinator.sync_user(
-        user_email=user_email,
-        platform=platform,
-        dry_run=dry_run,
-        request_id=getattr(payload, "correlation_id", "") or "",
-    )
+    idempotency = get_idempotency_service()
+    settings = get_access_sync_settings()
+    job_ttl = settings.sync_job_ttl_seconds
+    lock_stale = settings.sync_lock_stale_after_seconds
 
-    if result.is_success:
-        outcome = result.data
-        applied_actions = outcome.applied_actions if outcome else []
-
-        if dry_run:
-            prefix = t(
-                "access_sync.user.result.dry_run_prefix",
-                locale,
-                "Dry-run — planned actions",
-            )
-        else:
-            prefix = t(
-                "access_sync.user.result.sync_prefix",
-                locale,
-                "Sync complete — actions applied",
-            )
-
-        if applied_actions:
-            actions_text = "\n".join(f"• `{a}`" for a in applied_actions)
-        else:
-            actions_text = t(
-                "access_sync.user.result.no_actions",
-                locale,
-                "_(none)_",
-            )
-
-        manual_note = ""
-        if outcome and outcome.requires_manual_action:
-            manual_note = "\n" + t(
-                "access_sync.user.result.manual_action_required",
-                locale,
-                "⚠️ Some actions require manual follow-up.",
-            )
-
-        message = (
-            f"{prefix} for *{user_email}* on *{platform}*:\n"
-            f"{actions_text}{manual_note}"
-        )
-        return CommandResponse(message=message, ephemeral=False)
-
-    if result.status == OperationStatus.NOT_FOUND:
+    lock_key = user_lock_key(platform, user_email)
+    running = check_lock(lock_key, idempotency, lock_stale)
+    if running is not None:
+        existing_job_id = running.get("job_id", "")
+        log.info("user_sync_already_running", existing_job_id=existing_job_id)
         return CommandResponse(
             message=t(
-                "access_sync.user.result.not_found",
+                "access_sync.user.result.already_running",
                 locale,
-                f"⚠️ User or platform not found: {result.message}",
-                message=result.message,
+                (
+                    f"⏳ User sync already in progress for *{user_email}* on *{platform}*."
+                    f"\nJob ID: `{existing_job_id}`"
+                    f"\nPoll status: `/sre access sync status {existing_job_id}`"
+                ),
+                user_email=user_email,
+                platform=platform,
+                job_id=existing_job_id,
             ),
             ephemeral=True,
         )
 
+    job_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+
+    acquire_lock(
+        lock_key,
+        {
+            "job_id": job_id,
+            "sync_type": "user",
+            "user_email": user_email,
+            "platform": platform,
+            "dry_run": dry_run,
+            "status": "running",
+            "started_at": started_at,
+        },
+        idempotency,
+        job_ttl,
+    )
+    idempotency.set(
+        job_id,
+        {
+            "job_id": job_id,
+            "sync_type": "user",
+            "user_email": user_email,
+            "platform": platform,
+            "dry_run": dry_run,
+            "status": "in_progress",
+            "started_at": started_at,
+        },
+        ttl_seconds=job_ttl,
+    )
+
+    thread = threading.Thread(
+        target=_run_user_sync_background,
+        kwargs=dict(
+            coordinator=coordinator,
+            job_id=job_id,
+            user_email=user_email,
+            platform=platform,
+            dry_run=dry_run,
+            started_at=started_at,
+            job_ttl_seconds=job_ttl,
+        ),
+        daemon=True,
+    )
+    thread.start()
+
+    log.info("user_sync_job_enqueued", job_id=job_id)
+
     return CommandResponse(
         message=t(
-            "access_sync.user.result.error",
+            "access_sync.user.result.enqueued",
             locale,
-            f"❌ Sync failed: {result.message}",
-            message=result.message,
+            (
+                f"⏳ User sync enqueued for *{user_email}* on *{platform}*."
+                f"\nJob ID: `{job_id}`"
+                f"\nPoll status: `/sre access sync status {job_id}`"
+            ),
+            user_email=user_email,
+            platform=platform,
+            job_id=job_id,
         ),
-        ephemeral=True,
+        ephemeral=False,
     )
 
 
@@ -250,13 +353,9 @@ def _run_platform_sync_background(
     platform: str,
     dry_run: bool,
     started_at: str,
+    job_ttl_seconds: int,
 ) -> None:
-    """Background thread target: run platform sync and persist the outcome.
-
-    The idempotency record is written to ``running`` before this thread starts.
-    This function overwrites it with ``completed`` or ``failed`` once the
-    coordinator returns.
-    """
+    """Background thread target: run platform sync and persist the outcome."""
     idempotency = get_idempotency_service()
     log = logger.bind(job_id=job_id, platform=platform, dry_run=dry_run)
 
@@ -313,7 +412,8 @@ def _run_platform_sync_background(
         }
         log.error("platform_sync_job_error", error=str(exc))
 
-    idempotency.set(job_id, payload, ttl_seconds=_PLATFORM_SYNC_JOB_TTL_SECONDS)
+    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(platform_lock_key(platform), payload, idempotency, job_ttl_seconds)
 
 
 def handle_sync_platform_command(
@@ -338,24 +438,56 @@ def handle_sync_platform_command(
     )
     log.info("slack_command_received", text=payload.text)
 
+    coordinator = get_access_sync_coordinator()
+    idempotency = get_idempotency_service()
+    settings = get_access_sync_settings()
+    job_ttl = settings.sync_job_ttl_seconds
+    lock_stale = settings.sync_lock_stale_after_seconds
+
+    running = check_lock(platform_lock_key(platform), idempotency, lock_stale)
+    if running is not None:
+        existing_job_id = running.get("job_id", "")
+        log.info("platform_sync_already_running", existing_job_id=existing_job_id)
+        return CommandResponse(
+            message=t(
+                "access_sync.platform.result.already_running",
+                locale,
+                (
+                    f"⏳ Platform sync already in progress for *{platform}*."
+                    f"\nJob ID: `{existing_job_id}`"
+                    f"\nPoll status: `/sre access sync status {existing_job_id}`"
+                ),
+                platform=platform,
+                job_id=existing_job_id,
+            ),
+            ephemeral=True,
+        )
+
     job_id = str(uuid.uuid4())
     started_at = datetime.now(timezone.utc).isoformat()
 
-    coordinator = get_access_sync_coordinator()
-    idempotency = get_idempotency_service()
-
-    # Persist running status before spawning the thread so polling works immediately
+    acquire_lock(
+        platform_lock_key(platform),
+        {
+            "job_id": job_id,
+            "platform": platform,
+            "dry_run": dry_run,
+            "status": "running",
+            "started_at": started_at,
+        },
+        idempotency,
+        job_ttl,
+    )
     idempotency.set(
         job_id,
         {
             "job_id": job_id,
             "platform": platform,
             "dry_run": dry_run,
-            "status": "running",
-            "phase": "syncing",
+            "status": "in_progress",
             "started_at": started_at,
         },
-        ttl_seconds=_PLATFORM_SYNC_JOB_TTL_SECONDS,
+        ttl_seconds=job_ttl,
     )
 
     thread = threading.Thread(
@@ -366,6 +498,7 @@ def handle_sync_platform_command(
             platform=platform,
             dry_run=dry_run,
             started_at=started_at,
+            job_ttl_seconds=job_ttl,
         ),
         daemon=True,
     )
