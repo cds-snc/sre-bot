@@ -248,4 +248,4 @@ def test_run_user_sync_job_stores_failed_outcome_on_exception():
     args, _ = fake_idempotency.set.call_args_list[0]
     assert args[0] == "job-3"
     assert args[1]["status"] == "failed"
-    assert "error" in args[1]
+    assert args[1]["error"] == "sync_failed"

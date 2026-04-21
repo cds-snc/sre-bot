@@ -122,7 +122,7 @@ def _run_user_sync_job(
             "status": "failed",
             "started_at": started_at,
             "completed_at": completed_at,
-            "error": str(exc),
+            "error": "sync_failed",
         }
         log.error("user_sync_job_error", error=str(exc), error_type=type(exc).__name__)
     idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
@@ -216,7 +216,7 @@ def _run_platform_sync_job(
             "status": "failed",
             "started_at": started_at,
             "completed_at": completed_at,
-            "error": str(exc),
+            "error": "sync_failed",
         }
         log.error(
             "platform_sync_job_error",
