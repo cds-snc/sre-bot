@@ -2,41 +2,22 @@
 
 import pytest
 
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+from packages.access.common.config import (
+    AccessRuntimeConfig as AccessSyncRuntimeConfig,
+    PlatformPolicy,
+)
 from packages.access.sync.policies import (
     AdapterCapabilities,
     EffectivePlatformPolicy,
     EntitlementRule,
-    PlatformPolicy,
     PolicyEngine,
     resolve_effective_policy,
 )
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Local helpers (policies-specific)
 # ---------------------------------------------------------------------------
-
-
-def make_config(
-    platform: str = "aws",
-    authn_token: str = "authn",
-    authn_removal_mode: str = "delete",
-    dir_prefix: str = "sg",
-    dir_separator: str = "-",
-    mode_overrides: dict | None = None,
-) -> AccessSyncRuntimeConfig:
-    return AccessSyncRuntimeConfig(
-        dir_prefix=dir_prefix,
-        dir_separator=dir_separator,
-        platforms={
-            platform: PlatformPolicy(
-                authn_token=authn_token,
-                authn_removal_mode=authn_removal_mode,
-                mode_overrides=mode_overrides or {},
-            )
-        },
-    )
 
 
 def make_effective(
@@ -98,8 +79,8 @@ def test_platform_policy_custom_values():
 
 
 @pytest.mark.unit
-def test_group_prefix_derives_from_dir_prefix_and_platform():
-    config = make_config(platform="aws", dir_prefix="sg", dir_separator="-")
+def test_group_prefix_derives_from_dir_prefix_and_platform(make_runtime_config):
+    config = make_runtime_config(platform="aws", dir_prefix="sg", dir_separator="-")
     assert config.group_prefix("aws") == "sg-aws-"
 
 
@@ -114,8 +95,8 @@ def test_group_prefix_custom_separator():
 
 
 @pytest.mark.unit
-def test_authn_group_slug_derives_correctly():
-    config = make_config(platform="aws", authn_token="authn")
+def test_authn_group_slug_derives_correctly(make_runtime_config):
+    config = make_runtime_config(platform="aws", authn_token="authn")
     assert config.authn_group_slug("aws") == "sg-aws-authn"
 
 
@@ -135,8 +116,8 @@ def test_authn_group_slug_custom_token():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_excludes_authn_group():
-    config = make_config(platform="aws", authn_token="authn")
+def test_resolve_effective_policy_excludes_authn_group(make_runtime_config):
+    config = make_runtime_config(platform="aws", authn_token="authn")
     discovered = {"sg-aws-authn", "sg-aws-admin"}
     effective = resolve_effective_policy(config, "aws", discovered)
     slugs = {r.group_slug for r in effective.entitlement_rules}
@@ -145,8 +126,8 @@ def test_resolve_effective_policy_excludes_authn_group():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_excludes_non_platform_slugs():
-    config = make_config(platform="aws")
+def test_resolve_effective_policy_excludes_non_platform_slugs(make_runtime_config):
+    config = make_runtime_config(platform="aws")
     discovered = {"sg-aws-admin", "sg-gcp-viewer", "other-group"}
     effective = resolve_effective_policy(config, "aws", discovered)
     slugs = {r.group_slug for r in effective.entitlement_rules}
@@ -154,8 +135,8 @@ def test_resolve_effective_policy_excludes_non_platform_slugs():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_strips_prefix_for_entitlement_id():
-    config = make_config(platform="aws")
+def test_resolve_effective_policy_strips_prefix_for_entitlement_id(make_runtime_config):
+    config = make_runtime_config(platform="aws")
     discovered = {"sg-aws-finops-readonly"}
     effective = resolve_effective_policy(config, "aws", discovered)
     assert len(effective.entitlement_rules) == 1
@@ -164,8 +145,8 @@ def test_resolve_effective_policy_strips_prefix_for_entitlement_id():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_excludes_ephemeral_override():
-    config = make_config(
+def test_resolve_effective_policy_excludes_ephemeral_override(make_runtime_config):
+    config = make_runtime_config(
         platform="aws",
         mode_overrides={"breakglass-admin": "ephemeral"},
     )
@@ -177,8 +158,8 @@ def test_resolve_effective_policy_excludes_ephemeral_override():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_excludes_deactivated_override():
-    config = make_config(
+def test_resolve_effective_policy_excludes_deactivated_override(make_runtime_config):
+    config = make_runtime_config(
         platform="aws",
         mode_overrides={"legacy-access": "deactivated"},
     )
@@ -190,8 +171,8 @@ def test_resolve_effective_policy_excludes_deactivated_override():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_returns_correct_metadata():
-    config = make_config(
+def test_resolve_effective_policy_returns_correct_metadata(make_runtime_config):
+    config = make_runtime_config(
         platform="aws",
         authn_token="authn",
         authn_removal_mode="delete",
@@ -204,15 +185,15 @@ def test_resolve_effective_policy_returns_correct_metadata():
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_empty_discovery():
-    config = make_config(platform="aws")
+def test_resolve_effective_policy_empty_discovery(make_runtime_config):
+    config = make_runtime_config(platform="aws")
     effective = resolve_effective_policy(config, "aws", set())
     assert effective.entitlement_rules == []
 
 
 @pytest.mark.unit
-def test_resolve_effective_policy_normalizes_slug_case():
-    config = make_config(platform="aws")
+def test_resolve_effective_policy_normalizes_slug_case(make_runtime_config):
+    config = make_runtime_config(platform="aws")
     discovered = {"SG-AWS-Admin"}
     effective = resolve_effective_policy(config, "aws", discovered)
     slugs = {r.group_slug for r in effective.entitlement_rules}

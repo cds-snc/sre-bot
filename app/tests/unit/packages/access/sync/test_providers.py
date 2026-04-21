@@ -5,20 +5,12 @@ import pytest
 from packages.access.sync import providers
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
-from packages.access.sync.config import AccessSyncRuntimeConfig
-from packages.access.sync.policies import PlatformPolicy
-
-
-def _make_policy() -> PlatformPolicy:
-    """Build a minimal platform policy for registry wiring tests."""
-    return PlatformPolicy(
-        authn_token="authn",
-        authn_removal_mode="delete",
-    )
+from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 
 
 @pytest.mark.unit
 def test_get_access_sync_adapters_registers_aws_and_fake(
+    make_platform_policy,
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Adapter wiring includes both aws and fake adapters when configured."""
@@ -27,16 +19,15 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
     runtime_config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
         platforms={
-            "aws": _make_policy(),
-            "fake": _make_policy(),
+            "aws": make_platform_policy(adapter_type="aws_identity_center"),
+            "fake": make_platform_policy(adapter_type="fake"),
         },
     )
     monkeypatch.setattr(
         providers,
-        "get_access_sync_runtime_config",
+        "get_access_runtime_config",
         lambda: runtime_config,
     )
-    monkeypatch.setattr(providers, "get_aws_clients", lambda: object())
 
     # Act
     adapters = providers.get_access_sync_adapters()
@@ -51,6 +42,7 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
 
 @pytest.mark.unit
 def test_get_access_sync_adapters_ignores_unknown_platforms(
+    make_platform_policy,
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Unsupported platform policy keys should not register an adapter."""
@@ -59,13 +51,13 @@ def test_get_access_sync_adapters_ignores_unknown_platforms(
     runtime_config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
         platforms={
-            "fake": _make_policy(),
-            "custom": _make_policy(),
+            "fake": make_platform_policy(adapter_type="fake"),
+            "custom": make_platform_policy(adapter_type="custom_unsupported"),
         },
     )
     monkeypatch.setattr(
         providers,
-        "get_access_sync_runtime_config",
+        "get_access_runtime_config",
         lambda: runtime_config,
     )
 

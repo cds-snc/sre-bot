@@ -7,8 +7,10 @@ from infrastructure.directory.models import DirectoryGroup, MembershipCheckResul
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.catalog.domain import ParsedEntitlementToken
 from packages.access.catalog.service import CatalogService
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
-from packages.access.sync.policies import PlatformPolicy
+from packages.access.common.config import (
+    AccessRuntimeConfig as AccessSyncRuntimeConfig,
+    PlatformPolicy,
+)
 
 
 # ---------------------------------------------------------------------------

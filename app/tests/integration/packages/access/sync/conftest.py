@@ -7,8 +7,8 @@ import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
-from packages.access.sync.policies import PlatformPolicy
+from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
+from packages.access.common.config import PlatformPolicy
 
 
 @pytest.fixture

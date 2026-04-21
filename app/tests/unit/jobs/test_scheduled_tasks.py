@@ -113,7 +113,7 @@ class TestReconcileAccessSync:
     """Tests for the reconcile_access_sync scheduled job."""
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
+    @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_syncs_each_registered_platform(
@@ -136,7 +136,7 @@ class TestReconcileAccessSync:
         assert called_platforms == {"aws", "fake"}
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
+    @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_runs_with_dry_run_false(
@@ -156,7 +156,7 @@ class TestReconcileAccessSync:
         )
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
+    @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_no_platforms_does_nothing(
@@ -174,7 +174,7 @@ class TestReconcileAccessSync:
         mock_coordinator.sync_platform.assert_not_called()
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_access_sync_runtime_config")
+    @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
     def test_reconcile_logs_started(

@@ -18,13 +18,13 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.sync.coordinator import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
+from packages.access.common.config import PlatformPolicy
 from packages.access.sync.policies import (
     AdapterCapabilities,
-    PlatformPolicy,
 )
 
 
@@ -181,21 +181,6 @@ class FakeDirectory:
         return OperationResult.success(data=matching)
 
 
-def _make_config(
-    platform: str = "aws",
-    authn_removal_mode: str = "delete",
-) -> AccessSyncRuntimeConfig:
-    return AccessSyncRuntimeConfig(
-        dir_prefix="sg",
-        platforms={
-            platform: PlatformPolicy(
-                authn_token="authn",
-                authn_removal_mode=authn_removal_mode,
-            )
-        },
-    )
-
-
 def make_coordinator(
     platform: str = "aws",
     authn_removal_mode: str = "delete",
@@ -209,7 +194,15 @@ def make_coordinator(
         adapter = FakeAdapter(
             current_entitlement_ids=current_ids or set(), user_exists=user_exists
         )
-    config = _make_config(platform=platform, authn_removal_mode=authn_removal_mode)
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        platforms={
+            platform: PlatformPolicy(
+                authn_token="authn",
+                authn_removal_mode=authn_removal_mode,
+            )
+        },
+    )
     authn_slug = config.authn_group_slug(platform)
     if is_member:
         user_group_slugs = {authn_slug} | (discovered_groups or set())
@@ -345,7 +338,7 @@ def test_sync_user_disable_unsupported_sets_requires_manual_action():
 
 
 @pytest.mark.unit
-def test_sync_user_entitlement_not_applied_when_not_in_group():
+def test_sync_user_entitlement_not_applied_when_not_in_group(make_runtime_config):
     """Entitlement is only applied when user is a member of the entitlement group."""
     adapter = FakeAdapter()
     directory = FakeDirectory(
@@ -353,7 +346,7 @@ def test_sync_user_entitlement_not_applied_when_not_in_group():
     )
     # Member of authn but NOT of entitlement group
     directory.set_membership("sg-aws-admin", False)
-    config = _make_config()
+    config = make_runtime_config()
     coordinator = AccessSyncCoordinator(
         adapters={"aws": adapter},
         config=config,
