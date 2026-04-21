@@ -10,7 +10,6 @@ from packages.access.common.config.loaders import (
     normalize_target_key,
 )
 from packages.access.common.config.settings import (
-    AccessConfigBootstrapSettings,
     AccessRuntimeConfig,
     EntitlementMode,
     EntitlementModeOverride,
@@ -27,8 +26,7 @@ __all__ = [
     "InlineJsonConfigLoader",
     "get_access_config_loader",
     "normalize_target_key",
-    # settings / models
-    "AccessConfigBootstrapSettings",
+    # runtime config models
     "AccessRuntimeConfig",
     "EntitlementMode",
     "EntitlementModeOverride",

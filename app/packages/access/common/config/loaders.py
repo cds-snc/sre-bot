@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,7 +50,7 @@ def normalize_target_key(value: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-class AccessConfigLoader:
+class AccessConfigLoader(Protocol):
     """Protocol for loading access runtime configuration."""
 
     def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
