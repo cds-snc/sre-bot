@@ -69,6 +69,16 @@ class AccessSyncSettings(BaseSettings):
         default="03:00",
         alias="ACCESS_SYNC_RECONCILIATION_SCHEDULE",
     )
+    sync_job_ttl_seconds: int = Field(
+        default=86400,
+        alias="ACCESS_SYNC_JOB_TTL_SECONDS",
+        description="How long completed/failed sync job records are retained (seconds). Default: 24h.",
+    )
+    sync_lock_stale_after_seconds: int = Field(
+        default=14400,
+        alias="ACCESS_SYNC_LOCK_STALE_SECONDS",
+        description="Running lock older than this is treated as stale (crashed thread). Default: 4h.",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
