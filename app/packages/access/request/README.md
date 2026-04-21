@@ -69,6 +69,26 @@ Terminal states (no further transitions without operator action): `rejected`, `c
 
 ---
 
+## Settings
+
+All request settings are in `AccessRequestsSettings` (a slice of `AccessSettings` in `packages/access/common/settings.py`):
+
+| Env var | Default | Description |
+|---|---|---|
+| `ACCESS_REQUESTS_ENABLED` | `false` | Master on/off switch. All routes return `503` when disabled. |
+| `ACCESS_REQUESTS_MANAGER_GROUP_SLUG` | `sg-managers` | Primary approver group slug |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `sg-org-admins` | Fallback approver group slug |
+| `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `1` | Approval threshold |
+| `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `72` | Hours before an open request expires |
+
+May also be set as a single JSON env var:
+
+```bash
+ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
+```
+
+---
+
 ## Module map
 
 | File | Purpose |
@@ -78,6 +98,7 @@ Terminal states (no further transitions without operator action): `rejected`, `c
 | `service.py` | Lifecycle orchestration — the canonical place to understand the flow |
 | `policies.py` | Pure policy functions: auto-approval, self-approval guard, approver resolution |
 | `store.py` | DynamoDB repository (`sre_bot_access_requests` table) |
+| `providers.py` | `get_access_request_settings()` — thin slice provider returning `AccessRequestsSettings` |
 | `providers.py` | `@lru_cache` singletons — object graph wiring |
 | `events.py` | Event name constants for this package |
 | `transport/routes.py` | FastAPI route handlers — HTTP mapping only, no business logic |
