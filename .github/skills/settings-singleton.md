@@ -73,6 +73,7 @@ Every `packages/<name>/` defines its own settings in `packages/<name>/settings.p
 **Decision rule:**
 - New package, no existing SSM keys → **Pattern A** (`env_prefix`, dedicated SSM parameter)
 - Migrating an existing module with keys already in SSM → **Pattern B** (`Field(alias=...)` for each existing key)
+- Feature with multiple sub-features sharing one namespace → **Pattern C** (single root `BaseSettings` with nested `BaseModel` slices)
 
 ### Pattern A — New package, no existing env vars
 
@@ -136,7 +137,79 @@ def get_incident_settings() -> IncidentSettings:
 
 A field that also exists in `SlackSettings` (e.g., `INCIDENT_CHANNEL`) is an accepted temporary duplicate during migration. Remove the legacy field from the integration settings class in the **same PR** that retires the old `modules/incident` code.
 
-Validated at startup via `startup_warmup` hookimpl:
+### Pattern C — Feature with multiple sub-features (used by `packages/access/`)
+
+When one top-level namespace (`ACCESS_`) contains settings for several sub-features (sync, requests, catalog), consolidate into a **single root `BaseSettings`** with **plain `BaseModel` slices**. One env read, tree-shaped access.
+
+**Mechanism**: `env_prefix` + `env_nested_delimiter="_"` + `env_nested_max_split=1` + `case_sensitive=False`.
+
+`env_nested_max_split=1` means the split happens only at the sub-feature boundary:
+`ACCESS_SYNC_RECONCILIATION_SCHEDULE` → strip prefix → `SYNC_RECONCILIATION_SCHEDULE` → split once → group `sync`, field `reconciliation_schedule`.
+
+`case_sensitive=False` is **required** with this mechanism: pydantic-settings uses field names (lowercase `sync`) to build the key prefix, and must match the uppercase OS env vars case-insensitively.
+
+```python
+# packages/access/common/settings.py
+from functools import lru_cache
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class AccessSyncSettings(BaseModel):       # plain BaseModel, not BaseSettings
+    enabled: bool = False                  # ACCESS_SYNC_ENABLED
+    job_ttl_seconds: int = 86400           # ACCESS_SYNC_JOB_TTL_SECONDS
+
+class AccessRequestsSettings(BaseModel):
+    enabled: bool = False                  # ACCESS_REQUESTS_ENABLED
+
+class AccessSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="ACCESS_",
+        env_nested_delimiter="_",
+        env_nested_max_split=1,
+        case_sensitive=False,              # required — see above
+        extra="ignore",
+        env_file=".env",
+    )
+    sync: AccessSyncSettings = Field(default_factory=AccessSyncSettings)
+    requests: AccessRequestsSettings = Field(default_factory=AccessRequestsSettings)
+
+@lru_cache(maxsize=1)
+def get_access_settings() -> AccessSettings:
+    return AccessSettings()
+```
+
+**Slice providers for FastAPI `Depends`** — thin functions (no `@lru_cache` needed since root is already cached):
+
+```python
+# packages/access/sync/providers.py
+def get_access_sync_settings() -> AccessSyncSettings:
+    return get_access_settings().sync
+```
+
+**Sub-features** pass their own slice to services, not the root object:
+
+```python
+settings = get_access_settings()
+return SyncService(settings=settings.sync)   # ✅ — narrow type
+```
+
+**Testing**: `AccessSyncSettings` is a plain `BaseModel`. Construct directly with overrides:
+
+```python
+def _make(**overrides) -> AccessSyncSettings:
+    return AccessSyncSettings(**overrides)
+
+# For env-var loading tests, use the root:
+settings = AccessSettings(_env_file=None).sync
+```
+
+**Adding a new sub-feature**:
+1. Add `AccessAdminSettings(BaseModel)` to `common/settings.py`
+2. Add `admin: AccessAdminSettings = Field(default_factory=AccessAdminSettings)` to `AccessSettings`
+3. Define env vars as `ACCESS_ADMIN_{FIELD}`
+4. No new `BaseSettings` subclass, no new provider, no new `entry.sh` line
+
+---
 
 ```python
 # packages/my_feature/__init__.py
