@@ -82,7 +82,8 @@ class UserSyncJobAcceptedResponse(BaseModel):
 class SyncJobStatusResponse(BaseModel):
     """Polling response for any enqueued sync job (user or platform).
 
-    Job-type-specific fields are optional so the same schema serves both.
+    Job-type-specific fields are optional so the same schema serves both
+    user sync and platform sync jobs without requiring separate polling models.
     """
 
     job_id: str
@@ -93,10 +94,12 @@ class SyncJobStatusResponse(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     error: Optional[str] = None
+    # Platform sync outcome fields
     users_synced: Optional[int] = None
     users_converged: Optional[int] = None
     orphans_found: Optional[int] = None
     requires_manual_action_count: Optional[int] = None
+    # User sync outcome fields
     user_email: Optional[str] = None
     actions_planned: Optional[List[str]] = None
     actions_applied: Optional[List[str]] = None

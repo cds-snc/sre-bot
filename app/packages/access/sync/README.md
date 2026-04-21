@@ -47,6 +47,8 @@ Runtime config is a JSON document with this shape:
 
 ### Config sources (set via env vars)
 
+Env var `ACCESS_CONFIG_SOURCE` controls which loader is used. It is read from `settings.config.source` in `AccessSettings` (defined in `packages/access/common/settings.py`).
+
 | `ACCESS_CONFIG_SOURCE` | `ACCESS_CONFIG_REF` | When to use |
 |---|---|---|
 | `bundle` (default) | ignored | Local dev — no platforms configured, feature in waiting mode |
@@ -74,6 +76,18 @@ ACCESS_SYNC_PLATFORMS_JSON={"aws": {"authn_token": "authn", "authn_removal_mode"
 ACCESS_CONFIG_SOURCE=file_json
 ACCESS_CONFIG_REF=/workspace/app/packages/access/access.local.json
 ```
+
+### Operational settings
+
+All sync operational settings are in `AccessSyncSettings` (a slice of `AccessSettings` in `packages/access/common/settings.py`):
+
+| Env var | Default | Description |
+|---|---|---|
+| `ACCESS_SYNC_ENABLED` | `false` | Master on/off switch |
+| `ACCESS_SYNC_RECONCILIATION_ENABLED` | `false` | Enable scheduled batch sync |
+| `ACCESS_SYNC_RECONCILIATION_SCHEDULE` | `03:00` | Daily run time (UTC, HH:MM) |
+| `ACCESS_SYNC_JOB_TTL_SECONDS` | `86400` | Retention for completed/failed job records |
+| `ACCESS_SYNC_LOCK_STALE_SECONDS` | `14400` | Running lock older than this is treated as stale |
 
 ### Scheduled reconciliation
 
@@ -126,7 +140,7 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
 | File | Purpose |
 |---|---|
 | `policies.py` | Business rules, data models, `PolicyEngine`. **Read this first.** |
-| `config/settings.py` | Bootstrap env vars (`AccessSyncSettings`) and runtime domain models (`AccessSyncRuntimeConfig`) |
+| `config/__init__.py` | Re-exports `AccessRuntimeConfig` for backwards compatibility |
 | `config/loaders.py` | Config loader implementations and JSON input validation |
 | `adapters/__init__.py` | `AccessSyncAdapter` protocol and capability models |
 | `adapters/aws_identity_center.py` | AWS Identity Center adapter (reference implementation) |
@@ -137,3 +151,5 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
 | `providers.py` | `@lru_cache` singletons — the only place the object graph is assembled |
 | `store.py` | `SyncRunRepository` — persists audit records |
 | `transport/` | HTTP routes and Slack command handlers |
+
+**Settings** live in `packages/access/common/settings.py` as `AccessSyncSettings` (slice of `AccessSettings`).

@@ -50,8 +50,6 @@ def startup_warmup(logger) -> None:
     logger.info(
         "access_sync_settings_loaded",
         enabled=settings.enabled,
-        config_source=settings.config_source,
-        config_ref=settings.config_ref,
         reconciliation_enabled=settings.reconciliation_enabled,
         reconciliation_schedule=settings.reconciliation_schedule,
     )

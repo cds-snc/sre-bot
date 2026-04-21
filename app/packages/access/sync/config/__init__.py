@@ -1,38 +1,10 @@
 """Access Sync config sub-package.
 
-Re-exports all public symbols from settings.py and loaders.py so that existing
-``from packages.access.sync.config import ...`` statements continue to work
-without modification.
+Re-exports ``AccessRuntimeConfig`` from ``packages.access.common.config``.
 """
 
-from packages.access.sync.config.settings import (
-    AccessSyncRuntimeConfig,
-    AccessSyncSettings,
-    EntitlementModeOverride,
-)
 from packages.access.common.config import AccessRuntimeConfig
-from packages.access.sync.config.loaders import (
-    AccessSyncConfigLoader,
-    BundleConfigLoader,
-    EnvConfigLoader,
-    FileJsonConfigLoader,
-    InlineJsonConfigLoader,
-    get_access_sync_config_loader,
-    normalize_target_key,
-)
 
 __all__ = [
-    # settings
-    "AccessSyncSettings",
     "AccessRuntimeConfig",
-    "AccessSyncRuntimeConfig",
-    "EntitlementModeOverride",
-    # loaders
-    "AccessSyncConfigLoader",
-    "BundleConfigLoader",
-    "EnvConfigLoader",
-    "FileJsonConfigLoader",
-    "InlineJsonConfigLoader",
-    "get_access_sync_config_loader",
-    "normalize_target_key",
 ]

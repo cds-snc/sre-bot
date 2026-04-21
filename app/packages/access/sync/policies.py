@@ -29,18 +29,10 @@ Adapters must not duplicate any logic from this module.
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING
 
-from packages.access.common.config import (
-    EntitlementMode,
-    EntitlementRule,
-    PlatformPolicy,
-)
+from packages.access.common.config import EntitlementRule
 
 if TYPE_CHECKING:
     from packages.access.common.config import AccessRuntimeConfig
-
-# Backward-compatible re-exports for existing imports.
-PolicyEntitlementMode = EntitlementMode
-PolicyPlatformPolicy = PlatformPolicy
 
 
 @dataclass(frozen=True)

@@ -8,10 +8,8 @@ once must produce the same result.  When an action cannot be automated, adapters
 return a non-success OperationResult with a machine-readable error_code so the
 service can mark the run as manual_action_required.
 
-v1 supported entitlement_type: "group"
-  entitlement_id = platform-native group identifier (e.g. AWS IC GroupId)
-
-Future: "permission_set" for temporary elevated account assignments.
+Supported entitlement types:
+  "group" — platform-native group identifier (e.g. AWS IC GroupId)
 """
 
 from typing import Protocol, Set, TYPE_CHECKING, runtime_checkable
