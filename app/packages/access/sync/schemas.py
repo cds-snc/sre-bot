@@ -54,34 +54,8 @@ AccessSyncRequest = Annotated[
 ]
 
 
-class UserSyncResponse(BaseModel):
-    """HTTP response for on-demand single-user sync."""
-
-    success: bool
-    sync_type: Literal["user"] = "user"
-    platform: str
-    dry_run: bool = False
-    user_email: Optional[str] = None
-    actions_planned: List[str] = Field(default_factory=list)
-    actions_applied: List[str] = Field(default_factory=list)
-    requires_manual_action: bool = False
-
-
-class PlatformSyncResponse(BaseModel):
-    """HTTP response for full platform reconciliation."""
-
-    success: bool
-    sync_type: Literal["platform"] = "platform"
-    platform: str
-    dry_run: bool = False
-    users_synced: Optional[int] = None
-    users_converged: Optional[int] = None
-    orphans_found: Optional[int] = None
-    requires_manual_action_count: Optional[int] = None
-
-
 class PlatformSyncJobAcceptedResponse(BaseModel):
-    """HTTP 202 response returned immediately when a platform sync job is enqueued."""
+    """HTTP 202 response when a platform sync job is enqueued."""
 
     success: bool
     sync_type: Literal["platform"] = "platform"
@@ -92,23 +66,38 @@ class PlatformSyncJobAcceptedResponse(BaseModel):
     started_at: str
 
 
-class PlatformSyncJobStatusResponse(BaseModel):
-    """HTTP response for polling the status of an enqueued platform sync job."""
+class UserSyncJobAcceptedResponse(BaseModel):
+    """HTTP 202 response when a user sync job is enqueued."""
+
+    success: bool
+    sync_type: Literal["user"] = "user"
+    job_id: str
+    platform: str
+    user_email: str
+    dry_run: bool = False
+    status: Literal["in_progress"] = "in_progress"
+    started_at: str
+
+
+class SyncJobStatusResponse(BaseModel):
+    """Polling response for any enqueued sync job (user or platform).
+
+    Job-type-specific fields are optional so the same schema serves both.
+    """
 
     job_id: str
+    sync_type: Optional[str] = None
     platform: str
     dry_run: bool
     status: str
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    error: Optional[str] = None
     users_synced: Optional[int] = None
     users_converged: Optional[int] = None
     orphans_found: Optional[int] = None
     requires_manual_action_count: Optional[int] = None
-    error: Optional[str] = None
-
-
-AccessSyncResponse = Annotated[
-    Union[UserSyncResponse, PlatformSyncResponse],
-    Field(discriminator="sync_type"),
-]
+    user_email: Optional[str] = None
+    actions_planned: Optional[List[str]] = None
+    actions_applied: Optional[List[str]] = None
+    requires_manual_action: Optional[bool] = None
