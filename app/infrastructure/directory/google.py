@@ -639,3 +639,49 @@ class GoogleDirectoryProvider:
                 groups.append(group_result.data)
 
         return OperationResult.success(data=groups)
+
+    def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
+        """Return all managed groups the user is a direct member of.
+
+        Uses ``groups.list(userKey=...)`` — the inverse group lookup — to fetch
+        every group the user belongs to in a single paginated call instead of
+        calling ``hasMember`` once per candidate group.
+
+        Only groups whose email matches the configured managed-group domain are
+        included in the result, so callers can safely compare ``group_slug``
+        values against effective policy slugs without domain-filtering.
+
+        Args:
+            user_email: Canonical user email, normalised to lowercase.
+
+        Returns:
+            OperationResult: success with the list of managed DirectoryGroup
+            the user belongs to.
+        """
+        normalized_email = self._normalize_email(user_email)
+        result = self._directory.list_user_groups(normalized_email)
+        if not result.is_success:
+            return self._typed_error(result)
+
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory user groups payload is not a list",
+                error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
+            )
+
+        groups: list[DirectoryGroup] = []
+        for item in result.data:
+            if not isinstance(item, dict):
+                return OperationResult.permanent_error(
+                    message="Directory user groups payload contains an invalid entry",
+                    error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
+                )
+
+            group_result = self._build_directory_group(item)
+            if not group_result.is_success:
+                return self._typed_error(group_result)
+
+            if group_result.data is not None:
+                groups.append(group_result.data)
+
+        return OperationResult.success(data=groups)

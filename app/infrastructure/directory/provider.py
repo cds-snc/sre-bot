@@ -161,3 +161,23 @@ class DirectoryProvider(Protocol):
             OperationResult: success with the matching DirectoryGroup list.
         """
         ...
+
+    def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
+        """Return all groups the user is a direct member of.
+
+        Uses an inverse group lookup (e.g. ``groups.list?userKey=``) so a
+        single call replaces the per-group ``check_membership`` loop in the
+        single-user sync path.
+
+        Note: Returns direct memberships only — transitive membership through
+        nested sub-groups is not expanded.  Managed ``sg-*`` security groups
+        use flat membership, making this safe for the single-user sync hot path.
+
+        Args:
+            user_email: Canonical user email, normalised to lowercase.
+
+        Returns:
+            OperationResult: success with the list of DirectoryGroup the user
+            belongs to.
+        """
+        ...
