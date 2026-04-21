@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Security
 
 from infrastructure.identity.models import User
 from infrastructure.idempotency import IdempotencyService
-from infrastructure.operations import OperationResult, OperationStatus
+
 from infrastructure.services import get_current_user, get_idempotency_service
 from packages.access.sync.coordinator import AccessSyncCoordinatorPort
 from packages.access.sync.providers import (
@@ -29,19 +29,106 @@ from packages.access.sync.providers import (
     get_access_sync_settings,
 )
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
+from packages.access.sync.platform_lock import (
+    acquire_lock,
+    check_lock,
+    platform_lock_key,
+    release_lock,
+    user_lock_key,
+)
+
 from packages.access.sync.schemas import (
     AccessSyncRequest,
     PlatformSyncJobAcceptedResponse,
-    PlatformSyncJobStatusResponse,
-    UserSyncResponse,
+    SyncJobStatusResponse,
+    UserSyncJobAcceptedResponse,
     UserSyncRequest,
 )
 
-# How long a completed / failed platform sync job record is kept in the cache.
-_PLATFORM_SYNC_JOB_TTL_SECONDS = 86400  # 24 h
-
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access", tags=["Access Management"])
+
+
+def _run_user_sync_job(
+    coordinator: AccessSyncCoordinatorPort,
+    idempotency: IdempotencyService,
+    job_id: str,
+    user_email: str,
+    platform: str,
+    dry_run: bool,
+    request_id: str,
+    started_at: str,
+    job_ttl_seconds: int,
+) -> None:
+    """Background thread target: run user sync and persist the outcome."""
+    log = logger.bind(
+        job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run
+    )
+    payload: dict[str, Any]
+    log.info("user_sync_job_started", correlation_id=request_id)
+    try:
+        result = coordinator.sync_user(
+            user_email=user_email,
+            platform=platform,
+            dry_run=dry_run,
+            request_id=request_id,
+        )
+        completed_at = datetime.now(timezone.utc).isoformat()
+        if result.is_success and result.data is not None:
+            outcome: SyncOutcome = result.data  # type: ignore[assignment]
+            payload = {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": user_email,
+                "platform": platform,
+                "dry_run": dry_run,
+                "status": "completed",
+                "started_at": started_at,
+                "completed_at": completed_at,
+                "actions_planned": outcome.planned_actions,
+                "actions_applied": outcome.applied_actions,
+                "requires_manual_action": outcome.requires_manual_action,
+            }
+            log.info(
+                "user_sync_job_completed",
+                applied=len(outcome.applied_actions),
+                dry_run=dry_run,
+            )
+        else:
+            payload = {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": user_email,
+                "platform": platform,
+                "dry_run": dry_run,
+                "status": "failed",
+                "started_at": started_at,
+                "completed_at": completed_at,
+                "error": result.message or "sync_failed",
+            }
+            log.warning(
+                "user_sync_job_failed",
+                error=result.message,
+                error_code=result.error_code,
+            )
+    except Exception as exc:
+        completed_at = datetime.now(timezone.utc).isoformat()
+        payload = {
+            "job_id": job_id,
+            "sync_type": "user",
+            "user_email": user_email,
+            "platform": platform,
+            "dry_run": dry_run,
+            "status": "failed",
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "error": str(exc),
+        }
+        log.error("user_sync_job_error", error=str(exc), error_type=type(exc).__name__)
+    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(
+        user_lock_key(platform, user_email), payload, idempotency, job_ttl_seconds
+    )
 
 
 def _run_platform_sync_job(
@@ -52,6 +139,7 @@ def _run_platform_sync_job(
     dry_run: bool,
     request_id: str,
     started_at: str,
+    job_ttl_seconds: int,
 ) -> None:
     """Background thread target: run platform sync and persist the outcome."""
     log = logger.bind(job_id=job_id, platform=platform, dry_run=dry_run)
@@ -71,7 +159,7 @@ def _run_platform_sync_job(
             "phase": "syncing",
             "started_at": started_at,
         },
-        ttl_seconds=_PLATFORM_SYNC_JOB_TTL_SECONDS,
+        ttl_seconds=job_ttl_seconds,
     )
     try:
         result = coordinator.sync_platform(
@@ -135,23 +223,27 @@ def _run_platform_sync_job(
             error=str(exc),
             error_type=type(exc).__name__,
         )
-    idempotency.set(job_id, payload, ttl_seconds=_PLATFORM_SYNC_JOB_TTL_SECONDS)
+    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(platform_lock_key(platform), payload, idempotency, job_ttl_seconds)
 
 
 class _AccessSyncSettingsPort(Protocol):
     """Structural contract for the settings object consumed by route handlers."""
 
     enabled: bool
+    sync_job_ttl_seconds: int
+    sync_lock_stale_after_seconds: int
 
 
 @router.post(
     "/sync-runs",
-    response_model=Union[UserSyncResponse, PlatformSyncJobAcceptedResponse],
+    response_model=Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse],
     summary="Sync access",
     description=(
         "Converge user or platform access state to match IDP group membership policy. "
         "Use sync_type='user' for on-demand single-user sync (triggered by events, "
-        "webhooks, or API calls). Use sync_type='platform' to enqueue a full batch "
+        "webhooks, or API calls); returns 202 with a job_id. "
+        "Use sync_type='platform' to enqueue a full batch "
         "convergence pass across all users on a platform; returns 202 with a job_id "
         "that can be polled via GET /access/sync-runs/{job_id}."
     ),
@@ -166,8 +258,8 @@ def sync_endpoint(
     current_user: Annotated[
         User, Security(get_current_user, scopes=["sre-bot:access-sync"])
     ],
-) -> Union[UserSyncResponse, PlatformSyncJobAcceptedResponse]:
-    """Trigger an on-demand user sync or a full platform sync."""
+) -> Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse]:
+    """Enqueue an on-demand user sync or a full platform sync job."""
     log = logger.bind(
         sync_type=request.sync_type,
         platform=request.platform,
@@ -180,41 +272,117 @@ def sync_endpoint(
     if not settings.enabled:
         raise HTTPException(status_code=503, detail="Access Sync is not enabled")
 
+    idempotency = get_idempotency_service()
+    job_ttl = settings.sync_job_ttl_seconds
+    lock_stale = settings.sync_lock_stale_after_seconds
+
     if isinstance(request, UserSyncRequest):
-        result = coordinator.sync_user(
-            user_email=str(request.user_email),
+        lock_key = user_lock_key(request.platform, str(request.user_email))
+        running = check_lock(lock_key, idempotency, lock_stale)
+        if running is not None:
+            log.info("user_sync_already_running", existing_job_id=running.get("job_id"))
+            response.status_code = 202
+            return UserSyncJobAcceptedResponse(
+                success=True,
+                job_id=running["job_id"],
+                platform=request.platform,
+                user_email=str(request.user_email),
+                dry_run=running.get("dry_run", request.dry_run),
+                status="in_progress",
+                started_at=running.get("started_at", ""),
+            )
+
+        job_id = str(uuid.uuid4())
+        correlation_id = request.request_id or job_id
+        started_at = datetime.now(timezone.utc).isoformat()
+        acquire_lock(
+            lock_key,
+            {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": str(request.user_email),
+                "platform": request.platform,
+                "dry_run": request.dry_run,
+                "status": "running",
+                "started_at": started_at,
+            },
+            idempotency,
+            job_ttl,
+        )
+        idempotency.set(
+            job_id,
+            {
+                "job_id": job_id,
+                "sync_type": "user",
+                "user_email": str(request.user_email),
+                "platform": request.platform,
+                "dry_run": request.dry_run,
+                "status": "in_progress",
+                "started_at": started_at,
+            },
+            ttl_seconds=job_ttl,
+        )
+        thread = threading.Thread(
+            target=_run_user_sync_job,
+            kwargs={
+                "coordinator": coordinator,
+                "idempotency": idempotency,
+                "job_id": job_id,
+                "user_email": str(request.user_email),
+                "platform": request.platform,
+                "dry_run": request.dry_run,
+                "request_id": correlation_id,
+                "started_at": started_at,
+                "job_ttl_seconds": job_ttl,
+            },
+            daemon=True,
+            name=f"user-sync-{job_id[:8]}",
+        )
+        thread.start()
+        log.info("user_sync_job_enqueued", job_id=job_id, correlation_id=correlation_id)
+        response.status_code = 202
+        return UserSyncJobAcceptedResponse(
+            success=True,
+            job_id=job_id,
             platform=request.platform,
+            user_email=str(request.user_email),
             dry_run=request.dry_run,
-            request_id=request.request_id or "",
+            status="in_progress",
+            started_at=started_at,
         )
 
-        if result.is_success:
-            return _build_user_response(request, result.data)
+    # Platform sync
+    running = check_lock(platform_lock_key(request.platform), idempotency, lock_stale)
+    if running is not None:
+        log.info(
+            "platform_sync_already_running",
+            existing_job_id=running.get("job_id"),
+        )
+        response.status_code = 202
+        return PlatformSyncJobAcceptedResponse(
+            success=True,
+            job_id=running["job_id"],
+            platform=request.platform,
+            dry_run=running.get("dry_run", request.dry_run),
+            status="in_progress",
+            started_at=running.get("started_at", ""),
+        )
 
-        status_code, detail = _to_public_error(result)
-        if status_code >= 500:
-            log.error(
-                "sync_request_failed",
-                status=str(result.status),
-                error_code=result.error_code,
-                error=result.message,
-            )
-        else:
-            log.warning(
-                "sync_request_failed",
-                status=str(result.status),
-                error_code=result.error_code,
-                error=result.message,
-            )
-        raise HTTPException(status_code=status_code, detail=detail)
-
-    # Platform sync — enqueue as a background job and return 202 immediately.
-    # job_id is always server-generated so the caller has a stable polling key.
-    # The caller's request_id (if any) is forwarded as a tracing correlation ID only.
     job_id = str(uuid.uuid4())
     correlation_id = request.request_id or job_id
     started_at = datetime.now(timezone.utc).isoformat()
-    idempotency = get_idempotency_service()
+    acquire_lock(
+        platform_lock_key(request.platform),
+        {
+            "job_id": job_id,
+            "platform": request.platform,
+            "dry_run": request.dry_run,
+            "status": "running",
+            "started_at": started_at,
+        },
+        idempotency,
+        job_ttl,
+    )
     idempotency.set(
         job_id,
         {
@@ -224,7 +392,7 @@ def sync_endpoint(
             "status": "in_progress",
             "started_at": started_at,
         },
-        ttl_seconds=_PLATFORM_SYNC_JOB_TTL_SECONDS,
+        ttl_seconds=job_ttl,
     )
     thread = threading.Thread(
         target=_run_platform_sync_job,
@@ -236,6 +404,7 @@ def sync_endpoint(
             "dry_run": request.dry_run,
             "request_id": correlation_id,
             "started_at": started_at,
+            "job_ttl_seconds": job_ttl,
         },
         daemon=True,
         name=f"platform-sync-{job_id[:8]}",
@@ -253,27 +422,14 @@ def sync_endpoint(
     )
 
 
-def _to_public_error(result: OperationResult) -> tuple[int, str]:
-    """Map internal OperationResult errors to safe public API responses."""
-    if result.error_code == "FEATURE_DISABLED":
-        return 503, "Access Sync is not enabled"
-    if result.status == OperationStatus.NOT_FOUND:
-        return 404, "Requested access sync resource was not found"
-    if result.status == OperationStatus.UNAUTHORIZED:
-        return 403, "Not authorized to perform this access sync action"
-    if result.status == OperationStatus.PERMANENT_ERROR:
-        return 400, "Access sync request could not be completed"
-    return 500, "Access sync request failed due to an internal error"
-
-
 @router.get(
     "/sync-runs/{job_id}",
-    response_model=PlatformSyncJobStatusResponse,
-    summary="Get platform sync job status",
+    response_model=SyncJobStatusResponse,
+    summary="Get sync job status",
     description=(
-        "Poll the status of an enqueued platform sync job. "
+        "Poll the status of an enqueued sync job (user or platform). "
         "Returns the current state (in_progress, completed, or failed) "
-        "and, once finished, the reconciliation outcome. "
+        "and, once finished, the sync outcome. "
         "Records expire after 24 hours."
     ),
 )
@@ -282,26 +438,10 @@ def get_sync_job_status(
     current_user: Annotated[
         User, Security(get_current_user, scopes=["sre-bot:access-sync"])
     ],
-) -> PlatformSyncJobStatusResponse:
-    """Return the current status and outcome of a platform sync job."""
+) -> SyncJobStatusResponse:
+    """Return the current status and outcome of a sync job."""
     idempotency = get_idempotency_service()
     record = idempotency.get(job_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Sync job not found or has expired")
-    return PlatformSyncJobStatusResponse(**record)
-
-
-def _build_user_response(
-    request: UserSyncRequest, data: object  # type: ignore[valid-type]
-) -> UserSyncResponse:
-    """Map sync_user result data to the HTTP response model."""
-    outcome: SyncOutcome = data  # type: ignore[assignment]
-    return UserSyncResponse(
-        success=True,
-        platform=request.platform,
-        user_email=request.user_email,
-        dry_run=request.dry_run,
-        actions_planned=outcome.planned_actions if outcome else [],
-        actions_applied=outcome.applied_actions if outcome else [],
-        requires_manual_action=outcome.requires_manual_action if outcome else False,
-    )
+    return SyncJobStatusResponse(**record)
