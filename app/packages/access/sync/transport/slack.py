@@ -410,7 +410,9 @@ def _run_platform_sync_background(
             "completed_at": datetime.now(timezone.utc).isoformat(),
             "error": "sync_failed",
         }
-        log.error("platform_sync_job_error", error=str(exc), error_type=type(exc).__name__)
+        log.error(
+            "platform_sync_job_error", error=str(exc), error_type=type(exc).__name__
+        )
 
     idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
     release_lock(platform_lock_key(platform), payload, idempotency, job_ttl_seconds)
