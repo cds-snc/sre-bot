@@ -111,13 +111,35 @@ class FakeDirectory:
         self,
         is_member: bool = True,
         groups: Set[str] | None = None,
+        user_group_slugs: Set[str] | None = None,
     ) -> None:
         self._is_member = is_member
         self._per_group: Dict[str, bool] = {}
         self._groups: Set[str] = groups or set()
+        self._user_group_slugs: Set[str] | None = user_group_slugs
 
     def set_membership(self, group_slug: str, value: bool) -> None:
         self._per_group[group_slug] = value
+
+    def get_user_groups(self, user_email: str) -> OperationResult:
+        if self._user_group_slugs is not None:
+            slugs = self._user_group_slugs
+        else:
+            slugs = {
+                slug
+                for slug in self._groups
+                if self._per_group.get(slug, self._is_member)
+            }
+        return OperationResult.success(
+            data=[
+                DirectoryGroup(
+                    group_email=f"{slug}@example.com",
+                    group_slug=slug,
+                    provider_group_id=f"gid-{slug}",
+                )
+                for slug in slugs
+            ]
+        )
 
     def get_group(self, slug: str) -> OperationResult:
         return OperationResult.success(
@@ -188,7 +210,16 @@ def make_coordinator(
             current_entitlement_ids=current_ids or set(), user_exists=user_exists
         )
     config = _make_config(platform=platform, authn_removal_mode=authn_removal_mode)
-    directory = FakeDirectory(is_member=is_member, groups=discovered_groups or set())
+    authn_slug = config.authn_group_slug(platform)
+    if is_member:
+        user_group_slugs = {authn_slug} | (discovered_groups or set())
+    else:
+        user_group_slugs = set()
+    directory = FakeDirectory(
+        is_member=is_member,
+        groups=discovered_groups or set(),
+        user_group_slugs=user_group_slugs,
+    )
     membership_builder = DirectoryMembershipBuilder(directory)
     coordinator = AccessSyncCoordinator(
         adapters={platform: adapter},
@@ -317,7 +348,9 @@ def test_sync_user_disable_unsupported_sets_requires_manual_action():
 def test_sync_user_entitlement_not_applied_when_not_in_group():
     """Entitlement is only applied when user is a member of the entitlement group."""
     adapter = FakeAdapter()
-    directory = FakeDirectory(is_member=True, groups={"sg-aws-admin"})
+    directory = FakeDirectory(
+        is_member=True, groups={"sg-aws-admin"}, user_group_slugs={"sg-aws-authn"}
+    )
     # Member of authn but NOT of entitlement group
     directory.set_membership("sg-aws-admin", False)
     config = _make_config()
