@@ -66,8 +66,15 @@ class DirectoryMembershipBuilder:
         Skips group discovery — the coordinator resolved effective policy once
         before calling this method.
         """
+        log = logger.bind(user_email=user_email, platform=effective.platform)
         authn_result = self._check_group_membership(
             effective.authn_group_slug, user_email
+        )
+        log.debug(
+            "check_authn_group_membership_completed",
+            authn_group_slug=effective.authn_group_slug,
+            is_member=authn_result.data if authn_result.is_success else None,
+            result_status=authn_result.status,
         )
         if not authn_result.is_success:
             return OperationResult.error(

@@ -771,10 +771,25 @@ class PlatformReconciliationExecutor:
         current_result = adapter.get_current_entitlement_ids(user_email)
         if current_result.is_success:
             if isinstance(current_result.data, set):
-                current_ids = {value for value in current_result.data if isinstance(value, str)}
+                current_ids = {
+                    value for value in current_result.data if isinstance(value, str)
+                }
             return current_ids, True, None
 
         if current_result.status == OperationStatus.NOT_FOUND:
+            if desired_state.user_should_exist:
+                inventory_exists = self._resolve_platform_existence_from_inventory(
+                    adapter=adapter,
+                    user_email=user_email,
+                    log=log,
+                )
+                if inventory_exists is True:
+                    log.warning(
+                        "platform_user_presence_recovered_from_inventory",
+                        user_email=user_email,
+                    )
+                    return current_ids, True, None
+
             if emit_absent_log:
                 log.info("platform_user_absent")
             return current_ids, False, None
@@ -787,6 +802,37 @@ class PlatformReconciliationExecutor:
         return current_ids, False, current_result
 
     @staticmethod
+    def _resolve_platform_existence_from_inventory(
+        adapter: AccessSyncAdapter,
+        user_email: str,
+        log: Any,
+    ) -> Optional[bool]:
+        """Check platform user existence via inventory when direct lookup returns NOT_FOUND.
+
+        This fallback is used to guard against provider false-negatives on point lookups.
+        Returns True/False when inventory is available, or None when inventory cannot be
+        retrieved and the caller should keep the original NOT_FOUND interpretation.
+        """
+        inventory_result = adapter.list_all_provisioned_users()
+        if not inventory_result.is_success or not isinstance(
+            inventory_result.data, set
+        ):
+            log.warning(
+                "platform_user_inventory_lookup_skipped",
+                error_code=inventory_result.error_code,
+                error=inventory_result.message,
+            )
+            return None
+
+        normalized_user_email = user_email.strip().lower()
+        provisioned_users = {
+            value.strip().lower()
+            for value in inventory_result.data
+            if isinstance(value, str)
+        }
+        return normalized_user_email in provisioned_users
+
+    @staticmethod
     def _should_log_plans(
         planned_actions: List[str],
         emit_plan_logs: bool,
@@ -794,7 +840,9 @@ class PlatformReconciliationExecutor:
         """Keep platform sync logs focused while preserving removal visibility."""
         if emit_plan_logs:
             return True
-        return any(action in {"remove_user", "disable_user"} for action in planned_actions)
+        return any(
+            action in {"remove_user", "disable_user"} for action in planned_actions
+        )
 
     def _persist(
         self,
@@ -905,6 +953,13 @@ class AccessSyncCoordinator:
         desired_result = self._membership_builder.build_user_state_from_effective(
             user_email=user_email,
             effective=effective,
+        )
+        log.info(
+            "build_user_state_completed",
+            user_email=user_email,
+            platform=platform,
+            result_status=desired_result.status,
+            has_desired_state=desired_result.data is not None,
         )
         if not desired_result.is_success or desired_result.data is None:
             return desired_result
