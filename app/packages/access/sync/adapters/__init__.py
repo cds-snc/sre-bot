@@ -17,6 +17,7 @@ from typing import Protocol, Set, TYPE_CHECKING, runtime_checkable
 from infrastructure.operations import OperationResult
 
 if TYPE_CHECKING:
+    from packages.access.sync.domain import DesiredUserState
     from packages.access.sync.policies import AdapterCapabilities
 
 
@@ -106,6 +107,31 @@ class AccessSyncAdapter(Protocol):
 
         Returns:
             ``OperationResult[Set[str]]`` of lowercase member emails, or error.
+        """
+        ...
+
+    def assess(
+        self,
+        user_email: str,
+        desired_state: "DesiredUserState",
+    ) -> OperationResult:
+        """Assess the user's current platform state.
+
+        The adapter is the sole authority for determining whether the user
+        exists on the platform and which entitlements they currently hold.
+        When ``desired_state.current_entitlement_ids`` is pre-populated (batch
+        sync path), the implementation must use it directly with zero additional
+        API calls.
+
+        Args:
+            user_email: Normalised user email address.
+            desired_state: IDP-derived desired state; may carry pre-fetched
+                platform entitlements for the batch reconciliation path.
+
+        Returns:
+            ``OperationResult[AdapterAssessment]`` on success, or error when
+            the platform API call fails (hard errors only; user-not-found is
+            represented as ``AdapterAssessment(platform_user_exists=False)``).
         """
         ...
 

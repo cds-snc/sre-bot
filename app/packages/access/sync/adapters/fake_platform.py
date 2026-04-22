@@ -8,6 +8,7 @@ batch membership reads) without external API dependencies.
 from typing import Dict, Set
 
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access.sync.domain import AdapterAssessment, DesiredUserState
 from packages.access.sync.policies import AdapterCapabilities
 
 
@@ -130,3 +131,47 @@ class FakePlatformAdapter:
             for group_id in group_ids
         }
         return OperationResult.success(data=mapping)
+
+    def assess(
+        self,
+        user_email: str,
+        desired_state: DesiredUserState,
+    ) -> OperationResult:
+        """Assess current platform state for the user.
+
+        Uses pre-fetched state when available (batch sync path); otherwise
+        performs a live platform read.
+        """
+        if desired_state.current_entitlement_ids is not None:
+            current_ids: Set[str] = {
+                v for v in desired_state.current_entitlement_ids if isinstance(v, str)
+            }
+            if desired_state.platform_user_exists is not None:
+                platform_user_exists = desired_state.platform_user_exists
+            else:
+                platform_user_exists = bool(current_ids)
+            return OperationResult.success(
+                data=AdapterAssessment(
+                    platform_user_exists=platform_user_exists,
+                    current_entitlement_ids=current_ids,
+                )
+            )
+
+        state = self._fetch_current_state(user_email)
+        if not state.is_success:
+            if state.status == OperationStatus.NOT_FOUND:
+                return OperationResult.success(
+                    data=AdapterAssessment(
+                        platform_user_exists=False,
+                        current_entitlement_ids=set(),
+                    )
+                )
+            return state
+
+        group_ids: Set[str] = set((state.data or {}).get("group_ids", []))
+        return OperationResult.success(
+            data=AdapterAssessment(
+                platform_user_exists=True,
+                current_entitlement_ids=group_ids,
+            )
+        )

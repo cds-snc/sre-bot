@@ -17,6 +17,28 @@ from packages.access.sync.policies import EntitlementRule
 
 
 @dataclass(frozen=True)
+class AdapterAssessment:
+    """Current platform state assessed by the adapter for one user.
+
+    Returned by ``AccessSyncAdapter.assess()`` so the coordinator can plan and
+    execute without any heuristic inference of user existence or entitlements.
+
+    The adapter is the sole source of truth for platform state.  When pre-fetched
+    data is embedded in ``DesiredUserState`` (batch sync path), the adapter
+    assess implementation uses it directly with zero additional API calls.
+
+    Attributes:
+        platform_user_exists: True when the user is provisioned on the platform.
+        current_entitlement_ids: Entitlement IDs the user currently holds.
+            Empty set when the user exists with no entitlements.
+            Also empty when the user does not exist (see platform_user_exists).
+    """
+
+    platform_user_exists: bool
+    current_entitlement_ids: Set[str] = field(default_factory=set)
+
+
+@dataclass(frozen=True)
 class DesiredUserState:
     """Resolved desired and current state for one user on one platform.
 

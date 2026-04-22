@@ -21,7 +21,12 @@ from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.sync.coordinator import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
-from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
+from packages.access.sync.domain import (
+    AdapterAssessment,
+    DesiredUserState,
+    ReconciliationOutcome,
+    SyncOutcome,
+)
 from packages.access.common.config import PlatformPolicy
 from packages.access.sync.policies import (
     AdapterCapabilities,
@@ -102,6 +107,22 @@ class FakeAdapter:
     def list_group_members(self, group_id: str) -> OperationResult:
         self.calls.append(("list_group_members", group_id))
         return OperationResult.success(data=set())
+
+    def assess(self, email: str, desired_state: DesiredUserState) -> OperationResult:
+        self.calls.append(("assess", email))
+        if not self._user_exists:
+            return OperationResult.success(
+                data=AdapterAssessment(
+                    platform_user_exists=False,
+                    current_entitlement_ids=set(),
+                )
+            )
+        return OperationResult.success(
+            data=AdapterAssessment(
+                platform_user_exists=True,
+                current_entitlement_ids=set(self._current_ids),
+            )
+        )
 
 
 class FakeDirectory:
@@ -307,9 +328,7 @@ def test_sync_user_dry_run_no_action_calls():
     assert result.is_success
     assert result.data.applied_actions == []
     assert "provision_user" not in result.data.planned_actions
-    exec_calls = [
-        c for c in adapter.calls if c[0] not in {"get_current_entitlement_ids"}
-    ]
+    exec_calls = [c for c in adapter.calls if c[0] not in {"assess"}]
     assert exec_calls == []
 
 

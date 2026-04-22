@@ -477,17 +477,18 @@ class PlatformReconciliationExecutor:
         Shared path for both sync_user (live IDP check) and the per-user
         loop inside sync_platform (pre-fetched state reused, zero IDP calls).
         """
-        current_ids, platform_user_exists, current_state_error = (
-            self._resolve_current_platform_state(
-                adapter=adapter,
-                user_email=user_email,
-                desired_state=desired_state,
-                log=log,
-                emit_absent_log=emit_plan_logs,
+        assessment_result = adapter.assess(user_email, desired_state)
+        if not assessment_result.is_success or assessment_result.data is None:
+            log.error(
+                "adapter_assess_failed",
+                error_code=assessment_result.error_code,
+                error=assessment_result.message,
             )
-        )
-        if current_state_error is not None:
-            return current_state_error
+            return assessment_result
+        assessment = assessment_result.data
+
+        if not assessment.platform_user_exists and emit_plan_logs:
+            log.info("platform_user_absent")
 
         canonicalized = self._canonicalize_entitlements(
             adapter=adapter,
@@ -503,8 +504,8 @@ class PlatformReconciliationExecutor:
             capabilities=adapter.capabilities(),
             user_should_exist=desired_state.user_should_exist,
             required_entitlements=canon.required_entitlements,
-            current_entitlement_ids=current_ids,
-            platform_user_exists=platform_user_exists,
+            current_entitlement_ids=assessment.current_entitlement_ids,
+            platform_user_exists=assessment.platform_user_exists,
         )
         planned_actions = [str(a.action) for a in planned]
         should_log_plans = self._should_log_plans(
@@ -516,8 +517,8 @@ class PlatformReconciliationExecutor:
                 "actions_planned",
                 count=len(planned_actions),
                 actions=planned_actions,
-                platform_user_exists=platform_user_exists,
-                current_entitlement_count=len(current_ids),
+                platform_user_exists=assessment.platform_user_exists,
+                current_entitlement_count=len(assessment.current_entitlement_ids),
                 user_should_exist=desired_state.user_should_exist,
             )
 
@@ -741,96 +742,6 @@ class PlatformReconciliationExecutor:
             message=f"Unknown action: {action.action}",
             error_code="UNKNOWN_ACTION",
         )
-
-    def _resolve_current_platform_state(
-        self,
-        adapter: AccessSyncAdapter,
-        user_email: str,
-        desired_state: DesiredUserState,
-        log: Any,
-        emit_absent_log: bool,
-    ) -> Tuple[Set[str], bool, Optional[OperationResult]]:
-        """Return current entitlement IDs and platform-existence status for a user."""
-        current_ids: Set[str] = set()
-
-        if desired_state.current_entitlement_ids is not None:
-            current_ids = {
-                value
-                for value in desired_state.current_entitlement_ids
-                if isinstance(value, str)
-            }
-            platform_user_exists = (
-                desired_state.platform_user_exists
-                if desired_state.platform_user_exists is not None
-                else bool(current_ids)
-            )
-            if not platform_user_exists and emit_absent_log:
-                log.info("platform_user_absent")
-            return current_ids, platform_user_exists, None
-
-        current_result = adapter.get_current_entitlement_ids(user_email)
-        if current_result.is_success:
-            if isinstance(current_result.data, set):
-                current_ids = {
-                    value for value in current_result.data if isinstance(value, str)
-                }
-            return current_ids, True, None
-
-        if current_result.status == OperationStatus.NOT_FOUND:
-            if desired_state.user_should_exist:
-                inventory_exists = self._resolve_platform_existence_from_inventory(
-                    adapter=adapter,
-                    user_email=user_email,
-                    log=log,
-                )
-                if inventory_exists is True:
-                    log.warning(
-                        "platform_user_presence_recovered_from_inventory",
-                        user_email=user_email,
-                    )
-                    return current_ids, True, None
-
-            if emit_absent_log:
-                log.info("platform_user_absent")
-            return current_ids, False, None
-
-        log.error(
-            "get_current_entitlement_ids_failed",
-            error_code=current_result.error_code,
-            error=current_result.message,
-        )
-        return current_ids, False, current_result
-
-    @staticmethod
-    def _resolve_platform_existence_from_inventory(
-        adapter: AccessSyncAdapter,
-        user_email: str,
-        log: Any,
-    ) -> Optional[bool]:
-        """Check platform user existence via inventory when direct lookup returns NOT_FOUND.
-
-        This fallback is used to guard against provider false-negatives on point lookups.
-        Returns True/False when inventory is available, or None when inventory cannot be
-        retrieved and the caller should keep the original NOT_FOUND interpretation.
-        """
-        inventory_result = adapter.list_all_provisioned_users()
-        if not inventory_result.is_success or not isinstance(
-            inventory_result.data, set
-        ):
-            log.warning(
-                "platform_user_inventory_lookup_skipped",
-                error_code=inventory_result.error_code,
-                error=inventory_result.message,
-            )
-            return None
-
-        normalized_user_email = user_email.strip().lower()
-        provisioned_users = {
-            value.strip().lower()
-            for value in inventory_result.data
-            if isinstance(value, str)
-        }
-        return normalized_user_email in provisioned_users
 
     @staticmethod
     def _should_log_plans(
