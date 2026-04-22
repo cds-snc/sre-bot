@@ -58,6 +58,15 @@ class DirectorySettings(InfrastructureSettings):
         alias="DIRECTORY_MANAGED_GROUP_DOMAIN",
         description="Authoritative domain for managed group emails",
     )
+    managed_group_prefix: str = Field(
+        default="",
+        alias="DIRECTORY_MANAGED_GROUP_PREFIX",
+        description=(
+            "Optional prefix that identifies managed security groups (e.g. 'sg-'). "
+            "When set, the provider prefers aliases starting with this prefix when "
+            "resolving canonical group emails and applies alias-aware group discovery."
+        ),
+    )
     enforce_managed_group_email: bool = Field(
         default=True,
         alias="DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL",

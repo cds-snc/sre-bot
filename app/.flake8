@@ -12,5 +12,6 @@ per-file-ignores =
     packages/access/sync/coordinator.py: E704
     packages/access/catalog/service.py: E704
     packages/access/request/service.py: E704
+    packages/access/sync/application.py: E704
 max-complexity = 16
 max-line-length = 130

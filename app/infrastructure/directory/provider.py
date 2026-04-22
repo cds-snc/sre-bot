@@ -181,3 +181,26 @@ class DirectoryProvider(Protocol):
             belongs to.
         """
         ...
+
+    def get_group_members_batch(
+        self,
+        group_keys: list[str],
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult[dict[str, list[DirectoryMember]]]:
+        """Return the member list for multiple groups in a single batch call.
+
+        Implementors should use a provider-native batch API when available so
+        the cost is one network round-trip regardless of how many groups are
+        queried.  Falls back gracefully for providers that do not support
+        batching.
+
+        Args:
+            group_keys: Canonical managed-group emails (normalised to lowercase).
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``). If not provided, return all types.
+
+        Returns:
+            OperationResult: success with a dict mapping each group_key to its
+            DirectoryMember list.  Groups with no members map to an empty list.
+        """
+        ...
