@@ -34,21 +34,6 @@ class FakePlatformAdapter:
             supports_bulk_user_delta=True,
         )
 
-    def get_user(self, user_email: str) -> OperationResult:
-        normalized = user_email.lower()
-        if normalized not in self._users:
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND,
-                message=f"User not found: {normalized}",
-                error_code="USER_NOT_FOUND",
-            )
-        return OperationResult.success(
-            data={
-                "user_id": f"fake-{normalized}",
-                "disabled": normalized in self._disabled,
-            }
-        )
-
     def ensure_user(self, user_email: str) -> OperationResult:
         normalized = user_email.lower()
         self._users.add(normalized)
@@ -105,7 +90,7 @@ class FakePlatformAdapter:
         members.discard(normalized)
         return OperationResult.success(message="entitlement_removed")
 
-    def fetch_current_state(self, user_email: str) -> OperationResult:
+    def _fetch_current_state(self, user_email: str) -> OperationResult:
         normalized = user_email.lower()
         if normalized not in self._users:
             return OperationResult.error(
@@ -126,7 +111,7 @@ class FakePlatformAdapter:
         )
 
     def get_current_entitlement_ids(self, user_email: str) -> OperationResult:
-        state = self.fetch_current_state(user_email)
+        state = self._fetch_current_state(user_email)
         if not state.is_success:
             return state
         group_ids = state.data.get("group_ids", []) if state.data else []

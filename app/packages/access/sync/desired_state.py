@@ -267,25 +267,3 @@ class DirectoryMembershipBuilder:
 
         member = membership_result.data
         return OperationResult.success(data=member.is_member if member else False)
-
-    def _resolve_member_entitlements(
-        self,
-        user_email: str,
-        platform: str,
-        rules: List[EntitlementRule],
-    ) -> List[EntitlementRule]:
-        """Return only sync-managed entitlement rules the user qualifies for."""
-        log = logger.bind(user_email=user_email, platform=platform)
-        qualified: List[EntitlementRule] = []
-        for rule in rules:
-            result = self._check_group_membership(rule.group_slug, user_email)
-            if result.is_success and result.data:
-                qualified.append(rule)
-                continue
-            if not result.is_success:
-                log.warning(
-                    "entitlement_group_check_failed",
-                    group_slug=rule.group_slug,
-                    error=result.message,
-                )
-        return qualified

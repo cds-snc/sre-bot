@@ -326,10 +326,6 @@ class AwsIdentityCenterAdapter:
             )
         return OperationResult.success(data={"user_id": user_id})
 
-    def get_user(self, user_email: str) -> OperationResult:
-        """Look up a user; returns NOT_FOUND if missing."""
-        return self._aws.identitystore.describe_user_by_username(username=user_email)
-
     def ensure_user(self, user_email: str) -> OperationResult:
         """Ensure the user exists in Identity Store; create if missing (idempotent)."""
         log = logger.bind(user_email=user_email, adapter="aws_identity_center")
@@ -525,7 +521,7 @@ class AwsIdentityCenterAdapter:
             log.error("remove_entitlement_failed", error=result.message)
         return result
 
-    def fetch_current_state(self, user_email: str) -> OperationResult:
+    def _fetch_current_state(self, user_email: str) -> OperationResult:
         """Fetch all current group memberships for a user.
 
         Returns SUCCESS with data={"user_id": str, "group_ids": list[str]}.
@@ -574,7 +570,7 @@ class AwsIdentityCenterAdapter:
         """
         log = logger.bind(user_email=user_email, adapter="aws_identity_center")
 
-        state_result = self.fetch_current_state(user_email)
+        state_result = self._fetch_current_state(user_email)
         if not state_result.is_success:
             return state_result
 

@@ -186,6 +186,17 @@ def handle_sync_user_command(
     job_ttl = settings.job_ttl_seconds
     lock_stale = settings.lock_stale_seconds
 
+    if not settings.enabled:
+        log.warning("access_sync_disabled_rejected")
+        return CommandResponse(
+            message=t(
+                "access_sync.disabled",
+                locale,
+                "\u26d4 Access Sync is not enabled. Contact your administrator.",
+            ),
+            ephemeral=True,
+        )
+
     lock_key = user_lock_key(platform, user_email)
     running = check_lock(lock_key, idempotency, lock_stale)
     if running is not None:
@@ -266,6 +277,17 @@ def handle_sync_platform_command(
     settings = get_access_sync_settings()
     job_ttl = settings.job_ttl_seconds
     lock_stale = settings.lock_stale_seconds
+
+    if not settings.enabled:
+        log.warning("access_sync_disabled_rejected")
+        return CommandResponse(
+            message=t(
+                "access_sync.disabled",
+                locale,
+                "\u26d4 Access Sync is not enabled. Contact your administrator.",
+            ),
+            ephemeral=True,
+        )
 
     running = check_lock(platform_lock_key(platform), idempotency, lock_stale)
     if running is not None:

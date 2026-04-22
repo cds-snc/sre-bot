@@ -1,6 +1,6 @@
 # Access Sync Adapters
 
-Platform adapters translate generic Access Sync operations (`provision_user`, `apply_entitlement`, …) into real API calls for a specific identity platform. Each adapter is registered in `packages/access/sync/registry.py` and selected at runtime by matching the `platform` key in the sync config.
+Platform adapters translate generic Access Sync operations (`provision_user`, `apply_entitlement`, …) into real API calls for a specific identity platform. Adapters are resolved at runtime by the `providers.py` factory using the `platform` key in the sync config.
 
 ---
 
@@ -10,6 +10,26 @@ Platform adapters translate generic Access Sync operations (`provision_user`, `a
 |---|---|---|---|
 | `AwsIdentityCenterAdapter` | `aws_identity_center.py` | `aws` | Group membership via AWS IdentityStore |
 | `FakePlatformAdapter` | `fake_platform.py` | `fake` | In-memory deterministic adapter for local dev and tests |
+
+---
+
+## Adapter Protocol Contract
+
+All adapters must implement the `AccessSyncAdapter` protocol defined in `__init__.py`. These are the required public methods:
+
+| Method | Description |
+|---|---|
+| `capabilities()` | Return `AdapterCapabilities` describing what operations this adapter supports |
+| `ensure_user(user_email)` | Create or activate a user account (idempotent) |
+| `disable_user(user_email)` | Deactivate a user account (idempotent; return `UNSUPPORTED_OPERATION` if not supported) |
+| `remove_user(user_email)` | Remove a user from the platform entirely (idempotent) |
+| `apply_entitlement(user_email, entitlement_type, entitlement_id)` | Add an entitlement to a user (idempotent) |
+| `remove_entitlement(user_email, entitlement_type, entitlement_id)` | Remove an entitlement from a user (idempotent) |
+| `get_current_entitlement_ids(user_email)` | Return `Set[str]` of platform entitlement IDs the user holds; `NOT_FOUND` if the user does not exist on the platform |
+| `list_all_provisioned_users()` | Return `Set[str]` of all user emails provisioned on the platform (used for orphan detection) |
+| `list_group_members(group_id)` | Return `Set[str]` of user emails in the given platform group |
+
+All methods must return `OperationResult`. Adapters must never raise exceptions across this boundary.
 
 ---
 
@@ -30,7 +50,6 @@ v1 entitlement model: **group membership only**. Direct user-to-account permissi
 | `remove_user` | ✅ | Deletes user from IdentityStore (idempotent) |
 | `apply_entitlement` | ✅ | Adds user to IC group via `CreateGroupMembership` (idempotent) |
 | `remove_entitlement` | ✅ | Removes user from IC group (idempotent, no-op if already absent) |
-| `fetch_current_state` | ✅ | Lists all IC group memberships for a user |
 | Bulk user delta | ✅ | Batch membership reads supported |
 | Multiple entitlement types | ❌ | Only `"group"` supported in v1 |
 
@@ -120,7 +139,7 @@ Pre-seeded state:
 ## Writing a new adapter
 
 1. Create `packages/access/sync/adapters/<platform_name>.py`.
-2. Implement the methods called by `SyncOrchestrator`: `capabilities()`, `get_user()`, `ensure_user()`, `disable_user()`, `remove_user()`, `apply_entitlement()`, `remove_entitlement()`, `fetch_current_state()`, `get_current_entitlement_ids()`.
+2. Implement all methods in the `AccessSyncAdapter` protocol from `__init__.py`: `capabilities()`, `ensure_user()`, `disable_user()`, `remove_user()`, `apply_entitlement()`, `remove_entitlement()`, `get_current_entitlement_ids()`, `list_all_provisioned_users()`, `list_group_members()`.
 3. Return `OperationResult` from every method — never raise.
-4. Register the adapter in `packages/access/sync/registry.py`.
-5. Add a platform policy entry that matches the new platform key.
+4. Add a platform policy entry in the runtime config that matches the new platform key.
+5. Register the adapter in `packages/access/sync/providers.py` adapter factory.

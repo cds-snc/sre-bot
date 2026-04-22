@@ -30,3 +30,5 @@ access_sync:
   status.result.completed: "✅ Le travail `{job_id}` est *terminé* pour la plateforme *{platform}*.\nUtilisateurs synchronisés\u00a0: {users_synced} | Convergés\u00a0: {users_converged} | Orphelins\u00a0: {orphans_found} | Actions manuelles\u00a0: {requires_manual_action_count}\nTerminé\u00a0: {completed_at}"
   status.result.failed: "❌ Le travail `{job_id}` a *échoué* pour la plateforme *{platform}*.\nErreur\u00a0: {error}"
   status.result.unknown: "❓ Le travail `{job_id}` a un statut inconnu\u00a0: *{status}*"
+
+  disabled: "⛔ La synchronisation des accès n'est pas activée. Contactez votre administrateur."

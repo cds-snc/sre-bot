@@ -178,18 +178,6 @@ def test_ensure_user_create_payload_matches_identitystore_requirements() -> None
 
 
 @pytest.mark.unit
-def test_get_user_uses_describe_user_by_username() -> None:
-    """Direct user lookups should reuse the infrastructure client describe method."""
-    client = FakeIdentityStoreClient()
-    adapter = make_adapter(client)
-
-    result = adapter.get_user("alice@example.com")
-
-    assert result.is_success
-    assert client.calls == [("describe_user_by_username", "alice@example.com")]
-
-
-@pytest.mark.unit
 def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> None:
     """Only NOT_FOUND should trigger membership creation."""
     client = FakeIdentityStoreClient()

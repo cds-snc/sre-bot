@@ -2,7 +2,6 @@
 
 import pytest
 
-from infrastructure.operations import OperationStatus
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 
 
@@ -56,18 +55,3 @@ def test_fake_adapter_apply_and_remove_group_entitlement_updates_state():
     assert remove_result.is_success
     assert current_after_remove.is_success
     assert current_after_remove.data == set()
-
-
-@pytest.mark.unit
-def test_fake_adapter_get_user_not_found_returns_normalized_error():
-    """Unknown users should return NOT_FOUND with a stable error code."""
-    # Arrange
-    adapter = FakePlatformAdapter()
-
-    # Act
-    result = adapter.get_user("missing@example.com")
-
-    # Assert
-    assert not result.is_success
-    assert result.status == OperationStatus.NOT_FOUND
-    assert result.error_code == "USER_NOT_FOUND"

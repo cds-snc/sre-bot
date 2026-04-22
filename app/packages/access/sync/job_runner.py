@@ -80,7 +80,9 @@ def run_user_sync_job(
             dry_run=dry_run,
             request_id=request_id,
         )
-        log.info("user_sync_job_finished", success=result.is_success, error=result.message)
+        log.info(
+            "user_sync_job_finished", success=result.is_success, error=result.message
+        )
         completed_at = datetime.now(timezone.utc).isoformat()
         if result.is_success and result.data is not None:
             outcome: SyncOutcome = result.data
