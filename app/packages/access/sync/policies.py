@@ -59,6 +59,35 @@ class EffectivePlatformPolicy:
         return list(self.entitlement_rules)
 
 
+@dataclass(frozen=True)
+class PlanningContext:
+    """Policy context passed to adapters for reconciliation planning.
+
+    Contains only the information adapters need to compute a delta plan.
+    IDP-specific fields (authn_group_slug) are intentionally excluded; those
+    are only needed during desired-state construction in ``desired_state.py``.
+
+    Produced by ``PlanningContext.from_effective`` after the IDP step.
+    """
+
+    platform: str
+    authn_removal_mode: str
+    entitlement_rules: List[EntitlementRule]
+
+    def sync_managed_rules(self) -> List[EntitlementRule]:
+        """All rules (every rule in planning context is already sync_managed)."""
+        return list(self.entitlement_rules)
+
+    @classmethod
+    def from_effective(cls, effective: "EffectivePlatformPolicy") -> "PlanningContext":
+        """Derive a PlanningContext from an EffectivePlatformPolicy."""
+        return cls(
+            platform=effective.platform,
+            authn_removal_mode=effective.authn_removal_mode,
+            entitlement_rules=effective.entitlement_rules,
+        )
+
+
 def resolve_effective_policy(
     config: "AccessRuntimeConfig",
     platform: str,
@@ -168,7 +197,7 @@ class PolicyEngine:
 
     def plan_actions(
         self,
-        policy: EffectivePlatformPolicy,
+        policy: PlanningContext,
         capabilities: AdapterCapabilities,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
@@ -178,7 +207,7 @@ class PolicyEngine:
         """Produce the minimal ordered action list to converge one user.
 
         Args:
-            policy: Run-scoped effective policy (all rules sync_managed).
+            policy: Planning context (platform, removal mode, rules).
             capabilities: Adapter capability declaration.
             user_should_exist: Whether IDP membership in the authn group is True.
             required_entitlements: Sync-managed rules the user qualifies for.

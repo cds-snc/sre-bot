@@ -40,17 +40,15 @@ class AdapterAssessment:
 
 @dataclass(frozen=True)
 class DesiredUserState:
-    """Resolved desired and current state for one user on one platform.
+    """Resolved desired state for one user on one platform.
 
-    Built from directory membership data for on-demand sync and enriched with
-    pre-fetched platform state during batch sync so planning and execution run
-    through one shared internal shape.
+    Built from IDP directory membership data.  The adapter is the sole
+    authority for current platform state — this model carries no platform
+    state fields.
     """
 
     user_should_exist: bool
     required_entitlements: List[EntitlementRule] = field(default_factory=list)
-    current_entitlement_ids: Optional[Set[str]] = None
-    platform_user_exists: Optional[bool] = None
 
 
 @dataclass(frozen=True)

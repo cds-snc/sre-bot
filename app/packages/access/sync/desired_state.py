@@ -134,6 +134,9 @@ class DirectoryMembershipBuilder:
         Accepts pre-resolved EffectivePlatformPolicy so the coordinator can
         resolve effective policy once and reuse it across state building,
         prefetch, and engine planning.
+
+        Entitlement-group membership is fetched in a single batch IDP call
+        (``get_group_members_batch``) after all rule group emails are resolved.
         """
         log = logger.bind(platform=effective.platform)
 
@@ -163,6 +166,9 @@ class DirectoryMembershipBuilder:
         }
         log.info("build_desired_state_authn_members", count=len(desired))
 
+        # Resolve every rule slug to its canonical group email first so we can
+        # issue a single batch members call instead of one per entitlement group.
+        email_to_rule: Dict[str, EntitlementRule] = {}
         for rule in effective.sync_managed_rules():
             group_result = self._directory.get_group(rule.group_slug)
             if not group_result.is_success or not group_result.data:
@@ -171,28 +177,32 @@ class DirectoryMembershipBuilder:
                     group_slug=rule.group_slug,
                 )
                 continue
+            email_to_rule[group_result.data.group_email] = rule
 
-            rule_members_result = self._directory.get_group_members(
-                group_result.data.group_email,
+        if email_to_rule:
+            batch_result = self._directory.get_group_members_batch(
+                list(email_to_rule.keys()),
                 include_member_types={"USER"},
             )
-            if not rule_members_result.is_success:
+            if not batch_result.is_success:
                 log.warning(
-                    "build_desired_state_members_failed",
-                    group_slug=rule.group_slug,
-                    error=rule_members_result.message,
+                    "build_desired_state_batch_members_failed",
+                    error=batch_result.message,
                 )
-                continue
-
-            for member in rule_members_result.data or []:
-                normalized_email = member.email.lower()
-                state = desired.get(normalized_email)
-                if state is None:
-                    continue
-                desired[normalized_email] = DesiredUserState(
-                    user_should_exist=True,
-                    required_entitlements=state.required_entitlements + [rule],
-                )
+            else:
+                for group_email, members in (batch_result.data or {}).items():
+                    matched_rule = email_to_rule.get(group_email)
+                    if matched_rule is None:
+                        continue
+                    for member in members:
+                        normalized_email = member.email.lower()
+                        state = desired.get(normalized_email)
+                        if state is None:
+                            continue
+                        desired[normalized_email] = DesiredUserState(
+                            user_should_exist=True,
+                            required_entitlements=state.required_entitlements + [matched_rule],
+                        )
 
         return OperationResult.success(data=desired)
 

@@ -1,38 +1,29 @@
-"""Access Sync adapter contract and capability models.
+"""Access Sync adapter contract.
 
-Adapters execute normalized actions against a specific platform's external API.
-They must never implement policy logic — that belongs in policies.py.
+Adapters own the full reconciliation lifecycle for a platform:
+  assess current state → plan delta → execute via platform API calls.
 
-All adapter methods are idempotent: calling them with the same inputs more than
-once must produce the same result.  When an action cannot be automated, adapters
-return a non-success OperationResult with a machine-readable error_code so the
-service can mark the run as manual_action_required.
-
-Supported entitlement types:
-  "group" — platform-native group identifier (e.g. AWS IC GroupId)
+All methods are idempotent and return OperationResult.
+Adapters must never raise exceptions across this boundary.
 """
 
-from typing import Protocol, Set, TYPE_CHECKING, runtime_checkable
+from typing import Dict, Protocol, TYPE_CHECKING
 
 from infrastructure.operations import OperationResult
 
 if TYPE_CHECKING:
     from packages.access.sync.domain import DesiredUserState
-    from packages.access.sync.policies import AdapterCapabilities
+    from packages.access.sync.policies import (
+        AdapterCapabilities,
+        PlanningContext,
+    )
 
 
 class AccessSyncAdapter(Protocol):
-    """Contract for all platform sync adapters.
-
-    All methods are idempotent and return OperationResult.  Adapters must not
-    raise exceptions across this boundary.
-    """
+    """Contract for all platform sync adapters."""
 
     def capabilities(self) -> "AdapterCapabilities":
-        """Return the execution capabilities of this adapter.
-
-        Used by PolicyEngine.plan_actions to select compatible actions.
-        """
+        """Return the execution capabilities declared by this adapter."""
         ...
 
     def ensure_user(self, user_email: str) -> OperationResult:
@@ -53,10 +44,7 @@ class AccessSyncAdapter(Protocol):
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Apply an entitlement to a user (idempotent; no-op if already held).
-
-        v1: entitlement_type="group", entitlement_id=<platform group id>
-        """
+        """Apply an entitlement to a user (idempotent; no-op if already held)."""
         ...
 
     def remove_entitlement(
@@ -65,98 +53,37 @@ class AccessSyncAdapter(Protocol):
         entitlement_type: str,
         entitlement_id: str,
     ) -> OperationResult:
-        """Remove an entitlement from a user (idempotent; no-op if already absent).
-
-        v1: entitlement_type="group", entitlement_id=<platform group id>
-        """
+        """Remove an entitlement from a user (idempotent; no-op if already absent)."""
         ...
 
-    def get_current_entitlement_ids(self, user_email: str) -> OperationResult:
-        """Return the normalized set of entitlement IDs the user currently holds.
-
-        Entitlement IDs must use the same format as ``EntitlementRule.entitlement_id``
-        so the PolicyEngine can compute the delta against the desired set.
-
-        Returns:
-            ``OperationResult[Set[str]]`` with the entitlement ID set, or error.
-            Returns an empty set (success) when the user exists but holds nothing.
-            Returns NOT_FOUND when the user does not exist on the platform.
-        """
-        ...
-
-    def list_all_provisioned_users(self) -> OperationResult:
-        """Return a set of all user emails currently provisioned on this platform.
-
-        Used by reconciliation for orphan detection: users on the platform
-        whose IDP authn-group membership has since been revoked.
-
-        Returns:
-            ``OperationResult[Set[str]]`` of lowercase user emails, or error.
-            Adapters that cannot enumerate their user base return NOT_IMPLEMENTED.
-        """
-        ...
-
-    def list_group_members(self, group_id: str) -> OperationResult:
-        """Return the set of user emails that are members of the given platform group.
-
-        Used by reconciliation batch read phase to get platform-side group
-        membership without per-user API calls.
-
-        Args:
-            group_id: Platform-native group identifier (e.g. AWS IC GroupId).
-
-        Returns:
-            ``OperationResult[Set[str]]`` of lowercase member emails, or error.
-        """
-        ...
-
-    def assess(
+    def reconcile_user(
         self,
         user_email: str,
         desired_state: "DesiredUserState",
+        context: "PlanningContext",
+        dry_run: bool = False,
     ) -> OperationResult:
-        """Assess the user's current platform state.
+        """Assess current platform state, plan delta, execute changes for one user.
 
-        The adapter is the sole authority for determining whether the user
-        exists on the platform and which entitlements they currently hold.
-        When ``desired_state.current_entitlement_ids`` is pre-populated (batch
-        sync path), the implementation must use it directly with zero additional
-        API calls.
+        The adapter owns the full reconciliation lifecycle:
+          1. Read current platform state.
+          2. Plan delta via PolicyEngine (internal).
+          3. Execute planned actions via platform API calls.
+          4. Return OperationResult[SyncOutcome].
 
-        Args:
-            user_email: Normalised user email address.
-            desired_state: IDP-derived desired state; may carry pre-fetched
-                platform entitlements for the batch reconciliation path.
-
-        Returns:
-            ``OperationResult[AdapterAssessment]`` on success, or error when
-            the platform API call fails (hard errors only; user-not-found is
-            represented as ``AdapterAssessment(platform_user_exists=False)``).
+        In dry_run mode: return plan without executing.
         """
         ...
 
-
-@runtime_checkable
-class BulkGroupMembershipAdapter(Protocol):
-    """Optional high-throughput membership read capability.
-
-    Adapters implement this protocol when they can fetch members for many
-    groups in one optimized call path, reducing reconciliation read costs.
-    """
-
-    def list_members_for_groups(self, group_ids: Set[str]) -> OperationResult:
-        """Return mapping of group_id -> set of lowercase member emails."""
-        ...
-
-
-@runtime_checkable
-class EntitlementCanonicalizingAdapter(Protocol):
-    """Optional capability for converting entitlement references to canonical IDs."""
-
-    def canonicalize_entitlement_id(
+    def reconcile_platform(
         self,
-        entitlement_type: str,
-        entitlement_id: str,
+        desired_states: "Dict[str, DesiredUserState]",
+        context: "PlanningContext",
+        dry_run: bool = False,
     ) -> OperationResult:
-        """Return canonical entitlement ID representation for planner execution."""
+        """Batch reconcile all users on the platform.
+
+        The adapter owns batch-specific optimizations (prefetch, orphan detection).
+        Returns OperationResult[ReconciliationOutcome].
+        """
         ...
