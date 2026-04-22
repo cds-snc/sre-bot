@@ -8,7 +8,7 @@ Covers:
   F-05  UNSUPPORTED_OPERATION from adapter sets requires_manual_action
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import pytest
 

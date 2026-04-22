@@ -233,7 +233,6 @@ class SpyAdapter:
         return OperationResult.success()
 
     def _get_assessment(self, email: str) -> AdapterAssessment:
-        normalized = email.lower()
         if not self._user_exists:
             return AdapterAssessment(
                 platform_user_exists=False,
