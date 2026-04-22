@@ -1,14 +1,360 @@
-"""Fixtures for access_sync integration tests."""
+"""Fixtures for access_sync integration tests.
 
-from typing import Any
+Provides three layers of shared test infrastructure:
+
+1. **Shared test doubles** — ``FakeDirectory`` and ``SpyAdapter`` are
+   lightweight implementations of the directory provider and platform adapter
+   protocols.  They give full control over IDP and platform state without
+   touching real APIs.
+
+2. **Factory fixtures** — ``make_sync_config`` and ``make_coordinator`` build
+   configured coordinator stacks with safe defaults.  Tests override only the
+   parameters relevant to the scenario being verified.
+
+3. **AWS-specific helpers** — ``aws_config`` and ``make_adapter`` remain for
+   the existing adapter group-mapping integration tests.
+
+Separation of concerns between ``FakeDirectory`` fields:
+
+    discovered_slugs
+        Returned by ``list_groups(query=prefix)`` and ``list_groups("")``.
+        Controls which groups the coordinator considers when building the
+        effective policy.  Typically the platform-prefixed groups only.
+
+    transitive_membership_slugs
+        Controls what ``check_membership(group_email, user_email)`` returns.
+        A slug in this set makes the membership check return ``True`` for
+        *any* user.  Use it to model transitive (indirect) membership such as
+        ``sg-aws-authn`` when the user is only a direct member of a subgroup.
+
+    user_direct_group_slugs
+        Returned by ``get_user_groups(user_email)``.  These are the *direct*
+        group memberships that drive required-entitlement resolution.  Should
+        *not* include the authn group itself when modelling transitive access.
+
+    group_members
+        Dict[slug, list[email]] used by ``get_group_members`` during
+        ``sync_platform`` batch IDP reads (Phase 1).
+"""
+
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import MagicMock
 
 import pytest
 
+from infrastructure.directory.models import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
+from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
+from packages.access.sync.coordinator import AccessSyncCoordinator
+from packages.access.sync.desired_state import DirectoryMembershipBuilder
+from packages.access.sync.policies import AdapterCapabilities
+
+# ---------------------------------------------------------------------------
+# Environment isolation
+# ---------------------------------------------------------------------------
+
+_ACCESS_SYNC_ENV_KEYS = [
+    "ACCESS_SYNC_ENABLED",
+    "ACCESS_SYNC_RECONCILIATION_ENABLED",
+    "ACCESS_SYNC_JOB_TTL_SECONDS",
+    "ACCESS_CONFIG_SOURCE",
+    "ACCESS_CONFIG_REF",
+    "ACCESS_SYNC_DIR_PREFIX",
+    "ACCESS_SYNC_DIR_SEPARATOR",
+    "ACCESS_SYNC_PLATFORMS_JSON",
+]
+
+
+@pytest.fixture(autouse=True)
+def _access_sync_env_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip all ACCESS_SYNC_* env vars before every integration test."""
+    for key in _ACCESS_SYNC_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
+# ---------------------------------------------------------------------------
+# FakeDirectory — IDP test double
+# ---------------------------------------------------------------------------
+
+
+class FakeDirectory:
+    """Configurable IDP test double for integration tests.
+
+    All methods return ``OperationResult`` to satisfy the ``DirectoryProvider``
+    protocol used by ``DirectoryMembershipBuilder``.
+    """
+
+    def __init__(
+        self,
+        discovered_slugs: Optional[Set[str]] = None,
+        transitive_membership_slugs: Optional[Set[str]] = None,
+        user_direct_group_slugs: Optional[Set[str]] = None,
+        group_members: Optional[Dict[str, List[str]]] = None,
+    ) -> None:
+        self._discovered: Set[str] = discovered_slugs or set()
+        self._transitive: Set[str] = transitive_membership_slugs or set()
+        self._direct: Set[str] = user_direct_group_slugs or set()
+        self._members: Dict[str, List[str]] = group_members or {}
+
+    def _make_group(self, slug: str) -> DirectoryGroup:
+        return DirectoryGroup(
+            group_email=f"{slug}@example.com",
+            group_slug=slug,
+            provider_group_id=f"gid-{slug}",
+        )
+
+    def get_group(self, slug: str) -> OperationResult:
+        # Groups always exist in the IDP directory; only membership is configurable.
+        # The membership question is answered by check_membership / get_user_groups.
+        return OperationResult.success(data=self._make_group(slug))
+
+    def check_membership(self, group_email: str, user_email: str) -> OperationResult:
+        slug = group_email.split("@")[0]
+        is_member = slug in self._transitive
+        return OperationResult.success(
+            data=MembershipCheckResult(
+                group_email=group_email,
+                group_slug=slug,
+                provider_group_id=f"gid-{slug}",
+                user_email=user_email,
+                is_member=is_member,
+            )
+        )
+
+    def get_user_groups(self, user_email: str) -> OperationResult:
+        return OperationResult.success(
+            data=[self._make_group(slug) for slug in self._direct]
+        )
+
+    def get_group_members(
+        self,
+        group_email: str,
+        include_member_types: Optional[Set[str]] = None,
+    ) -> OperationResult:
+        slug = group_email.split("@")[0]
+        emails = self._members.get(slug, [])
+        return OperationResult.success(
+            data=[DirectoryMember(email=email) for email in emails]
+        )
+
+    def list_groups(self, query: str = "") -> OperationResult:
+        matching = [
+            self._make_group(slug)
+            for slug in self._discovered
+            if not query or slug.startswith(query)
+        ]
+        return OperationResult.success(data=matching)
+
+
+# ---------------------------------------------------------------------------
+# SpyAdapter — platform adapter test double
+# ---------------------------------------------------------------------------
+
+
+class SpyAdapter:
+    """In-memory platform adapter that records all calls.
+
+    Configurable return values let individual tests control current platform
+    state without wiring real API clients.
+    """
+
+    def __init__(
+        self,
+        current_entitlement_ids: Optional[Set[str]] = None,
+        user_exists: bool = True,
+        provisioned_users: Optional[Set[str]] = None,
+        supports_disable: bool = False,
+        group_members: Optional[Dict[str, Set[str]]] = None,
+    ) -> None:
+        self.calls: List[tuple] = []
+        self._current_ids: Set[str] = (
+            current_entitlement_ids if current_entitlement_ids is not None else set()
+        )
+        self._user_exists = user_exists
+        self._provisioned = provisioned_users
+        self._supports_disable = supports_disable
+        self._group_members: Dict[str, Set[str]] = group_members or {}
+
+    def capabilities(self) -> AdapterCapabilities:
+        return AdapterCapabilities(
+            supports_disable=self._supports_disable,
+            supports_delete=True,
+            supported_entitlement_types={"group"},
+            supports_bulk_user_delta=True,
+        )
+
+    def ensure_user(self, email: str) -> OperationResult:
+        self.calls.append(("ensure_user", email))
+        return OperationResult.success()
+
+    def disable_user(self, email: str) -> OperationResult:
+        self.calls.append(("disable_user", email))
+        return OperationResult.success()
+
+    def remove_user(self, email: str) -> OperationResult:
+        self.calls.append(("remove_user", email))
+        return OperationResult.success()
+
+    def apply_entitlement(self, email: str, etype: str, eid: str) -> OperationResult:
+        self.calls.append(("apply_entitlement", email, etype, eid))
+        return OperationResult.success()
+
+    def remove_entitlement(self, email: str, etype: str, eid: str) -> OperationResult:
+        self.calls.append(("remove_entitlement", email, etype, eid))
+        return OperationResult.success()
+
+    def get_current_entitlement_ids(self, email: str) -> OperationResult:
+        self.calls.append(("get_current_entitlement_ids", email))
+        if not self._user_exists:
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message=f"User not found on platform: {email}",
+                error_code="USER_NOT_FOUND",
+            )
+        return OperationResult.success(data=set(self._current_ids))
+
+    def list_all_provisioned_users(self) -> OperationResult:
+        self.calls.append(("list_all_provisioned_users",))
+        if self._provisioned is not None:
+            return OperationResult.success(data=set(self._provisioned))
+        return OperationResult.error(
+            OperationStatus.PERMANENT_ERROR,
+            message="Not supported",
+            error_code="UNSUPPORTED_OPERATION",
+        )
+
+    def list_group_members(self, group_id: str) -> OperationResult:
+        self.calls.append(("list_group_members", group_id))
+        return OperationResult.success(data=self._group_members.get(group_id, set()))
+
+
+# ---------------------------------------------------------------------------
+# Factory fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def make_sync_config():
+    """Factory for ``AccessSyncRuntimeConfig`` with safe production-like defaults.
+
+    Default: single ``aws`` platform, ``sg`` dir_prefix, ``-`` separator.
+    Override ``mode_overrides`` to exclude specific tokens from sync::
+
+        config = make_sync_config(mode_overrides={"scratch": "ephemeral"})
+    """
+
+    def _make(
+        platform: str = "aws",
+        authn_token: str = "authn",
+        authn_removal_mode: str = "delete",
+        mode_overrides: Optional[Dict[str, str]] = None,
+        dir_prefix: str = "sg",
+        dir_separator: str = "-",
+        adapter_type: str = "fake",
+    ) -> AccessSyncRuntimeConfig:
+        return AccessSyncRuntimeConfig(
+            dir_prefix=dir_prefix,
+            dir_separator=dir_separator,
+            platforms={
+                platform: PlatformPolicy(
+                    authn_token=authn_token,
+                    authn_removal_mode=authn_removal_mode,
+                    adapter_type=adapter_type,
+                    mode_overrides=mode_overrides or {},
+                )
+            },
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_coordinator(make_sync_config):
+    """Factory for a fully-wired ``AccessSyncCoordinator`` backed by test doubles.
+
+    Returns ``(coordinator, adapter)`` so tests can assert on adapter call
+    records after running a sync.
+
+    IDP state is controlled through ``FakeDirectory`` parameters:
+
+    * ``discovered_slugs`` — groups visible to ``list_groups``
+    * ``transitive_membership_slugs`` — groups where ``check_membership``
+      returns ``True`` (models transitive/indirect membership)
+    * ``user_direct_group_slugs`` — groups returned by ``get_user_groups``
+      (models direct group membership used for entitlement matching)
+    * ``group_members`` — mapping for batch platform-sync IDP reads
+
+    Platform state is controlled through ``SpyAdapter`` parameters::
+
+        coordinator, adapter = make_coordinator(
+            mode_overrides={"scratch": "ephemeral"},
+            discovered_slugs={"sg-aws-scratch"},
+            transitive_membership_slugs={"sg-aws-authn"},
+            user_direct_group_slugs={"sg-aws-scratch"},
+            user_exists=True,
+        )
+    """
+
+    def _make(
+        platform: str = "aws",
+        authn_removal_mode: str = "delete",
+        mode_overrides: Optional[Dict[str, str]] = None,
+        # IDP state
+        discovered_slugs: Optional[Set[str]] = None,
+        transitive_membership_slugs: Optional[Set[str]] = None,
+        user_direct_group_slugs: Optional[Set[str]] = None,
+        group_members: Optional[Dict[str, List[str]]] = None,
+        # Platform adapter state
+        current_entitlement_ids: Optional[Set[str]] = None,
+        user_exists: bool = True,
+        provisioned_users: Optional[Set[str]] = None,
+        supports_disable: bool = False,
+        adapter_group_members: Optional[Dict[str, Set[str]]] = None,
+    ) -> tuple:
+        config = make_sync_config(
+            platform=platform,
+            authn_removal_mode=authn_removal_mode,
+            mode_overrides=mode_overrides,
+        )
+        # Default transitive membership: authn slug is reachable (e.g. via a subgroup)
+        authn_slug = config.authn_group_slug(platform)
+        transitive = (
+            transitive_membership_slugs
+            if transitive_membership_slugs is not None
+            else {authn_slug}
+        )
+        directory = FakeDirectory(
+            discovered_slugs=discovered_slugs,
+            transitive_membership_slugs=transitive,
+            user_direct_group_slugs=user_direct_group_slugs,
+            group_members=group_members,
+        )
+        adapter = SpyAdapter(
+            current_entitlement_ids=current_entitlement_ids,
+            user_exists=user_exists,
+            provisioned_users=provisioned_users,
+            supports_disable=supports_disable,
+            group_members=adapter_group_members,
+        )
+        coordinator = AccessSyncCoordinator(
+            adapters={platform: adapter},
+            config=config,
+            membership_builder=DirectoryMembershipBuilder(directory),
+        )
+        return coordinator, adapter
+
+    return _make
+
+
+# ---------------------------------------------------------------------------
+# AWS-specific helpers (used by test_adapter_group_mapping.py)
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
