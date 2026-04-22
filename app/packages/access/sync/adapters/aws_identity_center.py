@@ -871,6 +871,38 @@ class AwsIdentityCenterAdapter:
             )
         )
 
+    def _log_platform_reconcile_summary(
+        self,
+        log: Any,
+        dry_run: bool,
+        planned_by_user: Dict[str, List[str]],
+        users_by_action: Dict[str, List[str]],
+        entitlements_by_action: Dict[str, Dict[str, List[str]]],
+        managed_entitlement_count: int,
+        unchanged_user_count: int,
+    ) -> None:
+        """Emit a delta-focused summary for human review after reconciliation.
+
+        Shows which users are impacted by which groups (slugs) for easy understanding.
+        """
+        log.info(
+            "reconcile_platform_plan_summary",
+            dry_run=dry_run,
+            changed_user_count=len(planned_by_user),
+            unchanged_user_count=unchanged_user_count,
+            managed_entitlement_count=managed_entitlement_count,
+            action_counts={
+                action: len(emails)
+                for action, emails in sorted(users_by_action.items())
+            },
+            entitlements_by_action={
+                action: {
+                    slug: sorted(emails) for slug, emails in sorted(by_slug.items())
+                }
+                for action, by_slug in sorted(entitlements_by_action.items())
+            },
+        )
+
     # ------------------------------------------------------------------
     # Primary reconciliation interface
     # ------------------------------------------------------------------
@@ -919,6 +951,17 @@ class AwsIdentityCenterAdapter:
             platform_user_exists=current.platform_user_exists,
         )
         planned_names: List[str] = [a.action for a in planned]
+        log.debug(
+            "reconcile_user_plan_summary",
+            dry_run=dry_run,
+            user_should_exist=desired_state.user_should_exist,
+            platform_user_exists=current.platform_user_exists,
+            desired_entitlement_ids=sorted(
+                rule.entitlement_id for rule in canonical_required
+            ),
+            current_entitlement_ids=sorted(current.current_entitlement_ids),
+            planned_actions=planned_names,
+        )
         log.info(
             "reconcile_user_planned",
             dry_run=dry_run,
@@ -957,6 +1000,13 @@ class AwsIdentityCenterAdapter:
         if not canon_result.is_success or not isinstance(canon_result.data, list):
             return canon_result
         canonical_rules: List[EntitlementRule] = canon_result.data
+
+        # Build mapping from UUID back to human-readable slugs for logging
+        uuid_to_slug: Dict[str, str] = {
+            r.entitlement_id: r.group_slug
+            for r in canonical_rules
+            if r.entitlement_type == "group"
+        }
 
         canonical_context = dc_replace(context, entitlement_rules=canonical_rules)
 
@@ -1008,6 +1058,10 @@ class AwsIdentityCenterAdapter:
         users_converged = 0
         requires_manual_action_count = 0
         per_user: Dict[str, SyncOutcome] = {}
+        planned_by_user: Dict[str, List[str]] = {}
+        users_by_action: Dict[str, List[str]] = {}
+        entitlements_by_action: Dict[str, Dict[str, List[str]]] = {}
+        unchanged_user_count = 0
 
         for email in sorted(all_subjects):
             state = desired_states.get(email, DesiredUserState(user_should_exist=False))
@@ -1058,10 +1112,34 @@ class AwsIdentityCenterAdapter:
                 current_entitlement_ids=current.current_entitlement_ids,
                 platform_user_exists=current.platform_user_exists,
             )
+            planned_names: List[str] = [action.action for action in planned]
+            planned_detail: List[str] = [
+                (
+                    f"{action.action}:{uuid_to_slug.get(action.entitlement_id, action.entitlement_id)}"
+                    if action.entitlement_id is not None
+                    else action.action
+                )
+                for action in planned
+            ]
+
+            if planned_names:
+                planned_by_user[email] = planned_detail
+                for action_name in sorted(set(planned_names)):
+                    users_by_action.setdefault(action_name, []).append(email)
+                for action in planned:
+                    if action.entitlement_id is not None:
+                        slug = uuid_to_slug.get(
+                            action.entitlement_id, action.entitlement_id
+                        )
+                        entitlements_by_action.setdefault(action.action, {}).setdefault(
+                            slug, []
+                        ).append(email)
+            else:
+                unchanged_user_count += 1
 
             if dry_run:
                 outcome = SyncOutcome(
-                    planned_actions=[a.action for a in planned],
+                    planned_actions=planned_names,
                     applied_actions=[],
                 )
             else:
@@ -1087,6 +1165,27 @@ class AwsIdentityCenterAdapter:
                 users_converged += 1
             if outcome.requires_manual_action:
                 requires_manual_action_count += 1
+
+        # Log group matching summary before action summary for visibility
+        failed_rules = [
+            r for r in context.entitlement_rules if r.entitlement_id not in uuid_to_slug
+        ]
+        log.info(
+            "reconcile_platform_groups_matched",
+            groups_discovered=len(context.entitlement_rules),
+            groups_canonicalized=len(canonical_rules),
+            groups_failed=len(failed_rules),
+        )
+
+        self._log_platform_reconcile_summary(
+            log=log,
+            dry_run=dry_run,
+            planned_by_user=planned_by_user,
+            users_by_action=users_by_action,
+            entitlements_by_action=entitlements_by_action,
+            managed_entitlement_count=len(managed_ids),
+            unchanged_user_count=unchanged_user_count,
+        )
 
         log.info(
             "reconcile_platform_completed",
