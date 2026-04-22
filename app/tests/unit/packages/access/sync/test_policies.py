@@ -10,6 +10,7 @@ from packages.access.sync.policies import (
     AdapterCapabilities,
     EffectivePlatformPolicy,
     EntitlementRule,
+    PlanningContext,
     PolicyEngine,
     resolve_effective_policy,
 )
@@ -29,6 +30,18 @@ def make_effective(
     return EffectivePlatformPolicy(
         platform=platform,
         authn_group_slug=authn_group_slug,
+        authn_removal_mode=authn_removal_mode,
+        entitlement_rules=rules or [],
+    )
+
+
+def make_planning_context(
+    platform: str = "aws",
+    authn_removal_mode: str = "delete",
+    rules: list | None = None,
+) -> PlanningContext:
+    return PlanningContext(
+        platform=platform,
         authn_removal_mode=authn_removal_mode,
         entitlement_rules=rules or [],
     )
@@ -201,14 +214,14 @@ def test_resolve_effective_policy_normalizes_slug_case(make_runtime_config):
 
 
 # ---------------------------------------------------------------------------
-# PolicyEngine.plan_actions -- uses EffectivePlatformPolicy
+# PolicyEngine.plan_actions -- uses PlanningContext
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 def test_plan_actions_user_should_exist_with_entitlements():
     rule = make_rule(entitlement_type="group", entitlement_id="admin")
-    effective = make_effective(authn_removal_mode="delete", rules=[rule])
+    effective = make_planning_context(authn_removal_mode="delete", rules=[rule])
     capabilities = AdapterCapabilities(
         supports_disable=False,
         supports_delete=True,
@@ -231,7 +244,7 @@ def test_plan_actions_user_should_exist_with_entitlements():
 
 @pytest.mark.unit
 def test_plan_actions_user_should_not_exist_delete():
-    effective = make_effective(authn_removal_mode="delete")
+    effective = make_planning_context(authn_removal_mode="delete")
     capabilities = AdapterCapabilities(
         supports_disable=False,
         supports_delete=True,
@@ -253,7 +266,7 @@ def test_plan_actions_user_should_not_exist_delete():
 @pytest.mark.unit
 def test_plan_actions_user_should_not_exist_already_absent():
     """No lifecycle action when user_should_exist=False and platform_user_exists=False."""
-    effective = make_effective(authn_removal_mode="delete")
+    effective = make_planning_context(authn_removal_mode="delete")
     capabilities = AdapterCapabilities(
         supports_disable=False,
         supports_delete=True,
@@ -273,7 +286,7 @@ def test_plan_actions_user_should_not_exist_already_absent():
 
 @pytest.mark.unit
 def test_plan_actions_user_should_not_exist_disable():
-    effective = make_effective(authn_removal_mode="disable")
+    effective = make_planning_context(authn_removal_mode="disable")
     capabilities = AdapterCapabilities(
         supports_disable=True,
         supports_delete=True,
@@ -296,7 +309,7 @@ def test_plan_actions_user_should_not_exist_disable():
 @pytest.mark.unit
 def test_plan_actions_removes_stale_entitlements():
     rule = make_rule(entitlement_id="admin")
-    effective = make_effective(rules=[rule])
+    effective = make_planning_context(rules=[rule])
     capabilities = AdapterCapabilities(
         supports_disable=True,
         supports_delete=True,
@@ -321,7 +334,7 @@ def test_plan_actions_removes_stale_entitlements():
 @pytest.mark.unit
 def test_plan_actions_no_removal_when_current_ids_unknown():
     rule = make_rule(entitlement_id="admin")
-    effective = make_effective(rules=[rule])
+    effective = make_planning_context(rules=[rule])
     capabilities = AdapterCapabilities(
         supports_disable=True,
         supports_delete=True,
@@ -343,7 +356,7 @@ def test_plan_actions_no_removal_when_current_ids_unknown():
 @pytest.mark.unit
 def test_plan_actions_entitlement_only_removal_mode_no_lifecycle():
     """entitlement_only mode: no lifecycle action planned when user should not exist."""
-    effective = make_effective(authn_removal_mode="entitlement_only")
+    effective = make_planning_context(authn_removal_mode="entitlement_only")
     capabilities = AdapterCapabilities(
         supports_disable=True,
         supports_delete=True,

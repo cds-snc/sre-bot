@@ -53,8 +53,17 @@ from packages.access.common.config import PlatformPolicy
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
-from packages.access.sync.domain import AdapterAssessment, DesiredUserState
-from packages.access.sync.policies import AdapterCapabilities
+from packages.access.sync.domain import (
+    AdapterAssessment,
+    DesiredUserState,
+    ReconciliationOutcome,
+    SyncOutcome,
+)
+from packages.access.sync.policies import (
+    AdapterCapabilities,
+    PlanningContext,
+    PolicyEngine,
+)
 
 # ---------------------------------------------------------------------------
 # Environment isolation
@@ -144,6 +153,18 @@ class FakeDirectory:
             data=[DirectoryMember(email=email) for email in emails]
         )
 
+    def get_group_members_batch(
+        self,
+        group_emails: List[str],
+        include_member_types: Optional[Set[str]] = None,
+    ) -> OperationResult:
+        result = {}
+        for group_email in group_emails:
+            slug = group_email.split("@")[0]
+            emails = self._members.get(slug, [])
+            result[group_email] = [DirectoryMember(email=email) for email in emails]
+        return OperationResult.success(data=result)
+
     def list_groups(self, query: str = "") -> OperationResult:
         matching = [
             self._make_group(slug)
@@ -159,10 +180,11 @@ class FakeDirectory:
 
 
 class SpyAdapter:
-    """In-memory platform adapter that records all calls.
+    """In-memory platform adapter that records reconcile calls.
 
     Configurable return values let individual tests control current platform
-    state without wiring real API clients.
+    state without wiring real API clients. Implements the AccessSyncAdapter
+    protocol with reconcile_user() and reconcile_platform().
     """
 
     def __init__(
@@ -210,58 +232,146 @@ class SpyAdapter:
         self.calls.append(("remove_entitlement", email, etype, eid))
         return OperationResult.success()
 
-    def get_current_entitlement_ids(self, email: str) -> OperationResult:
-        self.calls.append(("get_current_entitlement_ids", email))
+    def _get_assessment(self, email: str) -> AdapterAssessment:
+        normalized = email.lower()
         if not self._user_exists:
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND,
-                message=f"User not found on platform: {email}",
-                error_code="USER_NOT_FOUND",
+            return AdapterAssessment(
+                platform_user_exists=False,
+                current_entitlement_ids=set(),
             )
-        return OperationResult.success(data=set(self._current_ids))
-
-    def list_all_provisioned_users(self) -> OperationResult:
-        self.calls.append(("list_all_provisioned_users",))
-        if self._provisioned is not None:
-            return OperationResult.success(data=set(self._provisioned))
-        return OperationResult.error(
-            OperationStatus.PERMANENT_ERROR,
-            message="Not supported",
-            error_code="UNSUPPORTED_OPERATION",
+        return AdapterAssessment(
+            platform_user_exists=True,
+            current_entitlement_ids=set(self._current_ids),
         )
 
-    def list_group_members(self, group_id: str) -> OperationResult:
-        self.calls.append(("list_group_members", group_id))
-        return OperationResult.success(data=self._group_members.get(group_id, set()))
-
-    def assess(self, email: str, desired_state: DesiredUserState) -> OperationResult:
-        self.calls.append(("assess", email))
-        if not self._user_exists:
-            return OperationResult.success(
-                data=AdapterAssessment(
-                    platform_user_exists=False,
-                    current_entitlement_ids=set(),
-                )
-            )
-        if desired_state.current_entitlement_ids is not None:
-            current_ids = {
-                v for v in desired_state.current_entitlement_ids if isinstance(v, str)
-            }
-            platform_user_exists = (
-                desired_state.platform_user_exists
-                if desired_state.platform_user_exists is not None
-                else bool(current_ids)
-            )
-            return OperationResult.success(
-                data=AdapterAssessment(
-                    platform_user_exists=platform_user_exists,
-                    current_entitlement_ids=current_ids,
-                )
-            )
+    def reconcile_user(
+        self,
+        user_email: str,
+        desired_state: DesiredUserState,
+        context: PlanningContext,
+        dry_run: bool = False,
+    ) -> OperationResult:
+        self.calls.append(("reconcile_user", user_email))
+        current = self._get_assessment(user_email)
+        engine = PolicyEngine()
+        planned = engine.plan_actions(
+            policy=context,
+            capabilities=self.capabilities(),
+            user_should_exist=desired_state.user_should_exist,
+            required_entitlements=desired_state.required_entitlements,
+            current_entitlement_ids=current.current_entitlement_ids,
+            platform_user_exists=current.platform_user_exists,
+        )
+        applied: List[str] = []
+        if not dry_run:
+            for action in planned:
+                if action.action == "provision_user":
+                    self.ensure_user(user_email)
+                    applied.append(action.action)
+                elif action.action == "disable_user":
+                    self.disable_user(user_email)
+                    applied.append(action.action)
+                elif action.action == "remove_user":
+                    self.remove_user(user_email)
+                    applied.append(action.action)
+                elif (
+                    action.action == "apply_entitlement"
+                    and action.entitlement_type
+                    and action.entitlement_id
+                ):
+                    self.apply_entitlement(
+                        user_email, action.entitlement_type, action.entitlement_id
+                    )
+                    applied.append(action.action)
+                elif (
+                    action.action == "remove_entitlement"
+                    and action.entitlement_type
+                    and action.entitlement_id
+                ):
+                    self.remove_entitlement(
+                        user_email, action.entitlement_type, action.entitlement_id
+                    )
+                    applied.append(action.action)
         return OperationResult.success(
-            data=AdapterAssessment(
-                platform_user_exists=True,
-                current_entitlement_ids=set(self._current_ids),
+            data=SyncOutcome(
+                planned_actions=[a.action for a in planned],
+                applied_actions=applied,
+            )
+        )
+
+    def reconcile_platform(
+        self,
+        desired_states: Dict[str, DesiredUserState],
+        context: PlanningContext,
+        dry_run: bool = False,
+    ) -> OperationResult:
+        self.calls.append(("reconcile_platform",))
+        idp_members = set(desired_states.keys())
+        provisioned = self._provisioned if self._provisioned is not None else set()
+        orphans = provisioned - idp_members
+        all_subjects = idp_members | orphans
+        engine = PolicyEngine()
+        users_synced = 0
+        users_converged = 0
+        per_user: Dict[str, SyncOutcome] = {}
+        for email in sorted(all_subjects):
+            state = desired_states.get(email, DesiredUserState(user_should_exist=False))
+            current = self._get_assessment(email)
+            planned = engine.plan_actions(
+                policy=context,
+                capabilities=self.capabilities(),
+                user_should_exist=state.user_should_exist,
+                required_entitlements=state.required_entitlements,
+                current_entitlement_ids=current.current_entitlement_ids,
+                platform_user_exists=current.platform_user_exists,
+            )
+            applied: List[str] = []
+            if not dry_run:
+                for action in planned:
+                    if action.action == "provision_user":
+                        self.ensure_user(email)
+                        applied.append(action.action)
+                    elif action.action == "disable_user":
+                        self.disable_user(email)
+                        applied.append(action.action)
+                    elif action.action == "remove_user":
+                        self.remove_user(email)
+                        applied.append(action.action)
+                    elif (
+                        action.action == "apply_entitlement"
+                        and action.entitlement_type
+                        and action.entitlement_id
+                    ):
+                        self.apply_entitlement(
+                            email, action.entitlement_type, action.entitlement_id
+                        )
+                        applied.append(action.action)
+                    elif (
+                        action.action == "remove_entitlement"
+                        and action.entitlement_type
+                        and action.entitlement_id
+                    ):
+                        self.remove_entitlement(
+                            email, action.entitlement_type, action.entitlement_id
+                        )
+                        applied.append(action.action)
+            outcome = SyncOutcome(
+                planned_actions=[a.action for a in planned],
+                applied_actions=applied,
+            )
+            per_user[email] = outcome
+            users_synced += 1
+            if applied:
+                users_converged += 1
+        return OperationResult.success(
+            data=ReconciliationOutcome(
+                platform=context.platform,
+                users_synced=users_synced,
+                users_converged=users_converged,
+                orphans_found=len(orphans),
+                requires_manual_action_count=0,
+                dry_run=dry_run,
+                per_user=per_user,
             )
         )
 

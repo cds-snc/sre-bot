@@ -28,6 +28,7 @@ def mock_directory_settings():
     """Directory settings fixture for provider construction."""
     settings = MagicMock()
     settings.managed_group_domain = "example.com"
+    settings.managed_group_prefix = "sg-"
     settings.enforce_managed_group_email = True
     return settings
 
@@ -943,3 +944,102 @@ class TestListGroups:
         # Assert
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
+
+
+class TestGetGroupMembersBatch:
+    def test_returns_members_for_each_group(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_batch_group_members.return_value = (
+            OperationResult.success(
+                data={
+                    "sg-aws-admin@example.com": [
+                        {"email": "alice@example.com", "type": "USER", "id": "m1"},
+                    ],
+                    "sg-aws-read@example.com": [
+                        {"email": "bob@example.com", "type": "USER", "id": "m2"},
+                    ],
+                }
+            )
+        )
+
+        # Act
+        result = provider.get_group_members_batch(
+            ["sg-aws-admin@example.com", "sg-aws-read@example.com"],
+            include_member_types={"USER"},
+        )
+
+        # Assert
+        assert result.is_success
+        assert set(result.data.keys()) == {
+            "sg-aws-admin@example.com",
+            "sg-aws-read@example.com",
+        }
+        assert len(result.data["sg-aws-admin@example.com"]) == 1
+        assert result.data["sg-aws-admin@example.com"][0].email == "alice@example.com"
+        assert len(result.data["sg-aws-read@example.com"]) == 1
+        assert result.data["sg-aws-read@example.com"][0].email == "bob@example.com"
+
+    def test_returns_empty_dict_for_empty_input(self, provider, mock_google_clients):
+        # Act
+        result = provider.get_group_members_batch([])
+
+        # Assert
+        assert result.is_success
+        assert result.data == {}
+        mock_google_clients.directory.get_batch_group_members.assert_not_called()
+
+    def test_propagates_batch_failure(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_batch_group_members.return_value = (
+            OperationResult.transient_error("batch_request_failed")
+        )
+
+        # Act
+        result = provider.get_group_members_batch(["sg-aws-admin@example.com"])
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_filters_to_requested_member_types(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_batch_group_members.return_value = (
+            OperationResult.success(
+                data={
+                    "sg-aws-admin@example.com": [
+                        {"email": "alice@example.com", "type": "USER", "id": "m1"},
+                        {
+                            "email": "nested-group@example.com",
+                            "type": "GROUP",
+                            "id": "m2",
+                        },
+                    ],
+                }
+            )
+        )
+
+        # Act
+        result = provider.get_group_members_batch(
+            ["sg-aws-admin@example.com"],
+            include_member_types={"USER"},
+        )
+
+        # Assert
+        assert result.is_success
+        members = result.data["sg-aws-admin@example.com"]
+        assert len(members) == 1
+        assert members[0].email == "alice@example.com"
+
+    def test_normalises_group_keys_to_lowercase(self, provider, mock_google_clients):
+        # Arrange
+        mock_google_clients.directory.get_batch_group_members.return_value = (
+            OperationResult.success(data={"sg-aws-admin@example.com": []})
+        )
+
+        # Act
+        provider.get_group_members_batch(["SG-AWS-Admin@EXAMPLE.COM"])
+
+        # Assert
+        mock_google_clients.directory.get_batch_group_members.assert_called_once_with(
+            ["sg-aws-admin@example.com"]
+        )
