@@ -51,33 +51,49 @@ class DirectoryMembershipBuilder:
     ) -> OperationResult[DesiredUserState]:
         """Build desired user state from an already-resolved EffectivePlatformPolicy.
 
-        Uses a single inverse group lookup (``get_user_groups``) to fetch all
-        managed groups the user belongs to, then checks authn and each
-        entitlement rule locally — replacing the previous 3 + 2N sequential
-        ``hasMember`` + ``get_group`` round trips with a single API call
-        regardless of the number of entitlement rules.
+        Two separate IDP calls with different semantics:
+
+        1. Lifecycle (user_should_exist): ``check_membership`` against the authn
+           group.  Uses the directory's transitive hasMember check so users who
+           are members of the authn group via a nested sub-group (e.g.
+           sg-aws-scratch ⊂ sg-aws-authn) are correctly resolved.
+
+        2. Entitlements (required_entitlements): ``get_user_groups`` returns the
+           user's direct group memberships, filtered against the run-scoped
+           sync_managed rules.  Deactivated tokens (e.g. scratch) are already
+           excluded from effective policy so they never produce entitlement rules.
 
         Skips group discovery — the coordinator resolved effective policy once
         before calling this method.
         """
-        user_groups_result = self._directory.get_user_groups(user_email)
-        if not user_groups_result.is_success:
+        authn_result = self._check_group_membership(
+            effective.authn_group_slug, user_email
+        )
+        if not authn_result.is_success:
             return OperationResult.error(
-                user_groups_result.status,
-                message=user_groups_result.message,
-                error_code=user_groups_result.error_code,
+                authn_result.status,
+                message=authn_result.message,
+                error_code=authn_result.error_code,
             )
 
-        user_group_slugs: Set[str] = {
-            group.group_slug.lower()
-            for group in (user_groups_result.data or [])
-            if group.group_slug
-        }
-
-        user_should_exist = effective.authn_group_slug.lower() in user_group_slugs
+        user_should_exist: bool = authn_result.data or False
 
         required_entitlements: List[EntitlementRule] = []
         if user_should_exist:
+            user_groups_result = self._directory.get_user_groups(user_email)
+            if not user_groups_result.is_success:
+                return OperationResult.error(
+                    user_groups_result.status,
+                    message=user_groups_result.message,
+                    error_code=user_groups_result.error_code,
+                )
+
+            user_group_slugs: Set[str] = {
+                group.group_slug.lower()
+                for group in (user_groups_result.data or [])
+                if group.group_slug
+            }
+
             required_entitlements = [
                 rule
                 for rule in effective.sync_managed_rules()

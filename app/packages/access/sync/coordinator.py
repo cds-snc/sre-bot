@@ -184,7 +184,12 @@ class PlatformPrefetchPlanner:
             provisioned = provisioned_result.data
             provisioned_known = True
             orphans = provisioned - idp_members
-            log.info("orphans_detected", count=len(orphans))
+            log.info(
+                "orphans_detected",
+                count=len(orphans),
+                orphan_emails=sorted(orphans),
+                provisioned_count=len(provisioned),
+            )
         else:
             log.warning("orphan_detection_skipped", error=provisioned_result.message)
 
@@ -387,6 +392,7 @@ class PlatformReconciliationExecutor:
         provisioned_known: bool,
         provisioned: Set[str],
         log: Any,
+        emit_per_user_plan_logs: bool = True,
     ) -> Tuple[int, int, int, Dict[str, SyncOutcome]]:
         """Run per-user convergence over all selected subjects.
 
@@ -434,6 +440,7 @@ class PlatformReconciliationExecutor:
                 run_id=reconcile_id,
                 request_id=reconcile_id,
                 log=user_log,
+                emit_plan_logs=emit_per_user_plan_logs,
             )
             users_synced += 1
             if result.is_success and result.data is not None:
@@ -463,33 +470,24 @@ class PlatformReconciliationExecutor:
         run_id: str,
         request_id: str,
         log: Any,
+        emit_plan_logs: bool = True,
     ) -> OperationResult:
         """Plan and execute actions for one user against the platform.
 
         Shared path for both sync_user (live IDP check) and the per-user
         loop inside sync_platform (pre-fetched state reused, zero IDP calls).
         """
-        current_ids: Set[str] = set()
-        platform_user_exists = False
-
-        if desired_state.current_entitlement_ids is not None:
-            current_ids = {
-                v for v in desired_state.current_entitlement_ids if isinstance(v, str)
-            }
-            if desired_state.platform_user_exists is not None:
-                platform_user_exists = desired_state.platform_user_exists
-            else:
-                platform_user_exists = bool(current_ids)
-            if not platform_user_exists:
-                log.info("platform_user_absent")
-        else:
-            current_result = adapter.get_current_entitlement_ids(user_email)
-            platform_user_exists = current_result.is_success
-            if current_result.is_success and current_result.data is not None:
-                if isinstance(current_result.data, set):
-                    current_ids = {v for v in current_result.data if isinstance(v, str)}
-            elif current_result.status == OperationStatus.NOT_FOUND:
-                log.info("platform_user_absent")
+        current_ids, platform_user_exists, current_state_error = (
+            self._resolve_current_platform_state(
+                adapter=adapter,
+                user_email=user_email,
+                desired_state=desired_state,
+                log=log,
+                emit_absent_log=emit_plan_logs,
+            )
+        )
+        if current_state_error is not None:
+            return current_state_error
 
         canonicalized = self._canonicalize_entitlements(
             adapter=adapter,
@@ -509,17 +507,23 @@ class PlatformReconciliationExecutor:
             platform_user_exists=platform_user_exists,
         )
         planned_actions = [str(a.action) for a in planned]
-        log.info(
-            "actions_planned",
-            count=len(planned_actions),
-            actions=planned_actions,
-            platform_user_exists=platform_user_exists,
-            current_entitlement_count=len(current_ids),
-            user_should_exist=desired_state.user_should_exist,
+        should_log_plans = self._should_log_plans(
+            planned_actions=planned_actions,
+            emit_plan_logs=emit_plan_logs,
         )
+        if should_log_plans:
+            log.info(
+                "actions_planned",
+                count=len(planned_actions),
+                actions=planned_actions,
+                platform_user_exists=platform_user_exists,
+                current_entitlement_count=len(current_ids),
+                user_should_exist=desired_state.user_should_exist,
+            )
 
         if dry_run:
-            log.info("dry_run_plan_ready", actions=planned_actions)
+            if should_log_plans:
+                log.info("dry_run_plan_ready", actions=planned_actions)
             return OperationResult.success(
                 data=SyncOutcome(planned_actions=planned_actions, applied_actions=[])
             )
@@ -737,6 +741,60 @@ class PlatformReconciliationExecutor:
             message=f"Unknown action: {action.action}",
             error_code="UNKNOWN_ACTION",
         )
+
+    def _resolve_current_platform_state(
+        self,
+        adapter: AccessSyncAdapter,
+        user_email: str,
+        desired_state: DesiredUserState,
+        log: Any,
+        emit_absent_log: bool,
+    ) -> Tuple[Set[str], bool, Optional[OperationResult]]:
+        """Return current entitlement IDs and platform-existence status for a user."""
+        current_ids: Set[str] = set()
+
+        if desired_state.current_entitlement_ids is not None:
+            current_ids = {
+                value
+                for value in desired_state.current_entitlement_ids
+                if isinstance(value, str)
+            }
+            platform_user_exists = (
+                desired_state.platform_user_exists
+                if desired_state.platform_user_exists is not None
+                else bool(current_ids)
+            )
+            if not platform_user_exists and emit_absent_log:
+                log.info("platform_user_absent")
+            return current_ids, platform_user_exists, None
+
+        current_result = adapter.get_current_entitlement_ids(user_email)
+        if current_result.is_success:
+            if isinstance(current_result.data, set):
+                current_ids = {value for value in current_result.data if isinstance(value, str)}
+            return current_ids, True, None
+
+        if current_result.status == OperationStatus.NOT_FOUND:
+            if emit_absent_log:
+                log.info("platform_user_absent")
+            return current_ids, False, None
+
+        log.error(
+            "get_current_entitlement_ids_failed",
+            error_code=current_result.error_code,
+            error=current_result.message,
+        )
+        return current_ids, False, current_result
+
+    @staticmethod
+    def _should_log_plans(
+        planned_actions: List[str],
+        emit_plan_logs: bool,
+    ) -> bool:
+        """Keep platform sync logs focused while preserving removal visibility."""
+        if emit_plan_logs:
+            return True
+        return any(action in {"remove_user", "disable_user"} for action in planned_actions)
 
     def _persist(
         self,
@@ -966,6 +1024,7 @@ class AccessSyncCoordinator:
                 provisioned_known=provisioned_known,
                 provisioned=provisioned,
                 log=log,
+                emit_per_user_plan_logs=False,
             )
         )
 
@@ -980,9 +1039,13 @@ class AccessSyncCoordinator:
         )
 
         actions_breakdown: Dict[str, int] = {}
+        remove_user_targets: List[str] = []
         for outcome in per_user.values():
             for action in outcome.planned_actions:
                 actions_breakdown[action] = actions_breakdown.get(action, 0) + 1
+        for email, outcome in per_user.items():
+            if "remove_user" in outcome.planned_actions:
+                remove_user_targets.append(email)
         planned_actions_total = sum(actions_breakdown.values())
 
         log.info(
@@ -993,6 +1056,7 @@ class AccessSyncCoordinator:
             requires_manual_action=requires_manual_action_count,
             planned_actions_total=planned_actions_total,
             planned_actions_breakdown=actions_breakdown,
+            remove_user_targets=sorted(remove_user_targets),
         )
 
         if self._dispatcher:

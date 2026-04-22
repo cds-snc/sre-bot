@@ -244,9 +244,31 @@ def test_plan_actions_user_should_not_exist_delete():
         capabilities=capabilities,
         user_should_exist=False,
         required_entitlements=[],
+        platform_user_exists=True,
     )
     assert any(a.action == "remove_user" for a in actions)
     assert not any(a.action == "disable_user" for a in actions)
+
+
+@pytest.mark.unit
+def test_plan_actions_user_should_not_exist_already_absent():
+    """No lifecycle action when user_should_exist=False and platform_user_exists=False."""
+    effective = make_effective(authn_removal_mode="delete")
+    capabilities = AdapterCapabilities(
+        supports_disable=False,
+        supports_delete=True,
+        supported_entitlement_types=set(),
+    )
+    engine = PolicyEngine()
+
+    actions = engine.plan_actions(
+        policy=effective,
+        capabilities=capabilities,
+        user_should_exist=False,
+        required_entitlements=[],
+        platform_user_exists=False,
+    )
+    assert not any(a.action in {"remove_user", "disable_user"} for a in actions)
 
 
 @pytest.mark.unit
@@ -264,6 +286,7 @@ def test_plan_actions_user_should_not_exist_disable():
         capabilities=capabilities,
         user_should_exist=False,
         required_entitlements=[],
+        platform_user_exists=True,
     )
 
     assert any(a.action == "disable_user" for a in actions)

@@ -244,9 +244,10 @@ class PolicyEngine:
                         )
                     )
 
-        if policy.authn_removal_mode == "disable":
-            planned.append(PlannedAction(action="disable_user"))
-        elif policy.authn_removal_mode == "delete":
-            planned.append(PlannedAction(action="remove_user"))
+        if platform_user_exists:
+            if policy.authn_removal_mode == "disable":
+                planned.append(PlannedAction(action="disable_user"))
+            elif policy.authn_removal_mode == "delete":
+                planned.append(PlannedAction(action="remove_user"))
 
         return planned
