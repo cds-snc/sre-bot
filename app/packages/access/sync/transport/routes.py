@@ -1,18 +1,15 @@
 """Access Sync FastAPI route handlers — HTTP transport layer only.
 
 Defines the POST /api/v1/access/sync-runs and GET /api/v1/access/sync-runs/{job_id}
-endpoints.  Handlers validate the incoming request schema, check or acquire the
-concurrency lock, delegate execution to ``job_runner``, and map the result to an
-HTTP response.  No business logic lives here — all decisions belong in
-``policies.py`` and ``coordinator.py``.
+endpoints.  Handlers validate the incoming request schema, delegate admission
+to ``transport.ingress``, and map the result to an HTTP response.  No business
+logic lives here — all decisions belong in ``policies.py`` and ``coordinator.py``.
 
 FastAPI ``Depends`` factories for the coordinator and settings are declared in
 ``providers.py``.  Route handlers consume them through type-annotated protocols
 so they are test-substitutable without monkey-patching FastAPI.
 """
 
-import uuid
-from datetime import datetime, timezone
 from typing import Annotated, Protocol, Union
 
 import structlog
@@ -21,11 +18,6 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Security
 from infrastructure.identity.models import User
 from infrastructure.services import get_current_user, get_idempotency_service
 from packages.access.sync.coordinator import AccessSyncCoordinatorPort
-from packages.access.sync.platform_lock import (
-    check_lock,
-    platform_lock_key,
-    user_lock_key,
-)
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
@@ -37,9 +29,10 @@ from packages.access.sync.schemas import (
     UserSyncJobAcceptedResponse,
     UserSyncRequest,
 )
-from packages.access.sync.job_runner import (
-    spawn_platform_sync_thread,
-    spawn_user_sync_thread,
+from packages.access.sync.transport.ingress import (
+    EnqueuedJob,
+    enqueue_platform_sync,
+    enqueue_user_sync,
 )
 from packages.access.sync.presenters import to_http_status_response
 
@@ -58,6 +51,18 @@ class _AccessSyncSettingsPort(Protocol):
     enabled: bool
     job_ttl_seconds: int
     lock_stale_seconds: int
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:
+    """Map ingress error codes to HTTP exceptions."""
+    if error_code == "FEATURE_DISABLED":
+        return HTTPException(status_code=503, detail=message)
+    return HTTPException(status_code=500, detail=message)
 
 
 # ---------------------------------------------------------------------------
@@ -99,94 +104,54 @@ def sync_endpoint(
     )
     log.info("sync_request")
 
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Sync is not enabled")
-
     idempotency = get_idempotency_service()
-    job_ttl = settings.job_ttl_seconds
-    lock_stale = settings.lock_stale_seconds
 
     if isinstance(request, UserSyncRequest):
-        lock_key = user_lock_key(request.platform, str(request.user_email))
-        running = check_lock(lock_key, idempotency, lock_stale)
-        if running is not None:
-            log.info("user_sync_already_running", existing_job_id=running.get("job_id"))
-            response.status_code = 202
-            return UserSyncJobAcceptedResponse(
-                success=True,
-                job_id=running["job_id"],
-                platform=request.platform,
-                user_email=str(request.user_email),
-                dry_run=running.get("dry_run", request.dry_run),
-                status="in_progress",
-                started_at=running.get("started_at", ""),
-            )
-
-        job_id = str(uuid.uuid4())
-        correlation_id = request.request_id or job_id
-        started_at = datetime.now(timezone.utc).isoformat()
-        spawn_user_sync_thread(
+        result = enqueue_user_sync(
             coordinator=coordinator,
             idempotency=idempotency,
-            job_id=job_id,
+            settings=settings,
             user_email=str(request.user_email),
             platform=request.platform,
             dry_run=request.dry_run,
-            request_id=correlation_id,
-            started_at=started_at,
-            job_ttl_seconds=job_ttl,
+            request_id=request.request_id or "",
         )
-        log.info("user_sync_job_enqueued", job_id=job_id, correlation_id=correlation_id)
+        if not result.is_success or result.data is None:
+            raise _http_error_from_enqueue(
+                result.error_code or "", result.message or ""
+            )
+        job: EnqueuedJob = result.data
         response.status_code = 202
         return UserSyncJobAcceptedResponse(
             success=True,
-            job_id=job_id,
-            platform=request.platform,
-            user_email=str(request.user_email),
-            dry_run=request.dry_run,
+            job_id=job.job_id,
+            platform=job.platform,
+            user_email=job.user_email,
+            dry_run=job.dry_run,
             status="in_progress",
-            started_at=started_at,
+            started_at=job.started_at,
         )
 
     # Platform sync
-    running = check_lock(platform_lock_key(request.platform), idempotency, lock_stale)
-    if running is not None:
-        log.info(
-            "platform_sync_already_running",
-            existing_job_id=running.get("job_id"),
-        )
-        response.status_code = 202
-        return PlatformSyncJobAcceptedResponse(
-            success=True,
-            job_id=running["job_id"],
-            platform=request.platform,
-            dry_run=running.get("dry_run", request.dry_run),
-            status="in_progress",
-            started_at=running.get("started_at", ""),
-        )
-
-    job_id = str(uuid.uuid4())
-    correlation_id = request.request_id or job_id
-    started_at = datetime.now(timezone.utc).isoformat()
-    spawn_platform_sync_thread(
+    result = enqueue_platform_sync(
         coordinator=coordinator,
         idempotency=idempotency,
-        job_id=job_id,
+        settings=settings,
         platform=request.platform,
         dry_run=request.dry_run,
-        request_id=correlation_id,
-        started_at=started_at,
-        job_ttl_seconds=job_ttl,
+        request_id=request.request_id or "",
     )
-    log.info("platform_sync_job_enqueued", job_id=job_id, correlation_id=correlation_id)
+    if not result.is_success or result.data is None:
+        raise _http_error_from_enqueue(result.error_code or "", result.message or "")
+    job = result.data
     response.status_code = 202
     return PlatformSyncJobAcceptedResponse(
         success=True,
-        job_id=job_id,
-        platform=request.platform,
-        dry_run=request.dry_run,
+        job_id=job.job_id,
+        platform=job.platform,
+        dry_run=job.dry_run,
         status="in_progress",
-        started_at=started_at,
+        started_at=job.started_at,
     )
 
 

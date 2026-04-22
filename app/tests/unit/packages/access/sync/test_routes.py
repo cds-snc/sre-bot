@@ -124,7 +124,7 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
             return_value=fake_idempotency,
         ),
         patch(
-            "packages.access.sync.transport.routes.check_lock",
+            "packages.access.sync.transport.ingress.check_lock",
             return_value=fake_idempotency.get.return_value,
         ),
         patch(

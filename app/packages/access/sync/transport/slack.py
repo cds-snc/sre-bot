@@ -9,8 +9,6 @@ Command hierarchy under /sre:
             └── status  <job_id>
 """
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, TYPE_CHECKING
 
 import structlog
@@ -18,18 +16,13 @@ import structlog
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
 from infrastructure.services import get_idempotency_service, t
-from packages.access.sync.platform_lock import (
-    check_lock,
-    platform_lock_key,
-    user_lock_key,
-)
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
-from packages.access.sync.job_runner import (
-    spawn_platform_sync_thread,
-    spawn_user_sync_thread,
+from packages.access.sync.transport.ingress import (
+    enqueue_platform_sync,
+    enqueue_user_sync,
 )
 from packages.access.sync.presenters import to_slack_status_message
 
@@ -183,68 +176,68 @@ def handle_sync_user_command(
     coordinator = get_access_sync_coordinator()
     idempotency = get_idempotency_service()
     settings = get_access_sync_settings()
-    job_ttl = settings.job_ttl_seconds
-    lock_stale = settings.lock_stale_seconds
 
-    if not settings.enabled:
-        log.warning("access_sync_disabled_rejected")
+    result = enqueue_user_sync(
+        coordinator=coordinator,
+        idempotency=idempotency,
+        settings=settings,
+        user_email=user_email,
+        platform=platform,
+        dry_run=dry_run,
+    )
+
+    if not result.is_success or result.data is None:
+        if result.error_code == "FEATURE_DISABLED":
+            log.warning("access_sync_disabled_rejected")
+            return CommandResponse(
+                message=t(
+                    "access_sync.disabled",
+                    locale,
+                    "\u26d4 Access Sync is not enabled. Contact your administrator.",
+                ),
+                ephemeral=True,
+            )
         return CommandResponse(
             message=t(
-                "access_sync.disabled",
+                "access_sync.user.result.error",
                 locale,
-                "\u26d4 Access Sync is not enabled. Contact your administrator.",
+                f"\u274c Unexpected error: {result.message}",
             ),
             ephemeral=True,
         )
 
-    lock_key = user_lock_key(platform, user_email)
-    running = check_lock(lock_key, idempotency, lock_stale)
-    if running is not None:
-        existing_job_id = running.get("job_id", "")
-        log.info("user_sync_already_running", existing_job_id=existing_job_id)
+    job = result.data
+    if job.already_running:
+        log.info("user_sync_already_running", existing_job_id=job.job_id)
         return CommandResponse(
             message=t(
                 "access_sync.user.result.already_running",
                 locale,
                 (
                     f"\u23f3 User sync already in progress for *{user_email}* on *{platform}*."
-                    f"\nJob ID: `{existing_job_id}`"
-                    f"\nPoll status: `/sre access sync status {existing_job_id}`"
+                    f"\nJob ID: `{job.job_id}`"
+                    f"\nPoll status: `/sre access sync status {job.job_id}`"
                 ),
                 user_email=user_email,
                 platform=platform,
-                job_id=existing_job_id,
+                job_id=job.job_id,
             ),
             ephemeral=True,
         )
 
-    job_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
-    spawn_user_sync_thread(
-        coordinator=coordinator,
-        idempotency=idempotency,
-        job_id=job_id,
-        user_email=user_email,
-        platform=platform,
-        dry_run=dry_run,
-        request_id=job_id,
-        started_at=started_at,
-        job_ttl_seconds=job_ttl,
-    )
-    log.info("user_sync_job_enqueued", job_id=job_id)
-
+    log.info("user_sync_job_enqueued", job_id=job.job_id)
     return CommandResponse(
         message=t(
             "access_sync.user.result.enqueued",
             locale,
             (
                 f"\u23f3 User sync enqueued for *{user_email}* on *{platform}*."
-                f"\nJob ID: `{job_id}`"
-                f"\nPoll status: `/sre access sync status {job_id}`"
+                f"\nJob ID: `{job.job_id}`"
+                f"\nPoll status: `/sre access sync status {job.job_id}`"
             ),
             user_email=user_email,
             platform=platform,
-            job_id=job_id,
+            job_id=job.job_id,
         ),
         ephemeral=False,
     )
@@ -275,64 +268,65 @@ def handle_sync_platform_command(
     coordinator = get_access_sync_coordinator()
     idempotency = get_idempotency_service()
     settings = get_access_sync_settings()
-    job_ttl = settings.job_ttl_seconds
-    lock_stale = settings.lock_stale_seconds
 
-    if not settings.enabled:
-        log.warning("access_sync_disabled_rejected")
+    result = enqueue_platform_sync(
+        coordinator=coordinator,
+        idempotency=idempotency,
+        settings=settings,
+        platform=platform,
+        dry_run=dry_run,
+    )
+
+    if not result.is_success or result.data is None:
+        if result.error_code == "FEATURE_DISABLED":
+            log.warning("access_sync_disabled_rejected")
+            return CommandResponse(
+                message=t(
+                    "access_sync.disabled",
+                    locale,
+                    "\u26d4 Access Sync is not enabled. Contact your administrator.",
+                ),
+                ephemeral=True,
+            )
         return CommandResponse(
             message=t(
-                "access_sync.disabled",
+                "access_sync.platform.result.error",
                 locale,
-                "\u26d4 Access Sync is not enabled. Contact your administrator.",
+                f"\u274c Unexpected error: {result.message}",
             ),
             ephemeral=True,
         )
 
-    running = check_lock(platform_lock_key(platform), idempotency, lock_stale)
-    if running is not None:
-        existing_job_id = running.get("job_id", "")
-        log.info("platform_sync_already_running", existing_job_id=existing_job_id)
+    job = result.data
+    if job.already_running:
+        log.info("platform_sync_already_running", existing_job_id=job.job_id)
         return CommandResponse(
             message=t(
                 "access_sync.platform.result.already_running",
                 locale,
                 (
                     f"\u23f3 Platform sync already in progress for *{platform}*."
-                    f"\nJob ID: `{existing_job_id}`"
-                    f"\nPoll status: `/sre access sync status {existing_job_id}`"
+                    f"\nJob ID: `{job.job_id}`"
+                    f"\nPoll status: `/sre access sync status {job.job_id}`"
                 ),
                 platform=platform,
-                job_id=existing_job_id,
+                job_id=job.job_id,
             ),
             ephemeral=True,
         )
 
-    job_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
-    spawn_platform_sync_thread(
-        coordinator=coordinator,
-        idempotency=idempotency,
-        job_id=job_id,
-        platform=platform,
-        dry_run=dry_run,
-        request_id=job_id,
-        started_at=started_at,
-        job_ttl_seconds=job_ttl,
-    )
-    log.info("platform_sync_job_enqueued", job_id=job_id)
-
+    log.info("platform_sync_job_enqueued", job_id=job.job_id)
     return CommandResponse(
         message=t(
             "access_sync.platform.result.enqueued",
             locale,
             (
                 f"\u2705 Platform sync job enqueued for *{platform}*.\n"
-                f"Job ID: `{job_id}`\n"
-                f"Poll status: `/sre access sync status {job_id}`"
+                f"Job ID: `{job.job_id}`\n"
+                f"Poll status: `/sre access sync status {job.job_id}`"
             ),
             platform=platform,
-            job_id=job_id,
+            job_id=job.job_id,
         ),
         ephemeral=False,
     )
