@@ -201,7 +201,8 @@ class DirectoryMembershipBuilder:
                             continue
                         desired[normalized_email] = DesiredUserState(
                             user_should_exist=True,
-                            required_entitlements=state.required_entitlements + [matched_rule],
+                            required_entitlements=state.required_entitlements
+                            + [matched_rule],
                         )
 
         return OperationResult.success(data=desired)
