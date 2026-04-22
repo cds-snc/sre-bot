@@ -25,7 +25,8 @@ All adapters must implement the `AccessSyncAdapter` protocol defined in `__init_
 | `remove_user(user_email)` | Remove a user from the platform entirely (idempotent) |
 | `apply_entitlement(user_email, entitlement_type, entitlement_id)` | Add an entitlement to a user (idempotent) |
 | `remove_entitlement(user_email, entitlement_type, entitlement_id)` | Remove an entitlement from a user (idempotent) |
-| `get_current_entitlement_ids(user_email)` | Return `Set[str]` of platform entitlement IDs the user holds; `NOT_FOUND` if the user does not exist on the platform |
+| `reconcile_user(user_email, desired_state, context, dry_run)` | Full reconciliation lifecycle for one user: assess → plan → execute. Returns `OperationResult[SyncOutcome]` |
+| `reconcile_platform(desired_states, context, dry_run)` | Batch reconciliation for all users on the platform. Returns `OperationResult[ReconciliationOutcome]` |
 | `list_all_provisioned_users()` | Return `Set[str]` of all user emails provisioned on the platform (used for orphan detection) |
 | `list_group_members(group_id)` | Return `Set[str]` of user emails in the given platform group |
 
@@ -81,12 +82,13 @@ The adapter does **not** read settings directly. Configuration is consumed by `A
 
 ### Platform policy fields that matter for this adapter
 
-Because `disable_user` is unsupported, the `authn_removal_mode` field must be set to `"delete"` for AWS:
+Because `disable_user` is unsupported, the `authn_removal_mode` field must be set to `"delete"` for AWS. The `adapter_type` field is **required** to route the platform to this adapter — omitting it silently falls through to `FakePlatformAdapter`:
 
 ```json
 {
   "platforms": {
     "aws": {
+      "adapter_type": "aws_identity_center",
       "authn_token": "authn",
       "authn_removal_mode": "delete"
     }
@@ -113,12 +115,13 @@ The user is created with `UserName` set to the full email address, which serves 
 
 An in-memory adapter used for **local development and automated tests**. It holds a small set of pre-seeded users and group memberships and supports all operations including `disable_user`.
 
-Use the `fake` platform key in your local runtime config to exercise the full sync orchestration path without AWS credentials:
+Use the `fake` platform key in your local runtime config to exercise the full sync orchestration path without AWS credentials. Set `adapter_type: "fake"` explicitly (or omit it, since `"fake"` is the default):
 
 ```json
 {
   "platforms": {
     "fake": {
+      "adapter_type": "fake",
       "authn_token": "authn",
       "authn_removal_mode": "disable"
     }
@@ -139,7 +142,7 @@ Pre-seeded state:
 ## Writing a new adapter
 
 1. Create `packages/access/sync/adapters/<platform_name>.py`.
-2. Implement all methods in the `AccessSyncAdapter` protocol from `__init__.py`: `capabilities()`, `ensure_user()`, `disable_user()`, `remove_user()`, `apply_entitlement()`, `remove_entitlement()`, `get_current_entitlement_ids()`, `list_all_provisioned_users()`, `list_group_members()`.
+2. Implement all methods in the `AccessSyncAdapter` protocol from `__init__.py`: `capabilities()`, `ensure_user()`, `disable_user()`, `remove_user()`, `apply_entitlement()`, `remove_entitlement()`, `reconcile_user()`, `reconcile_platform()`, `list_all_provisioned_users()`, `list_group_members()`.
 3. Return `OperationResult` from every method — never raise.
-4. Add a platform policy entry in the runtime config that matches the new platform key.
+4. Add a platform policy entry in the runtime config that includes `"adapter_type": "<your_key>"` — **this is required**; without it the platform silently uses `FakePlatformAdapter`.
 5. Register the adapter in `packages/access/sync/providers.py` adapter factory.

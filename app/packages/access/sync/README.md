@@ -30,6 +30,7 @@ Runtime config is a JSON document with this shape:
   "dir_separator": "-",
   "platforms": {
     "aws": {
+      "adapter_type": "aws_identity_center",
       "authn_token": "authn",
       "authn_removal_mode": "delete"
     }
@@ -42,6 +43,7 @@ Runtime config is a JSON document with this shape:
 | `dir_prefix` | Organization-wide IDP group prefix (e.g. `sg`) |
 | `dir_separator` | Separator between prefix segments (almost always `-`) |
 | `platforms.<key>` | Platform key, used to look up adapters and derive slugs |
+| `adapter_type` | Which adapter implementation to use: `aws_identity_center` or `fake` (default: `fake`) |
 | `authn_token` | Token segment for the lifecycle group (default: `authn`) |
 | `authn_removal_mode` | Action when a user leaves the authn group: `delete`, `disable`, or `entitlement_only` |
 
@@ -65,7 +67,7 @@ When `ACCESS_CONFIG_SOURCE=env`, no JSON file or inline document is needed. The 
 ACCESS_CONFIG_SOURCE=env
 ACCESS_SYNC_DIR_PREFIX=sg
 ACCESS_SYNC_DIR_SEPARATOR=-
-ACCESS_SYNC_PLATFORMS_JSON={"aws": {"authn_token": "authn", "authn_removal_mode": "delete"}}
+ACCESS_SYNC_PLATFORMS_JSON={"aws": {"adapter_type": "aws_identity_center", "authn_token": "authn", "authn_removal_mode": "delete"}}
 ```
 
 `ACCESS_SYNC_PLATFORMS_JSON` is the platforms block only — not the full config document. Add these vars to the `sre-bot-config` (or `sre-bot-config-infrastructure`) SSM parameter alongside the other app config.
@@ -111,7 +113,8 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
        def remove_user(self, user_email: str) -> OperationResult: ...
        def apply_entitlement(self, user_email: str, entitlement_type: str, entitlement_id: str) -> OperationResult: ...
        def remove_entitlement(self, user_email: str, entitlement_type: str, entitlement_id: str) -> OperationResult: ...
-       def get_current_entitlement_ids(self, user_email: str) -> OperationResult: ...
+       def reconcile_user(self, user_email: str, desired_state: DesiredUserState, context: PlanningContext, dry_run: bool = False) -> OperationResult: ...
+       def reconcile_platform(self, desired_states: Dict[str, DesiredUserState], context: PlanningContext, dry_run: bool = False) -> OperationResult: ...
        def list_all_provisioned_users(self) -> OperationResult: ...
        def list_group_members(self, group_id: str) -> OperationResult: ...
    ```
@@ -122,14 +125,28 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
    - Wrap all external API calls in `try/except` and return `OperationResult` — never raise across this boundary.
    - Obtain platform clients from `infrastructure.services`, not by instantiating them directly.
 
-2. **Register the adapter** in `providers.py` inside `get_access_sync_adapters()`:
+2. **Register the adapter** in `providers.py` inside `get_access_sync_adapters()` by adding a branch for the new `adapter_type` string:
 
    ```python
-   if platform_key == "myplatform":
-       adapters[platform_key] = MyPlatformAdapter(...)
+   if policy.adapter_type == "myplatform":
+       adapters[platform_name] = MyPlatformAdapter(...)
    ```
 
-3. **Add the platform to config** — add `"myplatform": { "authn_token": "authn", "authn_removal_mode": "delete" }` to the `platforms` block in your config document.
+3. **Add the platform to config** — add an entry to the `platforms` block in your config document, declaring `adapter_type` so the provider factory routes correctly:
+
+   ```json
+   {
+     "platforms": {
+       "myplatform": {
+         "adapter_type": "myplatform",
+         "authn_token": "authn",
+         "authn_removal_mode": "delete"
+       }
+     }
+   }
+   ```
+
+   > **Important**: omitting `adapter_type` silently defaults to `"fake"` — the real adapter will never be called.
 
 4. **Write tests** — unit tests go in `tests/unit/packages/access/sync/`. Use the `FakePlatformAdapter` as a reference for a minimal correct implementation.
 
@@ -143,9 +160,9 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
 | `config/__init__.py` | Re-exports `AccessRuntimeConfig` for backwards compatibility |
 | `config/loaders.py` | Config loader implementations and JSON input validation |
 | `adapters/__init__.py` | `AccessSyncAdapter` protocol and capability models |
-| `adapters/aws_identity_center.py` | AWS Identity Center adapter (reference implementation) |
-| `adapters/fake_platform.py` | In-memory fake adapter for tests and local dev |
-| `coordinator.py` | Orchestration — wires policy, desired state, adapter, and persistence |
+| `adapters/aws_identity_center.py` | AWS Identity Center adapter (reference implementation — `adapter_type: "aws_identity_center"`) |
+| `adapters/fake_platform.py` | In-memory fake adapter for tests and local dev (`adapter_type: "fake"`) |
+| `application.py` | Orchestration — wires policy, desired state, adapter, and persistence |
 | `desired_state.py` | IDP directory queries → `DesiredUserState` |
 | `domain.py` | Pure domain types (`SyncOutcome`, `ReconciliationOutcome`, etc.) |
 | `providers.py` | `@lru_cache` singletons — the only place the object graph is assembled |

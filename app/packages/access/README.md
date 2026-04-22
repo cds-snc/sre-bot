@@ -55,6 +55,7 @@ All sub-packages share a single `AccessRuntimeConfig` instance loaded once at st
   "dir_separator": "-",
   "platforms": {
     "aws": {
+      "adapter_type": "aws_identity_center",
       "authn_token": "authn",
       "authn_removal_mode": "delete"
     }
@@ -128,6 +129,7 @@ The runtime config JSON is the single place you define the group naming conventi
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `adapter_type` | string | `"fake"` | Selects the adapter implementation: `aws_identity_center` or `fake`. **Required** for non-fake platforms — omitting it silently routes to `FakePlatformAdapter` |
 | `authn_token` | string | `"authn"` | Token segment that identifies the authentication group. The full slug is `{dir_prefix}{sep}{platform}{sep}{authn_token}` — e.g. `sg-aws-authn` |
 | `authn_removal_mode` | string | `"delete"` | What Access Sync does when a user loses authn group membership: `delete` removes the platform user, `disable` deactivates them, `entitlement_only` removes entitlements but leaves the account |
 | `mode_overrides` | object | `{}` | Per-entitlement-token overrides — see below |
@@ -164,7 +166,7 @@ The key in `mode_overrides` is the **entitlement token** — the segment after t
 ### Adding a new platform
 
 1. Create the IDP groups following the naming convention: `{dir_prefix}{sep}{platform}{sep}{token}` for entitlements and `{dir_prefix}{sep}{platform}{sep}{authn_token}` for the authn group.
-2. Add the entry to your runtime config JSON under `platforms`.
+2. Add the entry to your runtime config JSON under `platforms`, including `"adapter_type": "<your_adapter>"` — **this is required** to route to the real adapter.
 3. Register a platform adapter in `packages/access/sync/` (see [sync/README.md](sync/README.md)).
 4. Optionally register a catalog token parser in `packages/access/catalog/providers.py`.
 
@@ -178,6 +180,7 @@ Use `ACCESS_CONFIG_SOURCE=file_json` and point `ACCESS_CONFIG_REF` at a local fi
   "dir_separator": "-",
   "platforms": {
     "aws": {
+      "adapter_type": "aws_identity_center",
       "authn_token": "authn",
       "authn_removal_mode": "delete",
       "mode_overrides": {
@@ -185,6 +188,7 @@ Use `ACCESS_CONFIG_SOURCE=file_json` and point `ACCESS_CONFIG_REF` at a local fi
       }
     },
     "fake": {
+      "adapter_type": "fake",
       "authn_token": "authn",
       "authn_removal_mode": "delete"
     }
