@@ -12,7 +12,7 @@ from packages.access.common.settings import AccessSyncSettings, get_access_setti
 from packages.access.sync.adapters import AccessSyncAdapter
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
-from packages.access.sync.coordinator import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.store import SyncRunRepository
 

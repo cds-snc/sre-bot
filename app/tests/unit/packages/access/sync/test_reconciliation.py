@@ -11,7 +11,7 @@ from typing import Set
 from unittest.mock import MagicMock
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.coordinator import (
+from packages.access.sync.reconciliation import (
     OptimizationStrategy,
     PlatformPrefetchPlanner,
     TargetResolver,

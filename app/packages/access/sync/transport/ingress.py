@@ -16,7 +16,7 @@ import structlog
 
 from infrastructure.idempotency import IdempotencyService
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.coordinator import AccessSyncCoordinatorPort
+from packages.access.sync.application import AccessSyncCoordinatorPort
 from packages.access.sync.job_runner import (
     spawn_platform_sync_thread,
     spawn_user_sync_thread,

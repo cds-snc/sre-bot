@@ -1,43 +1,16 @@
-"""Access Sync coordinator — single orchestration entrypoint.
+"""Access Sync reconciliation — internal orchestration classes.
 
-This is the canonical place to understand the full sync business flow.
-A new engineer should be able to read this file and understand what
-happens when we sync one user or one platform.
+These classes are implementation details of the sync application service.
+They are not part of the public package API; import from ``application.py``.
 
-Two public methods:
-    sync_user()     — on-demand single-user convergence.
-    sync_platform() — batch group-driven reconciliation of all users.
-
-Internal flow:
-1. Resolve target: look up policy and adapter by normalized key.
-2. Discover IDP group slugs and resolve effective policy once for the run.
-3. Build desired state from IDP group membership (no adapter calls here).
-4. Prefetch current platform state for delta planning (platform sync only).
-5. Plan actions via PolicyEngine (pure, no side effects).
-6. Execute planned actions via adapter (or skip for dry-run).
-7. Persist audit record and emit domain events.
-
-Internal collaborators (each with a single responsibility):
-- ``TargetResolver``              — look up policy + adapter by platform key.
-- ``PlatformPrefetchPlanner``     — orphan detection + entitlement prefetch.
-- ``OptimizationStrategy``        — select which subjects to process this run.
-- ``PlatformReconciliationExecutor`` — per-user converge loop and single-user
-                                       plan/execute/persist pipeline.
+- ``TargetResolver``                — resolve platform key → (policy, adapter)
+- ``PlatformPrefetchPlanner``       — orphan detection + entitlement prefetch
+- ``OptimizationStrategy``          — lifecycle-delta subject selection
+- ``PlatformReconciliationExecutor``— per-user converge pipeline
 """
 
-import uuid
 from dataclasses import replace
-from typing import (
-    Any,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    TYPE_CHECKING,
-)
+from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, TYPE_CHECKING
 
 import structlog
 
@@ -50,20 +23,13 @@ from packages.access.sync.adapters import (
     BulkGroupMembershipAdapter,
     EntitlementCanonicalizingAdapter,
 )
-from packages.access.sync.desired_state import DirectoryMembershipBuilder
-from packages.access.sync.domain import (
-    DesiredUserState,
-    ReconciliationOutcome,
-    SyncOutcome,
-    SyncRunRecord,
-)
+from packages.access.sync.domain import DesiredUserState, SyncOutcome, SyncRunRecord
 from packages.access.sync.policies import (
     AdapterCapabilities,
     EffectivePlatformPolicy,
     EntitlementRule,
     PlannedAction,
     PolicyEngine,
-    resolve_effective_policy,
 )
 
 if TYPE_CHECKING:
@@ -73,44 +39,15 @@ logger = structlog.get_logger()
 
 
 # ---------------------------------------------------------------------------
-# Public protocol (transport and test contract)
-# ---------------------------------------------------------------------------
-
-
-class AccessSyncCoordinatorPort(Protocol):
-    """Structural contract for the access sync coordinator.
-
-    Transport handlers (HTTP routes, Slack commands) and test stubs depend on
-    this Protocol rather than the concrete class, so they remain decoupled from
-    implementation details and are trivially substitutable in tests.
-    """
-
-    def sync_user(
-        self,
-        user_email: str,
-        platform: str,
-        dry_run: bool = False,
-        request_id: str = "",
-    ) -> OperationResult: ...
-
-    def sync_platform(
-        self,
-        platform: str,
-        dry_run: bool = False,
-        request_id: str = "",
-    ) -> OperationResult: ...
-
-
-# ---------------------------------------------------------------------------
-# TargetResolver — resolve platform key → (policy, adapter)
+# TargetResolver
 # ---------------------------------------------------------------------------
 
 
 class TargetResolver:
-    """Resolves a platform key to its policy and adapter.
+    """Resolve a platform key to its policy and adapter.
 
-    Encapsulates the NOT_FOUND / ADAPTER_NOT_FOUND error paths so the
-    coordinator body stays focused on orchestration flow.
+    Returns ``(policy, adapter, None)`` on success or ``(None, None, error)``
+    on failure so the coordinator body stays focused on orchestration flow.
     """
 
     def __init__(
@@ -127,7 +64,7 @@ class TargetResolver:
     ) -> Tuple[
         Optional[PlatformPolicy], Optional[AccessSyncAdapter], Optional[OperationResult]
     ]:
-        """Return (policy, adapter, None) on success or (None, None, error) on failure."""
+        """Return (policy, adapter, None) or (None, None, error)."""
         policy = self._config.platforms.get(platform)
         if policy is None:
             return (
@@ -154,18 +91,17 @@ class TargetResolver:
 
 
 # ---------------------------------------------------------------------------
-# PlatformPrefetchPlanner — orphan detection + entitlement prefetch
+# PlatformPrefetchPlanner
 # ---------------------------------------------------------------------------
 
 
 class PlatformPrefetchPlanner:
-    """Performs the two read-heavy phases of platform sync.
+    """Batch read phases for platform-wide sync.
 
-    Phase 2: Orphan detection — enumerate all provisioned users and find those
-             absent from the IDP.
-    Phase 3: Current entitlement prefetch — invert platform group membership
-             into a per-user entitlement-ID map so the per-user loop needs
-             zero additional platform reads.
+    Phase 2: Orphan detection — enumerate all provisioned users; find those
+             absent from the IDP authn group.
+    Phase 3: Entitlement prefetch — invert platform group membership into a
+             per-user map so the per-user loop needs zero additional reads.
     """
 
     def detect_orphans(
@@ -286,18 +222,16 @@ class PlatformPrefetchPlanner:
 
 
 # ---------------------------------------------------------------------------
-# OptimizationStrategy — subject selection policy
+# OptimizationStrategy
 # ---------------------------------------------------------------------------
 
 
 class OptimizationStrategy:
-    """Encapsulates the platform sync subject selection logic.
+    """Select which subjects to process in a platform sync run.
 
-    Determines which users are candidates for convergence this run.  The
-    lifecycle-delta optimization path skips users already in sync when the
-    adapter supports bulk-user-delta and there are no sync-managed entitlement
-    rules — reducing the processing set to only deltas (new IDP members and
-    orphans).
+    When the adapter supports bulk-user-delta and no sync-managed entitlement
+    rules are configured, only lifecycle deltas (new members and orphans) are
+    processed — skipping users who are already in sync.
     """
 
     def select_subjects(
@@ -338,7 +272,7 @@ class OptimizationStrategy:
 
 
 # ---------------------------------------------------------------------------
-# Internal carrier for canonicalized entitlement data
+# _Canon — internal carrier for canonicalized entitlement data
 # ---------------------------------------------------------------------------
 
 
@@ -353,19 +287,15 @@ class _Canon:
 
 
 # ---------------------------------------------------------------------------
-# PlatformReconciliationExecutor — per-user converge pipeline
+# PlatformReconciliationExecutor
 # ---------------------------------------------------------------------------
 
 
 class PlatformReconciliationExecutor:
-    """Runs the per-user convergence pipeline for both sync_user and sync_platform.
+    """Per-user convergence pipeline for both sync_user and sync_platform.
 
-    Owns:
-    - ``execute()``        — the platform-wide loop over all selected subjects.
-    - ``converge_user()``  — plan + execute actions for one user (shared path).
-    - ``_canonicalize_entitlements()`` — optional adapter-specific ID translation.
-    - ``_execute_action()``            — dispatch a single action to the adapter.
-    - ``_persist()``                   — write audit record (non-fatal on failure).
+    - ``execute()``       — platform-wide loop over all selected subjects.
+    - ``converge_user()`` — plan + execute actions for one user (shared path).
     """
 
     def __init__(
@@ -472,10 +402,13 @@ class PlatformReconciliationExecutor:
         log: Any,
         emit_plan_logs: bool = True,
     ) -> OperationResult:
-        """Plan and execute actions for one user against the platform.
+        """Plan and execute actions for one user.
 
-        Shared path for both sync_user (live IDP check) and the per-user
-        loop inside sync_platform (pre-fetched state reused, zero IDP calls).
+        Shared path for sync_user (live IDP check) and the per-user loop inside
+        sync_platform (pre-fetched state, zero additional IDP calls).
+
+        The adapter is the authoritative source for platform state via ``assess()``.
+        The coordinator never infers user existence or entitlement IDs directly.
         """
         assessment_result = adapter.assess(user_email, desired_state)
         if not assessment_result.is_success or assessment_result.data is None:
@@ -508,10 +441,7 @@ class PlatformReconciliationExecutor:
             platform_user_exists=assessment.platform_user_exists,
         )
         planned_actions = [str(a.action) for a in planned]
-        should_log_plans = self._should_log_plans(
-            planned_actions=planned_actions,
-            emit_plan_logs=emit_plan_logs,
-        )
+        should_log_plans = self._should_log_plans(planned_actions, emit_plan_logs)
         if should_log_plans:
             log.info(
                 "actions_planned",
@@ -609,16 +539,14 @@ class PlatformReconciliationExecutor:
         adapter: AccessSyncAdapter,
         effective: EffectivePlatformPolicy,
         desired_state: DesiredUserState,
-    ) -> "OperationResult[_Canon]":
-        """Canonicalize entitlement IDs for stable planner comparisons.
+    ) -> OperationResult:
+        """Translate entitlement tokens to canonical platform IDs.
 
-        Only runs when the adapter implements EntitlementCanonicalizingAdapter.
-        Returns the effective policy and required entitlements with canonical IDs.
-
-        Entitlement rules that the platform cannot resolve (GROUP_ID_NOT_FOUND,
-        AMBIGUOUS_GROUP_NAME) are skipped with a warning so that config drift on
-        one group does not block the entire user sync.  All other errors are
-        still treated as hard failures.
+        Only runs when the adapter implements ``EntitlementCanonicalizingAdapter``
+        (e.g. AWS IC which maps token names → GroupIds).  Rules that cannot be
+        resolved (GROUP_ID_NOT_FOUND, AMBIGUOUS_GROUP_NAME) are skipped with a
+        warning so that config drift on one group does not block the entire sync.
+        All other errors are hard failures.
         """
         _SKIP_CODES = frozenset({"GROUP_ID_NOT_FOUND", "AMBIGUOUS_GROUP_NAME"})
 
@@ -631,8 +559,8 @@ class PlatformReconciliationExecutor:
             )
 
         log = logger.bind(platform=effective.platform)
+        rule_by_key: Dict[Tuple, EntitlementRule] = {}
 
-        rule_by_key: dict = {}
         for rule in effective.entitlement_rules:
             result = adapter.canonicalize_entitlement_id(
                 entitlement_type=rule.entitlement_type,
@@ -704,8 +632,8 @@ class PlatformReconciliationExecutor:
             )
         )
 
+    @staticmethod
     def _execute_action(
-        self,
         adapter: AccessSyncAdapter,
         action: PlannedAction,
         user_email: str,
@@ -744,11 +672,8 @@ class PlatformReconciliationExecutor:
         )
 
     @staticmethod
-    def _should_log_plans(
-        planned_actions: List[str],
-        emit_plan_logs: bool,
-    ) -> bool:
-        """Keep platform sync logs focused while preserving removal visibility."""
+    def _should_log_plans(planned_actions: List[str], emit_plan_logs: bool) -> bool:
+        """Log plans always when requested; always log removal actions."""
         if emit_plan_logs:
             return True
         return any(
@@ -766,7 +691,7 @@ class PlatformReconciliationExecutor:
         request_id: str,
         error_message: Optional[str] = None,
     ) -> None:
-        """Persist run record if repository is available. Failures are non-fatal."""
+        """Persist audit record. Non-fatal: failures are logged and swallowed."""
         if self._repository is None:
             return
         self._repository.save(
@@ -781,266 +706,3 @@ class PlatformReconciliationExecutor:
                 error_message=error_message,
             )
         )
-
-
-# ---------------------------------------------------------------------------
-# AccessSyncCoordinator — thin orchestrator
-# ---------------------------------------------------------------------------
-
-
-class AccessSyncCoordinator:
-    """Orchestrates the full access sync lifecycle.
-
-    Wires ``PolicyEngine``, ``DirectoryMembershipBuilder``, and the platform
-    adapter together via explicit collaborators.  Each collaborator has a
-    single responsibility so the coordinator body is limited to sequencing.
-
-    All business logic stays in ``policies.py``; all IDP reads stay in
-    ``desired_state.py``; all platform mutations stay in the adapter.
-
-    Constructed once per process by ``providers.get_access_sync_coordinator``
-    and injected into HTTP route handlers via FastAPI ``Depends``.
-    """
-
-    def __init__(
-        self,
-        adapters: Mapping[str, AccessSyncAdapter],
-        config: AccessRuntimeConfig,
-        membership_builder: DirectoryMembershipBuilder,
-        repository: "Optional[SyncRunRepository]" = None,
-        dispatcher: Optional[EventDispatcher] = None,
-    ) -> None:
-        self._adapters = adapters
-        self._config = config
-        self._membership_builder = membership_builder
-        self._target_resolver = TargetResolver(adapters, config)
-        self._prefetch_planner = PlatformPrefetchPlanner()
-        self._optimization_strategy = OptimizationStrategy()
-        engine = PolicyEngine()
-        self._reconciler = PlatformReconciliationExecutor(
-            engine, repository, dispatcher
-        )
-        self._dispatcher = dispatcher
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def sync_user(
-        self,
-        user_email: str,
-        platform: str,
-        dry_run: bool = False,
-        request_id: str = "",
-    ) -> OperationResult:
-        """Converge one user's access on a platform to match IDP policy.
-
-        Performs a live IDP membership check for the user across all
-        relevant groups, then plans and executes the required actions.
-
-        Returns:
-            OperationResult[SyncOutcome] on success.
-            OperationResult.error on infrastructure or policy failures.
-        """
-        run_id = request_id or str(uuid.uuid4())
-        log = logger.bind(user_email=user_email, platform=platform, run_id=run_id)
-        log.info("sync_user_started", dry_run=dry_run)
-
-        _policy, adapter, error = self._target_resolver.resolve(platform)
-        if error is not None:
-            return error
-        if adapter is None:
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message=f"No adapter resolved for platform '{platform}'.",
-                error_code="PLATFORM_NOT_CONFIGURED",
-            )
-
-        discovered = self._membership_builder.discover_group_slugs(
-            self._config, platform
-        )
-        effective = resolve_effective_policy(self._config, platform, discovered)
-
-        desired_result = self._membership_builder.build_user_state_from_effective(
-            user_email=user_email,
-            effective=effective,
-        )
-        log.info(
-            "build_user_state_completed",
-            user_email=user_email,
-            platform=platform,
-            result_status=desired_result.status,
-            has_desired_state=desired_result.data is not None,
-        )
-        if not desired_result.is_success or desired_result.data is None:
-            return desired_result
-
-        return self._reconciler.converge_user(
-            user_email=user_email,
-            platform=platform,
-            adapter=adapter,
-            effective=effective,
-            desired_state=desired_result.data,
-            dry_run=dry_run,
-            run_id=run_id,
-            request_id=request_id,
-            log=log,
-        )
-
-    def sync_platform(
-        self,
-        platform: str,
-        dry_run: bool = False,
-        request_id: str = "",
-    ) -> OperationResult:
-        """Converge all users on a platform to match IDP group membership.
-
-        Phase 1: Batch IDP reads — one get_group_members call per policy
-                 group. Builds desired state in O(groups) not O(users).
-        Phase 2: Orphan detection — list all provisioned users on the platform.
-        Phase 3: Current entitlement prefetch — inverts platform group membership
-                 into a per-user entitlement-ID map for delta planning.
-        Phase 4: Per-user convergence — plan and execute with zero additional
-                 IDP calls (pre-fetched state reused from Phase 1).
-
-        Returns:
-            OperationResult[ReconciliationOutcome] on completion (even partial).
-            OperationResult.error if policy or adapter cannot be resolved.
-        """
-        reconcile_id = request_id or str(uuid.uuid4())
-        log = logger.bind(platform=platform, reconcile_id=reconcile_id, dry_run=dry_run)
-        log.info("sync_platform_started")
-
-        if self._dispatcher:
-            self._dispatcher.dispatch_background(
-                Event(
-                    event_type=sync_events.PLATFORM_SYNC_STARTED,
-                    metadata={"platform": platform, "dry_run": dry_run},
-                )
-            )
-
-        _policy, adapter, error = self._target_resolver.resolve(platform)
-        if error is not None:
-            return error
-        if adapter is None:
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message=f"No adapter resolved for platform '{platform}'.",
-                error_code="PLATFORM_NOT_CONFIGURED",
-            )
-
-        discovered = self._membership_builder.discover_group_slugs(
-            self._config, platform
-        )
-        effective = resolve_effective_policy(self._config, platform, discovered)
-        adapter_capabilities = adapter.capabilities()
-
-        # Phase 1: batch IDP desired state — O(groups) not O(users).
-        desired_result = self._membership_builder.build_platform_states_from_effective(
-            effective=effective,
-        )
-        if not desired_result.is_success or desired_result.data is None:
-            return desired_result
-        desired_states: Dict[str, DesiredUserState] = desired_result.data
-        idp_members: Set[str] = set(desired_states.keys())
-
-        # Phase 2: orphan detection.
-        provisioned, provisioned_known, orphans = self._prefetch_planner.detect_orphans(
-            adapter=adapter,
-            idp_members=idp_members,
-            log=log,
-        )
-
-        # Phase 3: current entitlement prefetch for delta planning.
-        precomputed_current_ids, prefetch_complete = (
-            self._prefetch_planner.prefetch_current_ids(
-                effective=effective,
-                adapter=adapter,
-                log=log,
-            )
-        )
-        has_sync_managed = bool(effective.sync_managed_rules())
-
-        # Select which subjects to process.
-        candidate_subjects, all_subjects, lifecycle_delta_optimized = (
-            self._optimization_strategy.select_subjects(
-                idp_members=idp_members,
-                orphans=orphans,
-                precomputed_current_ids=precomputed_current_ids,
-                provisioned=provisioned,
-                provisioned_known=provisioned_known,
-                has_sync_managed=has_sync_managed,
-                capabilities=adapter_capabilities,
-                log=log,
-            )
-        )
-
-        # Phase 4: per-user convergence — zero additional IDP calls.
-        users_synced, users_converged, requires_manual_action_count, per_user = (
-            self._reconciler.execute(
-                all_subjects=all_subjects,
-                platform=platform,
-                adapter=adapter,
-                effective=effective,
-                desired_states=desired_states,
-                dry_run=dry_run,
-                reconcile_id=reconcile_id,
-                prefetch_complete=prefetch_complete,
-                precomputed_current_ids=precomputed_current_ids,
-                provisioned_known=provisioned_known,
-                provisioned=provisioned,
-                log=log,
-                emit_per_user_plan_logs=False,
-            )
-        )
-
-        reconciliation_outcome = ReconciliationOutcome(
-            platform=platform,
-            users_synced=users_synced,
-            users_converged=users_converged,
-            orphans_found=len(orphans),
-            requires_manual_action_count=requires_manual_action_count,
-            dry_run=dry_run,
-            per_user=per_user,
-        )
-
-        actions_breakdown: Dict[str, int] = {}
-        remove_user_targets: List[str] = []
-        for outcome in per_user.values():
-            for action in outcome.planned_actions:
-                actions_breakdown[action] = actions_breakdown.get(action, 0) + 1
-        for email, outcome in per_user.items():
-            if "remove_user" in outcome.planned_actions:
-                remove_user_targets.append(email)
-        planned_actions_total = sum(actions_breakdown.values())
-
-        log.info(
-            "sync_platform_completed",
-            users_synced=users_synced,
-            users_converged=users_converged,
-            orphans_found=len(orphans),
-            requires_manual_action=requires_manual_action_count,
-            planned_actions_total=planned_actions_total,
-            planned_actions_breakdown=actions_breakdown,
-            remove_user_targets=sorted(remove_user_targets),
-        )
-
-        if self._dispatcher:
-            self._dispatcher.dispatch_background(
-                Event(
-                    event_type=sync_events.PLATFORM_SYNC_COMPLETED,
-                    metadata={
-                        "platform": platform,
-                        "users_synced": users_synced,
-                        "users_converged": users_converged,
-                        "orphans_found": len(orphans),
-                        "requires_manual_action_count": requires_manual_action_count,
-                        "dry_run": dry_run,
-                        "subjects_total": len(candidate_subjects),
-                        "subjects_processed": len(all_subjects),
-                        "lifecycle_delta_optimized": lifecycle_delta_optimized,
-                    },
-                )
-            )
-
-        return OperationResult.success(data=reconciliation_outcome)

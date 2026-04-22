@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import structlog
 
 from infrastructure.idempotency import IdempotencyService
-from packages.access.sync.coordinator import AccessSyncCoordinatorPort
+from packages.access.sync.application import AccessSyncCoordinatorPort
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.platform_lock import (
     acquire_lock,

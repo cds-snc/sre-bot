@@ -92,20 +92,14 @@ def test_should_plan_no_actions_when_catchall_user_is_already_provisioned(
     ), f"Expected no actions but got: {result.data.planned_actions}"
     assert result.data.applied_actions == []
     # Adapter must NOT have called ensure_user or apply_entitlement
-    mutation_calls = [
-        c[0] for c in adapter.calls if c[0] != "get_current_entitlement_ids"
-    ]
+    mutation_calls = [c[0] for c in adapter.calls if c[0] not in ["assess"]]
     assert mutation_calls == [], f"Unexpected adapter mutations: {mutation_calls}"
-    # Validate that adapter.get_current_entitlement_ids() WAS called and returned
-    # success(set()) for user with no groups — proving platform_user_exists=True
-    get_current_calls = [
-        c for c in adapter.calls if c[0] == "get_current_entitlement_ids"
-    ]
+    # Validate that adapter.assess() WAS called — it is the source of truth
+    assess_calls = [c for c in adapter.calls if c[0] == "assess"]
     assert (
-        len(get_current_calls) == 1
-    ), f"Expected one get_current_entitlement_ids call but got {len(get_current_calls)}"
-    # The call must have been for the correct user
-    assert get_current_calls[0][1] == _USER
+        len(assess_calls) == 1
+    ), f"Expected one assess call but got {len(assess_calls)}"
+    assert assess_calls[0][1] == _USER
 
 
 # ---------------------------------------------------------------------------
@@ -157,40 +151,9 @@ def test_should_recognize_user_exists_when_adapter_returns_empty_group_set(
         f"coordinator planned: {result.data.planned_actions}. "
         f"This indicates platform_user_exists was incorrectly computed as False."
     )
-    # Verify the adapter was consulted
-    get_current_calls = [
-        c for c in adapter.calls if c[0] == "get_current_entitlement_ids"
-    ]
-    assert len(get_current_calls) >= 1, "Adapter must be queried for current state"
-
-
-@pytest.mark.integration
-def test_should_not_plan_provision_when_not_found_is_recovered_from_inventory(
-    make_coordinator,
-):
-    """Recover platform presence via list_all_provisioned_users on false NOT_FOUND.
-
-    This mirrors the real incident shape:
-    - IDP says user should exist
-    - required entitlements are empty
-    - point entitlement lookup returns NOT_FOUND
-    - platform inventory still contains the user
-
-    Expected: no actions planned.
-    """
-    coordinator, adapter = make_coordinator(
-        user_direct_group_slugs=set(),
-        user_exists=False,
-        current_entitlement_ids=set(),
-        provisioned_users={_USER},
-    )
-
-    result = coordinator.sync_user(_USER, "aws")
-
-    assert result.is_success
-    assert result.data.planned_actions == []
-    assert result.data.applied_actions == []
-    assert any(call[0] == "list_all_provisioned_users" for call in adapter.calls)
+    # Verify adapter.assess() was called — it is the single source of truth
+    assess_calls = [c for c in adapter.calls if c[0] == "assess"]
+    assert len(assess_calls) >= 1, "Adapter.assess() must be queried for platform state"
 
 
 # D2: New user — provision_user

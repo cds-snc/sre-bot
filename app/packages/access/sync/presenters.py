@@ -26,16 +26,16 @@ def to_http_status_response(record: Dict[str, Any]) -> SyncJobStatusResponse:
     return SyncJobStatusResponse(**record)
 
 
-def to_slack_status_message(record: Dict[str, Any], locale: str) -> str:
+def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
     """Format a stored job record as a localized Slack status message.
 
     Uses the ``t()`` i18n helper so messages are rendered in the requesting
     user's locale.  Falls back to inline English strings when a key is absent.
     """
-    status = record.get("status", "unknown")
-    job_id = record.get("job_id", "")
-    platform = record.get("platform", "")
-    started_at = record.get("started_at", "")
+    status = record.status
+    job_id = record.job_id
+    platform = record.platform
+    started_at = record.started_at or ""
 
     if status == JobStatus.IN_PROGRESS:
         return t(
@@ -51,13 +51,13 @@ def to_slack_status_message(record: Dict[str, Any], locale: str) -> str:
         )
 
     if status == JobStatus.COMPLETED:
-        sync_type = record.get("sync_type", "")
-        completed_at = record.get("completed_at", "")
+        sync_type = record.sync_type or ""
+        completed_at = record.completed_at or ""
 
         if sync_type == "user":
-            user_email = record.get("user_email", "")
-            actions_applied = record.get("actions_applied", [])
-            requires_manual = record.get("requires_manual_action", False)
+            user_email = record.user_email or ""
+            actions_applied = record.actions_applied or []
+            requires_manual = record.requires_manual_action or False
             return t(
                 "access_sync.status.result.completed_user",
                 locale,
@@ -79,17 +79,17 @@ def to_slack_status_message(record: Dict[str, Any], locale: str) -> str:
                 completed_at=completed_at,
             )
 
-        users_synced = record.get("users_synced", 0)
-        users_converged = record.get("users_converged", 0)
-        orphans_found = record.get("orphans_found", 0)
-        requires_manual = record.get("requires_manual_action_count", 0)
+        users_synced = record.users_synced or 0
+        users_converged = record.users_converged or 0
+        orphans_found = record.orphans_found or 0
+        requires_manual_count = record.requires_manual_action_count or 0
         return t(
             "access_sync.status.result.completed",
             locale,
             (
                 f"\u2705 Sync job `{job_id}` *completed* for platform *{platform}*.\n"
                 f"Users synced: {users_synced} | Converged: {users_converged} | "
-                f"Orphans: {orphans_found} | Manual actions: {requires_manual}\n"
+                f"Orphans: {orphans_found} | Manual actions: {requires_manual_count}\n"
                 f"Completed: {completed_at}"
             ),
             job_id=job_id,
@@ -97,12 +97,12 @@ def to_slack_status_message(record: Dict[str, Any], locale: str) -> str:
             users_synced=users_synced,
             users_converged=users_converged,
             orphans_found=orphans_found,
-            requires_manual_action_count=requires_manual,
+            requires_manual_action_count=requires_manual_count,
             completed_at=completed_at,
         )
 
     if status == JobStatus.FAILED:
-        error = record.get("error", "Unknown error")
+        error = record.error or "Unknown error"
         return t(
             "access_sync.status.result.failed",
             locale,

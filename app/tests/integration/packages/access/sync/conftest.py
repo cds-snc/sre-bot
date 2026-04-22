@@ -51,8 +51,9 @@ from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
-from packages.access.sync.coordinator import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
+from packages.access.sync.domain import AdapterAssessment, DesiredUserState
 from packages.access.sync.policies import AdapterCapabilities
 
 # ---------------------------------------------------------------------------
@@ -232,6 +233,37 @@ class SpyAdapter:
     def list_group_members(self, group_id: str) -> OperationResult:
         self.calls.append(("list_group_members", group_id))
         return OperationResult.success(data=self._group_members.get(group_id, set()))
+
+    def assess(self, email: str, desired_state: DesiredUserState) -> OperationResult:
+        self.calls.append(("assess", email))
+        if not self._user_exists:
+            return OperationResult.success(
+                data=AdapterAssessment(
+                    platform_user_exists=False,
+                    current_entitlement_ids=set(),
+                )
+            )
+        if desired_state.current_entitlement_ids is not None:
+            current_ids = {
+                v for v in desired_state.current_entitlement_ids if isinstance(v, str)
+            }
+            platform_user_exists = (
+                desired_state.platform_user_exists
+                if desired_state.platform_user_exists is not None
+                else bool(current_ids)
+            )
+            return OperationResult.success(
+                data=AdapterAssessment(
+                    platform_user_exists=platform_user_exists,
+                    current_entitlement_ids=current_ids,
+                )
+            )
+        return OperationResult.success(
+            data=AdapterAssessment(
+                platform_user_exists=True,
+                current_entitlement_ids=set(self._current_ids),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

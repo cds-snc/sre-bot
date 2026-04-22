@@ -19,7 +19,7 @@ from infrastructure.directory.models import (
 )
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
-from packages.access.sync.coordinator import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     AdapterAssessment,

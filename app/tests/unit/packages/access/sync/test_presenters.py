@@ -7,6 +7,7 @@ from packages.access.sync.presenters import (
     to_http_status_response,
     to_slack_status_message,
 )
+from packages.access.sync.schemas import SyncJobStatusResponse
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +90,11 @@ def test_to_slack_status_message_in_progress_contains_job_id():
     record = {
         "job_id": "j-4",
         "platform": "aws",
+        "dry_run": False,
         "status": JobStatus.IN_PROGRESS,
         "started_at": "2026-04-21T00:00:00+00:00",
     }
-    message = to_slack_status_message(record, locale="en-US")
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "j-4" in message
 
 
@@ -108,6 +110,7 @@ def test_to_slack_status_message_completed_platform_contains_metrics():
         "job_id": "j-5",
         "platform": "aws",
         "sync_type": "platform",
+        "dry_run": False,
         "status": JobStatus.COMPLETED,
         "started_at": "2026-04-21T00:00:00+00:00",
         "completed_at": "2026-04-21T00:10:00+00:00",
@@ -116,7 +119,7 @@ def test_to_slack_status_message_completed_platform_contains_metrics():
         "orphans_found": 2,
         "requires_manual_action_count": 1,
     }
-    message = to_slack_status_message(record, locale="en-US")
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "j-5" in message
     assert "50" in message
     assert "5" in message
@@ -135,13 +138,14 @@ def test_to_slack_status_message_completed_user_contains_email():
         "platform": "aws",
         "sync_type": "user",
         "user_email": "alice@example.com",
+        "dry_run": False,
         "status": JobStatus.COMPLETED,
         "started_at": "2026-04-21T00:00:00+00:00",
         "completed_at": "2026-04-21T00:01:00+00:00",
         "actions_applied": ["provision_user"],
         "requires_manual_action": False,
     }
-    message = to_slack_status_message(record, locale="en-US")
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "alice@example.com" in message
     assert "j-6" in message
 
@@ -157,10 +161,11 @@ def test_to_slack_status_message_failed_contains_error():
     record = {
         "job_id": "j-7",
         "platform": "aws",
+        "dry_run": False,
         "status": JobStatus.FAILED,
         "error": "sync_failed",
     }
-    message = to_slack_status_message(record, locale="en-US")
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "sync_failed" in message
     assert "j-7" in message
 
@@ -176,8 +181,9 @@ def test_to_slack_status_message_unknown_status_does_not_raise():
     record = {
         "job_id": "j-8",
         "platform": "aws",
+        "dry_run": False,
         "status": "weird_unknown_status",
     }
-    message = to_slack_status_message(record, locale="en-US")
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert isinstance(message, str)
     assert len(message) > 0

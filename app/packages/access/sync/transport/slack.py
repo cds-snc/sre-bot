@@ -20,6 +20,7 @@ from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
+from packages.access.sync.schemas import SyncJobStatusResponse
 from packages.access.sync.transport.ingress import (
     enqueue_platform_sync,
     enqueue_user_sync,
@@ -366,5 +367,5 @@ def handle_sync_status_command(
             ephemeral=True,
         )
 
-    message = to_slack_status_message(record, locale)
+    message = to_slack_status_message(SyncJobStatusResponse(**record), locale)
     return CommandResponse(message=message, ephemeral=True)
