@@ -761,13 +761,13 @@ class AwsIdentityCenterAdapter:
             user_ids_by_group[group_identifier] = pending_user_ids
 
         unresolved_user_ids = {
-            user_id
-            for user_ids in user_ids_by_group.values()
-            for user_id in user_ids
+            user_id for user_ids in user_ids_by_group.values() for user_id in user_ids
         }
         if unresolved_user_ids:
             user_map_result = self._build_user_id_email_map()
-            if not user_map_result.is_success or not isinstance(user_map_result.data, dict):
+            if not user_map_result.is_success or not isinstance(
+                user_map_result.data, dict
+            ):
                 return user_map_result
             user_id_to_email: Dict[str, str] = user_map_result.data
 
@@ -1263,6 +1263,46 @@ class AwsIdentityCenterAdapter:
                 requires_manual_action_count=requires_manual_action_count,
                 dry_run=dry_run,
                 per_user=per_user,
+                changed_user_count=len(actions_by_user),
+                unchanged_user_count=len(
+                    canonical_desired.desired_users | current_state.current_users
+                )
+                - len(actions_by_user),
+                action_counts={
+                    "apply_entitlement": sum(
+                        len(members) for members in plan.entitlement_adds_by_id.values()
+                    ),
+                    "disable_user": len(plan.users_to_disable),
+                    "provision_user": len(plan.users_to_provision),
+                    "remove_entitlement": sum(
+                        len(members)
+                        for members in plan.entitlement_removes_by_id.values()
+                    ),
+                    "remove_user": len(plan.users_to_remove),
+                },
+                lifecycle_actions={
+                    "disable_user": sorted(plan.users_to_disable),
+                    "provision_user": sorted(plan.users_to_provision),
+                    "remove_user": sorted(plan.users_to_remove),
+                },
+                entitlements_by_action={
+                    "apply_entitlement": {
+                        canonical_desired.entitlement_slug_by_id.get(
+                            entitlement_id, entitlement_id
+                        ): sorted(members)
+                        for entitlement_id, members in sorted(
+                            plan.entitlement_adds_by_id.items()
+                        )
+                    },
+                    "remove_entitlement": {
+                        canonical_desired.entitlement_slug_by_id.get(
+                            entitlement_id, entitlement_id
+                        ): sorted(members)
+                        for entitlement_id, members in sorted(
+                            plan.entitlement_removes_by_id.items()
+                        )
+                    },
+                },
             )
         )
 

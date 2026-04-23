@@ -158,12 +158,28 @@ def test_completed_platform_record_carries_reconciliation_metrics():
         users_converged=5,
         orphans_found=2,
         requires_manual_action_count=1,
+        changed_user_count=7,
+        unchanged_user_count=43,
+        action_counts={"apply_entitlement": 4, "remove_user": 2},
+        lifecycle_actions={"remove_user": ["carol@example.com"]},
+        entitlements_by_action={
+            "apply_entitlement": {
+                "sg-aws-admin": ["alice@example.com"],
+            }
+        },
     )
     d = record.to_dict()
     assert d["users_synced"] == 50
     assert d["users_converged"] == 5
     assert d["orphans_found"] == 2
     assert d["requires_manual_action_count"] == 1
+    assert d["changed_user_count"] == 7
+    assert d["unchanged_user_count"] == 43
+    assert d["action_counts"]["apply_entitlement"] == 4
+    assert d["lifecycle_actions"]["remove_user"] == ["carol@example.com"]
+    assert d["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == [
+        "alice@example.com"
+    ]
     assert d["status"] == JobStatus.COMPLETED
 
 

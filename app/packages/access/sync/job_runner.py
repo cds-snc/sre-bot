@@ -189,6 +189,17 @@ def run_platform_sync_job(
                 users_converged=recon.users_converged,
                 orphans_found=recon.orphans_found,
                 requires_manual_action_count=recon.requires_manual_action_count,
+                changed_user_count=recon.changed_user_count,
+                unchanged_user_count=recon.unchanged_user_count,
+                action_counts=dict(recon.action_counts),
+                lifecycle_actions={
+                    action: list(users)
+                    for action, users in recon.lifecycle_actions.items()
+                },
+                entitlements_by_action={
+                    action: {slug: list(users) for slug, users in by_slug.items()}
+                    for action, by_slug in recon.entitlements_by_action.items()
+                },
             )
             log.info(
                 "platform_sync_job_completed",

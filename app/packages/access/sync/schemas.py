@@ -8,7 +8,7 @@ The `sync_type` Literal field acts as a Pydantic discriminator so the
 correct schema is validated before the request reaches the service layer.
 """
 
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -99,6 +99,11 @@ class SyncJobStatusResponse(BaseModel):
     users_converged: Optional[int] = None
     orphans_found: Optional[int] = None
     requires_manual_action_count: Optional[int] = None
+    changed_user_count: Optional[int] = None
+    unchanged_user_count: Optional[int] = None
+    action_counts: Optional[Dict[str, int]] = None
+    lifecycle_actions: Optional[Dict[str, List[str]]] = None
+    entitlements_by_action: Optional[Dict[str, Dict[str, List[str]]]] = None
     # User sync outcome fields
     user_email: Optional[str] = None
     actions_planned: Optional[List[str]] = None

@@ -123,3 +123,10 @@ class ReconciliationOutcome:
     requires_manual_action_count: int
     dry_run: bool = False
     per_user: Dict[str, SyncOutcome] = field(default_factory=dict)
+    changed_user_count: int = 0
+    unchanged_user_count: int = 0
+    action_counts: Dict[str, int] = field(default_factory=dict)
+    lifecycle_actions: Dict[str, List[str]] = field(default_factory=dict)
+    entitlements_by_action: Dict[str, Dict[str, List[str]]] = field(
+        default_factory=dict
+    )

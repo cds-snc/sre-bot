@@ -1,5 +1,7 @@
 """Unit tests for access sync transport presenters."""
 
+from typing import Any, Dict
+
 import pytest
 
 from packages.access.sync.job_models import JobStatus
@@ -87,7 +89,7 @@ def test_to_http_status_response_maps_failed_record():
 @pytest.mark.unit
 def test_to_slack_status_message_in_progress_contains_job_id():
     """In-progress status message must include the job ID."""
-    record = {
+    record: Dict[str, Any] = {
         "job_id": "j-4",
         "platform": "aws",
         "dry_run": False,
@@ -106,7 +108,7 @@ def test_to_slack_status_message_in_progress_contains_job_id():
 @pytest.mark.unit
 def test_to_slack_status_message_completed_platform_contains_metrics():
     """Completed platform status message must include reconciliation metrics."""
-    record = {
+    record: Dict[str, Any] = {
         "job_id": "j-5",
         "platform": "aws",
         "sync_type": "platform",
@@ -118,11 +120,34 @@ def test_to_slack_status_message_completed_platform_contains_metrics():
         "users_converged": 5,
         "orphans_found": 2,
         "requires_manual_action_count": 1,
+        "changed_user_count": 9,
+        "unchanged_user_count": 41,
+        "action_counts": {
+            "apply_entitlement": 3,
+            "provision_user": 2,
+            "remove_user": 1,
+            "disable_user": 0,
+            "remove_entitlement": 0,
+        },
+        "lifecycle_actions": {
+            "provision_user": ["alice@example.com"],
+            "remove_user": ["carol@example.com"],
+            "disable_user": [],
+        },
+        "entitlements_by_action": {
+            "apply_entitlement": {
+                "sg-aws-admin": ["alice@example.com", "bob@example.com"],
+            },
+            "remove_entitlement": {},
+        },
     }
     message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "j-5" in message
     assert "50" in message
-    assert "5" in message
+    assert "Changed: 9" in message
+    assert "Users to provision (1): alice@example.com" in message
+    assert "Entitlement adds" in message
+    assert "sg-aws-admin" in message
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +158,7 @@ def test_to_slack_status_message_completed_platform_contains_metrics():
 @pytest.mark.unit
 def test_to_slack_status_message_completed_user_contains_email():
     """Completed user status message must include the user email."""
-    record = {
+    record: Dict[str, Any] = {
         "job_id": "j-6",
         "platform": "aws",
         "sync_type": "user",
@@ -158,7 +183,7 @@ def test_to_slack_status_message_completed_user_contains_email():
 @pytest.mark.unit
 def test_to_slack_status_message_failed_contains_error():
     """Failed status message must include the error string."""
-    record = {
+    record: Dict[str, Any] = {
         "job_id": "j-7",
         "platform": "aws",
         "dry_run": False,
@@ -178,7 +203,7 @@ def test_to_slack_status_message_failed_contains_error():
 @pytest.mark.unit
 def test_to_slack_status_message_unknown_status_does_not_raise():
     """Unknown status must not raise — it should return a fallback message."""
-    record = {
+    record: Dict[str, Any] = {
         "job_id": "j-8",
         "platform": "aws",
         "dry_run": False,

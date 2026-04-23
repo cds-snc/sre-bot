@@ -167,6 +167,15 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
                 users_converged=3,
                 orphans_found=1,
                 requires_manual_action_count=0,
+                changed_user_count=4,
+                unchanged_user_count=6,
+                action_counts={"apply_entitlement": 2, "remove_user": 1},
+                lifecycle_actions={"remove_user": ["carol@example.com"]},
+                entitlements_by_action={
+                    "apply_entitlement": {
+                        "sg-aws-admin": ["alice@example.com"],
+                    }
+                },
             )
         )
     )
@@ -194,6 +203,13 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
     assert final["users_synced"] == 10
     assert final["users_converged"] == 3
     assert final["orphans_found"] == 1
+    assert final["changed_user_count"] == 4
+    assert final["unchanged_user_count"] == 6
+    assert final["action_counts"]["apply_entitlement"] == 2
+    assert final["lifecycle_actions"]["remove_user"] == ["carol@example.com"]
+    assert final["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == [
+        "alice@example.com"
+    ]
 
 
 @pytest.mark.unit

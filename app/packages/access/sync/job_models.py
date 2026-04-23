@@ -11,7 +11,7 @@ converts to the wire representation expected by ``IdempotencyService``.
 
 import dataclasses
 from dataclasses import dataclass
-from typing import List
+from typing import Dict, List
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +118,13 @@ class CompletedPlatformRecord:
     users_converged: int
     orphans_found: int
     requires_manual_action_count: int
+    changed_user_count: int = 0
+    unchanged_user_count: int = 0
+    action_counts: Dict[str, int] = dataclasses.field(default_factory=dict)
+    lifecycle_actions: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
+    entitlements_by_action: Dict[str, Dict[str, List[str]]] = dataclasses.field(
+        default_factory=dict
+    )
     sync_type: str = "platform"
     status: str = JobStatus.COMPLETED
 
