@@ -115,7 +115,7 @@ def test_should_return_user_exists_false_when_user_absent(make_aws_adapter):
 @pytest.mark.integration
 def test_should_propagate_service_error_from_list_group_memberships(make_aws_adapter):
     """A transient error must NOT be silently converted to NOT_FOUND."""
-    service_error = OperationResult.error(
+    service_error: OperationResult[None] = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR,
         message="Service unavailable",
         error_code="SERVICE_UNAVAILABLE",
@@ -168,3 +168,46 @@ def test_list_group_memberships_called_with_user_id_format(make_aws_adapter):
     assert call_args is not None
     member_id = call_args.kwargs.get("member_id") or call_args.args[0]
     assert member_id == {"UserId": user_id}
+
+
+@pytest.mark.integration
+def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details(
+    make_aws_adapter,
+):
+    """Bulk membership reads should map MemberId.UserId to emails when UserDetails is missing."""
+    group_id = "11111111-2222-3333-4444-555555555555"
+    adapter, fake_identitystore = make_aws_adapter()
+
+    fake_identitystore.describe_group.return_value = OperationResult.success(
+        data={"GroupId": group_id}
+    )
+    fake_identitystore.list_groups_with_memberships.return_value = (
+        OperationResult.success(
+            data=[
+                {
+                    "GroupId": group_id,
+                    "GroupMemberships": [
+                        {"MemberId": {"UserId": "u-1"}},
+                        {"MemberId": {"UserId": "u-2"}},
+                    ],
+                }
+            ]
+        )
+    )
+    fake_identitystore.list_users.return_value = OperationResult.success(
+        data=[
+            {
+                "UserId": "u-1",
+                "Emails": [{"Value": "alice@example.com", "Primary": True}],
+            },
+            {
+                "UserId": "u-2",
+                "Emails": [{"Value": "bob@example.com", "Primary": True}],
+            },
+        ]
+    )
+
+    result = adapter.list_members_for_groups({group_id})
+
+    assert result.is_success
+    assert result.data == {group_id: {"alice@example.com", "bob@example.com"}}

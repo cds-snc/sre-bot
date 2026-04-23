@@ -705,7 +705,9 @@ class AwsIdentityCenterAdapter:
             resolved_group_ids.add(resolved_result.data)
         return OperationResult.success(data=resolved_group_ids)
 
-    def _list_members_for_groups_bulk(self, group_ids: Set[str]) -> OperationResult:
+    def _list_members_for_groups_bulk(  # noqa: C901
+        self, group_ids: Set[str]
+    ) -> OperationResult:
         """Attempt one bulk list path for many groups."""
         identitystore = self._aws.identitystore
         if not hasattr(identitystore, "list_groups_with_memberships"):
@@ -726,6 +728,7 @@ class AwsIdentityCenterAdapter:
             return bulk_result
 
         mapping: Dict[str, Set[str]] = {}
+        user_ids_by_group: Dict[str, Set[str]] = {}
         for group in bulk_result.data:
             if not isinstance(group, dict):
                 continue
@@ -737,6 +740,7 @@ class AwsIdentityCenterAdapter:
                 continue
             members = group.get("GroupMemberships", [])
             emails: Set[str] = set()
+            pending_user_ids: Set[str] = set()
             if isinstance(members, list):
                 for membership in members:
                     if not isinstance(membership, dict):
@@ -746,7 +750,33 @@ class AwsIdentityCenterAdapter:
                         email = self._extract_primary_email(details)
                         if email is not None:
                             emails.add(email)
+                            continue
+
+                    member_id = membership.get("MemberId")
+                    if isinstance(member_id, dict):
+                        user_id = member_id.get("UserId")
+                        if isinstance(user_id, str) and user_id:
+                            pending_user_ids.add(user_id)
             mapping[group_identifier] = emails
+            user_ids_by_group[group_identifier] = pending_user_ids
+
+        unresolved_user_ids = {
+            user_id
+            for user_ids in user_ids_by_group.values()
+            for user_id in user_ids
+        }
+        if unresolved_user_ids:
+            user_map_result = self._build_user_id_email_map()
+            if not user_map_result.is_success or not isinstance(user_map_result.data, dict):
+                return user_map_result
+            user_id_to_email: Dict[str, str] = user_map_result.data
+
+            for group_identifier, pending_user_ids in user_ids_by_group.items():
+                mapping.setdefault(group_identifier, set()).update(
+                    user_id_to_email[user_id]
+                    for user_id in pending_user_ids
+                    if user_id in user_id_to_email
+                )
 
         for group_identifier in target_ids:
             mapping.setdefault(group_identifier, set())
