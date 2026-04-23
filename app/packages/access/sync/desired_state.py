@@ -7,7 +7,7 @@ It makes no adapter calls — all I/O is read-only directory queries.
 The coordinator resolves effective policy once per run via
 ``resolve_effective_policy`` and passes the result to
 ``build_user_state_from_effective`` (single-user) or
-``build_platform_states_from_effective`` (batch reconciliation).  Discovery
+``build_platform_state_from_effective`` (batch reconciliation).  Discovery
 of IDP groups is handled by ``discover_group_slugs`` which queries the
 directory with the platform prefix and returns matching slugs.
 """
@@ -17,11 +17,8 @@ from typing import Dict, List, Set, TYPE_CHECKING
 import structlog
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.domain import DesiredUserState
-from packages.access.sync.policies import (
-    EffectivePlatformPolicy,
-    EntitlementRule,
-)
+from packages.access.sync.domain import DesiredPlatformState, DesiredUserState
+from packages.access.sync.policies import EffectivePlatformPolicy, EntitlementRule
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
@@ -125,19 +122,11 @@ class DirectoryMembershipBuilder:
             )
         )
 
-    def build_platform_states_from_effective(
+    def build_platform_state_from_effective(
         self,
         effective: EffectivePlatformPolicy,
-    ) -> OperationResult[Dict[str, DesiredUserState]]:
-        """Batch-read authn and entitlement groups into per-user desired state.
-
-        Accepts pre-resolved EffectivePlatformPolicy so the coordinator can
-        resolve effective policy once and reuse it across state building,
-        prefetch, and engine planning.
-
-        Entitlement-group membership is fetched in a single batch IDP call
-        (``get_group_members_batch``) after all rule group emails are resolved.
-        """
+    ) -> OperationResult[DesiredPlatformState]:
+        """Batch-read authn and entitlement groups into platform-shaped state."""
         log = logger.bind(platform=effective.platform)
 
         authn_group_result = self._directory.get_group(effective.authn_group_slug)
@@ -160,14 +149,11 @@ class DirectoryMembershipBuilder:
                 error_code=authn_members_result.error_code,
             )
 
-        desired: Dict[str, DesiredUserState] = {
-            member.email.lower(): DesiredUserState(user_should_exist=True)
-            for member in (authn_members_result.data or [])
+        desired_users: Set[str] = {
+            member.email.lower() for member in (authn_members_result.data or [])
         }
-        log.info("build_desired_state_authn_members", count=len(desired))
+        log.info("build_desired_state_authn_members", count=len(desired_users))
 
-        # Resolve every rule slug to its canonical group email first so we can
-        # issue a single batch members call instead of one per entitlement group.
         email_to_rule: Dict[str, EntitlementRule] = {}
         for rule in effective.sync_managed_rules():
             group_result = self._directory.get_group(rule.group_slug)
@@ -178,6 +164,12 @@ class DirectoryMembershipBuilder:
                 )
                 continue
             email_to_rule[group_result.data.group_email] = rule
+
+        desired_members_by_entitlement: Dict[str, Set[str]] = {}
+        entitlement_slug_by_id: Dict[str, str] = {
+            rule.entitlement_id: rule.group_slug
+            for rule in effective.sync_managed_rules()
+        }
 
         if email_to_rule:
             batch_result = self._directory.get_group_members_batch(
@@ -194,18 +186,21 @@ class DirectoryMembershipBuilder:
                     matched_rule = email_to_rule.get(group_email)
                     if matched_rule is None:
                         continue
-                    for member in members:
-                        normalized_email = member.email.lower()
-                        state = desired.get(normalized_email)
-                        if state is None:
-                            continue
-                        desired[normalized_email] = DesiredUserState(
-                            user_should_exist=True,
-                            required_entitlements=state.required_entitlements
-                            + [matched_rule],
-                        )
+                    desired_members_by_entitlement.setdefault(
+                        matched_rule.entitlement_id, set()
+                    ).update(
+                        member.email.lower()
+                        for member in members
+                        if member.email.lower() in desired_users
+                    )
 
-        return OperationResult.success(data=desired)
+        return OperationResult.success(
+            data=DesiredPlatformState(
+                desired_users=desired_users,
+                desired_members_by_entitlement=desired_members_by_entitlement,
+                entitlement_slug_by_id=entitlement_slug_by_id,
+            )
+        )
 
     def discover_group_slugs(
         self,

@@ -237,14 +237,14 @@ class AccessSyncCoordinator:
         assert adapter is not None
         assert effective is not None
 
-        desired_result = self._membership_builder.build_platform_states_from_effective(
+        desired_result = self._membership_builder.build_platform_state_from_effective(
             effective=effective,
         )
         if not desired_result.is_success or desired_result.data is None:
             return desired_result
 
         result = adapter.reconcile_platform(
-            desired_states=desired_result.data,
+            desired_state=desired_result.data,
             context=PlanningContext.from_effective(effective),
             dry_run=dry_run,
         )

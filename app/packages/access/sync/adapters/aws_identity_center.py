@@ -20,6 +20,8 @@ from infrastructure.clients.aws import AWSClients
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.domain import (
     AdapterAssessment,
+    CurrentPlatformState,
+    DesiredPlatformState,
     DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
@@ -29,6 +31,8 @@ from packages.access.sync.policies import (
     EntitlementRule,
     PlannedAction,
     PlanningContext,
+    PlatformActionPlan,
+    PlatformReconciliationPlanner,
     PolicyEngine,
 )
 
@@ -875,33 +879,175 @@ class AwsIdentityCenterAdapter:
         self,
         log: Any,
         dry_run: bool,
-        planned_by_user: Dict[str, List[str]],
-        users_by_action: Dict[str, List[str]],
-        entitlements_by_action: Dict[str, Dict[str, List[str]]],
-        managed_entitlement_count: int,
+        plan: PlatformActionPlan,
+        entitlement_slug_by_id: Dict[str, str],
         unchanged_user_count: int,
     ) -> None:
-        """Emit a delta-focused summary for human review after reconciliation.
+        """Emit a concise slug-first summary for full-platform reconciliation."""
+        changed_users: Set[str] = (
+            set(plan.users_to_provision)
+            | set(plan.users_to_disable)
+            | set(plan.users_to_remove)
+        )
+        for members in plan.entitlement_adds_by_id.values():
+            changed_users.update(members)
+        for members in plan.entitlement_removes_by_id.values():
+            changed_users.update(members)
 
-        Shows which users are impacted by which groups (slugs) for easy understanding.
-        """
         log.info(
             "reconcile_platform_plan_summary",
             dry_run=dry_run,
-            changed_user_count=len(planned_by_user),
+            changed_user_count=len(changed_users),
             unchanged_user_count=unchanged_user_count,
-            managed_entitlement_count=managed_entitlement_count,
             action_counts={
-                action: len(emails)
-                for action, emails in sorted(users_by_action.items())
+                "apply_entitlement": sum(
+                    len(members) for members in plan.entitlement_adds_by_id.values()
+                ),
+                "disable_user": len(plan.users_to_disable),
+                "provision_user": len(plan.users_to_provision),
+                "remove_entitlement": sum(
+                    len(members) for members in plan.entitlement_removes_by_id.values()
+                ),
+                "remove_user": len(plan.users_to_remove),
+            },
+            lifecycle_actions={
+                "disable_user": sorted(plan.users_to_disable),
+                "provision_user": sorted(plan.users_to_provision),
+                "remove_user": sorted(plan.users_to_remove),
             },
             entitlements_by_action={
-                action: {
-                    slug: sorted(emails) for slug, emails in sorted(by_slug.items())
-                }
-                for action, by_slug in sorted(entitlements_by_action.items())
+                "apply_entitlement": {
+                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(
+                        members
+                    )
+                    for entitlement_id, members in sorted(
+                        plan.entitlement_adds_by_id.items()
+                    )
+                },
+                "remove_entitlement": {
+                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(
+                        members
+                    )
+                    for entitlement_id, members in sorted(
+                        plan.entitlement_removes_by_id.items()
+                    )
+                },
             },
         )
+
+    def _build_canonical_platform_state(
+        self,
+        desired_state: DesiredPlatformState,
+        canonical_rules: List[EntitlementRule],
+    ) -> DesiredPlatformState:
+        """Translate desired platform state to canonical AWS group IDs."""
+        canonical_id_by_slug: Dict[str, str] = {
+            rule.group_slug: rule.entitlement_id
+            for rule in canonical_rules
+            if rule.entitlement_type == "group"
+        }
+        desired_members_by_entitlement: Dict[str, Set[str]] = {
+            canonical_id: set() for canonical_id in canonical_id_by_slug.values()
+        }
+        entitlement_slug_by_id: Dict[str, str] = {
+            canonical_id: slug for slug, canonical_id in canonical_id_by_slug.items()
+        }
+
+        for (
+            entitlement_id,
+            members,
+        ) in desired_state.desired_members_by_entitlement.items():
+            slug = desired_state.entitlement_slug_by_id.get(entitlement_id)
+            if slug is None:
+                continue
+            canonical_id = canonical_id_by_slug.get(slug)
+            if canonical_id is None:
+                continue
+            desired_members_by_entitlement.setdefault(canonical_id, set()).update(
+                member.lower() for member in members
+            )
+
+        return DesiredPlatformState(
+            desired_users={email.lower() for email in desired_state.desired_users},
+            desired_members_by_entitlement=desired_members_by_entitlement,
+            entitlement_slug_by_id=entitlement_slug_by_id,
+        )
+
+    def _build_current_platform_state(
+        self,
+        managed_entitlement_ids: Set[str],
+    ) -> OperationResult:
+        """Read current AWS users and entitlement memberships once per run."""
+        provisioned_result = self.list_all_provisioned_users()
+        if not provisioned_result.is_success or not isinstance(
+            provisioned_result.data, set
+        ):
+            return provisioned_result
+
+        current_members_by_entitlement: Dict[str, Set[str]] = {}
+        if managed_entitlement_ids:
+            memberships_result = self.list_members_for_groups(managed_entitlement_ids)
+            if not memberships_result.is_success or not isinstance(
+                memberships_result.data, dict
+            ):
+                return memberships_result
+            current_members_by_entitlement = {
+                entitlement_id: {
+                    email.lower() for email in members if isinstance(email, str)
+                }
+                for entitlement_id, members in memberships_result.data.items()
+            }
+
+        return OperationResult.success(
+            data=CurrentPlatformState(
+                current_users={
+                    email.lower()
+                    for email in provisioned_result.data
+                    if isinstance(email, str)
+                },
+                current_members_by_entitlement=current_members_by_entitlement,
+            )
+        )
+
+    def _build_user_action_map(
+        self,
+        plan: PlatformActionPlan,
+    ) -> Dict[str, List[PlannedAction]]:
+        """Translate grouped platform deltas into targeted per-user actions."""
+        actions_by_user: Dict[str, List[PlannedAction]] = {}
+
+        for user_email in sorted(plan.users_to_provision):
+            actions_by_user.setdefault(user_email, []).append(
+                PlannedAction(action="provision_user")
+            )
+        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
+            for user_email in sorted(members):
+                actions_by_user.setdefault(user_email, []).append(
+                    PlannedAction(
+                        action="apply_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for entitlement_id, members in sorted(plan.entitlement_removes_by_id.items()):
+            for user_email in sorted(members):
+                actions_by_user.setdefault(user_email, []).append(
+                    PlannedAction(
+                        action="remove_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for user_email in sorted(plan.users_to_disable):
+            actions_by_user.setdefault(user_email, []).append(
+                PlannedAction(action="disable_user")
+            )
+        for user_email in sorted(plan.users_to_remove):
+            actions_by_user.setdefault(user_email, []).append(
+                PlannedAction(action="remove_user")
+            )
+
+        return actions_by_user
 
     # ------------------------------------------------------------------
     # Primary reconciliation interface
@@ -920,8 +1066,11 @@ class AwsIdentityCenterAdapter:
             platform=context.platform,
             adapter="aws_identity_center",
         )
+        log.info(
+            "reconcile_user_started",
+            user_should_exist=desired_state.user_should_exist,
+        )
 
-        # Step 1: Canonicalize entitlement IDs (token → GroupId).
         canon_result = self._canonicalize_rules(context.entitlement_rules)
         if not canon_result.is_success or not isinstance(canon_result.data, list):
             return canon_result
@@ -932,13 +1081,10 @@ class AwsIdentityCenterAdapter:
             return required_result
         canonical_required: List[EntitlementRule] = required_result.data
 
-        # Step 2: Assess current platform state.
         assessment = self._assess_live(user_email)
         if not assessment.is_success or assessment.data is None:
             return assessment
         current: AdapterAssessment = assessment.data
-
-        # Step 3: Plan delta.
 
         canonical_context = dc_replace(context, entitlement_rules=canonical_rules)
         engine = PolicyEngine()
@@ -977,221 +1123,105 @@ class AwsIdentityCenterAdapter:
                 )
             )
 
-        # Step 4: Execute.
         return self._execute_planned_actions(user_email, planned)
 
-    def reconcile_platform(  # noqa: C901
+    def reconcile_platform(
         self,
-        desired_states: Dict[str, DesiredUserState],
+        desired_state: DesiredPlatformState,
         context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
-        """Batch reconcile all users on AWS Identity Center.
-
-        Phase 1: Canonicalize entitlement IDs once for the whole run.
-        Phase 2: Orphan detection — find provisioned users absent from IDP.
-        Phase 3: Prefetch current entitlements via group membership reads.
-        Phase 4: Per-user reconcile (no additional IDP calls).
-        """
+        """Batch reconcile AWS Identity Center using entitlement-shaped state."""
         log = logger.bind(platform=context.platform, adapter="aws_identity_center")
+        log.info("reconcile_platform_started", dry_run=dry_run)
 
-        # Phase 1: Canonicalize rules once for the run.
         canon_result = self._canonicalize_rules(context.entitlement_rules)
         if not canon_result.is_success or not isinstance(canon_result.data, list):
             return canon_result
         canonical_rules: List[EntitlementRule] = canon_result.data
-
-        # Build mapping from UUID back to human-readable slugs for logging
-        uuid_to_slug: Dict[str, str] = {
-            r.entitlement_id: r.group_slug
-            for r in canonical_rules
-            if r.entitlement_type == "group"
-        }
-
         canonical_context = dc_replace(context, entitlement_rules=canonical_rules)
+        canonical_desired = self._build_canonical_platform_state(
+            desired_state=desired_state,
+            canonical_rules=canonical_rules,
+        )
 
-        idp_members: Set[str] = set(desired_states.keys())
+        current_state_result = self._build_current_platform_state(
+            managed_entitlement_ids=set(
+                canonical_desired.desired_members_by_entitlement.keys()
+            )
+        )
+        if not current_state_result.is_success or not isinstance(
+            current_state_result.data, CurrentPlatformState
+        ):
+            return current_state_result
+        current_state: CurrentPlatformState = current_state_result.data
 
-        # Phase 2: Orphan detection.
-        orphans: Set[str] = set()
-        provisioned: Set[str] = set()
-        provisioned_known = False
-        prov_result = self.list_all_provisioned_users()
-        if prov_result.is_success and isinstance(prov_result.data, set):
-            provisioned = prov_result.data
-            provisioned_known = True
-            orphans = provisioned - idp_members
-            log.info("orphans_detected", count=len(orphans))
-        else:
-            log.warning("orphan_detection_skipped", error=prov_result.message)
+        planner = PlatformReconciliationPlanner()
+        plan = planner.plan_platform_actions(
+            desired_users=canonical_desired.desired_users,
+            desired_members_by_entitlement=canonical_desired.desired_members_by_entitlement,
+            current_users=current_state.current_users,
+            current_members_by_entitlement=current_state.current_members_by_entitlement,
+            authn_removal_mode=canonical_context.authn_removal_mode,
+        )
+        actions_by_user = self._build_user_action_map(plan)
 
-        # Phase 3: Prefetch current entitlements.
-        managed_ids: Set[str] = {
-            r.entitlement_id for r in canonical_rules if r.entitlement_type == "group"
-        }
-        precomputed: Dict[str, Set[str]] = {}
-        prefetch_complete = False
-        if managed_ids:
-            fetch_result = self.list_members_for_groups(managed_ids)
-            if fetch_result.is_success and isinstance(fetch_result.data, dict):
-                group_to_members: Dict[str, Set[str]] = fetch_result.data
-                for group_id, members in group_to_members.items():
-                    for email in members:
-                        if isinstance(email, str):
-                            precomputed.setdefault(email.lower(), set()).add(group_id)
-                prefetch_complete = True
-                log.info("prefetch_ok", users=len(precomputed))
-            else:
-                log.warning(
-                    "prefetch_skipped",
-                    error=(
-                        fetch_result.message
-                        if not fetch_result.is_success
-                        else "invalid data"
-                    ),
-                )
+        failed_group_slugs = sorted(
+            set(desired_state.entitlement_slug_by_id.values())
+            - set(canonical_desired.entitlement_slug_by_id.values())
+        )
+        log.info(
+            "reconcile_platform_groups_matched",
+            groups_discovered=len(desired_state.entitlement_slug_by_id),
+            groups_canonicalized=len(canonical_desired.entitlement_slug_by_id),
+            groups_failed=len(failed_group_slugs),
+            failed_group_slugs=failed_group_slugs,
+        )
+        self._log_platform_reconcile_summary(
+            log=log,
+            dry_run=dry_run,
+            plan=plan,
+            entitlement_slug_by_id=canonical_desired.entitlement_slug_by_id,
+            unchanged_user_count=len(
+                canonical_desired.desired_users | current_state.current_users
+            )
+            - len(actions_by_user),
+        )
 
-        # Phase 4: Per-user reconcile.
-        all_subjects = idp_members | orphans | set(precomputed.keys())
-        engine = PolicyEngine()
-        users_synced = 0
+        per_user: Dict[str, SyncOutcome] = {}
         users_converged = 0
         requires_manual_action_count = 0
-        per_user: Dict[str, SyncOutcome] = {}
-        planned_by_user: Dict[str, List[str]] = {}
-        users_by_action: Dict[str, List[str]] = {}
-        entitlements_by_action: Dict[str, Dict[str, List[str]]] = {}
-        unchanged_user_count = 0
-
-        for email in sorted(all_subjects):
-            state = desired_states.get(email, DesiredUserState(user_should_exist=False))
-            desired_required = state.required_entitlements
-
-            # Canonicalize required entitlements for this user.
-            req_result = self._canonicalize_rules(desired_required)
-            if not req_result.is_success or not isinstance(req_result.data, list):
-                log.warning(
-                    "reconcile_platform_user_canonicalize_failed",
-                    user_email=email,
-                    error_code=req_result.error_code,
-                )
-                users_synced += 1
-                continue
-            canonical_required: List[EntitlementRule] = req_result.data
-
-            # Determine current state (prefetch or live).
-            if prefetch_complete:
-                current_ids: Optional[Set[str]] = precomputed.get(email)
-                if provisioned_known:
-                    user_exists = email in provisioned
-                else:
-                    user_exists = current_ids is not None and bool(current_ids)
-                current = AdapterAssessment(
-                    platform_user_exists=user_exists,
-                    current_entitlement_ids=(
-                        current_ids if current_ids is not None else set()
-                    ),
-                )
-            else:
-                live = self._assess_live(email)
-                if not live.is_success or live.data is None:
-                    log.warning(
-                        "reconcile_platform_assess_failed",
-                        user_email=email,
-                        error_code=live.error_code,
-                    )
-                    users_synced += 1
-                    continue
-                current = live.data
-
-            planned = engine.plan_actions(
-                policy=canonical_context,
-                capabilities=self.capabilities(),
-                user_should_exist=state.user_should_exist,
-                required_entitlements=canonical_required,
-                current_entitlement_ids=current.current_entitlement_ids,
-                platform_user_exists=current.platform_user_exists,
-            )
-            planned_names: List[str] = [action.action for action in planned]
-            planned_detail: List[str] = [
-                (
-                    f"{action.action}:{uuid_to_slug.get(action.entitlement_id, action.entitlement_id)}"
-                    if action.entitlement_id is not None
-                    else action.action
-                )
-                for action in planned
-            ]
-
-            if planned_names:
-                planned_by_user[email] = planned_detail
-                for action_name in sorted(set(planned_names)):
-                    users_by_action.setdefault(action_name, []).append(email)
-                for action in planned:
-                    if action.entitlement_id is not None:
-                        slug = uuid_to_slug.get(
-                            action.entitlement_id, action.entitlement_id
-                        )
-                        entitlements_by_action.setdefault(action.action, {}).setdefault(
-                            slug, []
-                        ).append(email)
-            else:
-                unchanged_user_count += 1
-
+        for user_email in sorted(actions_by_user):
+            planned_actions = actions_by_user[user_email]
             if dry_run:
                 outcome = SyncOutcome(
-                    planned_actions=planned_names,
+                    planned_actions=[action.action for action in planned_actions],
                     applied_actions=[],
                 )
             else:
-                exec_result = self._execute_planned_actions(email, planned)
-                if exec_result.is_success and isinstance(exec_result.data, SyncOutcome):
-                    outcome = exec_result.data
-                else:
-                    log.warning(
-                        "reconcile_platform_user_failed",
-                        user_email=email,
-                        error_code=(
-                            exec_result.error_code
-                            if not exec_result.is_success
-                            else None
-                        ),
-                    )
-                    users_synced += 1
-                    continue
-
-            per_user[email] = outcome
-            users_synced += 1
+                exec_result = self._execute_planned_actions(user_email, planned_actions)
+                if not exec_result.is_success or not isinstance(
+                    exec_result.data, SyncOutcome
+                ):
+                    return exec_result
+                outcome = exec_result.data
+            per_user[user_email] = outcome
             if outcome.applied_actions:
                 users_converged += 1
             if outcome.requires_manual_action:
                 requires_manual_action_count += 1
 
-        # Log group matching summary before action summary for visibility
-        failed_rules = [
-            r for r in context.entitlement_rules if r.entitlement_id not in uuid_to_slug
-        ]
-        log.info(
-            "reconcile_platform_groups_matched",
-            groups_discovered=len(context.entitlement_rules),
-            groups_canonicalized=len(canonical_rules),
-            groups_failed=len(failed_rules),
+        users_synced = len(
+            canonical_desired.desired_users | current_state.current_users
         )
-
-        self._log_platform_reconcile_summary(
-            log=log,
-            dry_run=dry_run,
-            planned_by_user=planned_by_user,
-            users_by_action=users_by_action,
-            entitlements_by_action=entitlements_by_action,
-            managed_entitlement_count=len(managed_ids),
-            unchanged_user_count=unchanged_user_count,
+        orphans_found = len(
+            current_state.current_users - canonical_desired.desired_users
         )
-
         log.info(
             "reconcile_platform_completed",
             users_synced=users_synced,
             users_converged=users_converged,
-            orphans_found=len(orphans),
+            orphans_found=orphans_found,
             dry_run=dry_run,
         )
         return OperationResult.success(
@@ -1199,7 +1229,7 @@ class AwsIdentityCenterAdapter:
                 platform=context.platform,
                 users_synced=users_synced,
                 users_converged=users_converged,
-                orphans_found=len(orphans),
+                orphans_found=orphans_found,
                 requires_manual_action_count=requires_manual_action_count,
                 dry_run=dry_run,
                 per_user=per_user,

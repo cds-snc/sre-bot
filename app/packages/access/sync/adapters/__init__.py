@@ -7,16 +7,13 @@ All methods are idempotent and return OperationResult.
 Adapters must never raise exceptions across this boundary.
 """
 
-from typing import Dict, Protocol, TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING
 
 from infrastructure.operations import OperationResult
 
 if TYPE_CHECKING:
-    from packages.access.sync.domain import DesiredUserState
-    from packages.access.sync.policies import (
-        AdapterCapabilities,
-        PlanningContext,
-    )
+    from packages.access.sync.domain import DesiredPlatformState, DesiredUserState
+    from packages.access.sync.policies import AdapterCapabilities, PlanningContext
 
 
 class AccessSyncAdapter(Protocol):
@@ -77,13 +74,13 @@ class AccessSyncAdapter(Protocol):
 
     def reconcile_platform(
         self,
-        desired_states: "Dict[str, DesiredUserState]",
+        desired_state: "DesiredPlatformState",
         context: "PlanningContext",
         dry_run: bool = False,
     ) -> OperationResult:
-        """Batch reconcile all users on the platform.
+        """Batch reconcile a full platform using entitlement-shaped desired state.
 
-        The adapter owns batch-specific optimizations (prefetch, orphan detection).
+        The adapter owns platform-state assessment, delta planning, and execution.
         Returns OperationResult[ReconciliationOutcome].
         """
         ...

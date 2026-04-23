@@ -52,6 +52,23 @@ class DesiredUserState:
 
 
 @dataclass(frozen=True)
+class DesiredPlatformState:
+    """Resolved desired state for a full platform reconciliation run."""
+
+    desired_users: Set[str] = field(default_factory=set)
+    desired_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
+    entitlement_slug_by_id: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CurrentPlatformState:
+    """Current platform state for a full platform reconciliation run."""
+
+    current_users: Set[str] = field(default_factory=set)
+    current_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class SyncOutcome:
     """Business outcome of a completed or dry-run sync_user call.
 

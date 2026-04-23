@@ -11,6 +11,8 @@ import structlog
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.domain import (
     AdapterAssessment,
+    CurrentPlatformState,
+    DesiredPlatformState,
     DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
@@ -19,6 +21,7 @@ from packages.access.sync.policies import (
     AdapterCapabilities,
     PlannedAction,
     PlanningContext,
+    PlatformReconciliationPlanner,
     PolicyEngine,
 )
 
@@ -211,45 +214,78 @@ class FakePlatformAdapter:
 
     def reconcile_platform(
         self,
-        desired_states: Dict[str, DesiredUserState],
+        desired_state: DesiredPlatformState,
         context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
-        """Batch reconcile all users on the fake platform."""
-        idp_members = set(desired_states.keys())
-        orphans = self._users - idp_members
-        all_subjects = idp_members | orphans
-        engine = PolicyEngine()
-        users_synced = 0
+        """Batch reconcile the fake platform using entitlement-shaped state."""
+        planner = PlatformReconciliationPlanner()
+        current_state = CurrentPlatformState(
+            current_users=set(self._users),
+            current_members_by_entitlement={
+                entitlement_id: set(members)
+                for entitlement_id, members in self._members_by_group.items()
+            },
+        )
+        plan = planner.plan_platform_actions(
+            desired_users=desired_state.desired_users,
+            desired_members_by_entitlement=desired_state.desired_members_by_entitlement,
+            current_users=current_state.current_users,
+            current_members_by_entitlement=current_state.current_members_by_entitlement,
+            authn_removal_mode=context.authn_removal_mode,
+        )
+        actions_by_user: Dict[str, List[PlannedAction]] = {}
+
+        for email in sorted(plan.users_to_provision):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="provision_user")
+            )
+        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="apply_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for entitlement_id, members in sorted(plan.entitlement_removes_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="remove_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for email in sorted(plan.users_to_disable):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="disable_user")
+            )
+        for email in sorted(plan.users_to_remove):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="remove_user")
+            )
+
+        users_synced = len(desired_state.desired_users | current_state.current_users)
         users_converged = 0
         requires_manual_action_count = 0
         per_user: Dict[str, SyncOutcome] = {}
-
-        for email in sorted(all_subjects):
-            state = desired_states.get(email, DesiredUserState(user_should_exist=False))
-            current = self._assess(email)
-            planned = engine.plan_actions(
-                policy=context,
-                capabilities=self.capabilities(),
-                user_should_exist=state.user_should_exist,
-                required_entitlements=state.required_entitlements,
-                current_entitlement_ids=current.current_entitlement_ids,
-                platform_user_exists=current.platform_user_exists,
-            )
+        for email in sorted(actions_by_user):
+            planned = actions_by_user[email]
             if dry_run:
                 outcome = SyncOutcome(
-                    planned_actions=[a.action for a in planned],
+                    planned_actions=[action.action for action in planned],
                     applied_actions=[],
                 )
             else:
                 exec_result = self._execute_planned_actions(email, planned)
-                if exec_result.is_success and isinstance(exec_result.data, SyncOutcome):
-                    outcome = exec_result.data
-                else:
-                    users_synced += 1
-                    continue
+                if not exec_result.is_success or not isinstance(
+                    exec_result.data, SyncOutcome
+                ):
+                    return exec_result
+                outcome = exec_result.data
             per_user[email] = outcome
-            users_synced += 1
             if outcome.applied_actions:
                 users_converged += 1
             if outcome.requires_manual_action:
@@ -260,7 +296,9 @@ class FakePlatformAdapter:
                 platform=context.platform,
                 users_synced=users_synced,
                 users_converged=users_converged,
-                orphans_found=len(orphans),
+                orphans_found=len(
+                    current_state.current_users - desired_state.desired_users
+                ),
                 requires_manual_action_count=requires_manual_action_count,
                 dry_run=dry_run,
                 per_user=per_user,

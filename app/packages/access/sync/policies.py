@@ -184,6 +184,17 @@ class PlannedAction:
     entitlement_id: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class PlatformActionPlan:
+    """Lifecycle and entitlement deltas for a full platform reconciliation run."""
+
+    users_to_provision: Set[str]
+    users_to_disable: Set[str]
+    users_to_remove: Set[str]
+    entitlement_adds_by_id: Dict[str, Set[str]]
+    entitlement_removes_by_id: Dict[str, Set[str]]
+
+
 class PolicyEngine:
     """Translates policy + current state into a minimal ordered list of actions.
 
@@ -280,3 +291,56 @@ class PolicyEngine:
                 planned.append(PlannedAction(action="remove_user"))
 
         return planned
+
+
+class PlatformReconciliationPlanner:
+    """Compute lifecycle and entitlement deltas for full-platform sync."""
+
+    def plan_platform_actions(
+        self,
+        desired_users: Set[str],
+        desired_members_by_entitlement: Dict[str, Set[str]],
+        current_users: Set[str],
+        current_members_by_entitlement: Dict[str, Set[str]],
+        authn_removal_mode: str,
+    ) -> PlatformActionPlan:
+        """Return direct set-based deltas for platform reconciliation."""
+        users_to_provision = desired_users - current_users
+        users_to_disable = (
+            current_users - desired_users if authn_removal_mode == "disable" else set()
+        )
+        users_to_remove = (
+            current_users - desired_users if authn_removal_mode == "delete" else set()
+        )
+
+        entitlement_adds_by_id: Dict[str, Set[str]] = {}
+        entitlement_removes_by_id: Dict[str, Set[str]] = {}
+        entitlement_ids = set(desired_members_by_entitlement.keys()) | set(
+            current_members_by_entitlement.keys()
+        )
+
+        for entitlement_id in sorted(entitlement_ids):
+            desired_members = set(
+                desired_members_by_entitlement.get(entitlement_id, set())
+            )
+            current_members = set(
+                current_members_by_entitlement.get(entitlement_id, set())
+            )
+            members_to_add = desired_members - current_members
+            members_to_remove = current_members - desired_members
+
+            if users_to_remove:
+                members_to_remove -= users_to_remove
+
+            if members_to_add:
+                entitlement_adds_by_id[entitlement_id] = members_to_add
+            if members_to_remove:
+                entitlement_removes_by_id[entitlement_id] = members_to_remove
+
+        return PlatformActionPlan(
+            users_to_provision=users_to_provision,
+            users_to_disable=users_to_disable,
+            users_to_remove=users_to_remove,
+            entitlement_adds_by_id=entitlement_adds_by_id,
+            entitlement_removes_by_id=entitlement_removes_by_id,
+        )

@@ -4,6 +4,7 @@ import pytest
 
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.domain import (
+    DesiredPlatformState,
     DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
@@ -73,6 +74,8 @@ def test_fake_adapter_reconcile_user_removes_user_not_in_desired():
     result = adapter.reconcile_user("alice@example.com", desired, _EFFECTIVE)
 
     assert result.is_success
+    assert result.data is not None
+    assert isinstance(result.data, SyncOutcome)
     assert "remove_user" in result.data.applied_actions
     assert "alice@example.com" not in adapter._users
 
@@ -80,12 +83,13 @@ def test_fake_adapter_reconcile_user_removes_user_not_in_desired():
 @pytest.mark.unit
 def test_fake_adapter_reconcile_platform_returns_outcome():
     adapter = FakePlatformAdapter()
-    desired_states = {
-        "alice@example.com": DesiredUserState(user_should_exist=True),
-        "bob@example.com": DesiredUserState(user_should_exist=True),
-    }
+    desired_state = DesiredPlatformState(
+        desired_users={"alice@example.com", "bob@example.com"},
+        desired_members_by_entitlement={},
+        entitlement_slug_by_id={},
+    )
 
-    result = adapter.reconcile_platform(desired_states, _EFFECTIVE)
+    result = adapter.reconcile_platform(desired_state, _EFFECTIVE)
 
     assert result.is_success
     assert isinstance(result.data, ReconciliationOutcome)
@@ -96,12 +100,16 @@ def test_fake_adapter_reconcile_platform_returns_outcome():
 def test_fake_adapter_reconcile_platform_dry_run_no_mutations():
     adapter = FakePlatformAdapter()
     users_before = set(adapter._users)
-    desired_states = {
-        "newuser@example.com": DesiredUserState(user_should_exist=True),
-    }
+    desired_state = DesiredPlatformState(
+        desired_users={"newuser@example.com"},
+        desired_members_by_entitlement={},
+        entitlement_slug_by_id={},
+    )
 
-    result = adapter.reconcile_platform(desired_states, _EFFECTIVE, dry_run=True)
+    result = adapter.reconcile_platform(desired_state, _EFFECTIVE, dry_run=True)
 
     assert result.is_success
+    assert result.data is not None
+    assert isinstance(result.data, ReconciliationOutcome)
     assert result.data.dry_run is True
     assert adapter._users == users_before

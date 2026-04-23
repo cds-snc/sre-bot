@@ -37,7 +37,7 @@ Separation of concerns between ``FakeDirectory`` fields:
         ``sync_platform`` batch IDP reads (Phase 1).
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Literal, Optional, Set
 from unittest.mock import MagicMock
 
 import pytest
@@ -55,13 +55,16 @@ from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     AdapterAssessment,
+    DesiredPlatformState,
     DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
 )
 from packages.access.sync.policies import (
     AdapterCapabilities,
+    PlannedAction,
     PlanningContext,
+    PlatformReconciliationPlanner,
     PolicyEngine,
 )
 
@@ -298,32 +301,57 @@ class SpyAdapter:
             )
         )
 
-    def reconcile_platform(
+    def reconcile_platform(  # noqa: C901
         self,
-        desired_states: Dict[str, DesiredUserState],
+        desired_state: DesiredPlatformState,
         context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
         self.calls.append(("reconcile_platform",))
-        idp_members = set(desired_states.keys())
-        provisioned = self._provisioned if self._provisioned is not None else set()
-        orphans = provisioned - idp_members
-        all_subjects = idp_members | orphans
-        engine = PolicyEngine()
-        users_synced = 0
+        planner = PlatformReconciliationPlanner()
+        current_users = self._provisioned if self._provisioned is not None else set()
+        plan = planner.plan_platform_actions(
+            desired_users=desired_state.desired_users,
+            desired_members_by_entitlement=desired_state.desired_members_by_entitlement,
+            current_users=current_users,
+            current_members_by_entitlement=self._group_members,
+            authn_removal_mode=context.authn_removal_mode,
+        )
+        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        for email in sorted(plan.users_to_provision):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="provision_user")
+            )
+        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="apply_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for entitlement_id, members in sorted(plan.entitlement_removes_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="remove_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for email in sorted(plan.users_to_disable):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="disable_user")
+            )
+        for email in sorted(plan.users_to_remove):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="remove_user")
+            )
+
         users_converged = 0
         per_user: Dict[str, SyncOutcome] = {}
-        for email in sorted(all_subjects):
-            state = desired_states.get(email, DesiredUserState(user_should_exist=False))
-            current = self._get_assessment(email)
-            planned = engine.plan_actions(
-                policy=context,
-                capabilities=self.capabilities(),
-                user_should_exist=state.user_should_exist,
-                required_entitlements=state.required_entitlements,
-                current_entitlement_ids=current.current_entitlement_ids,
-                platform_user_exists=current.platform_user_exists,
-            )
+        for email, planned in sorted(actions_by_user.items()):
             applied: List[str] = []
             if not dry_run:
                 for action in planned:
@@ -359,15 +387,14 @@ class SpyAdapter:
                 applied_actions=applied,
             )
             per_user[email] = outcome
-            users_synced += 1
             if applied:
                 users_converged += 1
         return OperationResult.success(
             data=ReconciliationOutcome(
                 platform=context.platform,
-                users_synced=users_synced,
+                users_synced=len(desired_state.desired_users | current_users),
                 users_converged=users_converged,
-                orphans_found=len(orphans),
+                orphans_found=len(current_users - desired_state.desired_users),
                 requires_manual_action_count=0,
                 dry_run=dry_run,
                 per_user=per_user,
@@ -394,7 +421,9 @@ def make_sync_config():
         platform: str = "aws",
         authn_token: str = "authn",
         authn_removal_mode: str = "delete",
-        mode_overrides: Optional[Dict[str, str]] = None,
+        mode_overrides: Optional[
+            Dict[str, Literal["sync_managed", "ephemeral", "deactivated"]]
+        ] = None,
         dir_prefix: str = "sg",
         dir_separator: str = "-",
         adapter_type: str = "fake",
@@ -445,7 +474,9 @@ def make_coordinator(make_sync_config):
     def _make(
         platform: str = "aws",
         authn_removal_mode: str = "delete",
-        mode_overrides: Optional[Dict[str, str]] = None,
+        mode_overrides: Optional[
+            Dict[str, Literal["sync_managed", "ephemeral", "deactivated"]]
+        ] = None,
         # IDP state
         discovered_slugs: Optional[Set[str]] = None,
         transitive_membership_slugs: Optional[Set[str]] = None,
@@ -483,10 +514,11 @@ def make_coordinator(make_sync_config):
             supports_disable=supports_disable,
             group_members=adapter_group_members,
         )
+        directory_provider: Any = directory
         coordinator = AccessSyncCoordinator(
             adapters={platform: adapter},
             config=config,
-            membership_builder=DirectoryMembershipBuilder(directory),
+            membership_builder=DirectoryMembershipBuilder(directory_provider),
         )
         return coordinator, adapter
 

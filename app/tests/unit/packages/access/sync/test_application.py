@@ -8,24 +8,31 @@ Covers:
   F-05  UNSUPPORTED_OPERATION from adapter sets requires_manual_action
 """
 
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import pytest
 
-from infrastructure.directory.models import DirectoryGroup, MembershipCheckResult
+from infrastructure.directory.models import (
+    DirectoryGroup,
+    DirectoryMember,
+    MembershipCheckResult,
+)
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     AdapterAssessment,
+    DesiredPlatformState,
     DesiredUserState,
     ReconciliationOutcome,
     SyncOutcome,
 )
 from packages.access.sync.policies import (
     AdapterCapabilities,
+    PlannedAction,
     PlanningContext,
+    PlatformReconciliationPlanner,
     PolicyEngine,
 )
 
@@ -155,39 +162,59 @@ class FakeAdapter:
 
     def reconcile_platform(
         self,
-        desired_states: Dict[str, DesiredUserState],
+        desired_state: DesiredPlatformState,
         context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
         self.calls.append(("reconcile_platform",))
-        engine = PolicyEngine()
-        per_user: Dict[str, SyncOutcome] = {}
-        users_synced = 0
-        users_converged = 0
-        for email, state in sorted(desired_states.items()):
-            current = self._assess(email)
-            planned = engine.plan_actions(
-                policy=context,
-                capabilities=self.capabilities(),
-                user_should_exist=state.user_should_exist,
-                required_entitlements=state.required_entitlements,
-                current_entitlement_ids=current.current_entitlement_ids,
-                platform_user_exists=current.platform_user_exists,
+        planner = PlatformReconciliationPlanner()
+        plan = planner.plan_platform_actions(
+            desired_users=desired_state.desired_users,
+            desired_members_by_entitlement=desired_state.desired_members_by_entitlement,
+            current_users=set(),
+            current_members_by_entitlement={},
+            authn_removal_mode=context.authn_removal_mode,
+        )
+        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        for email in sorted(plan.users_to_provision):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="provision_user")
             )
+        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="apply_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for email in sorted(plan.users_to_disable):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="disable_user")
+            )
+        for email in sorted(plan.users_to_remove):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="remove_user")
+            )
+
+        per_user: Dict[str, SyncOutcome] = {}
+        users_converged = 0
+        for email, planned in sorted(actions_by_user.items()):
             if dry_run:
                 outcome = SyncOutcome(
-                    planned_actions=[a.action for a in planned], applied_actions=[]
+                    planned_actions=[action.action for action in planned],
+                    applied_actions=[],
                 )
             else:
                 outcome = self._execute(email, planned)
             per_user[email] = outcome
-            users_synced += 1
             if outcome.applied_actions:
                 users_converged += 1
         return OperationResult.success(
             data=ReconciliationOutcome(
                 platform=context.platform,
-                users_synced=users_synced,
+                users_synced=len(desired_state.desired_users),
                 users_converged=users_converged,
                 orphans_found=0,
                 requires_manual_action_count=0,
@@ -259,7 +286,28 @@ class FakeDirectory:
     def get_group_members(
         self, group_email: str, include_member_types: Optional[set] = None
     ) -> OperationResult:
-        return OperationResult.success(data=[])
+        slug = group_email.split("@", 1)[0]
+        if slug not in (self._user_group_slugs or set()):
+            return OperationResult.success(data=[])
+        return OperationResult.success(
+            data=[DirectoryMember(email="alice@example.com", member_type="USER")]
+        )
+
+    def get_group_members_batch(
+        self,
+        group_emails: List[str],
+        include_member_types: Optional[set] = None,
+    ) -> OperationResult:
+        mapping: Dict[str, List[DirectoryMember]] = {}
+        for group_email in group_emails:
+            slug = group_email.split("@", 1)[0]
+            if slug in (self._user_group_slugs or set()):
+                mapping[group_email] = [
+                    DirectoryMember(email="alice@example.com", member_type="USER")
+                ]
+            else:
+                mapping[group_email] = []
+        return OperationResult.success(data=mapping)
 
     def list_groups(self, query: str = "") -> OperationResult:
         matching = [
@@ -305,10 +353,11 @@ def make_coordinator(
         groups=discovered_groups or set(),
         user_group_slugs=user_group_slugs,
     )
+    directory_provider: Any = directory
     coordinator = AccessSyncCoordinator(
         adapters={platform: adapter},
         config=config,
-        membership_builder=DirectoryMembershipBuilder(directory),
+        membership_builder=DirectoryMembershipBuilder(directory_provider),
     )
     return coordinator, adapter
 
@@ -376,10 +425,11 @@ def test_sync_user_adapter_not_found():
         dir_prefix="sg",
         platforms={"aws": PlatformPolicy()},
     )
+    directory_provider: Any = FakeDirectory()
     coordinator = AccessSyncCoordinator(
         adapters={},
         config=config,
-        membership_builder=DirectoryMembershipBuilder(FakeDirectory()),
+        membership_builder=DirectoryMembershipBuilder(directory_provider),
     )
     result = coordinator.sync_user("alice@example.com", "aws")
     assert not result.is_success
