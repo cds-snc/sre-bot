@@ -27,6 +27,12 @@ access_sync:
 
   status.result.not_found: "⚠️ No sync job found with ID: `{job_id}`"
   status.result.running: "⏳ Sync job `{job_id}` is *running* for platform *{platform}*.\nStarted: {started_at}"
+  status.result.completed_user: "✅ User sync `{job_id}` *completed* for *{user_email}* on *{platform}*.\nActions applied: {actions_applied_count}\nCompleted: {completed_at}"
+  status.result.completed_user_header: "✅ User sync `{job_id}` *completed* for *{user_email}* on *{platform}*."
+  status.result.completed_user_counts: "Actions planned: {actions_planned_count} | Applied: {actions_applied_count}"
+  status.result.completed_user_planned_actions: "Planned actions: {actions}"
+  status.result.completed_user_applied_actions: "Applied actions: {actions}"
+  status.result.completed_user_manual: "⚠️ Manual action required"
   status.result.completed_header: "✅ Sync job `{job_id}` *completed* for platform *{platform}*."
   status.result.completed_summary: "Users synced: {users_synced} | Changed: {changed_user_count} | Unchanged: {unchanged_user_count}"
   status.result.completed_lifecycle: "Lifecycle: +{provision_count} provision | -{remove_count} remove | {disable_count} disable"

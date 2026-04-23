@@ -27,6 +27,12 @@ access_sync:
 
   status.result.not_found: "⚠️ Aucun travail de synchronisation trouvé avec l'identifiant\u00a0: `{job_id}`"
   status.result.running: "⏳ Le travail `{job_id}` est *en cours* pour la plateforme *{platform}*.\nDémarré\u00a0: {started_at}"
+  status.result.completed_user: "✅ La synchronisation utilisateur `{job_id}` est *terminée* pour *{user_email}* sur *{platform}*.\nActions appliquées\u00a0: {actions_applied_count}\nTerminé\u00a0: {completed_at}"
+  status.result.completed_user_header: "✅ La synchronisation utilisateur `{job_id}` est *terminée* pour *{user_email}* sur *{platform}*."
+  status.result.completed_user_counts: "Actions planifiées\u00a0: {actions_planned_count} | Appliquées\u00a0: {actions_applied_count}"
+  status.result.completed_user_planned_actions: "Actions planifiées\u00a0: {actions}"
+  status.result.completed_user_applied_actions: "Actions appliquées\u00a0: {actions}"
+  status.result.completed_user_manual: "⚠️ Intervention manuelle requise"
   status.result.completed_header: "✅ Le travail `{job_id}` est *terminé* pour la plateforme *{platform}*."
   status.result.completed_summary: "Utilisateurs synchronisés\u00a0: {users_synced} | Modifiés\u00a0: {changed_user_count} | Inchangés\u00a0: {unchanged_user_count}"
   status.result.completed_lifecycle: "Cycle de vie\u00a0: +{provision_count} provisionnés | -{remove_count} supprimés | {disable_count} désactivés"

@@ -14,6 +14,7 @@ from packages.access.sync.schemas import SyncJobStatusResponse
 _MAX_LIFECYCLE_USERS = 8
 _MAX_ENTITLEMENTS = 8
 _MAX_USERS_PER_ENTITLEMENT = 3
+_MAX_USER_ACTIONS = 6
 
 
 def to_http_status_response(record: Dict[str, Any]) -> SyncJobStatusResponse:
@@ -46,30 +47,84 @@ def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
 
         if sync_type == "user":
             user_email = record.user_email or ""
+            actions_planned = record.actions_planned or []
             actions_applied = record.actions_applied or []
             requires_manual = record.requires_manual_action or False
-            return str(
-                t(
-                    "access_sync.status.result.completed_user",
-                    locale,
-                    (
-                        f"\u2705 User sync `{job_id}` *completed* for *{user_email}* on *{platform}*."
-                        f"\nActions applied: {len(actions_applied)}"
-                        + (
-                            "\n\u26a0\ufe0f Manual action required"
-                            if requires_manual
-                            else ""
+            user_sections: list[str] = [
+                str(
+                    t(
+                        "access_sync.status.result.completed_user_header",
+                        locale,
+                        f"\u2705 User sync `{job_id}` *completed* for *{user_email}* on *{platform}*.",
+                        job_id=job_id,
+                        user_email=user_email,
+                        platform=platform,
+                    )
+                ),
+                str(
+                    t(
+                        "access_sync.status.result.completed_user_counts",
+                        locale,
+                        (
+                            f"Actions planned: {len(actions_planned)} | "
+                            f"Applied: {len(actions_applied)}"
+                        ),
+                        actions_planned_count=len(actions_planned),
+                        actions_applied_count=len(actions_applied),
+                    )
+                ),
+            ]
+
+            if actions_planned:
+                user_sections.append(
+                    str(
+                        t(
+                            "access_sync.status.result.completed_user_planned_actions",
+                            locale,
+                            (
+                                "Planned actions: "
+                                f"{_truncate_list(actions_planned, _MAX_USER_ACTIONS)}"
+                            ),
+                            actions=_truncate_list(actions_planned, _MAX_USER_ACTIONS),
                         )
-                        + f"\nCompleted: {completed_at}"
-                    ),
-                    job_id=job_id,
-                    platform=platform,
-                    user_email=user_email,
-                    actions_applied_count=len(actions_applied),
-                    requires_manual_action=requires_manual,
-                    completed_at=completed_at,
+                    )
+                )
+            if actions_applied:
+                user_sections.append(
+                    str(
+                        t(
+                            "access_sync.status.result.completed_user_applied_actions",
+                            locale,
+                            (
+                                "Applied actions: "
+                                f"{_truncate_list(actions_applied, _MAX_USER_ACTIONS)}"
+                            ),
+                            actions=_truncate_list(actions_applied, _MAX_USER_ACTIONS),
+                        )
+                    )
+                )
+            if requires_manual:
+                user_sections.append(
+                    str(
+                        t(
+                            "access_sync.status.result.completed_user_manual",
+                            locale,
+                            "\u26a0\ufe0f Manual action required",
+                        )
+                    )
+                )
+
+            user_sections.append(
+                str(
+                    t(
+                        "access_sync.status.result.completed_timestamp",
+                        locale,
+                        f"Completed: {completed_at}",
+                        completed_at=completed_at,
+                    )
                 )
             )
+            return "\n".join(line for line in user_sections if line)
 
         users_synced = record.users_synced or 0
         users_converged = record.users_converged or 0

@@ -167,12 +167,15 @@ def test_to_slack_status_message_completed_user_contains_email():
         "status": JobStatus.COMPLETED,
         "started_at": "2026-04-21T00:00:00+00:00",
         "completed_at": "2026-04-21T00:01:00+00:00",
+        "actions_planned": ["provision_user", "apply_entitlement"],
         "actions_applied": ["provision_user"],
         "requires_manual_action": False,
     }
     message = to_slack_status_message(SyncJobStatusResponse(**record), locale="en-US")
     assert "alice@example.com" in message
     assert "j-6" in message
+    assert "Actions planned: 2 | Applied: 1" in message
+    assert "Planned actions:" in message
 
 
 # ---------------------------------------------------------------------------
