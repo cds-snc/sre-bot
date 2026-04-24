@@ -1,91 +1,136 @@
-# SRE Bot Copilot Instructions
+# Project AI Operating Contract
 
-**Root**: `/workspace/app` | **Run**: `cd /workspace/app`  
-**Skills**: `.github/skills/` directory contains detailed pattern enforcement rules  
-**ADRs**: `docs/decisions/tier-1-foundation/` contains architectural decisions
+## Mission
 
----
+Produce production-grade Python/FastAPI backend changes with architecture-first decision making, strict typing, deterministic validation, and low premium request waste.
 
-## ENFORCEMENT MODE
+## Priority Order
 
-**Before generating ANY code**:
-1. Read applicable skill documents from `.github/skills/`
-2. Verify code follows all patterns in skills
-3. Run pre-implementation checklists
-4. If any rule violated, REJECT code generation and explain violation
+1. Safety and correctness
+2. Architecture consistency
+3. Testability and maintainability
+4. Cost-efficient Copilot usage
+5. Speed
 
-**Critical Skills** (check EVERY time):
-- `imports-pattern.md` - Import rules (frequently violated)
-- `settings-singleton.md` - Settings access
-- `logging-pattern.md` - Structured logging
-- `no-async-pattern.md` - Synchronous code only
-- `type-hints-pattern.md` - Type annotations
-- `testing-pattern.md` - Test patterns when writing tests
+## Product and Architecture Constraints
 
-Additional skill to read when introducing or changing data models or service boundaries:
-- `type-model-boundaries-pattern.md` - Protocol vs dataclass vs Pydantic vs TypedDict
+- Runtime target: Python 3.12+.
+- Framework: FastAPI.
+- Focus: API/backend only.
+- Shared platform capabilities belong in `app/infrastructure`.
+- Business logic belongs in `app/packages/<domain>`.
+- Do not place new business logic in `app/infrastructure`.
+- Treat `app/modules` as legacy and do not use it as an architectural reference.
+- Prefer architecture references from `app/infrastructure` and `app/packages`.
+- `app/packages/access` is a useful reference package but not a source of absolute truth.
+- Prefer partitioned settings for new package domains in `app/packages/<feature>/settings.py`.
+- Avoid growing root settings aggregators for new package-owned concerns.
+- Services should receive the narrowest settings slice needed, not broad root settings objects.
 
----
+## Model Boundary Rules
 
-## Quick Reference
+- Use `Protocol` for behavior/service contracts.
+- Use `@dataclass(frozen=True)` for canonical internal entities and shared internal data.
+- Use Pydantic `BaseModel` at untrusted I/O boundaries (HTTP, webhook, external payload parsing).
+- Use `TypedDict` only when dictionary semantics are explicitly required.
+- Do not default to Pydantic models for internal service boundaries.
 
-| Rule | ✅ Correct | ❌ Forbidden |
-|------|-----------|-------------|
-| **Imports** | Top-level only | Inside functions |
-| **Settings** | `from infrastructure.services import SettingsDep, get_settings` | `Settings()` direct instantiation |
-| **Async** | `def func():` | `async def / await` (except lifespan) |
-| **Logging** | `log = logger.bind(user_id=...)` | Manual `code_namespace` binding |
-| **Types** | `def func(x: str) -> int:` | Missing type hints |
-| **Services** | `__init__(self, settings: Settings):` | `__init__(self): self.settings = get_settings()` |
-| **Results** | `if result.is_success:` | `if result.is_success():` |
+## Plugin and Startup Rules
 
-**Full details**: See skills documents in `.github/skills/`
+- Package discovery/registration/loading/initialization must be startup-driven via lifespan.
+- Use pluggy-based registration for package capabilities.
+- Use startup-driven filesystem discovery (`auto_discover_plugins`) as the canonical way to register packages.
+- Never perform plugin registration at import time (no side-effecting code in `__init__.py` bodies).
+- Design all new packages to be plugin-registerable from day one.
 
----
+## Working Modes
 
-## Validation
+### Architecture Mode
 
-```bash
-cd /workspace/app
-mypy . && flake8 . && black --check . && pytest tests/ -v
-black .  # Fix formatting
-```
+Use when requirements are unclear, when introducing/refactoring patterns, or before major implementation.
 
-Run after 3-5 changes, before PR/complete.
+Required behavior:
 
----
+- Architect first, then implement.
+- Research best practices in isolation from current code.
+- Ask clarifying questions before proposing implementation.
+- Produce explicit decisions: context, alternatives, tradeoffs, chosen option, risks, test strategy.
+- Define acceptance criteria before coding begins.
 
-## Module Structure
+### Implementation Mode
 
-```
-modules/feature/
-├── schemas.py controllers.py service.py
-├── validation.py responses.py
-├── providers/ tests/
-```
+Use when architecture and acceptance criteria are clear.
 
----
+Required behavior:
 
-## Skills Documentation
+- Follow TDD loop: write or update failing tests first, implement, then iterate to green.
+- Keep changes scoped to the agreed architecture.
+- Maintain strict typing and predictable async behavior.
+- Run validations after every 3-5 meaningful changes and before completion.
+- Prefer reusable prompt files for recurring workflows under `.github/prompts/*.prompt.md`.
 
-Detailed patterns with code examples and checklists:
+## Testing Placement and Naming
 
-1. **[imports-pattern.md](./skills/imports-pattern.md)** ⚠️ TOP PRIORITY
-2. **[settings-singleton.md](./skills/settings-singleton.md)**
-3. **[logging-pattern.md](./skills/logging-pattern.md)**
-4. **[provider-pattern.md](./skills/provider-pattern.md)**
-5. **[initialization-pattern.md](./skills/initialization-pattern.md)**
-6. **[no-async-pattern.md](./skills/no-async-pattern.md)**
-7. **[type-hints-pattern.md](./skills/type-hints-pattern.md)**
-8. **[testing-pattern.md](./skills/testing-pattern.md)**
-9. **[type-model-boundaries-pattern.md](./skills/type-model-boundaries-pattern.md)**
+- Place tests in `app/tests/` only.
+- Use feature-prefix names (for example, `test_groups_routes.py`, `test_identity_resolver.py`).
+- Avoid ambiguous test file names such as `test_routes.py`.
+- For FastAPI route changes, include success and error-mapping path coverage.
 
-**Read skills before implementing patterns.**
+## Request Context and Logging
 
----
+- Prefer `structlog.contextvars` middleware binding for request context propagation.
+- Avoid threading `request_id` through every signature unless crossing boundaries that require explicit values.
 
-## Workflow Guides
+## OpenAPI and Route Metadata
 
-Process and planning documentation (optional reference):
+- Router declarations should include exactly one tag.
+- Route handlers should include concise summary/description and explicit response mapping.
+- Public schema fields should include clear field descriptions.
 
-- **[Implementation Planning](workflows/implementation-planning.md)** - Feature development workflow
+## Mandatory Generation Patterns (Every Change)
+
+- Imports: explicit, minimal, no unused imports.
+- Settings/config: centralized, typed, no ad-hoc constants scattered in code.
+- Logging: structured, contextual, no sensitive data leakage.
+- Async: non-blocking paths for I/O, explicit await boundaries, cancellation-aware patterns.
+- Types: type hints on public interfaces and internal service boundaries.
+- Errors: explicit domain/application boundaries and predictable API error mapping.
+
+## Tooling Policy
+
+- Use web search/fetch tooling for up-to-date best practices and documentation when making architectural or library decisions.
+- Use Bash for fast repository analysis; prefer `rg` and `rg --files`, fallback to `grep/find` if needed.
+- Use subagents for research/investigation/output-heavy tasks; keep main session focused on decisions and implementation.
+
+## Validation Policy
+
+Run these checks regularly (after each 3-5 edits and before completion):
+
+- `mypy`
+- `flake8`
+- `black --check .`
+- `pytest app/tests --ignore=app/tests/smoke`
+
+Do not run `app/tests/smoke/*` unless explicitly requested and required environment variables are configured.
+
+If a check fails, fix root causes before proceeding.
+
+## Git and File-Change Guardrail
+
+- Never run git commands unless the user explicitly requests a specific git task.
+- Never modify files unless explicitly asked for the task.
+- User controls all git operations manually.
+
+## Customization Paths
+
+- Always-on workspace instructions: `.github/copilot-instructions.md`.
+- Scoped instructions: `.github/instructions/*.instructions.md` with `applyTo` globs.
+- Skills: `.github/skills/<skill-name>/SKILL.md` where frontmatter `name` matches folder name in kebab-case.
+- Custom agents: `.github/agents/*.agent.md`.
+- Prompt files: `.github/prompts/*.prompt.md`.
+- Hooks: `.github/hooks/*.json`.
+- Workspace MCP configuration: `.vscode/mcp.json`.
+
+## Skill Promotion Rule
+
+When a best practice is repeatedly validated and stable, create/update a dedicated skill for it and reference that skill from architecture/implementation workflows.
