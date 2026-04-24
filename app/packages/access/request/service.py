@@ -495,7 +495,8 @@ class AccessRequestService:
                and publish access_request_approved.
 
         Returns:
-            OperationResult[AccessRequest] with updated state.
+            OperationResult[tuple[AccessRequest, List[ApprovalDecision]]] with
+            updated state and decision history.
         """
         log = self.logger.bind(
             request_id=request_id,
@@ -613,13 +614,13 @@ class AccessRequestService:
                 )
             )
             return OperationResult.success(
-                data=updated,
+                data=(updated, all_decisions),
                 message="Request approved and access provisioning triggered.",
             )
 
         log.info("access_request_decision_recorded", request_id=request_id)
         return OperationResult.success(
-            data=request,
+            data=(request, all_decisions),
             message="Approval recorded; waiting for additional approvers.",
         )
 
@@ -632,7 +633,8 @@ class AccessRequestService:
         """Record a rejection decision and close the request.
 
         Returns:
-            OperationResult[AccessRequest] with updated state.
+            OperationResult[tuple[AccessRequest, List[ApprovalDecision]]] with
+            updated state and decision history.
         """
         log = self.logger.bind(
             request_id=request_id,
@@ -641,7 +643,7 @@ class AccessRequestService:
         )
         log.info("access_request_rejection_started")
 
-        request, _ = self._repo.get_request_with_decisions(request_id)
+        request, decisions = self._repo.get_request_with_decisions(request_id)
         if request is None:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
@@ -677,6 +679,7 @@ class AccessRequestService:
             decided_at=now,
         )
         self._repo.save_decision(decision)
+        all_decisions = decisions + [decision]
 
         updated = replace(request, status="rejected", updated_at=now)
         self._repo.save_request(updated)
@@ -702,7 +705,7 @@ class AccessRequestService:
             )
         )
         return OperationResult.success(
-            data=updated,
+            data=(updated, all_decisions),
             message="Request rejected.",
         )
 
@@ -718,7 +721,8 @@ class AccessRequestService:
         Only the original requester (actor_email) may cancel.
 
         Returns:
-            OperationResult[AccessRequest] with updated state.
+            OperationResult[tuple[AccessRequest, List[ApprovalDecision]]] with
+            updated state and current decision history.
         """
         log = self.logger.bind(
             request_id=request_id,
@@ -727,7 +731,7 @@ class AccessRequestService:
         )
         log.info("access_request_cancellation_started")
 
-        request, _ = self._repo.get_request_with_decisions(request_id)
+        request, decisions = self._repo.get_request_with_decisions(request_id)
         if request is None:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
@@ -773,7 +777,7 @@ class AccessRequestService:
             )
         )
         return OperationResult.success(
-            data=updated,
+            data=(updated, decisions),
             message="Request cancelled.",
         )
 
@@ -798,7 +802,8 @@ class AccessRequestService:
             5. On failure: keep as ``failed``, save audit event, return transient error.
 
         Returns:
-            OperationResult[AccessRequest] with updated state.
+            OperationResult[tuple[AccessRequest, List[ApprovalDecision]]] with
+            updated state and current decision history.
         """
         log = self.logger.bind(
             request_id=request_id,
@@ -807,7 +812,7 @@ class AccessRequestService:
         )
         log.info("access_request_retry_started")
 
-        request, _ = self._repo.get_request_with_decisions(request_id)
+        request, decisions = self._repo.get_request_with_decisions(request_id)
         if request is None:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
@@ -894,7 +899,7 @@ class AccessRequestService:
             )
         )
         return OperationResult.success(
-            data=updated,
+            data=(updated, decisions),
             message="Retry succeeded. Access provisioning re-triggered.",
         )
 

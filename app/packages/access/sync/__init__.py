@@ -9,10 +9,10 @@ Exports the FastAPI router for registration in the main application.
 
 from pathlib import Path
 
-from infrastructure.events import register_event_handler
 from infrastructure.i18n.resources import I18nResourceSpec
-from infrastructure.services import hookimpl
+from infrastructure.services import get_event_dispatcher, hookimpl
 from packages.access.common.events import REQUEST_APPROVED
+from packages.access.common.providers import get_access_runtime_config
 from packages.access.sync.transport import slack
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
@@ -27,7 +27,6 @@ def register_slack_commands(provider) -> None:
     slack.register_commands(provider)
 
 
-@register_event_handler(REQUEST_APPROVED)
 def on_access_request_approved(event) -> None:
     """Trigger on-demand sync when an access request is approved."""
     get_access_sync_coordinator().sync_user(
@@ -35,6 +34,15 @@ def on_access_request_approved(event) -> None:
         platform=event.metadata.get("platform", ""),
         request_id=str(getattr(event, "correlation_id", "")),
     )
+
+
+def _register_request_handlers() -> None:
+    """Register request-approved handler once during startup warmup."""
+    dispatcher = get_event_dispatcher()
+    if on_access_request_approved not in dispatcher.get_handlers_for_event(
+        REQUEST_APPROVED
+    ):
+        dispatcher.register_handler(REQUEST_APPROVED)(on_access_request_approved)
 
 
 @hookimpl
@@ -61,6 +69,9 @@ def startup_warmup(logger) -> None:
         return
 
     try:
+        # Validate runtime config at startup to surface misconfiguration early.
+        get_access_runtime_config()
+        _register_request_handlers()
         get_access_sync_coordinator()
         logger.info("access_sync_providers_warmed")
     except Exception as exc:

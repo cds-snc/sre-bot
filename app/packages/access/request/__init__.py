@@ -8,9 +8,9 @@ Slack command and interaction registration are deferred to a later iteration
 pending a ``register_slack_interactions(bot)`` hookspec addition.
 """
 
-from infrastructure.events import register_event_handler
-from infrastructure.services import hookimpl
+from infrastructure.services import get_event_dispatcher, hookimpl
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
+from packages.access.common.providers import get_access_runtime_config
 from packages.access.request.providers import (
     get_access_request_service,
     get_access_request_settings,
@@ -24,16 +24,23 @@ def register_routes(app) -> None:
     app.include_router(access_requests_router, prefix="/api/v1")
 
 
-@register_event_handler(SYNC_COMPLETED)
 def on_sync_completed(event) -> None:
     """Advance the originating access request to 'completed' after a successful sync."""
     get_access_request_service().advance_from_sync_result(event)
 
 
-@register_event_handler(SYNC_FAILED)
 def on_sync_failed(event) -> None:
     """Advance the originating access request to 'failed' after a sync failure."""
     get_access_request_service().advance_from_sync_result(event)
+
+
+def _register_sync_event_handlers() -> None:
+    """Register sync result handlers once during startup warmup."""
+    dispatcher = get_event_dispatcher()
+    if on_sync_completed not in dispatcher.get_handlers_for_event(SYNC_COMPLETED):
+        dispatcher.register_handler(SYNC_COMPLETED)(on_sync_completed)
+    if on_sync_failed not in dispatcher.get_handlers_for_event(SYNC_FAILED):
+        dispatcher.register_handler(SYNC_FAILED)(on_sync_failed)
 
 
 @hookimpl
@@ -56,6 +63,9 @@ def startup_warmup(logger) -> None:
         return
 
     try:
+        # Fail fast on misconfigured runtime config sources.
+        get_access_runtime_config()
+        _register_sync_event_handlers()
         get_access_request_service()
         logger.info("access_requests_providers_warmed")
     except Exception as exc:

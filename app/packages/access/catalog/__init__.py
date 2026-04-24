@@ -6,6 +6,7 @@ interaction support is deferred to the next iteration.
 """
 
 from infrastructure.services import hookimpl
+from packages.access.common.providers import get_access_runtime_config
 from packages.access.catalog.providers import (
     get_catalog_service,
     get_catalog_settings,
@@ -36,6 +37,8 @@ def startup_warmup(logger) -> None:
         return
 
     try:
+        # Validate runtime config source at startup (fail-fast behavior).
+        get_access_runtime_config()
         get_catalog_service()
         logger.info("access_catalog_providers_warmed")
     except Exception as exc:

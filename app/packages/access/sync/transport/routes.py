@@ -16,8 +16,8 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, Security
 
 from infrastructure.identity.models import User
+from infrastructure.operations import OperationResult
 from infrastructure.services import get_current_user, get_idempotency_service
-from packages.access.sync.application import AccessSyncCoordinatorPort
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
@@ -37,7 +37,7 @@ from packages.access.sync.transport.ingress import (
 from packages.access.sync.presenters import to_http_status_response
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/access", tags=["Access Management"])
+router = APIRouter(prefix="/access", tags=["Access Sync"])
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +51,25 @@ class _AccessSyncSettingsPort(Protocol):
     enabled: bool
     job_ttl_seconds: int
     lock_stale_seconds: int
+
+
+class _AccessSyncCoordinatorPort(Protocol):
+    """Structural contract for coordinator methods consumed by routes."""
+
+    def sync_user(
+        self,
+        user_email: str,
+        platform: str,
+        dry_run: bool = False,
+        request_id: str = "",
+    ) -> OperationResult: ...
+
+    def sync_platform(
+        self,
+        platform: str,
+        dry_run: bool = False,
+        request_id: str = "",
+    ) -> OperationResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +106,7 @@ def sync_endpoint(
     request: AccessSyncRequest,
     response: Response,
     coordinator: Annotated[
-        AccessSyncCoordinatorPort, Depends(get_access_sync_coordinator)
+        _AccessSyncCoordinatorPort, Depends(get_access_sync_coordinator)
     ],
     settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
     current_user: Annotated[

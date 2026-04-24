@@ -1,0 +1,131 @@
+"""Unit tests for packages.access.sync package initialization behavior."""
+
+import importlib
+
+import pytest
+
+from infrastructure.events import clear_handlers, get_handlers_for_event
+from packages.access.common.events import REQUEST_APPROVED
+
+
+def _reload_sync_package():
+    module = importlib.import_module("packages.access.sync")
+    return importlib.reload(module)
+
+
+@pytest.mark.unit
+def test_sync_package_import_has_no_event_registration_side_effects():
+    clear_handlers()
+
+    _reload_sync_package()
+
+    assert get_handlers_for_event(REQUEST_APPROVED) == []
+
+
+@pytest.mark.unit
+def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeypatch):
+    clear_handlers()
+    sync_pkg = _reload_sync_package()
+
+    runtime_config_called = False
+    provider_warm_called = False
+
+    def _runtime_config() -> object:
+        nonlocal runtime_config_called
+        runtime_config_called = True
+        return object()
+
+    class _Settings:
+        enabled = True
+        reconciliation_enabled = False
+        reconciliation_schedule = "03:00"
+
+    def _warm_provider() -> object:
+        nonlocal provider_warm_called
+        provider_warm_called = True
+        return object()
+
+    monkeypatch.setattr(
+        sync_pkg, "get_access_runtime_config", _runtime_config, raising=False
+    )
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+    monkeypatch.setattr(sync_pkg, "get_access_sync_coordinator", _warm_provider)
+
+    sync_pkg.startup_warmup(
+        logger=type(
+            "L",
+            (),
+            {
+                "info": lambda *a, **k: None,
+                "warning": lambda *a, **k: None,
+                "error": lambda *a, **k: None,
+            },
+        )()
+    )
+
+    assert runtime_config_called is True
+    assert provider_warm_called is True
+    assert len(get_handlers_for_event(REQUEST_APPROVED)) == 1
+
+
+@pytest.mark.unit
+def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch):
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        enabled = True
+        reconciliation_enabled = False
+        reconciliation_schedule = "03:00"
+
+    class _Dispatcher:
+        def __init__(self) -> None:
+            self._handlers: dict[str, list[object]] = {}
+
+        def get_handlers_for_event(self, event_type: str):
+            return self._handlers.get(event_type, [])
+
+        def register_handler(self, event_type: str):
+            def _decorator(handler):
+                self._handlers.setdefault(event_type, []).append(handler)
+                return handler
+
+            return _decorator
+
+    dispatcher = _Dispatcher()
+
+    monkeypatch.setattr(sync_pkg, "get_access_runtime_config", lambda: object())
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+    monkeypatch.setattr(sync_pkg, "get_access_sync_coordinator", lambda: object())
+    monkeypatch.setattr(sync_pkg, "get_event_dispatcher", lambda: dispatcher)
+
+    # Enforce DI boundary: package code must not call module-level registration.
+    monkeypatch.setattr(
+        sync_pkg,
+        "register_event_handler",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("direct register_event_handler usage is forbidden")
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        sync_pkg,
+        "get_handlers_for_event",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("direct get_handlers_for_event usage is forbidden")
+        ),
+        raising=False,
+    )
+
+    sync_pkg.startup_warmup(
+        logger=type(
+            "L",
+            (),
+            {
+                "info": lambda *a, **k: None,
+                "warning": lambda *a, **k: None,
+                "error": lambda *a, **k: None,
+            },
+        )()
+    )
+
+    assert len(dispatcher.get_handlers_for_event(REQUEST_APPROVED)) == 1

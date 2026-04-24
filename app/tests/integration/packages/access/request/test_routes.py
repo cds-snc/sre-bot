@@ -152,7 +152,7 @@ def test_submit_request_raises_503_when_disabled():
 
 
 @pytest.mark.integration
-def test_submit_request_raises_422_on_permanent_error():
+def test_submit_request_raises_400_on_permanent_error():
     service = _FakeService(
         OperationResult.error(
             OperationStatus.PERMANENT_ERROR,
@@ -173,7 +173,7 @@ def test_submit_request_raises_422_on_permanent_error():
             settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
-    assert exc_info.value.status_code == 422
+    assert exc_info.value.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ def test_submit_request_raises_422_on_permanent_error():
 @pytest.mark.integration
 def test_approve_request_returns_response_on_success():
     request = _make_request(status="approved")
-    service = _FakeService(OperationResult.success(data=request))
+    service = _FakeService(OperationResult.success(data=(request, [])))
     body = ApproveRequestBody(comment="Looks good.")
 
     response = approve_request(
@@ -229,7 +229,7 @@ def test_approve_request_raises_404_on_not_found():
 @pytest.mark.integration
 def test_reject_request_returns_response_on_success():
     request = _make_request(status="rejected")
-    service = _FakeService(OperationResult.success(data=request))
+    service = _FakeService(OperationResult.success(data=(request, [])))
     body = RejectRequestBody(comment="Not needed.")
 
     response = reject_request(
@@ -244,7 +244,7 @@ def test_reject_request_returns_response_on_success():
 
 
 @pytest.mark.integration
-def test_reject_request_raises_422_on_invalid_state():
+def test_reject_request_raises_400_on_invalid_state():
     service = _FakeService(
         OperationResult.error(
             OperationStatus.PERMANENT_ERROR,
@@ -262,7 +262,7 @@ def test_reject_request_raises_422_on_invalid_state():
             settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
-    assert exc_info.value.status_code == 422
+    assert exc_info.value.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ def test_reject_request_raises_422_on_invalid_state():
 @pytest.mark.integration
 def test_cancel_request_returns_response_on_success():
     request = _make_request(status="cancelled")
-    service = _FakeService(OperationResult.success(data=request))
+    service = _FakeService(OperationResult.success(data=(request, [])))
     body = CancelRequestBody(comment="Changed my mind.")
 
     response = cancel_request(
@@ -338,7 +338,7 @@ def test_get_request_status_raises_404_on_missing():
 @pytest.mark.integration
 def test_retry_request_returns_approved_response_on_success():
     request = _make_request(status="approved")
-    service = _FakeService(OperationResult.success(data=request))
+    service = _FakeService(OperationResult.success(data=(request, [])))
     body = RetryRequestBody(comment="DWD scopes fixed.")
 
     response = retry_request(
@@ -354,7 +354,7 @@ def test_retry_request_returns_approved_response_on_success():
 
 
 @pytest.mark.integration
-def test_retry_request_raises_422_on_invalid_state():
+def test_retry_request_raises_400_on_invalid_state():
     service = _FakeService(
         OperationResult.error(
             OperationStatus.PERMANENT_ERROR,
@@ -372,7 +372,7 @@ def test_retry_request_raises_422_on_invalid_state():
             settings=_Settings(enabled=True),
             current_user=_make_user(email="approver@example.com"),
         )
-    assert exc_info.value.status_code == 422
+    assert exc_info.value.status_code == 400
 
 
 @pytest.mark.integration
