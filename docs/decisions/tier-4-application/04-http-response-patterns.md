@@ -136,3 +136,28 @@ def action_endpoint(request: ActionRequest, service: ...) -> ActionResponse:
 - ✅ Log at `error` level for 5xx, `warning` for 4xx
 - ❌ Do not inline the full status→code mapping in every handler
 - ❌ Do not expose stack traces or internal error codes in the HTTP response body
+
+---
+
+## RFC 7807 Problem Details
+
+**Decision**: Use the ad-hoc `{"error_code": "...", "message": "..."}` format internally. Adopt RFC 7807 Problem Details (`application/problem+json`) only if an external consumer (e.g. a Backstage plugin or partner API) explicitly requires it.
+
+[RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) defines a standard error envelope:
+
+```json
+{
+  "type": "https://sre-bot.example.com/errors/not-found",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "Group 'eng-oncall' does not exist.",
+  "instance": "/api/v1/groups/eng-oncall"
+}
+```
+
+If adopted, add `Content-Type: application/problem+json` to all error responses and define a `ProblemDetail` Pydantic model in `infrastructure/http/problem.py`.
+
+**Rules**:
+- ✅ Default to internal `{"error_code", "message"}` format for API consumers that are internal tools
+- ✅ Adopt RFC 7807 only when an external consumer declares a dependency on it
+- ❌ Do not mix formats within the same API version

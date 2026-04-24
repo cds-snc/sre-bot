@@ -52,7 +52,9 @@ def validate_jwt_token(
 - ✅ Keys are cached with `cache_jwk_set=True` — no round-trip per request
 - ✅ `validate_jwt_token` is a plain callable; it is not a FastAPI dependency
 - ✅ Error details from JWT libraries are never forwarded to callers (OWASP A02)
-- ❌ Never add `async def` to JWT functions
+- ✅ JWT functions are sync (`def`) — typically CPU-bound token validation, no I/O
+- ✅ For async routes, call sync JWT functions directly (FastAPI's thread pool handles them)
+- ❌ Never expose raw JWT exceptions to client (forbidden by OWASP A02)
 
 ---
 

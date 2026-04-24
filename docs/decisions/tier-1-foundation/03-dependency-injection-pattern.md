@@ -53,7 +53,7 @@ Rules:
 
 ## Dependency Type Aliases
 
-FastAPI dependency injection via `Annotated[T, Depends(get_X)]`.
+FastAPI dependency injection via `Annotated[T, Depends(get_X)]`. Works seamlessly with both sync and async handlers.
 
 ```python
 from typing import Annotated
@@ -64,6 +64,16 @@ from infrastructure.services.providers import get_settings, get_idempotency_serv
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_service)]
+
+# Use in sync handlers
+@router.post("/sync-endpoint")
+def sync_handler(settings: SettingsDep, service: IdempotencyServiceDep):
+    return service.process(settings)
+
+# Use in async handlers — same aliases work
+@router.post("/async-endpoint")
+async def async_handler(settings: SettingsDep, service: IdempotencyServiceDep):
+    return service.process(settings)
 ```
 
 **Anti-patterns**:

@@ -41,6 +41,23 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 - ✅ Error handling near application core
 - ❌ Don't reorder without understanding impact
 
+> **`BaseHTTPMiddleware` performance caveat**: `app.add_middleware(SomeMiddleware)` uses Starlette's `BaseHTTPMiddleware` by default. This wraps the ASGI app in a way that buffers the full response body for streaming responses, causing measurable overhead on large payloads. For simple request/response interception (e.g. adding headers, logging) it is acceptable. For high-throughput or streaming paths, prefer a pure ASGI middleware:
+>
+> ```python
+> class RequestIdMiddleware:
+>     def __init__(self, app):
+>         self.app = app
+>
+>     async def __call__(self, scope, receive, send):
+>         if scope["type"] == "http":
+>             import uuid, structlog
+>             request_id = scope.get("headers", {}).get(b"x-request-id", str(uuid.uuid4()).encode()).decode()
+>             structlog.contextvars.bind_contextvars(request_id=request_id)
+>         await self.app(scope, receive, send)
+>
+> app.add_middleware(RequestIdMiddleware)  # Pure ASGI, no buffering
+> ```
+
 ---
 
 ## Custom Error Handlers

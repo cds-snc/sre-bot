@@ -177,3 +177,112 @@ def test_with_patch(mock_list):
 - ✅ Use `monkeypatch.setattr()` for mocking
 - ✅ No manual cleanup needed
 - ❌ Avoid `@patch` decorators in new tests
+
+---
+
+## lru_cache Teardown
+
+**Decision**: Always clear provider `@lru_cache` singletons in test teardown alongside `dependency_overrides`.
+
+`dependency_overrides` intercepts FastAPI's `Depends()` resolution but does **not** clear the underlying `@lru_cache`. If a provider executes before the override is set, the cached singleton persists for the remainder of the test session and contaminates subsequent tests.
+
+```python
+# tests/conftest.py
+import pytest
+from infrastructure.services.providers import (
+    get_settings,
+    get_idempotency_service,
+    get_aws_clients,
+    # ... add every provider used in tests
+)
+
+@pytest.fixture(autouse=True)
+def clear_provider_caches():
+    """Clear all @lru_cache provider singletons before and after every test."""
+    get_settings.cache_clear()
+    get_idempotency_service.cache_clear()
+    get_aws_clients.cache_clear()
+    yield
+    get_settings.cache_clear()
+    get_idempotency_service.cache_clear()
+    get_aws_clients.cache_clear()
+```
+
+Combined with dependency overrides:
+
+```python
+def test_endpoint_with_overrides(mock_settings):
+    app.dependency_overrides[get_settings] = lambda: mock_settings
+    try:
+        client = TestClient(app)
+        response = client.get("/api/v1/example")
+        assert response.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        get_settings.cache_clear()  # \u274c Without this, the real singleton may survive
+```
+
+**Rules**:
+- ✅ Add every `@lru_cache` provider to the `clear_provider_caches` autouse fixture
+- ✅ Clear both before and after each test (pre-clear eliminates state from non-test imports)
+- ✅ Clear `dependency_overrides` and provider caches together in `finally` blocks
+- ❌ Never rely on `dependency_overrides` alone when providers may already be cached
+
+---
+
+## Async Testing Pattern
+
+**Decision**: Use `httpx.AsyncClient` with `anyio` for async route handlers and async services.
+
+`TestClient` wraps the ASGI app in a synchronous thread and can mask async-specific bugs (cancellation, `contextvars` propagation, task leaks). Use `AsyncClient` to test async paths faithfully.
+
+**Setup** (`pytest.ini` or `pyproject.toml`):
+```ini
+[pytest]
+anyio_mode = auto
+```
+
+**Async test fixture**:
+```python
+# tests/conftest.py
+import pytest
+import httpx
+from httpx import AsyncClient
+from asgi_lifespan import LifespanManager
+from server.main import app
+
+@pytest.fixture
+async def async_client():
+    """Async HTTP client running full ASGI lifespan."""
+    async with LifespanManager(app):
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            yield client
+```
+
+**Usage**:
+```python
+import pytest
+
+@pytest.mark.anyio
+async def test_async_endpoint(async_client: AsyncClient):
+    response = await async_client.post(
+        "/api/v1/groups/add",
+        json={"group_id": "123", "member_email": "user@example.com"},
+    )
+    assert response.status_code == 200
+```
+
+**When to use each client**:
+
+| Scenario | Use |
+|---|---|
+| Sync route handlers, simple integration tests | `TestClient` |
+| Async route handlers, cancellation, `contextvars` propagation | `AsyncClient` + `anyio` |
+| Background task or scheduler behaviour | `AsyncClient` + `anyio` |
+
+**Rules**:
+- ✅ Use `anyio_mode = auto` in `pytest.ini` to avoid per-test `@pytest.mark.anyio`
+- ✅ Wrap app in `LifespanManager` so startup/shutdown hooks run in async tests
+- ✅ Use `async_client` fixture pattern for reuse across test modules
+- ✅ Add `httpx` and `anyio` and `asgi-lifespan` to `requirements_dev.txt`
+- ❌ Do not use `TestClient` to test async routes that use `contextvars` or task groups
