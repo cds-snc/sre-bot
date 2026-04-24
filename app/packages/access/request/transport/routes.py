@@ -18,7 +18,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Security
 
 from infrastructure.identity.models import User
-from infrastructure.operations import OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.services import get_current_user
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.providers import (
@@ -35,7 +35,6 @@ from packages.access.request.schemas import (
     SubmitAccessRequestBody,
     SubmitAccessRequestResponse,
 )
-from packages.access.request.service import AccessRequestServicePort
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access/requests", tags=["Access Requests"])
@@ -45,6 +44,56 @@ class _AccessRequestSettingsPort(Protocol):
     """Structural contract for settings consumed by route handlers."""
 
     enabled: bool
+
+
+class _AccessRequestServicePort(Protocol):
+    """Structural contract for service methods consumed by route handlers."""
+
+    def submit_request(
+        self,
+        user_email: str,
+        actor_email: str,
+        actor_type: str,
+        request_type: str,
+        platform: str,
+        group_slug: str,
+        entitlement_type: str,
+        justification: str,
+        ticket_id: str | None = None,
+    ) -> OperationResult[AccessRequest]: ...
+
+    def approve_request(
+        self,
+        request_id: str,
+        approver_email: str,
+        comment: str = "",
+    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+
+    def reject_request(
+        self,
+        request_id: str,
+        approver_email: str,
+        comment: str,
+    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+
+    def cancel_request(
+        self,
+        request_id: str,
+        actor_email: str,
+        comment: str = "",
+    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+
+    def retry_request(
+        self,
+        request_id: str,
+        actor_email: str,
+        comment: str = "",
+    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+
+    def get_request_status(
+        self,
+        request_id: str,
+    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +106,7 @@ def _map_status(status: OperationStatus) -> int:
     if status == OperationStatus.NOT_FOUND:
         return 404
     if status == OperationStatus.PERMANENT_ERROR:
-        return 422
+        return 400
     if status == OperationStatus.TRANSIENT_ERROR:
         return 503
     if status == OperationStatus.UNAUTHORIZED:
@@ -118,7 +167,7 @@ def _build_request_response(
 )
 def submit_request(
     body: SubmitAccessRequestBody,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],
@@ -180,7 +229,7 @@ def submit_request(
 def approve_request(
     request_id: str,
     body: ApproveRequestBody,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],
@@ -215,8 +264,7 @@ def approve_request(
 
     if result.data is None:
         raise HTTPException(status_code=500, detail="Internal server error.")
-    request: AccessRequest = result.data
-    decisions: List[ApprovalDecision] = []
+    request, decisions = result.data
     return _build_request_response(request, decisions)
 
 
@@ -228,7 +276,7 @@ def approve_request(
 def reject_request(
     request_id: str,
     body: RejectRequestBody,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],
@@ -263,8 +311,8 @@ def reject_request(
 
     if result.data is None:
         raise HTTPException(status_code=500, detail="Internal server error.")
-    request: AccessRequest = result.data
-    return _build_request_response(request, [])
+    request, decisions = result.data
+    return _build_request_response(request, decisions)
 
 
 @router.post(
@@ -275,7 +323,7 @@ def reject_request(
 def cancel_request(
     request_id: str,
     body: CancelRequestBody,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],
@@ -310,8 +358,8 @@ def cancel_request(
 
     if result.data is None:
         raise HTTPException(status_code=500, detail="Internal server error.")
-    request: AccessRequest = result.data
-    return _build_request_response(request, [])
+    request, decisions = result.data
+    return _build_request_response(request, decisions)
 
 
 @router.post(
@@ -328,7 +376,7 @@ def cancel_request(
 def retry_request(
     request_id: str,
     body: RetryRequestBody,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],
@@ -363,8 +411,8 @@ def retry_request(
 
     if result.data is None:
         raise HTTPException(status_code=500, detail="Internal server error.")
-    request: AccessRequest = result.data
-    return _build_request_response(request, [])
+    request, decisions = result.data
+    return _build_request_response(request, decisions)
 
 
 @router.get(
@@ -374,7 +422,7 @@ def retry_request(
 )
 def get_request_status(
     request_id: str,
-    service: Annotated[AccessRequestServicePort, Depends(get_access_request_service)],
+    service: Annotated[_AccessRequestServicePort, Depends(get_access_request_service)],
     settings: Annotated[
         _AccessRequestSettingsPort, Depends(get_access_request_settings)
     ],

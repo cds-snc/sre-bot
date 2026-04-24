@@ -350,7 +350,11 @@ def test_approve_request_should_transition_to_approved():
     )
 
     assert result.is_success
-    assert result.data.status == "approved"
+    assert result.data is not None
+    updated, decisions = result.data
+    assert updated.status == "approved"
+    assert len(decisions) == 1
+    assert decisions[0].decision == "approved"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" in event_types
 
@@ -546,7 +550,11 @@ def test_reject_request_should_transition_to_rejected():
     )
 
     assert result.is_success
-    assert result.data.status == "rejected"
+    assert result.data is not None
+    updated, decisions = result.data
+    assert updated.status == "rejected"
+    assert len(decisions) == 1
+    assert decisions[0].decision == "rejected"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_requests.request_rejected" in event_types
 
@@ -578,7 +586,10 @@ def test_cancel_request_should_transition_to_cancelled():
     )
 
     assert result.is_success
-    assert result.data.status == "cancelled"
+    assert result.data is not None
+    updated, decisions = result.data
+    assert updated.status == "cancelled"
+    assert decisions == []
 
 
 @pytest.mark.unit
@@ -767,6 +778,10 @@ def test_retry_request_should_succeed_and_transition_to_approved():
     )
 
     assert result.is_success
+    assert result.data is not None
+    updated, decisions = result.data
+    assert updated.status == "approved"
+    assert decisions == []
     assert repo._store[request_id].status == "approved"
     assert any(
         e.event_type == "access_requests.request_approved"
@@ -1016,7 +1031,11 @@ def test_revoke_approve_calls_remove_group_member():
     )
 
     assert result.is_success
-    assert result.data.status == "approved"
+    assert result.data is not None
+    updated, decisions = result.data
+    assert updated.status == "approved"
+    assert len(decisions) == 1
+    assert decisions[0].decision == "approved"
     directory.remove_group_member.assert_called_once_with(
         "sg-aws-admins@example.com", "user@example.com"
     )

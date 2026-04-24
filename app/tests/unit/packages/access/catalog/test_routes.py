@@ -150,7 +150,27 @@ def test_list_platforms_should_return_500_when_service_fails():
             current_user=_make_user(),
         )
 
-    assert exc_info.value.status_code == 500
+    assert exc_info.value.status_code == 400
+
+
+def test_list_platforms_should_return_404_when_service_returns_not_found():
+    # Arrange
+    service = _FakeCatalogService(
+        platforms_result=OperationResult.error(
+            OperationStatus.NOT_FOUND,
+            message="no configured platforms",
+        )
+    )
+
+    # Act / Assert
+    with pytest.raises(HTTPException) as exc_info:
+        list_platforms(
+            service=service,
+            settings=_FakeSettings(),
+            current_user=_make_user(),
+        )
+
+    assert exc_info.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +283,7 @@ def test_list_entitlements_should_return_500_when_service_fails():
             current_user=_make_user(),
         )
 
-    assert exc_info.value.status_code == 500
+    assert exc_info.value.status_code == 400
 
 
 # ---------------------------------------------------------------------------

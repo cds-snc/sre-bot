@@ -15,7 +15,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Security
 
 from infrastructure.identity.models import User
-from infrastructure.operations import OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.services import get_current_user
 from packages.access.catalog.domain import EntitlementEntry, PlatformSummary
 from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
@@ -26,7 +26,6 @@ from packages.access.catalog.schemas import (
     PlatformListResponse,
     PlatformSummaryResponse,
 )
-from packages.access.catalog.service import CatalogServicePort
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access/catalog", tags=["Access Catalog"])
@@ -38,6 +37,31 @@ class _CatalogSettingsPort(Protocol):
     enabled: bool
 
 
+class _CatalogServicePort(Protocol):
+    """Structural contract for catalog service consumed by route handlers."""
+
+    def list_platforms(self) -> OperationResult[List[PlatformSummary]]: ...
+
+    def list_entitlements(
+        self,
+        platform: str,
+        user_email: str,
+    ) -> OperationResult[List[EntitlementEntry]]: ...
+
+
+def _map_status(status: OperationStatus) -> int:
+    """Map OperationStatus to stable HTTP status codes."""
+    if status == OperationStatus.NOT_FOUND:
+        return 404
+    if status == OperationStatus.PERMANENT_ERROR:
+        return 400
+    if status == OperationStatus.TRANSIENT_ERROR:
+        return 503
+    if status == OperationStatus.UNAUTHORIZED:
+        return 401
+    return 500
+
+
 @router.get(
     "",
     response_model=PlatformListResponse,
@@ -45,7 +69,7 @@ class _CatalogSettingsPort(Protocol):
     description="Return all platforms enrolled in the access management system.",
 )
 def list_platforms(
-    service: Annotated[CatalogServicePort, Depends(get_catalog_service)],
+    service: Annotated[_CatalogServicePort, Depends(get_catalog_service)],
     settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
     current_user: Annotated[
         User, Security(get_current_user, scopes=["sre-bot:access-catalog"])
@@ -62,7 +86,12 @@ def list_platforms(
         raise HTTPException(status_code=503, detail="Access Catalog is not enabled")
 
     result = service.list_platforms()
-    if not result.is_success or result.data is None:
+    if not result.is_success:
+        raise HTTPException(
+            status_code=_map_status(result.status),
+            detail=result.message or "Failed to retrieve platforms",
+        )
+    if result.data is None:
         raise HTTPException(status_code=500, detail="Failed to retrieve platforms")
 
     return PlatformListResponse(
@@ -81,7 +110,7 @@ def list_platforms(
 )
 def list_entitlements(
     platform: str,
-    service: Annotated[CatalogServicePort, Depends(get_catalog_service)],
+    service: Annotated[_CatalogServicePort, Depends(get_catalog_service)],
     settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
     current_user: Annotated[
         User, Security(get_current_user, scopes=["sre-bot:access-catalog"])
@@ -104,13 +133,8 @@ def list_entitlements(
     )
 
     if not result.is_success:
-        if result.status == OperationStatus.NOT_FOUND:
-            raise HTTPException(
-                status_code=404,
-                detail=result.message or f"Platform '{platform}' not found",
-            )
         raise HTTPException(
-            status_code=500,
+            status_code=_map_status(result.status),
             detail=result.message or "Failed to retrieve entitlements",
         )
 
