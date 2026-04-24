@@ -4,48 +4,94 @@
 
 ## The Problem
 
-Two patterns emerged:
+Three patterns emerged during development:
 
-**Option 1: Import-Time Auto-Discovery** (❌ Rejected)
+---
+
+**Option 1: Module-Body Side Effects** (❌ Rejected)
 ```python
 # packages/geolocate/interactions/slack.py
 from infrastructure.interactions import get_slack_provider
 slack = get_slack_provider()
-slack.register_command("geolocate", handler)  # Runs at import time - hidden!
+slack.register_command("geolocate", handler)  # Runs at import time — hidden!
 
 # main.py
 from infrastructure.interactions import discover_interaction_features
-discover_interaction_features()  # Imports all packages, triggers registration
+discover_interaction_features()  # Imports all packages, which triggers registration
 ```
 
-**Option 2: Explicit Registration via Pluggy** (✅ Chosen)
+The call to `slack.register_command(...)` executes as a side effect of the Python import system. This makes registration order dependent on import order and makes tests that mock providers extremely fragile.
+
+---
+
+**Option 2: Decorator-Based Self-Registration** (❌ Rejected — the subtler anti-pattern)
 ```python
-# packages/geolocate/__init__.py
-@hookimpl
-def register_slack_commands(provider):
-    """Explicitly register Slack commands."""
+# modules/groups/providers/google.py
+@register_primary_provider("google")       # ← executes when this class is defined
+class GoogleWorkspaceProvider(PrimaryGroupProvider):
+    ...
+
+# modules/groups/providers/__init__.py
+_primary_discovered: Dict[str, Type] = {}  # module-level mutable registry
+
+def register_primary_provider(name: str):
+    def decorator(cls):
+        _primary_discovered[name] = cls    # ← mutates global dict at import time
+        return cls
+    return decorator
+
+def load_providers():                      # called during startup
+    for module_info in pkgutil.iter_modules(__path__):
+        importlib.import_module(full_name) # ← triggers decorator side effects above
+    activate_providers()                   # reads _primary_discovered
+```
+
+This looks more structured, but the import-time mutation of `_primary_discovered` is the same fundamental problem as Option 1. Key problems:
+- `@register_primary_provider` mutates a module-level dict when the **class body is processed** — at import time
+- `load_providers()` deliberately imports modules to trigger these mutations
+- Each sub-system invents its own `_discovered` dict, `reset_registry()`, activation lifecycle, and validation rules
+- Tests require explicit `reset_registry()` teardown; missed teardown causes cross-test pollution
+- `load_providers()` couples discovery to `pkgutil.iter_modules` on a specific filesystem path — not pluggable
+
+This pattern is present in `modules/groups/providers/` and `infrastructure/commands/providers/` and is being superseded.
+
+---
+
+**Option 3: Pluggy + Startup-Driven Discovery** (✅ Chosen)
+```python
+# packages/geolocate/__init__.py  — @hookimpl is a metadata marker only, zero side effects
+from infrastructure.services import hookimpl
+
+@hookimpl                                  # ← only attaches metadata to the function
+def register_slack_commands(provider):     # no dict mutation, no external calls
     provider.register_command("geolocate", handler)
 
-# main.py
-discover_and_register_platforms(slack_provider=slack)  # Explicit invocation
+# infrastructure/services/plugins/manager.py  — scanning happens during lifespan startup
+def collect_feature_i18n_resources(logger):
+    pm = get_plugin_manager()
+    auto_discover_plugins(pm, base_paths=["packages", "modules"])  # ← startup-time scan
+    pm.hook.register_i18n_resources(registry=registry)
 ```
 
-## Why Explicit is Better
+`@hookimpl` only stores metadata on the function object — no side effects. `auto_discover_plugins` performs the filesystem scan and calls `pm.register(module)` **during lifespan startup**, after the application is initializing but before it accepts requests.
 
-### Problems with Import-Time Auto-Discovery
+## Why Pluggy + Startup Discovery is Better
 
-❌ **Hidden Side Effects**: Module imports have invisible behavior; violates "explicit is better than implicit" (PEP 20)  
-❌ **Fragile**: Registration order depends on import order; circular dependency risk  
-❌ **Hard to Test**: Global side effects; difficult to isolate tests  
-❌ **No Control**: Cannot conditionally register based on runtime state  
-❌ **Inconsistent**: FastAPI uses explicit router inclusion; creates pattern inconsistency  
+### Problems with Options 1 and 2 (import-time side effects)
 
-### Advantages of Explicit Registration
+❌ **Hidden Mutations**: State changes during import make behavior depend on import order  
+❌ **Per-Subsystem Boilerplate**: Each service reinvents discovery, registration, activation, and reset  
+❌ **Test Pollution**: Module-level dicts persist across tests; `reset_registry()` must be called explicitly  
+❌ **Fragile Isolation**: A missed `reset_registry()` in teardown silently passes wrong state to the next test  
+❌ **Not Pluggable**: `pkgutil.iter_modules` on a hardcoded path cannot be overridden or composed  
 
-✅ **Clear Execution**: Registration called explicitly: `discover_and_register_platforms(provider)`  
-✅ **Testable**: Easy to invoke in isolation; no global state pollution  
-✅ **Configurable**: Can conditionally register based on config  
-✅ **Type-Safe**: Hook specs define expected signatures; IDE support  
+### Advantages of Option 3
+
+✅ **No Import-Time Side Effects**: `@hookimpl` is a marker; the module can be imported safely in any order  
+✅ **Single Mechanism**: All services share pluggy's PluginManager — one discovery engine, one set of rules  
+✅ **Testable**: Override providers with `dependency_overrides`; no `reset_registry()` needed  
+✅ **Startup-Explicit**: Discovery is visibly invoked in lifespan; nothing hidden in module init  
+✅ **Zero-Touch Extension**: Add a new `packages/` directory — nothing else changes  
 ✅ **Battle-Tested**: Pluggy powers pytest (1400+ plugins); industry proven  
 
 ## Implementation
@@ -120,29 +166,56 @@ def register_slack_commands(provider):
     slack_register(provider)
 ```
 
-### 4. Application Startup
+### 4. Application Startup (lifespan)
+
+Feature packages must be registered with the plugin manager **before** hooks are invoked. The canonical approach is **startup-driven discovery**: `auto_discover_plugins` scans `packages/` and `modules/` once at lifespan startup and calls `pm.register(module)` for every discovered package. Adding a new package requires **no changes to lifespan code**.
 
 ```python
-# main.py
-from infrastructure.services import discover_and_register_platforms
+# app/server/lifespan.py
+from infrastructure.services.plugins.manager import (
+    collect_feature_i18n_resources,
+    register_feature_integrations,
+)
 from infrastructure.platforms import get_slack_provider, get_teams_provider
 
-settings = get_settings()
+async def startup(app):
+    # ✅ startup-driven discovery: auto_discover_plugins runs inside this call
+    # all packages/ and modules/ packages with @hookimpl are registered automatically
+    i18n_registry = collect_feature_i18n_resources(logger=logger)
+    # ✅ pm.check_pending() should be called after discovery to validate hookimpls
 
-# Explicit registration
-discover_and_register_platforms(
-    slack_provider=get_slack_provider() if settings.slack.enabled else None,
-    teams_provider=get_teams_provider() if settings.teams.enabled else None,
-)
+    settings = get_settings()
+    # ✅ keyword arguments only when calling hooks
+    register_feature_integrations(
+        app=app,
+        logger=logger,
+        slack_provider=get_slack_provider() if settings.slack.enabled else None,
+        teams_provider=get_teams_provider() if settings.teams.enabled else None,
+    )
+```
+
+New feature package — zero-touch registration:
+```python
+# packages/newfeature/__init__.py  — this is all that's needed
+from infrastructure.services import hookimpl
+from packages.newfeature.interactions.http import router
+
+@hookimpl
+def register_routes(app):
+    app.include_router(router)
 ```
 
 ## Rules
 
 - ✅ Hook specs define extension points (what can be extended)
+- ✅ `add_hookspecs()` called **before** any `register()` call — enables immediate hookimpl validation
 - ✅ Plugin manager created once via `@lru_cache(maxsize=1)` (singleton)
-- ✅ Feature packages use `@hookimpl` decorators
-- ✅ Registration invoked explicitly in application startup
-- ✅ Auto-discover implementations but explicit invoke registration
-- ❌ Never register at import time
+- ✅ Use `auto_discover_plugins` for startup-driven discovery — packages self-register via `@hookimpl`; lifespan code does not need updating when new packages are added
+- ✅ `pm.check_pending()` called after all registrations — raises `PluginValidationError` for unmatched hookimpls
+- ✅ Hooks called with **keyword arguments only** — pluggy raises `HookCallError` for positional args
+- ✅ Registration invoked during lifespan startup; never at import time
+- ✅ Use `@hookimpl(optionalhook=True)` for hookimpls that intentionally have no matching spec
+- ❌ Never register at import time — `__init__.py` must only define `@hookimpl` functions, no side-effecting calls
 - ❌ Never use global side effects from module imports
-- ❌ Never create new plugin manager per registration
+- ❌ Never create a new plugin manager per registration
+- ❌ Never call hooks with positional arguments
