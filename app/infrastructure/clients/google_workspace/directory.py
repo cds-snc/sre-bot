@@ -699,6 +699,54 @@ class DirectoryClient:
             )
         return result
 
+    def list_user_groups(
+        self,
+        user_key: str,
+        delegated_email: Optional[str] = None,
+    ) -> OperationResult:
+        """List all groups a user is a direct member of.
+
+        Uses ``groups.list(userKey=...)`` — the inverse group lookup — to return
+        every group the user belongs to in a single paginated call.  This is
+        intentionally separate from ``list_groups`` because the Google API does
+        not allow ``customer`` and ``userKey`` to be combined.
+
+        Note: Returns *direct* memberships only.  Transitive membership through
+        nested sub-groups is not expanded.  Managed ``sg-*`` security groups
+        controlled by this bot use flat membership, so this is safe for the
+        single-user sync hot path.
+
+        Args:
+            user_key: User's primary email address (normalised to lowercase).
+            delegated_email: Email for domain-wide delegation.
+
+        Returns:
+            OperationResult with list of group dicts in data field.
+        """
+        self._logger.debug("listing_user_groups", user_key=user_key)
+
+        def api_call() -> list[dict[str, Any]]:
+            service = self._session_provider.get_service(
+                "admin",
+                "directory_v1",
+                scopes=[
+                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
+                ],
+                delegated_user_email=delegated_email,
+            )
+
+            all_groups: list[dict[str, Any]] = []
+            request = service.groups().list(userKey=user_key)
+
+            while request is not None:
+                response = request.execute()
+                all_groups.extend(response.get("groups", []))
+                request = service.groups().list_next(request, response)
+
+            return all_groups
+
+        return execute_google_api_call("list_user_groups", api_call)
+
     def get_batch_members_for_user(
         self,
         group_keys: list[str],

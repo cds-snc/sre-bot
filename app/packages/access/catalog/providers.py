@@ -10,9 +10,6 @@ module scope — never bypass providers.
 from functools import lru_cache
 from typing import Dict
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from infrastructure.services import get_directory_provider
 from packages.access.catalog.parsers import (
     AwsCatalogSlugParser,
@@ -20,32 +17,13 @@ from packages.access.catalog.parsers import (
     FallbackCatalogSlugParser,
 )
 from packages.access.catalog.service import CatalogService
-from packages.access.sync.providers import get_access_runtime_config
+from packages.access.common.providers import get_access_runtime_config
+from packages.access.common.settings import AccessCatalogSettings, get_access_settings
 
 
-class CatalogSettings(BaseSettings):
-    """Bootstrap settings for Access Catalog.
-
-    Environment Variables:
-        ACCESS_CATALOG_ENABLED: Master on/off switch. Default: false.
-    """
-
-    enabled: bool = Field(
-        default=False,
-        alias="ACCESS_CATALOG_ENABLED",
-    )
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
-
-
-@lru_cache(maxsize=1)
-def get_catalog_settings() -> CatalogSettings:
-    """Return the singleton CatalogSettings instance."""
-    return CatalogSettings()
+def get_catalog_settings() -> AccessCatalogSettings:
+    """Return the catalog settings slice from the unified access settings."""
+    return get_access_settings().catalog
 
 
 @lru_cache(maxsize=1)

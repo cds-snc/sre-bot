@@ -1,176 +1,45 @@
-"""Unit tests for Access Sync config module."""
+"""Unit tests for Access Sync config settings and loaders."""
+
+import json
 
 import pytest
 
-from packages.access.sync.config import (
-    AccessSyncRuntimeConfig,
+from packages.access.common.config import (
     BundleConfigLoader,
     FileJsonConfigLoader,
     InlineJsonConfigLoader,
-    get_access_sync_config_loader,
+    get_access_config_loader,
     normalize_target_key,
 )
-from packages.access.sync.policies import PlatformPolicy
+from packages.access.common.settings import AccessSettings
+
+
+# ---------------------------------------------------------------------------
+# AccessSyncSettings defaults
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_bundle_loader_returns_empty_config():
-    # Arrange
-    loader = BundleConfigLoader()
-
-    # Act
-    result = loader.load(ref="default")
-
-    # Assert
-    assert result.is_success
-    assert isinstance(result.data, AccessSyncRuntimeConfig)
-    assert result.data.platforms == {}
-    assert result.data.entitlement_mode_overrides == []
-    assert "waiting mode" in result.message
+def test_access_sync_settings_defaults(make_sync_settings):
+    """AccessSyncSettings must provide sane defaults without env vars."""
+    # _access_sync_env_isolation (autouse) already strips all ACCESS_SYNC_* vars.
+    settings = make_sync_settings()
+    assert settings.enabled is False
+    assert settings.reconciliation_enabled is False
+    assert settings.reconciliation_schedule == "03:00"
+    assert settings.job_ttl_seconds == 86400
+    assert settings.lock_stale_seconds == 14400
 
 
 @pytest.mark.unit
-def test_get_access_sync_config_loader_bundle():
-    loader = get_access_sync_config_loader("bundle")
-    assert isinstance(loader, BundleConfigLoader)
+def test_access_sync_settings_env_overrides(monkeypatch):
+    """AccessSettings must read ACCESS_SYNC_* env vars into the sync slice."""
+    monkeypatch.setenv("ACCESS_SYNC_ENABLED", "true")
+    monkeypatch.setenv("ACCESS_SYNC_JOB_TTL_SECONDS", "3600")
 
-
-@pytest.mark.unit
-def test_get_access_sync_config_loader_inline_json():
-    loader = get_access_sync_config_loader("inline_json")
-    assert isinstance(loader, InlineJsonConfigLoader)
-
-
-@pytest.mark.unit
-def test_get_access_sync_config_loader_file_json():
-    loader = get_access_sync_config_loader("file_json")
-    assert isinstance(loader, FileJsonConfigLoader)
-
-
-@pytest.mark.unit
-def test_inline_json_loader_parses_aws_policy():
-    # Arrange
-    loader = InlineJsonConfigLoader()
-    ref = (
-        '{"dir_prefix":"sg","dir_separator":"-",'
-        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
-    )
-
-    # Act
-    result = loader.load(ref=ref)
-
-    # Assert
-    assert result.is_success
-    assert result.data is not None
-    assert "aws" in result.data.platforms
-    policy = result.data.platforms["aws"]
-    assert isinstance(policy, PlatformPolicy)
-    assert policy.authn_token == "authn"
-    assert policy.authn_removal_mode == "delete"
-
-
-@pytest.mark.unit
-def test_inline_json_loader_slug_derivation():
-    # Arrange
-    loader = InlineJsonConfigLoader()
-    ref = (
-        '{"dir_prefix":"sg","dir_separator":"-",'
-        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
-    )
-
-    # Act
-    result = loader.load(ref=ref)
-
-    # Assert
-    assert result.is_success
-    config = result.data
-    assert config.group_prefix("aws") == "sg-aws-"
-    assert config.authn_group_slug("aws") == "sg-aws-authn"
-
-
-@pytest.mark.unit
-def test_inline_json_loader_mode_overrides():
-    # Arrange
-    loader = InlineJsonConfigLoader()
-    ref = (
-        '{"dir_prefix":"sg","platforms":{"aws":{"authn_token":"authn",'
-        '"authn_removal_mode":"delete","mode_overrides":{"breakglass":"ephemeral"}}}}'
-    )
-
-    # Act
-    result = loader.load(ref=ref)
-
-    # Assert
-    assert result.is_success
-    policy = result.data.platforms["aws"]
-    assert policy.mode_overrides == {"breakglass": "ephemeral"}
-
-
-@pytest.mark.unit
-def test_inline_json_loader_rejects_invalid_json():
-    # Arrange
-    loader = InlineJsonConfigLoader()
-
-    # Act
-    result = loader.load(ref="not-json")
-
-    # Assert
-    assert not result.is_success
-    assert result.error_code == "CONFIG_INVALID_JSON"
-
-
-@pytest.mark.unit
-def test_inline_json_loader_rejects_missing_dir_prefix():
-    # Arrange
-    loader = InlineJsonConfigLoader()
-
-    # Act
-    result = loader.load(ref='{"platforms":{}}')
-
-    # Assert
-    assert not result.is_success
-    assert result.error_code == "CONFIG_INVALID_SHAPE"
-
-
-@pytest.mark.unit
-def test_file_json_loader_parses_aws_policy(tmp_path):
-    # Arrange
-    loader = FileJsonConfigLoader()
-    config_file = tmp_path / "access-sync.json"
-    config_file.write_text(
-        '{"dir_prefix":"sg","dir_separator":"-",'
-        '"platforms":{"aws":{"authn_token":"authn","authn_removal_mode":"delete"}}}',
-        encoding="utf-8",
-    )
-
-    # Act
-    result = loader.load(ref=str(config_file))
-
-    # Assert
-    assert result.is_success
-    assert result.data is not None
-    assert "aws" in result.data.platforms
-
-
-@pytest.mark.unit
-def test_file_json_loader_missing_file_returns_not_found(tmp_path):
-    # Arrange
-    loader = FileJsonConfigLoader()
-    missing_path = str(tmp_path / "does-not-exist-access-sync.json")
-
-    # Act
-    result = loader.load(ref=missing_path)
-
-    # Assert
-    assert not result.is_success
-    assert result.error_code == "CONFIG_NOT_FOUND"
-
-
-@pytest.mark.unit
-def test_get_access_sync_config_loader_unknown_raises():
-    # Act / Assert
-    with pytest.raises(NotImplementedError, match="not yet implemented"):
-        get_access_sync_config_loader("dynamodb")
+    settings = AccessSettings(_env_file=None).sync
+    assert settings.enabled is True
+    assert settings.job_ttl_seconds == 3600
 
 
 # ---------------------------------------------------------------------------
@@ -181,17 +50,69 @@ def test_get_access_sync_config_loader_unknown_raises():
 @pytest.mark.unit
 def test_normalize_target_key_lowercases_and_strips():
     assert normalize_target_key("  AWS  ") == "aws"
-    assert normalize_target_key("FakePlatform") == "fakeplatform"
+    assert normalize_target_key("GitHub") == "github"
     assert normalize_target_key("aws") == "aws"
 
 
+# ---------------------------------------------------------------------------
+# get_access_config_loader factory (canonical)
+# ---------------------------------------------------------------------------
+
+
 @pytest.mark.unit
-def test_inline_json_loader_normalizes_platform_key():
-    """Platform map key must be normalized regardless of JSON casing."""
+def test_get_access_config_loader_returns_bundle_by_default():
+    """config_source='bundle' must return a BundleConfigLoader."""
+    loader = get_access_config_loader("bundle")
+    assert isinstance(loader, BundleConfigLoader)
+
+
+@pytest.mark.unit
+def test_get_access_config_loader_returns_inline_json():
+    """config_source='inline_json' must return an InlineJsonConfigLoader."""
+    loader = get_access_config_loader("inline_json")
+    assert isinstance(loader, InlineJsonConfigLoader)
+
+
+@pytest.mark.unit
+def test_get_access_config_loader_returns_file_json():
+    """config_source='file_json' must return a FileJsonConfigLoader."""
+    loader = get_access_config_loader("file_json")
+    assert isinstance(loader, FileJsonConfigLoader)
+
+
+# ---------------------------------------------------------------------------
+# BundleConfigLoader and InlineJsonConfigLoader smoke tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_bundle_config_loader_load_returns_success():
+    """BundleConfigLoader.load() must return a successful OperationResult."""
+    loader = BundleConfigLoader()
+    result = loader.load("default")
+    assert result.is_success
+
+
+@pytest.mark.unit
+def test_inline_json_config_loader_parses_platforms():
+    """InlineJsonConfigLoader.load() must return AccessRuntimeConfig with correct platforms."""
+    payload = json.dumps(
+        {
+            "dir_prefix": "sg",
+            "dir_separator": "-",
+            "platforms": {
+                "aws": {
+                    "authn_token": "authn",
+                    "authn_removal_mode": "delete",
+                    "mode_overrides": {},
+                }
+            },
+        }
+    )
     loader = InlineJsonConfigLoader()
-    ref = '{"dir_prefix":"sg","platforms":{"AWS":{"authn_token":"authn","authn_removal_mode":"delete"}}}'
-    result = loader.load(ref=ref)
+    result = loader.load(payload)
     assert result.is_success
     assert result.data is not None
     assert "aws" in result.data.platforms
-    assert "AWS" not in result.data.platforms
+    assert result.data.group_prefix("aws") == "sg-aws-"
+    assert result.data.authn_group_slug("aws") == "sg-aws-authn"

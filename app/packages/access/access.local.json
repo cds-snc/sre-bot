@@ -3,6 +3,7 @@
   "dir_separator": "-",
   "platforms": {
     "aws": {
+      "adapter_type": "aws_identity_center",
       "authn_token": "authn",
       "authn_removal_mode": "delete",
       "mode_overrides": {

@@ -44,6 +44,9 @@ class GoogleDirectoryProvider:
         self._managed_group_domain = (
             directory_settings.managed_group_domain.strip().lower()
         )
+        self._managed_group_prefix = (
+            directory_settings.managed_group_prefix.strip().lower()
+        )
         self._logger = logger.bind(provider="google")
 
     def _normalize_email(self, value: str) -> str:
@@ -107,32 +110,44 @@ class GoogleDirectoryProvider:
         return aliases
 
     def _extract_managed_group_email(self, item: dict[str, Any]) -> str:
-        """Return the canonical managed-group email, preferring sg-* aliases."""
+        """Return the canonical managed-group email, preferring managed-prefix aliases."""
 
         primary_email = self._extract_email(item, "email", "groupEmail")
         aliases = self._extract_group_aliases(item)
 
-        for alias in aliases:
-            local_part, _, domain = alias.partition("@")
-            if not local_part.startswith("sg-"):
-                continue
-            if self._managed_group_domain and domain != self._managed_group_domain:
-                continue
-            return alias
+        if self._managed_group_prefix:
+            for alias in aliases:
+                local_part, _, domain = alias.partition("@")
+                if not local_part.startswith(self._managed_group_prefix):
+                    continue
+                if self._managed_group_domain and domain != self._managed_group_domain:
+                    continue
+                return alias
 
         return primary_email
 
     def _managed_group_query_prefix(self, query: str) -> str | None:
-        """Return a managed-group prefix for alias-aware discovery queries."""
+        """Return a managed-group prefix for alias-aware discovery queries.
 
+        Returns a prefix string when the query looks like a managed-group prefix
+        search (triggering a full-list + client-side alias filter instead of an
+        email-field query).  Returns ``None`` when no prefix is configured or the
+        query does not match the configured prefix.
+        """
+        if not self._managed_group_prefix:
+            return None
         normalized_query = query.strip().lower()
         if not normalized_query:
             return None
         if ":" not in normalized_query and "=" not in normalized_query:
-            return normalized_query if normalized_query.startswith("sg-") else None
+            return (
+                normalized_query
+                if normalized_query.startswith(self._managed_group_prefix)
+                else None
+            )
         if normalized_query.startswith("email:") and normalized_query.endswith("*"):
             prefix = normalized_query[len("email:") : -1]
-            return prefix if prefix.startswith("sg-") else None
+            return prefix if prefix.startswith(self._managed_group_prefix) else None
         return None
 
     def _matches_managed_group_prefix(self, item: dict[str, Any], prefix: str) -> bool:
@@ -432,6 +447,71 @@ class GoogleDirectoryProvider:
 
         return OperationResult.success(data=members)
 
+    def get_group_members_batch(
+        self,
+        group_keys: list[str],
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult[dict[str, list[DirectoryMember]]]:
+        """Return the member list for multiple groups in a single batch call.
+
+        Uses the Google Admin batch API so cost is one network round-trip
+        regardless of the number of groups.
+
+        Args:
+            group_keys: Canonical managed-group emails — normalised to lowercase.
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``). Defaults to no filtering.
+
+        Returns:
+            OperationResult: success with a dict mapping group_key to
+            DirectoryMember list.
+        """
+        if not group_keys:
+            return OperationResult.success(data={})
+
+        normalized_keys = [self._normalize_email(k) for k in group_keys]
+        result = self._directory.get_batch_group_members(normalized_keys)
+        if not result.is_success:
+            return self._typed_error(result)
+
+        if not isinstance(result.data, dict):
+            return OperationResult.permanent_error(
+                message="Batch directory members payload is not a dict",
+                error_code="DIRECTORY_BATCH_MEMBERS_PAYLOAD_INVALID",
+            )
+
+        allowed_member_types = None
+        if include_member_types is not None:
+            allowed_member_types = {
+                str(t).strip().upper() for t in include_member_types if str(t).strip()
+            }
+            if not allowed_member_types:
+                return OperationResult.permanent_error(
+                    message="include_member_types must contain at least one type",
+                    error_code="DIRECTORY_MEMBER_TYPES_INVALID",
+                )
+
+        batch_members: dict[str, list[DirectoryMember]] = {}
+        for group_key, raw_members in result.data.items():
+            members: list[DirectoryMember] = []
+            if isinstance(raw_members, list):
+                for item in raw_members:
+                    if not isinstance(item, dict):
+                        continue
+                    member_type = str(item.get("type") or "").strip().upper()
+                    if (
+                        allowed_member_types is not None
+                        and member_type
+                        and member_type not in allowed_member_types
+                    ):
+                        continue
+                    member = self._build_directory_member(item)
+                    if member is not None:
+                        members.append(member)
+            batch_members[group_key] = members
+
+        return OperationResult.success(data=batch_members)
+
     def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
         """Return a canonical managed group by key.
 
@@ -629,6 +709,60 @@ class GoogleDirectoryProvider:
                 return OperationResult.permanent_error(
                     message="Directory groups payload contains an invalid entry",
                     error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
+                )
+
+            group_result = self._build_directory_group(item)
+            if not group_result.is_success:
+                return self._typed_error(group_result)
+
+            if group_result.data is not None:
+                groups.append(group_result.data)
+
+        return OperationResult.success(data=groups)
+
+    def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
+        """Return all managed groups the user is a direct member of.
+
+        Uses ``groups.list(userKey=...)`` — the inverse group lookup — to fetch
+        every group the user belongs to in a single paginated call instead of
+        calling ``hasMember`` once per candidate group.
+
+        Only groups whose email matches the configured managed-group domain are
+        included in the result, so callers can safely compare ``group_slug``
+        values against effective policy slugs without domain-filtering.
+
+        Args:
+            user_email: Canonical user email, normalised to lowercase.
+
+        Returns:
+            OperationResult: success with the list of managed DirectoryGroup
+            the user belongs to.
+        """
+        log = self._logger.bind(operation="get_user_groups", user_email=user_email)
+        normalized_email = self._normalize_email(user_email)
+        result = self._directory.list_user_groups(normalized_email)
+        log.debug(
+            "list_user_groups_result",
+            success=result.is_success,
+            error=result.message,
+            data=result.data,
+        )
+        if not result.is_success:
+            log.error("list_user_groups_failed", error=result.message)
+            return self._typed_error(result)
+
+        if not isinstance(result.data, list):
+            return OperationResult.permanent_error(
+                message="Directory user groups payload is not a list",
+                error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
+            )
+
+        groups: list[DirectoryGroup] = []
+        for item in result.data:
+            if not isinstance(item, dict):
+                return OperationResult.permanent_error(
+                    message="Directory user groups payload contains an invalid entry",
+                    error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
                 )
 
             group_result = self._build_directory_group(item)

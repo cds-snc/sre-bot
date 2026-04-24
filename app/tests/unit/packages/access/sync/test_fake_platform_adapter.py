@@ -1,73 +1,115 @@
-"""Unit tests for fake non-AWS access sync adapter."""
+"""Unit tests for FakePlatformAdapter."""
 
 import pytest
 
-from infrastructure.operations import OperationStatus
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
+from packages.access.sync.domain import (
+    DesiredPlatformState,
+    DesiredUserState,
+    ReconciliationOutcome,
+    SyncOutcome,
+)
+from packages.access.sync.policies import PlanningContext
+
+_EFFECTIVE = PlanningContext(
+    platform="fake",
+    authn_removal_mode="delete",
+    entitlement_rules=[],
+)
 
 
 @pytest.mark.unit
 def test_fake_adapter_has_deterministic_seed_data():
-    """Adapter should expose sample users and group memberships."""
-    # Arrange
     adapter = FakePlatformAdapter()
-
-    # Act
     users_result = adapter.list_all_provisioned_users()
-    group_result = adapter.list_group_members("fake-group-admin")
-
-    # Assert
     assert users_result.is_success
     assert users_result.data == {
         "alice@example.com",
         "bob@example.com",
         "carol@example.com",
     }
-    assert group_result.is_success
-    assert group_result.data == {"alice@example.com", "carol@example.com"}
 
 
 @pytest.mark.unit
 def test_fake_adapter_apply_and_remove_group_entitlement_updates_state():
-    """Applying/removing group entitlement should change current entitlement IDs."""
-    # Arrange
     adapter = FakePlatformAdapter()
     user_email = "dana@example.com"
     group_id = "fake-group-read"
 
-    # Act
     apply_result = adapter.apply_entitlement(
         user_email=user_email,
         entitlement_type="group",
         entitlement_id=group_id,
     )
-    current_after_apply = adapter.get_current_entitlement_ids(user_email)
+    assert apply_result.is_success
+    assert user_email in adapter._members_by_group[group_id]
+
     remove_result = adapter.remove_entitlement(
         user_email=user_email,
         entitlement_type="group",
         entitlement_id=group_id,
     )
-    current_after_remove = adapter.get_current_entitlement_ids(user_email)
-
-    # Assert
-    assert apply_result.is_success
-    assert current_after_apply.is_success
-    assert current_after_apply.data == {group_id}
     assert remove_result.is_success
-    assert current_after_remove.is_success
-    assert current_after_remove.data == set()
+    assert user_email not in adapter._members_by_group.get(group_id, set())
 
 
 @pytest.mark.unit
-def test_fake_adapter_get_user_not_found_returns_normalized_error():
-    """Unknown users should return NOT_FOUND with a stable error code."""
-    # Arrange
+def test_fake_adapter_reconcile_user_provisions_new_user():
     adapter = FakePlatformAdapter()
+    desired = DesiredUserState(user_should_exist=True)
 
-    # Act
-    result = adapter.get_user("missing@example.com")
+    result = adapter.reconcile_user("newuser@example.com", desired, _EFFECTIVE)
 
-    # Assert
-    assert not result.is_success
-    assert result.status == OperationStatus.NOT_FOUND
-    assert result.error_code == "USER_NOT_FOUND"
+    assert result.is_success
+    assert isinstance(result.data, SyncOutcome)
+    assert "provision_user" in result.data.applied_actions
+    assert "newuser@example.com" in adapter._users
+
+
+@pytest.mark.unit
+def test_fake_adapter_reconcile_user_removes_user_not_in_desired():
+    adapter = FakePlatformAdapter()  # alice is seeded
+    desired = DesiredUserState(user_should_exist=False)
+
+    result = adapter.reconcile_user("alice@example.com", desired, _EFFECTIVE)
+
+    assert result.is_success
+    assert result.data is not None
+    assert isinstance(result.data, SyncOutcome)
+    assert "remove_user" in result.data.applied_actions
+    assert "alice@example.com" not in adapter._users
+
+
+@pytest.mark.unit
+def test_fake_adapter_reconcile_platform_returns_outcome():
+    adapter = FakePlatformAdapter()
+    desired_state = DesiredPlatformState(
+        desired_users={"alice@example.com", "bob@example.com"},
+        desired_members_by_entitlement={},
+        entitlement_slug_by_id={},
+    )
+
+    result = adapter.reconcile_platform(desired_state, _EFFECTIVE)
+
+    assert result.is_success
+    assert isinstance(result.data, ReconciliationOutcome)
+    assert result.data.platform == "fake"
+
+
+@pytest.mark.unit
+def test_fake_adapter_reconcile_platform_dry_run_no_mutations():
+    adapter = FakePlatformAdapter()
+    users_before = set(adapter._users)
+    desired_state = DesiredPlatformState(
+        desired_users={"newuser@example.com"},
+        desired_members_by_entitlement={},
+        entitlement_slug_by_id={},
+    )
+
+    result = adapter.reconcile_platform(desired_state, _EFFECTIVE, dry_run=True)
+
+    assert result.is_success
+    assert result.data is not None
+    assert isinstance(result.data, ReconciliationOutcome)
+    assert result.data.dry_run is True
+    assert adapter._users == users_before

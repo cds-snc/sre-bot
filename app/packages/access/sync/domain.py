@@ -17,18 +17,55 @@ from packages.access.sync.policies import EntitlementRule
 
 
 @dataclass(frozen=True)
-class DesiredUserState:
-    """Resolved desired and current state for one user on one platform.
+class AdapterAssessment:
+    """Current platform state assessed by the adapter for one user.
 
-    Built from directory membership data for on-demand sync and enriched with
-    pre-fetched platform state during batch sync so planning and execution run
-    through one shared internal shape.
+    Returned by ``AccessSyncAdapter.assess()`` so the coordinator can plan and
+    execute without any heuristic inference of user existence or entitlements.
+
+    The adapter is the sole source of truth for platform state.  When pre-fetched
+    data is embedded in ``DesiredUserState`` (batch sync path), the adapter
+    assess implementation uses it directly with zero additional API calls.
+
+    Attributes:
+        platform_user_exists: True when the user is provisioned on the platform.
+        current_entitlement_ids: Entitlement IDs the user currently holds.
+            Empty set when the user exists with no entitlements.
+            Also empty when the user does not exist (see platform_user_exists).
+    """
+
+    platform_user_exists: bool
+    current_entitlement_ids: Set[str] = field(default_factory=set)
+
+
+@dataclass(frozen=True)
+class DesiredUserState:
+    """Resolved desired state for one user on one platform.
+
+    Built from IDP directory membership data.  The adapter is the sole
+    authority for current platform state — this model carries no platform
+    state fields.
     """
 
     user_should_exist: bool
     required_entitlements: List[EntitlementRule] = field(default_factory=list)
-    current_entitlement_ids: Optional[Set[str]] = None
-    platform_user_exists: Optional[bool] = None
+
+
+@dataclass(frozen=True)
+class DesiredPlatformState:
+    """Resolved desired state for a full platform reconciliation run."""
+
+    desired_users: Set[str] = field(default_factory=set)
+    desired_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
+    entitlement_slug_by_id: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CurrentPlatformState:
+    """Current platform state for a full platform reconciliation run."""
+
+    current_users: Set[str] = field(default_factory=set)
+    current_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -86,3 +123,10 @@ class ReconciliationOutcome:
     requires_manual_action_count: int
     dry_run: bool = False
     per_user: Dict[str, SyncOutcome] = field(default_factory=dict)
+    changed_user_count: int = 0
+    unchanged_user_count: int = 0
+    action_counts: Dict[str, int] = field(default_factory=dict)
+    lifecycle_actions: Dict[str, List[str]] = field(default_factory=dict)
+    entitlements_by_action: Dict[str, Dict[str, List[str]]] = field(
+        default_factory=dict
+    )

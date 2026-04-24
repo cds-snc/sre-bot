@@ -17,7 +17,7 @@ Run with:
 
 import pytest
 
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
+from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.sync.policies import resolve_effective_policy
 
 from .conftest import make_adapter

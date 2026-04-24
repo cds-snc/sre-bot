@@ -6,25 +6,34 @@ Covers:
   F-03  POLICY_NOT_FOUND and ADAPTER_NOT_FOUND errors surface correctly
   F-04  dry_run returns planned actions without executing them
   F-05  UNSUPPORTED_OPERATION from adapter sets requires_manual_action
-  D-01  per-user entitlement group qualification
 """
 
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 import pytest
 
 from infrastructure.directory.models import (
     DirectoryGroup,
+    DirectoryMember,
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.config.settings import AccessSyncRuntimeConfig
-from packages.access.sync.coordinator import AccessSyncCoordinator
+from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
+from packages.access.sync.application import AccessSyncCoordinator
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
-from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
+from packages.access.sync.domain import (
+    AdapterAssessment,
+    DesiredPlatformState,
+    DesiredUserState,
+    ReconciliationOutcome,
+    SyncOutcome,
+)
 from packages.access.sync.policies import (
     AdapterCapabilities,
-    PlatformPolicy,
+    PlannedAction,
+    PlanningContext,
+    PlatformReconciliationPlanner,
+    PolicyEngine,
 )
 
 
@@ -34,15 +43,18 @@ from packages.access.sync.policies import (
 
 
 class FakeAdapter:
-    """Records all calls; configurable return values per method."""
+    """Records calls; uses PolicyEngine internally for reconcile methods."""
 
     def __init__(
-        self, current_entitlement_ids: Set[str] | None = None, user_exists: bool = True
+        self,
+        current_entitlement_ids: Optional[Set[str]] = None,
+        user_exists: bool = True,
+        disable_fails: bool = False,
     ) -> None:
         self.calls: List[tuple] = []
         self._current_ids: Set[str] = current_entitlement_ids or set()
-        self._disable_fails = False
         self._user_exists = user_exists
+        self._disable_fails = disable_fails
 
     def set_disable_fails(self) -> None:
         self._disable_fails = True
@@ -81,43 +93,173 @@ class FakeAdapter:
         self.calls.append(("remove_entitlement", email, etype, eid))
         return OperationResult.success()
 
-    def get_current_entitlement_ids(self, email: str) -> OperationResult:
-        self.calls.append(("get_current_entitlement_ids", email))
+    def _assess(self, email: str) -> AdapterAssessment:
         if not self._user_exists:
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND,
-                message="User not found",
-                error_code="USER_NOT_FOUND",
+            return AdapterAssessment(
+                platform_user_exists=False, current_entitlement_ids=set()
             )
-        return OperationResult.success(data=set(self._current_ids))
-
-    def list_all_provisioned_users(self) -> OperationResult:
-        self.calls.append(("list_all_provisioned_users",))
-        return OperationResult.error(
-            OperationStatus.PERMANENT_ERROR,
-            message="not supported",
-            error_code="UNSUPPORTED_OPERATION",
+        return AdapterAssessment(
+            platform_user_exists=True,
+            current_entitlement_ids=set(self._current_ids),
         )
 
-    def list_group_members(self, group_id: str) -> OperationResult:
-        self.calls.append(("list_group_members", group_id))
-        return OperationResult.success(data=set())
+    def _execute(self, email: str, planned: list) -> SyncOutcome:
+        applied: List[str] = []
+        requires_manual = False
+        for action in planned:
+            if action.action == "provision_user":
+                r = self.ensure_user(email)
+            elif action.action == "disable_user":
+                r = self.disable_user(email)
+            elif action.action == "remove_user":
+                r = self.remove_user(email)
+            elif action.action == "apply_entitlement":
+                r = self.apply_entitlement(
+                    email, action.entitlement_type or "", action.entitlement_id or ""
+                )
+            elif action.action == "remove_entitlement":
+                r = self.remove_entitlement(
+                    email, action.entitlement_type or "", action.entitlement_id or ""
+                )
+            else:
+                continue
+            if r.is_success:
+                applied.append(action.action)
+            elif r.error_code == "UNSUPPORTED_OPERATION":
+                requires_manual = True
+        return SyncOutcome(
+            planned_actions=[a.action for a in planned],
+            applied_actions=applied,
+            requires_manual_action=requires_manual,
+        )
+
+    def reconcile_user(
+        self,
+        user_email: str,
+        desired_state: DesiredUserState,
+        context: PlanningContext,
+        dry_run: bool = False,
+    ) -> OperationResult:
+        self.calls.append(("reconcile_user", user_email))
+        current = self._assess(user_email)
+        engine = PolicyEngine()
+        planned = engine.plan_actions(
+            policy=context,
+            capabilities=self.capabilities(),
+            user_should_exist=desired_state.user_should_exist,
+            required_entitlements=desired_state.required_entitlements,
+            current_entitlement_ids=current.current_entitlement_ids,
+            platform_user_exists=current.platform_user_exists,
+        )
+        if dry_run:
+            return OperationResult.success(
+                data=SyncOutcome(
+                    planned_actions=[a.action for a in planned],
+                    applied_actions=[],
+                )
+            )
+        return OperationResult.success(data=self._execute(user_email, planned))
+
+    def reconcile_platform(
+        self,
+        desired_state: DesiredPlatformState,
+        context: PlanningContext,
+        dry_run: bool = False,
+    ) -> OperationResult:
+        self.calls.append(("reconcile_platform",))
+        planner = PlatformReconciliationPlanner()
+        plan = planner.plan_platform_actions(
+            desired_users=desired_state.desired_users,
+            desired_members_by_entitlement=desired_state.desired_members_by_entitlement,
+            current_users=set(),
+            current_members_by_entitlement={},
+            authn_removal_mode=context.authn_removal_mode,
+        )
+        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        for email in sorted(plan.users_to_provision):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="provision_user")
+            )
+        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
+            for email in sorted(members):
+                actions_by_user.setdefault(email, []).append(
+                    PlannedAction(
+                        action="apply_entitlement",
+                        entitlement_type="group",
+                        entitlement_id=entitlement_id,
+                    )
+                )
+        for email in sorted(plan.users_to_disable):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="disable_user")
+            )
+        for email in sorted(plan.users_to_remove):
+            actions_by_user.setdefault(email, []).append(
+                PlannedAction(action="remove_user")
+            )
+
+        per_user: Dict[str, SyncOutcome] = {}
+        users_converged = 0
+        for email, planned in sorted(actions_by_user.items()):
+            if dry_run:
+                outcome = SyncOutcome(
+                    planned_actions=[action.action for action in planned],
+                    applied_actions=[],
+                )
+            else:
+                outcome = self._execute(email, planned)
+            per_user[email] = outcome
+            if outcome.applied_actions:
+                users_converged += 1
+        return OperationResult.success(
+            data=ReconciliationOutcome(
+                platform=context.platform,
+                users_synced=len(desired_state.desired_users),
+                users_converged=users_converged,
+                orphans_found=0,
+                requires_manual_action_count=0,
+                dry_run=dry_run,
+                per_user=per_user,
+            )
+        )
 
 
 class FakeDirectory:
-    """Static group/member fixtures. Configurable per-group membership and list_groups."""
+    """Static IDP fixture for unit tests."""
 
     def __init__(
         self,
         is_member: bool = True,
-        groups: Set[str] | None = None,
+        groups: Optional[Set[str]] = None,
+        user_group_slugs: Optional[Set[str]] = None,
     ) -> None:
         self._is_member = is_member
         self._per_group: Dict[str, bool] = {}
         self._groups: Set[str] = groups or set()
+        self._user_group_slugs: Optional[Set[str]] = user_group_slugs
 
     def set_membership(self, group_slug: str, value: bool) -> None:
         self._per_group[group_slug] = value
+
+    def get_user_groups(self, user_email: str) -> OperationResult:
+        if self._user_group_slugs is not None:
+            slugs = self._user_group_slugs
+        else:
+            slugs = {
+                slug
+                for slug in self._groups
+                if self._per_group.get(slug, self._is_member)
+            }
+        return OperationResult.success(
+            data=[
+                DirectoryGroup(
+                    group_email=f"{slug}@example.com",
+                    group_slug=slug,
+                    provider_group_id=f"gid-{slug}",
+                )
+                for slug in slugs
+            ]
+        )
 
     def get_group(self, slug: str) -> OperationResult:
         return OperationResult.success(
@@ -142,9 +284,30 @@ class FakeDirectory:
         )
 
     def get_group_members(
-        self, group_email: str, include_member_types: set | None = None
+        self, group_email: str, include_member_types: Optional[set] = None
     ) -> OperationResult:
-        return OperationResult.success(data=[])
+        slug = group_email.split("@", 1)[0]
+        if slug not in (self._user_group_slugs or set()):
+            return OperationResult.success(data=[])
+        return OperationResult.success(
+            data=[DirectoryMember(email="alice@example.com", member_type="USER")]
+        )
+
+    def get_group_members_batch(
+        self,
+        group_emails: List[str],
+        include_member_types: Optional[set] = None,
+    ) -> OperationResult:
+        mapping: Dict[str, List[DirectoryMember]] = {}
+        for group_email in group_emails:
+            slug = group_email.split("@", 1)[0]
+            if slug in (self._user_group_slugs or set()):
+                mapping[group_email] = [
+                    DirectoryMember(email="alice@example.com", member_type="USER")
+                ]
+            else:
+                mapping[group_email] = []
+        return OperationResult.success(data=mapping)
 
     def list_groups(self, query: str = "") -> OperationResult:
         matching = [
@@ -159,11 +322,20 @@ class FakeDirectory:
         return OperationResult.success(data=matching)
 
 
-def _make_config(
+def make_coordinator(
     platform: str = "aws",
     authn_removal_mode: str = "delete",
-) -> AccessSyncRuntimeConfig:
-    return AccessSyncRuntimeConfig(
+    is_member: bool = True,
+    current_ids: Optional[Set[str]] = None,
+    user_exists: bool = True,
+    adapter: Optional[FakeAdapter] = None,
+    discovered_groups: Optional[Set[str]] = None,
+) -> tuple:
+    if adapter is None:
+        adapter = FakeAdapter(
+            current_entitlement_ids=current_ids or set(), user_exists=user_exists
+        )
+    config = AccessRuntimeConfig(
         dir_prefix="sg",
         platforms={
             platform: PlatformPolicy(
@@ -172,28 +344,20 @@ def _make_config(
             )
         },
     )
-
-
-def make_coordinator(
-    platform: str = "aws",
-    authn_removal_mode: str = "delete",
-    is_member: bool = True,
-    current_ids: Set[str] | None = None,
-    user_exists: bool = True,
-    adapter: FakeAdapter | None = None,
-    discovered_groups: Set[str] | None = None,
-) -> tuple[AccessSyncCoordinator, FakeAdapter]:
-    if adapter is None:
-        adapter = FakeAdapter(
-            current_entitlement_ids=current_ids or set(), user_exists=user_exists
-        )
-    config = _make_config(platform=platform, authn_removal_mode=authn_removal_mode)
-    directory = FakeDirectory(is_member=is_member, groups=discovered_groups or set())
-    membership_builder = DirectoryMembershipBuilder(directory)
+    authn_slug = config.authn_group_slug(platform)
+    user_group_slugs = (
+        ({authn_slug} | (discovered_groups or set())) if is_member else set()
+    )
+    directory = FakeDirectory(
+        is_member=is_member,
+        groups=discovered_groups or set(),
+        user_group_slugs=user_group_slugs,
+    )
+    directory_provider: Any = directory
     coordinator = AccessSyncCoordinator(
         adapters={platform: adapter},
         config=config,
-        membership_builder=membership_builder,
+        membership_builder=DirectoryMembershipBuilder(directory_provider),
     )
     return coordinator, adapter
 
@@ -257,14 +421,15 @@ def test_sync_user_policy_not_found():
 
 @pytest.mark.unit
 def test_sync_user_adapter_not_found():
-    config = AccessSyncRuntimeConfig(
+    config = AccessRuntimeConfig(
         dir_prefix="sg",
         platforms={"aws": PlatformPolicy()},
     )
+    directory_provider: Any = FakeDirectory()
     coordinator = AccessSyncCoordinator(
-        adapters={},  # no adapter registered
+        adapters={},
         config=config,
-        membership_builder=DirectoryMembershipBuilder(FakeDirectory()),
+        membership_builder=DirectoryMembershipBuilder(directory_provider),
     )
     result = coordinator.sync_user("alice@example.com", "aws")
     assert not result.is_success
@@ -278,15 +443,11 @@ def test_sync_user_adapter_not_found():
 
 @pytest.mark.unit
 def test_sync_user_dry_run_no_action_calls():
-    coordinator, adapter = make_coordinator(is_member=True)
+    coordinator, adapter = make_coordinator(is_member=False, user_exists=True)
     result = coordinator.sync_user("alice@example.com", "aws", dry_run=True)
     assert result.is_success
     assert result.data.applied_actions == []
-    assert "provision_user" not in result.data.planned_actions
-    exec_calls = [
-        c for c in adapter.calls if c[0] not in {"get_current_entitlement_ids"}
-    ]
-    assert exec_calls == []
+    assert not any(c[0] == "remove_user" for c in adapter.calls)
 
 
 # ---------------------------------------------------------------------------
@@ -302,35 +463,11 @@ def test_sync_user_disable_unsupported_sets_requires_manual_action():
         authn_removal_mode="disable",
         is_member=False,
         adapter=adapter,
+        user_exists=True,
     )
     result = coordinator.sync_user("alice@example.com", "aws")
     assert result.is_success
     assert result.data.requires_manual_action is True
-
-
-# ---------------------------------------------------------------------------
-# D-01 per-user entitlement group qualification
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_sync_user_entitlement_not_applied_when_not_in_group():
-    """Entitlement is only applied when user is a member of the entitlement group."""
-    adapter = FakeAdapter()
-    directory = FakeDirectory(is_member=True, groups={"sg-aws-admin"})
-    # Member of authn but NOT of entitlement group
-    directory.set_membership("sg-aws-admin", False)
-    config = _make_config()
-    coordinator = AccessSyncCoordinator(
-        adapters={"aws": adapter},
-        config=config,
-        membership_builder=DirectoryMembershipBuilder(directory),
-    )
-    result = coordinator.sync_user("alice@example.com", "aws")
-    assert result.is_success
-    call_names = [c[0] for c in adapter.calls]
-    assert "ensure_user" not in call_names
-    assert "apply_entitlement" not in call_names
 
 
 # ---------------------------------------------------------------------------

@@ -29,18 +29,10 @@ Adapters must not duplicate any logic from this module.
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING
 
-from packages.access.common.config import (
-    EntitlementMode,
-    EntitlementRule,
-    PlatformPolicy,
-)
+from packages.access.common.config import EntitlementRule
 
 if TYPE_CHECKING:
     from packages.access.common.config import AccessRuntimeConfig
-
-# Backward-compatible re-exports for existing imports.
-PolicyEntitlementMode = EntitlementMode
-PolicyPlatformPolicy = PlatformPolicy
 
 
 @dataclass(frozen=True)
@@ -65,6 +57,35 @@ class EffectivePlatformPolicy:
     def sync_managed_rules(self) -> List[EntitlementRule]:
         """All rules (every rule in effective policy is already sync_managed)."""
         return list(self.entitlement_rules)
+
+
+@dataclass(frozen=True)
+class PlanningContext:
+    """Policy context passed to adapters for reconciliation planning.
+
+    Contains only the information adapters need to compute a delta plan.
+    IDP-specific fields (authn_group_slug) are intentionally excluded; those
+    are only needed during desired-state construction in ``desired_state.py``.
+
+    Produced by ``PlanningContext.from_effective`` after the IDP step.
+    """
+
+    platform: str
+    authn_removal_mode: str
+    entitlement_rules: List[EntitlementRule]
+
+    def sync_managed_rules(self) -> List[EntitlementRule]:
+        """All rules (every rule in planning context is already sync_managed)."""
+        return list(self.entitlement_rules)
+
+    @classmethod
+    def from_effective(cls, effective: "EffectivePlatformPolicy") -> "PlanningContext":
+        """Derive a PlanningContext from an EffectivePlatformPolicy."""
+        return cls(
+            platform=effective.platform,
+            authn_removal_mode=effective.authn_removal_mode,
+            entitlement_rules=effective.entitlement_rules,
+        )
 
 
 def resolve_effective_policy(
@@ -163,6 +184,17 @@ class PlannedAction:
     entitlement_id: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class PlatformActionPlan:
+    """Lifecycle and entitlement deltas for a full platform reconciliation run."""
+
+    users_to_provision: Set[str]
+    users_to_disable: Set[str]
+    users_to_remove: Set[str]
+    entitlement_adds_by_id: Dict[str, Set[str]]
+    entitlement_removes_by_id: Dict[str, Set[str]]
+
+
 class PolicyEngine:
     """Translates policy + current state into a minimal ordered list of actions.
 
@@ -176,7 +208,7 @@ class PolicyEngine:
 
     def plan_actions(
         self,
-        policy: EffectivePlatformPolicy,
+        policy: PlanningContext,
         capabilities: AdapterCapabilities,
         user_should_exist: bool,
         required_entitlements: List[EntitlementRule],
@@ -186,7 +218,7 @@ class PolicyEngine:
         """Produce the minimal ordered action list to converge one user.
 
         Args:
-            policy: Run-scoped effective policy (all rules sync_managed).
+            policy: Planning context (platform, removal mode, rules).
             capabilities: Adapter capability declaration.
             user_should_exist: Whether IDP membership in the authn group is True.
             required_entitlements: Sync-managed rules the user qualifies for.
@@ -252,9 +284,63 @@ class PolicyEngine:
                         )
                     )
 
-        if policy.authn_removal_mode == "disable":
-            planned.append(PlannedAction(action="disable_user"))
-        elif policy.authn_removal_mode == "delete":
-            planned.append(PlannedAction(action="remove_user"))
+        if platform_user_exists:
+            if policy.authn_removal_mode == "disable":
+                planned.append(PlannedAction(action="disable_user"))
+            elif policy.authn_removal_mode == "delete":
+                planned.append(PlannedAction(action="remove_user"))
 
         return planned
+
+
+class PlatformReconciliationPlanner:
+    """Compute lifecycle and entitlement deltas for full-platform sync."""
+
+    def plan_platform_actions(
+        self,
+        desired_users: Set[str],
+        desired_members_by_entitlement: Dict[str, Set[str]],
+        current_users: Set[str],
+        current_members_by_entitlement: Dict[str, Set[str]],
+        authn_removal_mode: str,
+    ) -> PlatformActionPlan:
+        """Return direct set-based deltas for platform reconciliation."""
+        users_to_provision = desired_users - current_users
+        users_to_disable = (
+            current_users - desired_users if authn_removal_mode == "disable" else set()
+        )
+        users_to_remove = (
+            current_users - desired_users if authn_removal_mode == "delete" else set()
+        )
+
+        entitlement_adds_by_id: Dict[str, Set[str]] = {}
+        entitlement_removes_by_id: Dict[str, Set[str]] = {}
+        entitlement_ids = set(desired_members_by_entitlement.keys()) | set(
+            current_members_by_entitlement.keys()
+        )
+
+        for entitlement_id in sorted(entitlement_ids):
+            desired_members = set(
+                desired_members_by_entitlement.get(entitlement_id, set())
+            )
+            current_members = set(
+                current_members_by_entitlement.get(entitlement_id, set())
+            )
+            members_to_add = desired_members - current_members
+            members_to_remove = current_members - desired_members
+
+            if users_to_remove:
+                members_to_remove -= users_to_remove
+
+            if members_to_add:
+                entitlement_adds_by_id[entitlement_id] = members_to_add
+            if members_to_remove:
+                entitlement_removes_by_id[entitlement_id] = members_to_remove
+
+        return PlatformActionPlan(
+            users_to_provision=users_to_provision,
+            users_to_disable=users_to_disable,
+            users_to_remove=users_to_remove,
+            entitlement_adds_by_id=entitlement_adds_by_id,
+            entitlement_removes_by_id=entitlement_removes_by_id,
+        )

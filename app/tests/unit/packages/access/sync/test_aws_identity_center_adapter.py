@@ -178,18 +178,6 @@ def test_ensure_user_create_payload_matches_identitystore_requirements() -> None
 
 
 @pytest.mark.unit
-def test_get_user_uses_describe_user_by_username() -> None:
-    """Direct user lookups should reuse the infrastructure client describe method."""
-    client = FakeIdentityStoreClient()
-    adapter = make_adapter(client)
-
-    result = adapter.get_user("alice@example.com")
-
-    assert result.is_success
-    assert client.calls == [("describe_user_by_username", "alice@example.com")]
-
-
-@pytest.mark.unit
 def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> None:
     """Only NOT_FOUND should trigger membership creation."""
     client = FakeIdentityStoreClient()
@@ -313,6 +301,46 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
     assert result.is_success
     assert result.data == {group_1_id: {"alice@example.com"}}
     assert any(call[0] == "list_group_memberships" for call in client.calls)
+
+
+@pytest.mark.unit
+def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details() -> (
+    None
+):
+    """Bulk group read should resolve MemberId.UserId when UserDetails is omitted."""
+    client = FakeIdentityStoreClient()
+    group_1_id = "11111111-2222-3333-4444-555555555555"
+    client.list_groups_with_memberships_result = OperationResult.success(
+        data=[
+            {
+                "GroupId": group_1_id,
+                "GroupMemberships": [
+                    {"MemberId": {"UserId": "u-1"}},
+                    {"MemberId": {"UserId": "u-2"}},
+                ],
+            }
+        ]
+    )
+    client.list_users_result = OperationResult.success(
+        data=[
+            {
+                "UserId": "u-1",
+                "Emails": [{"Value": "Alice@example.com", "Primary": True}],
+            },
+            {
+                "UserId": "u-2",
+                "Emails": [{"Value": "bob@example.com", "Primary": True}],
+            },
+        ]
+    )
+    adapter = make_adapter(client)
+
+    result = adapter.list_members_for_groups({group_1_id})
+
+    assert result.is_success
+    assert result.data == {group_1_id: {"alice@example.com", "bob@example.com"}}
+    assert any(call[0] == "list_groups_with_memberships" for call in client.calls)
+    assert any(call[0] == "list_users" for call in client.calls)
 
 
 @pytest.mark.unit

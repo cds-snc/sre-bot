@@ -200,6 +200,10 @@ def main() -> None:
     print("   Press Ctrl-C to stop the JWKS server (token becomes invalid).")
     print("=" * 70)
     print()
+    print(f"{token}")
+    print()
+    print("=" * 70)
+    print()
 
     try:
         while True:

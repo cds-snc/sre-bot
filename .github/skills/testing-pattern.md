@@ -62,6 +62,116 @@ def test_user_validation(user):
     assert user.is_valid()
 ```
 
+**Default-safe, override edge cases only** — factory defaults should mirror
+production defaults so the happy-path test stays minimal.  Edge-case tests
+override only the single field that distinguishes the scenario:
+
+```python
+# ✅ CORRECT: edge-case test only changes what matters
+def test_disabled_mode(make_item, make_config):
+    config = make_config(mode="disabled")  # one override
+    ...
+
+# ❌ WRONG: edge-case test duplicates all the boring defaults
+def test_disabled_mode():
+    config = MyModuleConfig(
+        name="default",
+        items={"key": MyModuleItem(token="abc", mode="disabled")},
+    )
+```
+
+---
+
+## conftest.py Placement
+
+Place a `conftest.py` at the **package boundary** where fixtures are shared
+across multiple test files.  Do **not** scatter factories as module-level
+functions inside individual test files.
+
+```
+tests/unit/my_module/
+├── conftest.py          ← shared factories for this entire sub-package
+├── test_service.py      ← imports make_config from conftest
+├── test_coordinator.py  ← same
+└── test_validators.py   ← same
+```
+
+```python
+# conftest.py — one canonical location for shared factories
+@pytest.fixture
+def make_config(make_item):
+    def _make(name: str = "default", **item_kwargs):
+        return MyModuleConfig(
+            name=name,
+            items={"key": make_item(**item_kwargs)},
+        )
+    return _make
+```
+
+---
+
+## Environment Isolation (autouse)
+
+Use an `autouse` fixture to strip package-specific environment variables
+**before every test** so a local `.env` file or CI/CD pipeline cannot silently
+influence unit test behaviour.  Tests that require a specific value declare it
+explicitly via `monkeypatch.setenv`.
+
+```python
+# conftest.py
+_MY_MODULE_ENV_KEYS = [
+    "MY_MODULE_ENABLED",
+    "MY_MODULE_CONFIG_SOURCE",
+]
+
+@pytest.fixture(autouse=True)
+def _my_module_env_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip all MY_MODULE_* env vars before every test in this package."""
+    for key in _MY_MODULE_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+```
+
+```python
+# test_settings.py — no manual cleanup needed, just declare overrides
+def test_enabled_flag(make_module_settings, monkeypatch):
+    monkeypatch.setenv("MY_MODULE_ENABLED", "true")
+    settings = make_module_settings()
+    assert settings.enabled is True
+
+# ❌ FORBIDDEN: manual delenv in every test
+def test_defaults(monkeypatch):
+    monkeypatch.delenv("MY_MODULE_ENABLED", raising=False)  # repeated in every test
+    monkeypatch.delenv("MY_MODULE_CONFIG_SOURCE", raising=False)
+    settings = MyModuleSettings()
+    assert settings.enabled is False
+```
+
+---
+
+## Pydantic-Settings: Bypass .env on Disk
+
+`pydantic-settings` reads `.env` from disk even when all process env vars are
+cleared.  Always pass `_env_file=None` when constructing settings in unit tests,
+or wrap it in a factory fixture so the bypass is automatic:
+
+```python
+# ✅ CORRECT: wrap in a factory fixture
+@pytest.fixture
+def make_module_settings():
+    def _make(**overrides):
+        return MyModuleSettings(_env_file=None, **overrides)
+    return _make
+
+def test_defaults(make_module_settings):
+    settings = make_module_settings()
+    assert settings.enabled is False
+
+# ❌ FORBIDDEN: direct instantiation in tests — reads .env file from disk
+def test_defaults():
+    settings = MyModuleSettings()  # picks up developer .env on local machine
+    assert settings.enabled is False  # may pass locally, fail in CI
+```
+
 ---
 
 ## Cleanup with Fixtures
@@ -113,6 +223,30 @@ def test_with_env_vars():
     settings = get_settings()
     del os.environ["AWS__AWS_REGION"]  # Manual cleanup
 ```
+
+---
+
+## Mock Assertions
+
+Call `assert_*` methods directly on the mock — never prepend `assert` to a mock attribute access.
+
+```python
+# ✅ CORRECT: real assertion methods — raise AssertionError on failure
+mock_fn.assert_called_once_with("arg", key="val")  # called exactly once with these args
+mock_fn.assert_called_once()                        # called exactly once, any args (3.6+)
+mock_fn.assert_called_with("arg")                   # most recent call matches
+mock_fn.assert_not_called()
+assert mock_fn.call_count == 2                      # exact count check
+
+# ❌ FORBIDDEN: silently passes — never raises AssertionError
+assert mock_fn.called_once_with("arg")  # `called_once_with` is NOT a real method;
+                                         # MagicMock auto-creates it as a truthy child Mock
+assert mock_fn.called                   # only checks called≥1; ignores call count and args
+```
+
+**Root cause**: `MagicMock` creates any attribute on demand. `called_once_with` is not a real
+method, so accessing it returns a new truthy `Mock` — the `assert` always passes even if the
+mock was never called. Use the `assert_` prefixed methods which are real and raise on failure.
 
 ---
 
@@ -407,7 +541,10 @@ Before committing tests:
 - [ ] Run from `/workspace/app` directory
 - [ ] Descriptive test names (test_should_action_when_condition)
 - [ ] AAA pattern (Arrange, Act, Assert)
-- [ ] Factory fixtures for test data
+- [ ] Factory fixtures for test data (default-safe, override edge cases only)
+- [ ] Shared factories in `conftest.py` at the package boundary, not duplicated per file
+- [ ] `autouse` env isolation fixture strips package env vars before every test
+- [ ] pydantic-settings constructed with `_env_file=None` (via factory fixture)
 - [ ] Edge cases tested (empty, None, large, special chars)
 - [ ] Independent tests (no shared state)
 - [ ] Cleanup handled by fixtures

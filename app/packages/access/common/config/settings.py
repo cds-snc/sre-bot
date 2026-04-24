@@ -1,4 +1,4 @@
-"""Shared access-domain runtime config models."""
+"""Shared access-domain config: runtime models."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ class PlatformPolicy:
 
     authn_token: str = "authn"
     authn_removal_mode: str = "delete"  # disable | delete | entitlement_only
+    adapter_type: str = "fake"  # aws_identity_center | fake
     mode_overrides: Dict[str, EntitlementMode] = field(default_factory=dict)
 
 
@@ -78,3 +79,8 @@ class AccessRuntimeConfig:
         """Return optional catalog extension configuration."""
         value = self.extensions.get("catalog")
         return value
+
+
+# This file contains only runtime domain models loaded from an external config
+# document (JSON bundle, DynamoDB, etc.) — not from env vars.
+# Feature settings live in packages.access.common.settings.AccessSettings.
