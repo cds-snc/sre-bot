@@ -1,17 +1,54 @@
 # Core Architectural Principles
 
-## Synchronous-First Execution
+## Framework and Version Requirements
 
-All application code must be synchronous (`def`, not `async def`). Async is allowed only for FastAPI lifespan.
+This project requires:
+- **Python 3.12+** — all typing and async features assume 3.12 minimum.
+- **Pydantic v2 / pydantic-settings v2** — `SettingsConfigDict`, `model_config`, `@field_validator`, `@model_validator` all use v2 APIs. Never use v1 patterns (`class Config`, `validator`, `root_validator`).
+- **FastAPI 0.100+** — lifespan context manager, `Annotated[T, Depends()]` syntax.
+
+---
+
+## Incremental Async Migration
+
+The codebase is transitioning from synchronous-first to async-native. **Both sync and async handlers coexist safely in FastAPI.**
+
+**For new code and refactors, follow this priority:**
+
+1. **Async (`async def`)** — I/O-bound operations with async-native libraries (aiohttp, asyncpg, aioboto3). Avoids thread pool consumption. **Preferred for new work.**
+2. **Sync (`def`)** — CPU-bound logic, existing code, or when no async client library exists. Runs in thread pool without blocking event loop.
+3. **Both types** — Can mix safely in one application. FastAPI dependency injection supports both.
+
+**Guidelines:**
+
+- ✅ **Use async for:** Database queries, HTTP calls, external API requests, file I/O
+- ✅ **Use sync for:** Business logic, data transformation, CPU-bound processing, legacy code
+- ✅ **Both are valid:** No architectural penalty for using either; choose based on I/O presence
+- ⚠️ **Design for async:** When refactoring sync code, consider whether an async-native library exists for any external I/O. Use it if available.
+- ❌ **Avoid:** CPU-intensive operations in async handlers (no `await` necessary, doesn't improve concurrency)
+
+**Examples:**
 
 ```python
-# ✅ CORRECT
-def handle_command(ctx: CommandContext) -> CommandResponse:
-    return process_request()
+# ✅ ASYNC: I/O-bound (HTTP call)
+async def fetch_user(user_id: str) -> dict:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://api.example.com/users/{user_id}") as resp:
+            return await resp.json()
 
-# ❌ FORBIDDEN
-async def handle_command(ctx: CommandContext) -> CommandResponse:
-    return await process_request()
+# ✅ SYNC: Business logic
+def validate_command(command: CommandContext) -> bool:
+    return command.user_id in ALLOWED_USERS and command.action in ALLOWED_ACTIONS
+
+# ✅ ASYNC: Database query (async-native client)
+async def get_group_members(group_id: str) -> list:
+    async with get_db_pool() as pool:
+        return await pool.fetch("SELECT * FROM members WHERE group_id = $1", group_id)
+
+# ✅ SYNC: Legacy code, no I/O
+def parse_legacy_format(data: str) -> dict:
+    # Existing sync-only logic, no changes needed
+    return parse_data(data)
 ```
 
 ---

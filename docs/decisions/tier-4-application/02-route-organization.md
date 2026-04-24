@@ -2,12 +2,12 @@
 
 ## Routes in Feature Packages
 
-**Decision**: Routes live in feature packages under `packages/{feature}/transport/routes.py`. The main application never imports feature routes — each feature registers itself via hookimpl.
+**Decision**: Routes live in feature packages under `packages/{feature}/interactions/http.py`. The main application never imports feature routes — each feature registers itself via hookimpl.
 
 **Router declaration** — feature owns its path prefix:
 
 ```python
-# packages/feature/transport/routes.py
+# packages/feature/interactions/http.py
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/feature", tags=["Feature"])
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/feature", tags=["Feature"])
 ```python
 # packages/feature/__init__.py
 from infrastructure.services import hookimpl
-from packages.feature.transport.routes import router as feature_router
+from packages.feature.interactions.http import router as feature_router
 
 
 @hookimpl
@@ -43,7 +43,7 @@ def register_routes(app) -> None:
 Each route file declares a local structural Protocol for each dependency, exposing only the surface the handler needs. This decouples the handler from the concrete implementation and makes test substitution straightforward — patch `providers.get_*` at module scope.
 
 ```python
-# packages/feature/transport/routes.py
+# packages/feature/interactions/http.py
 from typing import Annotated, Protocol
 
 from fastapi import APIRouter, Depends
@@ -85,8 +85,8 @@ def action_endpoint(
 
 | Component | Location | Responsibility |
 |---|---|---|
-| HTTP routes | `packages/{feature}/transport/routes.py` | FastAPI route handlers |
-| Chat command handlers | `packages/{feature}/transport/slack.py` | Slack/Teams command dispatch |
+| HTTP routes | `packages/{feature}/interactions/http.py` | FastAPI route handlers |
+| Chat interaction handlers | `packages/{feature}/interactions/slack.py` | Slack interaction dispatch |
 | Request/response schemas | `packages/{feature}/schemas.py` | Pydantic HTTP models |
 | Business logic / orchestration | `packages/{feature}/service.py` or `coordinator.py` | Platform-agnostic operations |
 | Domain models | `packages/{feature}/domain.py` | Internal frozen dataclasses |

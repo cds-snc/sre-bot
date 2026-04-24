@@ -27,7 +27,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_nested_delimiter="__",
         extra="ignore",
-        case_sensitive=True,
+        case_sensitive=False,
     )
 ```
 

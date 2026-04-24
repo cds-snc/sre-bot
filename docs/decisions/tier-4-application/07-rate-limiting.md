@@ -1,5 +1,19 @@
 # Rate Limiting
 
+## Rate Limiting Architecture
+
+**Decision**: WAF and ALB are the primary rate limiting layers. SlowAPI is for application-level circuit-breaking only.
+
+| Layer | Tool | Purpose |
+|---|---|---|
+| Infrastructure | AWS WAF (see `terraform/waf.tf`) | Global flood protection, IP blocking, rule-based throttling |
+| Infrastructure | AWS ALB | Connection-level limits |
+| Application | SlowAPI | Per-endpoint fine-grained limits, user-specific quotas, sentinel bypass |
+
+Do not use SlowAPI as a substitute for WAF rules. Use it only where application context (e.g. authenticated user, route semantics) is needed to make the limit decision.
+
+---
+
 ## Route-Level Rate Limiting
 
 **Decision**: Use SlowAPI.

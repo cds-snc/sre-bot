@@ -21,23 +21,23 @@
 ### 1. Define Hook Specifications (Extension Points)
 
 ```python
-# infrastructure/hookspecs/platforms.py
-"""Hook specifications for platform command registration."""
+# infrastructure/hookspecs/interactions.py
+"""Hook specifications for interaction provider registration."""
 import pluggy
 from typing import Protocol
 
 hookspec = pluggy.HookspecMarker("sre_bot")
 
-class PlatformProvider(Protocol):
-    """Protocol for platform providers."""
+class InteractionProvider(Protocol):
+    """Protocol for interaction providers."""
     def register_command(self, *args, **kwargs): ...
 
 @hookspec
-def register_slack_commands(provider: PlatformProvider) -> None:
+def register_slack_commands(provider: InteractionProvider) -> None:
     """Register Slack commands with provider."""
 
 @hookspec
-def register_teams_commands(provider: PlatformProvider) -> None:
+def register_teams_commands(provider: InteractionProvider) -> None:
     """Register Teams commands with provider."""
 
 @hookspec
@@ -48,7 +48,7 @@ def register_http_routes(api_router) -> None:
 ### 2. Plugin Manager (Singleton)
 
 ```python
-# infrastructure/services/plugins/platforms.py
+# infrastructure/services/plugins/interactions.py
 from functools import lru_cache
 import pluggy
 import structlog
@@ -57,30 +57,30 @@ from infrastructure import hookspecs
 logger = structlog.get_logger()
 
 @lru_cache(maxsize=1)
-def get_platform_plugin_manager() -> pluggy.PluginManager:
-    """Get platform plugin manager singleton.
+def get_interaction_plugin_manager() -> pluggy.PluginManager:
+    """Get interaction plugin manager singleton.
     
-    Manages registration and invocation of platform hooks.
-    Auto-discovers implementations in packages/ and modules/.
+    Feature packages must be explicitly registered before hook invocation.
+    Registration happens during application lifespan startup.
     """
     pm = pluggy.PluginManager("sre_bot")
-    pm.add_hookspecs(hookspecs.platforms)
-    auto_discover_plugins(pm, base_paths=["packages", "modules"])
+    pm.add_hookspecs(hookspecs.interactions)
     
-    logger.info("plugin_manager_initialized", plugins=len(pm.get_plugins()))
+    logger.info("plugin_manager_initialized")
     return pm
 
-def discover_and_register_platforms(
+def discover_and_register_interactions(
     slack_provider=None,
     teams_provider=None,
     discord_provider=None,
 ) -> None:
-    """Discover and register all platform commands.
+    """Invoke hooks for all enabled interaction providers.
     
     Explicitly invokes hooks, passing enabled providers.
-    Called during application startup.
+    Called during application startup via lifespan after all
+    feature packages have been registered with the plugin manager.
     """
-    pm = get_platform_plugin_manager()
+    pm = get_interaction_plugin_manager()
     
     if slack_provider:
         pm.hook.register_slack_commands(provider=slack_provider)
@@ -95,37 +95,29 @@ def discover_and_register_platforms(
         logger.info("discord_commands_registered")
 ```
 
-### 3. Auto-Discovery Helper
+### 3. Lifespan Registration
+
+Feature packages are registered explicitly during lifespan startup — not via filesystem discovery. Each package to participate in hook dispatch must call `pm.register(module)` before hooks are invoked.
 
 ```python
-# infrastructure/services/plugins/base.py
-import importlib
-import pkgutil
-from pathlib import Path
-import pluggy
-import structlog
+# app/server/lifespan.py
+from infrastructure.services.plugins.interactions import (
+    get_interaction_plugin_manager,
+    discover_and_register_interactions,
+)
+import packages.access as access_package
+import packages.geolocate as geolocate_package
 
-logger = structlog.get_logger()
-
-def auto_discover_plugins(pm: pluggy.PluginManager, base_paths: list[str]) -> None:
-    """Auto-discover and register plugins from base paths.
+async def startup(app):
+    pm = get_interaction_plugin_manager()
+    pm.register(access_package)
+    pm.register(geolocate_package)
+    pm.check_pending()  # raises if any hookspecs have no implementations
     
-    Recursively imports all Python modules from specified paths,
-    allowing them to register @hookimpl decorators.
-    """
-    for base_path in base_paths:
-        path = Path(base_path)
-        if not path.exists():
-            logger.warning("plugin_path_not_found", path=str(path))
-            continue
-        
-        # Import all modules to trigger @hookimpl decorators
-        for module_info in pkgutil.walk_packages([str(path)], prefix=f"{base_path}."):
-            try:
-                module = importlib.import_module(module_info.name)
-                pm.register(module)
-            except Exception as e:
-                logger.error("plugin_discovery_error", module=module_info.name, error=str(e))
+    discover_and_register_interactions(
+        slack_provider=get_slack_provider(),
+        teams_provider=get_teams_provider(),
+    )
 ```
 
 ### 4. Feature Packages Implement Hooks
@@ -134,7 +126,7 @@ def auto_discover_plugins(pm: pluggy.PluginManager, base_paths: list[str]) -> No
 # packages/geolocate/__init__.py
 """Geolocate package - self-registers via Pluggy hooks."""
 from infrastructure.services import hookimpl
-from packages.geolocate.platforms.slack import register_commands as slack_register
+from packages.geolocate.interactions.slack import register_commands as slack_register
 
 @hookimpl
 def register_slack_commands(provider):
@@ -144,7 +136,7 @@ def register_slack_commands(provider):
 @hookimpl
 def register_http_routes(api_router):
     """Register geolocate HTTP routes."""
-    from packages.geolocate.routes import router
+    from packages.geolocate.interactions.http import router
     api_router.include_router(router)
 ```
 
@@ -155,17 +147,17 @@ def register_http_routes(api_router):
 """Central service exports."""
 from infrastructure.services.providers import (
     get_settings,
-    get_platform_service,
+    get_interaction_service,
 )
-from infrastructure.services.plugins.platforms import discover_and_register_platforms
+from infrastructure.services.plugins.interactions import discover_and_register_interactions
 from pluggy import HookimplMarker
 
 hookimpl = HookimplMarker("sre_bot")
 
 __all__ = [
     "get_settings",
-    "get_platform_service",
-    "discover_and_register_platforms",
+    "get_interaction_service",
+    "discover_and_register_interactions",
     "hookimpl",
 ]
 ```
@@ -175,13 +167,15 @@ __all__ = [
 - ✅ Hook specs define extension points (what can be extended)
 - ✅ Plugin managers created once via `@lru_cache(maxsize=1)` (singleton)
 - ✅ Feature packages use `@hookimpl` decorators to implement hooks
-- ✅ Auto-discovery finds implementations; explicit invocation triggers registration
-- ✅ Export hookimpl via `infrastructure.services` for easy access
+- ✅ Feature packages are registered explicitly during lifespan startup — no filesystem discovery
+- ✅ `pm.check_pending()` called after all registrations to detect missing implementations
+- ✅ Explicit hook invocation triggers registration at runtime
+- ✅ Export `hookimpl` via `infrastructure.services` for easy access
 - ✅ Type-hint hook functions for IDE support and clarity
+- ❌ Do not use `pkgutil.walk_packages` or `importlib` filesystem discovery for plugin loading
 - ❌ Never create plugin manager per invocation (defeats singleton pattern)
 - ❌ Never register plugins after discovery (initialize at startup)
 - ❌ Never use @hookimpl without corresponding hookspec definition
-hookimpl = HookimplMarker("sre_bot")
 
 # Plugin managers
 from infrastructure.services.plugins.platforms import (
@@ -306,6 +300,60 @@ def register_<feature>(<target>):
 
 🔄 **Migration Required**: Must convert existing registration to Pluggy hooks  
 🔄 **Documentation Updates**: Must document Pluggy patterns in architecture docs  
+
+---
+
+## firstresult: Single-Value Hook Calls
+
+By default every hook invocation collects the return values from **all** registered implementations and returns them as a `list`. For hooks that logically yield a single value (e.g. resolving a user, returning a platform config, checking feature enablement), receiving a list forces the caller to always take `results[0]` — fragile and undocumented.
+
+Mark single-value hooks with `firstresult=True` in the spec. Pluggy stops calling implementations as soon as the first one returns a non-`None` value and returns that value directly (not wrapped in a list).
+
+```python
+# infrastructure/hookspecs/identity.py
+import pluggy
+
+hookspec = pluggy.HookspecMarker("sre_bot")
+
+@hookspec(firstresult=True)
+def resolve_user_identity(platform_id: str) -> "User | None":
+    """Resolve a platform-specific user ID to a canonical User.
+
+    Only the first non-None result is used.
+    Return None to pass to the next registered resolver.
+    """
+```
+
+```python
+# packages/access/__init__.py
+from infrastructure.services import hookimpl
+from packages.access.identity import resolve_slack_user
+
+@hookimpl
+def resolve_user_identity(platform_id: str):
+    """Resolve Slack user IDs; return None for non-Slack IDs."""
+    if not platform_id.startswith("U"):
+        return None
+    return resolve_slack_user(platform_id)
+```
+
+```python
+# Callsite — returns a User directly, not a list
+user = pm.hook.resolve_user_identity(platform_id=slack_user_id)
+if user is None:
+    raise ValueError(f"No resolver found for {slack_user_id}")
+```
+
+**Decision rules:**
+
+| Hook pattern | Use |
+|---|---|
+| Fan-out: every implementation runs, all results matter | default (list return) |
+| First-match: stop at first non-None, rest are fallbacks | `firstresult=True` |
+
+- ✅ Use `firstresult=True` for: resolver hooks, factory hooks, capability-check hooks
+- ✅ Implementing hooks should return `None` to indicate "I cannot handle this"
+- ❌ Do not use `firstresult=True` for registration hooks where all implementations must run (e.g. `register_slack_commands`)
 
 ---
 

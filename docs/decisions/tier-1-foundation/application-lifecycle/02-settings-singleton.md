@@ -19,25 +19,28 @@ def get_settings() -> Settings:
 
 ```python
 # infrastructure/configuration/__init__.py
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AWSConfig(BaseModel):  # ✅ BaseModel for nested sections, NOT BaseSettings
+    aws_region: str
+    aws_account_id: str
+
 
 class Settings(BaseSettings):
     """Application configuration from environment."""
-    
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_nested_delimiter="__",
         case_sensitive=False,
         extra="ignore",
     )
-    
+
     environment: str = "development"
     log_level: str = "INFO"
-    
-    class AWSConfig(BaseSettings):
-        aws_region: str
-        aws_account_id: str
-    
+
     aws: AWSConfig
 ```
 

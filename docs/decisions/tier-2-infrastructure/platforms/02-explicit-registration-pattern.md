@@ -8,14 +8,14 @@ Two patterns emerged:
 
 **Option 1: Import-Time Auto-Discovery** (❌ Rejected)
 ```python
-# packages/geolocate/platforms/slack.py
-from infrastructure.platforms import get_slack_provider
+# packages/geolocate/interactions/slack.py
+from infrastructure.interactions import get_slack_provider
 slack = get_slack_provider()
 slack.register_command("geolocate", handler)  # Runs at import time - hidden!
 
 # main.py
-from infrastructure.platforms import discover_platform_features
-discover_platform_features()  # Imports all packages, triggers registration
+from infrastructure.interactions import discover_interaction_features
+discover_interaction_features()  # Imports all packages, triggers registration
 ```
 
 **Option 2: Explicit Registration via Pluggy** (✅ Chosen)
@@ -53,28 +53,28 @@ discover_and_register_platforms(slack_provider=slack)  # Explicit invocation
 ### 1. Hook Specification
 
 ```python
-# infrastructure/hookspecs/platforms.py
+# infrastructure/hookspecs/interactions.py
 import pluggy
 from typing import Protocol
 
 hookspec = pluggy.HookspecMarker("sre_bot")
 
-class PlatformProvider(Protocol):
+class InteractionProvider(Protocol):
     def register_command(self, *args, **kwargs): ...
 
 @hookspec
-def register_slack_commands(provider: PlatformProvider) -> None:
+def register_slack_commands(provider: InteractionProvider) -> None:
     """Register Slack commands with provider."""
 
 @hookspec
-def register_teams_commands(provider: PlatformProvider) -> None:
+def register_teams_commands(provider: InteractionProvider) -> None:
     """Register Teams commands with provider."""
 ```
 
 ### 2. Plugin Manager
 
 ```python
-# infrastructure/services/plugins/platforms.py
+# infrastructure/services/plugins/interactions.py
 from functools import lru_cache
 import pluggy
 import structlog
@@ -83,19 +83,20 @@ from infrastructure import hookspecs
 logger = structlog.get_logger()
 
 @lru_cache(maxsize=1)
-def get_platform_plugin_manager() -> pluggy.PluginManager:
-    """Get platform plugin manager singleton."""
+def get_interaction_plugin_manager() -> pluggy.PluginManager:
+    """Get interaction plugin manager singleton."""
     pm = pluggy.PluginManager("sre_bot")
-    pm.add_hookspecs(hookspecs.platforms)
-    auto_discover_plugins(pm, base_paths=["packages", "modules"])
+    pm.add_hookspecs(hookspecs.interactions)
     return pm
 
-def discover_and_register_platforms(slack_provider=None, teams_provider=None) -> None:
-    """Discover and register all platform commands.
+def discover_and_register_interactions(slack_provider=None, teams_provider=None) -> None:
+    """Discover and register all interaction handlers.
     
-    Called explicitly during application startup.
+    Called explicitly during application startup via lifespan.
+    Feature packages must be explicitly registered with the plugin manager
+    before this is called (see lifespan startup).
     """
-    pm = get_platform_plugin_manager()
+    pm = get_interaction_plugin_manager()
     
     if slack_provider:
         pm.hook.register_slack_commands(provider=slack_provider)
@@ -111,7 +112,7 @@ def discover_and_register_platforms(slack_provider=None, teams_provider=None) ->
 ```python
 # packages/geolocate/__init__.py
 from infrastructure.services import hookimpl
-from packages.geolocate.platforms.slack import register_commands as slack_register
+from packages.geolocate.interactions.slack import register_commands as slack_register
 
 @hookimpl
 def register_slack_commands(provider):

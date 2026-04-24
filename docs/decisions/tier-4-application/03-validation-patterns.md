@@ -41,7 +41,7 @@ class UserRequest(BaseModel):
 **Implementation**:
 ```python
 from pydantic import BaseModel, model_validator
-from typing_extensions import Self
+from typing import Self
 
 class PasswordReset(BaseModel):
     password: str

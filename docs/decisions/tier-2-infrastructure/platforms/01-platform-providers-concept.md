@@ -1,29 +1,22 @@
-# Platform Providers Concept
+# Interaction Providers Concept
 
-**Decision**: Replace "Command Provider" (text-only) with "Platform Providers" (multi-feature abstraction).
+**Decision**: Standardize and isolate collaboration platform capabilities as a centrally managed core service through typed Interaction Provider implementations.
 
 ## Why
 
-Modern platforms offer rich interactive features beyond commands:
+Collaboration platforms (Slack, Teams, Discord) offer rich interactive features that span multiple interaction modes:
 - Commands (slash commands, bot mentions)
-- Views/Modals (forms, workflows)
+- Views/Modals (forms, multi-step workflows)
 - Interactive Components (buttons, dropdowns, date pickers)
 - Messaging (DMs, threads, file attachments)
-- Message Actions (context menus, forwarding)
+- Message Actions (context menus, shortcuts)
 
-Command-only abstraction limited us to lowest-common-denominator text interfaces.
+A single abstraction — the Interaction Provider — exposes all of these capabilities behind a typed interface, isolating feature packages from platform SDK details.
 
-## What Changed
+## Provider Interface
 
-**Before** (Command Providers):
 ```python
-class CommandProvider:
-    def register_command(self, name: str, handler: Callable): ...
-```
-
-**After** (Platform Providers):
-```python
-class PlatformProvider:
+class InteractionProvider:
     def register_command(self, name: str, handler: Callable): ...
     def register_view(self, view_id: str, handler: Callable): ...
     def register_action(self, action_id: str, handler: Callable): ...
@@ -42,34 +35,41 @@ class PlatformProvider:
 
 ## CRITICAL: Business Logic HTTP-First
 
-Business logic exposed as **FastAPI endpoints first**. Platform providers wrap endpoints for native experiences.
+Business logic is exposed as **FastAPI HTTP endpoints** (`interactions/http.py`) so it remains independently testable and accessible. However, Slack and Teams interaction handlers in feature packages do **not** call that HTTP endpoint internally — they call the service layer directly.
+
+The Interaction Provider (infrastructure) owns the channel protocol:
+- `SlackInteractionProvider` manages the WebSocket connection, acknowledgment, and response delivery
+- `TeamsInteractionProvider` manages the bot framework channel and adaptive card delivery
+
+Feature handlers receive a structured payload from the provider, call business logic via `ingress.py`, format with `presenters.py`, and return the result. The provider handles delivery.
 
 ```
-HTTP Request → FastAPI → Business Logic → JSON
-Slack Command → Slack Provider → Internal HTTP → JSON → Block Kit
-Teams Message → Teams Provider → Internal HTTP → JSON → Adaptive Card
+HTTP Request  → interactions/http.py  → ingress.py → service.py → presenter → JSON response
+Slack Interaction → SlackInteractionProvider (WebSocket, ack) → interactions/slack.py → ingress.py → service.py → presenter → Block Kit
+Teams Interaction → TeamsInteractionProvider → interactions/teams.py → ingress.py → service.py → presenter → Adaptive Card
 ```
 
 This ensures:
-- ✅ Business logic platform-agnostic
-- ✅ Easy testing (HTTP, no SDK mocking)
-- ✅ Platform-independent
-- ✅ API-first preserved
+- ✅ Business logic testable over HTTP independently of any channel
+- ✅ No internal HTTP calls between feature interaction handlers and business logic
+- ✅ Channel protocol details (WebSocket, bot framework) isolated in infrastructure providers
+- ✅ Consistent service invocation path regardless of inbound channel
 
 ## Implementation
 
 ```
-infrastructure/platforms/
-├── base.py                  # BasePlatformProvider (interface)
+infrastructure/interactions/
+├── base.py                  # BaseInteractionProvider (interface)
+├── service.py               # InteractionService (central registry and dispatcher)
 └── providers/
-    ├── slack.py             # SlackPlatformProvider
-    ├── teams.py             # TeamsPlatformProvider
-    └── discord.py           # DiscordPlatformProvider
+    ├── slack.py             # SlackInteractionProvider
+    ├── teams.py             # TeamsInteractionProvider
+    └── discord.py           # DiscordInteractionProvider
 ```
 
 **Feature packages register capabilities**:
 ```python
-# packages/geolocate/platforms/slack.py
+# packages/geolocate/interactions/slack.py
 slack = get_slack_provider()
 
 slack.register_command(

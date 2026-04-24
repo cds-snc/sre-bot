@@ -15,15 +15,17 @@ packages/feature/
 ├── providers.py         — @lru_cache DI factory functions
 ├── store.py             — persistence layer
 ├── events.py            — domain event name constants
+├── presenters.py        — shared response shape mapping (optional)
 ├── adapters/            — Protocol-defined external integrations
 │   ├── __init__.py      — adapter Protocol contract
 │   └── <platform>.py   — platform-specific implementation
 ├── config/              — feature settings and config loaders
 │   ├── __init__.py
 │   └── settings.py
-└── transport/           — HTTP and chat platform handlers
-    ├── routes.py        — FastAPI route handlers
-    └── slack.py         — Slack command handlers
+└── interactions/        — inbound channel handlers (HTTP, Slack, Teams)
+    ├── ingress.py       — shared admission logic (optional)
+    ├── http.py          — FastAPI route handlers
+    └── slack.py         — Slack interaction handlers
 ```
 
 **Lean layout** (for simpler features without adapters or complex orchestration):
@@ -34,8 +36,8 @@ packages/feature/
 ├── domain.py            — internal dataclasses
 ├── service.py           — business logic
 ├── providers.py         — @lru_cache factory functions
-└── transport/
-    └── routes.py        — FastAPI route handlers
+└── interactions/
+    └── http.py          — FastAPI route handlers
 ```
 
 **Rules**:
@@ -57,7 +59,7 @@ packages/feature/
 Routes consume services and settings through Protocol-typed `Annotated[..., Depends(factory)]` parameters. Each route file declares a local structural Protocol for each dependency — this decouples the handler from the concrete implementation and makes test substitution straightforward. Factory functions come from `providers.py`.
 
 ```python
-# packages/feature/transport/routes.py
+# packages/feature/interactions/http.py
 from typing import Annotated, Protocol
 
 import structlog
@@ -308,8 +310,8 @@ class FeatureResponse(BaseModel):
 # packages/feature/__init__.py
 from infrastructure.services import hookimpl
 from packages.feature.providers import get_feature_settings, get_feature_service
-from packages.feature.transport.routes import router as feature_router
-from packages.feature.transport import slack
+from packages.feature.interactions.http import router as feature_router
+from packages.feature.interactions import slack
 
 
 @hookimpl

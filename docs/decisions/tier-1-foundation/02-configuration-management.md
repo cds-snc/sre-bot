@@ -2,7 +2,7 @@
 
 ## Settings Singleton Pattern
 
-ONE Settings instance per process via `@lru_cache`. Validation runs on first call; invalid config raises `ValidationError` and terminates startup.
+ONE Settings instance per process via `@lru_cache`. Validation runs on first call; invalid config raises `ValidationError` and terminates startup. Thread-safe for both sync and async handlers.
 
 ```python
 # infrastructure/services/providers.py
@@ -15,17 +15,25 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-**Routes** (FastAPI dependency injection):
+**Routes** (FastAPI dependency injection — sync or async):
 ```python
 import structlog
 from infrastructure.services import SettingsDep
 
 logger = structlog.get_logger()
 
+# Sync route (thread pool)
 @router.get("/example")
 def example(settings: SettingsDep):
     log = logger.bind()
     log.info("example_called")
+    return {"region": settings.aws.aws_region}
+
+# Async route (event loop) — preferred for I/O operations
+@router.get("/async-example")
+async def async_example(settings: SettingsDep):
+    log = logger.bind()
+    log.info("async_example_called")
     return {"region": settings.aws.aws_region}
 ```
 

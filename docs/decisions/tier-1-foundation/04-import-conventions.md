@@ -10,7 +10,7 @@
 
 ---
 
-## Application Code (Routes)
+## Application Code (Routes — Sync or Async)
 
 ```python
 import structlog
@@ -22,6 +22,7 @@ from modules.groups.api.schemas import AddMemberRequest, Response
 logger = structlog.get_logger()
 router = APIRouter()
 
+# Sync route (thread pool execution)
 @router.post("/add")
 def add_member(
     request: AddMemberRequest,
@@ -30,6 +31,17 @@ def add_member(
 ) -> Response:
     log = logger.bind(group_id=request.group_id)
     log.info("adding_member")
+    return Response(id="123")
+
+# Async route (event loop) — preferred for I/O operations
+@router.post("/add-async")
+async def add_member_async(
+    request: AddMemberRequest,
+    settings: SettingsDep,  # Same alias works
+    service: MyServiceDep,
+) -> Response:
+    log = logger.bind(group_id=request.group_id)
+    log.info("adding_member_async")
     return Response(id="123")
 ```
 
@@ -121,6 +133,7 @@ settings = Settings()
 - ✅ Application code uses `SettingsDep` or `get_settings()` from `infrastructure.services`
 - ✅ Services receive deps via constructor
 - ✅ Use `TYPE_CHECKING` for circular import avoidance
+- ✅ Both sync (`def`) and async (`async def`) handlers import identically; FastAPI handles execution
 - ❌ NEVER: Lazy imports (imports inside functions)
 - ❌ NEVER: Infrastructure services importing each other directly
 - ❌ NEVER: Application code importing from `infrastructure.configuration`

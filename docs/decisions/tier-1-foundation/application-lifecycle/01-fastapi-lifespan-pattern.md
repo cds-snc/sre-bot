@@ -69,18 +69,27 @@ app.include_router(router)
 
 ## State Storage
 
-Store initialization state in `app.state`:
+Store lifespan resources in `app.state` for graceful shutdown teardown only. Route handlers must always use `Depends()` — never access `request.app.state` in handlers.
 
 ```python
-# During startup
+# During startup — store for graceful shutdown reference only
 app.state.settings = settings
 app.state.providers = providers
+```
 
-# Access in request handlers
+```python
+# ✅ CORRECT: routes use Depends()
+from infrastructure.services import SettingsDep
+
+@router.get("/example")
+def example(settings: SettingsDep):
+    return {"region": settings.aws.aws_region}
+
+# ❌ FORBIDDEN: accessing app.state in a route handler
 from fastapi import Request
 
 def handler(request: Request):
-    settings = request.app.state.settings
+    settings = request.app.state.settings  # WRONG
 ```
 
 ---
@@ -90,6 +99,7 @@ def handler(request: Request):
 - ✅ Use `@asynccontextmanager` decorator
 - ✅ Code before `yield` = startup
 - ✅ Code after `yield` = shutdown
-- ✅ Store state in `app.state`
+- ✅ Store lifespan resources in `app.state` (shutdown teardown reference only)
 - ❌ NEVER: `app.add_event_handler("startup", ...)`
 - ❌ NEVER: `app.add_event_handler("shutdown", ...)`
+- ❌ NEVER: access `request.app.state` in route handlers — use `Depends()` instead
