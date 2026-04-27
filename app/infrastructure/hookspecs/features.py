@@ -7,7 +7,7 @@ Covers the full lifecycle of a feature package:
 """
 
 import pluggy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Protocol
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -18,6 +18,19 @@ if TYPE_CHECKING:
     from infrastructure.i18n.resources import I18nResourceRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
+
+
+class BackgroundJobRegistry(Protocol):
+    """Scheduler-agnostic registry for feature background jobs."""
+
+    def register(
+        self,
+        *,
+        job_name: str,
+        schedule: str,
+        job: Callable[[], None],
+    ) -> None:
+        """Register a recurring background job by name and schedule."""
 
 
 @hookspec
@@ -73,6 +86,18 @@ def startup_warmup(logger: "BoundLogger") -> None:
 
     Args:
         logger: Structured logger for recording initialization events.
+    """
+
+
+@hookspec
+def register_background_job(registry: "BackgroundJobRegistry") -> None:
+    """Register recurring feature jobs through the scheduler boundary.
+
+    Called during scheduler initialization at startup. Implementations should
+    register deterministic recurring jobs when feature settings require them.
+
+    Args:
+        registry: Scheduler-agnostic registry adapter used to register jobs.
     """
 
 
