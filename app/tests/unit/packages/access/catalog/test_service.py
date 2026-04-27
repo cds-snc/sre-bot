@@ -1,14 +1,17 @@
 """Unit tests for packages.access.catalog.service."""
 
+import json
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 from infrastructure.directory.models import DirectoryGroup, MembershipCheckResult
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access.catalog import providers as catalog_providers
 from packages.access.catalog.domain import ParsedEntitlementToken
 from packages.access.catalog.service import CatalogService
 from packages.access.common.config import (
     AccessRuntimeConfig as AccessSyncRuntimeConfig,
+    InlineJsonConfigLoader,
     PlatformPolicy,
 )
 
@@ -153,6 +156,48 @@ def test_list_platforms_should_fall_back_to_platform_key_as_display_name():
     # Assert
     assert result.is_success
     assert result.data[0].display_name == "aws"
+
+
+def test_list_platforms_should_use_display_name_from_runtime_extensions_via_provider_assembly(
+    monkeypatch,
+):
+    payload = {
+        "dir_prefix": "sg",
+        "dir_separator": "-",
+        "platforms": {
+            "aws": {
+                "authn_token": "authn",
+                "authn_removal_mode": "delete",
+                "mode_overrides": {},
+            }
+        },
+        "extensions": {
+            "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
+        },
+    }
+    result = InlineJsonConfigLoader().load(json.dumps(payload))
+    assert result.is_success
+    assert result.data is not None
+
+    catalog_providers._build_parser_map.cache_clear()
+    catalog_providers.get_catalog_service.cache_clear()
+    monkeypatch.setattr(
+        catalog_providers,
+        "get_access_runtime_config",
+        lambda: result.data,
+    )
+    monkeypatch.setattr(
+        catalog_providers,
+        "get_directory_provider",
+        lambda: _FakeDirectory(),
+    )
+
+    service = catalog_providers.get_catalog_service()
+    platforms = service.list_platforms()
+
+    assert platforms.is_success
+    assert platforms.data is not None
+    assert platforms.data[0].display_name == "Amazon Web Services"
 
 
 def test_list_platforms_should_derive_authn_group_slug_from_config():

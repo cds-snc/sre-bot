@@ -115,7 +115,7 @@ def test_check_entitlement_mode_returns_sync_managed_by_default():
 
 @pytest.mark.unit
 def test_check_entitlement_mode_returns_override_when_set():
-    config = make_config(platform="aws", mode_overrides={"sg-aws-admins": "ephemeral"})
+    config = make_config(platform="aws", mode_overrides={"admins": "ephemeral"})
     mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-admins")
     assert mode == "ephemeral"
 
@@ -129,16 +129,14 @@ def test_check_entitlement_mode_returns_deactivated_for_unknown_platform():
 
 @pytest.mark.unit
 def test_check_entitlement_mode_deactivated_override():
-    config = make_config(
-        platform="aws", mode_overrides={"sg-aws-admins": "deactivated"}
-    )
+    config = make_config(platform="aws", mode_overrides={"admins": "deactivated"})
     mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-admins")
     assert mode == "deactivated"
 
 
 @pytest.mark.unit
 def test_check_entitlement_mode_other_slug_not_overridden():
-    config = make_config(platform="aws", mode_overrides={"sg-aws-admins": "ephemeral"})
+    config = make_config(platform="aws", mode_overrides={"admins": "ephemeral"})
     mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-devs")
     assert mode == "sync_managed"
 

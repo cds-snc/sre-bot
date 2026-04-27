@@ -209,9 +209,7 @@ def test_submit_request_should_reject_when_group_not_found():
 
 @pytest.mark.unit
 def test_submit_request_should_reject_when_mode_is_deactivated():
-    config = make_config(
-        platform="aws", mode_overrides={"sg-aws-admins": "deactivated"}
-    )
+    config = make_config(platform="aws", mode_overrides={"admins": "deactivated"})
     service, _, _ = make_service(config=config)
 
     result = service.submit_request(
@@ -231,7 +229,7 @@ def test_submit_request_should_reject_when_mode_is_deactivated():
 
 @pytest.mark.unit
 def test_submit_request_should_reject_when_mode_is_ephemeral():
-    config = make_config(platform="aws", mode_overrides={"sg-aws-admins": "ephemeral"})
+    config = make_config(platform="aws", mode_overrides={"admins": "ephemeral"})
     service, _, _ = make_service(config=config)
 
     result = service.submit_request(
@@ -247,6 +245,26 @@ def test_submit_request_should_reject_when_mode_is_ephemeral():
 
     assert not result.is_success
     assert result.error_code == "ENTITLEMENT_MODE_EPHEMERAL"
+
+
+@pytest.mark.unit
+def test_submit_request_should_reject_when_mode_is_deactivated_with_token_key_override():
+    config = make_config(platform="aws", mode_overrides={"admins": "deactivated"})
+    service, _, _ = make_service(config=config)
+
+    result = service.submit_request(
+        user_email="user@example.com",
+        actor_email="user@example.com",
+        actor_type="self",
+        request_type="grant",
+        platform="aws",
+        group_slug="sg-aws-admins",
+        entitlement_type="group",
+        justification="Need access.",
+    )
+
+    assert not result.is_success
+    assert result.error_code == "ENTITLEMENT_MODE_DEACTIVATED"
 
 
 @pytest.mark.unit
