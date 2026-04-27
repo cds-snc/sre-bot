@@ -9,6 +9,7 @@ on:
       - ".devcontainer/**"
       - ".github/**"
       - "terraform/**"
+      - "docs/**"
 
 env:
   GITHUB_SHA: ${{ github.sha }}
