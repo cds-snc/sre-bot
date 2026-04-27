@@ -51,8 +51,10 @@ def startup_warmup(logger) -> None:
 
     Also eagerly initializes the coordinator and all providers when the feature
     is enabled, so the first sync request is not delayed by config loading,
-    adapter construction, and directory-provider wiring. Failures are logged
-    with actionable hints but do not crash the process.
+    adapter construction, and directory-provider wiring.
+
+    For enabled paths, startup failures are fatal and must propagate so
+    misconfiguration is detected before traffic.
     """
     settings = get_access_sync_settings()
     logger.info(
@@ -68,18 +70,11 @@ def startup_warmup(logger) -> None:
         )
         return
 
-    try:
-        # Validate runtime config at startup to surface misconfiguration early.
-        get_access_runtime_config()
-        _register_request_handlers()
-        get_access_sync_coordinator()
-        logger.info("access_sync_providers_warmed")
-    except Exception as exc:
-        logger.error(
-            "access_sync_provider_warmup_failed",
-            error=str(exc),
-            hint="Check ACCESS_CONFIG_SOURCE and ACCESS_CONFIG_REF.",
-        )
+    # Validate runtime config and provider assembly before serving traffic.
+    get_access_runtime_config()
+    _register_request_handlers()
+    get_access_sync_coordinator()
+    logger.info("access_sync_providers_warmed")
 
 
 @hookimpl

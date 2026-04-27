@@ -2,14 +2,21 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
+from fastapi import FastAPI
 from fastapi import Response
+from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.services import get_current_user
+from packages.access.sync.providers import (
+    get_access_sync_coordinator,
+    get_access_sync_settings,
+)
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.schemas import UserSyncRequest
 from packages.access.sync.job_runner import run_user_sync_job
-from packages.access.sync.transport.routes import sync_endpoint
+from packages.access.sync.transport.routes import router, sync_endpoint
 
 
 class _FakeCoordinator:
@@ -168,6 +175,41 @@ def test_sync_endpoint_returns_503_when_disabled():
             )
 
     assert exc_info.value.status_code == 503
+
+
+@pytest.mark.unit
+def test_sync_endpoint_returns_503_without_coordinator_dependency_assembly():
+    app = FastAPI()
+    app.include_router(router)
+
+    coordinator_provider_called = False
+
+    def _coordinator_provider() -> _FakeCoordinator:
+        nonlocal coordinator_provider_called
+        coordinator_provider_called = True
+        raise AssertionError("coordinator dependency should not be assembled")
+
+    app.dependency_overrides[get_access_sync_settings] = lambda: _Settings(
+        enabled=False
+    )
+    app.dependency_overrides[get_access_sync_coordinator] = _coordinator_provider
+    app.dependency_overrides[get_current_user] = _make_user
+
+    client = TestClient(app)
+    response = client.post(
+        "/access/sync-runs",
+        json={
+            "sync_type": "user",
+            "user_email": "user@example.com",
+            "platform": "aws",
+            "dry_run": False,
+            "request_id": "req-1",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Access Sync is not enabled"
+    assert coordinator_provider_called is False
 
 
 # ---------------------------------------------------------------------------

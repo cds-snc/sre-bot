@@ -8,16 +8,24 @@ protocol used in test_routes patterns across this codebase.
 from typing import Optional
 
 import pytest
+from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.services import get_current_user
+from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 from packages.access.catalog.domain import (
     EntitlementEntry,
     ParsedEntitlementToken,
     PlatformSummary,
 )
-from packages.access.catalog.transport.routes import list_entitlements, list_platforms
+from packages.access.catalog.transport.routes import (
+    list_entitlements,
+    list_platforms,
+    router,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +200,32 @@ def test_list_entitlements_should_return_503_when_feature_disabled():
         )
 
     assert exc_info.value.status_code == 503
+
+
+@pytest.mark.unit
+def test_list_platforms_returns_503_without_service_dependency_assembly():
+    app = FastAPI()
+    app.include_router(router)
+
+    service_provider_called = False
+
+    def _service_provider() -> _FakeCatalogService:
+        nonlocal service_provider_called
+        service_provider_called = True
+        raise AssertionError("catalog service dependency should not be assembled")
+
+    app.dependency_overrides[get_catalog_settings] = lambda: _FakeSettings(
+        enabled=False
+    )
+    app.dependency_overrides[get_catalog_service] = _service_provider
+    app.dependency_overrides[get_current_user] = _make_user
+
+    client = TestClient(app)
+    response = client.get("/access/catalog")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Access Catalog is not enabled"
+    assert service_provider_called is False
 
 
 # ---------------------------------------------------------------------------

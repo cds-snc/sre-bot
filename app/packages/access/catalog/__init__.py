@@ -36,17 +36,10 @@ def startup_warmup(logger) -> None:
         )
         return
 
-    try:
-        # Validate runtime config source at startup (fail-fast behavior).
-        get_access_runtime_config()
-        get_catalog_service()
-        logger.info("access_catalog_providers_warmed")
-    except Exception as exc:
-        logger.error(
-            "access_catalog_provider_warmup_failed",
-            error=str(exc),
-            hint="Check ACCESS_CONFIG_SOURCE / ACCESS_CONFIG_REF.",
-        )
+    # Validate runtime config and provider assembly before serving traffic.
+    get_access_runtime_config()
+    get_catalog_service()
+    logger.info("access_catalog_providers_warmed")
 
 
 __all__ = ["access_catalog_router"]

@@ -50,3 +50,34 @@ def test_catalog_startup_warmup_validates_runtime_config(monkeypatch):
 
     assert runtime_config_called is True
     assert provider_warm_called is True
+
+
+@pytest.mark.unit
+def test_catalog_startup_warmup_raises_when_enabled_runtime_config_is_invalid(
+    monkeypatch,
+):
+    catalog_pkg = _reload_catalog_package()
+
+    class _Settings:
+        enabled = True
+
+    monkeypatch.setattr(catalog_pkg, "get_catalog_settings", lambda: _Settings())
+    monkeypatch.setattr(
+        catalog_pkg,
+        "get_access_runtime_config",
+        lambda: (_ for _ in ()).throw(RuntimeError("invalid runtime config")),
+        raising=False,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid runtime config"):
+        catalog_pkg.startup_warmup(
+            logger=type(
+                "L",
+                (),
+                {
+                    "info": lambda *a, **k: None,
+                    "warning": lambda *a, **k: None,
+                    "error": lambda *a, **k: None,
+                },
+            )()
+        )

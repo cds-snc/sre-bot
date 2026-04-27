@@ -84,6 +84,18 @@ def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:
     return HTTPException(status_code=500, detail=message)
 
 
+def _resolve_coordinator(
+    coordinator: _AccessSyncCoordinatorPort | None,
+) -> _AccessSyncCoordinatorPort:
+    """Resolve coordinator lazily after feature-gate checks."""
+    return coordinator if coordinator is not None else get_access_sync_coordinator()
+
+
+def _noop_coordinator() -> _AccessSyncCoordinatorPort | None:
+    """No-op dependency used to defer coordinator assembly until after gating."""
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -105,13 +117,13 @@ def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:
 def sync_endpoint(
     request: AccessSyncRequest,
     response: Response,
-    coordinator: Annotated[
-        _AccessSyncCoordinatorPort, Depends(get_access_sync_coordinator)
-    ],
     settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
     current_user: Annotated[
         User, Security(get_current_user, scopes=["sre-bot:access-sync"])
     ],
+    coordinator: Annotated[
+        _AccessSyncCoordinatorPort | None, Depends(_noop_coordinator)
+    ] = None,
 ) -> Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse]:
     """Enqueue an on-demand user sync or a full platform sync job."""
     log = logger.bind(
@@ -123,11 +135,16 @@ def sync_endpoint(
     )
     log.info("sync_request")
 
+    if not settings.enabled:
+        raise HTTPException(status_code=503, detail="Access Sync is not enabled")
+
+    coordinator_dep = _resolve_coordinator(coordinator)
+
     idempotency = get_idempotency_service()
 
     if isinstance(request, UserSyncRequest):
         result = enqueue_user_sync(
-            coordinator=coordinator,
+            coordinator=coordinator_dep,
             idempotency=idempotency,
             settings=settings,
             user_email=str(request.user_email),
@@ -153,7 +170,7 @@ def sync_endpoint(
 
     # Platform sync
     result = enqueue_platform_sync(
-        coordinator=coordinator,
+        coordinator=coordinator_dep,
         idempotency=idempotency,
         settings=settings,
         platform=request.platform,

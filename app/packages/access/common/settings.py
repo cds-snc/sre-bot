@@ -24,7 +24,7 @@ not part of this env-var settings consolidation.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,16 +32,24 @@ class AccessConfigSettings(BaseModel):
     """Bootstrap: how to locate the AccessRuntimeConfig document.
 
     Env vars:
-        ACCESS_CONFIG_SOURCE  — loader backend (bundle | inline_json | file_json | env | dynamodb | s3 | ssm)
+        ACCESS_CONFIG_SOURCE  — loader backend (bundle | inline_json | file_json | env)
         ACCESS_CONFIG_REF     — reference key passed to the loader (table row PK, S3 key, etc.)
         ACCESS_CONFIG_REFRESH_SECONDS — reserved for future cache invalidation
     """
 
-    source: Literal[
-        "bundle", "inline_json", "file_json", "env", "dynamodb", "s3", "ssm"
-    ] = "bundle"
+    source: Literal["bundle", "inline_json", "file_json", "env"] = "bundle"
     ref: str = "default"
     refresh_seconds: int = 300
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _validate_source(cls, value: object) -> object:
+        allowed = {"bundle", "inline_json", "file_json", "env"}
+        if isinstance(value, str) and value not in allowed:
+            raise ValueError(
+                "ACCESS_CONFIG_SOURCE must be one of: bundle, inline_json, file_json, env"
+            )
+        return value
 
 
 class AccessSyncSettings(BaseModel):

@@ -143,6 +143,13 @@ def test_check_entitlement_mode_other_slug_not_overridden():
     assert mode == "sync_managed"
 
 
+@pytest.mark.unit
+def test_check_entitlement_mode_uses_token_keyed_override_semantics():
+    config = make_config(platform="aws", mode_overrides={"admins": "ephemeral"})
+    mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-admins")
+    assert mode == "ephemeral"
+
+
 # ---------------------------------------------------------------------------
 # resolve_approver_candidates
 # ---------------------------------------------------------------------------

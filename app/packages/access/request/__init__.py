@@ -62,21 +62,11 @@ def startup_warmup(logger) -> None:
         )
         return
 
-    try:
-        # Fail fast on misconfigured runtime config sources.
-        get_access_runtime_config()
-        _register_sync_event_handlers()
-        get_access_request_service()
-        logger.info("access_requests_providers_warmed")
-    except Exception as exc:
-        logger.error(
-            "access_requests_provider_warmup_failed",
-            error=str(exc),
-            hint=(
-                "Check ACCESS_CONFIG_SOURCE / ACCESS_CONFIG_REF "
-                "and ACCESS_REQUESTS_* env vars."
-            ),
-        )
+    # Fail fast on misconfigured runtime config or provider wiring.
+    get_access_runtime_config()
+    _register_sync_event_handlers()
+    get_access_request_service()
+    logger.info("access_requests_providers_warmed")
 
 
 __all__ = ["access_requests_router"]

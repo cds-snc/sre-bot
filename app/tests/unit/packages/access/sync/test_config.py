@@ -6,6 +6,7 @@ import pytest
 
 from packages.access.common.config import (
     BundleConfigLoader,
+    EnvConfigLoader,
     FileJsonConfigLoader,
     InlineJsonConfigLoader,
     get_access_config_loader,
@@ -116,3 +117,64 @@ def test_inline_json_config_loader_parses_platforms():
     assert "aws" in result.data.platforms
     assert result.data.group_prefix("aws") == "sg-aws-"
     assert result.data.authn_group_slug("aws") == "sg-aws-authn"
+
+
+@pytest.mark.unit
+def test_inline_json_loader_preserves_extensions_for_catalog():
+    payload = json.dumps(
+        {
+            "dir_prefix": "sg",
+            "dir_separator": "-",
+            "platforms": {
+                "aws": {
+                    "authn_token": "authn",
+                    "authn_removal_mode": "delete",
+                    "mode_overrides": {},
+                }
+            },
+            "extensions": {
+                "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
+            },
+        }
+    )
+
+    result = InlineJsonConfigLoader().load(payload)
+
+    assert result.is_success
+    assert result.data is not None
+    assert result.data.extensions == {
+        "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
+    }
+
+
+@pytest.mark.unit
+def test_env_config_loader_reads_access_config_env_names(monkeypatch):
+    monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_PREFIX", "sg")
+    monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_SEPARATOR", "-")
+    monkeypatch.setenv(
+        "ACCESS_CONFIG_ENV_PLATFORMS_JSON",
+        '{"aws": {"authn_token": "authn", "authn_removal_mode": "delete", "mode_overrides": {}}}',
+    )
+
+    result = EnvConfigLoader().load("unused")
+
+    assert result.is_success
+    assert result.data is not None
+    assert result.data.dir_prefix == "sg"
+    assert "aws" in result.data.platforms
+
+
+@pytest.mark.unit
+def test_env_config_loader_rejects_legacy_access_sync_env_names(monkeypatch):
+    monkeypatch.setenv("ACCESS_SYNC_DIR_PREFIX", "sg")
+    monkeypatch.setenv("ACCESS_SYNC_DIR_SEPARATOR", "-")
+    monkeypatch.setenv(
+        "ACCESS_SYNC_PLATFORMS_JSON",
+        '{"aws": {"authn_token": "authn", "authn_removal_mode": "delete", "mode_overrides": {}}}',
+    )
+
+    result = EnvConfigLoader().load("unused")
+
+    assert not result.is_success
+    assert result.error_code == "CONFIG_INVALID_SHAPE"
+    assert "ACCESS_CONFIG_ENV_DIR_PREFIX" in (result.message or "")
