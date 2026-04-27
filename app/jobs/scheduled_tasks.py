@@ -1,5 +1,6 @@
 import threading
 import time
+from typing import Any, Callable
 import schedule
 
 from structlog import get_logger
@@ -11,18 +12,37 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
+from infrastructure.services.plugins.manager import get_plugin_manager
 
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_runtime_config,
-    get_access_sync_settings,
 )
 
 logger = get_logger()
+schedule_lib = schedule
 
 
-def safe_run(job):
-    def wrapper(*args, **kwargs):
+class _ScheduleBackgroundJobRegistry:
+    """Adapter that binds feature jobs to the schedule library."""
+
+    def register(
+        self,
+        *,
+        job_name: str,
+        schedule: str,
+        job: Callable[[], None],
+    ) -> None:
+        schedule_lib.every().day.at(schedule).do(safe_run(job))
+        logger.info(
+            "feature_background_job_scheduled",
+            job_name=job_name,
+            schedule=schedule,
+        )
+
+
+def safe_run(job: Callable[..., Any]) -> Callable[..., None]:
+    def wrapper(*args: Any, **kwargs: Any) -> None:
         try:
             job(*args, **kwargs)
         except Exception as e:
@@ -54,14 +74,8 @@ def init(bot):
         safe_run(spending.generate_spending_data), logger=logger
     )
 
-    access_sync_settings = get_access_sync_settings()
-    if access_sync_settings.enabled and access_sync_settings.reconciliation_enabled:
-        reconcile_time = access_sync_settings.reconciliation_schedule
-        schedule.every().day.at(reconcile_time).do(safe_run(reconcile_access_sync))
-        logger.info(
-            "access_sync_reconciliation_scheduled",
-            time=reconcile_time,
-        )
+    registry = _ScheduleBackgroundJobRegistry()
+    get_plugin_manager().hook.register_background_job(registry=registry)
 
 
 def scheduler_heartbeat():
@@ -75,7 +89,7 @@ def integration_healthchecks():
     logger.info(
         "running_integration_healthchecks", module="scheduled_tasks", time=time.ctime()
     )
-    healthchecks = {
+    healthchecks: dict[str, Callable[[], bool]] = {
         "google_drive": google_drive.healthcheck,
         "maxmind": maxmind.healthcheck,
         "opsgenie": opsgenie.healthcheck,
