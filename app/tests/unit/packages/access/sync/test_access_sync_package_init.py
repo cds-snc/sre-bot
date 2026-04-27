@@ -129,3 +129,34 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
     )
 
     assert len(dispatcher.get_handlers_for_event(REQUEST_APPROVED)) == 1
+
+
+@pytest.mark.unit
+def test_sync_startup_warmup_raises_when_enabled_runtime_config_is_invalid(monkeypatch):
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        enabled = True
+        reconciliation_enabled = False
+        reconciliation_schedule = "03:00"
+
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+    monkeypatch.setattr(
+        sync_pkg,
+        "get_access_runtime_config",
+        lambda: (_ for _ in ()).throw(RuntimeError("invalid runtime config")),
+        raising=False,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid runtime config"):
+        sync_pkg.startup_warmup(
+            logger=type(
+                "L",
+                (),
+                {
+                    "info": lambda *a, **k: None,
+                    "warning": lambda *a, **k: None,
+                    "error": lambda *a, **k: None,
+                },
+            )()
+        )
