@@ -71,37 +71,39 @@ class AccessRequestServicePort(Protocol):
         entitlement_type: str,
         justification: str,
         ticket_id: Optional[str] = None,
-    ) -> OperationResult: ...
+    ) -> OperationResult[AccessRequest]: ...
 
     def approve_request(
         self,
         request_id: str,
         approver_email: str,
         comment: str = "",
-    ) -> OperationResult: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def reject_request(
         self,
         request_id: str,
         approver_email: str,
         comment: str,
-    ) -> OperationResult: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def cancel_request(
         self,
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def retry_request(
         self,
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
-    def get_request_status(self, request_id: str) -> OperationResult: ...
+    def get_request_status(
+        self, request_id: str
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def advance_from_sync_result(self, event: Event) -> None: ...
 
@@ -154,7 +156,7 @@ class AccessRequestService:
         entitlement_type: str,
         justification: str,
         ticket_id: Optional[str] = None,
-    ) -> OperationResult:
+    ) -> OperationResult[AccessRequest]:
         """Accept and process a new access request through intake.
 
         Flow:
@@ -483,7 +485,7 @@ class AccessRequestService:
         request_id: str,
         approver_email: str,
         comment: str = "",
-    ) -> OperationResult:
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Record an approval decision and advance state when threshold is met.
 
         Flow:
@@ -629,7 +631,7 @@ class AccessRequestService:
         request_id: str,
         approver_email: str,
         comment: str,
-    ) -> OperationResult:
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Record a rejection decision and close the request.
 
         Returns:
@@ -714,7 +716,7 @@ class AccessRequestService:
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult:
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Cancel a pending request at the requester's initiative.
 
         Only ``submitted`` or ``pending_approval`` requests may be cancelled.
@@ -786,7 +788,7 @@ class AccessRequestService:
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult:
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Re-attempt IDP provisioning for a request that previously failed.
 
         Only ``failed`` requests can be retried.  Only an actor present in
@@ -903,7 +905,9 @@ class AccessRequestService:
             message="Retry succeeded. Access provisioning re-triggered.",
         )
 
-    def get_request_status(self, request_id: str) -> OperationResult:
+    def get_request_status(
+        self, request_id: str
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Return the access request and all recorded decisions.
 
         Returns:
