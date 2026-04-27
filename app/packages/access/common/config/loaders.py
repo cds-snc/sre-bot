@@ -8,17 +8,14 @@ Config loader sources:
     bundle      - Built-in empty bundle. Default for local development.
     inline_json - Parse ACCESS_CONFIG_REF as inline JSON text.
     file_json   - Read ACCESS_CONFIG_REF as a path to a local JSON file.
-    env         - Read from ACCESS_SYNC_DIR_PREFIX / ACCESS_SYNC_PLATFORMS_JSON.
-    dynamodb    - Load from a DynamoDB item (reserved; not yet implemented).
-    s3          - Load from an S3 object (reserved; not yet implemented).
-    ssm         - Load from an SSM parameter (reserved; not yet implemented).
+    env         - Read from ACCESS_CONFIG_ENV_DIR_PREFIX / ACCESS_CONFIG_ENV_PLATFORMS_JSON.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Protocol
+from typing import Any, Dict, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -93,6 +90,7 @@ class RuntimeConfigJsonModel(BaseModel):
     dir_prefix: str
     dir_separator: str = "-"
     platforms: Dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
+    extensions: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +102,7 @@ def _build_runtime_config(
     dir_prefix: str,
     dir_separator: str,
     platforms_model: Dict[str, PlatformPolicyConfigModel],
+    extensions: Dict[str, Any] | None = None,
 ) -> AccessRuntimeConfig:
     """Convert validated JSON platform models into ``AccessRuntimeConfig``."""
     platforms: Dict[str, PlatformPolicy] = {}
@@ -118,6 +117,7 @@ def _build_runtime_config(
         dir_prefix=dir_prefix,
         dir_separator=dir_separator,
         platforms=platforms,
+        extensions=dict(extensions or {}),
     )
 
 
@@ -138,6 +138,7 @@ def _validate_runtime_config_payload(
         dir_prefix=validated.dir_prefix,
         dir_separator=validated.dir_separator,
         platforms_model=validated.platforms,
+        extensions=validated.extensions,
     )
     return OperationResult.success(
         data=config,
@@ -187,15 +188,17 @@ class EnvConfigLoader:
     """Builds AccessRuntimeConfig from individual env vars.
 
     Reads:
-        ACCESS_SYNC_DIR_PREFIX     — IDP group prefix (e.g. ``sg``)
-        ACCESS_SYNC_DIR_SEPARATOR  — segment separator; default ``-``
-        ACCESS_SYNC_PLATFORMS_JSON — platforms block as a JSON string
+        ACCESS_CONFIG_ENV_DIR_PREFIX     — IDP group prefix (e.g. ``sg``)
+        ACCESS_CONFIG_ENV_DIR_SEPARATOR  — segment separator; default ``-``
+        ACCESS_CONFIG_ENV_PLATFORMS_JSON — platforms block as a JSON string
     """
 
     class _EnvModel(BaseSettings):
-        dir_prefix: str = Field(default="", alias="ACCESS_SYNC_DIR_PREFIX")
-        dir_separator: str = Field(default="-", alias="ACCESS_SYNC_DIR_SEPARATOR")
-        platforms_json: str = Field(default="{}", alias="ACCESS_SYNC_PLATFORMS_JSON")
+        dir_prefix: str = Field(default="", alias="ACCESS_CONFIG_ENV_DIR_PREFIX")
+        dir_separator: str = Field(default="-", alias="ACCESS_CONFIG_ENV_DIR_SEPARATOR")
+        platforms_json: str = Field(
+            default="{}", alias="ACCESS_CONFIG_ENV_PLATFORMS_JSON"
+        )
 
         model_config = SettingsConfigDict(
             env_file=".env",
@@ -208,7 +211,7 @@ class EnvConfigLoader:
         if not env.dir_prefix:
             return OperationResult.error(
                 status=OperationStatus.PERMANENT_ERROR,
-                message="env_config_missing_dir_prefix: ACCESS_SYNC_DIR_PREFIX must be set",
+                message="env_config_missing_dir_prefix: ACCESS_CONFIG_ENV_DIR_PREFIX must be set",
                 error_code="CONFIG_INVALID_SHAPE",
             )
         try:
@@ -284,14 +287,13 @@ def get_access_config_loader(source: str) -> AccessConfigLoader:
     """Return the config loader for the given source string.
 
     Args:
-        source: One of 'bundle', 'inline_json', 'file_json', 'env',
-            'dynamodb', 's3', 'ssm'.
+        source: One of 'bundle', 'inline_json', 'file_json', 'env'.
 
     Returns:
         An AccessConfigLoader instance.
 
     Raises:
-        NotImplementedError: For sources that are not yet implemented.
+        ValueError: If the source is unsupported.
     """
     if source == "bundle":
         return BundleConfigLoader()
@@ -301,7 +303,7 @@ def get_access_config_loader(source: str) -> AccessConfigLoader:
         return FileJsonConfigLoader()
     if source == "env":
         return EnvConfigLoader()
-    raise NotImplementedError(
-        f"Access config source '{source}' is not yet implemented. "
-        "Use ACCESS_CONFIG_SOURCE=bundle, inline_json, file_json, or env."
+    raise ValueError(
+        f"Unsupported ACCESS_CONFIG_SOURCE '{source}'. "
+        "Use bundle, inline_json, file_json, or env."
     )
