@@ -52,7 +52,7 @@ def _runtime_config(mode_overrides: dict[str, str]) -> AccessRuntimeConfig:
 def _catalog_mode(config: AccessRuntimeConfig) -> tuple[str, bool]:
     service = CatalogService(
         runtime_config=config,
-        directory=_FakeDirectory(
+        directory=_FakeDirectory(  # type: ignore[arg-type]
             groups=[
                 DirectoryGroup(
                     group_email="sg-aws-admins@example.com",

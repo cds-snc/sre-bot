@@ -148,10 +148,10 @@ def make_service(
             OperationResult.success()
         )  # IDP write succeeds by default
     service = AccessRequestService(
-        repository=repo,
+        repository=repo,  # type: ignore[arg-type]
         directory=directory,
         runtime_config=config or make_config(),
-        dispatcher=dispatcher,
+        dispatcher=dispatcher,  # type: ignore[arg-type]
         fallback_approver_slug=fallback_approver_slug,
         min_approver_count=min_approver_count,
     )
@@ -309,6 +309,7 @@ def test_submit_request_should_auto_approve_delegated_requests():
     )
 
     assert result.is_success
+    assert result.data is not None
     assert result.data.status == "approved"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" in event_types
@@ -359,6 +360,7 @@ def test_approve_request_should_transition_to_approved():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit.data is not None
     request_id = submit.data.request_id
 
     result = service.approve_request(
@@ -390,6 +392,7 @@ def test_approve_request_should_reject_self_approval():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit.data is not None
     # Force actor into resolved_approvers for this test
     from dataclasses import replace
 
@@ -420,7 +423,7 @@ def test_approve_request_should_reject_unauthorized_approver():
         entitlement_type="group",
         justification="Need access.",
     )
-
+    assert submit.data is not None
     result = service.approve_request(
         request_id=submit.data.request_id,
         approver_email="not-an-approver@example.com",
@@ -823,6 +826,7 @@ def test_retry_request_should_fail_when_not_in_failed_state():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit_result.data is not None
     request_id = submit_result.data.request_id
 
     result = service.retry_request(
