@@ -60,9 +60,6 @@ def check_entitlement_mode(
         token = normalized_slug[len(prefix) :]
 
     override = platform_policy.mode_overrides.get(token)
-    if override is None:
-        # Compatibility fallback for pre-standardization documents.
-        override = platform_policy.mode_overrides.get(normalized_slug)
     if override is not None:
         return override
     return "sync_managed"

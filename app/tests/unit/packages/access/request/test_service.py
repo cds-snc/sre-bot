@@ -148,10 +148,10 @@ def make_service(
             OperationResult.success()
         )  # IDP write succeeds by default
     service = AccessRequestService(
-        repository=repo,
+        repository=repo,  # type: ignore[arg-type]
         directory=directory,
         runtime_config=config or make_config(),
-        dispatcher=dispatcher,
+        dispatcher=dispatcher,  # type: ignore[arg-type]
         fallback_approver_slug=fallback_approver_slug,
         min_approver_count=min_approver_count,
     )
@@ -209,9 +209,7 @@ def test_submit_request_should_reject_when_group_not_found():
 
 @pytest.mark.unit
 def test_submit_request_should_reject_when_mode_is_deactivated():
-    config = make_config(
-        platform="aws", mode_overrides={"sg-aws-admins": "deactivated"}
-    )
+    config = make_config(platform="aws", mode_overrides={"admins": "deactivated"})
     service, _, _ = make_service(config=config)
 
     result = service.submit_request(
@@ -231,7 +229,7 @@ def test_submit_request_should_reject_when_mode_is_deactivated():
 
 @pytest.mark.unit
 def test_submit_request_should_reject_when_mode_is_ephemeral():
-    config = make_config(platform="aws", mode_overrides={"sg-aws-admins": "ephemeral"})
+    config = make_config(platform="aws", mode_overrides={"admins": "ephemeral"})
     service, _, _ = make_service(config=config)
 
     result = service.submit_request(
@@ -247,6 +245,26 @@ def test_submit_request_should_reject_when_mode_is_ephemeral():
 
     assert not result.is_success
     assert result.error_code == "ENTITLEMENT_MODE_EPHEMERAL"
+
+
+@pytest.mark.unit
+def test_submit_request_should_reject_when_mode_is_deactivated_with_token_key_override():
+    config = make_config(platform="aws", mode_overrides={"admins": "deactivated"})
+    service, _, _ = make_service(config=config)
+
+    result = service.submit_request(
+        user_email="user@example.com",
+        actor_email="user@example.com",
+        actor_type="self",
+        request_type="grant",
+        platform="aws",
+        group_slug="sg-aws-admins",
+        entitlement_type="group",
+        justification="Need access.",
+    )
+
+    assert not result.is_success
+    assert result.error_code == "ENTITLEMENT_MODE_DEACTIVATED"
 
 
 @pytest.mark.unit
@@ -291,6 +309,7 @@ def test_submit_request_should_auto_approve_delegated_requests():
     )
 
     assert result.is_success
+    assert result.data is not None
     assert result.data.status == "approved"
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" in event_types
@@ -341,6 +360,7 @@ def test_approve_request_should_transition_to_approved():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit.data is not None
     request_id = submit.data.request_id
 
     result = service.approve_request(
@@ -372,6 +392,7 @@ def test_approve_request_should_reject_self_approval():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit.data is not None
     # Force actor into resolved_approvers for this test
     from dataclasses import replace
 
@@ -402,7 +423,7 @@ def test_approve_request_should_reject_unauthorized_approver():
         entitlement_type="group",
         justification="Need access.",
     )
-
+    assert submit.data is not None
     result = service.approve_request(
         request_id=submit.data.request_id,
         approver_email="not-an-approver@example.com",
@@ -805,6 +826,7 @@ def test_retry_request_should_fail_when_not_in_failed_state():
         entitlement_type="group",
         justification="Need access.",
     )
+    assert submit_result.data is not None
     request_id = submit_result.data.request_id
 
     result = service.retry_request(
