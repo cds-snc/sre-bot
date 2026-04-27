@@ -79,6 +79,10 @@ def _noop_catalog_service() -> _CatalogServicePort | None:
     response_model=PlatformListResponse,
     summary="List configured platforms",
     description="Return all platforms enrolled in the access management system.",
+    status_code=200,
+    responses={
+        503: {"description": "Access Catalog feature is disabled."},
+    },
 )
 def list_platforms(
     settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
@@ -122,6 +126,11 @@ def list_platforms(
         "Return all entitlements available on the platform, annotated with "
         "the authenticated user's current membership status."
     ),
+    status_code=200,
+    responses={
+        404: {"description": "Platform not found."},
+        503: {"description": "Access Catalog feature is disabled."},
+    },
 )
 def list_entitlements(
     platform: str,

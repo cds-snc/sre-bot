@@ -160,3 +160,65 @@ def test_sync_startup_warmup_raises_when_enabled_runtime_config_is_invalid(monke
                 },
             )()
         )
+
+
+@pytest.mark.unit
+def test_sync_register_background_job_registers_reconciliation_when_enabled(
+    monkeypatch,
+) -> None:
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        enabled = True
+        reconciliation_enabled = True
+        reconciliation_schedule = "03:30"
+
+    registrations: list[dict[str, object]] = []
+
+    class _BackgroundJobRegistry:
+        def register(self, *, job_name: str, schedule: str, job) -> None:
+            registrations.append(
+                {"job_name": job_name, "schedule": schedule, "job": job}
+            )
+
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+
+    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+
+    assert len(registrations) == 1
+    assert registrations[0]["job_name"] == "access_sync_reconciliation"
+    assert registrations[0]["schedule"] == "03:30"
+    assert callable(registrations[0]["job"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("enabled", "reconciliation_enabled"),
+    [(False, True), (True, False), (False, False)],
+)
+def test_sync_register_background_job_skips_registration_when_disabled(
+    monkeypatch,
+    enabled: bool,
+    reconciliation_enabled: bool,
+) -> None:
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        reconciliation_schedule = "03:30"
+
+    _Settings.enabled = enabled
+    _Settings.reconciliation_enabled = reconciliation_enabled
+
+    registrations: list[dict[str, object]] = []
+
+    class _BackgroundJobRegistry:
+        def register(self, *, job_name: str, schedule: str, job) -> None:
+            registrations.append(
+                {"job_name": job_name, "schedule": schedule, "job": job}
+            )
+
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+
+    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+
+    assert registrations == []

@@ -45,6 +45,14 @@ def _register_request_handlers() -> None:
         dispatcher.register_handler(REQUEST_APPROVED)(on_access_request_approved)
 
 
+def _run_reconciliation_job() -> None:
+    """Run full-platform Access Sync reconciliation."""
+    coordinator = get_access_sync_coordinator()
+    runtime_config = get_access_runtime_config()
+    for platform in runtime_config.platforms:
+        coordinator.sync_platform(platform=platform, dry_run=False)
+
+
 @hookimpl
 def startup_warmup(logger) -> None:
     """Log effective Access Sync settings at startup.
@@ -81,6 +89,20 @@ def startup_warmup(logger) -> None:
 def register_routes(app):
     """Register access sync HTTP routes under /api/v1."""
     app.include_router(access_sync_router, prefix="/api/v1")
+
+
+@hookimpl
+def register_background_job(registry) -> None:
+    """Register reconciliation schedule through the feature job registry."""
+    settings = get_access_sync_settings()
+    if not settings.enabled or not settings.reconciliation_enabled:
+        return
+
+    registry.register(
+        job_name="access_sync_reconciliation",
+        schedule=settings.reconciliation_schedule,
+        job=_run_reconciliation_job,
+    )
 
 
 @hookimpl

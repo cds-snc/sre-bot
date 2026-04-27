@@ -114,7 +114,13 @@ class AccessRequestStatusResponse(BaseModel):
     ticket_id: Optional[str] = None
     requested_at: Optional[str] = None
     updated_at: Optional[str] = None
-    decisions: List[ApprovalDecisionResponse] = Field(default_factory=list)
+    decisions: List[ApprovalDecisionResponse] = Field(
+        default_factory=list,
+        description=(
+            "Approval decision history. This list is empty for cancel and retry "
+            "operations when no new approval decision is created."
+        ),
+    )
 
 
 class SubmitAccessRequestResponse(BaseModel):

@@ -113,6 +113,10 @@ def _noop_coordinator() -> _AccessSyncApplicationServicePort | None:
         "convergence pass across all users on a platform; returns 202 with a job_id "
         "that can be polled via GET /access/sync-runs/{job_id}."
     ),
+    status_code=202,
+    responses={
+        503: {"description": "Access Sync feature is disabled."},
+    },
 )
 def sync_endpoint(
     request: AccessSyncRequest,
@@ -201,6 +205,10 @@ def sync_endpoint(
         "and, once finished, the sync outcome. "
         "Records expire after 24 hours."
     ),
+    status_code=200,
+    responses={
+        404: {"description": "Sync job not found or expired."},
+    },
 )
 def get_sync_job_status(
     job_id: str,
