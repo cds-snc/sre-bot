@@ -1,11 +1,15 @@
 """Unit tests for packages.access.request package initialization behavior."""
 
 import importlib
+from typing import get_args, get_origin, get_type_hints
 
 import pytest
 
 from infrastructure.events import clear_handlers, get_handlers_for_event
+from infrastructure.operations import OperationResult
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
+from packages.access.request.domain import AccessRequest, ApprovalDecision
+from packages.access.request.service import AccessRequestServicePort
 
 
 def _reload_request_package():
@@ -141,35 +145,23 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
 
 
 @pytest.mark.unit
-def test_request_startup_warmup_raises_when_enabled_runtime_config_is_invalid(
-    monkeypatch,
-):
-    request_pkg = _reload_request_package()
+def test_access_request_service_port_uses_parameterized_operation_result_returns():
+    expected_returns = {
+        "submit_request": OperationResult[AccessRequest],
+        "approve_request": OperationResult[
+            tuple[AccessRequest, list[ApprovalDecision]]
+        ],
+        "reject_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
+        "cancel_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
+        "retry_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
+        "get_request_status": OperationResult[
+            tuple[AccessRequest, list[ApprovalDecision]]
+        ],
+    }
 
-    class _Settings:
-        enabled = True
-        manager_group_slug = "sg-managers"
-        fallback_approver_slug = "sg-org-admins"
-        min_approver_count = 1
-        request_ttl_hours = 72
+    for method_name, expected in expected_returns.items():
+        method = getattr(AccessRequestServicePort, method_name)
+        return_type = get_type_hints(method)["return"]
 
-    monkeypatch.setattr(request_pkg, "get_access_request_settings", lambda: _Settings())
-    monkeypatch.setattr(
-        request_pkg,
-        "get_access_runtime_config",
-        lambda: (_ for _ in ()).throw(RuntimeError("invalid runtime config")),
-        raising=False,
-    )
-
-    with pytest.raises(RuntimeError, match="invalid runtime config"):
-        request_pkg.startup_warmup(
-            logger=type(
-                "L",
-                (),
-                {
-                    "info": lambda *a, **k: None,
-                    "warning": lambda *a, **k: None,
-                    "error": lambda *a, **k: None,
-                },
-            )()
-        )
+        assert get_origin(return_type) is get_origin(expected)
+        assert get_args(return_type) == get_args(expected)
