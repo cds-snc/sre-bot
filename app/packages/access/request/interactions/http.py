@@ -176,6 +176,11 @@ def _noop_request_service() -> _AccessRequestServicePort | None:
         "for delegated requests, on behalf of another user."
     ),
     status_code=202,
+    responses={
+        400: {"description": "Invalid request payload or policy violation."},
+        403: {"description": "Caller is not authorized."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def submit_request(
     body: SubmitAccessRequestBody,
@@ -240,6 +245,14 @@ def submit_request(
     "/{request_id}/approve",
     response_model=AccessRequestStatusResponse,
     summary="Approve an access request",
+    description="Approve a pending access request as an authorized approver.",
+    status_code=200,
+    responses={
+        403: {"description": "Caller is not authorized to approve requests."},
+        404: {"description": "Access request not found."},
+        409: {"description": "Request state does not allow approval."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def approve_request(
     request_id: str,
@@ -290,6 +303,14 @@ def approve_request(
     "/{request_id}/reject",
     response_model=AccessRequestStatusResponse,
     summary="Reject an access request",
+    description="Reject a pending access request as an authorized approver.",
+    status_code=200,
+    responses={
+        403: {"description": "Caller is not authorized to reject requests."},
+        404: {"description": "Access request not found."},
+        409: {"description": "Request state does not allow rejection."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def reject_request(
     request_id: str,
@@ -340,6 +361,14 @@ def reject_request(
     "/{request_id}/cancel",
     response_model=AccessRequestStatusResponse,
     summary="Cancel an access request",
+    description="Cancel a pending access request when the current state allows it.",
+    status_code=200,
+    responses={
+        403: {"description": "Caller is not authorized to cancel this request."},
+        404: {"description": "Access request not found."},
+        409: {"description": "Request state does not allow cancellation."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def cancel_request(
     request_id: str,
@@ -396,6 +425,13 @@ def cancel_request(
         "Use this to recover from transient infrastructure failures "
         "(e.g. Google DWD misconfiguration) without requiring a full re-submission."
     ),
+    status_code=200,
+    responses={
+        403: {"description": "Caller is not authorized to retry this request."},
+        404: {"description": "Access request not found."},
+        409: {"description": "Request state does not allow retry."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def retry_request(
     request_id: str,
@@ -446,6 +482,12 @@ def retry_request(
     "/{request_id}",
     response_model=AccessRequestStatusResponse,
     summary="Get access request status",
+    description="Return current request state, resolved approvers, and decisions.",
+    status_code=200,
+    responses={
+        404: {"description": "Access request not found."},
+        503: {"description": "Access Requests feature is disabled."},
+    },
 )
 def get_request_status(
     request_id: str,
