@@ -10,6 +10,7 @@ from typing import Optional
 import pytest
 from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
@@ -26,6 +27,13 @@ from packages.access.catalog.interactions.http import (
     list_platforms,
     router,
 )
+
+
+def _get_route(path: str, method: str) -> APIRoute:
+    for route in router.routes:
+        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
+            return route
+    raise AssertionError(f"Route {method} {path} not found")
 
 
 # ---------------------------------------------------------------------------
@@ -362,3 +370,21 @@ def test_list_entitlements_should_propagate_requestable_flag():
     # Assert
     assert response.entitlements[0].requestable is False
     assert response.entitlements[0].mode == "deactivated"
+
+
+@pytest.mark.unit
+def test_catalog_routes_expose_explicit_openapi_metadata() -> None:
+    cases = [
+        ("/access/catalog", "GET", 200, {503}),
+        ("/access/catalog/{platform}", "GET", 200, {404, 503}),
+    ]
+
+    for path, method, expected_status, expected_non_2xx_codes in cases:
+        route = _get_route(path, method)
+
+        assert route.summary
+        assert route.description
+        assert route.status_code == expected_status
+
+        documented_codes = {int(code) for code in route.responses}
+        assert expected_non_2xx_codes.issubset(documented_codes)

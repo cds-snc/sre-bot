@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi import Response
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
@@ -17,6 +18,17 @@ from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.schemas import UserSyncRequest
 from packages.access.sync.job_runner import run_user_sync_job
 from packages.access.sync.interactions.http import router, sync_endpoint
+
+
+def _get_route(path: str, method: str) -> APIRoute:
+    for route in router.routes:
+        if (
+            isinstance(route, APIRoute)
+            and route.path == path
+            and method in route.methods
+        ):
+            return route
+    raise AssertionError(f"Route {method} {path} not found")
 
 
 class _FakeCoordinator:
@@ -210,6 +222,24 @@ def test_sync_endpoint_returns_503_without_coordinator_dependency_assembly():
     assert response.status_code == 503
     assert response.json()["detail"] == "Access Sync is not enabled"
     assert coordinator_provider_called is False
+
+
+@pytest.mark.unit
+def test_access_sync_routes_expose_explicit_openapi_metadata() -> None:
+    cases = [
+        ("/access/sync-runs", "POST", 202, {503}),
+        ("/access/sync-runs/{job_id}", "GET", 200, {404}),
+    ]
+
+    for path, method, expected_status, expected_non_2xx_codes in cases:
+        route = _get_route(path, method)
+
+        assert route.summary
+        assert route.description
+        assert route.status_code == expected_status
+
+        documented_codes = {int(code) for code in route.responses}
+        assert expected_non_2xx_codes.issubset(documented_codes)
 
 
 # ---------------------------------------------------------------------------
