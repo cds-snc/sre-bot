@@ -81,6 +81,13 @@ Required behavior:
 - Prefer `structlog.contextvars` middleware binding for request context propagation.
 - Avoid threading `request_id` through every signature unless crossing boundaries that require explicit values.
 
+## Dependency Import Boundaries
+
+- Do not import concrete infrastructure service implementations directly from `app/infrastructure/<service>/...` in package/domain/route code.
+- Resolve infrastructure services via singleton provider functions in `app/infrastructure/services/providers.py`.
+- For FastAPI endpoints, consume infrastructure dependencies through `Annotated[..., Depends(...)]` aliases from `app/infrastructure/services/dependencies.py` (or re-exported `infrastructure.services` symbols), not by importing concrete classes.
+- Keep service construction in provider layers only; route and business modules must not instantiate infrastructure clients/services directly.
+
 ## OpenAPI and Route Metadata
 
 - Router declarations should include exactly one tag.

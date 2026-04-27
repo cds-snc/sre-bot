@@ -20,11 +20,24 @@ Use this skill when adding/refactoring package registration and startup behavior
 - Run validation checks (`check_pending` or equivalent) to surface invalid hook implementations early.
 - Keep startup behavior deterministic and observable through structured logs.
 
+## Event Handler Registration Pattern
+
+- Register event handlers inside a startup hook (`startup_warmup` or dedicated registration hook), never via import-time decorators in module body.
+- Make registration idempotent by checking existing handlers before registering, to avoid duplicate handlers in tests and repeated startup paths.
+- Keep handler functions import-safe; only registration should happen at startup.
+
+## Warmup Failure Policy Pattern
+
+- Choose and document one startup behavior per package: fail-startup (raise) or degrade (log and gate routes).
+- If using degrade mode, expose a deterministic readiness gate so requests return 503 until warmup dependencies are healthy.
+- Do not silently swallow warmup failures; include actionable structured log fields (config source, hint, error type).
+
 ## Anti-patterns
 
 - Side-effect registrations at import time.
 - Mutable module-level registries populated during imports.
 - Business modules owning bootstrap/service-wiring concerns.
+- Catch-and-continue warmup blocks that only log errors but still allow broken request paths.
 
 ## Contract Rules
 
@@ -39,3 +52,5 @@ At minimum, include:
 1. Startup success path with plugin discovery and route/handler registration.
 2. Startup failure path when a plugin contract is invalid.
 3. Regression test ensuring registration is not import-time side effect driven.
+4. Regression test proving event-handler registration is idempotent across repeated startup/test setup.
+5. Startup warmup failure test for the selected policy (fail-startup or degrade-with-503 gate).
