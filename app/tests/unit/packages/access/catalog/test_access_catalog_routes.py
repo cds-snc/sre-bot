@@ -31,7 +31,11 @@ from packages.access.catalog.interactions.http import (
 
 def _get_route(path: str, method: str) -> APIRoute:
     for route in router.routes:
-        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
+        if (
+            isinstance(route, APIRoute)
+            and route.path == path
+            and method in route.methods
+        ):
             return route
     raise AssertionError(f"Route {method} {path} not found")
 
