@@ -23,6 +23,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config.settings import (
     AccessRuntimeConfig,
+    CatalogExtensions,
+    CatalogParserConfig,
     EntitlementMode,
     PlatformPolicy,
 )
@@ -69,6 +71,19 @@ class PlatformPolicyConfigModel(BaseModel):
     mode_overrides: Dict[str, EntitlementMode] = Field(default_factory=dict)
 
 
+class CatalogParserConfigModel(BaseModel):
+    """Typed schema for one platform parser config in extensions."""
+
+    known_envs: list[str] = Field(default_factory=list)
+
+
+class CatalogExtensionsConfigModel(BaseModel):
+    """Typed schema for catalog extensions block in runtime config."""
+
+    parsers: Dict[str, CatalogParserConfigModel] = Field(default_factory=dict)
+    platform_display_names: Dict[str, str] = Field(default_factory=dict)
+
+
 class RuntimeConfigJsonModel(BaseModel):
     """Top-level schema for the access runtime config JSON document.
 
@@ -82,6 +97,14 @@ class RuntimeConfigJsonModel(BaseModel):
               "authn_token": "authn",
               "authn_removal_mode": "delete",
               "mode_overrides": {"breakglass-admin": "ephemeral"}
+            }
+          },
+          "extensions": {
+            "catalog": {
+              "parsers": {
+                "aws": {"known_envs": ["prod", "staging"]}
+              },
+              "platform_display_names": {"aws": "Amazon Web Services"}
             }
           }
         }
@@ -113,11 +136,26 @@ def _build_runtime_config(
             adapter_type=raw_policy.adapter_type,
             mode_overrides=dict(raw_policy.mode_overrides),
         )
+
+    catalog_ext: CatalogExtensions | None = None
+    if extensions and "catalog" in extensions:
+        cat_model = CatalogExtensionsConfigModel.model_validate(extensions["catalog"])
+        parsers = {}
+        for platform_key, parser_cfg in cat_model.parsers.items():
+            parsers[platform_key] = CatalogParserConfig(
+                known_envs=list(parser_cfg.known_envs)
+            )
+        catalog_ext = CatalogExtensions(
+            parsers=parsers,
+            platform_display_names=dict(cat_model.platform_display_names),
+        )
+
     return AccessRuntimeConfig(
         dir_prefix=dir_prefix,
         dir_separator=dir_separator,
         platforms=platforms,
         extensions=dict(extensions or {}),
+        catalog_extensions=catalog_ext,
     )
 
 
@@ -134,12 +172,19 @@ def _validate_runtime_config_payload(
             message=f"{error_prefix}_invalid_policy: {exc}",
             error_code="CONFIG_INVALID_SHAPE",
         )
-    config = _build_runtime_config(
-        dir_prefix=validated.dir_prefix,
-        dir_separator=validated.dir_separator,
-        platforms_model=validated.platforms,
-        extensions=validated.extensions,
-    )
+    try:
+        config = _build_runtime_config(
+            dir_prefix=validated.dir_prefix,
+            dir_separator=validated.dir_separator,
+            platforms_model=validated.platforms,
+            extensions=validated.extensions,
+        )
+    except ValidationError as exc:
+        return OperationResult.error(
+            status=OperationStatus.PERMANENT_ERROR,
+            message=f"{error_prefix}_invalid_extensions: {exc}",
+            error_code="CONFIG_INVALID_SHAPE",
+        )
     return OperationResult.success(
         data=config,
         message=f"{error_prefix}_loaded platforms={len(config.platforms)}",
