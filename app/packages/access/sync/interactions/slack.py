@@ -21,7 +21,7 @@ from packages.access.sync.providers import (
     get_access_sync_settings,
 )
 from packages.access.sync.schemas import SyncJobStatusResponse
-from packages.access.sync.transport.ingress import (
+from packages.access.sync.interactions.ingress import (
     enqueue_platform_sync,
     enqueue_user_sync,
 )

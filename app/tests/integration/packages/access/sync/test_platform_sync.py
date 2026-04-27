@@ -1,4 +1,4 @@
-"""Integration tests for AccessSyncCoordinator.sync_platform.
+"""Integration tests for AccessSyncApplicationService.sync_platform.
 
 Exercises the full batch-reconciliation pipeline end-to-end using
 ``FakeDirectory`` and ``SpyAdapter`` from conftest.

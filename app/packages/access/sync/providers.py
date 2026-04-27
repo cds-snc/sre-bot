@@ -12,7 +12,7 @@ from packages.access.common.settings import AccessSyncSettings, get_access_setti
 from packages.access.sync.adapters import AccessSyncAdapter
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
-from packages.access.sync.application import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.store import SyncRunRepository
 
@@ -48,9 +48,9 @@ def get_sync_run_repository() -> SyncRunRepository:
 
 
 @functools.lru_cache(maxsize=1)
-def get_access_sync_coordinator() -> AccessSyncCoordinator:
-    """Return the singleton AccessSyncCoordinator instance."""
-    return AccessSyncCoordinator(
+def get_access_sync_coordinator() -> AccessSyncApplicationService:
+    """Return the singleton AccessSyncApplicationService instance."""
+    return AccessSyncApplicationService(
         adapters=get_access_sync_adapters(),
         config=get_access_runtime_config(),
         membership_builder=DirectoryMembershipBuilder(

@@ -23,7 +23,7 @@ from packages.access.common.settings import AccessSettings
 @pytest.mark.unit
 def test_access_sync_settings_defaults(make_sync_settings):
     """AccessSyncSettings must provide sane defaults without env vars."""
-    # _access_sync_env_isolation (autouse) already strips all ACCESS_SYNC_* vars.
+    # Access-root conftest autouse fixture already strips ACCESS_* vars.
     settings = make_sync_settings()
     assert settings.enabled is False
     assert settings.reconciliation_enabled is False

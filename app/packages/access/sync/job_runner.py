@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import structlog
 
 from infrastructure.idempotency import IdempotencyService
-from packages.access.sync.application import AccessSyncCoordinatorPort
+from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.platform_lock import (
     acquire_lock,
@@ -51,7 +51,7 @@ logger = structlog.get_logger()
 
 
 def run_user_sync_job(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     job_id: str,
     user_email: str,
@@ -138,7 +138,7 @@ def run_user_sync_job(
 
 
 def run_platform_sync_job(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     job_id: str,
     platform: str,
@@ -250,7 +250,7 @@ def run_platform_sync_job(
 
 
 def spawn_user_sync_thread(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     job_id: str,
     user_email: str,
@@ -300,7 +300,7 @@ def spawn_user_sync_thread(
 
 
 def spawn_platform_sync_thread(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     job_id: str,
     platform: str,

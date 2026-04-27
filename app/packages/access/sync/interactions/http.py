@@ -1,9 +1,9 @@
-"""Access Sync FastAPI route handlers — HTTP transport layer only.
+"""Access Sync FastAPI route handlers — HTTP interaction layer only.
 
 Defines the POST /api/v1/access/sync-runs and GET /api/v1/access/sync-runs/{job_id}
 endpoints.  Handlers validate the incoming request schema, delegate admission
-to ``transport.ingress``, and map the result to an HTTP response.  No business
-logic lives here — all decisions belong in ``policies.py`` and ``coordinator.py``.
+to ``interactions.ingress``, and map the result to an HTTP response. No business
+logic lives here — all decisions belong in ``policies.py`` and ``application.py``.
 
 FastAPI ``Depends`` factories for the coordinator and settings are declared in
 ``providers.py``.  Route handlers consume them through type-annotated protocols
@@ -29,7 +29,7 @@ from packages.access.sync.schemas import (
     UserSyncJobAcceptedResponse,
     UserSyncRequest,
 )
-from packages.access.sync.transport.ingress import (
+from packages.access.sync.interactions.ingress import (
     EnqueuedJob,
     enqueue_platform_sync,
     enqueue_user_sync,
@@ -53,8 +53,8 @@ class _AccessSyncSettingsPort(Protocol):
     lock_stale_seconds: int
 
 
-class _AccessSyncCoordinatorPort(Protocol):
-    """Structural contract for coordinator methods consumed by routes."""
+class _AccessSyncApplicationServicePort(Protocol):
+    """Structural contract for application service methods consumed by routes."""
 
     def sync_user(
         self,
@@ -85,13 +85,13 @@ def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:
 
 
 def _resolve_coordinator(
-    coordinator: _AccessSyncCoordinatorPort | None,
-) -> _AccessSyncCoordinatorPort:
+    coordinator: _AccessSyncApplicationServicePort | None,
+) -> _AccessSyncApplicationServicePort:
     """Resolve coordinator lazily after feature-gate checks."""
     return coordinator if coordinator is not None else get_access_sync_coordinator()
 
 
-def _noop_coordinator() -> _AccessSyncCoordinatorPort | None:
+def _noop_coordinator() -> _AccessSyncApplicationServicePort | None:
     """No-op dependency used to defer coordinator assembly until after gating."""
     return None
 
@@ -122,7 +122,7 @@ def sync_endpoint(
         User, Security(get_current_user, scopes=["sre-bot:access-sync"])
     ],
     coordinator: Annotated[
-        _AccessSyncCoordinatorPort | None, Depends(_noop_coordinator)
+        _AccessSyncApplicationServicePort | None, Depends(_noop_coordinator)
     ] = None,
 ) -> Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse]:
     """Enqueue an on-demand user sync or a full platform sync job."""

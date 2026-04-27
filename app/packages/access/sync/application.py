@@ -38,8 +38,8 @@ logger = structlog.get_logger()
 # ---------------------------------------------------------------------------
 
 
-class AccessSyncCoordinatorPort(Protocol):
-    """Structural contract for the access sync coordinator."""
+class AccessSyncApplicationServicePort(Protocol):
+    """Structural contract for the access sync application service."""
 
     def sync_user(
         self,
@@ -58,11 +58,11 @@ class AccessSyncCoordinatorPort(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# AccessSyncCoordinator
+# AccessSyncApplicationService
 # ---------------------------------------------------------------------------
 
 
-class AccessSyncCoordinator:
+class AccessSyncApplicationService:
     """Thin orchestrator: IDP → adapter.reconcile_*() → persist/emit."""
 
     def __init__(

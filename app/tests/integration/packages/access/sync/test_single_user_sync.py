@@ -1,4 +1,4 @@
-"""Integration tests for AccessSyncCoordinator.sync_user.
+"""Integration tests for AccessSyncApplicationService.sync_user.
 
 Exercises the complete single-user sync pipeline end-to-end using
 FakeDirectory and SpyAdapter from conftest so no real external APIs are

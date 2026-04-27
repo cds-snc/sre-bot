@@ -51,7 +51,7 @@ from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
-from packages.access.sync.application import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     AdapterAssessment,
@@ -446,7 +446,7 @@ def make_sync_config():
 
 @pytest.fixture
 def make_coordinator(make_sync_config):
-    """Factory for a fully-wired ``AccessSyncCoordinator`` backed by test doubles.
+    """Factory for a fully-wired ``AccessSyncApplicationService`` backed by test doubles.
 
     Returns ``(coordinator, adapter)`` so tests can assert on adapter call
     records after running a sync.
@@ -515,7 +515,7 @@ def make_coordinator(make_sync_config):
             group_members=adapter_group_members,
         )
         directory_provider: Any = directory
-        coordinator = AccessSyncCoordinator(
+        coordinator = AccessSyncApplicationService(
             adapters={platform: adapter},
             config=config,
             membership_builder=DirectoryMembershipBuilder(directory_provider),

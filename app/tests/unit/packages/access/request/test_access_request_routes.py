@@ -1,4 +1,4 @@
-"""Unit tests for packages.access.request.transport.routes.
+"""Unit tests for packages.access.request.interactions.http.
 
 Tests invoke route handlers directly with fakes to validate HTTP mapping and
 response-shape behavior at the transport boundary.
@@ -21,7 +21,7 @@ from packages.access.request.providers import (
     get_access_request_settings,
 )
 from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
-from packages.access.request.transport.routes import (
+from packages.access.request.interactions.http import (
     approve_request,
     router,
     submit_request,

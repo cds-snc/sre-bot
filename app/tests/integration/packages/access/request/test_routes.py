@@ -1,7 +1,7 @@
-"""Integration tests for packages/access/request/transport/routes.py.
+"""Integration tests for packages/access/request/interactions/http.py.
 
 Tests route handlers directly by invoking them with stub dependencies,
-mirroring the pattern used in packages/access/sync/transport/routes.py tests.
+mirroring the pattern used in packages/access/sync/interactions/http.py tests.
 
 These tests exercise the HTTP-layer mapping (OperationResult → HTTP status)
 without touching real DynamoDB, directory providers, or event dispatchers.
@@ -23,7 +23,7 @@ from packages.access.request.schemas import (
     RetryRequestBody,
     SubmitAccessRequestBody,
 )
-from packages.access.request.transport.routes import (
+from packages.access.request.interactions.http import (
     approve_request,
     cancel_request,
     get_request_status,
