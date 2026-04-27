@@ -31,11 +31,13 @@ def check_entitlement_mode(
 ) -> EntitlementMode:
     """Return the effective entitlement mode for a platform + group slug.
 
-     Resolution order:
-     1. ``mode_overrides`` in the platform's ``PlatformPolicy`` — canonical
-         token-keyed lookup (for example ``"admins"`` for ``"sg-aws-admins"``).
-     2. Backward-compatible slug-keyed lookup for legacy documents.
-    2. ``"sync_managed"`` default — all managed groups are automatable unless
+    Resolution order:
+    1. Extract entitlement token from the group slug by removing the platform
+       group prefix (for example, extract ``"admins"`` from ``"sg-aws-admins"``
+       using platform prefix ``"sg-aws-"``).
+    2. Look up the extracted token in ``mode_overrides`` — token-keyed lookup only
+       (canonical semantics, consistent with sync and catalog sub-features).
+    3. ``"sync_managed"`` default — all managed groups are automatable unless
        overridden.
 
     Unknown platforms return ``"deactivated"`` so they are always rejected
