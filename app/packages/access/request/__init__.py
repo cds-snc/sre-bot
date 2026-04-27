@@ -15,7 +15,7 @@ from packages.access.request.providers import (
     get_access_request_service,
     get_access_request_settings,
 )
-from packages.access.request.transport.routes import router as access_requests_router
+from packages.access.request.interactions.http import router as access_requests_router
 
 
 @hookimpl

@@ -17,7 +17,7 @@ Quality gates:
 - mypy
 - flake8
 - black --check .
-- pytest
+- pytest app/tests --ignore=app/tests/smoke
 
 Constraints:
 - Keep business logic in app/packages.

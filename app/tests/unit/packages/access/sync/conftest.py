@@ -1,21 +1,8 @@
 """Shared fixtures for access sync unit tests.
 
-Provides three layers of shared test infrastructure:
-
-1. **Environment isolation** — ``_access_sync_env_isolation`` is an autouse
-   fixture that strips every ``ACCESS_*`` process env var before each test.
-   This prevents a local ``.env`` file or a CI/CD pipeline environment from
-   silently influencing behaviour.  Tests that need a specific value must
-   declare it explicitly via ``monkeypatch.setenv``.
-
-2. **Factory fixtures** — ``make_platform_policy``, ``make_runtime_config``, and
-   ``make_adapter_capabilities`` each return a callable factory so tests can
-   construct canonical objects with safe production-like defaults and override
-   only the field(s) relevant to their scenario.
-
-3. **Settings factory** — ``make_sync_settings`` wraps ``AccessSyncSettings``
-   (a plain ``BaseModel``) for direct field-override tests.  For env-var
-   loading tests, instantiate ``AccessSettings(_env_file=None).sync`` directly.
+The access-root ``conftest.py`` already applies env isolation and cache resets
+for every access subpackage test. This module keeps only sync-specific factory
+fixtures to reduce repeated object setup in sync tests.
 
 Pattern::
 
@@ -24,44 +11,13 @@ Pattern::
         caps   = make_adapter_capabilities(supports_disable=False)  # edge case
 """
 
+from typing import Any
+
 import pytest
 
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.common.settings import AccessSyncSettings
 from packages.access.sync.policies import AdapterCapabilities
-
-# env vars managed by this package — all are stripped before every test
-_ACCESS_SYNC_ENV_KEYS = [
-    "ACCESS_SYNC_ENABLED",
-    "ACCESS_SYNC_RECONCILIATION_ENABLED",
-    "ACCESS_SYNC_RECONCILIATION_SCHEDULE",
-    "ACCESS_SYNC_JOB_TTL_SECONDS",
-    "ACCESS_SYNC_LOCK_STALE_SECONDS",
-    "ACCESS_CONFIG_SOURCE",
-    "ACCESS_CONFIG_REF",
-    "ACCESS_CONFIG_REFRESH_SECONDS",
-    "ACCESS_REQUESTS_ENABLED",
-    "ACCESS_CATALOG_ENABLED",
-    # EnvConfigLoader vars
-    "ACCESS_CONFIG_ENV_DIR_PREFIX",
-    "ACCESS_CONFIG_ENV_DIR_SEPARATOR",
-    "ACCESS_CONFIG_ENV_PLATFORMS_JSON",
-]
-
-
-@pytest.fixture(autouse=True)
-def _access_sync_env_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Strip all ACCESS_SYNC_* env vars before every unit test in this package.
-
-    Tests that need a specific value must set it explicitly::
-
-        def test_flag_enabled(make_sync_settings, monkeypatch):
-            monkeypatch.setenv("ACCESS_SYNC_ENABLED", "true")
-            settings = make_sync_settings()
-            assert settings.enabled is True
-    """
-    for key in _ACCESS_SYNC_ENV_KEYS:
-        monkeypatch.delenv(key, raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +46,7 @@ def make_sync_settings():
             assert settings.job_ttl_seconds == 3600
     """
 
-    def _make(**overrides: object) -> AccessSyncSettings:
+    def _make(**overrides: Any) -> AccessSyncSettings:
         return AccessSyncSettings(**overrides)
 
     return _make

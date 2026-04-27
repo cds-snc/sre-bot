@@ -16,11 +16,11 @@ from packages.access.sync.providers import (
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.schemas import UserSyncRequest
 from packages.access.sync.job_runner import run_user_sync_job
-from packages.access.sync.transport.routes import router, sync_endpoint
+from packages.access.sync.interactions.http import router, sync_endpoint
 
 
 class _FakeCoordinator:
-    """Minimal coordinator stub that satisfies AccessSyncCoordinatorPort."""
+    """Minimal stub that satisfies the access sync application service port."""
 
     def __init__(self, result: OperationResult) -> None:
         self._result = result
@@ -87,7 +87,7 @@ def test_sync_endpoint_user_sync_enqueues_job_and_returns_202():
 
     with (
         patch(
-            "packages.access.sync.transport.routes.get_idempotency_service",
+            "packages.access.sync.interactions.http.get_idempotency_service",
             return_value=fake_idempotency,
         ),
         patch(
@@ -127,11 +127,11 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
 
     with (
         patch(
-            "packages.access.sync.transport.routes.get_idempotency_service",
+            "packages.access.sync.interactions.http.get_idempotency_service",
             return_value=fake_idempotency,
         ),
         patch(
-            "packages.access.sync.transport.ingress.check_lock",
+            "packages.access.sync.interactions.ingress.check_lock",
             return_value=fake_idempotency.get.return_value,
         ),
         patch(
@@ -161,7 +161,7 @@ def test_sync_endpoint_returns_503_when_disabled():
     fake_idempotency = MagicMock()
     with (
         patch(
-            "packages.access.sync.transport.routes.get_idempotency_service",
+            "packages.access.sync.interactions.http.get_idempotency_service",
             return_value=fake_idempotency,
         ),
     ):

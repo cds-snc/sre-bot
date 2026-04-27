@@ -16,7 +16,7 @@ import structlog
 
 from infrastructure.idempotency import IdempotencyService
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.access.sync.application import AccessSyncCoordinatorPort
+from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.job_runner import (
     spawn_platform_sync_thread,
     spawn_user_sync_thread,
@@ -51,7 +51,7 @@ class EnqueuedJob:
 
 
 def enqueue_user_sync(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     settings: "_IngressSettings",
     user_email: str,
@@ -118,7 +118,7 @@ def enqueue_user_sync(
 
 
 def enqueue_platform_sync(
-    coordinator: AccessSyncCoordinatorPort,
+    coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
     settings: "_IngressSettings",
     platform: str,

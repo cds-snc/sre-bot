@@ -30,7 +30,7 @@ logger = structlog.get_logger()
 class DirectoryMembershipBuilder:
     """Build desired access state from IDP directory group membership.
 
-    Injected into ``AccessSyncCoordinator`` at startup via ``providers.py``.
+    Injected into ``AccessSyncApplicationService`` at startup via ``providers.py``.
     Calls ``DirectoryProvider`` (the IDP abstraction from
     ``infrastructure.services``) exclusively; it never touches platform adapters.
 

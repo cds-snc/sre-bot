@@ -1,4 +1,4 @@
-"""Unit tests for packages.access.catalog.transport.routes.
+"""Unit tests for packages.access.catalog.interactions.http.
 
 Tests call route handlers directly (no HTTP client needed) by injecting
 stub service and settings objects via the FastAPI dependency-injection
@@ -21,7 +21,7 @@ from packages.access.catalog.domain import (
     ParsedEntitlementToken,
     PlatformSummary,
 )
-from packages.access.catalog.transport.routes import (
+from packages.access.catalog.interactions.http import (
     list_entitlements,
     list_platforms,
     router,

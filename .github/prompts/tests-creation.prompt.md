@@ -1,6 +1,6 @@
 ---
 name: tests-creation
-description: Create or update failing tests only from approved feature architecture and acceptance criteria.
+description: Create or update failing behavior tests only from approved feature architecture and acceptance criteria.
 agent: tests-creation
 model: Auto (copilot)
 ---
@@ -15,5 +15,6 @@ Required output:
 
 Rules:
 - Do not implement production feature behavior.
+- Do not create tests for architecture packet text, sprint naming, or transition-planning artifacts.
 - Keep tests behavior-focused and deterministic.
 - Cover success and failure mapping paths first.

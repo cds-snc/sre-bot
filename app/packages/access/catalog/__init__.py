@@ -11,7 +11,7 @@ from packages.access.catalog.providers import (
     get_catalog_service,
     get_catalog_settings,
 )
-from packages.access.catalog.transport.routes import router as access_catalog_router
+from packages.access.catalog.interactions.http import router as access_catalog_router
 
 
 @hookimpl
