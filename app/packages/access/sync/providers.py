@@ -33,6 +33,10 @@ def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
             adapters[platform_name] = AwsIdentityCenterAdapter(get_aws_clients())
         elif policy.adapter_type == "fake":
             adapters[platform_name] = FakePlatformAdapter()
+        else:
+            raise ValueError(
+                f"unknown adapter_type '{policy.adapter_type}' for platform '{platform_name}'"
+            )
 
     return adapters
 

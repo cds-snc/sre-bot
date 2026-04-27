@@ -31,8 +31,10 @@ def check_entitlement_mode(
 ) -> EntitlementMode:
     """Return the effective entitlement mode for a platform + group slug.
 
-    Resolution order:
-    1. ``mode_overrides`` in the platform's ``PlatformPolicy`` — per-group.
+     Resolution order:
+     1. ``mode_overrides`` in the platform's ``PlatformPolicy`` — canonical
+         token-keyed lookup (for example ``"admins"`` for ``"sg-aws-admins"``).
+     2. Backward-compatible slug-keyed lookup for legacy documents.
     2. ``"sync_managed"`` default — all managed groups are automatable unless
        overridden.
 
@@ -51,7 +53,16 @@ def check_entitlement_mode(
     platform_policy = runtime_config.platforms.get(platform)
     if platform_policy is None:
         return "deactivated"
-    override = platform_policy.mode_overrides.get(group_slug)
+    normalized_slug = group_slug.strip().lower()
+    token = normalized_slug
+    prefix = runtime_config.group_prefix(platform).lower()
+    if normalized_slug.startswith(prefix):
+        token = normalized_slug[len(prefix) :]
+
+    override = platform_policy.mode_overrides.get(token)
+    if override is None:
+        # Compatibility fallback for pre-standardization documents.
+        override = platform_policy.mode_overrides.get(normalized_slug)
     if override is not None:
         return override
     return "sync_managed"
