@@ -138,3 +138,38 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
 
     assert len(dispatcher.get_handlers_for_event(SYNC_COMPLETED)) == 1
     assert len(dispatcher.get_handlers_for_event(SYNC_FAILED)) == 1
+
+
+@pytest.mark.unit
+def test_request_startup_warmup_raises_when_enabled_runtime_config_is_invalid(
+    monkeypatch,
+):
+    request_pkg = _reload_request_package()
+
+    class _Settings:
+        enabled = True
+        manager_group_slug = "sg-managers"
+        fallback_approver_slug = "sg-org-admins"
+        min_approver_count = 1
+        request_ttl_hours = 72
+
+    monkeypatch.setattr(request_pkg, "get_access_request_settings", lambda: _Settings())
+    monkeypatch.setattr(
+        request_pkg,
+        "get_access_runtime_config",
+        lambda: (_ for _ in ()).throw(RuntimeError("invalid runtime config")),
+        raising=False,
+    )
+
+    with pytest.raises(RuntimeError, match="invalid runtime config"):
+        request_pkg.startup_warmup(
+            logger=type(
+                "L",
+                (),
+                {
+                    "info": lambda *a, **k: None,
+                    "warning": lambda *a, **k: None,
+                    "error": lambda *a, **k: None,
+                },
+            )()
+        )

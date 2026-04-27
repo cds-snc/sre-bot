@@ -8,13 +8,24 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
+from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
+from infrastructure.services import get_current_user
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.request.domain import AccessRequest, ApprovalDecision
+from packages.access.request.providers import (
+    get_access_request_service,
+    get_access_request_settings,
+)
 from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
-from packages.access.request.transport.routes import approve_request, submit_request
+from packages.access.request.transport.routes import (
+    approve_request,
+    router,
+    submit_request,
+)
 
 
 class _FakeSettings:
@@ -142,3 +153,41 @@ def test_approve_request_includes_decisions_in_response() -> None:
     assert response.request_id == "req-1"
     assert len(response.decisions) == 1
     assert response.decisions[0].decision == "approved"
+
+
+@pytest.mark.unit
+def test_submit_request_returns_503_without_service_dependency_assembly() -> None:
+    app = FastAPI()
+    app.include_router(router)
+
+    service_provider_called = False
+
+    def _service_provider() -> _FakeAccessRequestService:
+        nonlocal service_provider_called
+        service_provider_called = True
+        raise AssertionError("service dependency should not be assembled")
+
+    app.dependency_overrides[get_access_request_settings] = lambda: _FakeSettings(
+        enabled=False
+    )
+    app.dependency_overrides[get_access_request_service] = _service_provider
+    app.dependency_overrides[get_current_user] = lambda: _make_user(
+        "caller@example.com"
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/access/requests",
+        json={
+            "platform": "aws",
+            "group_slug": "sg-aws-admins",
+            "entitlement_type": "group",
+            "actor_type": "self",
+            "request_type": "grant",
+            "justification": "Need access",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Access Requests feature is disabled."
+    assert service_provider_called is False

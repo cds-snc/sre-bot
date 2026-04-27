@@ -6,6 +6,7 @@ defaults are applied when no env vars are set.
 """
 
 import pytest
+from pydantic import ValidationError
 
 from packages.access.common.settings import (
     AccessCatalogSettings,
@@ -191,3 +192,11 @@ def test_access_settings_accepts_requests_json_blob(monkeypatch):
     assert s.enabled is True
     assert s.min_approver_count == 3
     assert s.request_ttl_hours == 24
+
+
+@pytest.mark.unit
+def test_access_settings_rejects_unimplemented_config_sources(monkeypatch):
+    monkeypatch.setenv("ACCESS_CONFIG_SOURCE", "dynamodb")
+
+    with pytest.raises(ValidationError, match="ACCESS_CONFIG_SOURCE"):
+        AccessSettings(_env_file=None)

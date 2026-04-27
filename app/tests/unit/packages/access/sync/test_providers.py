@@ -41,11 +41,11 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
 
 
 @pytest.mark.unit
-def test_get_access_sync_adapters_ignores_unknown_platforms(
+def test_get_access_sync_adapters_raises_for_unknown_adapter_type(
     make_platform_policy,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Unsupported platform policy keys should not register an adapter."""
+    """Unknown adapter_type values should fail startup-time adapter assembly."""
     # Arrange
     providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
@@ -61,10 +61,7 @@ def test_get_access_sync_adapters_ignores_unknown_platforms(
         lambda: runtime_config,
     )
 
-    # Act
-    adapters = providers.get_access_sync_adapters()
-
-    # Assert
-    assert sorted(adapters.keys()) == ["fake"]
+    with pytest.raises(ValueError, match="unknown adapter_type"):
+        providers.get_access_sync_adapters()
 
     providers.get_access_sync_adapters.cache_clear()
