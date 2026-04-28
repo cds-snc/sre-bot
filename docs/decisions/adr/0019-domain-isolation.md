@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0019
 title: "Domain Isolation"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 date_created: unknown
@@ -11,11 +11,13 @@ next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0051
 related_records:
   - ADR-0002
   - ADR-0007
   - ADR-0024
+  - ADR-0051
 related_packages: []
 review_state: stale
 ---

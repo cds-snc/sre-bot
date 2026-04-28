@@ -1,8 +1,8 @@
 ---
 adr_id: ADR-0032
 title: "Features Organization"
-status: Accepted
-decision_type: Feature
+status: Superseded
+decision_type: Feature Decision
 tier: Tier-4
 date_created: 2024-01-01
 last_updated: 2026-04-27
@@ -11,11 +11,13 @@ next_review_due: 2026-10-27
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0051
 related_records:
   - ADR-0033
   - ADR-0040
   - ADR-0030
+  - ADR-0051
 related_packages:
   - app/packages/access
   - app/packages/geolocate

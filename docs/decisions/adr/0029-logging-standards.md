@@ -1,9 +1,9 @@
 ---
 adr_id: ADR-0029
 title: "Logging Standards (OpenTelemetry + structlog)"
-status: Accepted
+status: Superseded
 decision_type: Standard
-tier: Tier-3
+tier: Tier-2
 date_created: unknown
 last_updated: 2026-04-28
 last_reviewed: unknown
@@ -11,10 +11,12 @@ next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0054
 related_records:
   - ADR-0031
   - ADR-0039
+  - ADR-0054
 related_packages: []
 review_state: stale
 ---
