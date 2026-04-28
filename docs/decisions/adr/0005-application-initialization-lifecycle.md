@@ -20,13 +20,13 @@ review_state: stale
 
 High-level initialization for FastAPI application using lifespan context manager.
 
-See [application-lifecycle/](./application-lifecycle/) subdirectory for detailed specifications.
+See the dedicated lifecycle ADRs listed below for detailed specifications.
 
 ---
 
 ## Current Implementation (Legacy)
 
-[main.py](/workspace/app/main.py) uses `app.add_event_handler("startup", ...)` for initialization.
+`app/main.py` uses `app.add_event_handler("startup", ...)` for initialization.
 FastAPI recommends lifespan and deprecates startup/shutdown events when lifespan is provided.
 
 ---
@@ -67,11 +67,11 @@ FastAPI recommends lifespan and deprecates startup/shutdown events when lifespan
 
 ## Detailed Specifications
 
-- [01-fastapi-lifespan-pattern.md](./application-lifecycle/01-fastapi-lifespan-pattern.md) - FastAPI lifespan context manager
-- [02-settings-singleton.md](./application-lifecycle/02-settings-singleton.md) - Configuration singleton
-- [03-initialization-phases.md](./application-lifecycle/03-initialization-phases.md) - 7-phase sequence
-- [04-provider-discovery.md](./application-lifecycle/04-provider-discovery.md) - Provider activation
-- [05-plugin-managers.md](./application-lifecycle/05-plugin-managers.md) - Plugin system
-- [06-slack-socket-mode.md](./application-lifecycle/06-slack-socket-mode.md) - Slack integration startup
-- [07-background-services.md](./application-lifecycle/07-background-services.md) - Scheduled jobs
-- [08-graceful-shutdown.md](./application-lifecycle/08-graceful-shutdown.md) - Cleanup and shutdown
+- [ADR-0009 FastAPI Lifespan Pattern](./0009-fastapi-lifespan-pattern.md) - FastAPI lifespan context manager
+- [ADR-0010 Settings Singleton Pattern](./0010-settings-singleton.md) - Configuration singleton
+- [ADR-0011 Initialization Phases](./0011-initialization-phases.md) - 7-phase sequence
+- [ADR-0012 Provider Discovery](./0012-provider-discovery.md) - Provider activation
+- [ADR-0013 Plugin Managers](./0013-plugin-managers.md) - Plugin system
+- [ADR-0014 Slack Socket Mode](./0014-slack-socket-mode.md) - Slack integration startup
+- [ADR-0015 Background Services](./0015-background-services.md) - Scheduled jobs
+- [ADR-0016 Graceful Shutdown](./0016-graceful-shutdown.md) - Cleanup and shutdown

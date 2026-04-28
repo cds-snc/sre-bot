@@ -281,6 +281,6 @@ def test_slack_command_calls_service_via_ingress():
 
 ## References
 
-- **Pluggy Integration**: [03-pluggy-plugin-system.md](./03-pluggy-plugin-system.md)
-- **Interaction Providers Concept**: [01-platform-providers-concept.md](./01-platform-providers-concept.md)
-- **Features Organization**: [../../tier-4-application/01-features-organization.md](../../tier-4-application/01-features-organization.md)
+- **Pluggy Integration**: [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md)
+- **Interaction Providers Concept**: [ADR-0025: Interaction Providers Concept](./0025-platform-providers-concept.md)
+- **Features Organization**: [ADR-0032: Features Organization](./0032-features-organization.md)

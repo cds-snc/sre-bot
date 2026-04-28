@@ -18,7 +18,7 @@ review_state: stale
 ---
 # HTTP Response Patterns
 
-**Reference**: See [03-operation-result-pattern.md](../tier-2-infrastructure/03-operation-result-pattern.md) for comprehensive OperationResult patterns.
+**Reference**: See [ADR-0020: Operation Result Pattern](./0020-operation-result-pattern.md) for comprehensive OperationResult patterns.
 
 ---
 

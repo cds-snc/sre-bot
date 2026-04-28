@@ -27,17 +27,17 @@ review_state: current
 
 ## Quick Navigation
 
-All platform integration architecture decisions are now documented in the [platforms/](./platforms/) subdirectory:
+All platform integration architecture decisions are now documented in the current ADR set:
 
-1. **[01-platform-providers-concept.md](./platforms/01-platform-providers-concept.md)** - Why we replaced command providers with platform providers (multi-feature abstraction)
+1. **[ADR-0025: Interaction Providers Concept](../0025-platform-providers-concept.md)** - Why we replaced command providers with platform providers (multi-feature abstraction)
 
-2. **[02-explicit-registration-pattern.md](./platforms/02-explicit-registration-pattern.md)** - Why we use explicit registration via Pluggy hooks instead of import-time auto-discovery
+2. **[ADR-0026: Explicit Registration Pattern](../0026-explicit-registration-pattern.md)** - Why we use explicit registration via Pluggy hooks instead of import-time auto-discovery
 
-3. **[03-pluggy-plugin-system.md](./platforms/03-pluggy-plugin-system.md)** - How we use Pluggy (pytest's plugin system) for registration and discovery
+3. **[ADR-0027: Pluggy Plugin System Integration](../0027-pluggy-plugin-system.md)** - How we use Pluggy (pytest's plugin system) for registration and discovery
 
-4. **[04-platform-feature-isolation.md](./platforms/04-platform-feature-isolation.md)** - How packages organize platform-specific code in `/packages/<feature>/platforms/` subdirectory
+4. **[ADR-0028: Feature Interaction Layer Isolation](../0028-platform-feature-isolation.md)** - How packages organize platform-specific code in dedicated interaction layers
 
-5. **[README.md](./platforms/README.md)** - Overview with quick reference, reading order, and FAQ
+5. **[Platform ADR README](../../tier-2-infrastructure/platforms/README.md)** - Overview with quick reference, reading order, and FAQ
 
 ## Core Principles (Summary)
 
@@ -49,7 +49,7 @@ All platform integration architecture decisions are now documented in the [platf
 
 ## For Quick Answers
 
-- **"What changed from command providers?"** → [01-platform-providers-concept.md](./platforms/01-platform-providers-concept.md)
-- **"Why explicit registration?"** → [02-explicit-registration-pattern.md](./platforms/02-explicit-registration-pattern.md)
-- **"How do I register a feature?"** → [03-pluggy-plugin-system.md](./platforms/03-pluggy-plugin-system.md)
-- **"How should I structure my package?"** → [04-platform-feature-isolation.md](./platforms/04-platform-feature-isolation.md)
+- **"What changed from command providers?"** → [ADR-0025: Interaction Providers Concept](../0025-platform-providers-concept.md)
+- **"Why explicit registration?"** → [ADR-0026: Explicit Registration Pattern](../0026-explicit-registration-pattern.md)
+- **"How do I register a feature?"** → [ADR-0027: Pluggy Plugin System Integration](../0027-pluggy-plugin-system.md)
+- **"How should I structure my package?"** → [ADR-0028: Feature Interaction Layer Isolation](../0028-platform-feature-isolation.md)

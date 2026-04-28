@@ -20,7 +20,7 @@ review_state: stale
 
 Plugin system using Pluggy for extensible platform integrations.
 
-See [03-pluggy-plugin-system.md](../../../tier-2-infrastructure/platforms/03-pluggy-plugin-system.md) for the full specification including call ordering, wrappers, `firstresult`, historic hooks, and deprecation patterns.
+See [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md) for the full specification including call ordering, wrappers, `firstresult`, historic hooks, and deprecation patterns.
 
 ---
 

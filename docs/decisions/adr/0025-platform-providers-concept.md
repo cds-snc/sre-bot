@@ -126,6 +126,6 @@ DISCORD__ENABLED=false
 
 ## References
 
-- [02-explicit-registration-pattern.md](./02-explicit-registration-pattern.md) - Registration method
-- [03-pluggy-plugin-system.md](./03-pluggy-plugin-system.md) - Implementation infrastructure
-- [04-platform-feature-isolation.md](./04-platform-feature-isolation.md) - Package structure
+- [ADR-0026: Explicit Registration Pattern](./0026-explicit-registration-pattern.md) - Registration method
+- [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md) - Implementation infrastructure
+- [ADR-0028: Feature Interaction Layer Isolation](./0028-platform-feature-isolation.md) - Package structure

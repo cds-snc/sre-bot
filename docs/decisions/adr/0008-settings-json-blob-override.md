@@ -22,7 +22,7 @@ review_state: stale
 **Status**: Accepted
 **Applies to**: All `packages/<name>/settings.py` using `BaseSettings` with `env_nested_delimiter`
 **Related**:
-- [ADR-07: Partitioned Settings Model](07-settings-partitioned-model.md) — establishes `env_nested_delimiter + env_nested_max_split` pattern
+- [ADR-07: Partitioned Settings Model](./0007-settings-partitioned-model.md) — establishes `env_nested_delimiter + env_nested_max_split` pattern
 - [pydantic-settings v2 — Parsing environment variable values](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 - [pydantic-settings v2 — Field value priority](https://docs.pydantic.dev/latest/concepts/pydantic_settings/#field-value-priority)
 

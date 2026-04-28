@@ -595,7 +595,7 @@ Use `entry_points` in `setup.py` for plugin discovery.
 ### 3. Import-Time Registration
 Use module-level registration when packages are imported.
 
-**Rejected**: Violates explicit registration principle (see [02-explicit-registration-pattern.md](./02-explicit-registration-pattern.md))
+**Rejected**: Violates explicit registration principle (see [ADR-0026: Explicit Registration Pattern](./0026-explicit-registration-pattern.md))
 
 ---
 
@@ -669,10 +669,9 @@ def test_plugin_discovery():
 
 ## References
 
-- **Design Document**: [PLUGGY_INTEGRATION_DESIGN.md](../../../architecture/PLUGGY_INTEGRATION_DESIGN.md)
-- **Pluggy Documentation**: https://pluggy.readthedocs.io/
-- **Pytest Plugin System**: https://docs.pytest.org/en/stable/how-to/writing_plugins.html
-- **Explicit Registration Decision**: [02-explicit-registration-pattern.md](./02-explicit-registration-pattern.md)
+- [Pluggy Documentation](https://pluggy.readthedocs.io/)
+- [Pytest Plugin System](https://docs.pytest.org/en/stable/how-to/writing_plugins.html)
+- **Explicit Registration Decision**: [ADR-0026: Explicit Registration Pattern](./0026-explicit-registration-pattern.md)
 
 ---
 

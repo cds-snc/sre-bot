@@ -22,9 +22,9 @@ review_state: stale
 **Status**: Accepted
 **Applies to**: `app/packages/access/common/config/loaders.py` — `_EnvModel` in `EnvConfigLoader`
 **Related**:
-- [ADR-07: Partitioned Settings Model](../tier-1-foundation/07-settings-partitioned-model.md) — AliasChoices pattern for *deployed* key preservation (not applicable here)
-- [ADR-08: Settings JSON Blob Override Pattern](../tier-1-foundation/08-settings-json-blob-override.md)
-- [Architecture Review: Access Level 3 Settings](../../transition/access-level3-settings-architecture-review-2026-04-27.md)
+- [ADR-0007: Partitioned Settings Model](./0007-settings-partitioned-model.md) — AliasChoices pattern for *deployed* key preservation (not applicable here)
+- [ADR-0008: Settings JSON Blob Override Pattern](./0008-settings-json-blob-override.md)
+- Architecture review notes were in the transition folder (removed from repository history)
 
 ---
 

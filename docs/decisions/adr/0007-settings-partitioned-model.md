@@ -23,8 +23,8 @@ review_state: stale
 **Supersedes**: [`02-configuration-management.md`](02-configuration-management.md) (partially — `get_settings()` rules for routes and legacy `modules/` remain; new constraints added for `packages/`)  
 **References**:
 - [pydantic-settings docs](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
-- [`infrastructure-core-services-cleanup.md`](../../transition/infrastructure-core-services-cleanup.md) — IS-07 tracking
-- [`.github/skills/settings-singleton.md`](../../../.github/skills/settings-singleton.md) — enforcement rules
+- IS-07 tracking notes (historical transition doc removed)
+- [ADR-0010: Settings Singleton Pattern](./0010-settings-singleton.md) — enforcement rules
 
 ---
 
@@ -58,7 +58,7 @@ Feature settings (`GroupsFeatureSettings`, `CommandsSettings`, `IncidentFeatureS
 
 ### Tier 2 — Feature package settings
 
-Every `packages/<name>/` owns its settings in `packages/<name>/settings.py`. See [`settings-singleton.md`](../../../.github/skills/settings-singleton.md) for the two patterns (new package vs. migrating a legacy module).
+Every `packages/<name>/` owns its settings in `packages/<name>/settings.py`. See [ADR-0010: Settings Singleton Pattern](./0010-settings-singleton.md) for the two patterns (new package vs. migrating a legacy module).
 
 The settings class is validated at startup via `startup_warmup` hookimpl and **never appears in `infrastructure/configuration/settings.py`**.
 
@@ -105,7 +105,7 @@ All `BaseSettings` subclasses use `env_file=".env"`. `entry.sh` is the only thin
 
 ## Migration Path
 
-Tracked under IS-07 in [`infrastructure-core-services-cleanup.md`](../../transition/infrastructure-core-services-cleanup.md).
+Tracked under IS-07 (historical transition tracking doc removed from the repository).
 
 ### IS-07-A: Retire `infrastructure/configuration/features/`
 
