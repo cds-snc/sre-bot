@@ -2,14 +2,22 @@
 adr_id: ADR-0043
 title: "Access Admin Operator Stuck-Lock Scope"
 status: Proposed
-decision_type: Feature
+decision_type: Feature Decision
 tier: Tier-4
+primary_domain: Transport and API
+secondary_domains:
+  - Security and Access Control
+  - Data and Persistence
 date_created: 2026-04-27
 last_updated: 2026-04-27
 last_reviewed: 2026-04-27
-next_review_due: 2026-07-27
+next_review_due: 2026-08-25
 owners:
-  - Platform Engineering
+  - SRE Team
+constrained_by:
+  - ADR-0044
+  - ADR-0040
+impacts: []
 supersedes: []
 superseded_by: []
 related_records:
@@ -94,7 +102,7 @@ review_state: current
 ## Freshness Review
 
 - Record age at review time (days): 0
-- Is record older than 30 days: No
+- Is record older than 120 days: No
 - If Yes, web validation completed: No
 - Validation summary: Local architecture decisions aligned to accepted project ADRs.
 - Follow-up actions:
