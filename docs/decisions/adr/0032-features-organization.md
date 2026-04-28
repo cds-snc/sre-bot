@@ -9,7 +9,7 @@ last_updated: 2026-04-27
 last_reviewed: 2026-04-27
 next_review_due: 2026-10-27
 owners:
-  - Platform Engineering
+  - SRE Team
 supersedes: []
 superseded_by: []
 related_records:

@@ -9,7 +9,7 @@ last_updated: 2026-04-28
 last_reviewed: 2026-04-28
 next_review_due: 2026-08-26
 owners:
-  - Platform Engineering
+  - SRE Team
 supersedes: []
 superseded_by:
   - ADR-0025
