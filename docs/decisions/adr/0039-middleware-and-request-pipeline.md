@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0031
+  - ADR-0038
 related_packages: []
 review_state: stale
 ---
 # Middleware & Request Pipeline
+
+## Context
+
+Middleware execution order affects performance and correctness. CORS must run first; authentication must run before handlers. Custom error handlers must be registered consistently. High-throughput paths can suffer from BaseHTTPMiddleware buffering.
+
+## Decision
+
+Middleware order (outer to inner): CORS, Rate limiting, Request logging, Error handling, Authentication. Use pure ASGI middleware for high-throughput paths to avoid response buffering. Custom exception handlers are registered via app.exception_handler.
+
+## Consequences
+
+- ✅ Consistent middleware ordering across all deployments
+- ✅ High-throughput paths avoid buffering overhead
+- ✅ Error handling is centralized and predictable
+- ✅ Custom handlers can implement domain-specific logic
+- ⚠️ Pure ASGI middleware requires careful async handling
+
+---
 
 ## Middleware Order
 

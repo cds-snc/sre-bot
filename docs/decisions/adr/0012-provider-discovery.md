@@ -12,13 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0005
+  - ADR-0011
+  - ADR-0013
+  - ADR-0026
+  - ADR-0027
 related_packages: []
 review_state: stale
 ---
 # Provider Discovery
 
-Discover and activate providers in strict order during initialization Phase 3.
+## Context
+
+Three provider types (Groups, Commands, Platforms) have interdependencies. Groups must load before Commands (which may depend on group information); both must load before Platforms. We need a strict ordering mechanism.
+
+## Decision
+
+Load providers in fixed order during Phase 3: Groups → Commands → Platforms. Log provider counts for each category. Fail fast if any required provider is missing.
+
+## Consequences
+
+- ✅ Predictable provider initialization
+- ✅ Observable provider status via logs
+- ⚠️ Provider load order is fixed; cannot be customized per deployment
 
 ---
 

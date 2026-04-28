@@ -12,13 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0001
+  - ADR-0005
+  - ADR-0011
+  - ADR-0016
 related_packages: []
 review_state: stale
 ---
 # FastAPI Lifespan Pattern
 
-Use FastAPI `lifespan` context manager for startup/shutdown. Replace `app.add_event_handler("startup", ...)`.
+## Context
+
+FastAPI's startup/shutdown events are deprecated when a lifespan context manager is provided. We need a unified, async-safe startup/shutdown mechanism that integrates with the 7-phase initialization sequence.
+
+## Decision
+
+Use FastAPI's `@asynccontextmanager`-based lifespan pattern for all startup and shutdown logic. Code before `yield` executes on startup; code after `yield` executes on shutdown. Replace all `app.add_event_handler("startup", ...)` calls.
+
+## Consequences
+
+- ✅ Single unified startup/shutdown entry point
+- ✅ Supports async initialization natively
+- ✅ Clear startup/shutdown separation via yield
+- ⚠️ All initialization logic must fit into one lifespan function or be called from it
 
 ---
 

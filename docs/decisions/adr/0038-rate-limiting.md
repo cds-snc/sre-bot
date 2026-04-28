@@ -12,11 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0039
 related_packages: []
 review_state: stale
 ---
 # Rate Limiting
+
+## Context
+
+Rate limiting must occur at multiple layers: infrastructure (WAF), load balancer (connection limits), and application (fine-grained per-endpoint limits with user context). Application-level SlowAPI should not duplicate infrastructure-layer protection.
+
+## Decision
+
+WAF and ALB provide primary flood protection. SlowAPI is used only for application-level circuit-breaking where business context matters (authenticated user, route semantics). Custom rate limit key functions can bypass limits for monitoring/sentinel requests.
+
+## Consequences
+
+- ✅ Layered defense: infrastructure + application
+- ✅ SlowAPI focuses on business-relevant limits
+- ✅ Custom key functions enable sentinel bypass
+- ✅ Error handling is consistent with platform conventions
+- ⚠️ Requires coordination between WAF rules and app limits
+
+---
 
 ## Rate Limiting Architecture
 

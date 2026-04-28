@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0025
+  - ADR-0027
 related_packages: []
 review_state: stale
 ---
 # Explicit Registration Pattern
+
+## Context
+
+Early development explored three registration patterns: import-time side effects, decorator-based auto-registration, and explicit Pluggy registration. Import-time mutations cause hidden state, test pollution, and order dependencies.
+
+## Decision
+
+Use explicit registration via Pluggy hooks instead of import-time auto-discovery. Feature registration occurs during lifespan startup, not at import time. Hooks are metadata markers only; actual registration happens through explicit plugin manager calls.
+
+## Consequences
+
+- ✅ No hidden import-time mutations or state
+- ✅ Registration order is explicit and controlled
+- ✅ Tests do not require registry reset teardown
+- ✅ Pluggy provides battle-tested infrastructure
+- ⚠️ Requires disciplined avoidance of import-time side effects
+
+---
 
 **Decision**: Use explicit registration via Pluggy hooks instead of import-time auto-discovery.
 

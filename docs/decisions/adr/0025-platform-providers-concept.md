@@ -13,13 +13,31 @@ owners:
 supersedes: []
 superseded_by: []
 related_records:
-    - ADR-0026
-    - ADR-0027
-    - ADR-0028
+  - ADR-0022
+  - ADR-0026
+  - ADR-0027
+  - ADR-0028
 related_packages: []
 review_state: stale
 ---
 # Interaction Providers Concept
+
+## Context
+
+Collaboration platforms (Slack, Teams, Discord) offer rich interactive features across multiple modes (commands, views, actions, messaging). Without a unified abstraction, feature packages duplicate interaction logic per platform.
+
+## Decision
+
+Standardize and isolate collaboration platform capabilities as typed Interaction Provider implementations. A single InteractionProvider interface exposes all capabilities (commands, views, actions, messaging) for each platform.
+
+## Consequences
+
+- ✅ Feature packages call a common interface regardless of platform
+- ✅ Adding new interaction types extends providers, not feature packages
+- ✅ Platform-specific SDK details are encapsulated
+- ⚠️ Requires careful interface design to cover all platform capabilities
+
+---
 
 **Decision**: Standardize and isolate collaboration platform capabilities as a centrally managed core service through typed Interaction Provider implementations.
 

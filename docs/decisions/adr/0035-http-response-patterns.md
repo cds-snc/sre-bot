@@ -13,11 +13,28 @@ owners:
 supersedes: []
 superseded_by: []
 related_records:
-    - ADR-0020
+  - ADR-0020
+  - ADR-0036
 related_packages: []
 review_state: stale
 ---
 # HTTP Response Patterns
+
+## Context
+
+OperationResult objects must be converted to HTTP responses with appropriate status codes and error details. Exhaustive pattern matching ensures all status variants are handled and logged.
+
+## Decision
+
+Convert OperationResult to HTTP responses using exhaustive match statements or if/elif chains. Map each OperationStatus to a specific HTTP status code (SUCCESS→200, NOT_FOUND→404, UNAUTHORIZED→401, etc.). Include structured error metadata in HTTPException details.
+
+## Consequences
+
+- ✅ All OperationStatus variants are explicitly handled
+- ✅ Error details are consistently structured
+- ✅ HTTP status codes are predictable and correct
+- ✅ Logging captures status and error codes
+- ⚠️ Requires exhaustive pattern matching discipline
 
 ---
 

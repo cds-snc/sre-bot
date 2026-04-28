@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0022
+  - ADR-0031
+  - ADR-0037
 related_packages: []
 review_state: stale
 ---
 # Identity Resolution Across Platforms
+
+## Context
+
+Multiple authentication sources (Slack, JWT, webhooks, system) supply user identities in different formats. Business logic should work with a normalized user model regardless of source platform.
+
+## Decision
+
+All platforms resolve to a canonical `User` model. Resolvers convert platform-specific identifiers (Slack user IDs, JWT tokens) to a normalized User with email, display_name, and source. Business logic never sees platform-specific identifiers.
+
+## Consequences
+
+- ✅ Business logic is platform-agnostic
+- ✅ User resolution is centralized and testable
+- ✅ Permission checks use normalized user fields
+- ⚠️ Requires resolver implementation for each authentication source
+
+---
 
 All platforms (Slack, Teams, API) resolve to a normalized `User` model. Business logic never sees platform-specific identifiers (Slack user IDs, JWT tokens).
 

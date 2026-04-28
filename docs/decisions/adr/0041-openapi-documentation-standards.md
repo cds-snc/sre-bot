@@ -12,7 +12,8 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0033
 related_packages: []
 review_state: stale
 ---

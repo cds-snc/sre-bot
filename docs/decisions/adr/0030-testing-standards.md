@@ -12,11 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0032
 related_packages: []
 review_state: stale
 ---
 # Testing Standards
+
+## Context
+
+Tests must be located consistently, named clearly for discoverability, and use FastAPI dependency overrides for route testing. Generic names like test_routes.py create confusion in large codebases.
+
+## Decision
+
+All tests live in app/tests/ with feature-prefix naming (e.g., test_groups_routes.py, test_identity_resolver.py). Use app.dependency_overrides for FastAPI route testing. Factory fixtures provide flexible test data creation.
+
+## Consequences
+
+- ✅ Tests are self-documenting when viewed in isolation
+- ✅ No ambiguity about feature ownership
+- ✅ Easy navigation and discovery
+- ✅ Dependency overrides make route testing straightforward
+- ⚠️ Requires consistent cleanup of dependency_overrides
+
+---
 
 ## Test Structure
 

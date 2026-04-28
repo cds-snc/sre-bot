@@ -12,11 +12,32 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0006
+  - ADR-0024
+  - ADR-0035
+  - ADR-0036
 related_packages: []
 review_state: stale
 ---
 # Operation Result Pattern
+
+## Context
+
+Integration operations need a consistent, type-safe way to return success/failure outcomes with structured metadata (error codes, retry hints, status). Plain exceptions are inadequate for cross-service calls that may be transient or permanent.
+
+## Decision
+
+All integration operations return `OperationResult[T]` instead of raising exceptions. Each result includes status, error code, message, retry hints, and typed data. Callers map OperationResult status to HTTP status codes or platform-specific responses.
+
+## Consequences
+
+- ✅ Predictable error handling without exception-catching boilerplate
+- ✅ Structured error metadata available for logging and client response mapping
+- ✅ Transient vs permanent errors explicitly distinguished
+- ⚠️ Requires adoption across all integration boundaries
+
+---
 
 All integration operations return `OperationResult` and accept `request_id` for logging.
 

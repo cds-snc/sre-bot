@@ -12,13 +12,35 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0001
+  - ADR-0003
+  - ADR-0007
+  - ADR-0010
+  - ADR-0018
 related_packages: []
 review_state: stale
 ---
 # Configuration Management
 
-## Settings Singleton Pattern
+## Context
+
+Configuration must be loaded once per process, validated immediately, and injected into all services. Multiple initialization patterns (routes, jobs, modules) need consistent access to settings without coupling to infrastructure details.
+
+## Decision
+
+Implement a Settings Singleton Pattern where ONE Settings instance per ECS task is created via `@lru_cache(maxsize=1)`, validated on first call, and injected via FastAPI's dependency system for both sync and async handlers.
+
+## Consequences
+
+- ✅ Single source of truth for configuration per process
+- ✅ Thread-safe for both sync (thread pool) and async (event loop) handlers
+- ✅ Invalid configuration raises `ValidationError` and terminates startup immediately
+- ⚠️ Requires DI for all service access; no direct instantiation
+
+## Implementation
+
+### Settings Singleton Pattern
 
 ONE Settings instance per process via `@lru_cache`. Validation runs on first call; invalid config raises `ValidationError` and terminates startup. Thread-safe for both sync and async handlers.
 

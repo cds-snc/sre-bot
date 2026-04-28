@@ -12,13 +12,26 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0002
+  - ADR-0003
+  - ADR-0004
+  - ADR-0005
+  - ADR-0009
 related_packages: []
 review_state: stale
 ---
 # Core Architectural Principles
 
-## Framework and Version Requirements
+## Context
+
+This project must run reliably on Python 3.12+ with modern async patterns, strict type safety, and safe concurrent request handling across multiple ECS tasks. We require clear boundaries between application logic, dependency injection, and infrastructure layers to maintain testability and scalability.
+
+## Decision
+
+We establish five core architectural principles governing all code:
+
+### Framework and Version Requirements
 
 This project requires:
 - **Python 3.12+** — all typing and async features assume 3.12 minimum.

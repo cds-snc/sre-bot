@@ -12,11 +12,33 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0003
+  - ADR-0019
+  - ADR-0020
+  - ADR-0040
 related_packages: []
 review_state: stale
 ---
 # External Service Integration
+
+## Context
+
+External services (AWS, Google Workspace, Slack) need consistent client initialization and injection patterns. Settings must be validated once and passed to clients, not fetched inside them.
+
+## Decision
+
+Client facades are initialized via providers with injected settings. Provider functions (e.g., `get_google_workspace_clients()`) extract service-specific settings from root Settings and return singleton clients. Routes consume clients via Annotated[Facade, Depends(provider)].
+
+## Consequences
+
+- ✅ Consistent naming across all external services
+- ✅ Settings validated once at startup
+- ✅ Clients are testable with mock settings and dependencies
+- ✅ Dependency ordering is explicit
+- ⚠️ Requires facade pattern for all external services
+
+---
 
 ## Naming Conventions
 

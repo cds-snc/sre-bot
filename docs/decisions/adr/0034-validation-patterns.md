@@ -12,11 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0040
 related_packages: []
 review_state: stale
 ---
 # Validation Patterns
+
+## Context
+
+Request validation must be predictable, composable, and maintain clear boundaries between input validation and business logic. Pydantic validators provide a structured way to validate and coerce HTTP request data.
+
+## Decision
+
+Use Pydantic field_validator and model_validator decorators for validation. Discriminated unions enable single endpoints to accept multiple request shapes selected by a Literal field. Business logic assumes validated data.
+
+## Consequences
+
+- ✅ Validation rules are co-located with schemas
+- ✅ Multi-field validation is explicit and composable
+- ✅ Discriminated unions provide type-safe polymorphism
+- ✅ Business logic never receives invalid data
+- ⚠️ Requires careful use of validator modes (before/after)
+
+---
 
 ## Field Validators
 

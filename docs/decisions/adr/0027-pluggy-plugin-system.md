@@ -13,11 +13,30 @@ owners:
 supersedes: []
 superseded_by: []
 related_records:
-    - ADR-0026
+  - ADR-0013
+  - ADR-0026
 related_packages: []
 review_state: stale
 ---
 # Pluggy Plugin System Integration
+
+## Context
+
+The application needs a plugin system for feature registration, discovery, and initialization. Building a custom registry introduces risk and maintenance burden. pytest's Pluggy is a proven, battle-tested alternative.
+
+## Decision
+
+Adopt Pluggy for platform registration and discovery. Define hook specifications for extension points (e.g., register_slack_commands, register_http_routes). Feature packages implement hookimpl functions. Plugin discovery happens at lifespan startup via auto_discover_plugins.
+
+## Consequences
+
+- ✅ Leverages proven pytest infrastructure (1400+ plugins)
+- ✅ Type safety and call ordering built-in
+- ✅ Comprehensive documentation and ecosystem
+- ✅ Reduces custom registry code and bugs
+- ⚠️ Requires learning Pluggy patterns
+
+---
 
 **Decision**: Adopt Pluggy (pytest's battle-tested plugin system) for platform registration and discovery.
 

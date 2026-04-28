@@ -12,13 +12,34 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0005
+  - ADR-0009
+  - ADR-0012
+  - ADR-0013
+  - ADR-0014
+  - ADR-0015
+  - ADR-0016
+  - ADR-0017
 related_packages: []
 review_state: stale
 ---
 # Initialization Phases
 
-Execute initialization in 7 sequential phases during FastAPI lifespan startup.
+## Context
+
+Startup order matters: configuration must load before services instantiate; services must exist before plugins register; plugins must register before commands are bound; and background work must start last. Dependencies between phases are strict.
+
+## Decision
+
+Execute seven sequential phases in strict order during FastAPI lifespan: 1) Configuration 2) Infrastructure 3) Providers 4) Features 5) Commands 6) Socket Mode 7) Background Services. Shutdown reverses this order.
+
+## Consequences
+
+- ✅ Clear phase ownership and debugging
+- ✅ Deterministic startup behavior
+- ✅ New subsystems map to an existing phase
+- ⚠️ Phase order is non-negotiable; adding new phases requires architecture change
 
 ---
 

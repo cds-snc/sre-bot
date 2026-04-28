@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0032
+  - ADR-0041
 related_packages: []
 review_state: stale
 ---
 # Route Organization
+
+## Context
+
+Routes can be defined in centralized api/ files or distributed in feature packages. Distributed routes require a registration pattern to avoid circular imports and centralized coupling. Feature packages need consistent module organization.
+
+## Decision
+
+Routes live in feature packages under packages/{feature}/interactions/http.py. Each feature registers itself via hookimpl, applying the /api/v1 prefix once at include time. Main application never imports feature routes directly.
+
+## Consequences
+
+- ✅ Feature packages are self-contained
+- ✅ No circular imports between main app and features
+- ✅ Routes are easily discoverable within feature package
+- ✅ Consistent registration pattern across all features
+- ⚠️ Requires discipline to avoid direct route imports
+
+---
 
 ## Routes in Feature Packages
 

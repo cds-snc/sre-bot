@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0020
+  - ADR-0035
 related_packages: []
 review_state: stale
 ---
 # Dual-Interface Error Handling
+
+## Context
+
+Different platforms (HTTP API vs. Slack/Teams) have different error response expectations. HTTP uses status codes; platforms use user-friendly messages. Both must map from OperationResult, but formatting differs.
+
+## Decision
+
+API endpoints return HTTP status codes with structured error details. Platform integrations (Slack, Teams) return user-friendly messages with formatting consistent with the platform. Both extract error data from OperationResult but format differently.
+
+## Consequences
+
+- ✅ API clients receive correct HTTP status codes
+- ✅ Platform users see friendly, formatted messages
+- ✅ Error handling logic is centralized at boundaries
+- ✅ Error codes and messages are available for structured logging
+- ⚠️ Requires separate error formatting per platform
+
+---
 
 ## API Error Response Pattern
 

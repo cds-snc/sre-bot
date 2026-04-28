@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0031
+  - ADR-0039
 related_packages: []
 review_state: stale
 ---
 # Logging Standards (OpenTelemetry + structlog)
+
+## Context
+
+Structured logging with request context propagation is critical for observability. Manual code-location binding creates noise; OpenTelemetry semantic conventions provide automatic source-code metadata.
+
+## Decision
+
+Use structlog for structured logging with contextvars-based request context binding. OpenTelemetry processors automatically add code location (file, function, line) to every log entry. Do not manually bind component or module names.
+
+## Consequences
+
+- ✅ Automatic code location metadata in every log
+- ✅ Request ID flows through call chains via contextvars
+- ✅ Reduced noise from manual component binding
+- ✅ Seamless integration with observability platforms
+- ⚠️ Requires discipline to avoid manual code-location binding
+
+---
 
 **Status**: ✅ CURRENT - Aligned with OpenTelemetry semantic conventions
 

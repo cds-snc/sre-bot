@@ -12,13 +12,29 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0002
+  - ADR-0007
+  - ADR-0008
 related_packages: []
 review_state: stale
 ---
 # Settings Singleton Pattern
 
-ONE Settings instance per ECS task via `@lru_cache`.
+## Context
+
+Configuration must be loaded and validated once, cached for the process lifetime, and accessed consistently by all services. Pydantic's validation runs on instantiation, so we need a safe, single point of construction.
+
+## Decision
+
+Create ONE Settings instance per ECS task via `@lru_cache(maxsize=1)` on a provider function. Pydantic validates on first call; subsequent calls return the cached instance from the same ECS task.
+
+## Consequences
+
+- ✅ Guaranteed single validation per task
+- ✅ Invalid configuration raises `ValidationError` and terminates startup
+- ✅ Thread-safe across sync and async handlers
+- ⚠️ Cache must be seeded during startup (first `get_settings()` call during initialization)
 
 ---
 

@@ -12,13 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0002
+  - ADR-0007
+  - ADR-0024
 related_packages: []
 review_state: stale
 ---
 # Domain Isolation
 
-## Configuration Domains
+## Context
+
+Configuration and clients serve different domains (integrations, features, infrastructure). Each domain should be isolated, composed via a root Settings class, and accessed via facade patterns.
+
+## Decision
+
+Organize settings and client facades by domain: `infrastructure/configuration/{integrations,features,infrastructure}` and client facades per service (e.g., GoogleWorkspaceClients wraps DirectoryClient + GroupsClient).
+
+## Consequences
+
+- ✅ Clear domain boundaries
+- ✅ Testable via mock facades
+- ✅ Scalable as new domains are added
+- ⚠️ Requires consistent naming conventions
+
+---
 
 Settings are grouped by domain and composed in a root `Settings` class.
 

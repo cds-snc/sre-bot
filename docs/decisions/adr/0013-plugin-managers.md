@@ -13,15 +13,29 @@ owners:
 supersedes: []
 superseded_by: []
 related_records:
-    - ADR-0027
+  - ADR-0011
+  - ADR-0026
+  - ADR-0027
 related_packages: []
 review_state: stale
 ---
 # Plugin Managers
 
-Plugin system using Pluggy for extensible platform integrations.
+## Context
 
-See [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md) for the full specification including call ordering, wrappers, `firstresult`, historic hooks, and deprecation patterns.
+Feature packages need a way to self-register during startup without modifying the main lifespan function. A declarative plugin system allows new packages under `packages/` to automatically wire themselves into the application.
+
+## Decision
+
+Use Pluggy (pytest's battle-tested plugin system) for managing hook specifications and plugin registration. Each hook specification defines an extension point; feature packages implement `@hookimpl` decorators. Plugin manager is a singleton created via `@lru_cache`.
+
+## Consequences
+
+- ✅ No coupling between main lifespan and feature packages
+- ✅ Type-safe hook specifications
+- ✅ Auto-discovery via `auto_discover_plugins()`
+- ✅ Comprehensive validation via `pm.check_pending()`
+- ⚠️ Requires pluggy learn curve for hook ordering (see ADR-0027)
 
 ---
 

@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0025
+  - ADR-0028
+  - ADR-0032
 related_packages: []
 review_state: stale
 ---
 # Response Format Abstraction
+
+## Context
+
+Business logic needs to return rich, formatted responses (cards, messages, errors) for multiple platforms (Slack, Teams, Discord, HTTP API). Embedding platform-specific formatting in business logic causes duplication and coupling.
+
+## Decision
+
+Business logic returns platform-agnostic models (Card, ErrorMessage, SuccessMessage). Each platform has a dedicated formatter that converts these models to platform-specific JSON (Block Kit, Adaptive Card, Embed, etc.).
+
+## Consequences
+
+- ✅ Single business logic source formats for multiple platforms
+- ✅ Platform formatters are isolated and testable
+- ✅ Adding new platforms requires only a new formatter, not business logic changes
+- ⚠️ Requires careful design of agnostic model surface
+
+---
 
 ## Platform-Agnostic Models
 

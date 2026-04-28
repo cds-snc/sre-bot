@@ -1,6 +1,6 @@
 ---
 adr_id: ADR-0017
-title: "ADR-AL-09: Feature Package Startup Failure Policy"
+title: "Feature Package Startup Failure Policy"
 status: Accepted
 decision_type: Principle
 tier: Tier-1
@@ -19,7 +19,7 @@ related_records:
 related_packages: []
 review_state: stale
 ---
-# ADR-AL-09: Feature Package Startup Failure Policy
+# Feature Package Startup Failure Policy
 
 **Date**: 2026-04-27
 **Status**: Accepted

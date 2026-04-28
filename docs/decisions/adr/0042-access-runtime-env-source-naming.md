@@ -20,6 +20,23 @@ review_state: stale
 ---
 # ADR-T4-11: Access Runtime Env-Source Variable Naming
 
+## Context
+
+Access package env-source configuration used `ACCESS_SYNC_*` prefixes, inherited from early designs when env-source was only used by sync. Now all three subfeatures (sync, requests, catalog) use the runtime config. The `ACCESS_SYNC_` prefix is semantically incorrect and misleading. No production deployments use these vars, so safe migration is possible.
+
+## Decision
+
+Rename env vars to use `ACCESS_CONFIG_` prefix (semantic match with ACCESS_CONFIG_SOURCE): `ACCESS_CONFIG_DIR_PREFIX`, `ACCESS_CONFIG_DIR_SEPARATOR`, `ACCESS_CONFIG_PLATFORMS_JSON`. Use direct rename (not deprecation aliases) because no deployed systems currently use these variables.
+
+## Consequences
+
+- ✅ Semantic clarity: env vars match the config selection mechanism
+- ✅ Operators understand vars affect all subfeatures, not just sync
+- ✅ Consistent naming within access feature configuration
+- ✅ No breaking changes to deployed systems (greenfield assessment confirms zero production usage)
+
+---
+
 **Date**: 2026-04-27
 **Status**: Accepted
 **Applies to**: `app/packages/access/common/config/loaders.py` — `_EnvModel` in `EnvConfigLoader`

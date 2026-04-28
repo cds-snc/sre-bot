@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0002
+  - ADR-0003
+  - ADR-0019
 related_packages: []
 review_state: stale
 ---
 # Service Wrapper Pattern
+
+## Context
+
+Infrastructure services need consistent patterns for dependency injection and isolation. Services should not instantiate their own settings or import other services directly, ensuring testability and loose coupling.
+
+## Decision
+
+Infrastructure services receive `settings` as a constructor parameter (injected by providers). Services do not instantiate settings, call `get_settings()`, or import other infrastructure services directly. All dependencies are wired via providers.
+
+## Consequences
+
+- ✅ Settings are validated once and shared across services
+- ✅ Services are independently testable with mock settings/dependencies
+- ✅ Dependency ordering is explicit and centralized in providers
+- ⚠️ Requires disciplined use of TYPE_CHECKING for type hints
+
+---
 
 ## Constructor Contract
 

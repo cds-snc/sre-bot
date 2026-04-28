@@ -12,11 +12,31 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0023
+  - ADR-0031
 related_packages: []
 review_state: stale
 ---
 # Security & Authentication
+
+## Context
+
+The application supports multiple transports (HTTP API, Slack commands) with different authentication mechanisms. HTTP requires JWT bearer tokens from trusted issuers; Slack uses request signing. Both require a consistent authenticated user model.
+
+## Decision
+
+HTTP endpoints require JWT Bearer tokens validated against trusted JWKS endpoints. Slack uses request signing (handled by platform layer). Get_current_user() dependency resolves authenticated principal for all protected endpoints. Multi-issuer JWKS validation supports multiple identity providers.
+
+## Consequences
+
+- ✅ Multiple identity providers supported via multi-issuer configuration
+- ✅ JWKS keys are cached to avoid round-trips
+- ✅ Authentication is centralized in one dependency
+- ✅ Platform-specific auth is encapsulated in platform layer
+- ⚠️ Requires ISSUER_CONFIG environment variable
+
+---
 
 ## Authentication Model
 

@@ -12,11 +12,32 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0005
+  - ADR-0009
+  - ADR-0011
+  - ADR-0015
 related_packages: []
 review_state: stale
 ---
 # Graceful Shutdown
+
+## Context
+
+When a SIGTERM signal arrives (ECS task stop), in-flight requests and background jobs must complete or be interrupted cleanly. We need a reverse shutdown sequence that mirrors startup.
+
+## Decision
+
+During lifespan shutdown (code after `yield`), execute shutdown phases in reverse order of startup. After all connections close and background work completes, the process exits cleanly.
+
+## Consequences
+
+- ✅ Clean resource release
+- ✅ In-flight requests complete before exit
+- ✅ Daemon threads and background jobs shut down properly
+- ⚠️ Shutdown timeout must account for max in-flight request duration
+
+---
 
 Cleanup resources in reverse initialization order during lifespan shutdown.
 

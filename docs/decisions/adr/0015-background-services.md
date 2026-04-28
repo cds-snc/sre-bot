@@ -12,11 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0011
+  - ADR-0016
 related_packages: []
 review_state: stale
 ---
 # Background Services
+
+## Context
+
+Scheduled jobs (e.g., periodic syncs) are production-only concerns. We need a non-blocking task scheduler that integrates cleanly with the lifespan pattern and shuts down gracefully.
+
+## Decision
+
+Use AsyncIOScheduler (preferred) or BackgroundScheduler during Phase 7 startup. Schedule only in production environments (conditional on environment variable). Store scheduler in `app.state` for shutdown reference.
+
+## Consequences
+
+- ✅ Non-blocking scheduler per ECS task
+- ✅ Clean integration with lifespan startup/shutdown
+- ✅ Async-native job execution
+- ⚠️ Jobs must handle task horizontal scaling (multiple tasks running same job)
+
+---
 
 Initialize scheduled background jobs during initialization Phase 7 (production only).
 

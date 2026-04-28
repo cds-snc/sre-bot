@@ -12,13 +12,33 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0001
+  - ADR-0003
+  - ADR-0019
 related_packages: []
 review_state: stale
 ---
 # Import Conventions
 
-## Import Hierarchy
+## Context
+
+Clear import boundaries prevent circular dependencies, make layer violations obvious, and support testability. Application code must not access low-level infrastructure clients directly.
+
+## Decision
+
+Enforce strict import hierarchy: Application can import from infrastructure/services only; Services layer can import infrastructure and configuration; Infrastructure Core packages are isolated from Application and from each other (siblings only).
+
+## Consequences
+
+- ✅ Clear enforcement of DI pattern (ADR-0003)
+- ✅ Prevents circular dependencies
+- ✅ Makes layer violations obvious in code review
+- ⚠️ Requires discipline to avoid `infrastructure.clients` imports in application code
+
+## Implementation
+
+### Import Hierarchy
 
 | Layer | CAN Import From | CANNOT Import From |
 |-------|----------------|-------------------|

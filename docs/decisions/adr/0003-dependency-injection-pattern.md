@@ -12,13 +12,37 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0001
+  - ADR-0002
+  - ADR-0004
+  - ADR-0018
+  - ADR-0024
+  - ADR-0033
 related_packages: []
 review_state: stale
 ---
 # Dependency Injection Pattern
 
-## Layering
+## Context
+
+Application code spans routes (sync/async), jobs, and modules—all requiring consistent access to services. Services must be testable with overridable dependencies. A clear layer boundary between application code and infrastructure is essential.
+
+## Decision
+
+Enforce a three-layer architecture with DI at the boundary: Application → Dependency Injection Layer (providers + type aliases) → Infrastructure Core. All services created via `@lru_cache` provider functions; all service injection via `Annotated[T, Depends(...)]` type aliases.
+
+## Consequences
+
+- ✅ Single, consistent service creation and access pattern
+- ✅ Testable via FastAPI's `override_dependency()`
+- ✅ Works seamlessly for both sync and async handlers
+- ⚠️ Requires defining type aliases in `infrastructure/services/dependencies.py`
+- ⚠️ Route and business code cannot instantiate services directly
+
+## Implementation
+
+### Layering
 
 ```
 APPLICATION (api/, modules/, jobs/)

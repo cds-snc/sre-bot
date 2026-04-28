@@ -12,11 +12,30 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0011
+  - ADR-0015
 related_packages: []
 review_state: stale
 ---
 # Slack Socket Mode
+
+## Context
+
+Slack webhooks require public HTTPS endpoints; some environments may not support this. Socket Mode allows Slack to initiate WebSocket connections from within the private network, eliminating egress requirements.
+
+## Decision
+
+Implement Slack Socket Mode as Phase 6 startup. Use a daemon thread (non-blocking) to maintain the WebSocket connection. Store the handler in `app.state` for graceful shutdown reference.
+
+## Consequences
+
+- ✅ Works in private networks without egress
+- ✅ Non-blocking daemon thread doesn't delay HTTP startup
+- ⚠️ Requires Slack Socket Mode token configuration
+- ⚠️ Daemon thread lifecycle must be managed during shutdown
+
+---
 
 Start Slack Socket Mode client in daemon thread during initialization Phase 6.
 
