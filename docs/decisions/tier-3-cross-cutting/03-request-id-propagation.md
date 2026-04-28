@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0031
+title: "Request ID Propagation"
+status: Accepted
+decision_type: Standard
+tier: Tier-3
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # Request ID Propagation
 
 **Status**: ACCEPTED — April 2026  

@@ -1,3 +1,25 @@
+---
+adr_id: ADR-0021
+title: "Platform Integration Conventions (Redirect)"
+status: Superseded
+decision_type: Standard
+tier: Tier-2
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: 2026-04-28
+next_review_due: 2026-08-26
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by:
+  - ADR-0025
+  - ADR-0026
+  - ADR-0027
+  - ADR-0028
+related_records: []
+related_packages: []
+review_state: current
+---
 # Platform Integration Conventions (Redirect)
 
 **Status**: ✅ ACTIVE (Redirect)  

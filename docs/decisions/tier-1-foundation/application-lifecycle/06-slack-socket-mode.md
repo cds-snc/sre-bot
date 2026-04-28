@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0014
+title: "Slack Socket Mode"
+status: Accepted
+decision_type: Principle
+tier: Tier-1
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # Slack Socket Mode
 
 Start Slack Socket Mode client in daemon thread during initialization Phase 6.

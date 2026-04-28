@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0042
+title: "ADR-T4-11: Access Runtime Env-Source Variable Naming"
+status: Accepted
+decision_type: Feature
+tier: Tier-4
+date_created: 2026-04-27
+last_updated: 2026-04-27
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # ADR-T4-11: Access Runtime Env-Source Variable Naming
 
 **Date**: 2026-04-27

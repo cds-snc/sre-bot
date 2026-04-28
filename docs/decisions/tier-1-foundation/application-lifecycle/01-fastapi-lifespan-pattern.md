@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0009
+title: "FastAPI Lifespan Pattern"
+status: Accepted
+decision_type: Principle
+tier: Tier-1
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # FastAPI Lifespan Pattern
 
 Use FastAPI `lifespan` context manager for startup/shutdown. Replace `app.add_event_handler("startup", ...)`.

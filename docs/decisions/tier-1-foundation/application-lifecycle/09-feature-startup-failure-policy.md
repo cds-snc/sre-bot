@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0017
+title: "ADR-AL-09: Feature Package Startup Failure Policy"
+status: Accepted
+decision_type: Principle
+tier: Tier-1
+date_created: 2026-04-27
+last_updated: 2026-04-27
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # ADR-AL-09: Feature Package Startup Failure Policy
 
 **Date**: 2026-04-27

@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0025
+title: "Interaction Providers Concept"
+status: Accepted
+decision_type: Standard
+tier: Tier-2
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # Interaction Providers Concept
 
 **Decision**: Standardize and isolate collaboration platform capabilities as a centrally managed core service through typed Interaction Provider implementations.

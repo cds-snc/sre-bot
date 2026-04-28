@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0027
+title: "Pluggy Plugin System Integration"
+status: Accepted
+decision_type: Standard
+tier: Tier-2
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # Pluggy Plugin System Integration
 
 **Decision**: Adopt Pluggy (pytest's battle-tested plugin system) for platform registration and discovery.

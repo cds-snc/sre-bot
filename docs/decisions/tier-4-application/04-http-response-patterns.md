@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0035
+title: "HTTP Response Patterns"
+status: Accepted
+decision_type: Feature
+tier: Tier-4
+date_created: unknown
+last_updated: 2026-04-28
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # HTTP Response Patterns
 
 **Reference**: See [03-operation-result-pattern.md](../tier-2-infrastructure/03-operation-result-pattern.md) for comprehensive OperationResult patterns.

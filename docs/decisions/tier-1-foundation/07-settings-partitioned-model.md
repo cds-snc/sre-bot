@@ -1,3 +1,21 @@
+---
+adr_id: ADR-0007
+title: "ADR-07: Partitioned Settings Model"
+status: Accepted
+decision_type: Principle
+tier: Tier-1
+date_created: 2026-03-20
+last_updated: 2026-03-20
+last_reviewed: unknown
+next_review_due: 2026-04-28
+owners:
+  - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: stale
+---
 # ADR-07: Partitioned Settings Model
 
 **Date**: 2026-03-20  
