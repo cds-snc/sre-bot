@@ -1,6 +1,6 @@
 ---
 adr_id: ADR-0008
-title: "ADR-08: Settings JSON Blob Override Pattern"
+title: "Settings JSON Blob Override Pattern"
 status: Accepted
 decision_type: Principle
 tier: Tier-1

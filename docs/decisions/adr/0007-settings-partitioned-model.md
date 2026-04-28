@@ -1,6 +1,6 @@
 ---
 adr_id: ADR-0007
-title: "ADR-07: Partitioned Settings Model"
+title: "Partitioned Settings Model"
 status: Accepted
 decision_type: Principle
 tier: Tier-1

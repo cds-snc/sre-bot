@@ -1,6 +1,6 @@
 ---
 adr_id: ADR-0042
-title: "ADR-T4-11: Access Runtime Env-Source Variable Naming"
+title: "Access Runtime Env-Source Variable Naming"
 status: Accepted
 decision_type: Feature
 tier: Tier-4
