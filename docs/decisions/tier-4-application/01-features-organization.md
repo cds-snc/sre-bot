@@ -4,35 +4,24 @@ title: "Features Organization"
 status: Accepted
 decision_type: Feature
 tier: Tier-4
-date_created: unknown
-last_updated: 2026-04-28
-last_reviewed: unknown
-next_review_due: 2026-04-28
+date_created: 2024-01-01
+last_updated: 2026-04-27
+last_reviewed: 2026-04-27
+next_review_due: 2026-10-27
 owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
-related_packages: []
-review_state: stale
+related_records:
+  - ADR-0033
+  - ADR-0040
+  - ADR-0030
+related_packages:
+  - app/packages/access
+  - app/packages/geolocate
+review_state: current
 ---
 # Features Organization
-
-## Metadata
-
-- **Title:** Features Organization
-- **ID:** tier-4-01
-- **Status:** Accepted
-- **Scope:** Tier-4 Application
-- **Date Created:** 2024-01-01
-- **Last Updated:** 2026-04-27
-- **Last Reviewed:** 2026-04-27
-- **Next Review Due:** 2026-10-27
-- **Owners:** Platform Engineering
-- **Related Records:** tier-4-02 (Route Organization), tier-4-09 (Type Model Boundaries), tier-3-02 (Testing Standards)
-- **Related Features/Packages:** `app/packages/access`, `app/packages/geolocate`
-
----
 
 ## Context
 

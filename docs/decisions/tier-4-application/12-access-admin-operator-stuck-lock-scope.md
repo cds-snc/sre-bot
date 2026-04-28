@@ -7,30 +7,22 @@ tier: Tier-4
 date_created: 2026-04-27
 last_updated: 2026-04-27
 last_reviewed: 2026-04-27
-next_review_due: 2026-08-25
+next_review_due: 2026-07-27
 owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
-related_packages: []
+related_records:
+  - ADR-0032
+  - ADR-0033
+  - ADR-0040
+  - ADR-0041
+related_packages:
+  - app/packages/access/admin
+  - app/packages/access/sync
 review_state: current
 ---
 # Access Admin Operator Stuck-Lock Scope
-
-## Metadata
-
-- Title: Access Admin Operator Stuck-Lock Scope
-- ID: tier-4-12
-- Status: Proposed (Tentative)
-- Scope: Tier-4 Application
-- Date Created: 2026-04-27
-- Last Updated: 2026-04-27
-- Last Reviewed: 2026-04-27
-- Next Review Due: 2026-07-27
-- Owners: Platform Engineering
-- Related Records: tier-4-01, tier-4-02, tier-4-09, tier-4-10, tier-1-foundation/application-lifecycle/09
-- Related Features/Packages: app/packages/access/admin, app/packages/access/sync
 
 ## Context
 
