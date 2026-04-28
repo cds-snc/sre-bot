@@ -81,8 +81,10 @@ related_packages: []
   - Additional authoring and review overhead for metadata correctness.
 - Risks introduced:
   - Legacy records may remain partially non-compliant until rewritten.
+  - In a single-maintainer workflow, review classification checks can be skipped under time pressure, allowing mixed-scope records to reappear without detection.
 - Mitigations:
   - Apply supersession updates in each rewrite wave and prioritize foundational records first.
+  - Automate tier/decision_type compatibility checks so enforcement does not depend solely on manual review discipline.
 
 ## Compliance and Boundaries
 
@@ -138,13 +140,17 @@ related_packages: []
 - Required changes:
   - Review and reclassify ADR metadata when the current tier/decision_type pair is non-compliant.
   - Reject new ADRs that use invalid decision_type values for their declared tier.
+  - Build and integrate a lint check that statically validates tier/decision_type compatibility before any ADR is merged; this is a required gate, not an advisory check.
+  - Make one-decision-per-record and one-authority-level-per-record checks explicit items in every review packet; they must not be implicit.
 - Validation and quality gates:
-  - Metadata schema validation.
-  - Supersession bidirectionality checks.
+  - Automated metadata schema validation (tier/decision_type compatibility table must be machine-checkable).
+  - Supersession bidirectionality checks (if A supersedes B, B's superseded_by must reference A).
   - Review-state freshness checks.
+  - Explicit checklist confirmation that no Tier-1 implementation detail has leaked into the record under review.
 - Test strategy and acceptance criteria impact:
-  - Step 5 is accepted when taxonomy constraints are codified and Twelve-Factor gap ADR ownership records are authored.
+  - Step 5 is accepted when taxonomy constraints are codified, lint automation is defined, and Twelve-Factor gap ADR ownership records are authored.
 
 ## Change Log
 
 - 2026-04-28: Created canonical taxonomy enforcement standard for Phase A execution; superseded ADR-0019 and ADR-0032.
+- 2026-04-28: Strengthened risks and implementation guidance following challenge review; named single-maintainer enforcement gap and elevated lint automation from follow-up action to required gate.

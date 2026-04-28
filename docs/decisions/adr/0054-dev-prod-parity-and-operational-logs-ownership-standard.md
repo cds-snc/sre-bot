@@ -75,8 +75,12 @@ related_packages:
   - Requires stricter discipline in local/dev runtime parity and configuration management.
 - Risks introduced:
   - Existing local workflows may rely on shortcuts not suitable for parity.
+  - Runtime request-context propagation is not yet fully wired end-to-end; correlation IDs may be absent from some structured log entries until explicit middleware binding is added.
+  - Structured log events may inadvertently serialize secrets or privileged payloads (tokens, credentials, PII) into stdout/stderr streams that the platform then archives. This is a high-impact risk given the platform's multi-provider integration surface.
 - Mitigations:
   - Track temporary deviations in Tier-5 migration ADRs with explicit retirement dates.
+  - Add request-boundary middleware that guarantees `clear_contextvars` and `bind_contextvars` on every request.
+  - Define and enforce log-safety review checks (explicit redaction verification) before structured log changes reach production.
 
 ## Compliance and Boundaries
 
@@ -132,12 +136,17 @@ related_packages:
 - Required changes:
   - Keep development runtime paths close to production for dependencies and startup flow.
   - Emit structured logs to stdout/stderr; do not embed sink-specific application logic.
+  - Add or verify request-boundary middleware that calls `structlog.contextvars.clear_contextvars()` at the start of each request and binds correlation context (request ID, method, path) before any downstream processing occurs. This must be wired into the live FastAPI runtime, not only used in tests.
+  - Audit all structured log call sites for sensitive field emission; add explicit redaction for tokens, credentials, and PII before any new logging path is merged.
 - Validation and quality gates:
   - Validate parity-critical settings in CI and local bootstrap checks.
-  - Audit structured logs for required context and secret redaction.
+  - End-to-end context propagation test: a request must produce log entries that contain the bound request ID from first middleware to final response handler.
+  - Log-safety gate: structured log output for access-request, sync, and multi-provider operations must be reviewed for secret redaction before shipping.
 - Test strategy and acceptance criteria impact:
-  - Include tests that verify logging context propagation and parity-sensitive configuration handling.
+  - Include tests that verify logging context propagation (correlation ID present in every structured log entry for a given request) and parity-sensitive configuration handling.
+  - Acceptance test: a fabricated request with a known request ID must produce at least one structured log entry containing that ID, with no credential fields serialized.
 
 ## Change Log
 
 - 2026-04-28: Added Tier-2 standard for Twelve-Factor dev/prod parity and logs ownership; superseded ADR-0029.
+- 2026-04-28: Strengthened risks and implementation guidance following challenge review; named sensitive-data leak as explicit risk, made middleware context binding a required change, and elevated redaction verification to a required gate.
