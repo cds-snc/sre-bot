@@ -1,38 +1,32 @@
 # Decision Record Template
 
-Use this template for new records and major updates.
+Copy this file to `docs/decisions/adr/NNNN-kebab-case-title.md` and fill in every field.
+All 18 metadata fields are required — see [adr-metadata-reference.md](adr-metadata-reference.md)
+for allowed values, field definitions, and the tier/decision-type compatibility table.
 
-```yaml
 ---
 adr_id: ADR-0000
 title: "Short decision title"
 status: Draft
 decision_type: Principle
 tier: Tier-1
+primary_domain: "Runtime and Lifecycle"
+secondary_domains: []
+owners:
+  - SRE Team
 date_created: YYYY-MM-DD
 last_updated: YYYY-MM-DD
 last_reviewed: YYYY-MM-DD
 next_review_due: YYYY-MM-DD
-owners:
-   - Platform Engineering
+constrained_by:
+  - ADR-0044
+impacts: []
 supersedes: []
 superseded_by: []
+review_state: current
 related_records: []
 related_packages: []
-review_state: current
 ---
-```
-
-## Metadata Rules
-
-- `adr_id`: canonical global ID (`ADR-0001`, `ADR-0002`, ...).
-- `status`: `Draft | Proposed | Accepted | Superseded | Deprecated`.
-- `decision_type`: `Principle | Standard | Feature | Migration`.
-- `tier`: `Tier-1 | Tier-2 | Tier-3 | Tier-4 | Cross-tier`.
-- `review_state`: `current | stale`.
-- `supersedes` and `superseded_by` are mandatory arrays (possibly empty).
-- If `status: Superseded`, `superseded_by` must include at least one ADR ID.
-- Strict freshness policy: records are stale when `last_reviewed` is older than 120 days.
 
 ## Context
 
