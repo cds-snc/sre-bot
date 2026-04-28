@@ -2,19 +2,37 @@
 
 Use this template for new records and major updates.
 
-## Metadata
+```yaml
+---
+adr_id: ADR-0000
+title: "Short decision title"
+status: Draft
+decision_type: Principle
+tier: Tier-1
+date_created: YYYY-MM-DD
+last_updated: YYYY-MM-DD
+last_reviewed: YYYY-MM-DD
+next_review_due: YYYY-MM-DD
+owners:
+   - Platform Engineering
+supersedes: []
+superseded_by: []
+related_records: []
+related_packages: []
+review_state: current
+---
+```
 
-- Title:
-- ID:
-- Status: Draft | Proposed | Accepted | Superseded | Deprecated
-- Scope: Tier-1 | Tier-2 | Tier-3 | Tier-4 | Cross-tier
-- Date Created: YYYY-MM-DD
-- Last Updated: YYYY-MM-DD
-- Last Reviewed: YYYY-MM-DD
-- Next Review Due: YYYY-MM-DD
-- Owners:
-- Related Records:
-- Related Features/Packages:
+## Metadata Rules
+
+- `adr_id`: canonical global ID (`ADR-0001`, `ADR-0002`, ...).
+- `status`: `Draft | Proposed | Accepted | Superseded | Deprecated`.
+- `decision_type`: `Principle | Standard | Feature | Migration`.
+- `tier`: `Tier-1 | Tier-2 | Tier-3 | Tier-4 | Cross-tier`.
+- `review_state`: `current | stale`.
+- `supersedes` and `superseded_by` are mandatory arrays (possibly empty).
+- If `status: Superseded`, `superseded_by` must include at least one ADR ID.
+- Strict freshness policy: records are stale when `last_reviewed` is older than 120 days.
 
 ## Context
 
@@ -57,8 +75,8 @@ Use this template for new records and major updates.
 ## Freshness Review
 
 - Record age at review time (days):
-- Is record older than 30 days: Yes | No
-- If Yes, web validation completed: Yes | No
+- Is record older than 120 days: Yes | No
+- If Yes, status set to stale: Yes | No
 - Validation summary:
 - Follow-up actions:
 
