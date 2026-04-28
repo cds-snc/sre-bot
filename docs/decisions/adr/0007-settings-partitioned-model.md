@@ -12,7 +12,8 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+    - ADR-0010
 related_packages: []
 review_state: stale
 ---
@@ -24,7 +25,6 @@ review_state: stale
 **References**:
 - [pydantic-settings docs](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 - IS-07 tracking notes (historical transition doc removed)
-- [ADR-0010: Settings Singleton Pattern](./0010-settings-singleton.md) — enforcement rules
 
 ---
 

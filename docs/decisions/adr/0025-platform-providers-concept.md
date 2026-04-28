@@ -12,7 +12,10 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+    - ADR-0026
+    - ADR-0027
+    - ADR-0028
 related_packages: []
 review_state: stale
 ---
@@ -124,8 +127,3 @@ DISCORD__ENABLED=false
 - ❌ Never hardcode platform selection
 - ❌ Never skip HTTP endpoint in favor of platform-direct integration
 
-## References
-
-- [ADR-0026: Explicit Registration Pattern](./0026-explicit-registration-pattern.md) - Registration method
-- [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md) - Implementation infrastructure
-- [ADR-0028: Feature Interaction Layer Isolation](./0028-platform-feature-isolation.md) - Package structure

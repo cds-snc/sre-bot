@@ -12,7 +12,10 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+    - ADR-0025
+    - ADR-0027
+    - ADR-0032
 related_packages: []
 review_state: stale
 ---
@@ -279,8 +282,3 @@ def test_slack_command_calls_service_via_ingress():
 
 ---
 
-## References
-
-- **Pluggy Integration**: [ADR-0027: Pluggy Plugin System Integration](./0027-pluggy-plugin-system.md)
-- **Interaction Providers Concept**: [ADR-0025: Interaction Providers Concept](./0025-platform-providers-concept.md)
-- **Features Organization**: [ADR-0032: Features Organization](./0032-features-organization.md)

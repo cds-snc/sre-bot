@@ -12,7 +12,9 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0007
+  - ADR-0008
 related_packages: []
 review_state: stale
 ---
@@ -21,9 +23,7 @@ review_state: stale
 **Date**: 2026-04-27
 **Status**: Accepted
 **Applies to**: `app/packages/access/common/config/loaders.py` — `_EnvModel` in `EnvConfigLoader`
-**Related**:
-- [ADR-0007: Partitioned Settings Model](./0007-settings-partitioned-model.md) — AliasChoices pattern for *deployed* key preservation (not applicable here)
-- [ADR-0008: Settings JSON Blob Override Pattern](./0008-settings-json-blob-override.md)
+**Context Note**:
 - Architecture review notes were in the transition folder (removed from repository history)
 
 ---

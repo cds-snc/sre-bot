@@ -12,7 +12,8 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+    - ADR-0026
 related_packages: []
 review_state: stale
 ---
@@ -671,7 +672,6 @@ def test_plugin_discovery():
 
 - [Pluggy Documentation](https://pluggy.readthedocs.io/)
 - [Pytest Plugin System](https://docs.pytest.org/en/stable/how-to/writing_plugins.html)
-- **Explicit Registration Decision**: [ADR-0026: Explicit Registration Pattern](./0026-explicit-registration-pattern.md)
 
 ---
 

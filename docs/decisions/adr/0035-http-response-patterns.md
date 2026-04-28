@@ -12,13 +12,12 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+    - ADR-0020
 related_packages: []
 review_state: stale
 ---
 # HTTP Response Patterns
-
-**Reference**: See [ADR-0020: Operation Result Pattern](./0020-operation-result-pattern.md) for comprehensive OperationResult patterns.
 
 ---
 

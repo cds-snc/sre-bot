@@ -12,7 +12,15 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0009
+  - ADR-0010
+  - ADR-0011
+  - ADR-0012
+  - ADR-0013
+  - ADR-0014
+  - ADR-0015
+  - ADR-0016
 related_packages: []
 review_state: stale
 ---
@@ -67,11 +75,4 @@ FastAPI recommends lifespan and deprecates startup/shutdown events when lifespan
 
 ## Detailed Specifications
 
-- [ADR-0009 FastAPI Lifespan Pattern](./0009-fastapi-lifespan-pattern.md) - FastAPI lifespan context manager
-- [ADR-0010 Settings Singleton Pattern](./0010-settings-singleton.md) - Configuration singleton
-- [ADR-0011 Initialization Phases](./0011-initialization-phases.md) - 7-phase sequence
-- [ADR-0012 Provider Discovery](./0012-provider-discovery.md) - Provider activation
-- [ADR-0013 Plugin Managers](./0013-plugin-managers.md) - Plugin system
-- [ADR-0014 Slack Socket Mode](./0014-slack-socket-mode.md) - Slack integration startup
-- [ADR-0015 Background Services](./0015-background-services.md) - Scheduled jobs
-- [ADR-0016 Graceful Shutdown](./0016-graceful-shutdown.md) - Cleanup and shutdown
+Detailed phase-level records are listed in frontmatter under `related_records`.

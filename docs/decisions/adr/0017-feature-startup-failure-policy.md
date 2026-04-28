@@ -12,7 +12,10 @@ owners:
   - Platform Engineering
 supersedes: []
 superseded_by: []
-related_records: []
+related_records:
+  - ADR-0007
+  - ADR-0011
+  - ADR-0013
 related_packages: []
 review_state: stale
 ---
@@ -21,10 +24,7 @@ review_state: stale
 **Date**: 2026-04-27
 **Status**: Accepted
 **Applies to**: All `app/packages/<name>/` plugin packages using `startup_warmup`
-**Related**:
-- [ADR-0007: Partitioned Settings Model](./0007-settings-partitioned-model.md) — "startup_warmup hookimpl preserves fail-fast guarantee"
-- [ADR-0013: Plugin Managers](./0013-plugin-managers.md)
-- [ADR-0011: Initialization Phases](./0011-initialization-phases.md)
+**External References**:
 - `.github/skills/plugin-registration-lifespan/SKILL.md`
 - [pluggy exception handling](https://pluggy.readthedocs.io/en/stable/#exception-handling)
 - [ASGI Lifespan Protocol v2.0](https://asgi.readthedocs.io/en/latest/specs/lifespan.html#startup-failed-send-event)
