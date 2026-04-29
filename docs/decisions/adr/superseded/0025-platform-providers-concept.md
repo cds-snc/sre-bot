@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0025
 title: "Interaction Providers Concept"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 date_created: unknown
@@ -11,14 +11,16 @@ next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0078
 related_records:
   - ADR-0022
   - ADR-0026
   - ADR-0027
   - ADR-0028
+  - ADR-0078
 related_packages: []
-review_state: stale
+review_state: superseded
 ---
 # Interaction Providers Concept
 
