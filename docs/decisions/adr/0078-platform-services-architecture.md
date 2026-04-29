@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0078
 title: "Platform Services Architecture"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 primary_domain: Dependency and Composition
@@ -49,7 +49,7 @@ related_packages:
 
 ## Context
 
-- **Problem statement:** The SRE Bot supports multiple collaboration platforms (Slack, Teams, potentially others) as optional, independently-configurable interaction surfaces. ADR-0025 proposed a unified `InteractionProvider` Protocol to abstract all platforms behind a single contract. Analysis revealed this abstraction is premature, leaky, and type-unsafe — the platforms' interaction models are fundamentally incompatible at the handler signature level. Slack Bolt uses functional middleware with `ack()`, `say()`, and `command` parameters; Teams Bot Framework uses class-based `TeamsActivityHandler` with `ITurnContext<T>`. A unified Protocol would require `Callable[..., Any]` type erasure, defeating mypy enforcement.
+- **Problem statement:** The SRE Bot supports multiple collaboration platforms (Slack, Teams, potentially others) as optional, independently-configurable interaction surfaces. ADR-0025 proposed a unified `InteractionProvider` Protocol to abstract all platforms behind a single contract. Analysis revealed this abstraction is premature, leaky, and type-unsafe — the platforms' interaction models are fundamentally incompatible at the handler signature level. Slack Bolt uses functional middleware with `ack()`, `say()`, and `command` parameters; Teams Bot Framework uses class-based `TeamsActivityHandler` with `TurnContext`. A unified Protocol would require `Callable[..., Any]` type erasure, defeating mypy enforcement.
 
 - **Business/operational drivers:**
 - Platform services must be independently configurable — a deployment may run Slack-only, Teams-only, or both.
@@ -151,16 +151,16 @@ Platform services are owned by the infrastructure layer. Features are consumers,
 1. **Unified InteractionProvider Protocol (ADR-0025 approach):**
 
 - Pros: Single abstraction across all platforms; capability matrix enables runtime feature degradation; new platforms transparently available to all features.
-- Cons: Platform interaction models are asymmetric (Slack `ack()` vs. Teams `ITurnContext`). A unified Protocol requires `Callable[..., Any]` for handler signatures — erasing all type safety. The capability matrix assumes symmetric platform surfaces that don't exist. Adding a capability query layer adds indirection without enabling meaningful platform-neutral code (handlers still need platform-specific formatting).
+- Cons: Platform interaction models are asymmetric (Slack `ack()` vs. Teams `TurnContext`). A unified Protocol requires `Callable[..., Any]` for handler signatures — erasing all type safety. The capability matrix assumes symmetric platform surfaces that don't exist. Adding a capability query layer adds indirection without enabling meaningful platform-neutral code (handlers still need platform-specific formatting).
 - Why not chosen: The Rule of Three applies — abstract only after three concrete implementations prove a shared pattern. With two platforms in production (Slack active, Teams experimental), abstraction is premature. The Platform Services Assessment (2026-04-29) empirically validated this finding.
 
-1. **PlatformService facade (centralized dispatch):**
+2. **PlatformService facade (centralized dispatch):**
 
 - Pros: Single entry point for all platform interactions; centralized registration and capability querying.
 - Cons: Adds an indirection layer that doesn't provide meaningful value when features already receive platform services directly via hookspec injection. The facade would either pass through to concrete services (no value) or abstract them (type erasure). DI ceremony overhead for a service consumed through hookspecs, not `Depends()`.
 - Why not chosen: Features calling `provider.register_command(...)` directly is simpler and more type-safe than routing through a facade.
 
-1. **Provider discovery pattern:**
+3. **Provider discovery pattern:**
 
 - Pros: Platforms register themselves dynamically; zero configuration for adding platforms.
 - Cons: Discovery adds startup complexity and non-determinism. With 2-3 platforms, explicit configuration is clearer than automatic discovery. Settings-driven availability (Standard 2) provides equivalent flexibility with deterministic behavior.
@@ -197,8 +197,8 @@ Platform services are owned by the infrastructure layer. Features are consumers,
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: N/A
-- Validation summary: Initial draft. Requires challenge review before acceptance.
-- Follow-up actions: Schedule challenge review.
+- Validation summary: Accepted. Challenge review (2026-04-29) returned REVISE → PASS after corrections applied.
+- Follow-up actions: None. Next review due 2026-08-29.
 
 ## Source References (Required)
 
@@ -209,40 +209,40 @@ Platform services are owned by the infrastructure layer. Features are consumers,
 - Accessed date: 2026-04-29
 - Relevance summary: Superseded predecessor. Defined the unified `InteractionProvider` interface concept that this record replaces with concrete per-platform services.
 
-1. ADR-0077 - Infrastructure Service Contract Standard (this repository):
+2. ADR-0077 - Infrastructure Service Contract Standard (this repository):
 
 - URL: docs/decisions/adr/0077-infrastructure-service-contract-standard.md
 - Publisher/maintainer: SRE Team
 - Accessed date: 2026-04-29
 - Relevance summary: Constraining standard for service classification. Platform services are Category C (infrastructure implementation details).
 
-1. ADR-0059 - Feature Interaction Boundaries and Platform Integration Standard (this repository):
+3. ADR-0059 - Feature Interaction Boundaries and Platform Integration Standard (this repository):
 
 - URL: docs/decisions/adr/0059-feature-interaction-boundaries-and-platform-integration-standard.md
 - Publisher/maintainer: SRE Team
 - Accessed date: 2026-04-29
 - Relevance summary: Companion standard governing feature-side interaction boundaries, hookspec contracts, and HTTP-first bridge patterns. This record governs platform-side architecture; ADR-0059 governs feature-side consumption.
 
-1. Platform Services Assessment (2026-04-29):
+4. Platform Services Assessment (2026-04-29):
 
 - URL: tmp/platform-services-assessment-2026-04-29.md
 - Publisher/maintainer: SRE Team
 - Accessed date: 2026-04-29
 - Relevance summary: Authoritative assessment that rejected the unified InteractionProvider Protocol and established the concrete per-platform services architecture codified here.
 
-1. Slack Bolt Python Documentation:
+5. Slack Bolt Python Documentation:
 
-- URL: <https://tools.slack.dev/bolt-python/>
+- URL: <https://docs.slack.dev/tools/bolt-python/>
 - Publisher/maintainer: Slack Technologies
 - Accessed date: 2026-04-29
 - Relevance summary: Slack Bolt's `ack()` pattern and functional middleware model — demonstrates why a unified Protocol erases platform-native type safety.
 
-1. Microsoft Teams Bot Framework Documentation:
+6. Microsoft Teams Bot Framework Documentation:
 
-- URL: <https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-basics>
+- URL: <https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-concepts>
 - Publisher/maintainer: Microsoft
 - Accessed date: 2026-04-29
-- Relevance summary: Teams' `TeamsActivityHandler` and `ITurnContext<T>` — fundamentally different from Slack's model, validating per-platform concrete types.
+- Relevance summary: Teams' `TeamsActivityHandler` and `TurnContext` — fundamentally different from Slack's model, validating per-platform concrete types.
 
 ## Implementation Guidance
 
@@ -266,3 +266,4 @@ Platform services are owned by the infrastructure layer. Features are consumers,
 ## Change Log
 
 - 2026-04-29: Initial draft created. Supersedes ADR-0025 (Interaction Providers Concept). Mandated by Platform Services Assessment (2026-04-29) and ADR-0059 challenge review findings. Establishes concrete per-platform services as Category C infrastructure implementation details.
+- 2026-04-29: Challenge review (REVISE). Corrected `ITurnContext<T>` (C#/.NET) to `TurnContext` (Python SDK). Updated stale Slack Bolt and Teams Bot Framework documentation URLs. Fixed Alternatives Considered list numbering.
