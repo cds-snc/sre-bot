@@ -132,11 +132,28 @@ Feature settings classes that belong to modules still in `app/modules/` remain i
 
 The `Settings` aggregator itself follows a deprecation sequence:
 
+#### Dual Settings Chain Coexistence
+
+The codebase has two independent settings resolution chains that coexist without interference:
+
+| Chain | Entry Point | Aggregator | Dissolution Target |
+|-------|------------|------------|-------------------|
+| **Infrastructure** | `from infrastructure.services import get_settings` | `infrastructure.configuration.Settings` | **Yes** — dissolved by this standard |
+| **Legacy** | `from core.config import settings` | `core.config.Settings` (module-level singleton) | **No** — remains stable as compatibility shim |
+
+Both chains independently instantiate feature settings classes (e.g., `IncidentFeatureSettings`) by reading the same environment variables, but they are separate object graphs. The deprecation sequence below targets **only** the infrastructure chain (`infrastructure.configuration.Settings`). The legacy chain (`core.config.Settings`) must not be modified during dissolution — it serves 18 consumer files across 9 legacy modules (incident: 7 files, webhooks: 3 files, and 8 others across ops, reports, dev, role, secret, and webhooks/aws_sns). These legacy consumers are unaffected by dissolution and will migrate off `core.config.Settings` individually as their owning modules are rearchitected or retired.
+
+**Note:** Some legacy features (e.g., webhooks) have no dedicated settings class — they borrow `PREFIX`, `is_production`, and `NOTIFY_OPS_CHANNEL_ID` from parent settings domains (`AppSettings`, `ServerSettings`). No Tier-5 ADR is required for these features. Their settings access migrates as part of the parent domain dissolution or the feature rearchitecting project, whichever comes first.
+
+#### Infrastructure Settings Aggregator Deprecation Sequence
+
 | Phase | Description | Breaking? |
 |-------|-------------|-----------|
 | Phase 1 | Each domain settings class gets its own singleton provider. `Settings` aggregator delegates to domain singletons internally. | No — backward compatible |
 | Phase 2 | All consumers migrated to domain-specific providers. `Settings` aggregator deprecated with runtime warning. | No — backward compatible |
 | Phase 3 | `Settings` aggregator and `SettingsDep` removed. | Yes — internal breaking change |
+
+The `core.config.Settings` legacy singleton is removed separately, only when zero consumers remain (all legacy modules fully migrated or retired).
 
 ### Standard 5: Bootstrap Settings vs. Runtime Configuration Documents
 
@@ -354,4 +371,5 @@ Additional fields (`env_prefix`, `env_nested_delimiter`, `case_sensitive`, `env_
 
 ## Change Log
 
+- 2026-04-29: Standard 4 updated — added "Dual Settings Chain Coexistence" subsection documenting `core.config.Settings` stability constraint, 18 legacy consumer files (incident: 7, webhooks: 3, others: 8), and note that features without dedicated settings classes (e.g., webhooks) require no Tier-5 ADR. Retitled deprecation sequence to "Infrastructure Settings Aggregator Deprecation Sequence" for clarity. Source: incident and webhooks legacy feature rearchitecting assessment.
 - 2026-04-29: Created canonical Tier-2 settings implementation standard. Supersedes ADR-0008. Defines eight standards for settings dissolution, type boundaries, ownership split, transitional posture, bootstrap vs runtime config, source ordering, AppSettings extraction, and configuration requirements. Scope expanded from original "Configuration Source Ordering and Overrides Standard" to cover full settings dissolution per Action 1a decision.
