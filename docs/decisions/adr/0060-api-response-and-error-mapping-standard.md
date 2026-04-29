@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0060
 title: "API Response and Error Mapping Standard"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 primary_domain: Transport and API
