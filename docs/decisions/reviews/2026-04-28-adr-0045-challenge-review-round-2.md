@@ -1,0 +1,104 @@
+# ADR Challenge and Content Review — Round 2
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0045: Core Architectural Principles (Canonical Rewrite) |
+| **Reviewer Name & Title** | SRE Team, Architecture Reviewer |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-28 |
+| **Revalidation Due** | 2027-04-28 |
+| **Gate Outcome** | **PASS** |
+| **Outcome Rationale** | Round 1 REVISE finding (Principle 2 dual-authority overlap with ADR-0048 Boundary 3) has been resolved. Principle 2 now states the general DI invariant ("explicit injection mechanism") and explicitly delegates mechanism details to ADR-0048. No remaining high-severity contradictions. All five principles are clean Tier-1 invariants with no implementation leakage. |
+| **Prior Review Reference** | 2026-04-28-adr-0045-challenge-review.md (Round 1 — REVISE) |
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Revision Verification
+
+| Round 1 Finding | Required Change | Revision Applied | Verification |
+|-----------------|-----------------|------------------|--------------|
+| Principle 2 overlaps with ADR-0048 Boundary 3 — both prescribe "constructor injection" creating dual authority | Narrow Principle 2 to state the general DI requirement; delegate mechanism to ADR-0048 | ✅ Principle 2 now reads: "All services must receive their dependencies through an explicit injection mechanism... The specific injection mechanism (constructor injection, framework-managed resolution) and boundary enforcement rules are governed by ADR-0048." | ✅ Verified — no overlap; Principle 2 is the general invariant, ADR-0048 Boundary 3 is the enforcement mechanism |
+
+### 2.B Cross-ADR Alignment Re-Check
+
+| ADR | Relationship | Alignment Status |
+|-----|-------------|------------------|
+| ADR-0044 | constrained_by | ✅ Tier-1 Principle complies with governance rules |
+| ADR-0046 | related | ✅ Principle 4 (fail-fast config) aligns with Invariant 3 (fail-fast startup) |
+| ADR-0047 | impacts | ✅ Principle 4 constrains configuration governance without duplication |
+| ADR-0048 | impacts | ✅ Principle 2 delegates mechanism; Principle 3 aligns with Boundary 1 |
+| ADR-0049 | impacts | ✅ Principle 4 aligns with Standard 6 (fail-fast warmup) |
+| ADR-0050 | impacts | ✅ No overlap; Principle 3 provides layer context for boundary decisions |
+
+### 2.C Validation Summary
+
+**Total Standards Checked:** 6 cross-ADR relationships
+**Aligned with Best Practice:** 6
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** Round 1 finding resolved; no new issues
+
+## 3. Assumptions Challenged (Round 2 Focus)
+
+### Assumption 3.1 (Re-check): Principle 2 is now sufficiently specific without being duplicative
+- **Stated Norm:** Principle 2 states "explicit injection mechanism" and delegates specifics to ADR-0048.
+- **Challenge:** Is "explicit injection mechanism" too vague to be actionable as a Tier-1 principle?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the principle establishes three clear requirements: (1) dependencies received through injection, (2) no self-provisioning, (3) graph must be inspectable/overridable. These are actionable constraints. The delegation to ADR-0048 is appropriate for the mechanism details.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The revised wording correctly separates "what" (DI is required) from "how" (constructor, Depends, etc.), which is the intended Tier-1/Tier-2 split.
+
+### Assumption 3.2 (New): Five principles are the correct decomposition
+- **Challenge:** Could any of the five principles be merged or should any be split?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — each principle addresses a distinct concern (state, DI, layers, config, security). No two principles overlap after the Round 1 revision. Splitting any principle would create unnecessary Tier-1 churn.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+## 4. Failure Modes Identified
+
+No new failure modes identified beyond Round 1. The Round 1 failure mode (dual-authority causing conflicting reviews) has been mitigated by the revision.
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Principle 2 / ADR-0048 Boundary 3 (Round 1) | ADR-0045, ADR-0048 | Medium | ✅ Resolved — delegation clause added |
+
+### Supersession Ambiguities
+- **ADRs this one supersedes:** ADR-0001
+- **Inheritance Status:** All principles from ADR-0001 are preserved; implementation examples removed.
+- **Gaps Identified:** None.
+
+## 6. Scenario Validation Matrix
+
+Scenarios validated in Round 1 remain valid. No re-validation needed — the Principle 2 change is a scope narrowing, not a behavioral change.
+
+## 7. Tradeoffs Accepted
+
+No new tradeoffs beyond Round 1. The delegation to ADR-0048 is a clarity improvement, not a new tradeoff.
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| None | — | — | — | No blocking actions identified |
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:** **PASS**
+
+Round 1 REVISE finding has been fully addressed. ADR-0045 is now a clean Tier-1 principle record with clear authority boundaries and no dual-authority overlap.
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | SRE Team |
+| **Reviewer Title** | Architecture Reviewer |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-28 |

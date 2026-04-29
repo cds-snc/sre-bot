@@ -1,0 +1,176 @@
+# ADR Challenge and Content Review
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0046: Runtime Lifecycle and Lifespan Canonical Model |
+| **Reviewer Name & Title** | SRE Team, Architecture Reviewer |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-28 |
+| **Revalidation Due** | 2027-04-28 |
+| **Gate Outcome** | **PASS** |
+| **Outcome Rationale** | The six lifecycle invariants are well-grounded, non-overlapping, and align with ASGI/FastAPI/Twelve-Factor guidance. Minor refinements are recommended but none are blocking. |
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| FastAPI Lifespan Events | FastAPI lifespan context manager startup shutdown | FastAPI documents lifespan as the recommended mechanism; startup/shutdown events are deprecated when lifespan is provided. | ✅ Aligned | None |
+| ASGI Lifespan Protocol v2.0 | ASGI lifespan startup.failed startup.complete | Protocol defines startup.complete and startup.failed events; unhandled exception in lifespan before-yield triggers startup.failed. | ✅ Aligned | None |
+| Starlette Lifespan | Starlette lifespan context manager implementation | Starlette (underlying FastAPI) implements lifespan as an async context manager with yield. | ✅ Aligned | None |
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor: Factor IX (Disposability) | fast startup graceful shutdown maximize robustness | Factor IX requires fast startup and graceful shutdown with SIGTERM handling. | ✅ Aligned | None |
+| ECS Task Lifecycle | ECS task termination grace period SIGTERM | ECS sends SIGTERM and waits for stopTimeout (default 30s) before SIGKILL. Shutdown must complete within this window. | ✅ Aligned | None |
+
+### 2.C Cross-Cutting Design Patterns
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Sequential initialization patterns | startup phase ordering deterministic initialization | Sequential phase execution with fail-fast is standard for applications with dependency chains. | ✅ Aligned | None |
+| Immutable registry pattern | immutable registry after initialization freeze | Freezing registries after initialization prevents runtime state corruption. | ✅ Aligned | None |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 6
+**Aligned with Best Practice:** 6
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Six phases are the right abstraction level
+- **Stated Norm:** "The canonical phase ordering is: 1) Configuration, 2) Infrastructure, 3) Discovery and Registration, 4) Feature Activation, 5) Transport, 6) Background."
+- **Underlying Assumption:** Six phases cover all lifecycle needs and the boundaries between phases are unambiguous.
+- **Challenge:** The legacy ADR-0005 defined seven phases (splitting Features and Commands). Reducing to six may collapse important distinctions. Additionally, health-check warm-up (e.g., pre-loading caches) is not explicitly represented.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the ADR explicitly states phases "may be refined or subdivided at Tier-2."
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The six-phase model is a good Tier-1 abstraction. The statement that phases can be subdivided at Tier-2 provides the necessary escape hatch for future refinement.
+
+### Assumption 3.2: Sequential execution is always sufficient
+- **Stated Norm:** "No phase may begin until all preceding phases have completed successfully."
+- **Underlying Assumption:** Sequential startup is fast enough for the deployment model.
+- **Challenge:** If provider discovery or feature activation becomes slow (many packages, slow external health checks), sequential execution could increase startup time beyond ECS health check thresholds.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** No — current startup completes well within ECS thresholds.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Sequential is the correct default for deterministic behavior. If startup time becomes a problem, concurrent sub-phase execution within a single phase can be explored at Tier-2 without violating the phase ordering invariant.
+
+### Assumption 3.3: Reverse-order shutdown is always correct
+- **Stated Norm:** "Shutdown must execute in reverse phase order."
+- **Underlying Assumption:** Reverse order correctly handles all resource dependency chains.
+- **Challenge:** Some resources may have cross-phase dependencies. For example, transport connections (phase 5) may need infrastructure logging (phase 2) during shutdown to record connection close events.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — infrastructure services (including logging) are the last to shut down in reverse order, so they remain available throughout shutdown.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Reverse order ensures infrastructure services outlive application-level components during shutdown. This is correct.
+
+### Assumption 3.4: Immutable registries after startup is universally applicable
+- **Stated Norm:** "All registries must be frozen after the startup sequence completes."
+- **Underlying Assumption:** No legitimate runtime registration need exists.
+- **Challenge:** Future hot-reload or dynamic plugin loading scenarios could require post-startup registration.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the ECS deployment model does not support hot-reload. New code requires a new task definition.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** For the ECS deployment model, immutable registries are correct. If hot-reload becomes a requirement, a Tier-1 amendment would be warranted.
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Startup timeout under ECS health check
+- **If Assumption Fails:** Sequential startup takes longer than the ECS health check grace period.
+- **Platform Impact:**
+  - Incident management workflow: Impact: High (app unavailable)
+  - Access synchronization workflow: Impact: High (sync delayed)
+  - Access request workflow: Impact: High (requests unavailable)
+  - Multi-provider integrations: Impact: High (all providers unavailable)
+- **Probability Estimate:** Low %
+- **Mitigation or Acceptance:** Current startup is fast. ECS health check grace period can be configured. If startup time grows, sub-phase concurrency can be explored at Tier-2.
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| None found | — | — | — |
+
+### Supersession Ambiguities
+- **ADRs this one supersedes:** ADR-0005, ADR-0009, ADR-0011
+- **Inheritance Status:** All lifecycle invariants from the three source ADRs are captured. The 7-phase model is abstracted to 6 phases (Commands merged into Feature Activation).
+- **Gaps Identified:** None
+
+### Ownership Clarity
+- **Primary Domain Owner:** SRE Team
+- **Audit Result:** ✅ Clear
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Deterministic startup | Sequential phase execution | Incident handler registration depends on infrastructure services being available | ✅ No | Phase ordering ensures infra → features |
+| Graceful shutdown | Reverse-order resource release | Active incident operations should complete before transport closes | ✅ No | Background stops first, then transport |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.2: Access Synchronization Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Plugin discovery | Startup-driven discovery before traffic | Access sync plugins discovered during phase 3 | ✅ No | Aligns with ADR-0049 |
+| Fail-fast on bad config | Process exits on startup failure | Sync misconfiguration detected at startup_warmup | ✅ No | Per ADR-0049 Standard 6 |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.3: Access Request Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Registry immutability | No post-startup registration | Request handlers registered during feature activation, frozen after | ✅ No | Correct lifecycle model |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.4: Multi-Provider Integration
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| Provider activation order | Infrastructure before providers | AWS, Google, Slack clients initialized in phase 2, activated in phase 3-4 | ✅ No | Correct dependency chain |
+| Transport startup | Transport after all providers registered | Slack WebSocket starts in phase 5, after all commands registered | ✅ No | Correct |
+
+**Validation Summary:** ✅ Fully aligned
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Sequential vs. Concurrent Startup
+- **Chosen:** Strict sequential phase execution.
+- **Rejected:** Concurrent phase execution for faster startup.
+- **Rationale:** Determinism and debuggability outweigh startup speed for the current deployment model.
+- **Risk Accepted:** Startup time scales linearly with the number of phases and packages.
+- **Contingency:** Sub-phase concurrency can be introduced at Tier-2 if startup time becomes a problem.
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| None | — | — | — | No blocking actions identified |
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:** **PASS**
+
+ADR-0046 is professionally sound and ready for use as a constraining record for downstream standards.
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | SRE Team |
+| **Reviewer Title** | Architecture Reviewer |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-28 |

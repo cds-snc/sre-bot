@@ -1,0 +1,170 @@
+# ADR Challenge and Content Review
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0047: Configuration and Settings Governance Canonical Model |
+| **Reviewer Name & Title** | SRE Team, Architecture Reviewer |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-28 |
+| **Revalidation Due** | 2027-04-28 |
+| **Gate Outcome** | **REVISE** |
+| **Outcome Rationale** | Principle 1 (no duplicate keys) needs a migration exception clause. Principle 5 (environment-variable-first) could conflict with future Secrets Manager native injection via ECS task definitions. Revisions are minor but necessary to prevent false non-compliance during active migration. |
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Pydantic Settings V2 | BaseSettings SettingsConfigDict env_prefix env_file | Pydantic validates at instantiation, supports env_prefix for partitioned settings, and supports AliasChoices for gradual migration. | ✅ Aligned | None |
+| PEP 484 / Python typing | typed configuration classes Python | Type hints on configuration classes are standard practice. | ✅ Aligned | None |
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor: Factor III | config strict separation from code environment variables | Factor III requires config in environment variables, with strict separation from code. | ✅ Aligned | None |
+| AWS ECS Task Definition Secrets | ECS secrets injection Secrets Manager SSM | ECS supports native secret injection via task definition `secrets:` field, which injects values as environment variables. Compatible with env-var-first principle. | ✅ Aligned | None |
+
+### 2.C Cross-Cutting Design Patterns
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Configuration ownership patterns | settings ownership microservices feature packages | Feature-owned configuration is a standard pattern in modular monolith and microservice architectures. | ✅ Aligned | None |
+| Narrow dependency injection | settings slice injection principle of least privilege | Passing narrow configuration slices reduces coupling and test surface. Standard DI practice. | ✅ Aligned | None |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 5
+**Aligned with Best Practice:** 5
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: No configuration key duplication is achievable during migration
+- **Stated Norm:** Principle 1: "No configuration key may be defined in more than one settings class."
+- **Underlying Assumption:** The codebase can maintain zero duplication at all times.
+- **Challenge:** ADR-0007 explicitly documents that during migration from centralized to partitioned settings, temporary key duplication exists (e.g., `INCIDENT_CHANNEL` in both `SlackSettings` and `IncidentFeatureSettings`). The migration path requires a coexistence window. An absolute no-duplication principle makes migration non-compliant by definition.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Yes — ADR-0007 documents temporary duplication as an accepted migration state.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The principle needs a migration exception clause that permits temporary duplication when governed by a Tier-5 migration ADR with explicit retirement criteria. Without this clause, all active migration states are technically non-compliant.
+
+### Assumption 3.2: Environment-variable-first is sufficient for all credential delivery
+- **Stated Norm:** Principle 5: "All configuration must be loadable from environment variables as the primary source."
+- **Underlying Assumption:** Environment variables are the universally appropriate delivery mechanism.
+- **Challenge:** ECS `secrets:` injection delivers Secrets Manager values as environment variables, so the principle holds. However, if the team ever adopts sidecar-based credential delivery (e.g., AWS Vault, HashiCorp Vault Agent), the credential may not arrive as a standard environment variable. The principle should clarify that the invariant is "environment variables at process boundary," not a restriction on upstream credential management.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — ECS native injection uses env vars.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Current wording is adequate for the ECS deployment model. Consider adding a note that upstream credential management (Secrets Manager, SSM) is out of scope as long as values arrive as environment variables at the process boundary.
+
+### Assumption 3.3: Narrow-slice injection is always feasible
+- **Stated Norm:** Principle 4: "Services must receive the narrowest configuration slice they need."
+- **Underlying Assumption:** Configuration can always be cleanly partitioned into non-overlapping slices.
+- **Challenge:** Some services may legitimately need settings from multiple domains (e.g., a notification service needs both Slack credentials and feature-specific thresholds). Narrow-slice injection then means multiple constructor parameters, which is correct but should be explicit.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — multiple narrow parameters are preferable to one broad parameter.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The principle is correct. Services needing multiple domains should receive multiple narrow slices, not one broad settings object.
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Migration state creates false non-compliance
+- **If Assumption Fails:** During active migration, duplicate keys exist temporarily. Without a migration exception, every migration PR is technically non-compliant with Principle 1.
+- **Platform Impact:**
+  - Incident management workflow: Impact: None (governance/process issue only)
+  - Access synchronization workflow: Impact: None
+  - Access request workflow: Impact: None
+  - Multi-provider integrations: Impact: None
+- **Probability Estimate:** High % (migration is actively in progress)
+- **Mitigation or Acceptance:** Add a migration exception clause to Principle 1 that permits temporary duplication when governed by a Tier-5 ADR.
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Principle 1 (no duplication) vs. ADR-0007 (accepted temporary duplication during migration) | ADR-0047, ADR-0007 | 🟡 Medium | ⚪ Unresolved → Add migration exception clause |
+
+### Supersession Ambiguities
+- **ADRs this one supersedes:** ADR-0002, ADR-0007, ADR-0010
+- **Inheritance Status:** All configuration governance principles are captured. ADR-0007 migration path details are delegated to Tier-5.
+- **Gaps Identified:** Migration exception for temporary key duplication not captured.
+
+### Ownership Clarity
+- **Primary Domain Owner:** SRE Team
+- **Audit Result:** ✅ Clear
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Config validation | Fail-fast on invalid config | Incident feature settings validated at startup | ✅ No | Per ADR-0046/ADR-0049 |
+| Ownership | Feature config in feature package | Incident config currently in infrastructure (legacy) | ⚠️ Yes | Migration in progress; governed by migration ADRs |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling (migration in progress)
+
+### Scenario 6.2: Access Synchronization Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Partitioned settings | Feature package owns its settings | access.sync has its own settings.py | ✅ No | Already migrated |
+| Narrow slice | Service receives narrowest slice | Access sync service receives AccessSyncSettings | ✅ No | Correct pattern |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.3: Access Request Workflow
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Partitioned settings | Feature package owns its settings | access.requests has its own settings.py | ✅ No | Already migrated |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.4: Multi-Provider Integration
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| Integration credentials | Infrastructure layer owns integration config | AWS, Slack, Google settings in infrastructure/configuration | ✅ No | Correct ownership |
+| Env-var-first | All config loadable from env vars | SSM values written to .env by entry.sh; pydantic reads env | ✅ No | Compatible |
+
+**Validation Summary:** ✅ Fully aligned
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Strict Ownership vs. Migration Flexibility
+- **Chosen:** Strict ownership boundaries with no feature settings in infrastructure.
+- **Rejected:** Flexible placement that allows feature settings anywhere.
+- **Rationale:** Strict boundaries prevent long-term coupling; migration friction is temporary.
+- **Risk Accepted:** Migration PRs may temporarily violate the no-duplication principle.
+- **Contingency:** Migration exception clause in Principle 1.
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Add migration exception clause to Principle 1 | ✅ Yes | SRE Team | 2026-04-28 | Permit temporary key duplication when governed by a Tier-5 migration ADR with explicit retirement criteria. |
+| Clarify Principle 5 process-boundary scope | ❌ No | SRE Team | 2026-05-05 | Add note that upstream credential management is out of scope as long as values arrive as env vars at process boundary. |
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:** **REVISE**
+
+**Primary Blockers:**
+1. Principle 1 needs a migration exception clause to avoid false non-compliance during active settings migration.
+
+**Revision Deadline:** 2026-04-28
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | SRE Team |
+| **Reviewer Title** | Architecture Reviewer |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-28 |

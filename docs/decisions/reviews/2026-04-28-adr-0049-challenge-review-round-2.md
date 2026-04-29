@@ -1,0 +1,124 @@
+# ADR Challenge and Content Review — Round 2
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0049: Plugin Registration and Startup Reliability Policy |
+| **Reviewer Name & Title** | SRE Team, Architecture Reviewer |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-28 |
+| **Revalidation Due** | 2027-04-28 |
+| **Gate Outcome** | **PASS** |
+| **Outcome Rationale** | Round 1 REVISE findings (Standard 6 lacked transient retry guidance; Standard 7 lacked discoverable package contract) have both been resolved. Standard 6 now distinguishes permanent vs. transient startup errors with bounded retry guidance (≤ 3 attempts, exponential backoff). Standard 7 now defines a three-condition discoverable package contract. Both revisions are consistent with ADR-0046 lifecycle invariants. |
+| **Prior Review Reference** | 2026-04-28-adr-0049-challenge-review.md (Round 1 — REVISE) |
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Revision Verification
+
+| Round 1 Finding | Required Change | Revision Applied | Verification |
+|-----------------|-----------------|------------------|--------------|
+| Standard 6 doesn't address transient startup errors (network blip, DNS timeout) | Add bounded retry guidance for transient errors | ✅ Standard 6 table now has two failure rows: permanent (immediate propagation) and transient (≤ 3 retries with backoff). Added "Transient retry guidance" paragraph. | ✅ Verified — retry is bounded, logged, and terminates with exception if exhausted. Compatible with ADR-0046 Invariant 3. |
+| Standard 7 doesn't define what makes a package "discoverable" | Define minimum discoverable package contract | ✅ Standard 7 now includes three conditions: (1) Python package under `app/packages/`, (2) `__init__.py` with `@hookimpl`, (3) importable. Added `auto_discover_plugins` behavior description. | ✅ Verified — contract is specific, testable, and consistent with Standard 8 (no import-time side effects). |
+
+### 2.B Cross-ADR Alignment Re-Check
+
+| ADR | Relationship | Alignment Status | Notes |
+|-----|-------------|------------------|-------|
+| ADR-0045 (revised) | constrained_by | ✅ Aligned | Principle 2 (DI) delegates mechanism to ADR-0048; Principle 4 (fail-fast) aligns with Standard 6 after retry exhaustion |
+| ADR-0046 | constrained_by | ✅ Aligned | Invariant 3 (fail-fast startup) is compatible with bounded retry — retries occur within a phase, fail-fast applies after exhaustion |
+| ADR-0048 | constrained_by | ✅ Aligned | Boundary 4 (no import-time side effects) aligns with Standards 1, 7, and 8 |
+
+### 2.C Validation Summary
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** Both Round 1 findings resolved; no new issues
+
+## 3. Assumptions Challenged (Round 2 Focus)
+
+### Assumption 3.1 (Re-check): Bounded retry ≤ 3 is the correct limit
+- **Challenge:** Is 3 the right number? Too few for DNS propagation delays? Too many for true permanent errors misclassified as transient?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** No — 3 attempts with exponential backoff provides ~7 seconds of retry window (1s + 2s + 4s). This is sufficient for transient DNS/network issues but short enough to fail fast. True permanent errors (config error, missing file) go through the immediate-propagation path, not the retry path.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The standard correctly places error classification responsibility on the warmup implementation, not on the standard itself. The ≤ 3 bound is a ceiling, not a mandate.
+
+### Assumption 3.2 (Re-check): Discovery contract is sufficiently specified
+- **Challenge:** The contract requires `__init__.py` with "at least one `@hookimpl`-decorated function." Is this testable without importing the module?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — `auto_discover_plugins` imports the module, which is when both the `@hookimpl` presence and importability are validated. There is no need to detect `@hookimpl` without importing; the import IS the discovery mechanism.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.3: Retry placement "within warmup, not at pluggy call site" is enforceable
+- **Challenge:** How do you prevent someone from adding retry logic at the pluggy `pm.hook.startup_warmup()` call site?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** No — the standard explicitly states "Retry logic for transient startup errors belongs within the warmup implementation... not at the pluggy call site." This is enforceable through code review. The pluggy call site is in the lifespan function, which is reviewed as infrastructure code.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1 (New): Transient error misclassification
+- **If Assumption Fails:** A warmup implementation classifies a permanent error (bad API key) as transient, causing 3 unnecessary retries before the same permanent failure.
+- **Platform Impact:** Startup delay of ~7 seconds for a misconfigured feature.
+- **Probability Estimate:** Low %
+- **Mitigation:** The standard distinguishes permanent (config error, missing file, invalid JSON) from transient (network blip, DNS timeout, provider health check) explicitly. Error classification is an implementation responsibility, not a framework concern.
+- **Status:** Accepted — minor startup delay, not a correctness issue.
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Standard 6 vs. ADR-0046 Invariant 3 (Round 1 concern) | ADR-0049, ADR-0046 | Low | ✅ No contradiction — bounded retry within a phase is not silent continuation |
+
+### Supersession Ambiguities
+- **ADRs this one supersedes:** ADR-0013, ADR-0017, ADR-0026, ADR-0027
+- **Inheritance Status:** All eight standards cover the complete lifecycle governed by the four source ADRs. ADR-0017's transient retry guidance (carried forward from the original) is now explicitly included in Standard 6.
+- **Gaps Identified:** None.
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Transient DNS Failure During Access Sync Warmup (New — validates revision)
+| Aspect | ADR Requirement | Expected Behavior | Gap? | Notes |
+|--------|-----------------|-------------------|------|-------|
+| Error classification | Transient (DNS timeout) | Warmup retries ≤ 3 times with backoff | ✅ No | Standard 6 table covers this |
+| Retry exhaustion | Exception propagates | Process terminates with non-zero exit after 3 attempts | ✅ No | Fail-fast after exhaustion |
+| Observability | Structured logging | Each retry attempt logged with attempt number and error | ✅ No | Standard 6 + Invariant 6 |
+
+**Validation Summary:** ✅ Fully aligned
+
+### Scenario 6.2: New Package Discovery (New — validates revision)
+| Aspect | ADR Requirement | Expected Behavior | Gap? | Notes |
+|--------|-----------------|-------------------|------|-------|
+| Package creation | Three-condition contract | Developer creates `app/packages/newpkg/__init__.py` with `@hookimpl` | ✅ No | Standard 7 contract |
+| Auto-discovery | No lifespan changes needed | `auto_discover_plugins` finds and imports the package | ✅ No | Standard 7 zero-touch |
+| Import failure | Treated as startup failure | Package with syntax error prevents startup | ✅ No | Standard 7 + Standard 6 |
+
+**Validation Summary:** ✅ Fully aligned
+
+## 7. Tradeoffs Accepted
+
+No new tradeoffs beyond Round 1. The bounded retry and discovery contract are clarifications, not new architectural choices.
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| None | — | — | — | No blocking actions identified |
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:** **PASS**
+
+Both Round 1 REVISE findings have been fully addressed. ADR-0049 now provides complete guidance for startup failure handling (including transient errors) and discoverable package contracts.
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | SRE Team |
+| **Reviewer Title** | Architecture Reviewer |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-28 |

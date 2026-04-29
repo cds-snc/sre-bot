@@ -1,0 +1,332 @@
+# ADR Challenge and Content Review — ADR-0077
+
+**Purpose:** Step 9.5 (Canonical ADR Challenge and Content Review Gate) execution for ADR-0077: Infrastructure Service Contract Standard. This review anchors all judgments on authoritative best practices, not current code implementation.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0077: Infrastructure Service Contract Standard |
+| **Reviewer Name & Title** | AI Architecture Reviewer, SRE Team |
+| **Secondary Reviewers** | — |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **PASS** |
+| **Outcome Rationale** | All five standards are grounded in authoritative sources (PEP 544, Hexagonal Architecture, Backstage ServiceRef pattern, Cosmic Python Repository Pattern, FastAPI dependency overrides). The three-tier service classification (A/B/C) is well-defined with clear criteria. The Protocol contract pattern follows established Python structural subtyping conventions. Migration priorities are empirically grounded. One moderate-confidence assumption documented with mitigation. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards:**
+- ✅ Python Enhancement Proposals (PEP 544 — Protocols: Structural subtyping)
+- ✅ FastAPI Official Documentation (https://fastapi.tiangolo.com/)
+- ✅ Python Typing Module Official Docs
+- ✅ Python 3.12 functools.lru_cache documentation
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| PEP 544 — Protocols: Structural Subtyping | "Protocol structural subtyping runtime_checkable" | PEP 544 defines `typing.Protocol` as the mechanism for structural subtyping in Python. `@runtime_checkable` enables `isinstance` checks. Protocols are the Python-native way to define service interfaces without requiring explicit inheritance. | ✅ Aligned | N/A |
+| PEP 544 — Protocol members | "protocol members methods variables" | "All methods defined in the protocol class body are protocol members." Protocol variables can be defined via PEP 526 annotations. Methods should have type annotations. | ✅ Aligned — Standard 2 Rule P6 mandates type annotations on all Protocol methods | N/A |
+| PEP 544 — @runtime_checkable | "runtime_checkable isinstance protocol" | `@runtime_checkable` enables `isinstance()` checks against protocols. The PEP notes: "instance checks are not 100% reliable statically" and recommends opt-in behavior. | ✅ Aligned — Standard 2 Rule P1 mandates `@runtime_checkable` for test assertions and factory validation | N/A |
+| FastAPI — Dependency Overrides | "dependency_overrides testing" | FastAPI docs confirm `app.dependency_overrides[provider_function] = lambda: fake_impl` as the framework-native mechanism for swapping service implementations in tests. | ✅ Aligned — Standard 4 directly uses this pattern | N/A |
+| FastAPI — Settings as Dependency | "lru_cache Settings Depends" | FastAPI docs show `@lru_cache` + `Depends(get_settings)` as the canonical provider pattern. Provider functions return typed values. | ✅ Aligned — Standard 2.3 builds on this pattern by requiring Protocol return types | N/A |
+| Python functools.lru_cache | "lru_cache maxsize singleton" | `@lru_cache(maxsize=1)` with zero-arg functions provides deterministic process-scoped singletons. Thread-safe for the GIL-protected read path. | ✅ Aligned | N/A |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards:**
+- ✅ Twelve-Factor App Methodology (https://12factor.net/)
+- ✅ Backstage Backend Services Architecture (https://backstage.io/docs/backend-system/architecture/services)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor — Factor IV (Backing Services) | "backing services attached resources substitutable" | "The code for a twelve-factor app makes no distinction between local and third party services. To the app, both are attached resources, accessed via a URL or other locator/credentials stored in the config." Backing services must be substitutable without code changes. Directly supports the core premise: Category A services abstract over backing services and should be swappable. | ✅ Aligned | N/A |
+| Backstage Backend Services | "ServiceRef ServiceFactory DI container" | Backstage uses ServiceRef (typed interface reference) + ServiceFactory (construction) + backend DI container. Every core service has an interface type. The Python equivalent is Protocol + `@lru_cache` provider + composition root. Backstage core services include: logging, database, config, cache, scheduler, auth, HTTP router, permissions. | ✅ Aligned — ADR explicitly references Backstage as the mental model and maps ServiceRef → Protocol, ServiceFactory → provider function | N/A |
+| Backstage — Service scope | "plugin-scoped root-scoped service" | Backstage distinguishes root-scoped (singleton) and plugin-scoped (per-plugin instance) services. sre-bot correctly uses `@lru_cache` singletons (root-scoped equivalent). | ✅ Aligned | N/A |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards:**
+- ✅ Hexagonal Architecture / Ports and Adapters (Cockburn)
+- ✅ Cosmic Python — Repository Pattern (Chapter 2)
+- ✅ Martin Fowler — Role Interface (2006)
+- ✅ Dependency Injection — Constructor Injection
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Hexagonal Architecture (Cockburn) | "ports adapters application core interface" | Application core depends on port interfaces (Protocols), not adapter implementations (concrete classes). Adapters are constructed at the composition root and injected through ports. Ports define the application's required interfaces; adapters satisfy them. | ✅ Aligned — Standard 1 Category A = ports, Category C = adapters, composition root = providers.py | N/A |
+| Cosmic Python — Repository Pattern (Ch. 2) | "repository protocol abstract base class fake" | Defines repository Protocols/ABCs for persistence, with concrete implementations (SQLAlchemy, in-memory) assembled at bootstrap. The `AbstractRepository` is the port; `SqlAlchemyRepository` and `FakeRepository` are adapters. "Building a Fake Repository for Tests Is Now Trivial!" — directly analogous to Standard 4 test override pattern. The authors note: "In practice we often just rely on Python's duck typing... To a Pythonista, a repository is any object that has `add(thing)` and `get(id)` methods." And: "An alternative to look into is PEP 544 protocols." | ✅ Aligned — StorageService Protocol follows this exact pattern | N/A |
+| Fowler — Role Interface (2006) | "role interface narrow interface client needs" | "Clients should depend on role interfaces tailored to their needs, not broad service interfaces." Service contracts should expose only what the consumer requires. | ✅ Aligned — P5 mandates capability-named Protocols (e.g., `StorageService` not `DynamoDBService`) | N/A |
+| Constructor Injection | "constructor injection dependency inversion" | Dependencies should be explicit and received via constructors. Enables test-time substitution without modifying production code. | ✅ Aligned — Standard 2.2 mandates concrete implementations receive dependencies via constructor | N/A |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 14
+**Aligned with Best Practice:** 14
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: The three-tier classification (A/B/C) is comprehensive and correct
+
+- **Stated Norm:** "Every infrastructure service falls into one of three categories: Category A (contract-required), Category B (shared utility), Category C (implementation detail)." (Standard 1)
+- **Underlying Assumption:** All 14+ infrastructure services can be cleanly classified into exactly one of three categories with no ambiguity.
+- **Challenge:** Could there be services that straddle categories? For example, `EventDispatcher` is classified as Category B (shared utility, no Protocol needed), but event dispatching could plausibly have alternative implementations (in-memory vs. queue-backed vs. webhook-based). Is the "no plausible alternative implementation" criterion subjective?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** Partial — The "plausible alternative implementation" criterion does involve judgment. However, the ADR provides three specific criteria for Category A classification: (1) abstracts over an external backing service, (2) feature packages would need to change if the backing service changed, (3) at least one plausible alternative implementation. EventDispatcher fails criterion (1) — it's an internal event bus, not an abstraction over an external backing service. The three criteria together are sufficiently precise to resolve most ambiguities. For edge cases, the classification can be revisited as new requirements emerge.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The three criteria are well-formulated and produce unambiguous results for all 14 current services. The classification is descriptive (based on current architecture) rather than prescriptive (dictating future evolution). If EventDispatcher needs to become queue-backed in the future, it can be reclassified to Category A at that point.
+
+### Assumption 3.2: @runtime_checkable is beneficial and worth the overhead
+
+- **Stated Norm:** "Protocols must be `@runtime_checkable`." (Standard 2, Rule P1)
+- **Underlying Assumption:** The benefit of `isinstance` checks in test assertions and factory validation outweighs the cost of `@runtime_checkable` (minor performance overhead, imperfect checking for data protocols).
+- **Challenge:** PEP 544 explicitly warns that "`isinstance()` checks are not 100% reliable statically" and makes `@runtime_checkable` opt-in for good reason. Could mandating it create false confidence in runtime type checking? Could it introduce subtle bugs where `isinstance` passes but the object doesn't fully satisfy the Protocol?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — PEP 544 notes that `@runtime_checkable` only checks method existence, not signatures. An object with `def put(self)` (wrong signature) would pass `isinstance(obj, StorageService)` even though it doesn't actually satisfy the Protocol. However, the ADR uses `@runtime_checkable` for test assertions and factory validation — contexts where the developer is already aware of the expected types. Static type checkers (mypy) provide the real signature validation. `@runtime_checkable` is a convenience for test assertions (`assert isinstance(fake_storage, StorageService)`), not a substitute for static checking.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The mandate is pragmatic but the limitation should be understood. The benefit for test assertions (clear assertion failures) outweighs the theoretical risk of false positives. Developers should not rely solely on `isinstance` for Protocol compliance — mypy is the primary enforcement tool. Consider adding a note in the ADR acknowledging PEP 544's caveat about incomplete runtime checking.
+
+### Assumption 3.3: Protocol definitions should live in the service's package, not a shared types package
+
+- **Stated Norm:** "Protocol definitions must live in the service's package (e.g., `infrastructure/storage/protocol.py`), not in a shared types package." (Standard 2, Rule P4)
+- **Underlying Assumption:** Ownership-follows-code is the correct organizational principle for Protocol definitions. Having the Protocol and its implementation in the same package makes the ownership clear and prevents a shared protocols package from becoming a bottleneck or orphaned.
+- **Challenge:** If a Protocol is consumed by multiple feature packages, wouldn't a central `infrastructure/protocols/` package make discovery easier? In Backstage, ServiceRef types are defined in a central `@backstage/backend-plugin-api` package, not in individual service packages.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** Partial — Backstage does centralize ServiceRef types in `@backstage/backend-plugin-api`. However, Backstage is a TypeScript monorepo with npm packages, where cross-package imports have different economics (explicit package.json dependencies, version resolution). In a Python single-process application, the import cost is trivial and there's no versioning concern. The Cosmic Python approach places the `AbstractRepository` (port) in the same module as the pattern it defines, not in a separate shared package. ADR-0047 P2 (ownership follows code) and the Alternatives Considered section (option 3, rejected) provide the rationale. A shared protocols package would separate the Protocol from its implementation, creating ownership ambiguity.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The Python/FastAPI context is different from Backstage's TypeScript monorepo. In a single-process Python application, colocating the Protocol with its implementation is the simpler choice and aligns with the Cosmic Python approach. Feature packages discover Protocols through the injection boundary (dependencies.py), not through direct import of the protocol module.
+
+### Assumption 3.4: The migration can be done incrementally without breaking existing consumers
+
+- **Stated Norm:** "Each migration must be an independently deployable change. No migration may break existing tests or require simultaneous changes across multiple services." (Standard 5)
+- **Underlying Assumption:** Renaming a service class (e.g., `StorageService` → `DynamoDBStorageService`) and introducing a Protocol with the original name can be done without breaking existing imports.
+- **Challenge:** Existing feature code imports `StorageService` as a concrete class. Changing it to a Protocol (same name) would change the type from a class to a Protocol. Could this break `isinstance` checks, type annotations, or runtime behavior?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — The migration steps are carefully sequenced: (1) Create Protocol, (2) Rename implementation, (3) Update provider return type, (4) Update dependency alias. Feature code currently depends on the `Annotated[StorageService, Depends(get_storage_service)]` alias. If the alias type changes from `StorageService` (concrete) to `StorageService` (Protocol), and the concrete class is renamed to `DynamoDBStorageService`, the alias still resolves to the same object at runtime (the `@lru_cache` provider returns the same instance). The type annotation changes from concrete to Protocol, which is a widening (less specific), not a narrowing — mypy will not flag errors. The key insight is that features interact with the service through the `Depends()` mechanism, not through direct import of the concrete class. As long as the `Depends()` provider returns an object that satisfies the Protocol, nothing breaks.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The migration sequencing is correct. The dependency alias pattern insulates feature code from the concrete-to-Protocol transition. The risk would be higher if features imported `StorageService` directly, but ADR-0048 B2 already mandates the injection boundary.
+
+### Assumption 3.5: Category B services truly don't need Protocol contracts
+
+- **Stated Norm:** "Category B services are concrete types with no alternative implementation expected. Protocol contracts are NOT required." (Standard 1)
+- **Underlying Assumption:** The classification of EventDispatcher, TranslationService, CommandService, ResilienceService, and IdempotencyService as "no alternative implementation expected" is correct.
+- **Challenge:** Could any of these services plausibly need alternative implementations in the future? For example, if the application moves from single-process to distributed architecture, EventDispatcher might need a queue-backed implementation. If the application adds a second language framework, TranslationService might need alternatives.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — The ADR acknowledges this in its Alternatives Considered (option 1, rejected): "Premature abstraction for services with no plausible alternative implementation (EventDispatcher, TranslationService)." The Backstage mental model reconciliation document notes that Backstage puts Protocols on _every_ service (even logging), but the ADR explicitly deviates from this: "Category B services do not get Protocol contracts. This deviates from Backstage because Python's structlog and similar libraries are not meaningfully swappable." The deviation is intentional and documented.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The classification is pragmatic. The risk is that a Category B service needs to become Category A in the future. The mitigation is that reclassification is straightforward — create a Protocol, rename the implementation, update the provider. The cost of premature abstraction (adding Protocols to all 14 services now) exceeds the cost of reclassifying one service later. The ADR's approach (classify now, reclassify as needed) is correct.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: @runtime_checkable false positive in test assertions (from Assumption 3.2)
+
+- **If Assumption Fails:** A test double passes `isinstance(fake, StorageService)` but has method signature mismatches that `@runtime_checkable` doesn't detect. The test passes but the fake doesn't correctly implement the Protocol.
+- **Platform Impact:**
+  - Incident management workflow: Low — production code uses the real implementation
+  - Access synchronization workflow: Low — same
+  - Access request workflow: Low — same
+  - Multi-provider integrations: Low — same
+- **Probability Estimate:** Low (< 15%) — mypy provides the real type enforcement; `isinstance` is a secondary check
+- **Mitigation or Acceptance:** Accepted with mitigation. mypy will catch signature mismatches at static analysis time. `isinstance` serves as a smoke test, not a comprehensive type check. Developers should run mypy as the primary validation, not rely solely on `isinstance`.
+
+### Failure Mode 4.2: Category B service needs Protocol later (from Assumption 3.5)
+
+- **If Assumption Fails:** A Category B service (e.g., EventDispatcher) needs an alternative implementation due to architecture evolution (e.g., move to distributed architecture with a message queue).
+- **Platform Impact:**
+  - Incident management workflow: Low — event dispatch is internal
+  - Access synchronization workflow: Medium — sync uses events for state notifications
+  - Access request workflow: Low — request workflow uses events minimally
+  - Multi-provider integrations: Low — event dispatch is platform-independent
+- **Probability Estimate:** Low-Medium (15-25%) over 2 years
+- **Mitigation or Acceptance:** Mitigated. Reclassification from Category B to Category A is a well-defined process: create Protocol, rename implementation, update provider/alias. The cost is proportional to the service's interface surface area. The ADR's incremental approach means this reclassification can happen when needed, not preemptively.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| ADR-0045 P6 (Protocol-Driven Service Contracts) mandates Protocols for "infrastructure services consumed by feature packages." ADR-0077 Standard 1 exempts Category B services from Protocol requirements. Is this a contradiction? | ADR-0045, ADR-0077 | 🟢 Low | ✅ Resolved → ADR-0045 P6 says "infrastructure services consumed by feature packages must be defined by Protocol contracts." ADR-0077 provides the classification that determines WHICH services require Protocols. Category B services are "shared utilities" (OperationResult, EventDispatcher) — they are consumed by feature packages but are not "services" in the backing-service-abstraction sense. P6's intent is implementation swappability for backing services; shared utilities are vocabulary types, not swappable services. |
+| ADR-0048 B7 (Protocol Contract Surface) says "features must depend on Protocol types, not concrete implementations." Category B services are concrete types consumed directly. Is B7 violated by Category B? | ADR-0048, ADR-0077 | 🟢 Low | ✅ Resolved → ADR-0048 B7 applies to services "where an infrastructure service has a Protocol contract." Category B services explicitly do not have Protocol contracts. B7 applies only to Category A services. The boundary is clear: if the service has a Protocol (Category A), features depend on the Protocol; if not (Category B), features depend on the concrete type. |
+| ADR-0056 Standard 1 (narrow-slice injection) vs ADR-0077 Standard 2.3 (Protocol return types for providers): ADR-0056 governs provider composition mechanics. ADR-0077 adds a requirement that provider return type annotations use Protocol types. Are these complementary or conflicting? | ADR-0056, ADR-0077 | 🟢 Low | ✅ Resolved → Complementary. ADR-0056 governs HOW providers are structured (narrow-slice, centralized, ceremony). ADR-0077 governs WHAT type the provider returns (Protocol for Category A). ADR-0077's Compliance section explicitly states: "ADR-0056 Standard 1 should be amended to reference this requirement." The amendment path is documented. |
+| ADR-0076 Standard 3 (composition root) vs ADR-0077 Standard 2.2 (concrete implementation constructed in composition root): Both mandate composition root for service construction. Redundant? | ADR-0076, ADR-0077 | 🟢 Low | ✅ Resolved → ADR-0076 S3 provides the general intra-layer rule (no infrastructure package may construct sibling services outside providers.py). ADR-0077 S2.2 provides the Protocol-specific pattern (concrete implementations are constructed in providers.py and returned as Protocol types). ADR-0077 is a more specific application of ADR-0076's general rule. |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** None (new standard)
+- **Inheritance Status:** Constrained by ADR-0044, ADR-0045, ADR-0048. Impacts ADR-0056, ADR-0059, ADR-0061, ADR-0065. All constraints and impacts are correctly listed in the metadata.
+- **Gaps Identified:** None. The constrained_by and impacts relationships are correctly specified.
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Secondary Domain Owners:** N/A
+- **Plugin/Startup Registration:** Not directly applicable — ADR governs service contract patterns, not plugin registration
+- **Config Owner:** Inherited from ADR-0045 and ADR-0048
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+**Context:** Emergency response requires rapid logging, context propagation, and operational decision-making under time pressure.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| AuditTrailService needs Protocol (Category A, P1) | Standard 1 classifies as Category A, migration priority P1 | Currently concrete class; audit writes during incident response need to be reliable regardless of backend | ✅ No | Protocol migration is planned (P1 priority) but not blocking current operations |
+| Notification channels (Category A, P2) | Standard 1 classifies NotificationService as Category A | Incident notifications use channels that are already partially abstracted | ✅ No | Channel abstraction exists; service-level Protocol is a formalization |
+| OperationResult (Category B) | Standard 1 permits concrete Category B types | OperationResult is universally used for fallible operations in incident handling | ✅ No | No Protocol needed — OperationResult is shared vocabulary |
+
+**Validation Summary:**
+- ✅ Fully aligned
+
+---
+
+### Scenario 6.2: Access Synchronization Workflow
+**Context:** Automated sync from identity providers (AWS IAM, Google Workspace, GitHub) to application; must handle failure, retry, and eventual consistency.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| StorageService Protocol (P0) | Standard 1 classifies as Category A, P0 priority | Access sync writes membership data to DynamoDB via StorageService. If DynamoDB is replaced, sync code must not change. | ✅ No | P0 migration directly enables the stated design goal (storage-agnostic) |
+| DirectoryProvider Protocol (already exists) | Standard 1 classifies as Category A, complete | Access sync reads group membership via DirectoryProvider. GoogleDirectoryProvider is the current implementation. | ✅ No | Already Protocol-based — validates the pattern |
+| RetryStore Protocol (already exists) | Standard 1 classifies as Category A, complete | Sync retries use DynamoDB-backed RetryStore. | ✅ No | Already Protocol-based — validates the pattern |
+| AWSClients facade (pragmatic exception) | Standard 3 pragmatic exception for domain-specific AWS operations | Access sync uses IdentityStore client for AWS IAM operations not covered by a domain service | ⚠️ Yes | Pragmatic exception is exercised; documented coupling is acceptable per Standard 3.2 |
+
+**Validation Summary:**
+- ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** AWSClients facade usage for IdentityStore is a documented pragmatic exception. If a second feature needs IdentityStore operations, a Category A domain service should be created (per Standard 3.2 "two consumers" trigger).
+
+---
+
+### Scenario 6.3: Access Request Workflow
+**Context:** User requests access to a resource/role; admin approves; system provisions and audits the action across multiple platforms.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| IdentityService needs Protocol (Category A, P1) | Standard 1 classifies as Category A, P1 priority | Access requests require identity resolution across platforms (JWT + platform resolvers). The service is currently concrete. | ✅ No | P1 migration will enable alternative identity backends |
+| PlatformService (Category A, P2) | Standard 1 classifies as Category A, partially abstracted | Platform interaction during request approval uses PlatformService with BasePlatformProvider base class | ✅ No | Partial abstraction exists; full Protocol formalization planned at P2 |
+
+**Validation Summary:**
+- ✅ Fully aligned
+
+---
+
+### Scenario 6.4: Multi-Provider Integration (Slack/Teams/AWS/GWS/GitHub)
+**Context:** Single operation may span multiple external APIs (rate limits, error handling, eventual consistency across platforms).
+
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| Platform client facades (pragmatic exception) | Standard 3 pragmatic exception for platform-specific operations | SlackClientFacade, TeamsClientFacade, DiscordClientFacade are accessed directly via DI aliases | ✅ No | Retained as pragmatic exception — platform-specific operations require direct access |
+| GoogleWorkspaceClients (phase-out recommended) | Standard 3.3 recommends phase-out | Features should use DirectoryProvider, not raw Google clients | ⚠️ Yes | Phase-out is recommended but not blocking; DirectoryProvider covers most use cases |
+| Cross-platform notification dispatch | NotificationService Category A (P2) | Multi-platform notifications go through NotificationService → channel-specific adapters | ✅ No | Channel abstraction already exists; service-level Protocol formalizes the pattern |
+
+**Validation Summary:**
+- ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** GoogleWorkspaceClients phase-out is a recommendation, not a mandate. Current usage through DirectoryProvider is the primary pattern. Any remaining direct client usage should be assessed case-by-case.
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Selective Protocol Coverage vs. Universal Protocol Coverage
+- **Chosen:** Category A (contract-required) services get Protocols; Category B (shared utilities) do not
+- **Rejected:** Require Protocols for ALL infrastructure services (including EventDispatcher, TranslationService, etc.)
+- **Rationale:** Protocol contracts add value only when the service abstracts over a swappable backing service. Shared utilities (OperationResult, EventDispatcher) are concrete by nature. Backstage puts ServiceRef on every service (even logging), but Python's structlog is not meaningfully swappable — the abstraction cost exceeds the swap probability.
+- **Risk Accepted:** A Category B service may need to become Category A in the future (see Failure Mode 4.2). Reclassification cost is proportional to interface surface area.
+- **Contingency:** Well-defined reclassification process: create Protocol → rename implementation → update provider/alias → run test suite.
+
+### Tradeoff 7.2: Protocol Colocated with Implementation vs. Central Protocols Package
+- **Chosen:** Protocol lives in the service's own package (`infrastructure/storage/protocol.py`)
+- **Rejected:** Central `infrastructure/protocols/` package containing all Protocol definitions
+- **Rationale:** Ownership-follows-code (ADR-0047 P2). Colocation makes it clear who owns and maintains the Protocol. A central package would separate contract from implementation, creating ownership ambiguity. Feature packages discover Protocols through the injection boundary, not through direct import.
+- **Risk Accepted:** Feature developers must look at the injection boundary (dependencies.py) to discover available Protocols, not a central directory.
+- **Contingency:** IDE tooling (go-to-definition on the Depends alias) resolves discoverability. Documentation in the `__init__.py` re-exports provides additional discovery path.
+
+### Tradeoff 7.3: Pragmatic Client Facade Exception vs. Strict Domain Service Mandate
+- **Chosen:** Feature packages may import typed client facades (AWSClients, SlackClientFacade) through the injection boundary when no Category A service covers the operation
+- **Rejected:** Require a domain service (Category A) for every backing-service operation, even single-use ones
+- **Rationale:** Creating a domain service for every possible AWS/Slack/Teams operation would be premature abstraction. Most client facade usage is domain-specific (IdentityStore for access sync, GuardDuty for SRE ops).
+- **Risk Accepted:** Direct client facade usage creates concrete coupling between feature and infrastructure implementation. If the backing service changes (e.g., Google Workspace → Entra ID), features using raw GoogleWorkspaceClients must change.
+- **Contingency:** The "two consumers" trigger (Standard 3.2) detects when a pragmatic exception should be promoted to a Category A service. GoogleWorkspaceClients is already recommended for phase-out (Standard 3.3).
+
+### Tradeoff 7.4: Incremental Migration vs. Big-Bang Migration
+- **Chosen:** P0 → P1 → P2 → P3 priority-ordered incremental migration
+- **Rejected:** Migrate all 9 concrete-only services simultaneously
+- **Rationale:** Each migration must be independently deployable. Incremental migration reduces risk and allows learning from each migration. StorageService (P0) is foundational — its Protocol pattern will serve as the template for subsequent migrations.
+- **Risk Accepted:** The codebase will temporarily have a mix of Protocol-backed and concrete-only services. This inconsistency is visible but architecturally safe — the injection boundary still works for concrete types.
+- **Contingency:** If incremental migration proves too slow, multiple P1 or P2 migrations can be parallelized (they are independent of each other).
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Execute P0 migration: StorageService Protocol | ❌ No | SRE Team | Action 5-6 timeframe | Create `infrastructure/storage/protocol.py`, rename `StorageService` → `DynamoDBStorageService`, update provider and alias |
+| ~~Amend ADR-0056: Protocol return type requirement~~ | ❌ No | SRE Team | ~~Post-Action 4~~ **Done (2026-04-29)** | ✅ Added service contract impact bullet to ADR-0056 Compliance and Boundaries section referencing ADR-0077 Standard 2 and Standard 5. Standard 1 already contained Protocol return type requirement paragraph. |
+| Add code review checklist item | ❌ No | SRE Team | Post-Action 4 | Add "Protocol contract required?" check for new Category A infrastructure services |
+| ~~Consider adding PEP 544 caveat note to Rule P1~~ | ❌ No | SRE Team | ~~Optional~~ **Done (2026-04-29)** | ✅ Added caveat to P1 rationale column: `@runtime_checkable` checks method existence only, not signatures; mypy is the primary enforcement tool. |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds:** None — all follow-up actions are non-blocking.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **PASS** → ADR-0077 is professionally sound and ready for phase-in via Step 10 cascade
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer |
+| **Reviewer Title** | Architecture Review, SRE Team |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | — |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+- ADR-0077 challenge review trail
+- Internal decision tracker
+
+**This Review Template Was Completed Per:**
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → then annual review_state cycle
