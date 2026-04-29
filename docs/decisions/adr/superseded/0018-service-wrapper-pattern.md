@@ -1,23 +1,27 @@
 ---
 adr_id: ADR-0018
 title: "Service Wrapper Pattern"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0056
+  - ADR-0077
 related_records:
   - ADR-0002
   - ADR-0003
   - ADR-0019
+  - ADR-0056
+  - ADR-0077
 related_packages: []
-review_state: stale
+review_state: superseded
 ---
 # Service Wrapper Pattern
 
@@ -62,6 +66,7 @@ class TranslationService:
 ```
 
 **Anti-patterns**:
+
 ```python
 # ❌ FORBIDDEN: Direct Settings import in services
 from infrastructure.configuration import Settings
@@ -79,6 +84,7 @@ class MyService:
 ```
 
 Rules:
+
 - ✅ `Settings` class imported only under `TYPE_CHECKING` in services
 - ✅ `settings` instance injected via provider
 - ❌ Services never instantiate `Settings`
@@ -107,12 +113,14 @@ class NotificationService:
 ```
 
 **Anti-patterns**:
+
 ```python
 # ❌ FORBIDDEN: Service importing another service
 from infrastructure.notifications.service import NotificationService
 ```
 
 Rules:
+
 - ✅ Dependencies wired in providers
 - ❌ Services import other services
 
@@ -145,5 +153,6 @@ def get_notification_service() -> NotificationService:
 ```
 
 Rules:
+
 - ✅ Providers use `@lru_cache(maxsize=1)`
 - ✅ Providers inject dependencies into services

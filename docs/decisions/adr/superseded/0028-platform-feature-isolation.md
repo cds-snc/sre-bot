@@ -1,23 +1,25 @@
 ---
 adr_id: ADR-0028
 title: "Feature Interaction Layer Isolation"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0059
 related_records:
     - ADR-0025
     - ADR-0027
     - ADR-0032
+    - ADR-0059
 related_packages: []
-review_state: stale
+review_state: superseded
 ---
 # Feature Interaction Layer Isolation
 
@@ -46,6 +48,7 @@ packages/<feature>/
 ## Directory Responsibilities
 
 **`__init__.py`** - Pluggy hook implementations (registration entry point):
+
 ```python
 """<Feature> package - self-registers via Pluggy hooks."""
 from infrastructure.services import hookimpl
@@ -64,6 +67,7 @@ def register_slack_commands(provider):
 ```
 
 **`interactions/http.py`** - FastAPI HTTP routes (primary interface, channel-agnostic):
+
 ```python
 """HTTP interaction handler for <feature>."""
 from fastapi import APIRouter, HTTPException
@@ -85,6 +89,7 @@ def perform_action(request: FeatureRequest) -> FeatureResponse:
 ```
 
 **`interactions/ingress.py`** - Shared admission logic (enabled-check, lock-check, job spawn):
+
 ```python
 """Shared admission logic for all interaction channels.
 
@@ -102,6 +107,7 @@ def admit_sync_request(param: str) -> OperationResult:
 ```
 
 **`interactions/slack.py`** - Slack command/view/action handlers:
+
 ```python
 """Slack interaction handlers for <feature>.
 
@@ -132,6 +138,7 @@ def register_commands(provider):
 ```
 
 **`service.py`** - Business logic (completely channel-agnostic):
+
 ```python
 """Business logic - channel-agnostic."""
 from infrastructure.operations import OperationResult
@@ -146,6 +153,7 @@ def execute_business_logic(request, settings) -> OperationResult:
 ```
 
 **`interactions/teams.py`** - Teams command/card handlers:
+
 ```python
 """Teams interaction handler for <feature>.
 
@@ -175,6 +183,7 @@ def register_commands(provider):
 ## Examples
 
 **Geolocate Package**:
+
 ```
 packages/geolocate/
 ├── __init__.py              # Pluggy hooks
@@ -187,6 +196,7 @@ packages/geolocate/
 ```
 
 **Groups Management Package**:
+
 ```
 packages/groups/
 ├── __init__.py              # Pluggy hooks
@@ -222,16 +232,19 @@ packages/groups/
 ## Package Naming Conventions
 
 ### Package Names
+
 - Use singular nouns: `geolocate`, `incident`, `group` (not `groups`)
 - Use lowercase: `packages/geolocate/` (not `packages/GeoLocate/`)
 - Use underscores for multi-word: `packages/access_request/`
 
 ### Interaction File Names
+
 - Named after their channel: `http.py`, `slack.py`, `teams.py`, `discord.py`
 - Always lowercase; match channel name exactly
 - Shared admission logic: `ingress.py`
 
 ### Hook Implementation Names
+
 - Format: `register_<channel>_<feature_type>`
 - Examples: `register_slack_commands`, `register_http_routes`, `register_event_handlers`
 
@@ -240,6 +253,7 @@ packages/groups/
 ## Testing Conventions
 
 ### Test Organization
+
 ```
 tests/
 ├── test_http.py             # HTTP route tests
@@ -281,4 +295,3 @@ def test_slack_command_calls_service_via_ingress():
 ```
 
 ---
-
