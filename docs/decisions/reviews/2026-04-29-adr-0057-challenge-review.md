@@ -1,0 +1,344 @@
+# ADR Challenge and Content Review — ADR-0057
+
+**Purpose:** Step 9.5 (Canonical ADR Challenge and Content Review Gate) execution for ADR-0057: Runtime Disposability and Graceful Shutdown Standard. This review anchors all judgments on authoritative best practices, not current code implementation.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0057: Runtime Disposability and Graceful Shutdown Standard |
+| **Reviewer Name & Title** | AI Architecture Reviewer, SRE Team |
+| **Secondary Reviewers** | — |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **REVISE** → **REVISED (2026-04-29)** |
+| **Outcome Rationale** | Standard 1 described the shutdown signal propagation chain with lifespan cleanup (step 3) occurring before in-flight request draining (step 4). Authoritative uvicorn documentation (sequence diagram at uvicorn.dev/concepts/lifespan/) and the ASGI Lifespan Protocol spec confirmed the opposite ordering: request draining completes first, then `lifespan.shutdown` is sent. This factual error cascaded into Standard 2 timeout budget analysis. **Revised same-day:** Standard 1 corrected to 6-step sequence with draining before lifespan shutdown. Standard 2 split into Phase A (request draining) and Phase B (lifespan cleanup). `--timeout-graceful-shutdown` recommendation corrected from 25s to 10s. Remaining standards (3–6) were well-grounded and required no changes. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards:**
+- ✅ FastAPI Official Documentation (https://fastapi.tiangolo.com/advanced/events/)
+- ✅ Starlette / ASGI Lifespan Protocol v2.0 (https://asgi.readthedocs.io/en/latest/specs/lifespan.html)
+- ✅ Uvicorn Settings Documentation (https://uvicorn.dev/settings/)
+- ✅ Uvicorn Server Behavior — Graceful Process Shutdown (https://uvicorn.dev/server-behavior/)
+- ✅ Uvicorn Concepts — Lifespan (https://uvicorn.dev/concepts/lifespan/)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| ASGI Lifespan Protocol v2.0 — Shutdown event | "lifespan.shutdown receive event" | Spec states: "Sent to the application **when the server has stopped accepting connections and closed all active connections.**" The shutdown event comes AFTER request draining, not before. | ⚠️ Deviation | ADR Standard 1 step ordering is reversed — see Assumption 3.1 |
+| Uvicorn Concepts — Lifespan sequence diagram | "lifespan shutdown sequence request draining" | The sequence diagram on uvicorn.dev/concepts/lifespan/ explicitly shows: (1) Shutdown signal received → (2) Stop accepting new connections → (3) Complete pending requests → (4) `lifespan.shutdown` sent → (5) `lifespan.shutdown.complete` received → (6) Server stopped. | ⚠️ Deviation | ADR Standard 1 states lifespan cleanup before request draining — opposite of uvicorn's documented behavior |
+| Uvicorn Server Behavior — Graceful Process Shutdown | "graceful process shutdown draining connections" | States: "Close any connections that are not currently waiting on an HTTP response, and **wait for any other connections to finalize their HTTP responses**. Wait for any background tasks to run to completion." This describes the draining phase that precedes lifespan shutdown. | ⚠️ Deviation | Confirms draining precedes lifespan shutdown |
+| Uvicorn Settings — `--timeout-graceful-shutdown` | "timeout graceful shutdown" | "Maximum number of seconds to wait for graceful shutdown. After this timeout, the server will start terminating requests." This timeout controls the request draining window, NOT the lifespan cleanup window. | ⚠️ Deviation | ADR Standard 2 does not account for this — the lifespan cleanup budget is the time remaining AFTER request draining |
+| FastAPI Lifespan Events | "lifespan yield cleanup shutdown" | "The part after the `yield` will be executed after the application has finished." FastAPI wraps ASGI lifespan — code after `yield` runs when the ASGI `lifespan.shutdown` event is received, which is after request draining. | ✅ Aligned (at the FastAPI abstraction level) | N/A — FastAPI docs correctly describe when cleanup runs; the issue is in the ADR's description of what triggers the cleanup |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards:**
+- ✅ Twelve-Factor App Methodology — Factor IX (Disposability)
+- ✅ Twelve-Factor App Methodology — Factor VIII (Concurrency)
+- ✅ AWS ECS Task Lifecycle (SIGTERM → SIGKILL contract)
+- ✅ Crash-Only Software (Candea & Fox, 2003)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor IX — Disposability | "graceful shutdown SIGTERM reentrant idempotent" | "Processes shut down gracefully when they receive a SIGTERM signal from the process manager. For a web process, graceful shutdown is achieved by ceasing to listen on the service port, allowing any current requests to finish, and then exiting." Also: "all jobs are reentrant, which typically is achieved by wrapping the results in a transaction, or making the operation idempotent." And: "Crash-only design takes this concept to its logical conclusion." | ✅ Aligned | N/A — Standard 4 crash resilience matches Factor IX precisely |
+| Twelve-Factor Factor VIII — Concurrency | "processes should never daemonize PID files process manager" | "Twelve-factor app processes should never daemonize or write PID files. Instead, rely on the operating system's process manager." | ✅ Aligned | N/A — Standard 1 delegates signal handling to uvicorn (process manager) |
+| AWS ECS Task Lifecycle | "SIGTERM stopTimeout SIGKILL ECS" | ECS sends SIGTERM, waits `stopTimeout` (default 30s), then sends SIGKILL. Confirmed via ADR's Terraform cross-reference (`deregistration_delay = 30` in `terraform/alb.tf`). | ✅ Aligned | N/A |
+| Crash-Only Software (Candea & Fox, 2003) | "crash recovery normal shutdown same path" | Design systems where crash recovery and normal shutdown converge — if you can handle SIGKILL safely, SIGTERM cleanup is a bonus. | ✅ Aligned | N/A — Standard 4 directly implements crash-only principles |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards:**
+- ✅ ASGI Lifespan State Management (scope["state"])
+- ✅ Resource Acquisition Is Initialization (RAII) — via Python context managers
+- ✅ Structured Observability (structured logging for lifecycle phases)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| ASGI Lifespan State | "scope state lifespan persist request" | ASGI spec provides `scope["state"]` for persisting data from lifespan to requests. FastAPI uses `app.state` as the Starlette/FastAPI equivalent. | ✅ Aligned | N/A — Standard 3 correctly mandates `app.state` for resource tracking |
+| RAII via context managers | "asynccontextmanager resource cleanup yield" | FastAPI lifespan `@asynccontextmanager` provides automatic cleanup after `yield` — the Python-native pattern for resource lifecycle management. | ✅ Aligned | N/A |
+| Structured observability | "structured logging phase events shutdown" | Industry standard for lifecycle monitoring — emit events at phase boundaries with duration and outcome. ADR-0054 establishes this for the project. | ✅ Aligned | N/A |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 11
+**Aligned with Best Practice:** 7
+**Deliberate Deviations:** 4 (all related to Standard 1 signal ordering — a single root cause)
+
+**High-Level Finding:**
+- 🔴 **Gaps Found:** Standard 1 describes a shutdown ordering that contradicts the ASGI Lifespan Protocol spec and uvicorn's documented behavior. Request draining happens BEFORE lifespan shutdown, not after. This gap cascades into Standard 2 timeout budget analysis.
+
+**Deviation Summary:**
+1. **Standard 1 step ordering (steps 2–4):** ADR states lifespan cleanup triggers before request draining. ASGI spec and uvicorn docs confirm the opposite. This is a factual error, not a deliberate deviation. Must be corrected.
+2. **Standard 2 timeout budget analysis:** Because the ordering is wrong, the timeout budget table does not account for the `--timeout-graceful-shutdown` parameter consuming part of the total shutdown window before lifespan cleanup begins. Must be revised to show the two-phase budget: (a) request draining window (bounded by `--timeout-graceful-shutdown`), then (b) lifespan cleanup window (remaining time before SIGKILL).
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: The signal-to-lifespan propagation chain ordering
+
+- **Stated Norm:** "2. Uvicorn receives SIGTERM and initiates ASGI lifespan shutdown — it stops accepting new connections and triggers the lifespan context manager to exit. 3. The FastAPI lifespan context manager executes cleanup code after the yield point. 4. After lifespan cleanup completes, uvicorn completes in-flight request draining and exits with status code 0." (Standard 1)
+- **Underlying Assumption:** Lifespan cleanup executes before in-flight request draining.
+- **Challenge:** The ASGI Lifespan Protocol v2.0 spec states the `lifespan.shutdown` event is "Sent to the application when the server has stopped accepting connections **and closed all active connections.**" The uvicorn lifespan concepts page (uvicorn.dev/concepts/lifespan/) includes a sequence diagram showing: (1) Shutdown signal → (2) Stop accepting new connections → (3) **Complete pending requests** → (4) `lifespan.shutdown` sent → (5) `lifespan.shutdown.complete` → (6) Server stopped. Request draining precedes lifespan shutdown.
+- **Evidence Strength:** ⭐ Strong (authoritative spec + implementation docs with sequence diagram)
+- **Counter-Evidence Found:** Yes — both the ASGI spec and uvicorn's own documentation contradict the ADR's step ordering.
+- **Confidence (ADR survives challenge):** 🔴 Low — the ordering is incorrect and must be revised
+- **Reviewer Notes:** The ADR's description of the signal chain has steps 3 and 4 inverted. The correct ordering is: SIGTERM → stop accepting connections → drain in-flight requests (bounded by `--timeout-graceful-shutdown`) → trigger lifespan.shutdown → lifespan cleanup runs → process exits. This is not a cosmetic issue — it fundamentally changes the timeout budget analysis in Standard 2.
+
+### Assumption 3.2: The shutdown timeout budget allocation model
+
+- **Stated Norm:** Standard 2 allocates the entire shutdown window to lifespan cleanup phases (Background ≤5s, Transport ≤5s, Feature ≤2s, Infrastructure ≤5s, Reserve ≥3s = 20s total) and mentions that `--timeout-graceful-shutdown` "should be configured to align with the ECS stop timeout minus a safety margin."
+- **Underlying Assumption:** The lifespan cleanup phases consume the primary portion of the shutdown window.
+- **Challenge:** Because request draining happens BEFORE lifespan cleanup (per Assumption 3.1), the shutdown window is actually split into two sequential phases: (1) request draining — bounded by `--timeout-graceful-shutdown` — and (2) lifespan cleanup — bounded by the remaining time before SIGKILL. If `--timeout-graceful-shutdown` is set to 25s (as the ADR's follow-up suggests), only ~5s would remain for all four lifespan cleanup phases. The current budget allocates 20s across those phases, which is incompatible with a 25s draining timeout within a 30s total window.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** Yes — the math doesn't work with the correct ordering.
+- **Confidence (ADR survives challenge):** 🔴 Low — budget must be recalculated
+- **Reviewer Notes:** The correct approach is: (a) Define the `--timeout-graceful-shutdown` value to cover request draining (e.g., 10–15s for a web process with short requests per Factor IX guidance), (b) Allocate the remaining time (15–20s) to lifespan cleanup phases. The current ADR's suggestion of `--timeout-graceful-shutdown=25` in the Implementation Guidance section would leave almost no time for lifespan cleanup.
+
+### Assumption 3.3: SIGTERM prohibition for application code is necessary and correct
+
+- **Stated Norm:** "Application code must not install custom `signal.signal()` handlers for SIGTERM or SIGINT. Signal handling is delegated to the ASGI server." (Standard 1 Prohibitions)
+- **Underlying Assumption:** Uvicorn handles SIGTERM correctly and additional signal handlers would interfere.
+- **Challenge:** Could there be legitimate use cases for custom signal handling in the application layer? For example, a "pre-shutdown" notification hook that fires immediately on SIGTERM rather than waiting for request draining to complete?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Twelve-Factor Factor VIII explicitly states "rely on the operating system's process manager" for signal handling. Custom SIGTERM handlers in Python are notoriously fragile (they run in the main thread, can conflict with asyncio event loop signal handling, and create race conditions with uvicorn's own handler). Uvicorn's signal handling is well-tested.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The prohibition is correct and well-grounded.
+
+### Assumption 3.4: `atexit` as a last-resort safety net is appropriate
+
+- **Stated Norm:** "`atexit` handlers are a last-resort safety net, not a substitute for lifespan-managed cleanup." (Standard 3 Rules)
+- **Underlying Assumption:** `atexit` handlers run reliably enough to serve as a backup, but not reliably enough to be primary.
+- **Challenge:** Python `atexit` handlers do NOT run on SIGKILL, segfault, or `os._exit()`. They DO run on normal interpreter shutdown (including SIGTERM-initiated shutdown when the process exits cleanly via uvicorn). Could reliance on `atexit` as even a safety net create false confidence?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — `atexit` handlers also run after the event loop is closed, so async cleanup is impossible in an `atexit` handler. The ADR acknowledges this limitation implicitly by mandating lifespan-managed cleanup as primary. The safety-net framing is pragmatic.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The ADR's characterization is appropriate. The current codebase uses `atexit` for the event executor shutdown — the ADR correctly identifies this as a gap that should be moved to lifespan shutdown.
+
+### Assumption 3.5: The `getattr(app.state, attr, None)` pattern for null-safe shutdown access
+
+- **Stated Norm:** "Missing `app.state` attributes during shutdown must be handled with `getattr(app.state, attr, None)` checks — not bare `hasattr` with separate access." (Standard 3 Rules)
+- **Underlying Assumption:** `getattr` with default is safer and more idiomatic than `hasattr` + getattr.
+- **Challenge:** Is the `hasattr` prohibition overly prescriptive? `hasattr` + `getattr` is a common Python pattern.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — `hasattr` + separate `getattr` creates a TOCTOU race condition (time-of-check-time-of-use). In a shutdown context where state may be mutated by concurrent cleanup, the single `getattr(app.state, attr, None)` call is atomically safe. This is a well-known Python best practice (e.g., Python Effective Strategies by Brett Slatkin, Item 92 equivalent for safe attribute access).
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Correct and well-motivated.
+
+### Assumption 3.6: Environment parity for shutdown via null-checks rather than environment branching
+
+- **Stated Norm:** "The lifespan shutdown code must not contain `if environment == 'production'` guards that skip cleanup. Cleanup code runs unconditionally; resources that were not acquired (due to environment guards at startup) are handled by null-checks, not by environment branching." (Standard 6 Rules)
+- **Underlying Assumption:** Null-check-based cleanup is more reliable than environment-branched cleanup.
+- **Challenge:** Could environment branching be simpler and more explicit in some cases?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Twelve-Factor Factor X (Dev/Prod Parity) mandates minimizing divergence. Environment branching in shutdown code creates two code paths, one of which (production) is rarely tested locally. Null-check-based cleanup exercises the same code path in all environments, catching bugs earlier. The principle is sound.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** This is the correct approach and aligns with Factor X.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Incorrect shutdown ordering leads to cleanup timeout (from Assumption 3.1)
+
+- **If Assumption Fails:** If the ADR's step ordering is implemented as written (lifespan cleanup before request draining), it would not match uvicorn's actual behavior. However, this is more of a documentation error than a runtime failure — the lifespan code itself executes whenever uvicorn triggers `lifespan.shutdown`, regardless of what the ADR says. The real risk is that engineers calibrate timeout budgets based on the incorrect ordering.
+- **Platform Impact:**
+  - Incident management workflow: Low — shutdown ordering affects cleanup reliability, not incident response
+  - Access synchronization workflow: Medium — a background sync job stopping during cleanup might be affected by incorrect timeout budgets
+  - Access request workflow: Low — request-scoped operations complete before lifespan shutdown
+  - Multi-provider integrations: Low — provider cleanup is bounded by the lifespan phases regardless
+- **Probability Estimate:** Medium (25-40%) — the timeout budget miscalculation could cause either premature SIGKILL or unnecessarily long shutdown waits
+- **Mitigation or Acceptance:** Must be corrected. Revise Standard 1 to reflect the correct ordering and Standard 2 to account for the two-phase shutdown window.
+
+### Failure Mode 4.2: `--timeout-graceful-shutdown=25` leaves insufficient lifespan cleanup time (from Assumption 3.2)
+
+- **If Assumption Fails:** If the Implementation Guidance suggestion of `--timeout-graceful-shutdown=25` is applied, and the ECS stop timeout is 30s, only ~5s remain for lifespan cleanup. The Standard 2 budget allocates 17s (5+5+2+5) to cleanup phases, which cannot fit in the ~5s remaining. Lifespan cleanup would be SIGKILL-ed before completing.
+- **Platform Impact:**
+  - Incident management workflow: Low
+  - Access synchronization workflow: Medium — background sync job thread join (5s budget) might be cut short
+  - Access request workflow: Low
+  - Multi-provider integrations: Medium — infrastructure client cleanup (5s budget) might be cut short
+- **Probability Estimate:** High (60-80%) if the Implementation Guidance suggestion is applied without correcting the budget
+- **Mitigation or Acceptance:** Must be corrected. The `--timeout-graceful-shutdown` value must be chosen to leave adequate time for lifespan cleanup. Given the 30s ECS stop timeout and 17s lifespan cleanup budget + 3s reserve, `--timeout-graceful-shutdown` should be ~10s (leaving ~20s for cleanup).
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| ADR-0046 Invariant 4 says "Background work stops first, then transport connections close, then features deactivate, then infrastructure services release resources." ADR-0057 Standard 2 budget table lists the same phases. These are aligned on the phase ordering. | ADR-0046, ADR-0057 | 🟢 Low | ✅ Resolved — consistent |
+| ADR-0058 Standard 7 says scheduler thread join timeout must align with ADR-0057 Standard 2 background phase budget (≤5s). ADR-0057 Standard 2 allocates ≤5s to Background phase. These are consistent. | ADR-0057, ADR-0058 | 🟢 Low | ✅ Resolved — consistent |
+| ADR-0046 Invariant 1 (single lifecycle entry point) and ADR-0057 Standard 1 (exclusive ASGI lifespan reliance) are the same requirement at different tiers — principle (ADR-0046) and standard (ADR-0057). Is this redundant or clarifying? | ADR-0046, ADR-0057 | 🟢 Low | ✅ Resolved — ADR-0057 Standard 1 operationalizes the principle with specifics (the 5-step signal chain and prohibitions). This is correct tier layering: Tier-1 principle → Tier-2 standard. |
+| ADR-0057 Standard 1 step 4 says "uvicorn completes in-flight request draining" after lifespan cleanup. This contradicts the ASGI spec and uvicorn docs which show draining BEFORE lifespan shutdown. The contradiction is between the ADR and the authoritative external source, not between ADRs. | ADR-0057, ASGI spec | 🔴 High | ⚪ Unresolved — requires ADR revision |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** ADR-0016 (Graceful Shutdown)
+- **Inheritance Status:** ADR-0016 is listed in `supersedes` and marked for move to `superseded/`. ADR-0057 inherits the conceptual content (reverse-order shutdown, resource cleanup) while correcting the tier classification and adding enforceable standards.
+- **Gaps Identified:** None in supersession. The tier correction (Tier-1 → Tier-2) is properly documented.
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Secondary Domain Owners:** N/A
+- **Plugin/Startup Registration:** Shutdown interacts with plugin lifecycle (Standard 3 — platform providers must be stopped). Correctly cross-references ADR-0049.
+- **Config Owner:** Timeout parameters sourced from Terraform (`alb.tf`) and uvicorn settings.
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+**Context:** Emergency response requires rapid logging, context propagation, and operational decision-making under time pressure.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Shutdown must not corrupt audit logs | Standard 4 — atomic/idempotent writes | Audit writes to DynamoDB are atomic per-item operations | ✅ No | DynamoDB atomic writes satisfy this |
+| Shutdown observability | Standard 5 — structured shutdown log events | Current implementation has basic `application_shutdown` log only | ⚠️ Yes | Missing phase-level events, but this is an implementation gap not an ADR gap |
+
+**Validation Summary:**
+- ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** Phase-level shutdown observability events are listed as Implementation Guidance follow-up actions. Not blocking the ADR's architectural soundness.
+
+---
+
+### Scenario 6.2: Access Synchronization Workflow
+**Context:** Automated sync from identity providers (AWS IAM, Google Workspace, GitHub) to application; must handle failure, retry, and eventual consistency.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Background sync job shutdown | Standard 3 — scheduled tasks signal stop event, allow current job to finish | `cease_continuous_run` event is set; scheduler thread checks between jobs | ✅ No | Job in progress completes before thread exits |
+| Crash resilience for sync | Standard 4 — background jobs must be reentrant | Access sync uses conditional DynamoDB writes (idempotent) | ✅ No | Reentrant by design |
+| Thread join timeout | Standard 2 — Background phase ≤5s | Current implementation has no explicit join timeout | ⚠️ Yes | Implementation gap — needs `thread.join(timeout=5)` |
+
+**Validation Summary:**
+- ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** Thread join timeout is an implementation gap identified in the ADR's follow-up actions.
+
+---
+
+### Scenario 6.3: Access Request Workflow
+**Context:** User requests access to a resource/role; admin approves; system provisions and audits the action across multiple platforms.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| In-flight requests complete before shutdown | Standard 1 (corrected) — request draining before lifespan cleanup | Per uvicorn's actual behavior, pending requests complete before cleanup | ✅ No | Works correctly in practice, ADR text is wrong but behavior is correct |
+| No process memory state loss | Standard 4 — no critical state in process memory | Request state is in the request scope; all durable state in DynamoDB | ✅ No | Aligned |
+
+**Validation Summary:**
+- ✅ Fully aligned
+
+---
+
+### Scenario 6.4: Multi-Provider Integration (Slack/Teams/AWS/GWS/GitHub)
+**Context:** Single operation may span multiple external APIs (rate limits, error handling, eventual consistency across platforms).
+
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| HTTP client session cleanup | Standard 3 — close persistent sessions during Infrastructure phase | Client sessions (httpx, aiohttp) managed by infrastructure services | ✅ No | Cleanup in reverse infrastructure phase |
+| Platform provider stop | Standard 3 — call `provider.stop()` during Feature phase | WebSocket-based providers (Slack RTM) have stop methods | ✅ No | Aligned |
+| Lock TTL for distributed locks | Standard 4 — locks must have TTL-based expiration | DynamoDB conditional writes with TTL already in use for idempotency | ✅ No | Pattern is consistent |
+
+**Validation Summary:**
+- ✅ Fully aligned
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Exclusive ASGI Lifespan Reliance vs. Custom Signal Handling
+- **Chosen:** Delegate all signal handling to uvicorn; prohibit custom signal handlers
+- **Rejected:** Install custom SIGTERM handler for immediate pre-shutdown notification
+- **Rationale:** Twelve-Factor Factor VIII mandates relying on the process manager. Custom signal handlers in Python conflict with uvicorn's handler and create race conditions. The ASGI lifespan protocol is the framework-native shutdown hook.
+- **Risk Accepted:** No way to perform immediate actions on SIGTERM before request draining completes. All cleanup must wait for the lifespan shutdown event.
+- **Contingency:** If immediate SIGTERM notification is needed, uvicorn can be extended or replaced — but this is unlikely given the current deployment model.
+
+### Tradeoff 7.2: Proceed-After-Timeout vs. Block-Until-Complete for Cleanup Phases
+- **Chosen:** If a phase exceeds its budget, log a warning and proceed to the next phase
+- **Rejected:** Block until all resources in a phase are fully cleaned up, regardless of time
+- **Rationale:** Blocking indefinitely risks SIGKILL from the container orchestrator, which provides zero observability. Proceeding after timeout preserves the ability to clean up subsequent phases and emit shutdown observability events.
+- **Risk Accepted:** Resources in a timed-out phase may not be fully cleaned up (e.g., a WebSocket connection not gracefully closed).
+- **Contingency:** Standard 4 crash resilience ensures that unclean resource release does not corrupt durable state. The impact of an unclean resource release is limited to transient connection state.
+
+### Tradeoff 7.3: Null-Check Cleanup vs. Environment-Branched Cleanup
+- **Chosen:** Cleanup code runs unconditionally; missing resources handled by `getattr(app.state, attr, None)`
+- **Rejected:** `if environment == "production"` guards in shutdown code
+- **Rationale:** Environment branching creates two code paths, reducing test coverage of the production path. Null-check cleanup exercises the same code in all environments.
+- **Risk Accepted:** Slightly more verbose cleanup code (null checks on every resource).
+- **Contingency:** None needed — the verbosity is minimal and the reliability benefit is clear.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| ~~Correct Standard 1 step ordering~~ | ✅ Yes | SRE Team | ~~2026-05-06~~ **Done (2026-04-29)** | ✅ Revised steps 2–5 to 6-step sequence reflecting correct uvicorn shutdown ordering: stop accepting → drain requests → lifespan.shutdown → cleanup → exit. Added ASGI spec citation and uvicorn sequence diagram reference. |
+| ~~Revise Standard 2 timeout budget~~ | ✅ Yes | SRE Team | ~~2026-05-06~~ **Done (2026-04-29)** | ✅ Split shutdown window into Phase A (request draining, bounded by `--timeout-graceful-shutdown=10`) and Phase B (lifespan cleanup, ~20s available). Budget table now applies to Phase B only. |
+| ~~Fix Implementation Guidance `--timeout-graceful-shutdown` recommendation~~ | ✅ Yes | SRE Team | ~~2026-05-06~~ **Done (2026-04-29)** | ✅ Changed to `--timeout-graceful-shutdown=10` with explicit rationale. |
+| Wire `shutdown_event_executor()` into lifespan | ❌ No | SRE Team | Post-revision | Move event executor shutdown from `atexit` to lifespan shutdown sequence (existing follow-up action). |
+| Add Standard 5 observability events | ❌ No | SRE Team | Post-revision | Add phase-level structured log events to lifespan shutdown code (existing follow-up action). |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds:** ~~Three blocking actions~~ All three blocking actions resolved (2026-04-29).
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **REVISE** → ~~ADR-0057 requires authoring revision~~ **REVISED (2026-04-29)**
+
+All three blockers resolved same-day:
+1. ~~**Standard 1 step ordering is incorrect.**~~ ✅ Corrected to 6-step sequence with draining before lifespan shutdown.
+2. ~~**Standard 2 timeout budget is misaligned.**~~ ✅ Split into Phase A (request draining) and Phase B (lifespan cleanup).
+3. ~~**Implementation Guidance recommends `--timeout-graceful-shutdown=25`.**~~ ✅ Changed to `--timeout-graceful-shutdown=10`.
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer |
+| **Reviewer Title** | Architecture Review Agent |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | N/A (automated review) |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+- PR or issue that delivers the revised ADR
+- Internal decision tracker / ADR review calendar
+
+**This Review Template Was Completed Per:**
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → then annual review_state cycle
