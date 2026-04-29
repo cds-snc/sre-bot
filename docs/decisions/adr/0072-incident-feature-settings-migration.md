@@ -2,7 +2,7 @@
 adr_id: ADR-0072
 title: "IncidentFeatureSettings Migration to packages/incident"
 status: Accepted
-decision_type: Migration
+decision_type: Migration Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
@@ -14,6 +14,7 @@ last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
+  - ADR-0044
   - ADR-0055
 impacts: []
 supersedes: []
