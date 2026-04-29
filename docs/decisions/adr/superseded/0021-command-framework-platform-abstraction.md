@@ -35,7 +35,7 @@ All platform integration architecture decisions are now documented in the curren
 
 3. **[ADR-0027: Pluggy Plugin System Integration](../0027-pluggy-plugin-system.md)** - How we use Pluggy (pytest's plugin system) for registration and discovery
 
-4. **[ADR-0028: Feature Interaction Layer Isolation](../0028-platform-feature-isolation.md)** - How packages organize platform-specific code in dedicated interaction layers
+4. **[ADR-0028: Feature Interaction Layer Isolation](0028-platform-feature-isolation.md)** - How packages organize platform-specific code in dedicated interaction layers
 
 5. **[Platform ADR README](../../tier-2-infrastructure/platforms/README.md)** - Overview with quick reference, reading order, and FAQ
 
@@ -52,4 +52,4 @@ All platform integration architecture decisions are now documented in the curren
 - **"What changed from command providers?"** → [ADR-0025: Interaction Providers Concept](../superseded/0025-platform-providers-concept.md)
 - **"Why explicit registration?"** → [ADR-0026: Explicit Registration Pattern](../0026-explicit-registration-pattern.md)
 - **"How do I register a feature?"** → [ADR-0027: Pluggy Plugin System Integration](../0027-pluggy-plugin-system.md)
-- **"How should I structure my package?"** → [ADR-0028: Feature Interaction Layer Isolation](../0028-platform-feature-isolation.md)
+- **"How should I structure my package?"** → [ADR-0028: Feature Interaction Layer Isolation](0028-platform-feature-isolation.md)

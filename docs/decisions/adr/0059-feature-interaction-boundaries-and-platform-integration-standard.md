@@ -284,7 +284,7 @@ Features own their outbound notification routing logic. There is no centralized 
 ## Source References (Required)
 
 1. ADR-0028 - Feature Interaction Layer Isolation (this repository):
- - URL: docs/decisions/adr/0028-platform-feature-isolation.md
+ - URL: docs/decisions/adr/superseded/0028-platform-feature-isolation.md
  - Publisher/maintainer: SRE Team
  - Accessed date: 2026-04-29
  - Relevance summary: Feature-side `interactions/` directory standard being superseded; provides package structure and boundary rules updated here for pluggy registration.
