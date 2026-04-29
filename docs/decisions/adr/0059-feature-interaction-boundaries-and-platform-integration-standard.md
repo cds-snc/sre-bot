@@ -171,7 +171,7 @@ Platform service availability is determined entirely by settings. This standard 
 
 **Rules:**
 - C1: If a platform is enabled in settings (e.g., `SLACK_ENABLED=true`) and required credentials are present, the platform service is constructed and warmed up during lifespan. If not, the platform is skipped entirely — no service instance, no hookspec calls, no transport connection.
-- C2: Platform settings live in `app/infrastructure/configuration/integrations/` (e.g., `slack.py` with `SlackSettings`). Settings follow the dissolution model (ADR-0055).
+- C2: Platform settings follow the dissolution model (ADR-0055) with independent singleton providers per settings domain. See ADR-0055 Standard 3 and ADR-0078 Standard 2 for authoritative settings location governance.
 - C3: No "provider discovery" pattern for platforms. Platform wiring is explicit, based on configuration.
 - C4: Platform services receive the narrowest settings slice needed (ADR-0055), not the root settings object.
 
@@ -264,10 +264,7 @@ Features own their outbound notification routing logic. There is no centralized 
  - ADR-0025 (Interaction Providers Concept): superseded by ADR-0078 (Platform Services Architecture), not by this record.
  - ADR-0018 (Service Wrapper Pattern): superseded by ADR-0056 + ADR-0077, not by this record. DI ceremony governance belongs in those standards.
 
-- **Supersession effects:**
- - ADR-0018 (Service Wrapper Pattern): service wrapper DI guidance is superseded by ADR-0056 + ADR-0077 Protocol contracts. Feature-side interaction patterns are superseded by Standard 4 and Standard 5 here.
- - ~~ADR-0025 (Interaction Providers Concept): provider-layer composition is now governed by ADR-0056. The interaction domain concept (InteractionProvider Protocol, capability matrix, HTTP-first bridge) is formalized by Standards 1\u20134 here.~~ **REVISED (2026-04-29):** ADR-0025 is superseded by ADR-0078 (Platform Services Architecture), not by this record. This record no longer supersedes ADR-0025.
- - ADR-0028 (Feature Interaction Layer Isolation): directory structure and boundary rules are superseded by Standard 5 here, updated for pluggy registration and concrete per-platform service types.
+
 
 ## Compliance and Boundaries
 
