@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0008
 title: "Settings JSON Blob Override Pattern"
-status: Accepted
-decision_type: Principle
-tier: Tier-1
+status: Superseded
+decision_type: Pattern
+tier: Tier-3
 date_created: 2026-04-27
-last_updated: 2026-04-27
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0055
 related_records:
   - ADR-0007
 related_packages: []
@@ -20,7 +21,7 @@ review_state: stale
 # ADR-08: Settings JSON Blob Override Pattern
 
 **Date**: 2026-04-27
-**Status**: Accepted
+**Status**: Superseded by [ADR-0055](0055-settings-implementation-and-dissolution-standard.md)
 **Applies to**: All `packages/<name>/settings.py` using `BaseSettings` with `env_nested_delimiter`
 **External References**:
 - [pydantic-settings v2 — Parsing environment variable values](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
