@@ -30,6 +30,7 @@ related_records:
   - ADR-0047
   - ADR-0049
   - ADR-0054
+  - ADR-0077
 related_packages:
   - app/infrastructure/services
   - app/packages/access
@@ -141,6 +142,8 @@ def get_notification_service() -> NotificationService:
 | `get_notification_service()` | `NotificationService(settings=settings, ...)` | Accept `NotifySettings` |
 | `get_command_service()` | `CommandService(settings=settings)` | Accept `CommandsSettings` |
 | `get_platform_service()` | `PlatformService(settings=settings)` | Accept `PlatformsSettings` |
+
+**Protocol return type requirement (ADR-0077):** In addition to narrow-slice injection, provider functions for Category A services (as classified by ADR-0077) must use the Protocol type as their return type annotation, not the concrete implementation class. After ADR-0077 Protocol migration, the provider return type and the dependency alias type must both reference the Protocol. See ADR-0077 Standard 2 for the full contract pattern.
 
 ### Standard 2: Package-Local Provider Permission
 
