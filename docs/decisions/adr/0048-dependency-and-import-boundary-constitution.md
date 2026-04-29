@@ -186,7 +186,7 @@ Infrastructure services that abstract over backing services (storage, directory,
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Confirms @hookimpl is a metadata marker with no import-time side effects.
 4. Source title: ADR-0003, ADR-0004 (Legacy)
-   - URL: docs/decisions/adr/
+   - URL: docs/decisions/adr/superseded/
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source records being consolidated; boundary invariants extracted and implementation details removed.
@@ -220,5 +220,5 @@ Infrastructure services that abstract over backing services (storage, directory,
 
 ## Change Log
 
-- 2026-04-29: Renamed B5 from "Infrastructure Sibling Isolation" to "Infrastructure Composition Governance" to correct the Backstage mental model misapplication. Added B7 (Protocol Contract Surface) to codify ADR-0045 P6 at the boundary level. Extended B2 with Protocol type requirement at the injection surface. Updated compliance, revalidation, source references, and changelog. See `tmp/backstage-mental-model-reconciliation-2026-04-29.md` for full analysis.
+- 2026-04-29: Renamed B5 from "Infrastructure Sibling Isolation" to "Infrastructure Composition Governance" to correct the Backstage mental model misapplication. Added B7 (Protocol Contract Surface) to codify ADR-0045 P6 at the boundary level. Extended B2 with Protocol type requirement at the injection surface. Updated compliance, revalidation, source references, and changelog. Root cause: Backstage's plugin isolation rule was incorrectly applied to the infrastructure service layer. ADR-0076 surfaced this empirically (61% violation rate, zero external evidence for blanket ban). The correct model: infrastructure services compose freely in the composition root; features are isolated and consume Protocol contracts only. See ADR-0076 and ADR-0077 for the corrective standards.
 - 2026-04-28: Created canonical Tier-1 dependency and import boundary constitution; supersedes ADR-0003 and ADR-0004. Two source records consolidated into six boundary invariants with explicit legacy-module posture and no implementation detail.
