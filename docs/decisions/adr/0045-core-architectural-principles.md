@@ -177,7 +177,7 @@ Infrastructure services consumed by feature packages must be defined by Protocol
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Confirms security-by-default logging boundaries (Principle 5).
 4. Source title: ADR-0001 (Legacy — Core Architectural Principles)
-   - URL: docs/decisions/adr/0001-core-architectural-principles.md
+   - URL: docs/decisions/adr/superseded/0001-core-architectural-principles.md
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source record being superseded; principles extracted and implementation details removed.
@@ -205,6 +205,6 @@ Infrastructure services consumed by feature packages must be defined by Protocol
 
 ## Change Log
 
-- 2026-04-29: Added Principle 6 (Protocol-Driven Service Contracts). Amended Principle 3 to clarify infrastructure layer's role as a shared service platform with internal collaboration. Updated alternatives, consequences, compliance, and revalidation sections. Root cause: original Backstage mental model's plugin isolation rule was misapplied to the infrastructure service layer; this amendment corrects the framing. See `tmp/backstage-mental-model-reconciliation-2026-04-29.md` for full analysis.
+- 2026-04-29: Added Principle 6 (Protocol-Driven Service Contracts). Amended Principle 3 to clarify infrastructure layer's role as a shared service platform with internal collaboration. Updated alternatives, consequences, compliance, and revalidation sections. Root cause: Backstage's plugin isolation rule ("plugins must never communicate through code") was misapplied to the infrastructure service layer via ADR-0048 B5. In Backstage, core services freely compose through declared deps; only plugins are isolated. The correct analogy for `app/infrastructure` is Backstage core services (shared utilities), not Backstage plugins. This amendment codifies Protocol-driven contracts as the Python/FastAPI equivalent of Backstage's ServiceRef pattern.
 - 2026-04-28: Revised Principle 2 to remove mechanism-specific language (constructor injection) and delegate boundary mechanics to ADR-0048, resolving dual-authority overlap identified in challenge review.
 - 2026-04-28: Created canonical Tier-1 principle record; supersedes ADR-0001. Implementation examples removed; five principles distilled to foundational invariants.
