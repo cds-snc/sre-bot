@@ -31,6 +31,7 @@ related_records:
  - ADR-0053
  - ADR-0055
  - ADR-0057
+ - ADR-0079
 related_packages:
  - app/jobs
  - app/server
