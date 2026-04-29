@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0017
 title: "Feature Package Startup Failure Policy"
-status: Accepted
+status: Superseded
 decision_type: Principle
 tier: Tier-1
 date_created: 2026-04-27
-last_updated: 2026-04-27
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0049
 related_records:
   - ADR-0007
   - ADR-0011

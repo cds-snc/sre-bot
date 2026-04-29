@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0026
 title: "Explicit Registration Pattern"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0049
 related_records:
   - ADR-0025
   - ADR-0027

@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0013
 title: "Plugin Managers"
-status: Accepted
+status: Superseded
 decision_type: Principle
 tier: Tier-1
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0049
 related_records:
   - ADR-0011
   - ADR-0026
