@@ -206,7 +206,7 @@ Package `__init__.py` files must only define `@hookimpl`-decorated functions and
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Warmup failure policy pattern and startup-driven discovery conventions.
 5. Source title: ADR-0013, ADR-0017, ADR-0026, ADR-0027 (Legacy)
-   - URL: docs/decisions/adr/
+   - URL: docs/decisions/adr/superseded/
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source records being consolidated; plugin lifecycle standards extracted.
