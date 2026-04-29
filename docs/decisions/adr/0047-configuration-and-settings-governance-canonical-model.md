@@ -152,7 +152,7 @@ All configuration must be loadable from environment variables as the primary sou
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Confirms validation-on-instantiation, env_prefix, and BaseSettings patterns.
 3. Source title: ADR-0002, ADR-0007, ADR-0010 (Legacy)
-   - URL: docs/decisions/adr/
+   - URL: docs/decisions/adr/superseded/
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source records being consolidated; configuration principles extracted and implementation details removed.
