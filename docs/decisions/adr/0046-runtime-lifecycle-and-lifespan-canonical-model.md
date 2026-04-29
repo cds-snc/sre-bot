@@ -168,7 +168,7 @@ Each lifecycle phase transition must emit a structured log event with the phase 
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Factor IX requires fast startup and graceful shutdown.
 4. Source title: ADR-0005, ADR-0009, ADR-0011 (Legacy)
-   - URL: docs/decisions/adr/
+   - URL: docs/decisions/adr/superseded/
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source records being consolidated; lifecycle invariants extracted and implementation details removed.
