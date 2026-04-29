@@ -31,7 +31,8 @@ related_records:
   - ADR-0044
   - ADR-0045
   - ADR-0046
-related_packages: []
+related_packages:
+  - app/packages/access
 ---
 
 # Configuration and Settings Governance Canonical Model
