@@ -126,7 +126,7 @@ related_packages:
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Defines logs as event streams managed by execution environment.
 3. Source title: Logging Standards (OpenTelemetry + structlog)
-   - URL: docs/decisions/adr/0029-logging-standards.md
+   - URL: docs/decisions/adr/superseded/0029-logging-standards.md
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Legacy logging baseline being superseded by this canonical ownership standard.

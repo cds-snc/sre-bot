@@ -195,7 +195,7 @@ Railway-Oriented Programming composition methods (`map`, `bind`, `unwrap_or`) ar
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Factor IV supports uniform interface for external service interaction.
 5. Source title: ADR-0006, ADR-0020 (Legacy)
-   - URL: docs/decisions/adr/
+   - URL: docs/decisions/adr/superseded/
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-28
    - Relevance summary: Source records being consolidated; OperationResult standards extracted and deduplicated.
