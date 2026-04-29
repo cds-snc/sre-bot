@@ -6,32 +6,32 @@ decision_type: Deprecation Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
+ - ADR-0047
+ - ADR-0056
 related_packages:
-  - app/packages/access
+ - app/packages/access
 ---
 
 # GroupsFeatureSettings Retirement
 
 ## Context
 
-The groups feature (`app/modules/groups/`) is fully deprecated. Its functionality — group lifecycle management, provider registry, reconciliation, and circuit breaker protection — has been superseded by the access feature (`app/packages/access/`). There is no `app/packages/groups/` target and none will be created.
+The groups feature (`app/modules/groups/`) is fully deprecated. Its functionality - group lifecycle management, provider registry, reconciliation, and circuit breaker protection - has been superseded by the access feature (`app/packages/access/`). There is no `app/packages/groups/` target and none will be created.
 
 ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in `infrastructure/configuration/features/`. Because the groups feature is being retired rather than migrated, this ADR records a deprecation, not a migration.
 

@@ -29,7 +29,7 @@ review_state: current
 
 All platform integration architecture decisions are now documented in the current ADR set:
 
-1. **[ADR-0025: Interaction Providers Concept](../0025-platform-providers-concept.md)** - Why we replaced command providers with platform providers (multi-feature abstraction)
+1. **[ADR-0025: Interaction Providers Concept](../superseded/0025-platform-providers-concept.md)** - Why we replaced command providers with platform providers (multi-feature abstraction)
 
 2. **[ADR-0026: Explicit Registration Pattern](../0026-explicit-registration-pattern.md)** - Why we use explicit registration via Pluggy hooks instead of import-time auto-discovery
 
@@ -49,7 +49,7 @@ All platform integration architecture decisions are now documented in the curren
 
 ## For Quick Answers
 
-- **"What changed from command providers?"** → [ADR-0025: Interaction Providers Concept](../0025-platform-providers-concept.md)
+- **"What changed from command providers?"** → [ADR-0025: Interaction Providers Concept](../superseded/0025-platform-providers-concept.md)
 - **"Why explicit registration?"** → [ADR-0026: Explicit Registration Pattern](../0026-explicit-registration-pattern.md)
 - **"How do I register a feature?"** → [ADR-0027: Pluggy Plugin System Integration](../0027-pluggy-plugin-system.md)
 - **"How should I structure my package?"** → [ADR-0028: Feature Interaction Layer Isolation](../0028-platform-feature-isolation.md)

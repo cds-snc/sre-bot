@@ -6,25 +6,25 @@ decision_type: Migration Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
+ - ADR-0047
+ - ADR-0056
 related_packages:
-  - app/modules/atip
+ - app/modules/atip
 ---
 
 # AtipSettings Migration to packages/atip
@@ -68,15 +68,15 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AtipSettings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore", env_file=".env")
+ model_config = SettingsConfigDict(extra="ignore", env_file=".env")
 
-    announce_channel: str | None = Field(
-        default=None, alias="ATIP_ANNOUNCE_CHANNEL"
-    )
+ announce_channel: str | None = Field(
+ default=None, alias="ATIP_ANNOUNCE_CHANNEL"
+ )
 
 @lru_cache(maxsize=1)
 def get_atip_settings() -> AtipSettings:
-    return AtipSettings()
+ return AtipSettings()
 ```
 
 ### Migration Steps
@@ -103,7 +103,7 @@ All conditions must be true:
 
 ### Target Date
 
-TBD — blocked on prerequisite module migration from `app/modules/atip/` to `app/packages/atip/`.
+TBD - blocked on prerequisite module migration from `app/modules/atip/` to `app/packages/atip/`.
 
 ## Consequences
 

@@ -6,25 +6,25 @@ decision_type: Migration Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
+ - ADR-0047
+ - ADR-0056
 related_packages:
-  - app/modules/incident
+ - app/modules/incident
 ---
 
 # IncidentFeatureSettings Migration to packages/incident
@@ -58,8 +58,8 @@ related_packages:
 
 | Variable | Purpose | Duplication |
 |----------|---------|-------------|
-| `INCIDENT_CHANNEL` | Slack channel ID for incident notifications | Also in `SlackSettings` — deduplicate during migration |
-| `SLACK_SECURITY_USER_GROUP_ID` | Security team user group ID for mentions | Also in `SlackSettings` — deduplicate during migration |
+| `INCIDENT_CHANNEL` | Slack channel ID for incident notifications | Also in `SlackSettings` - deduplicate during migration |
+| `SLACK_SECURITY_USER_GROUP_ID` | Security team user group ID for mentions | Also in `SlackSettings` - deduplicate during migration |
 
 ### Target Pattern
 
@@ -71,16 +71,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class IncidentSettings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore", env_file=".env")
+ model_config = SettingsConfigDict(extra="ignore", env_file=".env")
 
-    incident_channel: str = Field(default="", alias="INCIDENT_CHANNEL")
-    slack_security_user_group_id: str = Field(
-        default="", alias="SLACK_SECURITY_USER_GROUP_ID"
-    )
+ incident_channel: str = Field(default="", alias="INCIDENT_CHANNEL")
+ slack_security_user_group_id: str = Field(
+ default="", alias="SLACK_SECURITY_USER_GROUP_ID"
+ )
 
 @lru_cache(maxsize=1)
 def get_incident_settings() -> IncidentSettings:
-    return IncidentSettings()
+ return IncidentSettings()
 ```
 
 ### Migration Steps
@@ -89,7 +89,7 @@ def get_incident_settings() -> IncidentSettings:
 2. Update all consumers in `app/packages/incident/` to use `get_incident_settings()` instead of `settings.feat_incident`.
 3. **Deduplication safety check:** Before removing `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings`, verify no non-incident code reads these values via `settings.slack.INCIDENT_CHANNEL` or `settings.slack.SLACK_SECURITY_USER_GROUP_ID`. Current search (2026-04-29) found only one reference in `slack.py` line 24 (a comment/docstring), confirming safe removal.
 4. Remove `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings` (deduplication).
-5. **Fix import-time side effects:** `app/modules/incident/incident.py` (line 20–21) and `app/modules/incident/core.py` (line 17–18) both assign `INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID` at module level. This violates ADR-0046 (no side effects at import time). Replace with function calls or lazy accessors during migration.
+5. **Fix import-time side effects:** `app/modules/incident/incident.py` (line 20-21) and `app/modules/incident/core.py` (line 17-18) both assign `INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID` at module level. This violates ADR-0046 (no side effects at import time). Replace with function calls or lazy accessors during migration.
 6. Remove `IncidentFeatureSettings` from `infrastructure/configuration/features/incident.py`.
 7. Remove re-export from `infrastructure/configuration/features/__init__.py`.
 8. Remove `Settings.feat_incident` field from the aggregator.
@@ -102,9 +102,9 @@ Migration of `app/modules/incident/` to `app/packages/incident/`.
 
 The incident module operates entirely on the legacy `core.config.settings` singleton chain (7 files access `settings.PREFIX`, `settings.feat_incident`, or `settings.google_resources`). It has zero imports from `infrastructure.configuration` or `infrastructure.services` for settings. No infrastructure code imports from `app/modules/incident/` (zero reverse coupling).
 
-This means ADR-0072 execution does not block the infrastructure settings dissolution program (ADR-0055 Action 5). The `infrastructure.configuration.Settings` aggregator can be fully dissolved — its domain settings classes made into independent singletons, its providers narrowed, its boundary violations fixed — without touching any incident module code. The `core.config.Settings` legacy singleton remains stable as a compatibility shim throughout (see ADR-0055 Standard 4, Dual Settings Chain Coexistence).
+This means ADR-0072 execution does not block the infrastructure settings dissolution program (ADR-0055 Action 5). The `infrastructure.configuration.Settings` aggregator can be fully dissolved - its domain settings classes made into independent singletons, its providers narrowed, its boundary violations fixed - without touching any incident module code. The `core.config.Settings` legacy singleton remains stable as a compatibility shim throughout (see ADR-0055 Standard 4, Dual Settings Chain Coexistence).
 
-ADR-0072 execution is deferred to Phase C of the ADR program — a separate feature rearchitecting project that includes extracting service boundaries, replacing direct Slack SDK and Google API calls with infrastructure clients, introducing repository patterns, and fixing module-level settings loading. Settings migration is a leaf operation within that larger effort (~5% of scope).
+ADR-0072 execution is deferred to Phase C of the ADR program - a separate feature rearchitecting project that includes extracting service boundaries, replacing direct Slack SDK and Google API calls with infrastructure clients, introducing repository patterns, and fixing module-level settings loading. Settings migration is a leaf operation within that larger effort (~5% of scope).
 
 ### Retirement Criteria
 
@@ -119,7 +119,7 @@ All conditions must be true:
 
 ### Target Date
 
-TBD — blocked on prerequisite module migration from `app/modules/incident/` to `app/packages/incident/`.
+TBD - blocked on prerequisite module migration from `app/modules/incident/` to `app/packages/incident/`.
 
 ## Consequences
 

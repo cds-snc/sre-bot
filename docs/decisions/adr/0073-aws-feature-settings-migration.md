@@ -6,25 +6,25 @@ decision_type: Migration Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
+ - ADR-0047
+ - ADR-0056
 related_packages:
-  - app/modules/aws
+ - app/modules/aws
 ---
 
 # AWSFeatureSettings Migration to packages/aws_ops
@@ -69,16 +69,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AwsOpsSettings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore", env_file=".env")
+ model_config = SettingsConfigDict(extra="ignore", env_file=".env")
 
-    admin_groups: list[str] = Field(
-        default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
-    )
-    ops_group_name: str = Field(default="", alias="AWS_OPS_GROUP_NAME")
+ admin_groups: list[str] = Field(
+ default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
+ )
+ ops_group_name: str = Field(default="", alias="AWS_OPS_GROUP_NAME")
 
 @lru_cache(maxsize=1)
 def get_aws_ops_settings() -> AwsOpsSettings:
-    return AwsOpsSettings()
+ return AwsOpsSettings()
 ```
 
 ### Consumers
@@ -114,7 +114,7 @@ All conditions must be true:
 
 ### Target Date
 
-TBD — blocked on prerequisite module migration from `app/modules/aws/` to `app/packages/aws_ops/`.
+TBD - blocked on prerequisite module migration from `app/modules/aws/` to `app/packages/aws_ops/`.
 
 ## Consequences
 

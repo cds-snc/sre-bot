@@ -6,33 +6,33 @@ decision_type: Principle
 tier: Tier-1
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Dependency and Composition
-  - Runtime and Lifecycle
+ - Dependency and Composition
+ - Runtime and Lifecycle
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-28
 last_updated: 2026-04-28
 last_reviewed: 2026-04-28
 next_review_due: 2026-08-26
 constrained_by:
-  - ADR-0044
-  - ADR-0045
+ - ADR-0044
+ - ADR-0045
 impacts:
-  - ADR-0055
-  - ADR-0056
-  - ADR-0066
+ - ADR-0055
+ - ADR-0056
+ - ADR-0066
 supersedes:
-  - ADR-0002
-  - ADR-0007
-  - ADR-0010
+ - ADR-0002
+ - ADR-0007
+ - ADR-0010
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0044
-  - ADR-0045
-  - ADR-0046
+ - ADR-0044
+ - ADR-0045
+ - ADR-0046
 related_packages:
-  - app/packages/access
+ - app/packages/access
 ---
 
 # Configuration and Settings Governance Canonical Model
@@ -41,19 +41,19 @@ related_packages:
 
 - Problem statement: Configuration governance was fragmented across three legacy ADRs: ADR-0002 (Configuration Management) defined the settings singleton and DI consumption pattern, ADR-0007 (Partitioned Settings Model) defined the partitioning strategy and migration path, and ADR-0010 (Settings Singleton Pattern) defined the `@lru_cache` singleton mechanism. All three contained implementation-specific code examples and library-specific patterns, creating Tier-1 scope leakage. The overlap produced conflicting guidance about where configuration belongs, how services consume it, and what constitutes the canonical access pattern.
 - Business/operational drivers:
-  - Establish a single Tier-1 principle record for configuration governance that constrains all downstream implementation standards.
-  - Define clear ownership boundaries for where configuration classes live and who may modify them.
-  - Prevent configuration coupling between feature packages and infrastructure layers.
-  - Support the ongoing migration from centralized settings aggregator to partitioned domain-owned settings.
+ - Establish a single Tier-1 principle record for configuration governance that constrains all downstream implementation standards.
+ - Define clear ownership boundaries for where configuration classes live and who may modify them.
+ - Prevent configuration coupling between feature packages and infrastructure layers.
+ - Support the ongoing migration from centralized settings aggregator to partitioned domain-owned settings.
 - Constraints:
-  - Configuration must be validated and frozen before traffic is accepted (ADR-0045 Principle 4, ADR-0046 Invariant 1).
-  - Configuration must be injectable through the DI system (ADR-0045 Principle 2).
-  - Pydantic-settings is the validation framework; BaseSettings for root-level, BaseModel for nested sections.
-  - ECS deployment model: one settings instance per task, immutable after startup.
+ - Configuration must be validated and frozen before traffic is accepted (ADR-0045 Principle 4, ADR-0046 Invariant 1).
+ - Configuration must be injectable through the DI system (ADR-0045 Principle 2).
+ - Pydantic-settings is the validation framework; BaseSettings for root-level, BaseModel for nested sections.
+ - ECS deployment model: one settings instance per task, immutable after startup.
 - Non-goals:
-  - This record does not define specific settings class structures, field names, or environment variable conventions.
-  - This record does not define the SSM/Secrets Manager migration path (delegated to Tier-5 ADRs).
-  - This record does not prescribe code-level patterns for singleton providers or dependency aliases.
+ - This record does not define specific settings class structures, field names, or environment variable conventions.
+ - This record does not define the SSM/Secrets Manager migration path (delegated to Tier-5 ADRs).
+ - This record does not prescribe code-level patterns for singleton providers or dependency aliases.
 
 ## Decision
 
@@ -85,28 +85,28 @@ All configuration must be loadable from environment variables as the primary sou
 ## Alternatives Considered
 
 1. Retain three separate configuration ADRs with cross-references:
-   - Pros: Smaller individual records; each addresses one aspect.
-   - Cons: Overlapping authority creates contradiction risk; developers must consult three records.
-   - Why not chosen: Consolidation eliminates duplication.
+ - Pros: Smaller individual records; each addresses one aspect.
+ - Cons: Overlapping authority creates contradiction risk; developers must consult three records.
+ - Why not chosen: Consolidation eliminates duplication.
 2. Define configuration patterns (singleton mechanism, alias conventions) at Tier-1:
-   - Pros: Complete guidance in one record.
-   - Cons: Implementation changes (e.g., replacing `@lru_cache` with a different mechanism) would force Tier-1 amendments.
-   - Why not chosen: Implementation patterns belong in Tier-2 standards (ADR-0055).
+ - Pros: Complete guidance in one record.
+ - Cons: Implementation changes (e.g., replacing `@lru_cache` with a different mechanism) would force Tier-1 amendments.
+ - Why not chosen: Implementation patterns belong in Tier-2 standards (ADR-0055).
 
 ## Consequences
 
 - Positive impacts:
-  - Single configuration governance record eliminates contradictions between ADR-0002, ADR-0007, and ADR-0010.
-  - Ownership boundaries prevent feature-infrastructure coupling.
-  - Narrow-slice injection reduces test surface and makes dependencies explicit.
+ - Single configuration governance record eliminates contradictions between ADR-0002, ADR-0007, and ADR-0010.
+ - Ownership boundaries prevent feature-infrastructure coupling.
+ - Narrow-slice injection reduces test surface and makes dependencies explicit.
 - Tradeoffs accepted:
-  - Developers must consult both this Tier-1 record and Tier-2 standards for actionable configuration patterns.
-  - The migration from centralized settings aggregator to partitioned model is governed by this principle but executed through Tier-2 and Tier-5 records.
+ - Developers must consult both this Tier-1 record and Tier-2 standards for actionable configuration patterns.
+ - The migration from centralized settings aggregator to partitioned model is governed by this principle but executed through Tier-2 and Tier-5 records.
 - Risks introduced:
-  - The "no duplicate keys" principle may create friction during migration when legacy and new settings coexist temporarily.
+ - The "no duplicate keys" principle may create friction during migration when legacy and new settings coexist temporarily.
 - Mitigations:
-  - Temporary duplication during migration is documented in Tier-5 migration ADRs with explicit retirement criteria.
-  - Each migration step is atomic and independently deployable.
+ - Temporary duplication during migration is documented in Tier-5 migration ADRs with explicit retirement criteria.
+ - Each migration step is atomic and independently deployable.
 
 ## Compliance and Boundaries
 
@@ -119,14 +119,14 @@ All configuration must be loadable from environment variables as the primary sou
 
 - Revalidation date: 2026-04-28
 - Sources rechecked:
-  - Twelve-Factor App: Factor III (Config — store config in the environment).
-  - Pydantic Settings V2 documentation (BaseSettings, SettingsConfigDict, env_prefix).
-  - FastAPI dependency injection documentation (Annotated + Depends pattern for settings).
-  - Python 3.12+ typing conventions for configuration classes.
+ - Twelve-Factor App: Factor III (Config - store config in the environment).
+ - Pydantic Settings V2 documentation (BaseSettings, SettingsConfigDict, env_prefix).
+ - FastAPI dependency injection documentation (Annotated + Depends pattern for settings).
+ - Python 3.12+ typing conventions for configuration classes.
 - Alignment summary:
-  - Environment-variable-first configuration directly implements Factor III.
-  - Singleton lifecycle aligns with pydantic-settings validation-on-instantiation pattern.
-  - Narrow-slice injection aligns with FastAPI's dependency injection philosophy.
+ - Environment-variable-first configuration directly implements Factor III.
+ - Singleton lifecycle aligns with pydantic-settings validation-on-instantiation pattern.
+ - Narrow-slice injection aligns with FastAPI's dependency injection philosophy.
 - Intentional deviations: None.
 
 ## Freshness Review
@@ -136,37 +136,37 @@ All configuration must be loadable from environment variables as the primary sou
 - If Yes, status set to stale: No
 - Validation summary: Consolidates ADR-0002, ADR-0007, and ADR-0010 into one configuration governance principle with no implementation leakage.
 - Follow-up actions:
-  - Mark ADR-0002, ADR-0007, and ADR-0010 as superseded with `superseded_by: [ADR-0047]`.
-  - Ensure ADR-0055 references this record in `constrained_by`.
+ - Mark ADR-0002, ADR-0007, and ADR-0010 as superseded with `superseded_by: [ADR-0047]`.
+ - Ensure ADR-0055 references this record in `constrained_by`.
 
 ## Source References
 
-1. Source title: Twelve-Factor App — Config
-   - URL: https://12factor.net/config
-   - Publisher/maintainer: 12factor contributors
-   - Accessed date (YYYY-MM-DD): 2026-04-28
-   - Relevance summary: Factor III requires configuration stored in environment variables, not code.
+1. Source title: Twelve-Factor App - Config
+ - URL: https://12factor.net/config
+ - Publisher/maintainer: 12factor contributors
+ - Accessed date (YYYY-MM-DD): 2026-04-28
+ - Relevance summary: Factor III requires configuration stored in environment variables, not code.
 2. Source title: Pydantic Settings V2 Documentation
-   - URL: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
-   - Publisher/maintainer: Pydantic project
-   - Accessed date (YYYY-MM-DD): 2026-04-28
-   - Relevance summary: Confirms validation-on-instantiation, env_prefix, and BaseSettings patterns.
+ - URL: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+ - Publisher/maintainer: Pydantic project
+ - Accessed date (YYYY-MM-DD): 2026-04-28
+ - Relevance summary: Confirms validation-on-instantiation, env_prefix, and BaseSettings patterns.
 3. Source title: ADR-0002, ADR-0007, ADR-0010 (Legacy)
-   - URL: docs/decisions/adr/superseded/
-   - Publisher/maintainer: SRE Team
-   - Accessed date (YYYY-MM-DD): 2026-04-28
-   - Relevance summary: Source records being consolidated; configuration principles extracted and implementation details removed.
+ - URL: docs/decisions/adr/superseded/
+ - Publisher/maintainer: SRE Team
+ - Accessed date (YYYY-MM-DD): 2026-04-28
+ - Relevance summary: Source records being consolidated; configuration principles extracted and implementation details removed.
 
 ## Implementation Guidance
 
 - Required changes:
-  - Mark ADR-0002, ADR-0007, ADR-0010 as `status: Superseded` and add `superseded_by: [ADR-0047]`.
-  - Ensure downstream standards reference this record in `constrained_by`.
+ - Mark ADR-0002, ADR-0007, ADR-0010 as `status: Superseded` and add `superseded_by: [ADR-0047]`.
+ - Ensure downstream standards reference this record in `constrained_by`.
 - Validation and quality gates:
-  - ADR-0051 taxonomy check: confirm no implementation-level code examples in this record.
-  - Metadata completeness check: all 18 fields populated.
+ - ADR-0051 taxonomy check: confirm no implementation-level code examples in this record.
+ - Metadata completeness check: all 18 fields populated.
 - Test strategy and acceptance criteria impact:
-  - No direct test changes; configuration principles are validated through downstream standard compliance.
+ - No direct test changes; configuration principles are validated through downstream standard compliance.
 
 ## Change Log
 

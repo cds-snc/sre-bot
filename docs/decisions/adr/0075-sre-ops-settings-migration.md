@@ -6,26 +6,26 @@ decision_type: Migration Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
+ - ADR-0047
+ - ADR-0056
 related_packages:
-  - app/modules/sre
-  - app/modules/ops
+ - app/modules/sre
+ - app/modules/ops
 ---
 
 # SreOpsSettings Migration to packages/sre_ops
@@ -71,20 +71,20 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class SreOpsSettings(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore", env_file=".env")
+ model_config = SettingsConfigDict(extra="ignore", env_file=".env")
 
-    ops_channel_id: str = Field(default="", alias="SRE_OPS_CHANNEL_ID")
+ ops_channel_id: str = Field(default="", alias="SRE_OPS_CHANNEL_ID")
 
 @lru_cache(maxsize=1)
 def get_sre_ops_settings() -> SreOpsSettings:
-    return SreOpsSettings()
+ return SreOpsSettings()
 ```
 
 ### Consumers
 
 | File | Access Pattern | Issue |
 |------|---------------|-------|
-| `app/modules/ops/notifications.py` | `OPS_CHANNEL_ID = settings.sre_ops.SRE_OPS_CHANNEL_ID` (module-level) | Import-time side effect — violates ADR-0046 |
+| `app/modules/ops/notifications.py` | `OPS_CHANNEL_ID = settings.sre_ops.SRE_OPS_CHANNEL_ID` (module-level) | Import-time side effect - violates ADR-0046 |
 
 ### Migration Steps
 
@@ -99,7 +99,7 @@ def get_sre_ops_settings() -> SreOpsSettings:
 
 Migration of `app/modules/sre/` and `app/modules/ops/` to `app/packages/sre_ops/`.
 
-**Note on module scope:** The sole consumer of `SRE_OPS_CHANNEL_ID` is `app/modules/ops/notifications.py`, which lives in `app/modules/ops/` — a separate directory from `app/modules/sre/`. Both modules are logically part of the SRE operations domain and must be consolidated into the target `app/packages/sre_ops/` package. The blocking prerequisite covers both source directories.
+**Note on module scope:** The sole consumer of `SRE_OPS_CHANNEL_ID` is `app/modules/ops/notifications.py`, which lives in `app/modules/ops/` - a separate directory from `app/modules/sre/`. Both modules are logically part of the SRE operations domain and must be consolidated into the target `app/packages/sre_ops/` package. The blocking prerequisite covers both source directories.
 
 ### Retirement Criteria
 
@@ -114,7 +114,7 @@ All conditions must be true:
 
 ### Target Date
 
-TBD — blocked on prerequisite module migration from `app/modules/sre/` to `app/packages/sre_ops/`.
+TBD - blocked on prerequisite module migration from `app/modules/sre/` to `app/packages/sre_ops/`.
 
 ## Consequences
 

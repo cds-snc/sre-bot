@@ -6,24 +6,25 @@ decision_type: Deprecation Decision
 tier: Tier-5
 primary_domain: Configuration and Secrets
 secondary_domains:
-  - Package and Plugin Architecture
+ - Package and Plugin Architecture
 owners:
-  - SRE Team
+ - SRE Team
 date_created: 2026-04-29
 last_updated: 2026-04-29
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
-  - ADR-0044
-  - ADR-0055
+ - ADR-0044
+ - ADR-0055
 impacts: []
 supersedes: []
 superseded_by: []
 review_state: current
 related_records:
-  - ADR-0047
-  - ADR-0056
-  - ADR-0059
+ - ADR-0047
+ - ADR-0056
+ - ADR-0059
+ - ADR-0078
 related_packages: []
 ---
 
@@ -31,7 +32,9 @@ related_packages: []
 
 ## Context
 
-The commands feature (`app/infrastructure/commands/`) was an early attempt at standardizing interaction providers across platforms (Slack, Teams, etc.) but was ill-scoped. The correct architectural approach — a unified InteractionProvider Protocol with capability registration, platform abstraction, and HTTP-first bridge patterns — will be defined by ADR-0059 (Interaction Provider and Feature Integration Standard, Wave 4), which is currently in Draft status and must be accepted before this retirement can proceed.
+The commands feature (`app/infrastructure/commands/`) was an early attempt at standardizing interaction providers across platforms (Slack, Teams, etc.) but was ill-scoped. The correct architectural approach - concrete per-platform services (`SlackService`, `TeamsService`) with feature-owned interaction handlers registered via per-platform hookspecs - is defined by ADR-0059 (Feature Interaction Boundaries and Platform Integration Standard, Wave 4) and ADR-0078 (Platform Services Architecture, Wave 4).
+
+> **Unblocked (2026-04-29 - Platform Services Assessment):** The commands retirement path no longer depends on a unified InteractionProvider Protocol. The Platform Services Assessment rejected the unified Protocol in favor of concrete per-platform services. Command registrations migrate to per-platform hookimpl pattern with concrete `SlackService`/`TeamsService`.
 
 There is no `app/packages/commands/` target and none will be created. `CommandsSettings` has no corresponding module in `app/modules/` and no successor package.
 
@@ -39,7 +42,7 @@ ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in 
 
 ## Decision
 
-**Retire `CommandsSettings` and its source file** when the commands infrastructure is fully removed and replaced by the interaction provider architecture (ADR-0059).
+**Retire `CommandsSettings` and its source file** when the commands infrastructure is fully removed and replaced by the per-platform hookimpl registration pattern (ADR-0059 + ADR-0078).
 
 ### Source Artifact
 
@@ -66,15 +69,15 @@ ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in 
 
 ### Blocking Prerequisite
 
-1. **ADR-0059 must be accepted** — ADR-0059 (Interaction Provider and Feature Integration Standard) is currently Draft. It must complete challenge review and be accepted before implementation begins.
-2. **ADR-0059 implementation must be complete** — the interaction provider architecture must fully replace the commands infrastructure's provider registration and dispatch capabilities.
-3. All command registrations currently using `app/infrastructure/commands/providers/` must be migrated to the InteractionProvider hookspec pattern defined by ADR-0059 Standard 6.
+1. **ADR-0059 and ADR-0078 must be accepted** - ADR-0059 (Feature Interaction Boundaries) and ADR-0078 (Platform Services Architecture) must complete challenge review and be accepted before implementation begins.
+2. **Per-platform hookimpl migration must be complete** - the per-platform service pattern (concrete `SlackService`/`TeamsService` with hookspec-based handler registration) must fully replace the commands infrastructure's provider registration and dispatch capabilities.
+3. All command registrations currently using `app/infrastructure/commands/providers/` must be migrated to the per-platform hookimpl pattern defined by ADR-0059.
 
 ### Retirement Criteria
 
 All conditions must be true:
 
-1. `app/infrastructure/commands/` directory is deleted or refactored into the interaction provider architecture.
+1. `app/infrastructure/commands/` directory is deleted or refactored into the per-platform hookimpl registration pattern.
 2. `app/infrastructure/configuration/features/commands.py` is deleted.
 3. `CommandsSettings` is removed from `infrastructure/configuration/features/__init__.py`.
 4. `Settings.commands` field is removed from the Settings aggregator (or the aggregator itself has been dissolved per ADR-0055 Standard 7).
@@ -84,10 +87,10 @@ All conditions must be true:
 
 ### Target Date
 
-2026-09-30 (contingent on ADR-0059 authoring and interaction provider implementation).
+2026-09-30 (contingent on ADR-0059 and ADR-0078 authoring and per-platform hookimpl migration).
 
 ## Consequences
 
-- Platform-specific command registration will be governed by the InteractionProvider Protocol (ADR-0059) instead of the `COMMAND_PROVIDERS` JSON configuration pattern.
-- Any per-platform enable/disable configuration currently in `COMMAND_PROVIDERS` will be handled by the interaction provider's capability negotiation model, not a settings class.
+- Platform-specific command registration will be governed by per-platform hookspecs (ADR-0059) and concrete platform services (ADR-0078) instead of the `COMMAND_PROVIDERS` JSON configuration pattern.
+- Any per-platform enable/disable configuration currently in `COMMAND_PROVIDERS` will be handled by settings-driven platform availability (ADR-0078 - `SLACK_ENABLED=true` + valid credentials -> service constructed), not a settings class.
 - Tests in `app/tests/integration/infrastructure/commands/` must be migrated or removed as part of the commands infrastructure retirement.
