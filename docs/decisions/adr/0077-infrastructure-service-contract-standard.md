@@ -427,4 +427,4 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 
 ## Change Log
 
-- 2026-04-29: Created. Establishes service classification (A/B/C), Protocol contract pattern, client-layer boundary, test override pattern, and migration priorities. Root cause: Backstage mental model reconciliation identified missing Protocol contract standard. See `tmp/backstage-mental-model-reconciliation-2026-04-29.md` for full analysis.
+- 2026-04-29: Created. Establishes service classification (A/B/C), Protocol contract pattern, client-layer boundary, test override pattern, and migration priorities. Root cause: Backstage mental model reconciliation identified that the infrastructure layer lacked Protocol contracts for 9 of 14 feature-facing services, and no ADR articulated the layer's role as a swappable service platform. Backstage's ServiceRef + ServiceFactory pattern maps to Python Protocol + @lru_cache provider; this ADR codifies that mapping. See ADR-0045 P6 for the governing principle and ADR-0076 for the companion intra-layer import standard.

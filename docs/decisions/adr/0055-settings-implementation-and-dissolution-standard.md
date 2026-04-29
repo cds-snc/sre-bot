@@ -316,16 +316,15 @@ Additional fields (`env_prefix`, `env_nested_delimiter`, `case_sensitive`, `env_
    - Relevance summary: Confirms Annotated + Depends pattern for settings injection.
 
 4. Source title: ADR-0008 (Legacy — Settings JSON Blob Override Pattern)
-   - URL: docs/decisions/adr/0008-settings-json-blob-override.md
+   - URL: docs/decisions/adr/superseded/0008-settings-json-blob-override.md
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-29
    - Relevance summary: Source record being superseded. JSON blob rules incorporated into Standard 6.
 
 5. Source title: Infrastructure Configuration & Services Decentralization Analysis
-   - URL: tmp/infrastructure-configuration-and-services-decentralization-analysis-2026-04-28.md
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-29
-   - Relevance summary: Technical analysis identifying the Settings aggregator antipattern, boundary violations, and dissolution plan.
+   - Relevance summary: Technical analysis identifying the Settings aggregator antipattern (22 nested BaseSettings classes), 8 boundary violation files importing Settings directly, and the three-phase dissolution plan. Key findings: 5 providers passing full Settings, 6 service classes storing full Settings, 9 integration + 6 feature + 6 infrastructure + 3 app-level settings classes requiring independent singleton extraction. Ephemeral working document; findings are fully captured in this ADR (Standards 1–7) and ADR-0056.
 
 6. Source title: app/packages/access/common/settings.py (Reference Implementation)
    - URL: app/packages/access/common/settings.py
