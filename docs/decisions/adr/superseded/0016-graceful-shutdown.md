@@ -1,24 +1,25 @@
 ---
 adr_id: ADR-0016
 title: "Graceful Shutdown"
-status: Accepted
+status: Superseded
 decision_type: Principle
 tier: Tier-1
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0057
 related_records:
   - ADR-0005
   - ADR-0009
   - ADR-0011
   - ADR-0015
 related_packages: []
-review_state: stale
+review_state: superseded
 ---
 # Graceful Shutdown
 
