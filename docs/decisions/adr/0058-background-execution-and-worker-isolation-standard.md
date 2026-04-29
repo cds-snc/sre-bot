@@ -58,7 +58,7 @@ related_packages:
 - Non-goals:
   - This record does not prescribe a specific scheduling library. Library selection is an implementation detail; the standards are library-agnostic.
   - This record does not define one-off task execution (e.g., CLI commands, management scripts). Those are governed by separate concerns.
-  - This record does not define event-driven async processing (e.g., SQS consumers, webhook handlers). Those are transport-level concerns. A dedicated queueing and message-broker architecture ADR is planned but not yet assigned an ID; ADR-0059 covers interaction provider patterns, not queueing infrastructure.
+  - This record does not define event-driven async processing (e.g., SQS consumers, webhook handlers). Those are transport-level concerns governed by ADR-0078 (Queueing and Message-Broker Architecture Standard, Wave 4). ADR-0059 covers interaction provider patterns, not queueing infrastructure.
 
 ## Decision
 
