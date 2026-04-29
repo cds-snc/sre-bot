@@ -186,7 +186,7 @@ StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 
 | # | Rule | Rationale |
 |---|------|-----------|
-| P1 | Protocols must be `@runtime_checkable` | Enables `isinstance` checks in test assertions and factory validation |
+| P1 | Protocols must be `@runtime_checkable` | Enables `isinstance` checks in test assertions and factory validation. **Caveat (PEP 544):** `@runtime_checkable` checks method existence only, not signatures or return types. Static type checking via mypy is the primary enforcement tool for Protocol compliance; `isinstance` is a convenience for test assertions, not a substitute for static analysis. |
 | P2 | Protocol methods must use `OperationResult[T]` return types for fallible operations | Uniform error handling (ADR-0050) |
 | P3 | Protocol methods must not expose backing-service-specific types (e.g., DynamoDB AttributeValue, Google API Resource) | Implementation agnosticism |
 | P4 | Protocol definitions must live in the service's package (e.g., `infrastructure/storage/protocol.py`), not in a shared types package | Ownership follows code; prevents premature abstraction |
