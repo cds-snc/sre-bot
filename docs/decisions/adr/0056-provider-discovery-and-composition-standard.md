@@ -370,6 +370,7 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 - Type boundary impact: Standard 1 enforces narrow-slice types at constructor boundaries. After ADR-0055 dissolution, providers pass domain-specific `BaseSettings` instances or scalar values, not aggregated settings objects. This aligns with ADR-0040 type boundaries.
 - Startup/plugin registration impact: Standard 6 (provider graph shape) is compatible with ADR-0046 startup phase ordering. Settings providers (Level 0) are called during Phase 1 (Configuration). Client providers (Level 1) are called during Phase 2 (Client Construction). Composed and high-level providers (Levels 2-3) are called during Phase 3 (Service Wiring). Package-local providers that participate in startup warmup (ADR-0049 S6) are called during the plugin warmup sub-phase.
 - Settings partitioning impact: Standard 1 and Standard 6.3 define the transition from `get_settings()` to domain-specific settings providers as part of ADR-0055 dissolution. After dissolution, `get_settings()` is removed and each provider calls the domain-specific settings provider it needs.
+- Service contract impact: After ADR-0077 Protocol migration, provider return type annotations for Category A services must use the Protocol type, not the concrete implementation class. The `Annotated[..., Depends(...)]` alias in `dependencies.py` must likewise reference the Protocol type. See ADR-0077 Standard 2 (Protocol Contract Pattern) for the canonical pattern and Standard 5 for migration sequencing.
 
 ## Best-Practice Revalidation
 
