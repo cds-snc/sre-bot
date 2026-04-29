@@ -26,6 +26,7 @@ supersedes:
 superseded_by: []
 review_state: current
 related_records:
+  - ADR-0052
   - ADR-0053
   - ADR-0054
   - ADR-0058
@@ -66,10 +67,13 @@ related_packages:
 The application must rely exclusively on the ASGI lifespan protocol for shutdown orchestration. The signal propagation chain is:
 
 1. ECS sends SIGTERM to the container's PID 1 (uvicorn, launched via `exec` in `entry.sh`).
-2. Uvicorn receives SIGTERM and initiates ASGI lifespan shutdown — it stops accepting new connections and triggers the lifespan context manager to exit.
-3. The FastAPI lifespan context manager executes cleanup code after the `yield` point.
-4. After lifespan cleanup completes, uvicorn completes in-flight request draining and exits with status code 0.
-5. If the process has not exited within the ECS stop timeout, ECS sends SIGKILL.
+2. Uvicorn receives SIGTERM and stops accepting new connections.
+3. Uvicorn drains in-flight requests — connections not waiting on an HTTP response are closed immediately; connections with pending responses are allowed to complete, bounded by `--timeout-graceful-shutdown`.
+4. After request draining completes (or the `--timeout-graceful-shutdown` timeout expires), uvicorn sends the ASGI `lifespan.shutdown` event. The FastAPI lifespan context manager executes cleanup code after the `yield` point.
+5. After lifespan cleanup completes (the application sends `lifespan.shutdown.complete`), uvicorn exits with status code 0.
+6. If the process has not exited within the ECS stop timeout, ECS sends SIGKILL.
+
+This ordering is defined by the ASGI Lifespan Protocol v2.0 specification, which states that `lifespan.shutdown` is "sent to the application when the server has stopped accepting connections and closed all active connections." The uvicorn lifespan architecture documentation (uvicorn.dev/concepts/lifespan/) confirms this sequence via an explicit sequence diagram.
 
 **Prohibitions:**
 - Application code must not install custom `signal.signal()` handlers for SIGTERM or SIGINT. Signal handling is delegated to the ASGI server.
@@ -85,7 +89,23 @@ The total time available for graceful shutdown is determined by two infrastructu
 | ALB deregistration delay | `terraform/alb.tf` | 30 seconds | Time allowed for in-flight HTTP requests to complete after the target is deregistered from the load balancer. |
 | ECS stop timeout | ECS default | 30 seconds | Time between SIGTERM and SIGKILL. |
 
-The application shutdown budget is the time between lifespan cleanup start and SIGKILL. This budget must be allocated across shutdown phases:
+The 30-second ECS stop timeout is split into two sequential phases:
+
+**Phase A: Request Draining** (bounded by `--timeout-graceful-shutdown`)
+
+After SIGTERM, uvicorn drains in-flight requests. The `--timeout-graceful-shutdown` parameter controls how long uvicorn waits for pending requests to complete before forcibly terminating them. This phase consumes the first portion of the ECS stop timeout.
+
+**Phase B: Lifespan Cleanup** (remaining time before SIGKILL)
+
+After request draining completes, uvicorn triggers `lifespan.shutdown`. The lifespan cleanup code executes within the remaining time. If SIGKILL arrives before cleanup completes, cleanup is interrupted.
+
+**Recommended configuration:**
+
+| Parameter | Recommended Value | Rationale |
+|-----------|-------------------|-----------|
+| `--timeout-graceful-shutdown` | 10 seconds | Twelve-Factor Factor IX notes HTTP requests should be short ("no more than a few seconds"). 10s provides generous headroom for in-flight requests while leaving ~20s for lifespan cleanup. |
+
+**Lifespan cleanup budget** (Phase B, ~20 seconds available):
 
 | Phase | Budget Allocation | Activity |
 |-------|-------------------|----------|
@@ -93,13 +113,13 @@ The application shutdown budget is the time between lifespan cleanup start and S
 | Transport | ≤ 5 seconds | Close WebSocket connections, join transport threads |
 | Feature | ≤ 2 seconds | Deactivate feature-specific handlers |
 | Infrastructure | ≤ 5 seconds | Close clients, flush buffers, release connections |
-| Reserve | ≥ 3 seconds | Margin for uvicorn request draining and OS cleanup |
+| Reserve | ≥ 3 seconds | Margin for uvicorn finalization and OS cleanup |
 
 **Rules:**
 - No individual shutdown phase may block indefinitely. All blocking operations (thread joins, connection closes) must use explicit timeouts.
 - Thread join timeouts must not exceed the phase budget (e.g., `thread.join(timeout=5)`).
 - If a phase exceeds its budget, the lifespan must log a warning and proceed to the next phase rather than blocking.
-- The `--timeout-graceful-shutdown` uvicorn parameter should be configured to align with the ECS stop timeout minus a safety margin.
+- The `--timeout-graceful-shutdown` value plus the total lifespan cleanup budget must not exceed the ECS stop timeout. If either the ECS stop timeout or the ALB deregistration delay changes, this budget must be recalculated.
 
 ### Standard 3: Resource Cleanup Obligation
 
@@ -257,7 +277,7 @@ Development and test environments must exercise the same shutdown code path as p
    - URL: https://uvicorn.dev/settings/
    - Publisher/maintainer: Marcelo Trylesinski / uvicorn
    - Accessed date (YYYY-MM-DD): 2026-04-29
-   - Relevance summary: Documents `--timeout-graceful-shutdown` parameter for controlling request draining timeout after lifespan shutdown.
+   - Relevance summary: Documents `--timeout-graceful-shutdown` parameter for controlling request draining timeout before lifespan shutdown.
 5. Source title: FastAPI Lifespan Events
    - URL: https://fastapi.tiangolo.com/advanced/events/
    - Publisher/maintainer: Sebastián Ramírez / FastAPI
@@ -280,7 +300,7 @@ Development and test environments must exercise the same shutdown code path as p
   - Add structured shutdown phase logging to `app/server/lifespan.py` shutdown code (Standard 5 events).
   - Add explicit timeout parameters to all thread `.join()` calls during shutdown.
   - Wire `shutdown_event_executor()` from `app/infrastructure/events/dispatcher.py` into the lifespan shutdown sequence instead of relying solely on `atexit`.
-  - Configure `--timeout-graceful-shutdown` in the uvicorn startup command in `app/bin/entry.sh`.
+  - Configure `--timeout-graceful-shutdown=10` in the uvicorn startup command in `app/bin/entry.sh` (10s for request draining, leaving ~20s for lifespan cleanup within the 30s ECS stop timeout). Note: `entry.sh` is an active migration target under ADR-0052 (SSM removal) and ADR-0053 (port binding). Any migration that modifies entry.sh must preserve the `exec` invocation (PID 1 signal delivery) and this timeout parameter.
   - Audit all daemon threads to ensure resources they manage are cleaned up before the main thread exits the lifespan.
 - Validation and quality gates:
   - ADR-0051 taxonomy check: confirm no implementation-level code examples in this record (Tier-2 permits implementation guidance but not executable code blocks as normative content).
@@ -294,3 +314,4 @@ Development and test environments must exercise the same shutdown code path as p
 ## Change Log
 
 - 2026-04-29: Created Tier-2 standard; supersedes ADR-0016. Six standards covering signal-to-lifespan contract, timeout budgeting, resource cleanup obligations, crash resilience, shutdown observability, and environment parity.
+- 2026-04-29: Challenge review — corrected Standard 1 signal propagation chain ordering. Request draining occurs BEFORE lifespan.shutdown per ASGI Lifespan Protocol v2.0 spec and uvicorn documentation (uvicorn.dev/concepts/lifespan/ sequence diagram). Revised Standard 2 timeout budget to account for two sequential phases: (A) request draining bounded by `--timeout-graceful-shutdown`, then (B) lifespan cleanup in remaining time. Corrected `--timeout-graceful-shutdown` recommendation from 25s to 10s to leave adequate lifespan cleanup window.

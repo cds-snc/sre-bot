@@ -26,6 +26,7 @@ review_state: current
 related_records:
   - ADR-0033
   - ADR-0039
+  - ADR-0057
 related_packages:
   - app/server
 ---
@@ -145,7 +146,7 @@ The following artifacts currently violate this standard and require migration be
 
 - Required changes:
   - Add `SERVER_HOST` (str, default `0.0.0.0`) and `SERVER_PORT` (int, default `8000`) to `app/infrastructure/configuration/infrastructure/server.py` as the single authority for bind values.
-  - Update `app/bin/entry.sh` to read `$SERVER_HOST` and `$SERVER_PORT` and pass them as explicit Uvicorn arguments.
+  - Update `app/bin/entry.sh` to read `$SERVER_HOST` and `$SERVER_PORT` and pass them as explicit Uvicorn arguments. When modifying entry.sh, preserve the `exec` invocation form (PID 1 signal delivery) and the `--timeout-graceful-shutdown` parameter required by ADR-0057.
   - Update `terraform/ecs.tf` and `terraform/templates/sre-bot.json.tpl` to derive the container port from a shared Terraform variable rather than a hardcoded literal.
   - Align health and readiness probe targets in the ECS task definition to the declared `SERVER_PORT` rather than a separately hardcoded value.
   - Startup must fail with a clear error message if bind configuration is absent or invalid; silent fallback to a default is not acceptable after migration.

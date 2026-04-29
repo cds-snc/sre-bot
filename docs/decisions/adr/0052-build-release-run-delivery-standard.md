@@ -25,6 +25,7 @@ superseded_by: []
 review_state: current
 related_records:
   - ADR-0046
+  - ADR-0057
 related_packages:
   - app/server
 ---
@@ -134,7 +135,7 @@ related_packages:
 - Required changes:
   - Keep build, release, and run responsibilities distinct in CI/CD workflows and operational runbooks.
   - Track release identifiers independent of source branch names.
-  - Remove SSM parameter retrieval from `app/bin/entry.sh`; configuration must be resolved and injected before the container starts, not assembled at process launch. This migration requires a dedicated Tier-5 ADR.
+  - Remove SSM parameter retrieval from `app/bin/entry.sh`; configuration must be resolved and injected before the container starts, not assembled at process launch. This migration requires a dedicated Tier-5 ADR. When modifying entry.sh, preserve the `exec` invocation form (PID 1 signal delivery) and the `--timeout-graceful-shutdown` parameter required by ADR-0057.
   - Move release-phase configuration binding to the ECS task definition level (e.g., AWS Secrets Manager injection or task definition environment variables resolved at deploy time).
   - Ensure deployed release identity (image digest or git SHA) is visible in startup logs and health-check metadata so rollback decisions have a traceable baseline.
 - Validation and quality gates:
