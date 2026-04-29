@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0059
 title: "Feature Interaction Boundaries and Platform Integration Standard"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 primary_domain: Package and Plugin Architecture
@@ -156,7 +156,7 @@ def register_routes(app: "FastAPI") -> None:
 
 Per-platform hooks are preferred over a single unified hook because platform handler signatures genuinely differ:
 - **Slack Bolt:** Functional middleware — `ack()`, `say()`, `command` parameters. Requires explicit `ack()` within 3 seconds.
-- **Teams Bot Framework:** Class-based — `TeamsActivityHandler` with `ITurnContext<T>` carrying conversation state.
+- **Teams Bot Framework:** Class-based — `TeamsActivityHandler` with `TurnContext` carrying conversation state.
 - A unified hookspec would erase these type differences, forcing `Callable[..., Any]` signatures and `if platform == "slack"` branches.
 
 **Rules:**
@@ -216,7 +216,7 @@ Features own their outbound notification routing logic. There is no centralized 
 
 1. **Unified InteractionProvider Protocol (rejected):**
  - Pros: Single abstraction across all platforms; capability matrix enables runtime feature degradation.
- - Cons: Platform interaction models are asymmetric (Slack `ack()` vs. Teams `ITurnContext`). A unified Protocol erases type safety (`Callable[..., Any]`) and creates a leaky abstraction. Violates the "Rule of Three" — abstract only after three concrete implementations prove a shared pattern.
+ - Cons: Platform interaction models are asymmetric (Slack `ack()` vs. Teams `TurnContext`). A unified Protocol erases type safety (`Callable[..., Any]`) and creates a leaky abstraction. Violates the “Rule of Three” — abstract only after three concrete implementations prove a shared pattern.
  - Why not chosen: The Platform Services Assessment (2026-04-29) empirically validated that concrete per-platform services preserve type safety and platform-native semantics. See ADR-0078.
 
 2. **Single unified hookspec for all platforms:**
@@ -278,8 +278,8 @@ Features own their outbound notification routing logic. There is no centralized 
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: N/A
-- Validation summary: Revised draft. Challenge review (2026-04-29) returned REVISE — body revision completed per review findings. Ready for re-review.
-- Follow-up actions: Re-submit for challenge review; validate hookspec examples match codebase.
+- Validation summary: Accepted. Challenge review R1 (2026-04-29) returned REVISE — body revision completed. R2 (2026-04-29) returned APPROVE — all conditions resolved.
+- Follow-up actions: None. Next review due 2026-08-27.
 
 ## Source References (Required)
 
@@ -320,16 +320,16 @@ Features own their outbound notification routing logic. There is no centralized 
  - Relevance summary: Authoritative reference for DI alias pattern used in HTTP route handler injection.
 
 7. Slack Bolt Python - Commands, Actions, and Views:
- - URL: https://tools.slack.dev/bolt-python/
+ - URL: https://docs.slack.dev/tools/bolt-python/
  - Publisher/maintainer: Slack Technologies
  - Accessed date: 2026-04-29
  - Relevance summary: Authoritative reference for Slack's `ack()` pattern and handler signatures that justify per-platform hookspecs.
 
 8. Microsoft Teams Bot Framework - Activity Handlers:
- - URL: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-basics
+ - URL: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-concepts
  - Publisher/maintainer: Microsoft
  - Accessed date: 2026-04-29
- - Relevance summary: Authoritative reference for Teams' `TeamsActivityHandler` and `ITurnContext<T>` patterns that differ fundamentally from Slack's functional middleware model.
+ - Relevance summary: Authoritative reference for Teams' `TeamsActivityHandler` and `TurnContext` patterns that differ fundamentally from Slack's functional middleware model.
 
 ## Implementation Guidance
 
@@ -353,3 +353,4 @@ Features own their outbound notification routing logic. There is no centralized 
 - 2026-04-29: Initial draft created during ADR governance review.
 - 2026-04-29: Scope revision mandated by Platform Services Assessment. InteractionProvider Protocol, Capability Matrix, and PlatformService facade rejected.
 - 2026-04-29: **Full body revision completed per challenge review findings.** Removed rejected Standards 1-3. Renumbered kept Standards 4-6 to Standards 1-3. Added Standards 4-6 (platform service construction governance, transport lifecycle, outbound notification routing). Rewrote all sections to remove InteractionProvider/PlatformService references. Updated hookspec examples to match actual codebase definitions (`register_slack_commands`, `SlackPlatformProvider`). Removed ADR-0018 from `supersedes` — ADR-0018 is superseded by ADR-0056+ADR-0077, not by this record. Added explicit Discord non-goal. Added presenter testing recommendation. Resolved PlatformService classification as Category C (ADR-0077). Added ADR-0078 as source reference.
+- 2026-04-29: Corrected `ITurnContext<T>` (C#/.NET) to `TurnContext` (Python SDK) per ADR-0078 challenge review findings. Updated stale Slack Bolt and Teams Bot Framework documentation URLs.
