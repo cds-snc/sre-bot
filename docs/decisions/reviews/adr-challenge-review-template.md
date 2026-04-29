@@ -22,7 +22,7 @@
 
 **Requirement:** Before challenging assumptions, identify and search authoritative sources that govern the domain covered by this ADR. Document findings to establish whether the ADR aligns with or deliberately deviates from widely accepted best practices.
 
-All ADRs must be anchored in official documentation and authoritative best practices. Exceptions (deliberate deviations) require explicit rationale and accepted risk.
+All ADRs must be anchored in official documentation and authoritative best practices. Exceptions (deliberate deviations) require explicit rationale and accepted risk. Current code might be outdate or non-compliant; the ADR must be evaluated against standards, not current implementation.
 
 ### 2.A Language & Framework Standards
 
