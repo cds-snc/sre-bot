@@ -22,6 +22,7 @@ impacts:
   - ADR-0056
   - ADR-0059
   - ADR-0063
+  - ADR-0076
 supersedes:
   - ADR-0003
   - ADR-0004
@@ -79,7 +80,7 @@ Module imports must not trigger side effects: no registration, no state mutation
 
 ### Boundary 5: Infrastructure Sibling Isolation
 
-Infrastructure packages must not import from other infrastructure service implementations directly. Each infrastructure package is a peer that communicates through the provider/injection boundary. This prevents hidden coupling between infrastructure components and ensures each can be tested independently.
+Infrastructure packages are peers that must not develop hidden coupling. Direct service composition between infrastructure packages is prohibited — all cross-service wiring must happen through the composition root (`providers.py`). Shared value types and enumerations may be imported across infrastructure packages at runtime. Configuration must flow through constructor injection, not direct import. See ADR-0076 for implementation-level enforcement rules (three-part standard: shared types permitted, configuration via injection, composition root only).
 
 ### Boundary 6: Legacy Module Posture
 
