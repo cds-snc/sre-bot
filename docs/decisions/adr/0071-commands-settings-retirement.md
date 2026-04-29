@@ -31,7 +31,7 @@ related_packages: []
 
 ## Context
 
-The commands feature (`app/infrastructure/commands/`) was an early attempt at standardizing interaction providers across platforms (Slack, Teams, etc.) but was ill-scoped. The correct architectural approach — a unified InteractionProvider Protocol with capability registration, platform abstraction, and HTTP-first bridge patterns — is defined by ADR-0059 (Interaction Provider and Feature Integration Standard, Wave 4).
+The commands feature (`app/infrastructure/commands/`) was an early attempt at standardizing interaction providers across platforms (Slack, Teams, etc.) but was ill-scoped. The correct architectural approach — a unified InteractionProvider Protocol with capability registration, platform abstraction, and HTTP-first bridge patterns — will be defined by ADR-0059 (Interaction Provider and Feature Integration Standard, Wave 4), which is currently in Draft status and must be accepted before this retirement can proceed.
 
 There is no `app/packages/commands/` target and none will be created. `CommandsSettings` has no corresponding module in `app/modules/` and no successor package.
 
@@ -59,12 +59,16 @@ ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in 
 
 | File | Access Pattern |
 |------|---------------|
-| `app/infrastructure/commands/providers/__init__.py` | `settings.commands.providers` |
-| `app/infrastructure/commands/providers/slack.py` | `settings.commands.providers['slack']` |
+| `app/infrastructure/commands/providers/__init__.py` | `settings.commands.providers` (provider activation registry) |
+| `app/infrastructure/commands/providers/slack.py` | `settings.commands.providers['slack']` (Slack provider config) |
+
+**Test file consumers** (mock `settings.commands.*`): `test_providers.py`, `test_provider_integration.py`.
 
 ### Blocking Prerequisite
 
-Completion of ADR-0059 (Interaction Provider and Feature Integration Standard) and its implementation. The interaction provider architecture must fully replace the commands infrastructure's provider registration and dispatch capabilities.
+1. **ADR-0059 must be accepted** — ADR-0059 (Interaction Provider and Feature Integration Standard) is currently Draft. It must complete challenge review and be accepted before implementation begins.
+2. **ADR-0059 implementation must be complete** — the interaction provider architecture must fully replace the commands infrastructure's provider registration and dispatch capabilities.
+3. All command registrations currently using `app/infrastructure/commands/providers/` must be migrated to the InteractionProvider hookspec pattern defined by ADR-0059 Standard 6.
 
 ### Retirement Criteria
 

@@ -83,10 +83,12 @@ def get_aws_ops_settings() -> AwsOpsSettings:
 
 ### Consumers
 
-| File | Access Pattern |
-|------|---------------|
-| `app/modules/aws/groups.py` | `settings.aws_feature.AWS_ADMIN_GROUPS` (multiple call sites) |
-| `app/modules/aws/groups.py` | `settings.aws_feature.AWS_OPS_GROUP_NAME` |
+| File | Access Pattern | Sites |
+|------|---------------|-------|
+| `app/modules/aws/groups.py` | `settings.aws_feature.AWS_ADMIN_GROUPS` | 3 call sites (admin group authorization checks) |
+| `app/modules/aws/groups.py` | `settings.aws_feature.AWS_OPS_GROUP_NAME` | 1 call site |
+| `app/modules/aws/ops_group_assignment.py` | `settings.aws_feature.AWS_OPS_GROUP_NAME` | 10 access sites (group lookup, assignment, error messages, logging) |
+| `app/modules/aws/users.py` | `settings.aws_feature.AWS_ADMIN_GROUPS` | 1 call site (admin authorization check) |
 
 ### Migration Steps
 

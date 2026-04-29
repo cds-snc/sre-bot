@@ -69,9 +69,14 @@ ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in 
 
 | File | Access Pattern |
 |------|---------------|
-| `app/modules/groups/providers/google_workspace.py` | `settings.groups.group_domain` |
-| `app/modules/groups/providers/registry_utils.py` | `settings.groups.providers` |
-| `app/modules/groups/providers/__init__.py` | `settings.groups.providers` |
+| `app/modules/groups/providers/__init__.py` | `settings.groups.providers` (provider registry construction) |
+| `app/modules/groups/providers/registry_utils.py` | `settings.groups.providers` (provider config lookup) |
+| `app/modules/groups/providers/google_workspace.py` | `settings.groups.group_domain` (email domain suffix) |
+| `app/modules/groups/providers/base.py` | `settings.groups.circuit_breaker_enabled`, `circuit_breaker_failure_threshold`, `circuit_breaker_timeout_seconds`, `circuit_breaker_half_open_max_calls` (circuit breaker init) |
+| `app/modules/groups/providers/capabilities.py` | `settings.groups.providers[name].capabilities` (capability config override) |
+| `app/modules/groups/reconciliation/integration.py` | `settings.groups.reconciliation_enabled` (feature gate) |
+
+**Test file consumers** (mock `settings.groups.*`): `test_base_provider.py`, `test_aws_identity_center.py`, `test_google_workspace_provider.py`.
 
 ### Blocking Prerequisite
 

@@ -87,10 +87,12 @@ def get_incident_settings() -> IncidentSettings:
 
 1. Create `app/packages/incident/settings.py` with `IncidentSettings(BaseSettings)` and `get_incident_settings()`.
 2. Update all consumers in `app/packages/incident/` to use `get_incident_settings()` instead of `settings.feat_incident`.
-3. Remove `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings` (deduplication).
-4. Remove `IncidentFeatureSettings` from `infrastructure/configuration/features/incident.py`.
-5. Remove re-export from `infrastructure/configuration/features/__init__.py`.
-6. Remove `Settings.feat_incident` field from the aggregator.
+3. **Deduplication safety check:** Before removing `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings`, verify no non-incident code reads these values via `settings.slack.INCIDENT_CHANNEL` or `settings.slack.SLACK_SECURITY_USER_GROUP_ID`. Current search (2026-04-29) found only one reference in `slack.py` line 24 (a comment/docstring), confirming safe removal.
+4. Remove `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings` (deduplication).
+5. **Fix import-time side effects:** `app/modules/incident/incident.py` (line 20–21) and `app/modules/incident/core.py` (line 17–18) both assign `INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID` at module level. This violates ADR-0046 (no side effects at import time). Replace with function calls or lazy accessors during migration.
+6. Remove `IncidentFeatureSettings` from `infrastructure/configuration/features/incident.py`.
+7. Remove re-export from `infrastructure/configuration/features/__init__.py`.
+8. Remove `Settings.feat_incident` field from the aggregator.
 
 ### Blocking Prerequisite
 

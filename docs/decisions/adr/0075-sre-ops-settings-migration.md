@@ -25,6 +25,7 @@ related_records:
   - ADR-0056
 related_packages:
   - app/modules/sre
+  - app/modules/ops
 ---
 
 # SreOpsSettings Migration to packages/sre_ops
@@ -96,7 +97,9 @@ def get_sre_ops_settings() -> SreOpsSettings:
 
 ### Blocking Prerequisite
 
-Migration of `app/modules/sre/` to `app/packages/sre_ops/`.
+Migration of `app/modules/sre/` and `app/modules/ops/` to `app/packages/sre_ops/`.
+
+**Note on module scope:** The sole consumer of `SRE_OPS_CHANNEL_ID` is `app/modules/ops/notifications.py`, which lives in `app/modules/ops/` — a separate directory from `app/modules/sre/`. Both modules are logically part of the SRE operations domain and must be consolidated into the target `app/packages/sre_ops/` package. The blocking prerequisite covers both source directories.
 
 ### Retirement Criteria
 
