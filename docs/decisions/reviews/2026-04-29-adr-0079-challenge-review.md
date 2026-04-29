@@ -1,0 +1,343 @@
+# ADR Challenge and Content Review
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0079: Queueing and Message-Broker Architecture Standard |
+| **Reviewer Name & Title** | SRE Architecture Review, SRE Team |
+| **Secondary Reviewers** | — |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **REVISE** |
+| **Outcome Rationale** | Systematic lifecycle phase numbering errors throughout the document contradict the governing ADR-0046 Invariant 2 phase definitions. Four standards reference incorrect phase numbers, creating normative contradictions with the upstream Tier-1 principle. One codebase audit factual error (daemon thread claim). |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards:**
+
+- ✅ Python Enhancement Proposals (PEP 544 — Protocols)
+- ✅ FastAPI Official Documentation (lifespan events)
+- ✅ Pluggy Documentation (hookspecs, hookimpls)
+- ✅ Pydantic Settings V2 (BaseSettings)
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| PEP 544 Protocols | "PEP 544 structural subtyping Protocol" | Protocols define structural contracts; `@runtime_checkable` checks method existence only | ✅ Aligned | — |
+| FastAPI Lifespan | "FastAPI lifespan async context manager" | Lifespan manages startup/shutdown as async context manager; transport connections and background work are valid lifespan-managed resources | ✅ Aligned | — |
+| Pluggy hookspecs | "Pluggy hookspec hookimpl registration" | Hookspecs define extension points; hookimpls are discovered at startup, not import time. Pluggy's `PluginManager.register()` is explicitly a runtime call. | ✅ Aligned | — |
+| Pydantic Settings V2 | "Pydantic BaseSettings env variables" | BaseSettings loads from environment variables; supports nested models (but not nested BaseSettings per ADR-0055) | ✅ Aligned | — |
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards:**
+
+- ✅ Twelve-Factor App Methodology (Factor VIII: Concurrency)
+- ✅ AWS SQS Best Practices
+- ✅ Enterprise Integration Patterns (Hohpe, Woolf)
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor VIII: Concurrency | "12factor.net/concurrency" | Web processes handle HTTP; worker processes handle background tasks. Process types map to different scaling needs. Internal multiplexing (threads, async) is permitted within a single process. | ✅ Aligned | Standard 7 Phase 4 correctly identifies this as an evaluation trigger for worker separation. |
+| AWS SQS Best Practices | AWS SQS documentation | SQS provides at-least-once delivery natively. DLQ is a standard pattern. Visibility timeout prevents duplicate processing during in-flight handling. Exponential backoff with jitter is recommended for retries. | ✅ Aligned | Standard 3 and Standard 4 follow AWS SQS patterns. |
+| Enterprise Integration Patterns | Hohpe & Woolf, "Enterprise Integration Patterns" (2003) | Dead-Letter Channel, Idempotent Receiver, Message Channel, and Competing Consumers are canonical patterns. Protocol-based channel abstraction is standard. | ✅ Aligned | Standards 1, 3, 4 follow EIP canonical patterns. |
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards:**
+
+- ✅ Event-Driven Architecture Patterns
+- ✅ Dependency Injection Best Practices
+- ✅ Idempotency Patterns (for distributed systems)
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Cosmic Python Ch. 11 | "Event-Driven Architecture handler registration" | Handler registration should be separated from handler definition. Message bus abstractions enable broker substitution. | ✅ Aligned | Standard 2 follows this pattern. |
+| Seemann Composition Root | "Dependency Injection Composition Root" | Service wiring belongs in the composition root, not scattered through the codebase. | ✅ Aligned | Provider pattern (Standard 6) follows Composition Root. |
+| Idempotent Receiver | EIP and distributed systems literature | At-least-once delivery requires idempotent consumers. Message ID is the natural deduplication key. | ✅ Aligned | Standard 3 correctly requires idempotency. |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 10
+**Aligned with Best Practice:** 10
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations. The ADR's architectural patterns are well-grounded in authoritative sources.
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Lifecycle Phase Numbering Matches ADR-0046
+
+- **Stated Norm:** ADR-0079 references specific phase numbers throughout:
+  - Context: "ADR-0046 Invariant 2: Queue consumers start during lifespan phase 6 (transport phase)"
+  - Standard 2: "Handler registration happens during lifespan phase 5 (plugin registration), before transport start (phase 6)"
+  - Standard 5: "Queue consumers start during lifespan phase 6 (transport phase)"
+  - Standard 5.3: "Queue consumers stop during shutdown phase 1 (first to stop)"
+- **Underlying Assumption:** The phase numbers in ADR-0079 match ADR-0046 Invariant 2's canonical phase ordering.
+- **Challenge:** Direct inspection of ADR-0046 Invariant 2 reveals:
+  1. Configuration
+  2. Infrastructure
+  3. Discovery and Registration
+  4. Feature Activation (handlers, event subscribers, integrations)
+  5. **Transport** — Start external transport connections (WebSocket, **message queues**)
+  6. **Background** — Start scheduled and background work (production only)
+- **Evidence Strength:** ⭐ Strong — verified directly from ADR-0046 source text (lines 70–77)
+- **Counter-Evidence Found:** Yes — ADR-0079 systematically uses incorrect phase numbers:
+
+  | ADR-0079 Claim | ADR-0046 Reality | Error |
+  |----------------|------------------|-------|
+  | "phase 5 (plugin registration)" | Phase 3 = Discovery and Registration; Phase 5 = Transport | Wrong number and wrong label |
+  | "phase 6 (transport phase)" | Phase 5 = Transport; Phase 6 = Background | Wrong number and wrong label |
+  | Event handler registration in "phase 5" | Phase 4 = Feature Activation (includes "event subscribers") | Should be Phase 4, not Phase 5 |
+  | Queue consumer start in "phase 6 (transport)" | Phase 5 = Transport (includes "message queues") | Should be Phase 5, not Phase 6 |
+  | Queue consumer shutdown "phase 1 (first to stop)" | Reverse order: Background stops first (Phase 6 → shutdown step 1), Transport stops second (Phase 5 → shutdown step 2) | Queue consumers are Transport, so they stop second, not first |
+
+- **Confidence (ADR survives challenge):** 🔴 Low — **REVISE required.** The phase numbers are the normative interface between this ADR and its governing Tier-1 standard.
+- **Reviewer Notes:** The conceptual intent is correct (handler registration before transport start, transport start before background work, transport stops early in shutdown). But the specific phase numbers create normative contradictions with ADR-0046 that could cause implementation errors. Five corrections required.
+
+### Assumption 3.2: MessageProducer/MessageConsumer Are Category A
+
+- **Stated Norm:** Standard 1 classifies `MessageProducer` and `MessageConsumer` as Category A per ADR-0077.
+- **Underlying Assumption:** These Protocols meet Category A criteria: they abstract a backing service and are consumed by feature packages.
+- **Challenge:** Category A requires Protocol contracts for services "consumed across package boundaries by feature packages" (ADR-0077 Standard 1). The queue Protocols abstract SQS/Redis/in-memory, meeting the backing-service substitution criterion. Feature packages will consume them to send/receive messages.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — classification is correct. These meet both Category A criteria (backing service abstraction + cross-package consumption).
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Correctly classified. The Protocols are aspirational until Phase 2 but defining the target classification now prevents drift.
+
+### Assumption 3.3: EventDispatcher Is Category B
+
+- **Stated Norm:** Compliance section classifies EventDispatcher as Category B ("shared utility, concrete OK — it does not abstract a backing service in the current in-process model").
+- **Underlying Assumption:** The EventDispatcher's in-process ThreadPoolExecutor model does not meet Category A criteria.
+- **Challenge:** Category B is for shared utilities that don't abstract a backing service. The EventDispatcher currently fires events into a ThreadPoolExecutor — there is no backing service (no broker, no durable storage). The note "reclassify to Category A if migrated to a durable broker" is appropriate.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — classification is correct for the current model.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The reclassification trigger (durable broker migration) is well-defined.
+
+### Assumption 3.4: At-Least-Once Is Sufficient
+
+- **Stated Norm:** Standard 3 mandates at-least-once delivery and explicitly states "exactly-once is not guaranteed."
+- **Underlying Assumption:** No current or planned feature requires exactly-once delivery semantics.
+- **Challenge:** Exactly-once delivery in distributed systems is a well-known impossibility without additional coordination (two-phase commit, transactional outbox). AWS SQS Standard Queues provide at-least-once natively. SQS FIFO Queues provide exactly-once processing but with throughput limitations. The application's current workloads (access sync, webhook delivery, audit enrichment) are naturally idempotent or can be made idempotent with the IdempotencyService.
+- **Evidence Strength:** ⭐ Strong — aligned with AWS SQS native model and EIP Idempotent Receiver pattern
+- **Counter-Evidence Found:** No
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** SQS FIFO Queues are not excluded — the broker-agnostic standard permits their use. The Standard 3.4 ordering note correctly defers ordered processing to consumer-level implementation.
+
+### Assumption 3.5: IdempotencyService Exists and Is Available
+
+- **Stated Norm:** Standard 3 requires consumers to "use the idempotency service (ADR-0077 Standard 1, `IdempotencyService`) to deduplicate messages."
+- **Underlying Assumption:** The IdempotencyService exists in the codebase and is available via the DI system.
+- **Challenge:** Verified in codebase:
+  - `app/infrastructure/idempotency/service.py` — class exists
+  - `app/infrastructure/services/providers.py` line 287 — `get_idempotency_service()` provider exists
+  - `app/infrastructure/services/dependencies.py` line 96 — `IdempotencyServiceDep` alias exists
+- **Evidence Strength:** ⭐ Strong — verified by codebase inspection
+- **Counter-Evidence Found:** No
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.6: NotificationService Classification Claim
+
+- **Stated Norm:** Standard 4 references "notification service (ADR-0077 Category A P2)".
+- **Underlying Assumption:** NotificationService is classified as Category A with P2 migration priority.
+- **Challenge:** ADR-0077 places NotificationService in the P2 migration priority row, which means it is a *candidate* for Category A reclassification, not currently Category A. The wording "ADR-0077 Category A P2" could be read as "currently Category A" when it actually means "P2 priority in the migration plan to become Category A."
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — the wording is ambiguous but not strictly wrong. ADR-0077 P2 row describes services that should eventually have Protocol contracts.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** Recommend rewording to "notification service (ADR-0077 P2 migration candidate)" for precision. Not a blocker.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Phase Numbering → Implementation Error
+
+- **If Assumption Fails:** Developers implement queue consumer startup in Phase 6 (Background) instead of Phase 5 (Transport), causing queue consumers to start after background jobs instead of alongside other transport connections.
+- **Platform Impact:**
+  - Incident management workflow: Low — current model is in-process, no durable queues yet
+  - Access synchronization: Medium — when access sync migrates to queue-backed processing, startup ordering matters
+  - Multi-provider integrations: Low
+- **Probability Estimate:** High % — the phase numbers are explicitly cited as normative references
+- **Mitigation or Acceptance:** **Requires correction.** Phase numbers must match ADR-0046.
+
+### Failure Mode 4.2: Shutdown Ordering → Message Loss
+
+- **If Assumption Fails:** Queue consumers stop in "shutdown phase 1" (Background phase) but are actually Transport-phase resources. If Background stops first and drains, then Transport stops and queues close, the ordering may not matter. But if the implementation relies on "first to stop" semantics, queue consumers could be shut down before dependent background jobs finish producing messages.
+- **Platform Impact:**
+  - Access synchronization: Medium — in-flight sync operations producing queue messages during shutdown
+  - Incident management workflow: Low
+- **Probability Estimate:** Medium % — depends on implementation interpretation of "phase 1"
+- **Mitigation or Acceptance:** **Requires correction.** Queue consumers as Transport-phase resources stop in shutdown step 2 (reverse of Phase 5), not step 1.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Phase number mismatch: ADR-0079 says "phase 6 (transport)", ADR-0046 defines Phase 5 as Transport | ADR-0079, ADR-0046 | 🔴 High | ⚪ Unresolved — requires ADR-0079 revision |
+| Phase number mismatch: ADR-0079 says "phase 5 (plugin registration)", ADR-0046 defines Phase 3 as Discovery/Registration and Phase 4 as Feature Activation | ADR-0079, ADR-0046 | 🔴 High | ⚪ Unresolved — requires ADR-0079 revision |
+| Shutdown ordering: ADR-0079 says "shutdown phase 1 (first to stop)" for queue consumers, ADR-0046 Invariant 4 says Background stops first, then Transport | ADR-0079, ADR-0046 | 🟡 Medium | ⚪ Unresolved — queue consumers are Transport (Phase 5), stop second |
+| ADR-0058 `related_records` metadata: does not reference ADR-0079 | ADR-0079, ADR-0058 | 🟢 Low | ⚪ Unresolved — metadata-only, not normative |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** None (new coverage area) — correct
+- **Inheritance Status:** No inherited constraints (no superseded ADR) — correct
+- **Gaps Identified:** None
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team — clear
+- **Plugin/Startup Registration:** Pluggy hookspec for `register_event_handlers` and `register_queue_consumers` — clear
+- **Config Owner:** `QueueSettings` in `infrastructure/configuration/infrastructure/` — clear
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Event Dispatcher Remediation
+
+**Context:** Fix import-time side effects in the event dispatcher while maintaining current fire-and-forget behavior.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Handler registration | Pluggy hookspec during startup (Std 2) | Currently `@register_event_handler` at import time; 3 handlers in `modules/groups/events/handlers.py` | ⚠️ Yes | Migration required — handlers must move to hookimpl registration |
+| Error isolation | Caught, logged, non-blocking (Std 2.5) | `safe_run()` in `dispatcher.py` already implements this | ✅ No | Behavior codification, not change |
+| Correlation propagation | `Event[T]` carries `correlation_id` (Std 2.4) | `Event` dataclass already has `correlation_id` field | ✅ No | Already implemented |
+| Registry encapsulation | Instance-level dict, not module-level (Std 2.3) | Global `EVENT_HANDLERS` dict at module level | ⚠️ Yes | Migration required |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling — Standard 2 correctly identifies the violations and prescribes a clear remediation path. The migration is straightforward.
+
+### Scenario 6.2: Access Sync Queue Migration (Phase 3)
+
+**Context:** When access sync entitlement application migrates to queue-backed processing.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Idempotency | Consumer uses IdempotencyService (Std 3.2) | Access sync operations are naturally idempotent (desired state reconciliation) | ✅ No | IdempotencyService provides additional safety |
+| DLQ handling | Failed entitlements land in DLQ (Std 4.1) | Currently errors are logged and retried via RetryStore | ✅ No | DLQ is a natural extension |
+| Lifecycle integration | Consumer starts in transport phase (Std 5.1) | N/A — future state | ✅ No | Standard defines target correctly |
+| Settings partitioning | Queue config in QueueSettings (Std 6) | N/A — future state | ✅ No | Standard defines target correctly |
+
+**Validation Summary:** ✅ Fully aligned — the standards provide a clear target for access sync queue migration.
+
+### Scenario 6.3: Retry Store SQS Backend (Phase 2)
+
+**Context:** Implementing the SQS backend for the existing retry infrastructure.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Protocol alignment | MessageProducer/MessageConsumer Protocols (Std 1) | RetryStore/RetryProcessor Protocols already exist with different signatures | ⚠️ Yes | Documented in Gaps section — complementary, not conflicting |
+| Queue settings | QueueSettings with SQS config (Std 6) | RetrySettings already has `backend: 'sqs'` option | ⚠️ Yes | QueueSettings may overlap with RetrySettings; needs coordination |
+| DLQ config | Every durable queue has DLQ (Std 4.1) | Retry infrastructure has max_retries and permanent_failure handling | ✅ No | DLQ extends existing pattern |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling — the retry store has its own Protocol surface. The ADR correctly identifies the complementary relationship (not conflicting) in the Gaps section.
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Aspirational Protocols vs. Concrete Implementation
+
+- **Chosen:** Define Protocol interfaces (Standard 1) before any implementation exists
+- **Rejected:** Wait until first durable queue need to define Protocols
+- **Rationale:** Defining the target interface ensures aligned implementation across teams. Protocol revision risk is low given the minimal, well-established interface (send/receive/acknowledge).
+- **Risk Accepted:** Protocol definitions may need revision when the first broker is integrated.
+- **Contingency:** The Protocol is minimal (3 methods per Protocol); revision scope is bounded.
+
+### Tradeoff 7.2: Broker-Agnostic vs. SQS-Specific
+
+- **Chosen:** Broker-agnostic standards with SQS as the likely first implementation
+- **Rejected:** Mandate SQS immediately
+- **Rationale:** Standards should be durable; broker selection is an infrastructure decision. SQS is already referenced in retry settings.
+- **Risk Accepted:** Broker-agnostic standards may not leverage broker-specific features optimally.
+- **Contingency:** Broker-specific optimizations can be added as Tier-5 implementation decisions.
+
+### Tradeoff 7.3: Phased Evolution vs. Big-Bang Migration
+
+- **Chosen:** 5-phase evolution with explicit triggers (Standard 7)
+- **Rejected:** Immediate migration to queue-backed processing
+- **Rationale:** The colocated model works at current scale. Premature migration adds infrastructure complexity without benefit.
+- **Risk Accepted:** Technical debt accumulates if evolution triggers are ignored.
+- **Contingency:** Evolution triggers are explicit and measurable (execution time, resource contention, scaling divergence).
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Fix lifecycle phase numbers throughout ADR-0079 | ✅ Yes | ADR Author | 2026-04-30 | Correct all phase references to match ADR-0046 Invariant 2: Phase 3 (Discovery/Registration) or Phase 4 (Feature Activation) for handler registration; Phase 5 (Transport) for queue consumer start; reverse-Phase-5 for queue consumer shutdown. 5 corrections across Context, Standard 2, Standard 5, and Compliance sections. |
+| Fix shutdown ordering claim | ✅ Yes | ADR Author | 2026-04-30 | Queue consumers are Transport (Phase 5). In reverse-order shutdown, Background (Phase 6) stops first, then Transport (Phase 5) stops second. "Shutdown phase 1 (first to stop)" is incorrect for Transport-phase resources. |
+| Fix daemon thread claim in Codebase Audit | ❌ No | ADR Author | 2026-04-30 | Codebase audit context references "daemon thread" for `scheduled_tasks.py`. The thread is actually non-daemon (`daemon=True` is not set on `ScheduleThread`). Minor factual correction. |
+| Clarify NotificationService classification wording | ❌ No | ADR Author | 2026-04-30 | Standard 4 says "notification service (ADR-0077 Category A P2)". Recommend rewording to "notification service (ADR-0077 P2 migration candidate)" since NotificationService is not yet Category A. |
+| Add ADR-0079 to ADR-0058 related_records | ❌ No | ADR Author | 2026-04-30 | ADR-0058 does not reference ADR-0079 in its metadata despite being the complementary standard. Metadata-only update. |
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **REVISE** → ADR-0079 requires authoring revision; return to author team with feedback
+
+**Primary Blockers:**
+
+1. **Lifecycle phase numbering** — 5 instances of incorrect ADR-0046 phase references. Phase numbers are the normative interface between this Tier-2 standard and its governing Tier-1 principle. Incorrect numbers create implementation risk and cross-ADR contradiction. Corrections:
+   - Event handler registration: Phase 4 (Feature Activation), not "phase 5 (plugin registration)"
+   - Queue consumer start: Phase 5 (Transport), not "phase 6 (transport phase)"
+   - Queue consumer shutdown: Reverse of Phase 5 (shutdown step 2), not "shutdown phase 1 (first to stop)"
+   - Context section constraint reference: Phase 5, not "phase 6"
+2. **Shutdown ordering** — Queue consumers classified as Transport-phase resources must stop *after* Background, not first. ADR-0046 Invariant 4 specifies reverse-order: Background stops first (step 1), Transport stops second (step 2).
+
+**Non-blocking corrections (should be applied during revision):**
+3. Daemon thread factual error in Codebase Audit
+4. NotificationService classification wording ambiguity
+5. ADR-0058 metadata gap
+
+**Revision Deadline:** 2026-04-30
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | SRE Architecture Review |
+| **Reviewer Title** | Senior SRE / Architecture |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+
+---
+
+## Appendix: Codebase Verification Summary
+
+| ADR-0079 Claim | Verified? | Notes |
+|----------------|-----------|-------|
+| Global `EVENT_HANDLERS` dict | ✅ | `dispatcher.py` line 19 |
+| `@register_event_handler` decorator | ✅ | `dispatcher.py` lines 27-48 |
+| Import-time side effects | ✅ | 3 handlers in `modules/groups/events/handlers.py` register at import time |
+| `ThreadPoolExecutor` with 4 workers | ✅ | `dispatcher.py` line 105, `max_workers=4` default |
+| `EventDispatcher` wraps module functions | ✅ | `service.py` delegates all methods to module-level functions |
+| `RetryStore` Protocol exists | ✅ | `resilience/retry/store.py` |
+| `RetryProcessor` Protocol exists | ✅ | `resilience/retry/worker.py` |
+| `RETRY_BACKEND` with `sqs` option | ✅ | `configuration/infrastructure/retry.py`, backend field lists `memory`, `dynamodb`, `sqs` |
+| `schedule` library used | ✅ | `scheduled_tasks.py` line 5 |
+| `BackgroundJobRegistry` exists | ✅ | `_ScheduleBackgroundJobRegistry` in `scheduled_tasks.py` |
+| `safe_run()` exception swallowing | ✅ | `scheduled_tasks.py` lines 37-48 |
+| Daemon thread | ❌ | `ScheduleThread` does NOT set `daemon=True`; thread is non-daemon |
+| `IdempotencyService` exists | ✅ | `idempotency/service.py`, provider and DI alias available |
+| `bootstrap.py` no-op | ✅ | `register_infrastructure_handlers()` is currently a no-op |
