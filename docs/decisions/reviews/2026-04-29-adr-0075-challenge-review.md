@@ -1,0 +1,212 @@
+# ADR Challenge and Content Review Template
+
+**Purpose:** Standardized artifact for Step 9.5 (Canonical ADR Challenge and Content Review Gate) execution.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0075: SreOpsSettings Migration to packages/sre_ops |
+| **Reviewer Name & Title** | AI Reviewer (Copilot), Architecture Review Agent |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **REVISE** |
+| **Outcome Rationale** | Metadata non-compliance (missing `ADR-0044` in `constrained_by`, invalid `decision_type` value). Consumer table references wrong module path — consumer is in `app/modules/ops/` not `app/modules/sre/`. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards (check all that apply):**
+- ✅ Pydantic Settings V2 (https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Pydantic Settings V2 — BaseSettings singleton | "pydantic settings BaseSettings" | Independent `BaseSettings` with `@lru_cache` is the correct pattern. | ✅ Aligned | N/A |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards (check all that apply):**
+- ✅ Twelve-Factor App Methodology (https://12factor.net/)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor III: Config | "twelve-factor config" | Single env var, string type, env-var-sourced. Aligned. | ✅ Aligned | N/A |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards (check all that apply):**
+- ✅ ADR-0046: Runtime Lifecycle and Lifespan Canonical Model (import-time side effects)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| ADR-0046 import-time side effects | Codebase verification | `app/modules/ops/notifications.py` line 6: `OPS_CHANNEL_ID = settings.sre_ops.SRE_OPS_CHANNEL_ID` is a module-level assignment (import-time side effect). ADR-0075 correctly identifies this violation and includes it as a migration step to fix. | ✅ Aligned | N/A |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 3
+**Aligned with Best Practice:** 3
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Consumer is in ops module, migration target is sre_ops
+- **Stated Norm:** Blocking prerequisite is "Migration of `app/modules/sre/` to `app/packages/sre_ops/`." Consumer is `app/modules/ops/notifications.py`.
+- **Underlying Assumption:** The `ops/notifications.py` consumer will migrate as part of the `sre` module migration to `sre_ops` package.
+- **Challenge:** `app/modules/ops/` and `app/modules/sre/` are separate module directories. They may not migrate together. If `ops` migrates independently (or not at all), the consumer of `SRE_OPS_CHANNEL_ID` may end up in a different package than `sre_ops`.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** **Yes** — `app/modules/ops/` exists as a separate directory with only `notifications.py`. `app/modules/sre/` is a distinct directory with `sre.py` and `webhook_helper.py`. The ADR implies they are one module, but they are structurally separate.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The ADR should clarify whether `app/modules/ops/` is considered part of the `sre` module (logical grouping) or a separate module. If separate, the blocking prerequisite and migration steps need adjustment. The consumer (`ops/notifications.py`) may need to receive its settings via DI rather than owning them, or `notifications.py` may need to move into the `sre_ops` package.
+
+### Assumption 3.2: Import-time side effect fix is correctly scoped
+- **Stated Norm:** Migration step 2: "Fix the import-time side effect: replace module-level constant with a function call or lazy accessor."
+- **Underlying Assumption:** Changing `OPS_CHANNEL_ID = settings.sre_ops.SRE_OPS_CHANNEL_ID` to a function call is sufficient.
+- **Challenge:** What does the correct pattern look like? Should it be a local function call at use site, or should the settings provider be injected?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the ADR correctly identifies the problem and the general solution. The specific implementation (function call vs. lazy accessor vs. DI) is appropriately left to implementation time.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The fix direction is sound. ADR-0046 compliance will be validated at implementation.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: ops/notifications.py migrates separately from sre module
+- **If Assumption Fails:** `ops` module migrates independently, and `notifications.py` ends up in a different package than `sre_ops`. Settings ownership becomes ambiguous.
+- **Platform Impact:**
+  - Incident management workflow: Low (ops notifications used for operational logging)
+  - Access synchronization workflow: None
+  - Access request workflow: None
+  - Multi-provider integrations: Low
+- **Probability Estimate:** Medium % (`app/modules/ops/` is structurally separate from `app/modules/sre/`)
+- **Mitigation or Acceptance:** ADR should document the relationship between `ops` and `sre` modules, or adjust the blocking prerequisite to account for both.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Missing `ADR-0044` in `constrained_by` | ADR-0075, ADR-0044 | 🔴 High | ⚪ Unresolved — metadata reference requires every non-Tier-0 record to include `ADR-0044` |
+| `decision_type: Migration` is not a valid value | ADR-0075, ADR-0051 | 🔴 High | ⚪ Unresolved — must be `Migration Decision` per metadata reference |
+| Consumer module mismatch | ADR-0075 internal | 🟡 Medium | ⚪ Unresolved — consumer is in `app/modules/ops/`, blocking prerequisite references `app/modules/sre/` |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** None
+- **Gaps Identified:** None
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Config Owner:** Currently `app/infrastructure/configuration/features/sre_ops.py` → target `app/packages/sre_ops/settings.py`
+- **Audit Result:** ⚠️ Needs Clarification → Consumer is in `ops` module, not `sre` module. Ownership chain across the ops/sre boundary should be documented.
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+**Context:** `notifications.py` provides `log_ops_message()` for operational notifications to a Slack channel.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| OPS_CHANNEL_ID availability | Must be available at function call time | Currently loaded at import time | ⚠️ Yes | ADR correctly identifies and plans to fix |
+| Migration path | Settings move to sre_ops package | Consumer is in ops module (separate directory) | ⚠️ Yes | Module boundary ambiguity |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** ADR correctly plans import-time fix. Module boundary should be clarified.
+
+### Scenario 6.2–6.4: Access and Multi-Provider Workflows
+Not directly applicable.
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Separate sre_ops Package vs. Consolidation with ops
+- **Chosen:** Dedicated `app/packages/sre_ops/` package
+- **Rejected:** Consolidating ops and sre into one package
+- **Rationale:** 1:1 module→package migration pattern
+- **Risk Accepted:** Consumer in a different module directory
+- **Contingency:** Consumer can be moved into sre_ops package or receive settings via DI
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Fix `decision_type` to `Migration Decision` | ✅ Yes | SRE Team | 2026-05-06 | Non-compliant with ADR-0051 taxonomy |
+| Add `ADR-0044` to `constrained_by` | ✅ Yes | SRE Team | 2026-05-06 | Mandatory per metadata reference |
+| Clarify `ops` vs `sre` module relationship | ✅ Yes | SRE Team | 2026-05-06 | Consumer is in `app/modules/ops/notifications.py` but blocking prerequisite references `app/modules/sre/` migration |
+| Add `ADR-0046` to `related_records` | ❌ No | SRE Team | 2026-05-13 | Import-time side effect violation directly references ADR-0046 |
+| Add `ADR-0047` to `related_records` | ❌ No | SRE Team | 2026-05-13 | Governing principle |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds.**
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **REVISE** → ADR-0075 requires authoring revision; return to author team with feedback
+
+**If REVISE, Provide Primary Blockers:**
+1. `decision_type: Migration` must be `Migration Decision` (ADR-0051 taxonomy violation)
+2. `constrained_by` missing mandatory `ADR-0044` (metadata reference violation)
+3. Consumer module mismatch — consumer is in `app/modules/ops/`, but blocking prerequisite references only `app/modules/sre/`
+
+**Revision Deadline:** 2026-05-06
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer (Copilot) |
+| **Reviewer Title** | Architecture Review Agent |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | N/A |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+- PR or issue that delivers the revised ADR
+- Internal decision tracker or ADR review calendar
+
+**This Review Template Was Completed Per:**
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → Then annual review_state cycle

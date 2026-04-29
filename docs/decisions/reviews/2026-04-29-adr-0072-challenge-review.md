@@ -1,0 +1,234 @@
+# ADR Challenge and Content Review Template
+
+**Purpose:** Standardized artifact for Step 9.5 (Canonical ADR Challenge and Content Review Gate) execution.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0072: IncidentFeatureSettings Migration to packages/incident |
+| **Reviewer Name & Title** | AI Reviewer (Copilot), Architecture Review Agent |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **REVISE** |
+| **Outcome Rationale** | Metadata non-compliance (missing `ADR-0044` in `constrained_by`, invalid `decision_type` value), target pattern deviates from actual codebase base class, and `SlackSettings` deduplication impact requires cross-consumer analysis. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards (check all that apply):**
+- ✅ Pydantic Settings V2 (https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/)
+- ✅ Python Typing Module Official Docs
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Pydantic Settings V2 — BaseSettings singleton | "pydantic settings BaseSettings lru_cache singleton" | Independent `BaseSettings` with `@lru_cache` is the correct pattern for domain-owned singleton settings. `extra="ignore"` and `env_file=".env"` are recommended. | ✅ Aligned | N/A |
+| Pydantic Settings V2 — alias vs field name | "pydantic settings Field alias" | Using `alias` for env var names (e.g., `alias="INCIDENT_CHANNEL"`) is a supported pattern. Pydantic settings resolves env vars via alias. | ✅ Aligned | N/A |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards (check all that apply):**
+- ✅ Twelve-Factor App Methodology (https://12factor.net/)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor III: Config | "twelve-factor config single source" | Config must be stored in env vars. Each config value should have a single source of truth. Deduplication of `INCIDENT_CHANNEL` from `SlackSettings` is aligned with this principle. | ✅ Aligned | N/A |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards (check all that apply):**
+- ✅ Dependency Injection Best Practices
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Reader-owns rule (ADR-0055 Standard 3) | Codebase review | Incident module reads `INCIDENT_CHANNEL` and `SLACK_SECURITY_USER_GROUP_ID`. Per reader-owns rule, incident package should own these settings. | ✅ Aligned | N/A |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 4
+**Aligned with Best Practice:** 4
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Deduplication of INCIDENT_CHANNEL from SlackSettings is safe
+- **Stated Norm:** "The feature-owned copies become canonical and the integration-side duplicates must be removed."
+- **Underlying Assumption:** No code other than the incident module reads `INCIDENT_CHANNEL` or `SLACK_SECURITY_USER_GROUP_ID` from `SlackSettings`.
+- **Challenge:** If any infrastructure or non-incident code reads these values from `SlackSettings`, removing them would break those consumers.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — codebase confirms duplication exists in both `SlackSettings` and `IncidentFeatureSettings`. The ADR does not document a search for `SlackSettings.INCIDENT_CHANNEL` consumers beyond the incident module. If any Slack infrastructure code uses `settings.slack.INCIDENT_CHANNEL`, deduplication would break it.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The ADR should include a consumer search for `settings.slack.INCIDENT_CHANNEL` and `settings.slack.SLACK_SECURITY_USER_GROUP_ID` to confirm no non-incident consumers exist. Migration step 3 ("Remove from SlackSettings") needs this validation.
+
+### Assumption 3.2: Target pattern uses BaseSettings directly
+- **Stated Norm:** Target pattern shows `class IncidentSettings(BaseSettings):`
+- **Underlying Assumption:** The migrated settings class should inherit directly from `BaseSettings`.
+- **Challenge:** The current codebase uses `FeatureSettings(BaseSettings)` as an intermediate base class (defined in `app/infrastructure/configuration/base.py`). This base class adds `model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")`. The target pattern in ADR-0072 duplicates this config manually.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** **Yes** — all existing feature settings classes inherit from `FeatureSettings`, not `BaseSettings` directly. The `AccessSettings` reference pattern in `app/packages/access/common/settings.py` does inherit from `BaseSettings` directly (since it's in a package), so the target pattern is correct for the migrated version. However, the ADR should note this divergence from the current pattern.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The target pattern is correct for the migrated package. The shift from `FeatureSettings` to `BaseSettings` is intentional per the migration — package-owned settings don't use the infrastructure base class. This is aligned with ADR-0055 Standard 1.
+
+### Assumption 3.3: Module-level import-time side effects in incident consumers
+- **Stated Norm:** ADR lists `app/modules/incident/incident.py` and `app/modules/incident/core.py` as consumers with module-level assignments.
+- **Underlying Assumption:** Both files perform import-time side effects reading `settings.feat_incident`.
+- **Challenge:** Codebase confirms module-level assignments `INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL` in both files. This violates ADR-0046 (no import-time side effects). The migration should fix this.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No counter-evidence — the ADR correctly identifies these consumers. However, the ADR does not call out the ADR-0046 violation explicitly (unlike ADR-0075 which documents the same issue for `sre_ops`).
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Consider adding a note about the import-time side effect, consistent with ADR-0075's treatment of the same pattern.
+
+### Assumption 3.4: Isolation and Execution Phasing assessment is accurate
+- **Stated Norm:** "The incident module operates entirely on the legacy `core.config.settings` singleton chain (7 files access `settings.PREFIX`, `settings.feat_incident`, or `settings.google_resources`)."
+- **Underlying Assumption:** 7-file count and zero infrastructure imports are correct.
+- **Challenge:** This is a detailed codebase claim that should be verifiable.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the legacy chain assessment appears accurate based on codebase search results showing incident module uses `core.config.settings` exclusively.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The Isolation and Execution Phasing section is well-documented and defensible.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: SlackSettings deduplication breaks non-incident consumers
+- **If Assumption Fails:** Code outside the incident module reads `settings.slack.INCIDENT_CHANNEL` and breaks when the field is removed from `SlackSettings`.
+- **Platform Impact:**
+  - Incident management workflow: High (broken incident channel configuration)
+  - Access synchronization workflow: None
+  - Access request workflow: None
+  - Multi-provider integrations: Low
+- **Probability Estimate:** Low % (fields are semantically incident-specific, unlikely to be read by non-incident code)
+- **Mitigation or Acceptance:** Add a consumer search for `settings.slack.INCIDENT_CHANNEL` and `settings.slack.SLACK_SECURITY_USER_GROUP_ID` to the ADR before deduplication.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Missing `ADR-0044` in `constrained_by` | ADR-0072, ADR-0044 | 🔴 High | ⚪ Unresolved — metadata reference requires every non-Tier-0 record to include `ADR-0044` |
+| `decision_type: Migration` is not a valid value | ADR-0072, ADR-0051 | 🔴 High | ⚪ Unresolved — must be `Migration Decision` per metadata reference |
+| ADR-0047 challenge review relationship | ADR-0072, ADR-0047 | 🟢 Low | ADR-0072 mentions ADR-0047's challenge review but doesn't add ADR-0047 to `related_records` |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** None (migration record)
+- **Inheritance Status:** N/A
+- **Gaps Identified:** None
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Config Owner:** Currently `app/infrastructure/configuration/features/incident.py` → target `app/packages/incident/settings.py`
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+**Context:** The incident module manages incident channel notifications and security group mentions. Settings migration directly affects this workflow.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| INCIDENT_CHANNEL deduplication | Feature-owned copy becomes canonical | Currently read from both SlackSettings and IncidentFeatureSettings | ⚠️ Yes | Need consumer search for SlackSettings.INCIDENT_CHANNEL |
+| SLACK_SECURITY_USER_GROUP_ID | Same deduplication | Same dual-source pattern | ⚠️ Yes | Same deduplication risk |
+| Import-time side effects | Not explicitly addressed | `incident.py` and `core.py` use module-level assignments | ⚠️ Yes | Should be fixed during migration (ADR-0046 violation) |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling
+
+**Mitigation (if ⚠️):** Deduplication consumer search and import-time side effect fix should be added to migration steps.
+
+### Scenario 6.2–6.4: Access and Multi-Provider Workflows
+Not directly applicable.
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Phase C Deferral
+- **Chosen:** Settings migration deferred to Phase C (~5% of larger rearchitecting effort)
+- **Rejected:** Early settings migration before module migration
+- **Rationale:** Settings migration is a leaf operation within the broader feature rearchitecting project
+- **Risk Accepted:** Extended timeline for deduplication cleanup
+- **Contingency:** Dual settings chain coexistence (ADR-0055 Standard 4) allows indefinite deferral
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Fix `decision_type` to `Migration Decision` | ✅ Yes | SRE Team | 2026-05-06 | Non-compliant with ADR-0051 taxonomy |
+| Add `ADR-0044` to `constrained_by` | ✅ Yes | SRE Team | 2026-05-06 | Mandatory per metadata reference |
+| Add consumer search for `settings.slack.INCIDENT_CHANNEL` consumers | ✅ Yes | SRE Team | 2026-05-06 | Deduplication safety validation |
+| Document import-time side effect (ADR-0046 violation) in consumers table | ❌ No | SRE Team | 2026-05-13 | Consistency with ADR-0075 treatment |
+| Add `ADR-0047` to `related_records` | ❌ No | SRE Team | 2026-05-13 | Governing principle |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds.**
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **REVISE** → ADR-0072 requires authoring revision; return to author team with feedback
+
+**If REVISE, Provide Primary Blockers:**
+1. `decision_type: Migration` must be `Migration Decision` (ADR-0051 taxonomy violation)
+2. `constrained_by` missing mandatory `ADR-0044` (metadata reference violation)
+3. Missing consumer search for `settings.slack.INCIDENT_CHANNEL` — deduplication safety unverified
+
+**Revision Deadline:** 2026-05-06
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer (Copilot) |
+| **Reviewer Title** | Architecture Review Agent |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | N/A |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+- PR or issue that delivers the revised ADR
+- Internal decision tracker or ADR review calendar
+
+**This Review Template Was Completed Per:**
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → Then annual review_state cycle
