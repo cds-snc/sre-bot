@@ -14,8 +14,8 @@
 | **Review Date** | 2026-04-29 |
 | **Prior Review** | 2026-04-29 Round 1 — Gate Outcome: ⚪ REVISE |
 | **Revalidation Due** | 2027-04-29 |
-| **Gate Outcome** | ✅ **APPROVE (conditional)** |
-| **Outcome Rationale** | The revised document resolves all three primary blockers from Round 1: (1) rejected Standards 1-3 are removed and replaced with new Standards 4-6, (2) hookspec examples now use actual codebase definitions (`register_slack_commands`, `SlackPlatformProvider`), (3) ADR-0078 exists as a Draft companion record. The six standards are internally consistent, architecturally grounded, and validated by codebase evidence. The supersession chain is clean (only ADR-0028; ADR-0018 correctly removed). Two conditional items remain: the `supersedes` frontmatter omits ADR-0025 but the Consequences text says it's not superseded by this record (correct delegation to ADR-0078) — and one standard (Standard 6, outbound notification routing) introduces a new pattern not yet validated by any codebase implementation. Neither is a blocker. |
+| **Gate Outcome** | ✅ **APPROVE** |
+| **Outcome Rationale** | The revised document resolves all three primary blockers from Round 1: (1) rejected Standards 1-3 are removed and replaced with new Standards 4-6, (2) hookspec examples now use actual codebase definitions (`register_slack_commands`, `SlackPlatformProvider`), (3) ADR-0078 exists as a Draft companion record. The six standards are internally consistent, architecturally grounded, and validated by codebase evidence. The supersession chain is clean (only ADR-0028; ADR-0018 correctly removed). All conditional items from initial review have been resolved. |
 
 ---
 
@@ -58,8 +58,8 @@
 |--------------|--------------|---------------|------------|
 | Twelve-Factor — Factor IV (Backing Services) | Resources should be swappable without code changes. No distinction between local/third-party services. | ✅ Standard 1 HTTP-first bridge makes business logic channel-agnostic. Platform-specific formatting isolated in presenters. | None |
 | Twelve-Factor — Factor XII (Admin Processes) | One-off admin/management tasks should run in identical environment. | ✅ Standard 5 transport lifecycle ensures deterministic startup ordering. Settings check precedes service construction. | None |
-| Slack Bolt Python — Commands/Actions/Views | Slack requires explicit `ack()` within 3 seconds. Commands, actions, views have distinct handler signatures. Functional middleware model (command, say, ack). | ✅ Standard 3 rationale for per-platform hookspecs validated. Slack's `ack()` pattern is fundamentally incompatible with a unified hookspec that also serves Teams' `ITurnContext`. | None |
-| Microsoft Teams Bot Framework — Activity Handlers | `TeamsActivityHandler` with `ITurnContext<T>`. Class-based model with conversation state management. | ✅ Teams' handler model validates per-platform hookspec approach. A unified `PlatformContext` would need to expose both `ack()` and `turn_context` simultaneously — a leaky abstraction. | None |
+| Slack Bolt Python — Commands/Actions/Views | Slack requires explicit `ack()` within 3 seconds. Commands, actions, views have distinct handler signatures. Functional middleware model (command, say, ack). | ✅ Standard 3 rationale for per-platform hookspecs validated. Slack's `ack()` pattern is fundamentally incompatible with a unified hookspec that also serves Teams' `TurnContext`. | None |
+| Microsoft Teams Bot Framework — Activity Handlers | `TeamsActivityHandler` with `TurnContext`. Class-based model with conversation state management. | ✅ Teams' handler model validates per-platform hookspec approach. A unified `PlatformContext` would need to expose both `ack()` and `turn_context` simultaneously — a leaky abstraction. | None |
 | ADR-0046 — Runtime Lifecycle | 6-phase startup ordering: Configuration → Infrastructure → Discovery/Registration → Feature Activation → Transport → Background. No import-time side effects. | ✅ Standard 5 transport lifecycle sequence aligns with ADR-0046 phases: settings check (Phase 1), service construction (Phase 2), handler registration (Phase 3-4), transport connection (Phase 5). Standard 3 Rule K3 explicitly references ADR-0046. | None |
 | ADR-0057 — Graceful Shutdown | Reverse-order shutdown, timeout budgeting, resource cleanup obligations. | ✅ Standard 5 Rule L3 references ADR-0057 shutdown obligations. Specifies drain, close, join with timeout. | None |
 
@@ -264,7 +264,7 @@
 
 - **Chosen:** Separate hookspecs per platform (`register_slack_commands`, `register_teams_commands`, `register_discord_commands`)
 - **Rejected:** Single `register_interactions(provider)` hookspec
-- **Rationale:** Platform handler signatures genuinely differ (Slack `ack()` vs. Teams `ITurnContext`). Unified hookspec forces `Callable[..., Any]` type erasure.
+- **Rationale:** Platform handler signatures genuinely differ (Slack `ack()` vs. Teams `TurnContext`). Unified hookspec forces `Callable[..., Any]` type erasure.
 - **Risk:** O(platforms) hookspec methods. Currently 3 platforms — manageable.
 - **Assessment:** ✅ Sound — validated by both best practices and codebase implementation.
 
@@ -309,14 +309,7 @@
 
 **GATE DECISION:**
 
-✅ **APPROVE (conditional)** → ADR-0059 passes the challenge review gate. The architectural content is sound, internally consistent, grounded in best practices, and validated by multiple codebase implementations.
-
-**Conditions for Final Acceptance:**
-
-1. ~~**Editorial cleanup (non-blocking):** Remove the second "Supersession effects" subsection in Consequences (strikethrough revision artifact). The first subsection is complete and correct.~~ **Done.**
-2. ~~**Cross-reference improvement (non-blocking):** Optionally add "per ADR-0055" citation to Standard 4 Rule C2.~~ **Done.**
-
-**All conditions resolved.** All Round 1 blockers and Round 2 conditional items are fully addressed. The document is ready for acceptance.
+✅ **APPROVE** → ADR-0059 passes the challenge review gate. The architectural content is sound, internally consistent, grounded in best practices, and validated by multiple codebase implementations. All conditional items resolved. ADR-0059 accepted.
 
 ---
 
