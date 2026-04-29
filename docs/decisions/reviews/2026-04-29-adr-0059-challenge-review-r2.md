@@ -1,0 +1,347 @@
+# ADR Challenge and Content Review (Round 2) — ADR-0059
+
+**Purpose:** Secondary challenge review of ADR-0059: Feature Interaction Boundaries and Platform Integration Standard. This review evaluates the **revised** document produced after Round 1 findings were addressed. All judgments are anchored on authoritative best practices, codebase evidence, and cross-ADR consistency.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0059: Feature Interaction Boundaries and Platform Integration Standard |
+| **Reviewer Name & Title** | AI Architecture Reviewer, SRE Team |
+| **Secondary Reviewers** | — |
+| **Review Date** | 2026-04-29 |
+| **Prior Review** | 2026-04-29 Round 1 — Gate Outcome: ⚪ REVISE |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ✅ **APPROVE (conditional)** |
+| **Outcome Rationale** | The revised document resolves all three primary blockers from Round 1: (1) rejected Standards 1-3 are removed and replaced with new Standards 4-6, (2) hookspec examples now use actual codebase definitions (`register_slack_commands`, `SlackPlatformProvider`), (3) ADR-0078 exists as a Draft companion record. The six standards are internally consistent, architecturally grounded, and validated by codebase evidence. The supersession chain is clean (only ADR-0028; ADR-0018 correctly removed). Two conditional items remain: the `supersedes` frontmatter omits ADR-0025 but the Consequences text says it's not superseded by this record (correct delegation to ADR-0078) — and one standard (Standard 6, outbound notification routing) introduces a new pattern not yet validated by any codebase implementation. Neither is a blocker. |
+
+---
+
+## 2. Round 1 Blocker Resolution Verification
+
+| Round 1 Blocker | Status | Evidence |
+|-----------------|--------|----------|
+| **ADR-0078 does not exist** | ✅ Resolved | `docs/decisions/adr/0078-platform-services-architecture.md` exists (Draft). Frontmatter: `supersedes: [ADR-0025]`, `impacts: [ADR-0059, ADR-0067, ADR-0071]`. Cross-references ADR-0059 Standard 3 for hookspec definitions. |
+| **Document internally contradictory (rejected Standards 1-3 interleaved with kept Standards)** | ✅ Resolved | Rejected Standards removed entirely. Document now contains 6 coherent standards: HTTP-First Bridge (1), Feature-Side Interaction Boundary (2), Hookspec Contract (3), Platform Service Construction Governance (4), Platform Transport Lifecycle (5), Outbound Notification Routing (6). Principles Established section rewrites reference only kept concepts. |
+| **Standard 6 hookspec examples stale and wrong** | ✅ Resolved | Standard 3 (renumbered from old Standard 6) now shows actual codebase hookspec signatures: `register_slack_commands(provider: "SlackPlatformProvider")`, `register_teams_commands(provider: "TeamsPlatformProvider")`, `register_routes(app: "FastAPI")`. No `self` parameter, no `InteractionProvider` type. Matches `app/infrastructure/hookspecs/features.py` exactly. |
+| **ADR-0018 supersession overscoped** | ✅ Resolved | ADR-0018 removed from `supersedes` list. Frontmatter now: `supersedes: [ADR-0028]`. Consequences section explicitly states: "ADR-0018 (Service Wrapper Pattern): superseded by ADR-0056 + ADR-0077, not by this record." ADR-0018's own frontmatter confirms: `superseded_by: [ADR-0056, ADR-0077]`. |
+| **ADR-0028 `superseded_by` not updated** | ✅ Resolved | ADR-0028 frontmatter now reads: `superseded_by: [ADR-0059]`, `status: Superseded`. |
+
+---
+
+## 3. Evidence Gathering & Convention Validation
+
+### 3.A Language & Framework Standards
+
+**Applicable Standards:**
+
+- ✅ FastAPI Official Documentation (<https://fastapi.tiangolo.com/>)
+- ✅ Pluggy Documentation & Best Practices (<https://pluggy.readthedocs.io/>)
+- ✅ Python Typing Module Official Docs
+- ✅ Pydantic V2 Documentation (<https://docs.pydantic.dev/>)
+
+**Search & Findings:**
+
+| Standard/Doc | Key Findings | ADR Alignment | Deviation? |
+|--------------|--------------|---------------|------------|
+| FastAPI — APIRouter | `APIRouter` with `include_router()` is the canonical modular route organization mechanism. Routes are cloned into the main app with composable prefix/tags/dependencies. | ✅ Standard 2 `interactions/http.py` uses `APIRouter`; Standard 3 `register_routes(app)` hookimpl calls `app.include_router(router)`. Codebase confirms: 4 packages use this pattern (`access.sync`, `access.request`, `access.catalog`, `geolocate`). | None |
+| FastAPI — Dependency Injection | `Depends()` with `Annotated` aliases is framework-native DI. `app.dependency_overrides` enables test substitution. | ✅ Standard 1 mandates direct service invocation from handlers with DI injection. Codebase confirms: `access.request/interactions/http.py` imports services via provider functions (`get_access_request_service`, `get_access_request_settings`). | None |
+| Pluggy — Hookspec/Hookimpl | Hookspecs define call signatures; hookimpls provide implementations. Multiple plugins can implement the same hookspec. Hookimpls can accept fewer arguments than the hookspec (opt-in). Registration is explicit via `pm.register()`. | ✅ Standard 3 uses per-platform hookspecs with concrete types. Codebase confirms: `app/infrastructure/hookspecs/features.py` defines 7 hookspecs; `app/packages/access/sync/__init__.py` implements 4 hookimpls (`register_slack_commands`, `register_routes`, `startup_warmup`, `register_background_job`). | None |
+| Pluggy — Hookspec Naming | Hookspec and hookimpl matched by function name. `specname` option allows override. Parameter names validated as subset. | ✅ Standard 3 hookspec names now match codebase exactly: `register_slack_commands`, `register_teams_commands`, `register_routes`. | None |
+| Pydantic V2 — BaseModel at I/O | `BaseModel` designed for data validation at untrusted I/O boundaries. Internal models should use lightweight types (dataclasses). | ✅ Standard 2 places `schemas.py` (Pydantic) at I/O boundaries; `domain.py` (`@dataclass(frozen=True)`) for internal entities. Codebase confirms: `access.request/interactions/http.py` imports from `schemas` for HTTP models and from `domain` for internal types. | None |
+
+### 3.B Infrastructure & Operational Standards
+
+| Standard/Doc | Key Findings | ADR Alignment | Deviation? |
+|--------------|--------------|---------------|------------|
+| Twelve-Factor — Factor IV (Backing Services) | Resources should be swappable without code changes. No distinction between local/third-party services. | ✅ Standard 1 HTTP-first bridge makes business logic channel-agnostic. Platform-specific formatting isolated in presenters. | None |
+| Twelve-Factor — Factor XII (Admin Processes) | One-off admin/management tasks should run in identical environment. | ✅ Standard 5 transport lifecycle ensures deterministic startup ordering. Settings check precedes service construction. | None |
+| Slack Bolt Python — Commands/Actions/Views | Slack requires explicit `ack()` within 3 seconds. Commands, actions, views have distinct handler signatures. Functional middleware model (command, say, ack). | ✅ Standard 3 rationale for per-platform hookspecs validated. Slack's `ack()` pattern is fundamentally incompatible with a unified hookspec that also serves Teams' `ITurnContext`. | None |
+| Microsoft Teams Bot Framework — Activity Handlers | `TeamsActivityHandler` with `ITurnContext<T>`. Class-based model with conversation state management. | ✅ Teams' handler model validates per-platform hookspec approach. A unified `PlatformContext` would need to expose both `ack()` and `turn_context` simultaneously — a leaky abstraction. | None |
+| ADR-0046 — Runtime Lifecycle | 6-phase startup ordering: Configuration → Infrastructure → Discovery/Registration → Feature Activation → Transport → Background. No import-time side effects. | ✅ Standard 5 transport lifecycle sequence aligns with ADR-0046 phases: settings check (Phase 1), service construction (Phase 2), handler registration (Phase 3-4), transport connection (Phase 5). Standard 3 Rule K3 explicitly references ADR-0046. | None |
+| ADR-0057 — Graceful Shutdown | Reverse-order shutdown, timeout budgeting, resource cleanup obligations. | ✅ Standard 5 Rule L3 references ADR-0057 shutdown obligations. Specifies drain, close, join with timeout. | None |
+
+### 3.C Cross-Cutting Design Patterns
+
+| Standard/Doc | Key Findings | ADR Alignment | Deviation? |
+|--------------|--------------|---------------|------------|
+| Hexagonal Architecture (Cockburn) | Application core depends on port interfaces, not adapter implementations. Multiple adapters (Slack, Teams, HTTP) drive the same core. | ✅ Standard 1 is textbook hexagonal: `interactions/http.py`, `interactions/slack.py`, `interactions/teams.py` are driving adapters; `service.py` is the application core. Rule B1 enforces inward-only dependency. | None |
+| Anti-Corruption Layer Pattern | Translate between external and internal models at boundary. Prevent external model pollution. | ✅ Standard 2 `presenters.py` and `interactions/` act as anti-corruption layers. Block Kit / Adaptive Card formats stay out of service layer. `ingress.py` translates platform-neutral invocations. | None |
+| Dependency Injection — Narrow-Slice | Services receive only needed dependencies, not broad containers. | ✅ Standard 4 Rule C4 mandates narrowest settings slice (ADR-0055). Standard 1 mandates direct service invocation (not internal HTTP calls). | None |
+| Rule of Three | Abstract only after three concrete implementations prove a shared pattern. | ✅ Standard 6 Rule N3 explicitly invokes Rule of Three: "No centralized NotificationRouter — if a cross-cutting pattern emerges later (3+ features with identical routing logic), extract then." | None |
+
+### 3.D Validation Summary
+
+**Total Standards Checked:** 14
+**Aligned with Best Practice:** 14
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+
+- 🟢 **Fully Grounded:** All standards checked; no deviations found. The revision resolved every editorial and architectural issue from Round 1. Hookspec examples, type references, supersession chain, and principles are all internally consistent and match both the codebase and authoritative best practices.
+
+---
+
+## 4. Assumptions Challenged
+
+### Assumption 4.1: Standard 4 (Platform Service Construction Governance) belongs in ADR-0059
+
+- **Stated Norm:** "Platform service availability is determined entirely by settings. This standard defines the rules; ADR-0078 defines the service types and architecture." (Standard 4)
+- **Underlying Assumption:** ADR-0059 can own construction *rules* while ADR-0078 owns construction *types and architecture*. The two records have a clean division of concern.
+- **Challenge:** Standard 4 Rules C1-C4 overlap significantly with ADR-0078 Standard 2 (settings-driven platform availability). ADR-0078 Standard 2 states: "Whether a platform is available is determined entirely by settings." Rule C1 restates this nearly verbatim. Could this duplication cause drift between the two records?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — ADR-0078 Standard 2 focuses on the *infrastructure-side* mechanism (how lifespan checks settings and constructs providers). ADR-0059 Standard 4 focuses on the *feature-side* implication (features don't check platform availability — if a hookspec fires, the platform is available). The overlap in Rule C1 is a consequence of both records stating the same invariant from different perspectives. However, Rule C2 ("Platform settings live in `app/infrastructure/configuration/integrations/`") is purely infrastructure governance — this is ADR-0055 + ADR-0078 territory, not feature-side.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** Standard 4 is mostly appropriate — Rules C1 and C3-C4 define feature-relevant constraints. Rule C2 is a cross-reference that should cite ADR-0055/ADR-0078 as authoritative source rather than restating infrastructure settings location. The risk is modest: if ADR-0078 changes the settings location convention, ADR-0059 would need a coordinated update. Not a blocker.
+
+### Assumption 4.2: Standard 6 (Outbound Notification Routing) is premature without implementation evidence
+
+- **Stated Norm:** "Features own their outbound notification routing logic. There is no centralized notification router." (Standard 6)
+- **Underlying Assumption:** Feature-owned notification routing is the correct pattern based on current evidence (fewer than 3 features with identical routing logic).
+- **Challenge:** Standard 6 has no codebase implementation to validate against. All other standards (1-5) have at least one reference implementation (`app/packages/access/sync/interactions/` for Standards 1-3, lifespan for Standard 5, settings for Standard 4). Standard 6 is a forward-looking architectural position without empirical validation. Is it appropriate to accept a standard that has no implementation evidence?
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — The current codebase does contain outbound notification patterns. `access.sync` sends Slack notifications via `SlackPlatformProvider` after sync completion. However, this is not organized under a formal notification routing pattern — it's ad-hoc `provider.send_message()` calls. Standard 6 codifies the current ad-hoc approach as the intended pattern and defers centralization until the Rule of Three is met.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Standard 6 is defensive architecture — it prevents premature centralization. The Rule of Three citation (Rule N3) is architecturally sound. Codifying "don't build a centralized notification router yet" is a valid architectural decision, even without a formal reference implementation. The risk is that teams may interpret "features own their notification routing" as license for inconsistent notification patterns. However, the explicit instruction to extract a shared abstraction at 3+ features with identical routing logic provides a clear trigger.
+
+### Assumption 4.3: The `interactions/` directory name is the correct convention for inbound handlers
+
+- **Stated Norm:** "Feature packages organize inbound interaction handling in a dedicated `interactions/` directory." (Standard 2)
+- **Underlying Assumption:** The name `interactions/` clearly communicates "inbound channel-specific request handlers" and is superior to alternatives like `handlers/`, `transports/`, `adapters/`, or `platforms/`.
+- **Challenge:** The `geolocate` package uses `platforms/` instead of `interactions/`. This is an existing deviation that the ADR does not acknowledge. The name `interactions/` is ambiguous — it could refer to outbound interactions, user interactions, or API interactions. `handlers/` or `transports/` might be more precise.
+- **Evidence Strength:** ⭐ Strong (for the naming point)
+- **Counter-Evidence Found:** Yes — `app/packages/geolocate/` uses `platforms/` subdirectory with `slack.py` and `teams.py`. This is the only package that deviates from the `interactions/` convention. However, the geolocate package was built before ADR-0059 was drafted and represents a legacy structure, not a deliberate architectural choice. The `access` packages (`sync`, `request`, `catalog`) all use `interactions/` with the Standard 2 structure.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The `interactions/` name is established by 3 conforming packages vs. 1 legacy deviation. The name communicates "inbound handling" when paired with the directory contents (`http.py`, `slack.py`, `teams.py`, `ingress.py`). Alternative names (`handlers/`, `transports/`) would conflict with existing infrastructure conventions (`activity_handlers`, transport-layer naming). The deviation in `geolocate` should be noted as a migration target in Implementation Guidance — not a reason to change the convention. Minor finding.
+
+### Assumption 4.4: The `ingress.py` pattern will scale across features without excessive boilerplate
+
+- **Stated Norm:** "`ingress.py` contains shared admission logic (feature-enable checks, concurrency guards). Admission logic is feature-specific because it involves domain state (sync locks, platform-specific configurations, feature preconditions), not generic boolean flags." (Standard 2, Rule B3)
+- **Underlying Assumption:** Each feature's admission logic is sufficiently different that shared `ingress.py` modules don't create copy-paste boilerplate.
+- **Challenge:** Looking at the reference implementation (`access.sync/interactions/ingress.py`), the admission pattern involves: (1) settings-enabled check, (2) lock/concurrency check, (3) validation, (4) service invocation, (5) result mapping. The first two steps are generic across features. As more features adopt this pattern, the boilerplate risk increases.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — `access.request` has `interactions/http.py` but no `ingress.py`, suggesting not all features need shared admission logic. `access.catalog` similarly has only `http.py`. The pattern is opt-in (per Standard 2's directory listing, `ingress.py` is present but not mandatory). Features that don't need cross-transport admission logic (HTTP-only features) simply omit `ingress.py`.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The boilerplate concern is mitigated by the opt-in nature of `ingress.py`. Only features with multi-transport admission (HTTP + Slack + Teams) need it. HTTP-only features skip it entirely. If boilerplate does emerge, Rule B3's parenthetical ("not generic boolean flags") provides the correct escape hatch: extract the generic parts into infrastructure utilities while keeping domain-specific parts in feature ingress.
+
+### Assumption 4.5: The document correctly delegates ADR-0025 supersession to ADR-0078
+
+- **Stated Norm:** "ADR-0025 (Interaction Providers Concept): superseded by ADR-0078 (Platform Services Architecture), not by this record." (Consequences section)
+- **Underlying Assumption:** ADR-0078 alone supersedes ADR-0025 and no reference to ADR-0025 remains in ADR-0059's supersession chain.
+- **Challenge:** ADR-0025 no longer exists as a file (`docs/decisions/adr/0025*.md` — not found). ADR-0078 frontmatter lists `supersedes: [ADR-0025]`. However, ADR-0059's `related_records` field includes ADR-0078, not ADR-0025. The Consequences section has a ~~strikethrough~~ block referencing ADR-0025 — is this editorial residue that should be cleaned up?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — The delegation is correct. ADR-0078 owns the ADR-0025 supersession. ADR-0059 correctly does not list ADR-0025 in `supersedes`. However, the Consequences section contains a struck-through paragraph about ADR-0025 that is editorial noise. There are also **two** "Supersession effects" subsections in the Consequences — the first is clean, the second contains the strikethrough and appears to be a revision artifact.
+- **Confidence (ADR survives challenge):** 🟢 High (architecturally sound, editorially noisy)
+- **Reviewer Notes:** The supersession logic is correct. The duplicated "Supersession effects" subsection with strikethrough text should be removed in final polish. This is an editorial cleanup, not an architectural concern.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| ADR-0059 Standard 4 Rule C2 restates platform settings location (`app/infrastructure/configuration/integrations/`) — this is ADR-0055/ADR-0078 governance territory. | ADR-0059, ADR-0055, ADR-0078 | 🟡 Low | ✅ Resolved — Rule C2 revised to cite ADR-0055 Standard 3 and ADR-0078 Standard 2 as authoritative sources instead of restating the location. |
+| ADR-0059 Consequences section has two "Supersession effects" subsections. The second contains a ~~strikethrough~~ paragraph about ADR-0025. | ADR-0059 (internal) | 🟡 Low | ✅ Resolved — Second "Supersession effects" subsection removed. First subsection is complete and correct. |
+| ADR-0071 references `register_slack_interactions(bot)` hookspec name in access.request comment (`app/packages/access/request/__init__.py` module docstring). ADR-0059 Standard 3 uses `register_slack_commands(provider)`. | ADR-0059, ADR-0071, Codebase | 🟡 Medium | ✅ Resolved — Comment updated to reference `register_slack_commands(provider)` per ADR-0059 Standard 3. |
+| ADR-0077 Standard 1 lists `SlackService, TeamsService` as Category C target names. ADR-0059 Standard 3 uses current names (`SlackPlatformProvider`, `TeamsPlatformProvider`). Implementation Guidance acknowledges the future rename. | ADR-0059, ADR-0077, ADR-0078 | 🟢 None | ✅ Resolved — ADR-0059 Implementation Guidance item 4 explicitly documents the future rename from `*PlatformProvider` to `*Service` per ADR-0078 target naming. Both current and target names are documented. |
+
+### Supersession Chain Verification
+
+| Superseded ADR | ADR-0059 `supersedes` | Target ADR `superseded_by` | Chain Clean? |
+|----------------|----------------------|---------------------------|--------------|
+| ADR-0028 (Feature Interaction Layer Isolation) | ✅ Listed | ✅ `superseded_by: [ADR-0059]`, `status: Superseded` | ✅ Clean |
+| ADR-0018 (Service Wrapper Pattern) | ✅ NOT listed (correct) | ✅ `superseded_by: [ADR-0056, ADR-0077]` | ✅ Clean |
+| ADR-0025 (Interaction Providers Concept) | ✅ NOT listed (delegated to ADR-0078) | N/A (file removed, superseded by ADR-0078) | ✅ Clean |
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team ✅
+- **Feature-Side Governance (ADR-0059):** Standards 1-3 (HTTP-first bridge, interaction boundary, hookspec contract) — feature package architecture ✅
+- **Platform-Side Governance (ADR-0078):** Standards 4-6 delegated to ADR-0078 for platform service types and construction. ADR-0059 Standards 4-6 cover feature-relevant rules (settings-driven availability, transport lifecycle, outbound notifications) ✅
+- **Startup/Plugin Registration:** Standard 3 hookspecs + Standard 5 transport lifecycle align with ADR-0046 phases ✅
+- **Settings Ownership:** Standard 4 Rule C2 cites `app/infrastructure/configuration/integrations/` — owned by ADR-0055 dissolution model ✅
+- **Audit Result:** ✅ Clear — The ownership boundary between ADR-0059 (feature-side) and ADR-0078 (platform-side) is now explicit. Both records exist and cross-reference each other.
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Access Synchronization Workflow (Reference Implementation)
+
+**Context:** Automated sync from identity providers; users trigger via slash command or HTTP API.
+
+| Aspect | ADR Standard | Codebase Reality | Gap? |
+|--------|-------------|------------------|------|
+| Feature-side interaction boundary (Std 2) | `interactions/` directory with `ingress.py`, `http.py`, `slack.py` | `app/packages/access/sync/interactions/` implements exactly this | ✅ No |
+| Shared admission logic (Std 2, Rule B3) | `ingress.py` contains feature-enable checks, concurrency guards | `ingress.py` has `EnqueuedJob` dataclass, `_IngressSettings` Protocol, lock/feature-gate checks | ✅ No |
+| HTTP-first bridge (Std 1) | All transport paths share same service invocation | Slack handlers call ingress; HTTP routes call same ingress | ✅ No |
+| Per-platform hookspec (Std 3) | `register_slack_commands(provider: SlackPlatformProvider)` | `__init__.py` has `@hookimpl register_slack_commands` delegating to `slack.register_commands` | ✅ No |
+| Route registration (Std 3) | `register_routes(app: FastAPI)` | `__init__.py` has `@hookimpl register_routes` calling `app.include_router(access_sync_router, prefix="/api/v1")` | ✅ No |
+| Presenter isolation (Std 2, Rule B4) | Presenters format responses per-channel | Slack module uses `to_slack_status_message()` — presenter-style formatting isolated from service | ✅ No |
+
+**Validation:** ✅ Fully aligned — reference implementation validates Standards 1-3.
+
+### Scenario 6.2: Access Request Workflow (HTTP-Only, Platform Deferred)
+
+**Context:** User requests access via web UI; admin approves; system provisions. Slack/Teams integration deferred.
+
+| Aspect | ADR Standard | Codebase Reality | Gap? |
+|--------|-------------|------------------|------|
+| HTTP-only feature (Std 2, Rule B5) | Features implement platform handlers only for supported platforms | `access.request` has `interactions/http.py` only — no `slack.py` or `teams.py` | ✅ No |
+| No ingress.py needed (Std 2, Rule B3) | `ingress.py` is opt-in for multi-transport features | `access.request/interactions/` has no `ingress.py` — HTTP routes handle admission directly | ✅ No |
+| Route registration (Std 3) | `register_routes(app: FastAPI)` | `__init__.py` has `@hookimpl register_routes` | ✅ No |
+| No platform hookimpls (Std 3, Rule K2) | Features that don't support a platform omit the hookimpl | `access.request/__init__.py` has no `register_slack_commands` hookimpl | ✅ No |
+
+**Validation:** ✅ Fully aligned — HTTP-only feature validates Standard 2 Rule B5 and Standard 3 Rule K2.
+
+### Scenario 6.3: Geolocate Workflow (Legacy Structure, Multi-Platform)
+
+**Context:** Geolocate supports Slack + Teams + HTTP but uses `platforms/` directory instead of `interactions/`.
+
+| Aspect | ADR Standard | Codebase Reality | Gap? |
+|--------|-------------|------------------|------|
+| Directory convention (Std 2) | `interactions/` directory | Uses `platforms/` directory | ⚠️ Yes |
+| Per-platform hookimpls (Std 3) | `register_slack_commands`, `register_teams_commands`, `register_routes` | Has all three hookimpls with correct signatures | ✅ No |
+| Concrete types (Std 3, Rule K1) | Hookspec parameter types are concrete | Passes `provider` to `slack.register_commands(provider)` and `teams.register_commands(provider)` | ✅ No |
+| Lazy imports (Std 3, Rule K4) | Hookimpls use deferred imports | Imports `platforms.slack` and `platforms.teams` at module level, not lazily | ⚠️ Yes |
+
+**Validation:** ⚠️ Partially aligned — geolocate is a legacy package pre-dating ADR-0059. The directory naming (`platforms/` vs. `interactions/`) and eager imports are migration targets, not ADR defects.
+
+**Mitigation:** ADR-0059 Implementation Guidance item 2 already covers this: "Update `app/packages/` feature packages to use `interactions/` directory structure per Standard 2 where not already adopted."
+
+### Scenario 6.4: New Feature Adoption (Forward-Looking)
+
+**Context:** A new feature package is built from scratch following ADR-0059.
+
+| Aspect | ADR Standard | Implementability | Gap? |
+|--------|-------------|-----------------|------|
+| Directory structure (Std 2) | Standard 2 provides complete directory template | Template is clear, reference implementation exists | ✅ No |
+| Hookspec registration (Std 3) | Standard 3 provides hookimpl examples | Examples match codebase; K4 lazy import rule is clear | ✅ No |
+| Settings-driven availability (Std 4) | Standard 4 provides rules C1-C4 | Rules are clear; ADR-0078 provides infrastructure-side details | ✅ No |
+| Transport lifecycle (Std 5) | Standard 5 provides 5-step sequence | Sequence matches actual lifespan implementation | ✅ No |
+| Outbound notifications (Std 6) | Standard 6 provides rules N1-N3 | Rules are clear; Rule of Three defers centralization | ✅ No |
+| Testing strategy | Standards 1-2, Implementation Guidance | HTTP-first testing with presenter unit tests and platform handler supplements | ✅ No |
+
+**Validation:** ✅ Fully actionable for greenfield feature adoption.
+
+---
+
+## 7. Failure Modes Identified
+
+### Failure Mode 7.1: Rule C2 drift between ADR-0059 and ADR-0055/ADR-0078
+
+- **Scenario:** ADR-0055 or ADR-0078 revises the platform settings location convention. ADR-0059 Standard 4 Rule C2 continues to state the old location, creating ambiguity.
+- **Probability:** Low (15-20%) — settings conventions are stable and ADR-0055 is Accepted status.
+- **Impact:** Low — developers would find the correct location from ADR-0055 or the actual codebase.
+- **Mitigation:** Rule C2 should cite ADR-0055 as the authoritative source rather than restating the location. Alternatively, accept the cross-reference and update during regular freshness reviews.
+- **Assessment:** Non-blocking. Recommend editorial improvement.
+
+### Failure Mode 7.2: Standard 6 outbound notification pattern diverges across features
+
+- **Scenario:** Multiple features implement outbound notifications with inconsistent patterns (different channel resolution strategies, different error handling, different retry policies) because Standard 6 provides rules but no structural template.
+- **Probability:** Medium (25-35%) — Standard 6 is intentionally minimal (Rule of Three defers centralization).
+- **Impact:** Medium — inconsistent notification patterns create maintenance burden when centralization is eventually needed.
+- **Mitigation:** Standard 6 Rule N3 provides the trigger: extract a shared abstraction at 3+ features with identical routing logic. Monitoring feature adoption for this threshold is the owner's responsibility. The risk is accepted and documented.
+- **Assessment:** Non-blocking. Accepted tradeoff with explicit contingency.
+
+### Failure Mode 7.3: Stale Consequences section confuses readers
+
+- **Scenario:** The duplicated "Supersession effects" subsection (with strikethrough text about ADR-0025) confuses a reader into thinking ADR-0059 has a relationship with ADR-0025 that it doesn't.
+- **Probability:** Low (10-15%) — the strikethrough formatting is visible, and the first "Supersession effects" subsection is clear.
+- **Impact:** Low — editorial confusion, not architectural.
+- **Mitigation:** Remove the second "Supersession effects" subsection entirely. The first subsection is complete and correct.
+- **Assessment:** Non-blocking. Recommend editorial cleanup before acceptance.
+
+---
+
+## 8. Tradeoffs Accepted
+
+### Tradeoff 8.1: Per-Platform Hookspecs vs. Unified Interaction Hook
+
+- **Chosen:** Separate hookspecs per platform (`register_slack_commands`, `register_teams_commands`, `register_discord_commands`)
+- **Rejected:** Single `register_interactions(provider)` hookspec
+- **Rationale:** Platform handler signatures genuinely differ (Slack `ack()` vs. Teams `ITurnContext`). Unified hookspec forces `Callable[..., Any]` type erasure.
+- **Risk:** O(platforms) hookspec methods. Currently 3 platforms — manageable.
+- **Assessment:** ✅ Sound — validated by both best practices and codebase implementation.
+
+### Tradeoff 8.2: HTTP-First Testing vs. Full Platform Coverage
+
+- **Chosen:** HTTP routes as primary test surface; platform-specific tests as supplements
+- **Rejected:** Full end-to-end tests through each platform SDK
+- **Rationale:** HTTP tests validate service logic with minimal infrastructure. Hex arch inversion guarantee ensures path equivalence.
+- **Risk:** Presenter formatting errors and platform-specific handler issues not caught by HTTP tests.
+- **Assessment:** ✅ Sound — Standard 1 Rule H3 now explicitly recommends presenter unit tests as complements. This addresses the Round 1 finding.
+
+### Tradeoff 8.3: Feature-Owned Ingress vs. Infrastructure Middleware
+
+- **Chosen:** Each feature owns admission logic in `interactions/ingress.py`
+- **Rejected:** Centralized infrastructure middleware
+- **Rationale:** Admission involves domain-specific state. Centralized middleware would need domain coupling.
+- **Risk:** Boilerplate duplication if many features have similar admission patterns.
+- **Assessment:** ✅ Sound — `ingress.py` is opt-in (demonstrated by `access.request` omitting it). Boilerplate risk is mitigated.
+
+### Tradeoff 8.4: Concrete Platform Types vs. Protocol Abstraction
+
+- **Chosen:** Concrete types (`SlackPlatformProvider`, `TeamsPlatformProvider`) in hookspecs
+- **Rejected:** Abstract `InteractionProvider` Protocol
+- **Rationale:** Category C infrastructure details (ADR-0077). One implementation per platform — Protocol adds indirection without enabling substitution.
+- **Risk:** Feature hookimpls coupled to concrete types. Renames require cross-feature updates.
+- **Assessment:** ✅ Sound — coupling is intentional for Category C. Implementation Guidance item 4 documents the planned `*PlatformProvider` → `*Service` rename.
+
+---
+
+## 9. Conditional Items for Final Acceptance
+
+| Item | Type | Severity | Recommendation |
+|------|------|----------|----------------|
+| Duplicated "Supersession effects" subsection in Consequences | Editorial | Low | ✅ Fixed — second subsection removed. |
+| Standard 4 Rule C2 restates settings location owned by ADR-0055 | Cross-reference overlap | Low | ✅ Fixed — Rule C2 now cites ADR-0055 Standard 3 and ADR-0078 Standard 2 as authoritative sources. |
+| Stale comment in `app/packages/access/request/__init__.py` references `register_slack_interactions(bot)` | Codebase hygiene | Low | ✅ Fixed — comment updated to `register_slack_commands(provider)` per ADR-0059 Standard 3. |
+| `geolocate` package uses `platforms/` instead of `interactions/` | Migration target | Low | Already covered by Implementation Guidance item 2. No ADR change needed. |
+
+---
+
+## 10. Binary Gate Outcome
+
+**GATE DECISION:**
+
+✅ **APPROVE (conditional)** → ADR-0059 passes the challenge review gate. The architectural content is sound, internally consistent, grounded in best practices, and validated by multiple codebase implementations.
+
+**Conditions for Final Acceptance:**
+
+1. ~~**Editorial cleanup (non-blocking):** Remove the second "Supersession effects" subsection in Consequences (strikethrough revision artifact). The first subsection is complete and correct.~~ **Done.**
+2. ~~**Cross-reference improvement (non-blocking):** Optionally add "per ADR-0055" citation to Standard 4 Rule C2.~~ **Done.**
+
+**All conditions resolved.** All Round 1 blockers and Round 2 conditional items are fully addressed. The document is ready for acceptance.
+
+---
+
+## 11. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer |
+| **Reviewer Title** | Architecture Review Agent |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | N/A (automated review) |
+| **Round** | 2 (secondary challenge review) |
+
+---
+
+## 12. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+
+- ADR-0059 acceptance PR (when editorial cleanup is complete)
+- Round 1 review record (`2026-04-29-adr-0059-challenge-review.md`) for traceability
+- ADR-0078 review cycle (as companion record validation)
+
+**This Review Template Was Completed Per:**
+
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Secondary review cycle following Round 1 REVISE outcome
