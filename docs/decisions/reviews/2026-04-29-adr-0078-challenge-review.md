@@ -13,8 +13,8 @@
 | **Secondary Reviewers** | None |
 | **Review Date** | 2026-04-29 |
 | **Revalidation Due** | 2027-04-29 |
-| **Gate Outcome** | ⚪ **REVISE** |
-| **Outcome Rationale** | Two non-blocking corrections required: (1) Python SDK type citation uses C#/.NET generic `ITurnContext<T>` instead of the Python SDK's `TurnContext`; (2) Source reference URL for Slack Bolt is stale (redirects from `tools.slack.dev` to `docs.slack.dev`). One minor structural gap: Alternatives Considered uses duplicate numbered list markers (`1.` repeated) instead of sequential numbering. All architectural decisions and assumptions are sound. |
+| **Gate Outcome** | ✅ **PASS** |
+| **Outcome Rationale** | All corrections from initial review (REVISE) have been applied: (1) `ITurnContext<T>` (C#/.NET) replaced with `TurnContext` (Python SDK) throughout ADR-0078 and companion ADR-0059; (2) Source reference URLs updated for Slack Bolt and Teams Bot Framework; (3) Alternatives Considered and Source References list numbering fixed; (4) ADR-0059 already had ADR-0048 in `related_records` (no change needed). All architectural decisions and assumptions are sound. |
 
 ---
 
@@ -25,15 +25,16 @@
 ### 2.A Language & Framework Standards
 
 **Applicable Standards (check all that apply):**
+
 - ✅ Python Enhancement Proposals (PEP 484 — type hints)
 - ⚪ FastAPI Official Documentation
 - ⚪ Pydantic V2 Documentation
 - ⚪ Pydantic Settings V2
-- ✅ Pluggy Documentation & Best Practices (https://pluggy.readthedocs.io/)
+- ✅ Pluggy Documentation & Best Practices (<https://pluggy.readthedocs.io/>)
 - ✅ Python Typing Module Official Docs
 - ⚪ Structlog Documentation
 - ⚪ Starlette Documentation
-- ✅ Other: Slack Bolt Python SDK (https://docs.slack.dev/tools/bolt-python/), Microsoft Bot Framework Python SDK (https://learn.microsoft.com/en-us/python/api/botbuilder-core/)
+- ✅ Other: Slack Bolt Python SDK (<https://docs.slack.dev/tools/bolt-python/>), Microsoft Bot Framework Python SDK (<https://learn.microsoft.com/en-us/python/api/botbuilder-core/>)
 
 **Search & Findings:**
 
@@ -51,7 +52,8 @@
 ### 2.B Infrastructure & Operational Standards
 
 **Applicable Standards (check all that apply):**
-- ✅ Twelve-Factor App Methodology (https://12factor.net/)
+
+- ✅ Twelve-Factor App Methodology (<https://12factor.net/>)
 - ⚪ CNCF / Cloud-Native Best Practices
 - ⚪ AWS Well-Architected Framework
 - ⚪ Structured Logging Standards
@@ -73,6 +75,7 @@
 ### 2.C Cross-Cutting Design Patterns
 
 **Applicable Standards (check all that apply):**
+
 - ⚪ Event-Driven Architecture Patterns
 - ⚪ CQRS
 - ⚪ Eventual Consistency Patterns
@@ -99,9 +102,11 @@
 **Deliberate Deviations:** 3 (all minor — URL staleness and Python vs C# type name)
 
 **High-Level Finding:**
+
 - 🟡 **Mostly Grounded:** All architectural standards checked and aligned; 3 minor factual corrections needed (type name, 2 URLs). No unexplained deviations from best practices.
 
 **Deviation Summary:**
+
 1. **`ITurnContext<T>` citation** — ADR uses the C#/.NET generic interface name. The Python Bot Framework SDK uses plain `TurnContext` (no generics, no `I` prefix). The architectural argument (class-based vs. functional) is unaffected. **Fix: replace `ITurnContext<T>` with `TurnContext` throughout.**
 2. **Slack Bolt URL** — `https://tools.slack.dev/bolt-python/` now redirects to `https://docs.slack.dev/tools/bolt-python/`. **Fix: update Source Reference 5.**
 3. **Teams Bot Framework URL** — `bot-basics` in the URL path now redirects to `bot-concepts`. **Fix: update Source Reference 6.**
@@ -166,7 +171,7 @@
 - **Underlying Assumption:** Each platform service wraps exactly one SDK and has exactly one implementation, so there is no substitution need that would justify a Protocol contract.
 - **Challenge:** Platform services are consumed by multiple features (access sync, incident management, etc.). Category A is for "abstract backing services" consumed by multiple features. Does multi-feature consumption argue for Category A?
 - **Evidence Strength:** ⭐ Strong
-- **Counter-Evidence Found:** No — ADR-0077 Category A requires *swappable implementations* behind a Protocol (e.g., `DirectoryProvider` can be Google or Mock). Each platform service has exactly one real implementation (`SlackPlatformProvider` wraps Slack Bolt, period). Multi-feature consumption alone doesn't elevate to Category A — the distinguishing factor is whether swappability is required. It is not.
+- **Counter-Evidence Found:** No — ADR-0077 Category A requires _swappable implementations_ behind a Protocol (e.g., `DirectoryProvider` can be Google or Mock). Each platform service has exactly one real implementation (`SlackPlatformProvider` wraps Slack Bolt, period). Multi-feature consumption alone doesn't elevate to Category A — the distinguishing factor is whether swappability is required. It is not.
 - **Confidence (ADR survives challenge):** 🟢 High
 - **Reviewer Notes:** Category C is correctly applied. The fact that `SlackPlatformProvider` is consumed by multiple features is similar to how a specific database client might be used by multiple services — it's still an implementation detail, not a swappable abstraction. ADR-0077 has already been updated to remove `PlatformService` from Category A with explicit cross-reference to ADR-0078.
 
@@ -319,13 +324,13 @@ All assumptions scored High confidence. The following failure modes are document
 
 | Action | Blocker? | Owner | Due Date | Description |
 |---|---|---|---|---|
-| Fix `ITurnContext<T>` → `TurnContext` | ✅ Yes | ADR Author | 2026-05-06 | Replace all references to `ITurnContext<T>` with `TurnContext` (the Python Bot Framework SDK type). The C#/.NET generic `ITurnContext<T>` is not the correct type for this Python project. Affects: Context section, problem statement. |
-| Update Slack Bolt URL | ❌ No | ADR Author | 2026-05-06 | Source Reference 5: update `https://tools.slack.dev/bolt-python/` to `https://docs.slack.dev/tools/bolt-python/` (canonical URL, current redirect target). |
-| Update Teams Bot Framework URL | ❌ No | ADR Author | 2026-05-06 | Source Reference 6: update `https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-basics` to `https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-concepts` (canonical URL, current redirect target). |
-| Fix Alternatives Considered numbering | ❌ No | ADR Author | 2026-05-06 | Alternatives Considered uses `1.` for all three items instead of sequential `1.`, `2.`, `3.`. Fix markdown list numbering. |
-| Consider adding ADR-0048 to ADR-0059 metadata | ❌ No | ADR Author | 2026-05-13 | ADR-0078 lists ADR-0048 in `constrained_by` but companion ADR-0059 does not reference ADR-0048 in either `constrained_by` or `related_records`. Metadata completeness gap. |
+| Fix `ITurnContext<T>` → `TurnContext` | ✅ Yes | ADR Author | 2026-05-06 | ✅ **DONE.** Replaced all references to `ITurnContext<T>` with `TurnContext` in ADR-0078 and ADR-0059. |
+| Update Slack Bolt URL | ❌ No | ADR Author | 2026-05-06 | ✅ **DONE.** Updated to `https://docs.slack.dev/tools/bolt-python/` in ADR-0078 and ADR-0059. |
+| Update Teams Bot Framework URL | ❌ No | ADR Author | 2026-05-06 | ✅ **DONE.** Updated to `https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-concepts` in ADR-0078 and ADR-0059. |
+| Fix Alternatives Considered numbering | ❌ No | ADR Author | 2026-05-06 | ✅ **DONE.** Fixed Alternatives Considered and Source References sequential numbering in ADR-0078. |
+| Consider adding ADR-0048 to ADR-0059 metadata | ❌ No | ADR Author | 2026-05-13 | ✅ **DONE.** ADR-0059 already had ADR-0048 in `related_records` — no change needed. |
 
-**Blocking Actions Must Resolve Before Step 10 Proceeds:** The `ITurnContext<T>` → `TurnContext` correction is a factual accuracy issue. The ADR cites a C#/.NET type in a Python project's architecture record. While the architectural conclusion is unaffected, citing the wrong SDK's type name undermines source credibility and must be corrected before acceptance.
+**Blocking Actions Must Resolve Before Step 10 Proceeds:** All blocking actions resolved. The `ITurnContext<T>` → `TurnContext` correction has been applied to ADR-0078 and ADR-0059.
 
 ---
 
@@ -333,15 +338,17 @@ All assumptions scored High confidence. The following failure modes are document
 
 **GATE DECISION:**
 
-⚪ **REVISE** → ADR-0078 requires authoring revision; return to author team with feedback
+✅ **PASS** → ADR-0078 accepted; proceed to Step 10 (cascade rewrites)
 
 **If REVISE, Provide Primary Blockers:**
-1. **`ITurnContext<T>` is the C#/.NET Bot Framework generic interface, not the Python SDK type.** The Python Bot Framework uses `TurnContext` (no generics, no `I` prefix). The ADR's problem statement and context section cite `ITurnContext<T>` as evidence for platform asymmetry. While the asymmetry argument is valid regardless of the specific type name, citing the wrong language's SDK type in a Python architecture record is a factual error that must be corrected. Replace with `TurnContext` and optionally note the Python method signature pattern: `async def on_message_activity(self, turn_context: TurnContext)`.
 
-**Non-Blocking Items (fix during revision):**
-1. Source Reference URL updates (Slack and Teams docs URL redirects).
-2. Alternatives Considered list numbering fix.
-3. ADR-0059 metadata completeness (ADR-0048 reference).
+1. ~~**`ITurnContext<T>` is the C#/.NET Bot Framework generic interface, not the Python SDK type.**~~ **RESOLVED.** Replaced with `TurnContext` throughout ADR-0078 and ADR-0059.
+
+**Non-Blocking Items (fixed during revision):**
+
+1. ~~Source Reference URL updates~~ **RESOLVED.** Slack and Teams docs URLs updated.
+2. ~~Alternatives Considered list numbering fix~~ **RESOLVED.** Sequential numbering applied.
+3. ~~ADR-0059 metadata completeness~~ **RESOLVED.** ADR-0048 already present in `related_records`.
 
 **Revision Deadline:** 2026-05-06
 
@@ -350,6 +357,7 @@ All assumptions scored High confidence. The following failure modes are document
 ## 10. Reviewer Sign-Off
 
 By signing off below, the reviewer confirms:
+
 - All sections of this template have been completed
 - Evidence gathering (Section 2) has been completed; authoritative standards searched and documented
 - Contradictions have been audited and dispositioned
@@ -371,10 +379,12 @@ By signing off below, the reviewer confirms:
 ## 11. Review Artifacts Reference
 
 **This Review Record Should Be Attached To:**
+
 - PR or issue that delivers the revised ADR (if revisions were required)
 - Internal decision tracker or ADR review calendar
 - Audit trail for governance compliance verification
 
 **This Review Template Was Completed Per:**
+
 - ADR-0044 (Governance and Operating Model) § Step 9.5
 - Revalidation Cycle: [One-time gate review] → [Then annual review_state cycle]
