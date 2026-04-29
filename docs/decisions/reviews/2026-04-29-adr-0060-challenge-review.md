@@ -1,0 +1,377 @@
+# ADR Challenge and Content Review: ADR-0060
+
+**Purpose:** Step 9.5 (Canonical ADR Challenge and Content Review Gate) for ADR-0060 — API Response and Error Mapping Standard.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0060: API Response and Error Mapping Standard |
+| **Reviewer Name & Title** | Copilot Architecture Reviewer, SRE Team |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-29 |
+| **Revalidation Due** | 2027-04-29 |
+| **Gate Outcome** | ⚪ **REVISE** |
+| **Outcome Rationale** | Four blocking issues: (1) supersession cascade not applied — ADR-0022/0035/0036 still show `superseded_by: []`; (2) ADR-0060 references non-existent ADR-0062/0063 in `impacts` without noting they are future records; (3) codebase audit section contains a factual inaccuracy (`_http_error_from_enqueue` returns `HTTPException`, not `JSONResponse` as stated); (4) ADR-0060 prescribes `app/api/schemas/` as the error schema location, but `app/api/` has no governing ADR — its structure, boundaries, and conventions are ungoverned legacy. ADR-0063 (API Composition and Validation Standard) is planned but unwritten; schema placement decisions are premature until that ADR is authored and accepted. Non-blocking: the error schema deviates from RFC 9457 without clear future migration path. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards:**
+
+- ✅ FastAPI Official Documentation (<https://fastapi.tiangolo.com/>)
+- ✅ Pydantic V2 Documentation (<https://pydantic.dev/docs/validation/latest/get-started/>)
+- ✅ Python Typing Module Official Docs
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| FastAPI Error Handling | "Handling Errors", "HTTPException", "custom exception handlers" | FastAPI's `HTTPException` accepts any JSON-serializable value for `detail` (not just strings). FastAPI supports global exception handlers via `@app.exception_handler()` and route-level `responses` parameter for OpenAPI docs. FastAPI docs warn against leaking `RequestValidationError` internals. | ✅ Aligned | N/A — ADR-0060 correctly selects route-level mapping over global exception handlers. The `detail` field in Standard 1 as `dict[str, Any] | None` aligns with FastAPI's JSON-able detail support. |
+| FastAPI Additional Responses | "Additional Responses in OpenAPI" | FastAPI supports `responses={404: {"model": ErrorModel}}` parameter on route decorators for documenting non-2xx responses in OpenAPI. | ✅ Aligned | N/A — Standard 6 correctly mandates this pattern. |
+| Pydantic V2 BaseModel | "BaseModel at I/O boundary" | Pydantic V2 `BaseModel` is the standard approach for request/response schemas at HTTP boundaries. ADR-0040 mandates this for untrusted I/O. | ✅ Aligned | N/A |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards:**
+
+- ✅ OWASP Improper Error Handling (<https://owasp.org/www-community/Improper_Error_Handling>)
+- ✅ RFC 9457 Problem Details for HTTP APIs (<https://www.rfc-editor.org/rfc/rfc9457>)
+- ✅ Google API Design Guide - Errors (<https://cloud.google.com/apis/design/errors>)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| RFC 9457 (Problem Details) | "Problem Details for HTTP APIs", structured error response schema | RFC 9457 defines standard fields: `type` (URI), `status` (int), `title` (str), `detail` (str), `instance` (URI). Mandates `application/problem+json` media type. Extension members allowed. Security section warns against leaking implementation details. | ⚠️ Deviation | ADR-0060 uses `error` (machine code string) instead of `type` (URI). Uses `message` instead of `title`. Omits `status` and `instance` fields. Does not use `application/problem+json` content type. Rationale provided: "simplified schema is sufficient" for internal-first API. **See Assumption 3.3 for challenge.** |
+| OWASP Improper Error Handling | "error handling security", "stack traces", "implementation details" | OWASP mandates: (1) never reveal stack traces, database dumps, or error codes to users; (2) policy for all error types; (3) consistent error handling across the entire site; (4) log errors for detection but don't expose them. | ✅ Aligned | Standard 3 (Error Detail Redaction) directly implements OWASP guidance: 5xx responses use generic messages, `detail` field cannot contain stack traces/SQL/credentials, `request_id` enables log correlation. |
+| Google API Design Guide | "Error responses", "status code mapping" | Google uses canonical error codes mapped to HTTP status codes with exhaustive mapping tables. Error responses include `code` (int), `message` (str), `status` (enum string), `details` (array of structured objects). | ✅ Aligned | Standard 2 exhaustive mapping table follows Google's pattern. Status enum mapping is directionally the same. |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards:**
+
+- ✅ Dependency Injection Best Practices
+- ✅ Observability & Logging Patterns
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| DI Best Practices | "stateless utility vs injectable service" | Category B (stateless utility) classification is correct for a pure mapping function with no state or dependencies. No Protocol contract needed per ADR-0077. | ✅ Aligned | N/A |
+| Structured Logging + Error Correlation | "error correlation, request_id, structured logging" | Best practice: structured logs capture full error context; HTTP responses provide correlation ID for client-side incident reporting. | ✅ Aligned | Standard 3 Rule 4 correctly implements log correlation via `request_id`. ADR-0054 handles the logging side. |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 7
+**Aligned with Best Practice:** 6
+**Deliberate Deviations:** 1
+
+**High-Level Finding:**
+
+- 🟡 **Mostly Grounded:** All major standards checked; one deliberate deviation from RFC 9457 has rationale but lacks a migration trigger.
+
+**Deviation Summary:**
+
+1. **RFC 9457 schema deviation**: ADR-0060 does not implement the full RFC 9457 `application/problem+json` format (no `type` URI, no `status` integer, no `instance` URI, different field names). Rationale is provided ("internal-first API, simplified schema sufficient"). Risk: if the API becomes public-facing or multi-consumer, a breaking schema migration would be required. **Recommended mitigation**: document a concrete trigger condition (e.g., "adopt RFC 9457 if the API gains external consumers beyond Backstage") in the ADR.
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Route-Level Mapping Is Superior to Global Exception Handlers
+
+- **Stated Norm:** "Route handlers that consume OperationResult must perform exhaustive pattern matching on all status variants." (Standard 2)
+- **Underlying Assumption:** Route handlers are the right level to map OperationResult → HTTP response, not global exception handlers or middleware.
+- **Challenge:** Global exception handlers with a custom domain exception (e.g., `OperationException` wrapping `OperationResult`) could provide DRY mapping with zero route-level boilerplate. This is the pattern FastAPI's official docs endorse for custom exceptions.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Yes — FastAPI's `@app.exception_handler()` can catch structured domain exceptions and render them consistently. However, this pattern loses per-route OpenAPI response documentation and makes exhaustive matching implicit rather than explicit.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The ADR correctly identifies that global handlers cannot per-route distinguish which 2xx code to use or which 4xx sub-type applies (400 vs 409 vs 422 for PERMANENT_ERROR). Route-level mapping is the correct choice for this codebase where OperationResult status semantics are route-dependent. The tradeoff (more boilerplate) is explicitly acknowledged.
+
+### Assumption 3.2: The Shared Error Schema Must Live in `app/api/schemas/errors.py`
+
+- **Stated Norm:** "This schema must be defined as a shared Pydantic model in the API layer (e.g., `app/api/schemas/errors.py`)" (Standard 1)
+- **Underlying Assumption:** The `app/api/` directory is the correct location for shared schemas, and a `schemas/` subdirectory should be created there.
+- **Challenge:** The `app/api/` package itself is an ungoverned legacy construct. No ADR constitutes its structure, boundaries, or conventions. The only partial guidance is ADR-0033 (Route Organization, Tier-4 feature ADR, `review_state: stale`) which declares `api/` is for "cross-cutting concerns only" — but this is a stale, low-tier record, not a binding structural standard. ADR-0063 (API Composition and Validation Standard) is planned to consolidate ADR-0033/0034/0039/0041 and would directly govern `app/api/`, but it does not yet exist. Creating `app/api/schemas/` before `app/api/` itself has been architecturally assessed introduces a structural decision in an ungoverned package — the placement may need to change once ADR-0063 establishes the package's canonical structure.
+- **Evidence Strength:** ⭐ Strong (against the assumption)
+- **Counter-Evidence Found:** Yes — (1) `app/api/` has no governing ADR; its current structure is ad-hoc legacy with mixed concerns (landing pages, webhooks with embedded business logic, geolocate routes). (2) The existing `ErrorResponse` in `app/modules/groups/api/schemas.py` is legacy code from the architecturally deprecated `app/modules` layer. (3) ADR-0033 (the only ADR touching `app/api/` boundaries) is stale and itself due for supersession by ADR-0063. (4) `app/api/v1/routes/webhooks.py` is flagged in planning documents as a concrete anti-pattern (embeds business logic violating route-as-thin-adapter principle).
+- **Confidence (ADR survives challenge):** 🟡 Moderate — the *concept* of placing error schemas at the API layer is correct, but the *specific location* `app/api/schemas/` is premature
+- **Reviewer Notes:** **BLOCKER.** ADR-0060 Standard 1 prescribes a specific file path (`app/api/schemas/errors.py`) inside a package that has no architectural constitution. The `app/api/` package requires its own ADR assessment (ADR-0063) before structural additions are made. Recommendation: either (a) author ADR-0063 first to establish `app/api/` governance, then finalize ADR-0060's schema placement, or (b) revise ADR-0060 Standard 1 to specify the error schema conceptually ("at the API layer") without prescribing a specific path until ADR-0063 is accepted. The existing `ErrorResponse` in `app/modules/` is legacy code — `app/modules` is architecturally deprecated and must not be used as a reference for new patterns.
+
+### Assumption 3.3: RFC 9457 Can Be Deferred Indefinitely
+
+- **Stated Norm:** "The error response schema does not fully implement RFC 9457 `application/problem+json` content type." (Intentional Deviations)
+- **Underlying Assumption:** The simplified schema is sufficient for the foreseeable future because the API is internal-first.
+- **Challenge:** RFC 9457 is an IETF Internet Standard (not just informational). Tooling ecosystems (API gateways, client generators, observability platforms) increasingly expect RFC 9457 compliance. If the API is consumed by Backstage, external partners, or API gateway middleware, incompatibility could cause friction. Additionally, FastAPI's ecosystem (e.g., `fastapi-problem` libraries) provides RFC 9457 support with minimal effort.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Yes — RFC 9457 is the prevailing industry standard (obsoletes RFC 7807). The custom schema introduces proprietary field names (`error` vs `type`, `message` vs `title`) that reduce interoperability.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The deviation is defensible for an internal API, but the ADR should document a concrete migration trigger. Recommend adding a sentence to the Intentional Deviations section: "Revisit RFC 9457 adoption if: (a) the API gains external consumers, (b) API gateway middleware requires standard problem details, or (c) more than 3 consuming services integrate against the error schema." Without a trigger, this deviation risks becoming permanent technical debt.
+
+### Assumption 3.4: Exhaustive Matching with Catch-All Default Is Sufficient
+
+- **Stated Norm:** "Exhaustive matching means every status variant must be handled explicitly. A catch-all default must log an unrecognized status as a warning and return 500." (Standard 2)
+- **Underlying Assumption:** All five `OperationStatus` variants are stable and unlikely to change.
+- **Challenge:** If a new `OperationStatus` variant is added (e.g., `RATE_LIMITED`, `CONFLICT`), the catch-all default will silently return 500 for the new status until every route handler is updated. This could cause production incidents with incorrect status codes.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the catch-all with warning logging is the standard pattern for forward compatibility. Python's `match` statement doesn't enforce exhaustiveness at compile time.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The ADR's approach is correct. The warning log ensures new status variants are detected operationally. For additional safety, consider recommending a linting rule or test that verifies all OperationStatus values are covered. This is not a blocker.
+
+### Assumption 3.5: `_http_error_from_enqueue` Returns JSONResponse
+
+- **Stated Norm:** Codebase Audit states "`_http_error_from_enqueue()` maps error_code to status_code but returns `JSONResponse` with ad-hoc dict, not the canonical error schema." (Current Violations table)
+- **Underlying Assumption:** The function returns `JSONResponse`.
+- **Challenge:** Codebase inspection reveals the function returns `HTTPException`, not `JSONResponse`.
+- **Evidence Strength:** ⭐ Strong (direct code inspection)
+- **Counter-Evidence Found:** Yes — verified at `app/packages/access/sync/interactions/http.py` lines 83-87: `def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:` returns `HTTPException(status_code=..., detail=message)`.
+- **Confidence (ADR survives challenge):** 🔴 Low (factual error)
+- **Reviewer Notes:** **BLOCKER.** The codebase audit section contains a factual inaccuracy. The violation description must be corrected to state that `_http_error_from_enqueue()` returns `HTTPException` with a bare detail string, not `JSONResponse` with an ad-hoc dict. The violation itself (no structured error schema) is real, but the description is wrong.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: RFC 9457 Incompatibility Causes API Consumer Friction
+
+- **If Assumption Fails:** External consumers or API gateway middleware expect RFC 9457 `application/problem+json` format.
+- **Platform Impact:**
+  - Incident management workflow: Impact: None
+  - Access synchronization workflow: Impact: Low
+  - Access request workflow: Impact: Medium (if Backstage or external tools consume the API)
+  - Multi-provider integrations: Impact: None (providers are upstream, not downstream API consumers)
+- **Probability Estimate:** Low-Medium % (increasing over time as API consumer count grows)
+- **Mitigation or Acceptance:** Documented deviation with recommended migration trigger. Accepted as current risk.
+
+### Failure Mode 4.2: New OperationStatus Variant Returns 500
+
+- **If Assumption Fails:** A new `OperationStatus` variant is added without updating all route handlers.
+- **Platform Impact:**
+  - Incident management workflow: Impact: Medium (incorrect status codes in API responses)
+  - Access synchronization workflow: Impact: Medium (HTTP clients may misinterpret transient failures as server errors)
+  - Access request workflow: Impact: Medium
+  - Multi-provider integrations: Impact: None (integrations use OperationResult directly, not HTTP responses)
+- **Probability Estimate:** Low % (OperationStatus changes are rare and would be caught in review)
+- **Mitigation or Acceptance:** Catch-all default logs warning; operational detection is sufficient. Accepted.
+
+### Failure Mode 4.3: Sensitive Data Leaks in `detail` Field
+
+- **If Assumption Fails:** Developers populate `detail` field with sensitive data (stack traces, SQL, credentials) despite Standard 3 rules.
+- **Platform Impact:**
+  - Incident management workflow: Impact: None
+  - Access synchronization workflow: Impact: High (credential exposure)
+  - Access request workflow: Impact: High (PII exposure)
+  - Multi-provider integrations: Impact: High (API keys/tokens)
+- **Probability Estimate:** Medium % (human error in code review)
+- **Mitigation or Acceptance:** Code review enforcement. ADR-0054 structured logging captures full details server-side. Consider adding an automated lint rule or unit test that asserts error responses don't contain known sensitive patterns.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Supersession not applied: ADR-0022/0035/0036 still show `superseded_by: []` while ADR-0060 claims to supersede them | ADR-0060, ADR-0022, ADR-0035, ADR-0036 | 🔴 High | ⚪ Unresolved — must update superseded ADRs before ADR-0060 is accepted |
+| ADR-0060 `impacts: [ADR-0062, ADR-0063]` but neither ADR exists in the repository | ADR-0060, ADR-0062, ADR-0063 | 🟡 Medium | ⚪ Unresolved — if these are planned future ADRs, mark explicitly as "planned" in the impacts list or remove until they exist |
+| Codebase audit says `_http_error_from_enqueue` returns `JSONResponse` but it returns `HTTPException` | ADR-0060 internal | 🟡 Medium | ⚪ Unresolved — factual correction needed |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** ADR-0022, ADR-0035, ADR-0036
+- **Inheritance Status:** ADR-0022's response format abstractions (Card, ErrorMessage, SuccessMessage) are subsumed by ADR-0059 Standard 2 (presenter pattern), not directly by ADR-0060. ADR-0060 only addresses the HTTP error response side, not the platform formatting side. This creates a potential gap where ADR-0022's platform formatting guidance has no clear successor if ADR-0059 doesn't explicitly cover it.
+- **Gaps Identified:**
+  1. ADR-0022's Card/SuccessMessage abstractions are not addressed by ADR-0060 (only ErrorMessage is). The supersession claim is only partially valid — ADR-0060 supersedes the error portion, ADR-0059 supersedes the presentation portion. Consider listing both ADR-0059 and ADR-0060 in ADR-0022's `superseded_by`.
+  2. ADR-0035 `related_records` includes ADR-0020 and ADR-0036. ADR-0060 should ensure these relationships are preserved or explicitly dissolved.
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Secondary Domain Owners:** N/A
+- **Plugin/Startup Registration:** Not applicable (error schema is a module-level type definition)
+- **Config Owner:** Not applicable (stateless utility)
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+
+**Context:** Emergency response requires rapid logging, context propagation, and operational decision-making under time pressure.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Error visibility in API responses | Standard 3: 5xx responses use generic message; correlation via `request_id` | Incident responders need fast error correlation from Slack/API to logs | ✅ No | `request_id` enables log lookup; Slack presenter (Standard 4) provides human-friendly messages |
+| Retry guidance for transient errors | Standard 2: TRANSIENT_ERROR → 503 with mandatory `retry_after` | Incident tooling can use `retry_after` to auto-schedule retries | ✅ No | Aligns with operational needs |
+
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+### Scenario 6.2: Access Synchronization Workflow
+
+**Context:** Automated sync from identity providers (AWS IAM, Google Workspace) to application; handles failure, retry, and eventual consistency.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Sync job enqueue error mapping | Standard 1/2: structured error response with error_code | `_http_error_from_enqueue()` currently returns bare `HTTPException` detail strings; migration needed | ⚠️ Yes | Migration Phase 2 addresses this — new routes adopt immediately, touched routes adopt incrementally |
+| Retry-After propagation | Standard 2: TRANSIENT_ERROR maps to 503 with retry_after | Current `_http_error_from_enqueue()` does not propagate retry_after from OperationResult | ⚠️ Yes | Metadata loss acknowledged in audit. Standard 2 will fix this when adopted. |
+| Dual-interface (Slack + HTTP) | Standard 4: Service layer channel-agnostic; separate error formatting | Presenters in `app/packages/access/sync/presenters.py` predate this standard and are legacy implementations | ⚠️ Yes | Legacy code — structural separation exists but does not conform to ADR-0060 schema or mapping requirements. Must be migrated, not treated as compliant. |
+
+**Validation Summary:** ⚠️ Gaps exist — all current implementations are legacy and non-conformant
+
+**Mitigation:** Migration Phase 2-3 addresses the gaps. All existing error handling in the access sync workflow is legacy code that predates ADR-0060 and must be treated as non-conformant. The ADR correctly identifies `_http_error_from_enqueue` as a violation in the codebase audit (though with an incorrect return-type description — see Assumption 3.5).
+
+---
+
+### Scenario 6.3: Access Request Workflow
+
+**Context:** User requests access to a resource/role; admin approves; system provisions and audits across multiple platforms.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Structured error for denied requests | Standard 1: error_code + message in structured schema | Access request API routes do not yet exist (feature disabled, `ACCESS_REQUESTS_ENABLED=false`); standard will apply when enabled | ✅ No | New routes will adopt Standard 1 from day one per Migration Phase 1 |
+| Authorization error mapping | Standard 2: UNAUTHORIZED → 401/403 | Route handler disambiguates based on context (authn vs authz) | ✅ No | Standard correctly leaves disambiguation to the route handler |
+
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+### Scenario 6.4: Multi-Provider Integration (Slack/Teams/AWS/GWS/GitHub)
+
+**Context:** Single operation may span multiple external APIs with rate limits, error handling, and eventual consistency.
+
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| Provider-specific error codes | Standard 1: `error` field carries machine-readable code from OperationResult.error_code | OperationResult carries error codes but no route currently maps them through the canonical ErrorResponse schema defined by this ADR | ⚠️ Yes | Legacy — error codes exist in OperationResult but are not surfaced in HTTP responses per Standard 1. All current routes use bare `HTTPException` detail strings. |
+| Rate limit handling across providers | Standard 2: TRANSIENT_ERROR → 503 with retry_after | Provider adapters return OperationResult with retry_after, but no current route propagates this metadata to HTTP responses — `retry_after` is lost at the HTTP boundary | ⚠️ Yes | Legacy — end-to-end propagation is not implemented. Standard 2 defines the target state but current code does not conform. |
+| Channel-agnostic service layer | Standard 4: Neither HTTP mapping nor platform presenters in service layer | Service layer returns OperationResult, but current route/presenter implementations predate ADR-0060 and use ad-hoc error formatting | ⚠️ Yes | Legacy — the service-layer boundary is structurally correct but downstream mapping code does not conform to Standards 1-3. |
+
+**Validation Summary:** ⚠️ Gaps exist — current implementations are legacy and non-conformant at the HTTP mapping layer
+
+**Mitigation:** All current multi-provider error handling code predates ADR-0060. The ADR's standards define the target state; existing code requires migration per Phase 2-3.
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Route-Level Boilerplate vs. DRY Global Handlers
+
+- **Chosen:** Route-level exhaustive mapping of OperationResult → HTTP response
+- **Rejected:** Global exception handler with custom domain exception
+- **Rationale:** Route-level mapping preserves per-route OpenAPI documentation, enables explicit status code selection (e.g., 200 vs 201 vs 202 for SUCCESS), and enforces exhaustive status handling at the call site.
+- **Risk Accepted:** Each route handler will contain 10-20 lines of mapping boilerplate. Developers may copy-paste rather than think through each mapping.
+- **Contingency:** A shared `operation_result_to_response()` helper function (Standard 5, Category B) reduces boilerplate to a single function call per route. The helper handles common cases; routes override for special mappings.
+
+### Tradeoff 7.2: Simplified Schema vs. RFC 9457 Compliance
+
+- **Chosen:** Custom error schema with `error`, `message`, `detail`, `retry_after`, `request_id`
+- **Rejected:** Full RFC 9457 `application/problem+json` with `type` URI, `status`, `title`, `detail`, `instance`
+- **Rationale:** Internal-first API; simplified schema reduces complexity; RFC 9457 `type` URIs require a problem type registry that adds operational overhead.
+- **Risk Accepted:** If the API gains external consumers, a breaking schema migration is required.
+- **Contingency:** Adopt RFC 9457 format when external consumer requirements materialize. The structured schema makes migration mechanical (rename fields, add `type` URI, change content type).
+
+### Tradeoff 7.3: Incremental Migration vs. Big-Bang Adoption
+
+- **Chosen:** Three-phase migration (define schema → adopt in new/touched routes → full migration)
+- **Rejected:** Immediate mandatory adoption across all routes
+- **Rationale:** Reduces risk of introduction; allows validation of the schema design before committing all routes.
+- **Risk Accepted:** During the migration period, API consumers will receive inconsistent error formats depending on whether the route has been migrated. This creates a mixed-schema window.
+- **Contingency:** Track migration progress per-route; ensure API documentation clearly indicates which routes use the canonical schema.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Update ADR-0022 `superseded_by` to `[ADR-0060]` (and ADR-0059 for presentation portions) | ✅ Yes | SRE Team | 2026-05-06 | Supersession chain must be bidirectional per ADR-0044 governance rules. ADR-0022 currently shows `superseded_by: []`. |
+| Update ADR-0035 `superseded_by` to `[ADR-0060]` | ✅ Yes | SRE Team | 2026-05-06 | Same as above. |
+| Update ADR-0036 `superseded_by` to `[ADR-0060]` | ✅ Yes | SRE Team | 2026-05-06 | Same as above. |
+| Correct codebase audit: `_http_error_from_enqueue` returns `HTTPException`, not `JSONResponse` | ✅ Yes | SRE Team | 2026-05-06 | Factual inaccuracy in the Current Violations table. |
+| Author ADR-0063 (API Composition and Validation Standard) or defer ADR-0060 schema placement | ✅ Yes | SRE Team | 2026-05-13 | ADR-0060 prescribes `app/api/schemas/errors.py` but `app/api/` has no governing ADR. ADR-0063 is planned to constitute this package (consolidating ADR-0033/0034/0039/0041). Either author ADR-0063 first to validate the placement, or revise ADR-0060 to use a conceptual location without a specific path. ADR-0062 reference in `impacts` also needs resolution (does not exist in repository). |
+| Add RFC 9457 migration trigger to Intentional Deviations section | ❌ No | SRE Team | 2026-05-13 | Document concrete conditions under which the API should adopt RFC 9457 format. |
+| Create `app/api/schemas/` directory and define `ErrorResponse` model | ❌ No (blocked by ADR-0063) | SRE Team | After ADR-0063 | Phase 1 implementation per Migration Path. Cannot proceed until `app/api/` package structure is governed by ADR-0063. |
+| Clarify ADR-0022 supersession scope | ❌ No | SRE Team | 2026-05-13 | ADR-0022 covers both error and success response formats. ADR-0060 only supersedes the error portion. Document whether ADR-0059 supersedes the presentation/success portion, or if ADR-0022 remains partially active. |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds:** 5 blocking actions identified.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **REVISE** → ADR-0060 requires authoring revision; return to Step 5-9 author team with feedback
+
+**If REVISE, Provide Primary Blockers:**
+
+1. **Supersession cascade not applied:** ADR-0022, ADR-0035, and ADR-0036 all show `superseded_by: []` — must be updated to `superseded_by: [ADR-0060]` (and possibly `[ADR-0059, ADR-0060]` for ADR-0022) before ADR-0060 can be accepted. Without bidirectional supersession, the governance chain is broken.
+2. **Factual inaccuracy in codebase audit:** The Current Violations table states `_http_error_from_enqueue()` "returns `JSONResponse` with ad-hoc dict" — verified code inspection shows it returns `HTTPException` with a bare detail string. The violation category is correct but the description is wrong.
+3. **Non-existent `impacts` targets:** ADR-0062 and ADR-0063 are listed in `impacts` but do not exist in the repository. If they are planned future records, annotate accordingly; if they were removed, update the reference.
+4. **Ungoverned `app/api/` package dependency:** ADR-0060 Standard 1 prescribes `app/api/schemas/errors.py` as the canonical error schema location, but the `app/api/` package has no governing ADR. Its current structure is ungoverned legacy — containing ad-hoc landing pages, webhooks with embedded business logic, and a geolocate route. ADR-0033 (the only ADR touching `app/api/` boundaries) is a stale Tier-4 record. ADR-0063 (API Composition and Validation Standard) is planned to constitute this package but does not exist. Schema placement is premature until `app/api/` governance is established. **Resolution path:** either author ADR-0063 before finalizing ADR-0060, or revise Standard 1 to defer the specific file path.
+
+**Revision Deadline:** 2026-05-06
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | Copilot Architecture Reviewer |
+| **Reviewer Title** | Architecture Review Agent |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-29 |
+| **Email** | N/A (automated review) |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+
+- PR or issue that delivers the revised ADR-0060
+- Internal decision tracker or ADR review calendar
+- Audit trail for governance compliance verification
+
+**This Review Template Was Completed Per:**
+
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → then annual review_state cycle
+
+---
+
+## Appendix: Evidence Sources Consulted
+
+| Source | Access Date | Finding Summary |
+|--------|-------------|-----------------|
+| RFC 9457 — Problem Details for HTTP APIs (<https://www.rfc-editor.org/rfc/rfc9457>) | 2026-04-29 | IETF Internet Standard defining structured error response format with `type`, `status`, `title`, `detail`, `instance` fields. ADR-0060 intentionally deviates with simplified field names. |
+| OWASP Improper Error Handling (<https://owasp.org/www-community/Improper_Error_Handling>) | 2026-04-29 | Mandates no stack traces/database dumps in error responses; consistent error handling policy; log for detection. ADR-0060 Standard 3 fully aligned. |
+| FastAPI Error Handling (<https://fastapi.tiangolo.com/tutorial/handling-errors/>) | 2026-04-29 | Documents `HTTPException`, global exception handlers, `responses` parameter for OpenAPI. ADR-0060 route-level approach is valid FastAPI pattern. |
+| `app/infrastructure/operations/result.py` | 2026-04-29 | OperationResult dataclass with status, message, data, error_code, retry_after, provider, operation fields. Legacy implementation — requires validation against ADR-0050 canonical standard during migration. |
+| `app/infrastructure/operations/status.py` | 2026-04-29 | OperationStatus enum: SUCCESS, TRANSIENT_ERROR, PERMANENT_ERROR, UNAUTHORIZED, NOT_FOUND. Five variants confirmed. Legacy implementation — enum coverage and naming require revalidation against current ADR standards. |
+| `app/api/v1/routes/webhooks.py` | 2026-04-29 | 6 instances of `HTTPException` with bare detail strings. Violations confirmed. |
+| `app/api/v1/routes/geolocate.py` | 2026-04-29 | 1 instance of `HTTPException(404, detail=reader)`. Violation confirmed. |
+| `app/packages/access/sync/interactions/http.py` | 2026-04-29 | `_http_error_from_enqueue()` returns `HTTPException` (NOT `JSONResponse`). Factual correction needed in ADR. |
+| `app/packages/access/sync/presenters.py` | 2026-04-29 | Legacy dual-interface pattern (HTTP + Slack). Predates ADR-0060; requires migration to canonical error schema alignment. Should not be treated as a reference implementation. |
+| `app/api/` directory listing | 2026-04-29 | No `schemas/` subdirectory exists. Must be created for Phase 1. |
+| ADR-0022 frontmatter | 2026-04-29 | `superseded_by: []` — not yet updated to reference ADR-0060. |
+| ADR-0035 frontmatter | 2026-04-29 | `superseded_by: []` — not yet updated to reference ADR-0060. |
+| ADR-0036 frontmatter | 2026-04-29 | `superseded_by: []` — not yet updated to reference ADR-0060. |
+| ADR-0040 decision | 2026-04-29 | Confirms Pydantic BaseModel for untrusted I/O boundaries. Aligned with Standard 1. |
+| ADR-0062, ADR-0063 | 2026-04-29 | Files do not exist in `docs/decisions/adr/`. |
