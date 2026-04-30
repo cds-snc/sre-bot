@@ -54,6 +54,7 @@ Use exactly one value per ADR.
 | `Integration Decision` | External system interaction contract and failure semantics. Tier-4. |
 | `Migration Decision`   | Temporary transition path with explicit checkpoints. Tier-5.      |
 | `Deprecation Decision` | Retirement policy for legacy architecture or modules. Tier-5.     |
+| `Library Adoption Decision` | Evaluation and selection of an infrastructure library. Tier-5. |
 
 ---
 
@@ -83,7 +84,7 @@ A record's `tier` and `decision_type` must agree. Mixing is non-compliant.
 | Tier-2 | `Standard`, `Pattern`                                  |
 | Tier-3 | `Domain Contract`, `Domain Standard`                   |
 | Tier-4 | `Feature Decision`, `Integration Decision`             |
-| Tier-5 | `Migration Decision`, `Deprecation Decision`           |
+| Tier-5 | `Migration Decision`, `Deprecation Decision`, `Library Adoption Decision` |
 
 A Tier-1 ADR must not contain Tier-4 implementation specifics. Split into separate records
 if needed — one decision, one authority level (ADR-0044 §Classification Rules).
