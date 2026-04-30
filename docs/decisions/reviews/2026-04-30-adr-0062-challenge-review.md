@@ -197,7 +197,7 @@
 
 | Conflict | ADRs Involved | Severity | Resolution Status |
 |----------|---------------|----------|-------------------|
-| S4 requires Protocol stubs for Category A; ADR-0065 (Proposed) will define which types get Protocols. If ADR-0065 changes Category A classification, S4's scope changes. | ADR-0062, ADR-0065 | 🟡 Medium | ⚪ Unresolved — ADR-0065 is Proposed (Wave 5). ADR-0062 references it in `constrained_by` but constraint not yet finalized. |
+| S4 requires Protocol stubs for Category A; ADR-0065 P2 (Protocol for Behavioral Contracts) confirms this classification. | ADR-0062, ADR-0065 | 🟢 Low | ✅ Resolved — ADR-0065 Accepted 2026-04-30. P2 directly validates S4's Protocol stub requirement for Category A services. |
 | S3 says override "provider functions (from `infrastructure.services`)" — ADR-0056 S1 says providers in `providers.py`. `infrastructure.services` is a re-export. No actual conflict. | ADR-0062, ADR-0056 | 🟢 Low | ✅ Resolved — re-export convenience; both correct. |
 
 ### Supersession Ambiguities
@@ -319,7 +319,7 @@
 |--------|----------|-------|----------|-------------|
 | Add structlog sync/async caveat to S10 | ✅ Yes | ADR Author | 2026-05-05 | ✅ **Resolved 2026-04-30.** Standard 10 now includes sync/async isolation caveat blockquote with three mitigations: prefer `async def` handlers, bind context before thread-pool dispatch, use AsyncClient for boundary testing. |
 | Clarify pytest-asyncio auto mode in S7 | ✅ Yes | ADR Author | 2026-05-05 | ✅ **Resolved 2026-04-30.** Standard 7 now includes configuration-dependency callout noting `auto` is opt-in (default `strict`), references `app/pytest.ini` line 3, and notes pinned `pytest-asyncio==0.26.0`. |
-| ADR-0065 dependency verification | ❌ No | Wave 5 | Wave 5 gate | Once ADR-0065 accepted, verify S4's Category A classification still holds. |
+| ADR-0065 dependency verification | ❌ No | Wave 5 | Wave 5 gate | ✅ **Resolved 2026-04-30.** ADR-0065 Accepted. P2 (Protocol for Behavioral Contracts) confirms S4's Category A classification is correct. No changes needed. |
 
 **All blocking actions resolved. ADR-0062 may proceed to Step 10.**
 
