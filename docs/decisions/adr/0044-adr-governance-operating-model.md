@@ -14,9 +14,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-28
-last_updated: 2026-04-28
-last_reviewed: 2026-04-28
-next_review_due: 2026-08-26
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 constrained_by: []
 impacts:
  - ADR-0001
@@ -89,6 +89,7 @@ related_packages: []
 - One ADR, one decision, one authority level.
 - Higher-tier ADRs constrain lower-tier ADRs through explicit metadata links.
 - Time-bound migration and deprecation decisions must use Tier-5 and include retirement criteria.
+- Infrastructure library adoption decisions must use Tier-5 and include evaluation criteria (maturity, maintenance status, licensing, type-hint coverage, async compatibility) to govern the long-term dependency commitment. This complements ADR-0045 P7 (Managed Service Delegation Hierarchy), which establishes library delegation as Tier 2 in the three-tier hierarchy.
 - Foundational ADRs remain implementation-agnostic; implementation details belong in lower tiers.
 
 ## Alternatives Considered
