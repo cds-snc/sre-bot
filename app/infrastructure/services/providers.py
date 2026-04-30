@@ -11,6 +11,10 @@ from typing import cast
 
 
 from infrastructure.configuration import Settings
+from infrastructure.configuration.app import (
+    AppSettings,
+    get_app_settings as _get_app_settings,
+)
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
@@ -63,6 +67,11 @@ def get_settings() -> Settings:
         Settings: Cached settings instance loaded from environment.
     """
     return Settings()
+
+
+def get_app_settings() -> AppSettings:
+    """Get application-scoped app settings singleton."""
+    return _get_app_settings()
 
 
 @lru_cache(maxsize=1)
