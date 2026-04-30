@@ -21,6 +21,7 @@ constrained_by:
  - ADR-0054
  - ADR-0056
  - ADR-0063
+ - ADR-0065
  - ADR-0077
 impacts:
  - ADR-0062  # planned — API versioning standard

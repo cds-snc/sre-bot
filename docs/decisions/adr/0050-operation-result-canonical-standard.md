@@ -17,6 +17,7 @@ next_review_due: 2026-08-26
 constrained_by:
  - ADR-0044
  - ADR-0045
+ - ADR-0065
 impacts:
  - ADR-0060
  - ADR-0061
@@ -39,19 +40,19 @@ related_packages: []
 
 - Problem statement: The Operation Result pattern was documented in two legacy ADRs with different tier classifications: ADR-0006 was classified as Tier-1 Principle and contained extensive implementation detail (code examples, library comparisons, Railway-Oriented Programming philosophy), while ADR-0020 was classified as Tier-2 Standard and contained usage patterns for creating and handling results. This dual authority created confusion about whether the pattern is a foundational principle or an implementation standard, and which record to follow for practical guidance.
 - Business/operational drivers:
- - Establish a single Tier-2 standard for the Operation Result pattern, eliminating duplicate authority.
- - Define clear boundary rules for where OperationResult is mandatory and where exceptions are appropriate.
- - Support uniform error handling across multiple integration providers (Google Workspace, AWS, GitHub, Slack).
- - Ensure transient vs. permanent error classification drives retry behavior consistently.
+- Establish a single Tier-2 standard for the Operation Result pattern, eliminating duplicate authority.
+- Define clear boundary rules for where OperationResult is mandatory and where exceptions are appropriate.
+- Support uniform error handling across multiple integration providers (Google Workspace, AWS, GitHub, Slack).
+- Ensure transient vs. permanent error classification drives retry behavior consistently.
 - Constraints:
- - OperationResult is used at integration boundaries, not throughout internal business logic (ADR-0045 Principle 2 - explicit DI means services are modular, but error handling strategy is a Tier-2 implementation choice).
- - The pattern must support typed metadata: status, error code, message, retry hints.
- - Callers must be able to map OperationResult status to HTTP status codes and platform-specific responses.
- - The pattern must remain provider-agnostic: business logic should not need to know which provider generated the result.
+- OperationResult is used at integration boundaries, not throughout internal business logic (ADR-0045 Principle 2 - explicit DI means services are modular, but error handling strategy is a Tier-2 implementation choice).
+- The pattern must support typed metadata: status, error code, message, retry hints.
+- Callers must be able to map OperationResult status to HTTP status codes and platform-specific responses.
+- The pattern must remain provider-agnostic: business logic should not need to know which provider generated the result.
 - Non-goals:
- - This record does not define the OperationResult class implementation details (field types, method signatures).
- - This record does not define HTTP response mapping conventions (delegated to ADR-0060).
- - This record does not mandate Railway-Oriented Programming; functional composition is an optional usage pattern.
+- This record does not define the OperationResult class implementation details (field types, method signatures).
+- This record does not define HTTP response mapping conventions (delegated to ADR-0060).
+- This record does not mandate Railway-Oriented Programming; functional composition is an optional usage pattern.
 
 ## Decision
 
@@ -77,6 +78,7 @@ OperationResult must classify outcomes using a minimal, domain-relevant status e
 ### Standard 3: Structured Error Metadata
 
 Every non-success result must include:
+
 - `error_code`: a machine-readable string identifying the failure category (e.g., `RATE_LIMITED`, `UPSTREAM_TIMEOUT`).
 - `message`: a human-readable description of the failure.
 - `retry_after`: mandatory for `TRANSIENT_ERROR` status; seconds until retry is appropriate.
@@ -105,39 +107,46 @@ Railway-Oriented Programming composition methods (`map`, `bind`, `unwrap_or`) ar
 ## Alternatives Considered
 
 1. Maintain two separate OperationResult ADRs:
- - Pros: Existing records are already in use.
- - Cons: Duplicate authority; ADR-0006 at Tier-1 contains implementation detail that violates ADR-0051 taxonomy.
- - Why not chosen: One canonical standard eliminates ambiguity.
+
+- Pros: Existing records are already in use.
+- Cons: Duplicate authority; ADR-0006 at Tier-1 contains implementation detail that violates ADR-0051 taxonomy.
+- Why not chosen: One canonical standard eliminates ambiguity.
+
 2. Remove OperationResult and use only exceptions:
- - Pros: More Pythonic; no custom Result type needed.
- - Cons: Implicit control flow; poor type safety at integration boundaries; difficult to distinguish transient from permanent errors without per-provider exception hierarchies.
- - Why not chosen: The multi-provider integration model requires uniform error handling that exceptions do not provide.
+
+- Pros: More Pythonic; no custom Result type needed.
+- Cons: Implicit control flow; poor type safety at integration boundaries; difficult to distinguish transient from permanent errors without per-provider exception hierarchies.
+- Why not chosen: The multi-provider integration model requires uniform error handling that exceptions do not provide.
+
 3. Use a third-party Result library (dry-python/returns):
- - Pros: Feature-rich; community-maintained.
- - Cons: Heavy dependency; not tailored to integration boundary semantics.
- - Why not chosen: The custom OperationResult is simpler and domain-specific.
+
+- Pros: Feature-rich; community-maintained.
+- Cons: Heavy dependency; not tailored to integration boundary semantics.
+- Why not chosen: The custom OperationResult is simpler and domain-specific.
+
 4. Promote OperationResult to Tier-1 Principle:
- - Pros: Maximum authority.
- - Cons: Implementation-level choice elevated above its appropriate governance tier; violates ADR-0051.
- - Why not chosen: The pattern is a standard implementation convention, not a foundational invariant.
+
+- Pros: Maximum authority.
+- Cons: Implementation-level choice elevated above its appropriate governance tier; violates ADR-0051.
+- Why not chosen: The pattern is a standard implementation convention, not a foundational invariant.
 
 ## Consequences
 
 - Positive impacts:
- - Single authoritative standard eliminates the ADR-0006 / ADR-0020 dual-authority problem.
- - Correct Tier-2 classification aligns with ADR-0051 taxonomy enforcement.
- - Clear boundary rule prevents OperationResult overuse in internal logic.
- - Uniform error handling enables provider-agnostic business logic.
+- Single authoritative standard eliminates the ADR-0006 / ADR-0020 dual-authority problem.
+- Correct Tier-2 classification aligns with ADR-0051 taxonomy enforcement.
+- Clear boundary rule prevents OperationResult overuse in internal logic.
+- Uniform error handling enables provider-agnostic business logic.
 - Tradeoffs accepted:
- - Custom OperationResult is not a Python stdlib type; team members must learn it.
- - More verbose than raw exceptions at integration boundaries, but provides structured metadata.
- - Functional composition is optional and may lead to inconsistent usage if not guided.
+- Custom OperationResult is not a Python stdlib type; team members must learn it.
+- More verbose than raw exceptions at integration boundaries, but provides structured metadata.
+- Functional composition is optional and may lead to inconsistent usage if not guided.
 - Risks introduced:
- - Developers may use OperationResult for internal logic, violating Standard 4.
- - The five-status classification may be insufficient for future provider error semantics.
+- Developers may use OperationResult for internal logic, violating Standard 4.
+- The five-status classification may be insufficient for future provider error semantics.
 - Mitigations:
- - Code review enforcement of the boundary rule (Standard 4).
- - Status enumeration can be extended at Tier-2 without Tier-1 impact.
+- Code review enforcement of the boundary rule (Standard 4).
+- Status enumeration can be extended at Tier-2 without Tier-1 impact.
 
 ## Compliance and Boundaries
 
@@ -150,17 +159,17 @@ Railway-Oriented Programming composition methods (`map`, `bind`, `unwrap_or`) ar
 
 - Revalidation date: 2026-04-28
 - Sources rechecked:
- - Rust Result type documentation (https://doc.rust-lang.org/std/result/).
- - Railway-Oriented Programming by Scott Wlaschin, including "Against Railway-Oriented Programming" (scope boundary guidance).
- - Python typing documentation for generic dataclass patterns.
- - Twelve-Factor App: Factor IV (Backing Services - uniform interface to external services).
- - OWASP error handling guidance.
+- Rust Result type documentation (<https://doc.rust-lang.org/std/result/>).
+- Railway-Oriented Programming by Scott Wlaschin, including "Against Railway-Oriented Programming" (scope boundary guidance).
+- Python typing documentation for generic dataclass patterns.
+- Twelve-Factor App: Factor IV (Backing Services - uniform interface to external services).
+- OWASP error handling guidance.
 - Alignment summary:
- - The pattern aligns with industry-standard Result types (Rust, Kotlin, Swift).
- - The boundary rule (integration boundaries only) aligns with Wlaschin's "Against ROP" guidance: domain errors use Result, infrastructure errors are case-by-case, panics use exceptions.
- - Provider agnosticism aligns with Factor IV (backing services as attached resources with uniform interface).
+- The pattern aligns with industry-standard Result types (Rust, Kotlin, Swift).
+- The boundary rule (integration boundaries only) aligns with Wlaschin's "Against ROP" guidance: domain errors use Result, infrastructure errors are case-by-case, panics use exceptions.
+- Provider agnosticism aligns with Factor IV (backing services as attached resources with uniform interface).
 - Intentional deviations:
- - Python has no stdlib Result type; this is a custom implementation, which is standard practice in the Python community (dry-python/returns, rustedpy/result).
+- Python has no stdlib Result type; this is a custom implementation, which is standard practice in the Python community (dry-python/returns, rustedpy/result).
 
 ## Freshness Review
 
@@ -169,51 +178,60 @@ Railway-Oriented Programming composition methods (`map`, `bind`, `unwrap_or`) ar
 - If Yes, status set to stale: No
 - Validation summary: Consolidates ADR-0006 and ADR-0020 into one Tier-2 standard with correct taxonomy classification and clear boundary rules.
 - Follow-up actions:
- - Mark ADR-0006 and ADR-0020 as superseded with `superseded_by: [ADR-0050]`.
- - Ensure ADR-0060 references this record in `constrained_by`.
+- Mark ADR-0006 and ADR-0020 as superseded with `superseded_by: [ADR-0050]`.
+- Ensure ADR-0060 references this record in `constrained_by`.
 
 ## Source References
 
 1. Source title: Railway-Oriented Programming
- - URL: https://fsharpforfunandprofit.com/rop/
- - Publisher/maintainer: Scott Wlaschin
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Original pattern description; functional composition methods.
+
+- URL: <https://fsharpforfunandprofit.com/rop/>
+- Publisher/maintainer: Scott Wlaschin
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Original pattern description; functional composition methods.
+
 2. Source title: Against Railway-Oriented Programming
- - URL: https://fsharpforfunandprofit.com/posts/against-railway-oriented-programming/
- - Publisher/maintainer: Scott Wlaschin
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Scope boundary guidance for when NOT to use Result; informs Standard 4.
+
+- URL: <https://fsharpforfunandprofit.com/posts/against-railway-oriented-programming/>
+- Publisher/maintainer: Scott Wlaschin
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Scope boundary guidance for when NOT to use Result; informs Standard 4.
+
 3. Source title: Rust Result Type Documentation
- - URL: https://doc.rust-lang.org/std/result/
- - Publisher/maintainer: Rust project
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Industry-standard Result type; validates the pattern is not over-engineering.
+
+- URL: <https://doc.rust-lang.org/std/result/>
+- Publisher/maintainer: Rust project
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Industry-standard Result type; validates the pattern is not over-engineering.
+
 4. Source title: Twelve-Factor App - Backing Services
- - URL: https://12factor.net/backing-services
- - Publisher/maintainer: 12factor contributors
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Factor IV supports uniform interface for external service interaction.
+
+- URL: <https://12factor.net/backing-services>
+- Publisher/maintainer: 12factor contributors
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Factor IV supports uniform interface for external service interaction.
+
 5. Source title: ADR-0006, ADR-0020 (Legacy)
- - URL: docs/decisions/adr/superseded/
- - Publisher/maintainer: SRE Team
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Source records being consolidated; OperationResult standards extracted and deduplicated.
+
+- URL: docs/decisions/adr/superseded/
+- Publisher/maintainer: SRE Team
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Source records being consolidated; OperationResult standards extracted and deduplicated.
 
 ## Implementation Guidance
 
 - Required changes:
- - Mark ADR-0006 and ADR-0020 as `status: Superseded` and add `superseded_by: [ADR-0050]`.
- - Ensure all integration service methods return OperationResult, not raw exceptions.
- - Audit internal business logic for inappropriate OperationResult usage and refactor to exceptions where applicable.
+- Mark ADR-0006 and ADR-0020 as `status: Superseded` and add `superseded_by: [ADR-0050]`.
+- Ensure all integration service methods return OperationResult, not raw exceptions.
+- Audit internal business logic for inappropriate OperationResult usage and refactor to exceptions where applicable.
 - Validation and quality gates:
- - Test: integration methods return OperationResult with correct status classification.
- - Test: transient errors include retry_after metadata.
- - Test: provider-specific details do not leak into caller control flow.
- - ADR-0051 taxonomy check: confirm this is a Tier-2 Standard, not Tier-1 Principle.
+- Test: integration methods return OperationResult with correct status classification.
+- Test: transient errors include retry_after metadata.
+- Test: provider-specific details do not leak into caller control flow.
+- ADR-0051 taxonomy check: confirm this is a Tier-2 Standard, not Tier-1 Principle.
 - Test strategy and acceptance criteria impact:
- - Integration service tests must verify OperationResult contracts.
- - Business logic tests should use exceptions for internal error paths.
+- Integration service tests must verify OperationResult contracts.
+- Business logic tests should use exceptions for internal error paths.
 
 ## Change Log
 

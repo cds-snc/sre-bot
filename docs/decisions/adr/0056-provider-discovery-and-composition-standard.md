@@ -16,8 +16,10 @@ last_reviewed: 2026-04-30
 next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
+ - ADR-0045
  - ADR-0048
  - ADR-0055
+ - ADR-0065
 impacts:
  - ADR-0059
 supersedes:

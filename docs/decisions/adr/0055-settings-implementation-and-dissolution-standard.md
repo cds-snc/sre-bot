@@ -19,6 +19,7 @@ constrained_by:
  - ADR-0045
  - ADR-0046
  - ADR-0047
+ - ADR-0065
 impacts:
  - ADR-0056
 supersedes:

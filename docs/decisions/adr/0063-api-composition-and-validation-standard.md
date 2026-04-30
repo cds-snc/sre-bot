@@ -24,6 +24,7 @@ constrained_by:
   - ADR-0055
   - ADR-0056
   - ADR-0059
+  - ADR-0065
   - ADR-0076
   - ADR-0077
 impacts:

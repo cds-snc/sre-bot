@@ -18,6 +18,7 @@ constrained_by:
  - ADR-0044
  - ADR-0045
  - ADR-0048
+ - ADR-0065
 impacts:
  - ADR-0056
  - ADR-0059
@@ -47,22 +48,22 @@ related_packages:
 
 - Problem statement: ADR-0045 Principle 6 mandates that infrastructure services consumed by feature packages must be defined by Protocol contracts, enabling backing-service substitution without modifying feature code. ADR-0048 Boundary 7 requires the injection surface to expose Protocol types. However, no Tier-2 standard defines WHICH services require Protocol contracts, HOW Protocol contracts must be structured, or the migration path for existing concrete-only services. Currently, 5 of 14 feature-facing infrastructure services have Protocol contracts (DirectoryProvider, RetryStore, RetryProcessor, ResponseChannel, BackgroundJobRegistry). The remaining 9 are concrete classes exposed directly through the injection boundary. The architecture was originally inspired by Backstage's shared service layer model (ServiceRef + ServiceFactory), where every service has an interface type and a swappable factory. The Python/FastAPI equivalent is Protocol + `@lru_cache` provider function. This standard codifies the contract requirements for the sre-bot infrastructure layer.
 - Business/operational drivers:
- - Enable backing-service substitution (e.g., DynamoDB -> RDS, Google Workspace -> Entra ID) without modifying feature code.
- - Provide clear classification of infrastructure services: which need Protocol contracts, which are shared utilities, which are implementation details.
- - Define the Protocol -> Implementation -> Provider pattern as the canonical service architecture.
- - Establish migration priorities for existing concrete-only services.
- - Codify the client-layer boundary: when direct client access is acceptable vs. when domain-level services should be used.
+- Enable backing-service substitution (e.g., DynamoDB -> RDS, Google Workspace -> Entra ID) without modifying feature code.
+- Provide clear classification of infrastructure services: which need Protocol contracts, which are shared utilities, which are implementation details.
+- Define the Protocol -> Implementation -> Provider pattern as the canonical service architecture.
+- Establish migration priorities for existing concrete-only services.
+- Codify the client-layer boundary: when direct client access is acceptable vs. when domain-level services should be used.
 - Constraints:
- - ADR-0045 Principle 6 mandates Protocol contracts for feature-facing services.
- - ADR-0048 Boundary 2 requires Protocol types at the injection surface where applicable.
- - ADR-0048 Boundary 7 requires features to depend on Protocols, not concrete classes.
- - ADR-0056 Standard 3 centralizes infrastructure providers in `providers.py`.
- - ADR-0076 Standard 1 permits shared value types across infrastructure packages.
- - Existing services are deployed and in use; migration must be incremental.
+- ADR-0045 Principle 6 mandates Protocol contracts for feature-facing services.
+- ADR-0048 Boundary 2 requires Protocol types at the injection surface where applicable.
+- ADR-0048 Boundary 7 requires features to depend on Protocols, not concrete classes.
+- ADR-0056 Standard 3 centralizes infrastructure providers in `providers.py`.
+- ADR-0076 Standard 1 permits shared value types across infrastructure packages.
+- Existing services are deployed and in use; migration must be incremental.
 - Non-goals:
- - This record does not define specific Protocol method signatures for individual services.
- - This record does not define the interaction provider architecture (governed by ADR-0059).
- - This record does not define settings structure or provider composition mechanics (governed by ADR-0055 and ADR-0056).
+- This record does not define specific Protocol method signatures for individual services.
+- This record does not define the interaction provider architecture (governed by ADR-0059).
+- This record does not define settings structure or provider composition mechanics (governed by ADR-0055 and ADR-0056).
 
 ## Decision
 
@@ -78,6 +79,7 @@ Every infrastructure service falls into one of three categories:
 Services that abstract over backing services and are consumed by feature packages through the injection boundary. These MUST have Protocol contracts.
 
 **Criteria for Category A:**
+
 - The service abstracts over an external backing service (database, API, cloud provider).
 - Feature packages depend on the service and would need to change if the backing service changed.
 - The service has at least one plausible alternative implementation (even if not currently built).
@@ -222,6 +224,7 @@ Feature packages may import typed client facades through the injection boundary 
 3. Creating a Category A service for this single use would be premature abstraction.
 
 When the pragmatic exception is exercised:
+
 - The feature must document the coupling (a code comment or README note identifying the concrete dependency).
 - If a second feature needs the same client operation, a Category A service should be created.
 - The client facade must still be obtained through the injection boundary (`AWSClientsDep`), never by direct import.
@@ -264,6 +267,7 @@ def fake_storage() -> FakeStorageService:
 ```
 
 **Rules:**
+
 - Test doubles must satisfy the Protocol (verified by `isinstance` check if `@runtime_checkable`).
 - Test doubles must be minimal - only the methods exercised by the test under coverage need real implementations.
 - Test doubles must not import the concrete implementation they replace.
@@ -296,46 +300,51 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 ## Alternatives Considered
 
 1. Require Protocol contracts for ALL infrastructure services (Categories A, B, and C):
- - Pros: Maximum uniformity; every service is swappable.
- - Cons: Premature abstraction for services with no plausible alternative implementation (EventDispatcher, TranslationService). Increases ceremony without proportional benefit.
- - Why not chosen: Protocol contracts add value only when the service abstracts over a swappable backing service. Shared utilities (Category B) are concrete by nature.
 
-2. No service classification - let each service team decide:
- - Pros: Maximum flexibility; no governance overhead.
- - Cons: Inconsistent contract surfaces; some services have Protocols, others don't, with no principled reason. Features can't rely on swappability.
- - Why not chosen: ADR-0045 P6 mandates Protocol contracts. A standard without classification provides no actionable guidance.
+- Pros: Maximum uniformity; every service is swappable.
+- Cons: Premature abstraction for services with no plausible alternative implementation (EventDispatcher, TranslationService). Increases ceremony without proportional benefit.
+- Why not chosen: Protocol contracts add value only when the service abstracts over a swappable backing service. Shared utilities (Category B) are concrete by nature.
 
-3. Create a single `infrastructure/protocols/` package containing all Protocol definitions:
- - Pros: Single import location for all service contracts; easy to discover.
- - Cons: Separates the Protocol from its implementation, creating ownership ambiguity. Changes to a Protocol require editing a package that doesn't own the service. Violates ownership-follows-code (ADR-0047 P2).
- - Why not chosen: Protocols must live in the service's own package. A separate protocols package would create the same problems as a shared types package.
+1. No service classification - let each service team decide:
 
-4. Use abstract base classes (ABC) instead of Protocol:
- - Pros: Enforcement at inheritance time; explicit subclass relationship.
- - Cons: Requires `isinstance` type hierarchy; couples implementations to the base class. Python community convention has moved toward structural subtyping (Protocol) for service contracts. ABCs are appropriate for shared implementation (mixins), not for service interfaces.
- - Why not chosen: Protocol (PEP 544) is the modern Python pattern for service interfaces. ABCs create unnecessary coupling between the contract and its implementations.
+- Pros: Maximum flexibility; no governance overhead.
+- Cons: Inconsistent contract surfaces; some services have Protocols, others don't, with no principled reason. Features can't rely on swappability.
+- Why not chosen: ADR-0045 P6 mandates Protocol contracts. A standard without classification provides no actionable guidance.
 
-5. Defer all Protocol migration until modules are migrated to packages:
- - Pros: Avoids intermediate states; clean cut when modules migrate.
- - Cons: Blocks the primary architectural goal (swappable services) on an unrelated migration (modules -> packages). StorageService Protocol doesn't depend on module migration.
- - Why not chosen: Protocol migration and module migration are independent concerns. Protocol contracts should be added as soon as the service interface is stable.
+1. Create a single `infrastructure/protocols/` package containing all Protocol definitions:
+
+- Pros: Single import location for all service contracts; easy to discover.
+- Cons: Separates the Protocol from its implementation, creating ownership ambiguity. Changes to a Protocol require editing a package that doesn't own the service. Violates ownership-follows-code (ADR-0047 P2).
+- Why not chosen: Protocols must live in the service's own package. A separate protocols package would create the same problems as a shared types package.
+
+1. Use abstract base classes (ABC) instead of Protocol:
+
+- Pros: Enforcement at inheritance time; explicit subclass relationship.
+- Cons: Requires `isinstance` type hierarchy; couples implementations to the base class. Python community convention has moved toward structural subtyping (Protocol) for service contracts. ABCs are appropriate for shared implementation (mixins), not for service interfaces.
+- Why not chosen: Protocol (PEP 544) is the modern Python pattern for service interfaces. ABCs create unnecessary coupling between the contract and its implementations.
+
+1. Defer all Protocol migration until modules are migrated to packages:
+
+- Pros: Avoids intermediate states; clean cut when modules migrate.
+- Cons: Blocks the primary architectural goal (swappable services) on an unrelated migration (modules -> packages). StorageService Protocol doesn't depend on module migration.
+- Why not chosen: Protocol migration and module migration are independent concerns. Protocol contracts should be added as soon as the service interface is stable.
 
 ## Consequences
 
 - Positive impacts:
- - Every feature-facing infrastructure service will have an explicit, swappable contract.
- - Features depend on stable Protocol interfaces, not volatile implementation details.
- - Test doubles are clean Protocol satisfiers, not mock-heavy patches of concrete classes.
- - The classification (A/B/C) provides clear guidance for new infrastructure services.
- - Client-layer boundary with pragmatic exception balances purity with practicality.
+- Every feature-facing infrastructure service will have an explicit, swappable contract.
+- Features depend on stable Protocol interfaces, not volatile implementation details.
+- Test doubles are clean Protocol satisfiers, not mock-heavy patches of concrete classes.
+- The classification (A/B/C) provides clear guidance for new infrastructure services.
+- Client-layer boundary with pragmatic exception balances purity with practicality.
 - Tradeoffs accepted:
- - Category B services (shared utilities) do not get Protocol contracts. This is accepted because they have no plausible alternative implementations.
- - The pragmatic exception for client facades means some features will have direct concrete dependencies. This is accepted because the alternative (creating domain services for every possible operation) is premature abstraction.
- - Protocol migration is incremental, meaning the codebase will temporarily have a mix of Protocol-backed and concrete-only services. This is accepted because incremental migration is safer than a big-bang rewrite.
+- Category B services (shared utilities) do not get Protocol contracts. This is accepted because they have no plausible alternative implementations.
+- The pragmatic exception for client facades means some features will have direct concrete dependencies. This is accepted because the alternative (creating domain services for every possible operation) is premature abstraction.
+- Protocol migration is incremental, meaning the codebase will temporarily have a mix of Protocol-backed and concrete-only services. This is accepted because incremental migration is safer than a big-bang rewrite.
 - Risks introduced:
- - Protocol method signatures may not perfectly match the current concrete class interfaces, requiring minor refactoring during migration.
- - New team members may skip Protocol creation for new Category A services. Mitigation: code review checklist item.
- - The pragmatic exception for clients may be overused. Mitigation: the "two consumers" trigger for creating a Category A service.
+- Protocol method signatures may not perfectly match the current concrete class interfaces, requiring minor refactoring during migration.
+- New team members may skip Protocol creation for new Category A services. Mitigation: code review checklist item.
+- The pragmatic exception for clients may be overused. Mitigation: the "two consumers" trigger for creating a Category A service.
 
 ## Compliance and Boundaries
 
@@ -349,19 +358,21 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 
 - Revalidation date: 2026-04-29
 - Sources rechecked:
+
  1. PEP 544 (Protocols: Structural subtyping): Defines `typing.Protocol` as the mechanism for structural subtyping in Python. `@runtime_checkable` enables isinstance checks. This is the Python-native way to define service interfaces.
  2. Backstage Backend Services Architecture: ServiceRef (typed reference) + ServiceFactory (construction) + DI container (backend instance) is the direct TypeScript analog. Python equivalent: Protocol + `@lru_cache` provider + composition root. Every Backstage core service has an interface type (ServiceRef) - our standard mirrors this for Python.
  3. Hexagonal Architecture / Ports and Adapters (Cockburn): Application core depends on port interfaces (Protocols), not adapter implementations (concrete classes). Adapters are constructed at the composition root and injected through ports. Directly supports Standards 1-3.
  4. Cosmic Python - Repository Pattern (Chapter 2): Defines repository Protocols for persistence, with concrete implementations (SQLAlchemy, in-memory) assembled at bootstrap. Exactly the StorageService pattern we're implementing.
  5. FastAPI Dependency Overrides: `app.dependency_overrides[provider_function] = lambda: fake_impl` is the framework-native mechanism for swapping service implementations in tests. Directly supports Standard 4.
  6. Martin Fowler - "Role Interface" (2006): Clients should depend on role interfaces tailored to their needs, not broad service interfaces. Supports P5 (capability-named Protocols) and narrow-slice injection.
+
 - Alignment summary:
- - Protocol for service contracts aligns with PEP 544, Hexagonal Architecture ports, Backstage ServiceRef, and Cosmic Python repository pattern.
- - `@runtime_checkable` aligns with Python testing conventions and FastAPI dependency override patterns.
- - Service classification (A/B/C) aligns with Hexagonal Architecture's distinction between ports (Category A), application services (Category B), and adapters (Category C).
- - Client-layer boundary aligns with Ports and Adapters - clients are adapters that should be hidden behind ports.
+- Protocol for service contracts aligns with PEP 544, Hexagonal Architecture ports, Backstage ServiceRef, and Cosmic Python repository pattern.
+- `@runtime_checkable` aligns with Python testing conventions and FastAPI dependency override patterns.
+- Service classification (A/B/C) aligns with Hexagonal Architecture's distinction between ports (Category A), application services (Category B), and adapters (Category C).
+- Client-layer boundary aligns with Ports and Adapters - clients are adapters that should be hidden behind ports.
 - Intentional deviations:
- - Category B services (shared utilities) do not get Protocol contracts. This deviates from Backstage (where even logging has a ServiceRef) because Python's `structlog` and similar libraries are not meaningfully swappable - the abstraction cost exceeds the swap probability.
+- Category B services (shared utilities) do not get Protocol contracts. This deviates from Backstage (where even logging has a ServiceRef) because Python's `structlog` and similar libraries are not meaningfully swappable - the abstraction cost exceeds the swap probability.
 
 ## Freshness Review
 
@@ -370,75 +381,83 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 - If Yes, status set to stale: No
 - Validation summary: Tier-2 standard implementing ADR-0045 Principle 6 and ADR-0048 Boundary 7. Classifies infrastructure services, defines the Protocol contract pattern, codifies the client-layer boundary, and establishes the migration path. Amended 2026-04-30 to add delegation tier declaration per ADR-0045 P7.
 - Follow-up actions:
- - Amend ADR-0056 to reference Protocol return type requirement (Standard 2.3 of this ADR).
- - Execute P0 migration: StorageService Protocol.
- - Update migration map with ADR-0077 row.
- - Add code review checklist item for Protocol contract requirement on new Category A services.
- - Cascade delegation tier declarations to ADR-0061 (identity provider tier documentation).
+- Amend ADR-0056 to reference Protocol return type requirement (Standard 2.3 of this ADR).
+- Execute P0 migration: StorageService Protocol.
+- Update migration map with ADR-0077 row.
+- Add code review checklist item for Protocol contract requirement on new Category A services.
+- Cascade delegation tier declarations to ADR-0061 (identity provider tier documentation).
 
 ## Source References
 
 1. Source title: PEP 544 - Protocols: Structural subtyping (static duck typing)
- - URL: https://peps.python.org/pep-0544/
- - Publisher/maintainer: Python Software Foundation
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Defines the language mechanism for service contracts used throughout this standard.
 
-2. Source title: Backstage Backend Services Architecture
- - URL: https://backstage.io/docs/backend-system/architecture/services
- - Publisher/maintainer: Backstage / CNCF
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Original mental model for the shared service layer. ServiceRef + ServiceFactory = Protocol + provider function. Every core service has an interface type.
+- URL: <https://peps.python.org/pep-0544/>
+- Publisher/maintainer: Python Software Foundation
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Defines the language mechanism for service contracts used throughout this standard.
 
-3. Source title: Hexagonal Architecture (Ports and Adapters)
- - URL: https://alistair.cockburn.us/hexagonal-architecture/
- - Publisher/maintainer: Alistair Cockburn
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Ports (Protocols) define the application's required interfaces; adapters (concrete implementations) satisfy them. Adapters are assembled at the composition root.
+1. Source title: Backstage Backend Services Architecture
 
-4. Source title: Architecture Patterns with Python - Chapter 2: Repository Pattern
- - URL: https://www.cosmicpython.com/book/chapter_02_repository.html
- - Publisher/maintainer: Harry Percival, Bob Gregory
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Demonstrates the Protocol -> concrete implementation -> bootstrap assembly pattern for persistence services in Python. Directly analogous to our StorageService migration.
+- URL: <https://backstage.io/docs/backend-system/architecture/services>
+- Publisher/maintainer: Backstage / CNCF
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Original mental model for the shared service layer. ServiceRef + ServiceFactory = Protocol + provider function. Every core service has an interface type.
 
-5. Source title: FastAPI - Testing Dependencies with Overrides
- - URL: https://fastapi.tiangolo.com/advanced/testing-dependencies/
- - Publisher/maintainer: Sebastian Ramirez / FastAPI
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: `app.dependency_overrides` is the framework-native mechanism for swapping service implementations in tests, directly supporting Standard 4.
+1. Source title: Hexagonal Architecture (Ports and Adapters)
 
-6. Source title: Martin Fowler - Role Interface
- - URL: https://martinfowler.com/bliki/RoleInterface.html
- - Publisher/maintainer: Martin Fowler
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Clients should depend on role-specific interfaces, not broad service classes. Supports Protocol naming conventions (P5) and narrow interface design.
+- URL: <https://alistair.cockburn.us/hexagonal-architecture/>
+- Publisher/maintainer: Alistair Cockburn
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Ports (Protocols) define the application's required interfaces; adapters (concrete implementations) satisfy them. Adapters are assembled at the composition root.
 
-7. Source title: ADR-0045 - Core Architectural Principles (Principle 6)
- - URL: docs/decisions/adr/0045-core-architectural-principles.md
- - Publisher/maintainer: SRE Team
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Parent Tier-1 principle mandating Protocol contracts for feature-facing infrastructure services.
+1. Source title: Architecture Patterns with Python - Chapter 2: Repository Pattern
 
-8. Source title: ADR-0048 - Dependency and Import Boundary Constitution (Boundaries 2, 7)
- - URL: docs/decisions/adr/0048-dependency-and-import-boundary-constitution.md
- - Publisher/maintainer: SRE Team
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Parent Tier-1 constitution requiring Protocol types at the injection surface and features depending on Protocols, not concrete classes.
+- URL: <https://www.cosmicpython.com/book/chapter_02_repository.html>
+- Publisher/maintainer: Harry Percival, Bob Gregory
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Demonstrates the Protocol -> concrete implementation -> bootstrap assembly pattern for persistence services in Python. Directly analogous to our StorageService migration.
+
+1. Source title: FastAPI - Testing Dependencies with Overrides
+
+- URL: <https://fastapi.tiangolo.com/advanced/testing-dependencies/>
+- Publisher/maintainer: Sebastian Ramirez / FastAPI
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: `app.dependency_overrides` is the framework-native mechanism for swapping service implementations in tests, directly supporting Standard 4.
+
+1. Source title: Martin Fowler - Role Interface
+
+- URL: <https://martinfowler.com/bliki/RoleInterface.html>
+- Publisher/maintainer: Martin Fowler
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Clients should depend on role-specific interfaces, not broad service classes. Supports Protocol naming conventions (P5) and narrow interface design.
+
+1. Source title: ADR-0045 - Core Architectural Principles (Principle 6)
+
+- URL: docs/decisions/adr/0045-core-architectural-principles.md
+- Publisher/maintainer: SRE Team
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Parent Tier-1 principle mandating Protocol contracts for feature-facing infrastructure services.
+
+1. Source title: ADR-0048 - Dependency and Import Boundary Constitution (Boundaries 2, 7)
+
+- URL: docs/decisions/adr/0048-dependency-and-import-boundary-constitution.md
+- Publisher/maintainer: SRE Team
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Parent Tier-1 constitution requiring Protocol types at the injection surface and features depending on Protocols, not concrete classes.
 
 ## Implementation Guidance
 
 - Required changes:
- - Amend ADR-0056 Standard 1 or add new standard referencing Protocol return type requirement.
- - Execute Protocol migrations in priority order (P0: StorageService first).
- - Add migration Tier-5 ADRs for each Protocol migration (similar to ADR-0070 through ADR-0075 pattern).
+- Amend ADR-0056 Standard 1 or add new standard referencing Protocol return type requirement.
+- Execute Protocol migrations in priority order (P0: StorageService first).
+- Add migration Tier-5 ADRs for each Protocol migration (similar to ADR-0070 through ADR-0075 pattern).
 - Validation and quality gates:
- - `mypy --strict` should verify that feature code depends on Protocol types, not concrete classes.
- - `isinstance(service, ProtocolType)` checks in provider functions validate structural conformance.
- - Each Protocol migration must pass full test suite before and after.
+- `mypy --strict` should verify that feature code depends on Protocol types, not concrete classes.
+- `isinstance(service, ProtocolType)` checks in provider functions validate structural conformance.
+- Each Protocol migration must pass full test suite before and after.
 - Test strategy and acceptance criteria impact:
- - Each Protocol migration must include a test double (in-memory or fake implementation).
- - Existing tests using mock patches of concrete classes should be migrated to Protocol-based test doubles.
+- Each Protocol migration must include a test double (in-memory or fake implementation).
+- Existing tests using mock patches of concrete classes should be migrated to Protocol-based test doubles.
 
 ## Change Log
 

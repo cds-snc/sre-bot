@@ -22,9 +22,11 @@ impacts:
  - ADR-0048
  - ADR-0049
  - ADR-0050
+ - ADR-0052
  - ADR-0054
  - ADR-0055
  - ADR-0056
+ - ADR-0059
  - ADR-0065
  - ADR-0077
  - ADR-0079
@@ -49,17 +51,17 @@ related_packages: []
 
 - Problem statement: The prior ADR-0001 mixed foundational principles with implementation-specific examples (code snippets, library usage patterns, async migration guidance). This caused Tier-1 scope leakage: downstream ADRs inherited both principle authority and implementation detail from a single record, making it unclear which constraints were foundational and which were refinable at lower tiers.
 - Business/operational drivers:
- - Establish a clean Tier-1 principle record that constrains all downstream standards and patterns without dictating implementation.
- - Support reliable multi-task ECS deployment with strict boundaries between principle and implementation.
- - Provide a stable foundation that can evolve independently of specific library versions or API patterns.
+- Establish a clean Tier-1 principle record that constrains all downstream standards and patterns without dictating implementation.
+- Support reliable multi-task ECS deployment with strict boundaries between principle and implementation.
+- Provide a stable foundation that can evolve independently of specific library versions or API patterns.
 - Constraints:
- - Python 3.12+ runtime target.
- - FastAPI as the web framework.
- - Multi-task ECS deployment with no shared in-memory state across tasks.
- - All implementation specifics (code examples, library-specific patterns, migration guidance) must be delegated to Tier-2 standards.
+- Python 3.12+ runtime target.
+- FastAPI as the web framework.
+- Multi-task ECS deployment with no shared in-memory state across tasks.
+- All implementation specifics (code examples, library-specific patterns, migration guidance) must be delegated to Tier-2 standards.
 - Non-goals:
- - This record does not prescribe specific library versions, API patterns, or code-level conventions.
- - This record does not define async migration strategy or sync/async handler selection criteria.
+- This record does not prescribe specific library versions, API patterns, or code-level conventions.
+- This record does not define async migration strategy or sync/async handler selection criteria.
 
 ## Decision
 
@@ -77,6 +79,7 @@ All services must receive their dependencies through an explicit injection mecha
 ### Principle 3: Strict Layer Separation
 
 The application is organized into three layers with unidirectional dependency flow:
+
 1. **Application layer** (routes, jobs, event handlers) - consumes services through an injection boundary.
 2. **Service layer** (providers, dependency wiring) - assembles infrastructure components and exposes them to the application layer.
 3. **Infrastructure layer** (clients, configuration, persistence, operations) - provides reusable, standardized core services through Protocol-based contracts, enabling feature packages to consume capabilities without coupling to specific backing-service implementations.
@@ -108,33 +111,38 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 ## Alternatives Considered
 
 1. Retain principles and implementation guidance in one Tier-1 record:
- - Pros: Single reference for both principle and practice.
- - Cons: Tier-1 scope leakage; implementation changes force Tier-1 amendments; downstream ADRs cannot distinguish binding principles from refinable guidance.
- - Why not chosen: Violates ADR-0044 governance rule of one authority level per record and ADR-0051 taxonomy enforcement.
+
+- Pros: Single reference for both principle and practice.
+- Cons: Tier-1 scope leakage; implementation changes force Tier-1 amendments; downstream ADRs cannot distinguish binding principles from refinable guidance.
+- Why not chosen: Violates ADR-0044 governance rule of one authority level per record and ADR-0051 taxonomy enforcement.
+
 2. Keep at six principles and handle delegation at Tier-2 only:
- - Pros: Fewer Tier-1 constraints; less amendment friction.
- - Cons: The delegation hierarchy is a foundational design intent that completes Principle 6. Without a Tier-1 mandate, teams could implement custom infrastructure when managed services or proven libraries exist, accumulating unnecessary operational burden. The pattern parallels Principle 6: Protocol contracts govern the port shape; the delegation hierarchy governs what sits behind the adapter.
- - Why not chosen: The preference for managed services over custom code is a core architectural posture aligned with GC Cloud Adoption Strategy, AWS Well-Architected Framework, and Twelve-Factor backing services. It must constrain all downstream standards.
+
+- Pros: Fewer Tier-1 constraints; less amendment friction.
+- Cons: The delegation hierarchy is a foundational design intent that completes Principle 6. Without a Tier-1 mandate, teams could implement custom infrastructure when managed services or proven libraries exist, accumulating unnecessary operational burden. The pattern parallels Principle 6: Protocol contracts govern the port shape; the delegation hierarchy governs what sits behind the adapter.
+- Why not chosen: The preference for managed services over custom code is a core architectural posture aligned with GC Cloud Adoption Strategy, AWS Well-Architected Framework, and Twelve-Factor backing services. It must constrain all downstream standards.
+
 3. Omit Protocol-driven contracts as a principle and handle at Tier-2 only:
- - Pros: Fewer Tier-1 constraints; less amendment friction.
- - Cons: The swappable service layer is a foundational architectural intent, not an implementation detail. Without a Tier-1 mandate, Protocol adoption would be optional and inconsistent.
- - Why not chosen: The ability to swap backing-service implementations without modifying feature code is a core design goal that must constrain all downstream standards.
+
+- Pros: Fewer Tier-1 constraints; less amendment friction.
+- Cons: The swappable service layer is a foundational architectural intent, not an implementation detail. Without a Tier-1 mandate, Protocol adoption would be optional and inconsistent.
+- Why not chosen: The ability to swap backing-service implementations without modifying feature code is a core design goal that must constrain all downstream standards.
 
 ## Consequences
 
 - Positive impacts:
- - Clean Tier-1 record with no implementation leakage.
- - Downstream Tier-2 standards can evolve implementation details independently.
- - Principle boundaries are reviewable and auditable per ADR-0051 taxonomy enforcement.
+- Clean Tier-1 record with no implementation leakage.
+- Downstream Tier-2 standards can evolve implementation details independently.
+- Principle boundaries are reviewable and auditable per ADR-0051 taxonomy enforcement.
 - Tradeoffs accepted:
- - Developers must consult both this Tier-1 record and relevant Tier-2 standards for complete guidance.
- - The seven principles are deliberately abstract; actionable implementation rules live in lower-tier ADRs.
- - Principle 7 introduces a delegation evaluation step when selecting infrastructure implementations. This overhead is justified by the long-term reduction in custom code maintenance burden.
+- Developers must consult both this Tier-1 record and relevant Tier-2 standards for complete guidance.
+- The seven principles are deliberately abstract; actionable implementation rules live in lower-tier ADRs.
+- Principle 7 introduces a delegation evaluation step when selecting infrastructure implementations. This overhead is justified by the long-term reduction in custom code maintenance burden.
 - Risks introduced:
- - Principles may be too abstract for new team members without accompanying Tier-2 standards.
+- Principles may be too abstract for new team members without accompanying Tier-2 standards.
 - Mitigations:
- - Each principle has explicit downstream ADR references in the `impacts` metadata.
- - Onboarding documentation should reference both Tier-1 principles and their Tier-2 elaborations.
+- Each principle has explicit downstream ADR references in the `impacts` metadata.
+- Onboarding documentation should reference both Tier-1 principles and their Tier-2 elaborations.
 
 ## Compliance and Boundaries
 
@@ -150,24 +158,24 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 
 - Revalidation date: 2026-04-28
 - Sources rechecked:
- - Twelve-Factor App: Factor III (Config), Factor IV (Backing Services), Factor VI (Processes), Factor IX (Disposability).
- - Python 3.12+ typing and dependency injection conventions.
- - FastAPI dependency injection documentation (Annotated + Depends pattern).
- - OWASP secure logging and credential management guidance.
- - Python `typing.Protocol` documentation (PEP 544) for structural subtyping contracts.
- - Backstage backend services architecture (service interfaces, service factories, service references) as the original inspiration for the shared service layer model.
- - AWS Well-Architected Framework — Operational Excellence pillar (managed service preference).
- - GC Cloud Adoption Strategy (2018/2023) — Principle 8 (portability), service model priority (SaaS > PaaS > IaaS).
- - Hexagonal Architecture / Ports and Adapters (Cockburn) — governance of what sits behind the adapter.
+- Twelve-Factor App: Factor III (Config), Factor IV (Backing Services), Factor VI (Processes), Factor IX (Disposability).
+- Python 3.12+ typing and dependency injection conventions.
+- FastAPI dependency injection documentation (Annotated + Depends pattern).
+- OWASP secure logging and credential management guidance.
+- Python `typing.Protocol` documentation (PEP 544) for structural subtyping contracts.
+- Backstage backend services architecture (service interfaces, service factories, service references) as the original inspiration for the shared service layer model.
+- AWS Well-Architected Framework — Operational Excellence pillar (managed service preference).
+- GC Cloud Adoption Strategy (2018/2023) — Principle 8 (portability), service model priority (SaaS > PaaS > IaaS).
+- Hexagonal Architecture / Ports and Adapters (Cockburn) — governance of what sits behind the adapter.
 - Alignment summary:
- - All seven principles align with Twelve-Factor methodology and current Python/FastAPI best practices.
- - Stateless process design directly implements Factor VI.
- - Fail-fast configuration validation aligns with Factor III and pydantic-settings validation patterns.
- - Security-by-default boundaries align with OWASP logging and secrets management guidance.
- - Protocol-driven service contracts align with PEP 544 structural subtyping, the Ports and Adapters pattern, and Backstage's ServiceRef + ServiceFactory model adapted for Python.
- - Managed service delegation hierarchy aligns with Twelve-Factor Factor IV (backing services as attached resources, swappable via config), AWS Well-Architected ("use managed services to reduce undifferentiated heavy lifting"), GC Cloud Adoption Strategy Principle 8 (portability and interoperability), and Hexagonal Architecture (governance of adapter implementations behind port contracts).
+- All seven principles align with Twelve-Factor methodology and current Python/FastAPI best practices.
+- Stateless process design directly implements Factor VI.
+- Fail-fast configuration validation aligns with Factor III and pydantic-settings validation patterns.
+- Security-by-default boundaries align with OWASP logging and secrets management guidance.
+- Protocol-driven service contracts align with PEP 544 structural subtyping, the Ports and Adapters pattern, and Backstage's ServiceRef + ServiceFactory model adapted for Python.
+- Managed service delegation hierarchy aligns with Twelve-Factor Factor IV (backing services as attached resources, swappable via config), AWS Well-Architected ("use managed services to reduce undifferentiated heavy lifting"), GC Cloud Adoption Strategy Principle 8 (portability and interoperability), and Hexagonal Architecture (governance of adapter implementations behind port contracts).
 - Intentional deviations:
- - The original Backstage mental model included plugin-to-plugin isolation (no code-level communication between plugins). This rule applies correctly to feature packages (`app/packages`) but was incorrectly applied to infrastructure services in early ADRs. Infrastructure services are shared utilities that compose freely - analogous to Backstage's core services, not to Backstage's plugins. This deviation from the original mental model is intentional and corrective.
+- The original Backstage mental model included plugin-to-plugin isolation (no code-level communication between plugins). This rule applies correctly to feature packages (`app/packages`) but was incorrectly applied to infrastructure services in early ADRs. Infrastructure services are shared utilities that compose freely - analogous to Backstage's core services, not to Backstage's plugins. This deviation from the original mental model is intentional and corrective.
 
 ## Freshness Review
 
@@ -176,68 +184,85 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 - If Yes, status set to stale: No
 - Validation summary: Canonical rewrite of ADR-0001 with implementation examples removed and principle scope enforced per ADR-0044 and ADR-0051. P7 amendment adds managed service delegation hierarchy as a foundational principle.
 - Follow-up actions:
- - Ensure all downstream Tier-2 standards reference this record in `constrained_by`.
- - Mark ADR-0001 as superseded with `superseded_by: [ADR-0045]`.
- - Cascade P7 delegation hierarchy into ADR-0077 (Category A delegation tier declaration), ADR-0047 (backend settings pattern), ADR-0056 (provider backend selection), ADR-0054 (dev/test fallback), ADR-0055 (backend settings dissolution), ADR-0044 (Tier-5 library adoption trigger), ADR-0079 (queue/messaging rework).
+- Ensure all downstream Tier-2 standards reference this record in `constrained_by`.
+- Mark ADR-0001 as superseded with `superseded_by: [ADR-0045]`.
+- Cascade P7 delegation hierarchy into ADR-0077 (Category A delegation tier declaration), ADR-0047 (backend settings pattern), ADR-0056 (provider backend selection), ADR-0054 (dev/test fallback), ADR-0055 (backend settings dissolution), ADR-0044 (Tier-5 library adoption trigger), ADR-0079 (queue/messaging rework).
 
 ## Source References
 
 1. Source title: Twelve-Factor App Methodology
- - URL: https://12factor.net/
- - Publisher/maintainer: 12factor contributors
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Factors III, VI, IX directly inform principles 1, 4, and 5.
+
+- URL: <https://12factor.net/>
+- Publisher/maintainer: 12factor contributors
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Factors III, VI, IX directly inform principles 1, 4, and 5.
+
 2. Source title: FastAPI Dependency Injection Documentation
- - URL: https://fastapi.tiangolo.com/tutorial/dependencies/
- - Publisher/maintainer: Sebastian Ramirez / FastAPI
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Confirms framework support for explicit DI pattern (Principle 2).
+
+- URL: <https://fastapi.tiangolo.com/tutorial/dependencies/>
+- Publisher/maintainer: Sebastian Ramirez / FastAPI
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Confirms framework support for explicit DI pattern (Principle 2).
+
 3. Source title: OWASP Logging Cheat Sheet
- - URL: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
- - Publisher/maintainer: OWASP Foundation
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Confirms security-by-default logging boundaries (Principle 5).
+
+- URL: <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html>
+- Publisher/maintainer: OWASP Foundation
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Confirms security-by-default logging boundaries (Principle 5).
+
 4. Source title: ADR-0001 (Legacy - Core Architectural Principles)
- - URL: docs/decisions/adr/superseded/0001-core-architectural-principles.md
- - Publisher/maintainer: SRE Team
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Source record being superseded; principles extracted and implementation details removed.
+
+- URL: docs/decisions/adr/superseded/0001-core-architectural-principles.md
+- Publisher/maintainer: SRE Team
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Source record being superseded; principles extracted and implementation details removed.
+
 5. Source title: PEP 544 - Protocols: Structural subtyping (static duck typing)
- - URL: https://peps.python.org/pep-0544/
- - Publisher/maintainer: Python Software Foundation
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Defines Python's Protocol mechanism for structural subtyping, providing the language-level foundation for Principle 6 service contracts.
+
+- URL: <https://peps.python.org/pep-0544/>
+- Publisher/maintainer: Python Software Foundation
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Defines Python's Protocol mechanism for structural subtyping, providing the language-level foundation for Principle 6 service contracts.
+
 6. Source title: Backstage Backend Services Architecture
- - URL: https://backstage.io/docs/backend-system/architecture/services
- - Publisher/maintainer: Backstage / CNCF
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Original inspiration for the shared service layer mental model. Service interfaces (ServiceRef) + service factories (createServiceFactory) + DI container (backend instance) map to Protocol + provider function + composition root in Python.
+
+- URL: <https://backstage.io/docs/backend-system/architecture/services>
+- Publisher/maintainer: Backstage / CNCF
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Original inspiration for the shared service layer mental model. Service interfaces (ServiceRef) + service factories (createServiceFactory) + DI container (backend instance) map to Protocol + provider function + composition root in Python.
+
 7. Source title: AWS Well-Architected Framework — Operational Excellence Pillar
- - URL: https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/
- - Publisher/maintainer: Amazon Web Services
- - Accessed date (YYYY-MM-DD): 2026-04-30
- - Relevance summary: "Use managed services to reduce operational burden" — directly informs Principle 7's preference for managed cloud services over custom implementations.
+
+- URL: <https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/>
+- Publisher/maintainer: Amazon Web Services
+- Accessed date (YYYY-MM-DD): 2026-04-30
+- Relevance summary: "Use managed services to reduce operational burden" — directly informs Principle 7's preference for managed cloud services over custom implementations.
+
 8. Source title: Government of Canada Cloud Adoption Strategy
- - URL: https://www.canada.ca/en/government/system/digital-government/digital-government-innovations/cloud-services/government-canada-cloud-adoption-strategy.html
- - Publisher/maintainer: Treasury Board of Canada Secretariat
- - Accessed date (YYYY-MM-DD): 2026-04-30
- - Relevance summary: Principle 8 (portability and interoperability) and service model priority (SaaS > PaaS > IaaS) directly inform Principle 7's delegation hierarchy and configurable backend requirement.
+
+- URL: <https://www.canada.ca/en/government/system/digital-government/digital-government-innovations/cloud-services/government-canada-cloud-adoption-strategy.html>
+- Publisher/maintainer: Treasury Board of Canada Secretariat
+- Accessed date (YYYY-MM-DD): 2026-04-30
+- Relevance summary: Principle 8 (portability and interoperability) and service model priority (SaaS > PaaS > IaaS) directly inform Principle 7's delegation hierarchy and configurable backend requirement.
+
 9. Source title: Twelve-Factor App — Factor IV: Backing Services
- - URL: https://12factor.net/backing-services
- - Publisher/maintainer: 12factor contributors
- - Accessed date (YYYY-MM-DD): 2026-04-30
- - Relevance summary: "Treat backing services as attached resources" — swap between local and third-party services via configuration. Directly supports Principle 7's configurable backend model.
+
+- URL: <https://12factor.net/backing-services>
+- Publisher/maintainer: 12factor contributors
+- Accessed date (YYYY-MM-DD): 2026-04-30
+- Relevance summary: "Treat backing services as attached resources" — swap between local and third-party services via configuration. Directly supports Principle 7's configurable backend model.
 
 ## Implementation Guidance
 
 - Required changes:
- - Mark ADR-0001 as `status: Superseded` and add `superseded_by: [ADR-0045]`.
- - Ensure all Tier-2 standards that implement these principles include `constrained_by: [ADR-0045]`.
+- Mark ADR-0001 as `status: Superseded` and add `superseded_by: [ADR-0045]`.
+- Ensure all Tier-2 standards that implement these principles include `constrained_by: [ADR-0045]`.
 - Validation and quality gates:
- - ADR-0051 taxonomy check: confirm this record contains no implementation-level code examples or library-specific patterns.
- - Metadata completeness check: all 18 fields populated.
+- ADR-0051 taxonomy check: confirm this record contains no implementation-level code examples or library-specific patterns.
+- Metadata completeness check: all 18 fields populated.
 - Test strategy and acceptance criteria impact:
- - No direct test changes; principles are validated through downstream standard compliance.
+- No direct test changes; principles are validated through downstream standard compliance.
 
 ## Change Log
 

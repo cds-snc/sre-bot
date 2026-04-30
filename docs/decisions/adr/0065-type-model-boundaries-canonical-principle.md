@@ -25,7 +25,10 @@ impacts:
   - ADR-0056
   - ADR-0059
   - ADR-0060
+  - ADR-0061
+  - ADR-0062
   - ADR-0063
+  - ADR-0064
   - ADR-0077
 supersedes:
   - ADR-0040

@@ -30,6 +30,7 @@ superseded_by: []
 review_state: current
 related_records:
   - ADR-0049
+  - ADR-0054
   - ADR-0076
   - ADR-0078
 related_packages:
