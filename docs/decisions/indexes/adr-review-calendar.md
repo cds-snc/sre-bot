@@ -4,7 +4,6 @@
 
 | ID | Title | Due Date | Status | Review State |
 |---|---|---|---|---|
-| [ADR-0014](../adr/0014-slack-socket-mode.md) | Slack Socket Mode | 2026-04-28 | Accepted | stale |
 | [ADR-0046](../adr/0046-runtime-lifecycle-and-lifespan-canonical-model.md) | Runtime Lifecycle and Lifespan Canonical Model | 2026-08-26 | Accepted | current |
 | [ADR-0048](../adr/0048-dependency-and-import-boundary-constitution.md) | Dependency and Import Boundary Constitution | 2026-08-26 | Accepted | current |
 | [ADR-0049](../adr/0049-plugin-registration-and-startup-reliability-policy.md) | Plugin Registration and Startup Reliability Policy | 2026-08-26 | Accepted | current |
@@ -35,7 +34,7 @@
 | [ADR-0064](../adr/0064-security-and-rate-limiting-api-protection.md) | Security and Rate-Limiting API Protection | 2026-08-28 | Accepted | current |
 | [ADR-0065](../adr/0065-type-model-boundaries-canonical-principle.md) | Type-Model Boundaries Canonical Principle | 2026-08-28 | Accepted | current |
 | [ADR-0066](../adr/0066-access-config-env-source-naming.md) | Access Config Env-Source Naming | 2026-08-28 | Accepted | current |
-| [ADR-0067](../adr/0067-slack-transport-integration.md) | Slack Transport Integration Decision | 2026-08-28 | Draft | current |
+| [ADR-0067](../adr/0067-slack-transport-integration.md) | Slack Transport Integration Decision | 2026-08-28 | Accepted | current |
 | [ADR-0077](../adr/0077-infrastructure-service-contract-standard.md) | Infrastructure Service Contract Standard | 2026-08-28 | Accepted | current |
 | [ADR-0079](../adr/0079-queueing-and-message-broker-architecture-standard.md) | Queueing and Message-Broker Architecture Standard | 2026-08-28 | Accepted | current |
 | [ADR-0076](../adr/0076-infrastructure-intra-layer-import-standard.md) | Infrastructure Intra-Layer Import Standard | 2026-08-29 | Accepted | current |
