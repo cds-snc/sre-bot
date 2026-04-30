@@ -10,7 +10,7 @@
 
 **Active wave:** Wave 6  
 **Parallel activity:** Managed services delegation review — **Complete** (all 7 criteria met)  
-**Next gate:** ADR-0067 scoping → Wave 6 gate close
+**Next gate:** Wave 6 closed → Phase 1 infrastructure foundation
 
 **Note:** ADR-0066 narrowed from "Access Runtime Naming and Operator Scope" to "Access Config Env-Source Naming". Lock lifecycle scope removed — governed by ADR-0058 Standard 9. ADR-0043 rejection stands independently.
 
@@ -27,7 +27,7 @@
 | 3.5 | Tier-5 Feature Settings (0070–0075) | **Complete** |
 | 4 | API + Platform + Queueing (0059–0061, 0063, 0078, 0079) | **Complete** |
 | 5 | Testing + Security + Type Models (0062, 0064, 0065) | **Complete** |
-| 6 | Feature + Integration Decisions (0066, 0067) | In Progress |
+| 6 | Feature + Integration Decisions (0066, 0067) | **Complete** |
 | 7 | Access Sub-Feature Decisions (P1 Tier-4) | Planning — blocked on Phase 1 |
 | 8 | Legacy Module Migration Decisions (P3 Tier-4) | Planning — blocked on Phase 3 thaw |
 
@@ -97,7 +97,7 @@ Opens after Wave 5.
 | ADR | Title | Blocker | Status |
 |-----|-------|---------|--------|
 | 0066 | Access Config Env-Source Naming | None (narrowed to naming only; lock scope governed by ADR-0058 S9) | **Accepted** |
-| 0067 | Slack Transport Integration Decision | None | Draft — awaiting challenge review |
+| 0067 | Slack Transport Integration Decision | None | **R1 REVISE → Revised → R2 PASS — Accepted** |
 
 ### Wave 6 — Feature ADR Derivation Methodology
 
@@ -116,6 +116,17 @@ ADR-0043 (Proposed → Rejected) proposed feature-scoped lock release under `acc
 - Added Standard 9: Singleton Lock Lifecycle and Operator Intervention (6 rules)
 - Challenge review: PASS (2026-04-30)
 - Establishes infrastructure ownership of lock release and operator intervention utility
+
+### Wave 6 — Legacy Supersession and Gate Close
+
+| Item | ADR | Action | Status |
+|------|-----|--------|--------|
+| 1 | 0066 | Challenge review | **R1 PASS — Accepted** |
+| 2 | 0067 | Challenge review | **R1 REVISE → Revised → R2 PASS — Accepted** |
+| 3 | Legacy | Supersession: ADR-0014 → superseded by ADR-0067, moved to `superseded/` | **Complete** |
+| 4 | — | Wave 6 gate close | **Closed 2026-04-30** |
+
+**Note:** ADR-0014 was the last legacy ADR pending supersession. All 43 legacy ADRs (0001–0042, plus 0014) are now superseded.
 
 ---
 

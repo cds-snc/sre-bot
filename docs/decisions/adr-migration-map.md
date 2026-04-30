@@ -35,7 +35,7 @@
 | 0064 | Security and Rate-Limiting API Protection | 2 | 5 | 0037, 0038 | Accepted |
 | 0065 | Type-Model Boundaries Canonical Principle | 1 | 5 | 0040 | Accepted |
 | 0066 | Access Config Env-Source Naming | 4 | 6 | 0042 | Accepted |
-| 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Draft |
+| 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Accepted |
 
 ## Tier-5 Records (Migration / Deprecation)
 
@@ -97,14 +97,11 @@ All files in `adr/superseded/`. Each has `status: Superseded` and `superseded_by
 | 0040 | Type Model Boundaries | 0065 |
 | 0041 | OpenAPI Documentation Standards | 0063 |
 | 0042 | Access Runtime Env-Source Naming | 0066 |
+| 0014 | Slack Socket Mode | 0067 |
 
-## Pending Supersession (Wave 6)
+## Pending Supersession
 
-These legacy ADRs will be superseded when their Tier-4 canonical replacements are accepted:
-
-| Legacy ID | Original Title | Replacement ADR | Status |
-|-----------|----------------|-----------------|--------|
-| 0014 | Slack Socket Mode | ADR-0067 (Draft) | Awaiting challenge review |
+No legacy ADRs pending supersession. All legacy ADRs have been superseded.
 
 ### ADR-0043 — Rejected (Not Superseded)
 
