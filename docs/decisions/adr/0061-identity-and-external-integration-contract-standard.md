@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0061
 title: "Identity and External Integration Contract Standard"
-status: Draft
+status: Accepted
 decision_type: Domain Standard
 tier: Tier-3
 primary_domain: Dependency and Composition
