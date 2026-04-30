@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0067
 title: "Slack Transport Integration Decision"
-status: Draft
+status: Accepted
 decision_type: Integration Decision
 tier: Tier-4
 primary_domain: Transport and API
@@ -116,7 +116,7 @@ The Socket Mode WebSocket connection is managed by a single daemon thread owned 
 - R1: The daemon thread name must be `slack-socket-mode`. Thread must be created with `daemon=True`.
 - R2: The thread runs `SocketModeHandler.connect()` (blocking call). The handler manages WebSocket reconnection internally (Bolt SDK built-in retry).
 - R3: The `SocketModeHandler` and thread reference are stored in provider instance state (not directly in `app.state`). The provider itself is accessible via `app.state` through the `PlatformService`.
-- R4: Only one Socket Mode connection exists per process. Multiple connections per process are prohibited (Slack enforces this at the app-token level; violating it causes message duplication).
+- R4: Only one Socket Mode connection exists per process. Slack supports up to 10 simultaneous connections per app-token for load balancing and graceful restarts, but this application uses a single connection per process for operational simplicity — shutdown coordination, message ordering predictability, and avoiding handler dispatch ambiguity across connections. The application runs multiple ECS tasks (`desired_count = 2`), so Slack distributes inbound events across the resulting connections automatically with no duplication. Horizontal scaling (increasing ECS task count, up to 10) is the preferred throughput strategy; multi-connection per process is not planned.
 - R5: The provider must not install custom signal handlers. Signal handling is uvicorn's responsibility (ADR-0057 S1).
 
 ### S3 — Graceful Shutdown Contract
@@ -208,7 +208,7 @@ All Slack transport events use structured logging via `structlog` (ADR-0054).
 | Decision | Rationale | Standard |
 |---|---|---|
 | Socket Mode as exclusive Slack transport (no HTTP Events API) | Private VPC constraint; eliminates public endpoint requirement | S2 (entire) |
-| Single daemon thread named `slack-socket-mode` | Bolt SDK `SocketModeHandler.connect()` is blocking; one connection per app-token enforced by Slack | S2 R1, S2 R4 |
+| Single daemon thread named `slack-socket-mode` | Bolt SDK `SocketModeHandler.connect()` is blocking; single connection per process chosen for operational simplicity. Slack supports up to 10 connections; horizontal scaling via ECS tasks (currently 2) provides multi-connection distribution without per-process complexity | S2 R1, S2 R4 |
 | `SLACK_SOCKET_MODE` field defaulting to true with future HTTP mode path | Forward-compatible settings schema without current complexity | S5 R5 |
 | Provider-mediated SDK access (features must not import Bolt types) | Prevents coupling to SDK internals; enables future SDK version migration without feature changes | S4 R5 |
 | `slack_` log event prefix namespace | Avoids collision with platform-level and feature-level event names | S7 R1 |
@@ -262,17 +262,17 @@ All Slack transport events use structured logging via `structlog` (ADR-0054).
 ## Source References
 
 1. Source title: Slack Bolt for Python — Socket Mode
-   - URL: <https://slack.dev/bolt-python/concepts#socket-mode>
+   - URL: <https://docs.slack.dev/tools/bolt-python/concepts/socket-mode>
    - Publisher/maintainer: Slack Technologies / Salesforce
    - Accessed date (YYYY-MM-DD): 2026-04-30
    - Relevance summary: Authoritative documentation for SocketModeHandler lifecycle, connect/close semantics, and daemon thread usage patterns.
 2. Source title: Slack API — Socket Mode
-   - URL: <https://api.slack.com/apis/socket-mode>
+   - URL: <https://docs.slack.dev/apis/events-api/using-socket-mode>
    - Publisher/maintainer: Slack Technologies / Salesforce
    - Accessed date (YYYY-MM-DD): 2026-04-30
    - Relevance summary: Socket Mode protocol specification, app-level token requirements, connection limit enforcement (one connection per app-token).
 3. Source title: Slack Bolt for Python — Middleware and Listeners
-   - URL: <https://slack.dev/bolt-python/concepts#middleware>
+   - URL: <https://docs.slack.dev/tools/bolt-python/concepts/middleware>
    - Publisher/maintainer: Slack Technologies / Salesforce
    - Accessed date (YYYY-MM-DD): 2026-04-30
    - Relevance summary: Bolt middleware model (ack(), say(), command parameters) that defines the handler signatures feature hookimpls interact with.
@@ -303,3 +303,6 @@ All Slack transport events use structured logging via `structlog` (ADR-0054).
 ## Change Log
 
 - 2026-04-30: Authored as Draft. Supersedes ADR-0014 (Slack Socket Mode). Codifies SlackPlatformProvider lifecycle alignment, shutdown contract, feature registration hookspec, settings schema, and observability contract.
+- 2026-04-30: R1 challenge review → REVISE. Corrected S2 R4: Slack supports up to 10 simultaneous connections (not 1 as originally claimed). Single connection retained as design choice for operational simplicity. Updated source reference URLs to current docs.slack.dev domain.
+- 2026-04-30: R1 revision applied. S2 R4 expanded: documented multi-task ECS deployment (desired_count=2) as the horizontal scaling model. Slack distributes events across task connections with no duplication. Multi-connection per process not planned. Feature-Specific Decisions table updated to match.
+- 2026-04-30: R2 challenge review → PASS. Status changed from Draft to Accepted. ADR-0014 superseded and moved to `adr/superseded/`. Wave 6 gate closed.
