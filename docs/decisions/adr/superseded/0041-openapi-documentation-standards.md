@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0041
 title: "OpenAPI Documentation Standards"
-status: Accepted
+status: Superseded
 decision_type: Feature
 tier: Tier-4
 date_created: unknown
-last_updated: 2026-04-28
+last_updated: 2026-04-30
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0063
 related_records:
   - ADR-0033
 related_packages: []
