@@ -12,8 +12,8 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
-last_reviewed: 2026-04-29
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
 next_review_due: 2026-08-27
 constrained_by:
  - ADR-0044
@@ -129,6 +129,21 @@ The identity resolution service must support multiple identity sources with dete
 
 All Protocol methods that perform external lookups (Slack API, directory queries) must return `OperationResult[User]` per ADR-0050 Standard 1. Methods that perform only local computation (JWT parsing without external validation) may return the result directly.
 
+**Delegation tier declaration (ADR-0045 P7):** `IdentityService` is classified as **Tier 1 (managed service wrappers)** in the ADR-0077 Category A delegation tier table. The identity resolution backends all delegate to managed external service APIs:
+
+- **JWT / JWKS validation** — delegates to managed JWKS endpoints for signature verification. `JWKSManager` creates a `PyJWKClient` per configured issuer; key material is runtime-refreshed per Standard 6; the endpoint URL is release-phase bound per ADR-0052. The identity provider (IDP) that issues JWTs is a managed service (e.g., Google, Cognito, Entra ID).
+- **Slack API** — resolves platform user identity via the Slack Web API. Platform-specific resolution is Category C per ADR-0078, but the managed API call is the backing service.
+- **Webhook payload** — extracts identity claims from inbound webhook payloads signed by managed external services.
+
+The `IdentityService` itself contains proportional coordination logic (multi-source resolution priority, conflict handling per Standard 2) that orchestrates across these managed service backends. This orchestration layer is domain-specific glue, not a separate infrastructure concern — it does not implement identity provider functionality, it resolves callers by delegating to managed APIs. No Tier 3 justification is required.
+
+**Domain boundary clarification:** `IdentityService` (this standard) governs **interaction identity resolution** — determining *who is calling* from an HTTP request or collaboration platform interaction. It does NOT govern:
+
+- **IDP (source of truth)** — the canonical user/group directory is governed by the `DirectoryProvider` Protocol (Category A, complete). The IDP is currently Google Workspace; a switch to Entra ID or another provider would be a `DirectoryProvider` implementation change, not an `IdentityService` change.
+- **Access sync (IDP → third-party targets)** — syncing identities from the IDP into downstream systems (e.g., AWS Identity Store, GitHub) is an access-domain concern governed by the access package. AWS Identity Store is a *sync target* that receives identities pushed from the IDP — it is not an identity provider and is not part of IdentityService's resolution path.
+
+If a future identity source requires custom resolution logic with no managed API backend, it must document a Tier 3 justification per ADR-0045 P7 and be flagged for future delegation.
+
 ### Standard 4: Identity Settings Dissolution
 
 The `IdentityService` must receive a narrow identity-specific settings slice, not the full `Settings` aggregator:
@@ -144,15 +159,15 @@ This standard implements ADR-0055 Standard 1 and ADR-0056 Standard 1 for the ide
 
 External integration clients are classified per ADR-0077 Standard 1:
 
-| Service | Category | Protocol Required | Rationale |
-|---------|----------|-------------------|-----------|
-| `IdentityService` | **A** (Contract Required) | Yes — P1 priority | Feature-facing; abstracts multi-source identity resolution; backing implementation may change. |
-| `IdentityResolver` | **C** (Implementation Detail) | No | Internal to `IdentityService`; not consumed directly by features. |
-| Slack Client (slack_sdk) | **C** (Implementation Detail) | No | Platform-specific SDK wrapper; consumed by `SlackService` (ADR-0078 Category C). |
-| Google Workspace Clients | **C** (Implementation Detail) | No | Provider-specific API facades; consumed via `DirectoryProvider` Protocol (Category A, complete). |
-| AWS Clients (identity store, organizations, SSO) | **C** (Implementation Detail) | No | Provider-specific API facades; consumed by access sync adapters. Domain-specific operations documented as Category C exceptions per ADR-0077 Standard 3. |
-| GitHub Client | **C** (Implementation Detail) | No | Provider-specific API facade. |
-| GC Notify Client | **C** (Implementation Detail) | No | `NotificationService` wraps this; `NotificationService` is Category A P2 (ADR-0077). |
+| Service | Category | Protocol Required | Delegation Tier | Rationale |
+|---------|----------|-------------------|-----------------|-----------|
+| `IdentityService` | **A** (Contract Required) | Yes — P1 priority | Tier 1 (managed service wrappers — JWT/JWKS endpoints, Slack API) | Feature-facing; abstracts multi-source identity resolution; backing implementation may change. |
+| `IdentityResolver` | **C** (Implementation Detail) | No | N/A | Internal to `IdentityService`; not consumed directly by features. |
+| Slack Client (slack_sdk) | **C** (Implementation Detail) | No | N/A | Platform-specific SDK wrapper; consumed by `SlackService` (ADR-0078 Category C). |
+| Google Workspace Clients | **C** (Implementation Detail) | No | N/A | Provider-specific API facades; consumed via `DirectoryProvider` Protocol (Category A, complete). |
+| AWS Clients (identity store, organizations, SSO) | **C** (Implementation Detail) | No | N/A | Provider-specific API facades; consumed by access sync adapters. Domain-specific operations documented as Category C exceptions per ADR-0077 Standard 3. |
+| GitHub Client | **C** (Implementation Detail) | No | N/A | Provider-specific API facade. |
+| GC Notify Client | **C** (Implementation Detail) | No | N/A | `NotificationService` wraps this; `NotificationService` is Category A P2 (ADR-0077). |
 
 **Rule**: Feature packages must consume Category A services (e.g., `IdentityServiceProtocol`, `DirectoryProvider`, `StorageService`) via the injection boundary (ADR-0048 Boundary 2). Direct import of Category C clients from feature code is prohibited unless documented as a Category C exception (ADR-0077 Standard 3).
 
@@ -209,6 +224,7 @@ Identity provider credentials follow ADR-0052 (build-release-run):
 - Settings partitioning impact: Standard 4 mandates `IdentitySettings` extraction from the monolithic `Settings` aggregator. This is a specific instance of ADR-0055 Standard 1.
 - DI alias ceremony impact: Standard 3 mandates updating the DI alias to use Protocol type. This follows ADR-0056 Standard 4.
 - Service contract impact: Standard 3 mandates Protocol contract per ADR-0077 Standard 2. Standard 5 classifies all external integration clients per ADR-0077 Standard 1.
+- Managed service delegation impact: Standard 3 delegation tier declaration implements ADR-0045 P7 at the identity domain level. `IdentityService` is Tier 1 (managed service wrappers) — identity resolution delegates to managed APIs (JWT/JWKS endpoints, Slack API, webhook payloads from managed services). No Tier 3 justification is required. Standard 5 classification table includes delegation tier for the Category A service; Category C services are marked N/A (delegation tiers apply only to Category A). Domain boundary is explicitly declared: `IdentityService` governs interaction identity resolution only; IDP concerns are governed by `DirectoryProvider`; access sync concerns are governed by the access package. If a future identity source requires custom resolution logic, it must document a Tier 3 justification and be flagged for future delegation.
 
 ## Codebase Audit (2026-04-29)
 
@@ -259,7 +275,7 @@ Identity provider credentials follow ADR-0052 (build-release-run):
 
 ## Freshness Review
 
-- Record age at review time (days): 0
+- Record age at review time (days): 1
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
 - Validation summary: Consolidates ADR-0023 and ADR-0024 into one Tier-3 Domain Standard with Protocol contract mandate, settings dissolution target, external client classification, and credential lifecycle rules. All upstream constraint references verified against current accepted ADRs.
@@ -300,3 +316,7 @@ Identity provider credentials follow ADR-0052 (build-release-run):
    - Publisher/maintainer: SRE Team
    - Accessed date (YYYY-MM-DD): 2026-04-29
    - Relevance summary: Superseded legacy records whose domain-specific content is consolidated here.
+
+## Amendment Record
+
+- 2026-04-30: Delegation tier declaration amendment. Added delegation tier declaration to Standard 3 (IdentityService Protocol Contract) per ADR-0045 P7 (Managed Service Delegation Hierarchy). IdentityService is Tier 1 (managed service wrappers — JWT/JWKS endpoints, Slack API). Added explicit domain boundary clarification: IdentityService governs interaction identity resolution only; IDP (source of truth) is governed by DirectoryProvider; access sync (IDP → third-party targets) is governed by the access package. AWS Identity Store is a sync target, not part of IdentityService's resolution path. Added Delegation Tier column to Standard 5 classification table. Added managed service delegation impact to Compliance section. See managed-services-delegation-adr-review-tracker-2026-04-30.md Item #22.
