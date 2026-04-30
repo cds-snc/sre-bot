@@ -97,7 +97,7 @@ Opens after Wave 5.
 | ADR | Title | Blocker | Status |
 |-----|-------|---------|--------|
 | 0066 | Access Config Env-Source Naming | None (narrowed to naming only; lock scope governed by ADR-0058 S9) | **Accepted** |
-| 0067 | Slack Transport Integration Decision | Webhooks delivery adapter pattern scope needed | Not Started |
+| 0067 | Slack Transport Integration Decision | None | Draft — awaiting challenge review |
 
 ### Wave 6 — Feature ADR Derivation Methodology
 

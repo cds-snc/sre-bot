@@ -35,7 +35,7 @@
 | 0064 | Security and Rate-Limiting API Protection | 2 | 5 | 0037, 0038 | Accepted |
 | 0065 | Type-Model Boundaries Canonical Principle | 1 | 5 | 0040 | Accepted |
 | 0066 | Access Config Env-Source Naming | 4 | 6 | 0042 | Accepted |
-| 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Proposed |
+| 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Draft |
 
 ## Tier-5 Records (Migration / Deprecation)
 
@@ -104,7 +104,7 @@ These legacy ADRs will be superseded when their Tier-4 canonical replacements ar
 
 | Legacy ID | Original Title | Replacement ADR | Status |
 |-----------|----------------|-----------------|--------|
-| 0014 | Slack Socket Mode | ADR-0067 (Proposed) | Awaiting ADR-0067 authoring |
+| 0014 | Slack Socket Mode | ADR-0067 (Draft) | Awaiting challenge review |
 
 ### ADR-0043 — Rejected (Not Superseded)
 
@@ -121,7 +121,7 @@ Tier-4 ADRs not yet allocated in the registry. IDs will be assigned when authori
 | Access / Common | `packages/access/common` | Cross-sub-feature event contracts (evaluate if needed) | P1 | 7 | Phase 1 |
 | Access / Catalog | `packages/access/catalog` | Enumeration and annotation strategy (evaluate if trivial) | P1 | 7 | Phase 1 |
 | Incident | `modules/incident` → `packages/incident` | Incident lifecycle, Slack interaction patterns, stale-channel notification | P3 | 8 | Phase 3 thaw |
-| Webhooks | `modules/webhooks` → `packages/webhooks` | Payload dispatch pattern, webhook registry, delivery adapter | P3 | 8 | Phase 3 thaw |
+| Webhooks | `modules/webhooks` → `packages/webhooks` | Payload dispatch pattern, webhook registry, delivery adapter (platform-agnostic — Slack is one output channel, not the only one) | P3 | 8 | Phase 3 thaw |
 | AWS Ops | `modules/aws` → `packages/aws_ops` | Multi-service integration, async revocation, health monitoring | P3 | 8 | Phase 3 thaw |
 | SRE Ops | `modules/sre` → `packages/sre_ops` | Notification patterns (may not warrant ADR) | P4 | 8 | Phase 3 thaw |
 

@@ -35,6 +35,7 @@
 | [ADR-0064](../adr/0064-security-and-rate-limiting-api-protection.md) | Security and Rate-Limiting API Protection | 2026-08-28 | Accepted | current |
 | [ADR-0065](../adr/0065-type-model-boundaries-canonical-principle.md) | Type-Model Boundaries Canonical Principle | 2026-08-28 | Accepted | current |
 | [ADR-0066](../adr/0066-access-config-env-source-naming.md) | Access Config Env-Source Naming | 2026-08-28 | Accepted | current |
+| [ADR-0067](../adr/0067-slack-transport-integration.md) | Slack Transport Integration Decision | 2026-08-28 | Draft | current |
 | [ADR-0077](../adr/0077-infrastructure-service-contract-standard.md) | Infrastructure Service Contract Standard | 2026-08-28 | Accepted | current |
 | [ADR-0079](../adr/0079-queueing-and-message-broker-architecture-standard.md) | Queueing and Message-Broker Architecture Standard | 2026-08-28 | Accepted | current |
 | [ADR-0076](../adr/0076-infrastructure-intra-layer-import-standard.md) | Infrastructure Intra-Layer Import Standard | 2026-08-29 | Accepted | current |

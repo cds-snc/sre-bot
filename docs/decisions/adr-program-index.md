@@ -21,8 +21,30 @@
 | `adr/superseded/` | Legacy ADRs with `status: Superseded` |
 | `reviews/` | Challenge review artifacts |
 | `analysis/` | Supporting decision assessments and architectural analyses |
-| `templates/` | ADR metadata template |
-| `references/` | Reference materials and reusable review methodologies |
+| `templates/` | ADR metadata template and challenge review template |
+| `references/` | Reference materials, reusable methodologies, and architectural frameworks |
+
+### Reference Documents
+
+| Document | Purpose |
+|----------|---------|
+| [Authoring Workflow](references/adr-authoring-workflow.md) | ADR authoring, review, and acceptance procedure |
+| [HV Review Methodology](references/adr-horizontal-vertical-review-methodology.md) | Cross-ADR consistency review process |
+| [Delegation Framework](references/managed-services-delegation-framework.md) | Three-tier managed service delegation hierarchy (ADR-0045 P7) |
+| [Tier-3 Gap Analysis](references/tier3-domain-gap-analysis.md) | Domain contract coverage gaps — Wave 7 prerequisite |
+| [Mental Model Reconciliation](references/architecture-mental-model-reconciliation.md) | Backstage vs Python/FastAPI architecture root cause (ADR-0076) |
+| [Product Purpose](references/product-purpose.md) | Product context and mission |
+| [Runtime and Tech Stack](references/runtime-and-tech-stack.md) | Technology stack reference |
+
+### Analysis Documents
+
+| Document | Purpose |
+|----------|---------|
+| [Platform Services Assessment](analysis/platform-services-assessment.md) | InteractionProvider Protocol rejection rationale (ADR-0078) |
+| [Interaction Provider Analysis](analysis/interaction-provider-abstraction-analysis.md) | Unified abstraction risk assessment (ADR-0059) |
+| [Legacy Module Coupling](analysis/legacy-module-coupling-assessment.md) | Module coupling profiles and migration sequencing |
+| [Infrastructure Decentralization](analysis/infrastructure-decentralization-inventory.md) | Settings/provider current-state audit (ADR-0055, ADR-0056) |
+| [Delegation Assessment](analysis/managed-services-delegation-assessment.md) | Build-vs-delegate codebase audit and migration roadmap |
 
 ## Historical Context
 

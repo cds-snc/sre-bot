@@ -33,6 +33,7 @@ This is the complete index of all Architecture Decision Records.
 | [ADR-0064](../adr/0064-security-and-rate-limiting-api-protection.md) | Security and Rate-Limiting API Protection | Accepted | 2 | Standard |
 | [ADR-0065](../adr/0065-type-model-boundaries-canonical-principle.md) | Type-Model Boundaries Canonical Principle | Accepted | 1 | Principle |
 | [ADR-0066](../adr/0066-access-config-env-source-naming.md) | Access Config Env-Source Naming | Accepted | 4 | Feature Decision |
+| [ADR-0067](../adr/0067-slack-transport-integration.md) | Slack Transport Integration Decision | Draft | 4 | Integration Decision |
 | [ADR-0070](../adr/0070-groups-feature-settings-retirement.md) | GroupsFeatureSettings Retirement | Accepted | 5 | Deprecation Decision |
 | [ADR-0071](../adr/0071-commands-settings-retirement.md) | CommandsSettings Retirement | Accepted | 5 | Deprecation Decision |
 | [ADR-0072](../adr/0072-incident-feature-settings-migration.md) | IncidentFeatureSettings Migration to packages/incident | Accepted | 5 | Migration Decision |

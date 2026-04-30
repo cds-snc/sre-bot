@@ -111,6 +111,10 @@
 - [ADR-0043](../adr/0043-access-admin-operator-stuck-lock-scope.md): Access Admin Operator Stuck-Lock Scope - **Rejected**
 - [ADR-0066](../adr/0066-access-config-env-source-naming.md): Access Config Env-Source Naming - **Accepted**
 
+### Integration Decisions
+
+- [ADR-0067](../adr/0067-slack-transport-integration.md): Slack Transport Integration Decision - **Draft**
+
 ## Tier-5
 
 ### Deprecation Decisions
