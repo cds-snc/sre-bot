@@ -100,7 +100,7 @@ Services whose current implementation is Tier 3 must be flagged for future deleg
 | `ResponseChannel` | Yes | Platform-specific | Tier 1 (managed service wrapper per platform) | - (complete) |
 | `BackgroundJobRegistry` | Yes | Scheduler | Tier 2 (library — `schedule`) | - (complete) |
 | `StorageService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P0** - stated design goal is storage-agnostic |
-| `IdentityService` | **No** | JWT + platform resolvers | Tier 1 (managed service wrappers — Google Workspace, AWS IAM Identity Center) | **P1** - identity resolution could have multiple backends |
+| `IdentityService` | **No** | JWT + platform resolvers | Tier 1 (managed service wrappers — JWT/JWKS endpoints, Slack API) | **P1** - identity resolution could have multiple backends |
 | `AuditTrailService` | **No** | DynamoDB (via StorageService) | Tier 1 (managed service via StorageService) | **P1** - audit backend could change |
 | `NotificationService` | **No** | GC Notify / platform channels | Tier 1 (managed service — GC Notify API) | **P2** - channels are abstracted; dispatcher could follow |
 | `IdempotencyService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P3** - infrastructure concern, lower swap probability |
