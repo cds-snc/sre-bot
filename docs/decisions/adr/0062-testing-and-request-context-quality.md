@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0062
 title: "Testing and Request Context Quality"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 primary_domain: Testing and Quality
