@@ -1,0 +1,375 @@
+# ADR Challenge and Content Review Template
+
+**Purpose:** Standardized artifact for Step 9.5 (Canonical ADR Challenge and Content Review Gate) execution. Used to validate newly authored replacement ADRs (Phase A-E) for content soundness, assumption correctness, and platform-reality alignment before cascade rewrites proceed.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0065: Type-Model Boundaries Canonical Principle |
+| **Reviewer Name & Title** | AI Architecture Reviewer, SRE Team |
+| **Secondary Reviewers** | None |
+| **Review Date** | 2026-04-30 |
+| **Revalidation Due** | 2027-04-30 |
+| **Gate Outcome** | ⚪ **PASS** |
+| **Outcome Rationale** | All five principles grounded in Python standards (PEP 544, PEP 557, PEP 589), confirmed by codebase evidence, and properly scoped to Tier-1 authority without implementation leakage. No blockers. All assumptions survive challenge with High confidence. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+**Requirement:** Before challenging assumptions, identify and search authoritative sources that govern the domain covered by this ADR. Document findings to establish whether the ADR aligns with or deliberately deviates from widely accepted best practices.
+
+All ADRs must be anchored in official documentation and authoritative best practices. Exceptions (deliberate deviations) require explicit rationale and accepted risk. Current code might be outdated or non-compliant; the ADR must be evaluated against standards, not current implementation.
+
+### 2.A Language & Framework Standards
+
+**Applicable Standards (check all that apply):**
+
+- ✅ Python Enhancement Proposals (PEP 544, PEP 557, PEP 589)
+- ✅ FastAPI Official Documentation (<https://fastapi.tiangolo.com/>)
+- ✅ Pydantic V2 Documentation (<https://pydantic.dev/docs/validation/latest/get-started/>)
+- ✅ Pydantic Settings V2 (<https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/>)
+- ⚪ Pluggy Documentation & Best Practices
+- ✅ Python Typing Module Official Docs
+- ⚪ Structlog Documentation
+- ⚪ Starlette Documentation
+- ⚪ Other
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| PEP 544 – Protocols: Structural subtyping | "Protocol structural subtyping runtime_checkable" | Protocol provides structural subtyping (static duck typing). `@runtime_checkable` checks method existence only, not signatures. Static type checkers (mypy) are the primary enforcement tool. PEP is Final status, Python 3.8+. | ✅ Aligned | N/A |
+| PEP 557 – Data Classes | "dataclass frozen immutable replace" | `@dataclass(frozen=True)` generates `__setattr__` and `__delattr__` that raise `FrozenInstanceError`. `dataclasses.replace()` is the canonical copy-with-changes pattern. PEP is Final status, Python 3.7+. | ✅ Aligned | N/A |
+| PEP 589 – TypedDict | "TypedDict dictionary typing fixed keys" | TypedDict represents dict objects with specific string keys and per-key value types. Cannot be used in isinstance checks. Methods not allowed. PEP explicitly notes dataclasses as "a more recent alternative" to TypedDict for representing structured data. | ✅ Aligned | N/A |
+| Pydantic V2 – Why use Pydantic | "schema validation type hints powering" | Pydantic frames itself around "type hints powering schema validation." Core strengths: validation, coercion, JSON Schema generation, serialization. Also supports dataclasses and TypedDict validation via TypeAdapter — but primary design intent is validation, not internal modeling. | ✅ Aligned | N/A |
+| FastAPI – Dependencies | "Annotated Depends injection Protocol" | FastAPI uses `Annotated[Type, Depends(provider)]` pattern for DI. Protocol types work as the annotation type for structural subtyping at injection points. No special handling needed — standard Python typing. | ✅ Aligned | N/A |
+| Python typing module – Protocol | "typing Protocol structural subtyping" | `typing.Protocol` is the standard mechanism for structural subtyping in Python 3.8+. Available without backports in 3.12+. Runtime checkability is opt-in via `@runtime_checkable`. | ✅ Aligned | N/A |
+| Pydantic Settings V2 | "BaseSettings environment variables nested" | `BaseSettings` reads from environment variables with typed validation. Nested subsections use `BaseModel` (not `BaseSettings`) to avoid Pydantic double-init warnings. Validates ADR's configuration type mapping. | ✅ Aligned | N/A |
+
+---
+
+### 2.B Infrastructure & Operational Standards
+
+**Applicable Standards (check all that apply):**
+
+- ✅ Twelve-Factor App Methodology (<https://12factor.net/>)
+- ⚪ CNCF / Cloud-Native Best Practices
+- ⚪ AWS Well-Architected Framework
+- ⚪ Structured Logging Standards
+- ⚪ OWASP Security Best Practices
+- ⚪ External Provider Specs
+- ✅ Other: Hexagonal Architecture (Alistair Cockburn), Domain-Driven Design (Eric Evans)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor: IV. Backing Services | "backing services attached resources" | Backing services are attached resources accessed via config/credentials. Type boundary between app and backing service aligns with Protocol contract boundary (Principle 2). | ✅ Aligned | N/A |
+| Hexagonal Architecture (Ports & Adapters) | "ports adapters boundary types domain logic" | Ports define the contract (Protocol equivalent); adapters implement the contract (concrete class). Domain logic stays framework-free. Validates Principle 1 (boundary-determined selection) and Principle 2 (Protocol for behavior). | ✅ Aligned | N/A |
+| Domain-Driven Design – Value Objects | "value object immutable identity-less comparison" | Value Objects are immutable, compared by value not identity. Frozen dataclasses are the canonical Python implementation. `dataclasses.replace()` matches DDD's mutation-by-new-instance pattern. Validates Principle 3. | ✅ Aligned | N/A |
+
+---
+
+### 2.C Cross-Cutting Design Patterns
+
+**Applicable Standards (check all that apply):**
+
+- ⚪ Event-Driven Architecture Patterns
+- ⚪ CQRS
+- ⚪ Eventual Consistency Patterns
+- ✅ Dependency Injection Best Practices
+- ⚪ Circuit Breaker & Resilience Patterns
+- ⚪ Observability & Logging Patterns
+- ⚪ Idempotency Patterns
+- ✅ Other: Anti-Corruption Layer (DDD), Interface Segregation Principle (SOLID)
+
+**Search & Findings:**
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Dependency Injection – Protocol-based | "dependency injection Protocol Python structural subtyping" | Protocol-based DI is the recommended pattern in modern Python. Constructor injection with Protocol-typed parameters enables testability through duck-typed doubles. No framework dependency needed for the contract type itself. | ✅ Aligned | N/A |
+| Anti-Corruption Layer (DDD) | "anti-corruption layer boundary validation translation" | ACL validates and translates data at system boundaries. Pydantic at trust boundaries serves this ACL role: validate external input, convert to internal types, convert back for output. Validates Principle 4. | ✅ Aligned | N/A |
+| Interface Segregation Principle (SOLID) | "ISP no client should depend on methods it does not use" | Clients should depend on the narrowest interface. Protocol contracts define only the behavior consumed, not the full implementation surface. Validates Principle 2's restriction of Protocol to behavior only (no data fields, no validation logic). | ✅ Aligned | N/A |
+
+---
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 12
+**Aligned with Best Practice:** 12
+**Deliberate Deviations:** 0
+
+**High-Level Finding:**
+
+- 🟢 **Fully Grounded:** All standards checked; no unresolved deviations.
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Boundary determines the correct type construct, not data shape
+
+- **Stated Norm:** "The correct Python type construct is determined by the architectural boundary at which data or behavior is defined — not by the data's shape or the developer's familiarity with a particular library."
+- **Underlying Assumption:** The same data shape (e.g., a user record) legitimately appears in different type constructs at different boundaries (Pydantic at HTTP, frozen dataclass internally, Protocol for the service providing it). Developers will accept the mapping discipline and conversion boilerplate.
+- **Challenge:** Shape-based selection ("a user is always a dataclass") is simpler. Could the conversion overhead between Pydantic and dataclass types at route boundaries discourage adoption?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — PEP 589 itself notes dataclasses as "a more recent alternative" to dict-based structures, implying purpose-specific type selection is expected in modern Python. The Hexagonal Architecture ports-and-adapters pattern explicitly separates domain types from adapter types. The codebase already demonstrates the conversion pattern (Access package: `schemas.py` → `domain.py` conversion in routes).
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The conversion overhead is real but manageable. The Access package reference implementation proves the pattern works in practice. Shape-based selection leads to the known anti-pattern of Pydantic models accumulating business logic through validators — exactly what Principle 4 prevents. The boundary-determined approach is well-established in Hexagonal Architecture and DDD literature.
+
+### Assumption 3.2: Tier-1 is justified despite ADR-0045 P6 already covering Protocol contracts
+
+- **Stated Norm:** ADR-0065 establishes five type-model boundary principles as Tier-1. ADR-0045 P6 already mandates Protocol for infrastructure service contracts.
+- **Underlying Assumption:** The type-model boundary question is broader than Protocol contracts and warrants its own Tier-1 authority. ADR-0065 adds value beyond what ADR-0045 P6 provides.
+- **Challenge:** Could this be a Tier-2 Standard that refines ADR-0045 P6, similar to how ADR-0077 refines it for service classification? Would a Tier-2 Standard be sufficient if the constraint only needs to govern Tier-2 and Tier-3 records?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — a Tier-2 Standard cannot constrain peer Tier-2 records (ADR-0055, ADR-0060, ADR-0063, ADR-0077). The type-model boundary scope spans all five of these. ADR-0044 governance rule requires that constraining authority be at a higher tier. ADR-0045 P6 covers only Protocol; ADR-0065 covers the full spectrum (Protocol, dataclass, BaseModel, TypedDict, BaseSettings). These are complementary, not duplicative.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The tier justification is sound. The five principles address a scope wider than any single Tier-2 record. ADR-0045 P6 is a single principle about one construct at one boundary; ADR-0065 provides the unifying framework across all boundaries and all type constructs.
+
+### Assumption 3.3: Pydantic BaseModel should not propagate beyond trust boundaries
+
+- **Stated Norm:** "Validation types are boundary artifacts. They must not propagate into service logic, domain models, or infrastructure contracts."
+- **Underlying Assumption:** Pydantic's validation, serialization, and schema-generation capabilities are boundary concerns only. Using BaseModel internally would couple business logic to Pydantic framework behavior.
+- **Challenge:** Pydantic V2 is highly performant (Rust-based core). Some teams use BaseModel throughout for consistency and to avoid conversion boilerplate. Could the ADR be overly restrictive?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** Partial — Pydantic V2's performance means there's less reason to avoid it for performance reasons. However, the ADR's rationale is about coupling, not performance. When business logic uses Pydantic validators, rules are expressed as `@field_validator` decorators rather than explicit code — making them harder to test independently, harder to compose, and coupled to Pydantic's validation lifecycle. The codebase already avoids this pattern: no Pydantic models in service logic files.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The principle is well-calibrated. Two documented exceptions exist in the ADR's Current State Assessment (`User` in identity/models.py for multi-source validation, `AuditEvent` for SIEM serialization) — both with explicit justification. The principle allows pragmatic exceptions; it's not absolute. Pydantic's own "Why use Pydantic" page frames it around schema validation, not internal modeling, supporting the boundary-only positioning.
+
+### Assumption 3.4: Configuration types are a legitimate exception to "validation at trust boundaries only"
+
+- **Stated Norm:** "Configuration types (BaseSettings, nested BaseModel) are governed by ADR-0047 and ADR-0055 — these are a recognized exception to the 'validation types at trust boundaries only' rule because environment-variable parsing is itself a trust boundary."
+- **Underlying Assumption:** Environment variables are untrusted external input that requires validation. This makes configuration parsing a trust boundary, justifying Pydantic.
+- **Challenge:** Could the exception be misread as permission to use Pydantic everywhere that "needs validation"? Could this erode the boundary discipline over time?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the exception is explicitly scoped: environment-variable parsing only. ADR-0047 and ADR-0055 govern the specific patterns. The Twelve-Factor Factor III (Config) treats environment variables as an external interface — supporting their characterization as a trust boundary. The codebase structure reinforces this: `BaseSettings` classes exist only in `app/infrastructure/configuration/`, not scattered throughout business logic.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The exception is well-scoped and justified. The delegation to ADR-0047/ADR-0055 for implementation details prevents the exception from expanding. Environment variables are genuinely untrusted input (they can be set by deployment systems, operators, or CI/CD pipelines), so validating them with Pydantic is architecturally consistent.
+
+### Assumption 3.5: TypedDict should be constrained to adapter-local, dict-semantic use cases
+
+- **Stated Norm:** "TypedDict must remain local to the adapter or module that produces or consumes the dictionary. It must not be used for shared service contracts or cross-package data transfer."
+- **Underlying Assumption:** TypedDict's dict-based semantics (mutable, key-access, no methods) make it unsuitable for stable domain entities or shared contracts. Frozen dataclasses are better for these roles.
+- **Challenge:** TypedDict is used in some well-known Python projects for API response shapes and internal structures. Could restricting it to adapter-local use be too aggressive?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** Partial — TypedDict is legitimately used for JSON-shaped data in some projects. However, PEP 589 itself acknowledges that dataclasses are "a more recent alternative" for representing structured data. The codebase's existing TypedDict usage (4 instances, all in `modules/groups/domain/types.py`) is already adapter-local and legacy. No new TypedDict definitions have been introduced in `app/packages/`. The principle does not prohibit TypedDict — it constrains its scope to cases where dict semantics are intentional.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The constraint is appropriate. TypedDict is a dict-subtype hint, not a general-purpose data container (PEP 589). When a structure is stable enough to be shared across packages, it should have immutability guarantees and methods — which TypedDict cannot provide (methods are explicitly prohibited by PEP 589). The existing codebase validates this: new packages use frozen dataclasses, not TypedDict.
+
+### Assumption 3.6: The ADR's claimed codebase conformance is accurate
+
+- **Stated Norm:** The Current State Assessment claims strong conformance across all five principles, with specific exception documentation.
+- **Underlying Assumption:** The codebase survey (14 Protocols, ~20 frozen dataclasses, Pydantic concentrated at boundaries, 4 TypedDict in legacy module) accurately reflects the current state.
+- **Challenge:** Could there be undiscovered non-conformance — e.g., Pydantic models used in service logic, TypedDict at package boundaries, or missing Protocol contracts beyond those documented in ADR-0077 S5?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — the codebase survey was comprehensive (searched `app/infrastructure/`, `app/packages/`, `app/api/`, `app/models/`, `app/modules/`, `app/core/`). The two documented exceptions (`User`, `AuditEvent`) were identified with explicit justification. ADR-0077 S5 already catalogues Protocol migration priorities. The ADR acknowledges that non-conforming code is not retroactively non-compliant — forward compliance only.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The current state assessment is appropriately framed: "Conforming patterns were the basis for deriving these principles; non-conforming patterns are opportunities for future alignment, not retroactive violations." This is pragmatic and honest. The codebase predates the ADR program; the principles codify organic conventions.
+
+---
+
+## 4. Failure Modes Identified
+
+All assumptions scored High confidence. No moderate or low confidence assumptions identified. The following failure modes are documented for completeness.
+
+### Failure Mode 4.1: Conversion Boilerplate Fatigue (Assumption 3.1)
+
+- **If Assumption Fails:** Developers find the Pydantic-to-dataclass conversion at route boundaries too verbose and begin using Pydantic BaseModel throughout, eroding the boundary discipline.
+- **Platform Impact:**
+  - Incident management workflow: Low — existing patterns are established.
+  - Access synchronization workflow: Low — access sync already demonstrates the pattern.
+  - Access request workflow: Low — access request already demonstrates the pattern.
+  - Multi-provider integrations (Slack, Teams, GWS, AWS, GitHub): Low — webhook handlers already use Pydantic at boundary.
+- **Probability Estimate:** Low — the codebase already follows this pattern without complaint. The Access package provides a reference implementation.
+- **Mitigation or Acceptance:** Accepted. The `type-model-boundaries` Copilot skill provides IDE-time guidance. The conversion pattern is a one-time setup per route, not per-request overhead.
+
+### Failure Mode 4.2: Configuration Exception Scope Creep (Assumption 3.4)
+
+- **If Assumption Fails:** The configuration exception is misinterpreted as general permission to use Pydantic for any "validated" data, leading to BaseModel usage in service logic.
+- **Platform Impact:**
+  - Incident management workflow: Low — no configuration complexity.
+  - Access synchronization workflow: Low — settings patterns already established.
+  - Access request workflow: Low — settings patterns already established.
+  - Multi-provider integrations (Slack, Teams, GWS, AWS, GitHub): Low — integration settings are well-structured.
+- **Probability Estimate:** Low — the exception is explicitly scoped to environment-variable parsing, and ADR-0047/ADR-0055 govern the implementation patterns. Code review should catch misuse.
+- **Mitigation or Acceptance:** Accepted. The Copilot skill and code review provide enforcement. ADR-0047/ADR-0055 define the specific allowed patterns.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| ADR-0065 P2 mandates Protocol for behavioral contracts; ADR-0077 Category B lists services that do NOT require Protocol. | ADR-0065, ADR-0077 | 🟢 Low | ✅ Resolved → ADR-0065 P2 establishes the type-construct choice; ADR-0077 establishes _which services_ require it. Category B services (OperationResult, EventDispatcher, etc.) are shared utilities with no alternative implementation — they are concrete types, not behavioral contracts. P2's scope is "service-layer behavioral contracts," which excludes shared value types and utilities. |
+| ADR-0065 P4 restricts Pydantic to trust boundaries; ADR-0055 uses BaseModel for settings subsections. | ADR-0065, ADR-0055 | 🟢 Low | ✅ Resolved → ADR-0065 P4 explicitly acknowledges the configuration exception: "Configuration types (BaseSettings, nested BaseModel) are governed by ADR-0047 and ADR-0055 — these are a recognized exception...because environment-variable parsing is itself a trust boundary." |
+| ADR-0065 P3 mandates frozen dataclasses for internal data; `User` in identity/models.py uses Pydantic BaseModel internally. | ADR-0065, ADR-0061 | 🟢 Low | ✅ Resolved → ADR-0065 Current State Assessment documents this as a justified exception: "multi-source validation" (identity data arrives from multiple platform resolvers with different shapes, requiring Pydantic's coercion). The ADR allows "pragmatic exceptions" per P1. |
+| ADR-0065 P5 constrains TypedDict to adapter-local use; `modules/groups/domain/types.py` has TypedDict at domain level. | ADR-0065, legacy | 🟢 Low | ✅ Resolved → ADR-0065 explicitly notes: "The legacy `app/modules` layer is exempt from new enforcement but must not be used as an architectural reference (ADR-0048 B6)." The existing TypedDict usage is in the legacy layer. |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** ADR-0040 (Type Model Boundaries)
+- **Inheritance Status:** ✅ All inherited constraints and impacts acknowledged.
+  - ADR-0040's Protocol-for-contracts principle → captured in ADR-0065 P2.
+  - ADR-0040's frozen-dataclass-for-internal-data principle → captured in ADR-0065 P3.
+  - ADR-0040's Pydantic-at-I/O principle → captured in ADR-0065 P4.
+  - ADR-0040's TypedDict-for-dict-semantics principle → captured in ADR-0065 P5.
+  - ADR-0040's code examples and scenario recipes → preserved in `type-model-boundaries` Copilot skill, not elevated to Tier-1.
+- **Gaps Identified:** None. ADR-0040 requires `superseded_by: [ADR-0065]` and `status: Superseded` metadata update + move to `adr/superseded/`. These are documented in ADR-0065 Migration section as supersession actions.
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Secondary Domain Owners:** N/A (platform-wide scope)
+- **Plugin/Startup Registration:** Not directly applicable — ADR-0065 governs type selection, not runtime behavior.
+- **Config Owner:** Configuration type patterns delegated to ADR-0047 (governance) and ADR-0055 (implementation). Settings files in `app/infrastructure/configuration/`.
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Incident Management Workflow
+
+**Context:** Emergency response requires rapid logging, context propagation, and operational decision-making under time pressure. Incident data flows from Slack webhook → internal processing → notification dispatch.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Webhook payload validation (Slack/Teams) | P4: Pydantic BaseModel at trust boundary | Slack webhook payloads are validated with Pydantic schemas before processing. | ✅ No | Standard trust boundary pattern. |
+| Internal incident data model | P3: Frozen dataclass for internal data | Incident data is processed internally. Legacy `app/models/` may use Pydantic internally. | ⚠️ Yes | Legacy `app/models/` exists from before ADR program. ADR explicitly states forward compliance only — legacy is not retroactively non-compliant. |
+| Notification dispatch to Slack | P2: Protocol for service contracts | NotificationService lacks Protocol (ADR-0077 P2 migration candidate). | ⚠️ Yes | Migration governed by ADR-0077 S5. ADR-0065 P2 establishes the principle; ADR-0077 governs timing. Not a gap in ADR-0065. |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling. Legacy `app/models/` and pending Protocol migrations are acknowledged in ADR-0065 Current State Assessment and ADR-0077 S5 respectively.
+
+**Mitigation (if ⚠️):** Forward compliance + ADR-0077 migration priorities address both gaps incrementally.
+
+---
+
+### Scenario 6.2: Access Synchronization Workflow
+
+**Context:** Automated sync from identity providers (AWS IAM Identity Center, Google Workspace) to application. Involves HTTP API triggers, background job processing, and multi-provider integration.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| HTTP request schemas | P4: Pydantic BaseModel at trust boundary | `packages/access/sync/schemas.py` uses Pydantic for API request/response models. | ✅ No | Reference implementation. |
+| Domain entities | P3: Frozen dataclass for internal data | `packages/access/request/domain.py` uses `@dataclass(frozen=True)` for `AccessRequest`, `ApprovalDecision`, etc. | ✅ No | Reference implementation. |
+| Service contract | P2: Protocol for behavior contracts | `AccessRequestServicePort` Protocol defined in `packages/access/request/service.py`. Routes depend on Protocol, not concrete class. | ✅ No | Reference implementation. |
+| Pydantic-to-dataclass conversion | P1: Boundary-determined type selection | Route handlers convert Pydantic request → frozen dataclass → service → frozen dataclass → Pydantic response. | ✅ No | Pattern works. Conversion is localized in route handlers. |
+| DirectoryProvider contract | P2: Protocol for behavior contracts | `DirectoryProvider` Protocol in `infrastructure/directory/provider.py`. Feature uses Protocol type. | ✅ No | Exemplar Category A service. |
+
+**Validation Summary:** ✅ Fully aligned. Access sync is the reference implementation for all five principles.
+
+---
+
+### Scenario 6.3: Access Request Workflow
+
+**Context:** User requests access to a resource/role; admin approves; system provisions and audits the action across multiple platforms.
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Request submission schema | P4: Pydantic BaseModel at trust boundary | `SubmitAccessRequestBody` in `packages/access/request/schemas.py`. | ✅ No | Boundary validation, then conversion to domain dataclass. |
+| Domain model (AccessRequest) | P3: Frozen dataclass | `@dataclass(frozen=True)` in `packages/access/request/domain.py`. State transitions via `dataclasses.replace()`. | ✅ No | Canonical P3 implementation. |
+| Audit trail serialization | P4 exception | `AuditEvent` uses Pydantic BaseModel for SIEM serialization (`model_dump()` flattening). | ⚠️ Yes | Documented as justified exception in ADR-0065 Current State Assessment. |
+| Service boundary | P2: Protocol | `AccessRequestServicePort` Protocol. Route depends on Protocol type via DI alias. | ✅ No | Clean DI boundary. |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling. `AuditEvent` Pydantic usage is a justified pragmatic exception documented in the ADR.
+
+**Mitigation (if ⚠️):** Exception is documented with rationale (SIEM serialization requires `model_dump()`). If SIEM requirements change, migration to frozen dataclass with explicit serialization would be straightforward.
+
+---
+
+### Scenario 6.4: Multi-Provider Integration (Slack/Teams/AWS/GWS/GitHub)
+
+**Context:** Single operation may span multiple external APIs (rate limits, error handling, eventual consistency across platforms).
+
+| Aspect | ADR Requirement | Integration Reality | Gap? | Notes |
+|--------|-----------------|---------------------|------|-------|
+| SDK response types | P5: TypedDict for raw SDK payloads | AWS SDK returns dicts; Google Workspace API returns typed objects. TypedDict used locally in adapters for dict-shaped responses. | ✅ No | TypedDict usage is adapter-local per P5. |
+| Provider abstraction | P2: Protocol for swappable services | `DirectoryProvider` abstracts over Google Workspace Directory. `RetryStore` abstracts over DynamoDB. | ✅ No | Category A services use Protocol contracts. |
+| Platform-specific types (Slack/Teams) | ADR-0078: Category C, no Protocol | `SlackService`, `TeamsService` are concrete typed wrappers. No Protocol needed (one implementation per platform). | ✅ No | Governed by ADR-0078, consistent with ADR-0065 P2 scope (Protocol for _swappable_ services). |
+| Cross-provider data normalization | P3: Frozen dataclass for shared internal data | `DirectoryUser`, `DirectoryMember`, `DirectoryGroup` are frozen dataclasses used across providers. `NormalizedMember`, `NormalizedGroup` in groups module. | ✅ No | Normalized internal types are framework-independent frozen dataclasses. |
+| Provider error handling | ADR-0050: OperationResult[T] | Provider methods return `OperationResult[T]`. This is a frozen-dataclass-based value type (P3). | ✅ No | OperationResult governed by ADR-0050, type construct governed by ADR-0065 P3. |
+
+**Validation Summary:** ✅ Fully aligned.
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Conversion Boilerplate vs. Clean Boundaries
+
+- **Chosen:** Explicit Pydantic-to-dataclass conversion at route boundaries (P1, P4).
+- **Rejected:** Using Pydantic BaseModel throughout all layers for simplicity.
+- **Rationale:** Clean boundaries prevent Pydantic framework coupling in service logic. Business rules remain explicit Python code, not Pydantic validators. Internal types are framework-independent and portable.
+- **Risk Accepted:** Developers write conversion code at each route boundary. This is boilerplate but localized.
+- **Contingency:** If conversion patterns become highly repetitive, a Tier-2 standard could define helper utilities (e.g., generic `from_schema()` / `to_response()` patterns). The Copilot skill already provides conversion guidance.
+
+### Tradeoff 7.2: Forward Compliance Only vs. Retroactive Enforcement
+
+- **Chosen:** Non-conforming existing code is not retroactively non-compliant. Forward compliance for new and actively modified code.
+- **Rejected:** Requiring immediate full-codebase alignment.
+- **Rationale:** The codebase predates the ADR program. Retroactive enforcement would create a large, disruptive migration with no immediate behavioral benefit. The principles codify organic conventions — most code already conforms.
+- **Risk Accepted:** Legacy non-conforming code persists indefinitely until opportunistically modified.
+- **Contingency:** ADR-0077 S5 defines migration priorities for Protocol contracts. Settings dissolution (ADR-0055) addresses configuration type migration. Future Tier-5 ADRs can target specific legacy areas.
+
+### Tradeoff 7.3: Abstract Principles vs. Actionable Implementation Rules
+
+- **Chosen:** Five abstract Tier-1 principles with delegation to Tier-2 standards for implementation.
+- **Rejected:** Including code examples, scenario recipes, and model selection matrices at Tier-1.
+- **Rationale:** Tier-1 principles must remain stable across implementation changes. Code examples and patterns are refinable at Tier-2 without requiring Tier-1 amendments.
+- **Risk Accepted:** New developers must consult both Tier-1 principles and Tier-2 standards for complete guidance. Principles alone may be too abstract.
+- **Contingency:** The `type-model-boundaries` Copilot skill provides IDE-time actionable guidance. Onboarding documentation should reference both tiers.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Update ADR-0040 metadata | ❌ No | SRE Team | Wave 5 gate close | Set `status: Superseded`, `superseded_by: [ADR-0065]`. Move to `adr/superseded/`. |
+| Verify ADR-0045 `impacts` lists ADR-0065 | ❌ No | SRE Team | Wave 5 gate close | Confirmed: ADR-0045 already lists ADR-0065 in `impacts`. No action needed. |
+| Update `type-model-boundaries` Copilot skill | ❌ No | SRE Team | Post-acceptance | Align skill content with ADR-0065 normative principles (verify consistency). |
+
+**Blocking Actions Must Resolve Before Step 10 Proceeds:** None. No blocking follow-up actions.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+✅ **PASS** → ADR-0065 is professionally sound and ready for phase-in via Step 10 cascade.
+
+⚪ **REVISE** → _(not selected)_
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | AI Architecture Reviewer |
+| **Reviewer Title** | Architecture Agent, SRE Team |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-30 |
+| **Email** | N/A (AI reviewer) |
+
+---
+
+## 11. Review Artifacts Reference
+
+**This Review Record Should Be Attached To:**
+
+- ADR-0065 acceptance tracking in Wave 5 progress
+- ADR program change log (`docs/decisions/adr-change-log.md`)
+
+**This Review Template Was Completed Per:**
+
+- ADR-0044 (Governance and Operating Model) § Step 9.5
+- Revalidation Cycle: One-time gate review → Then annual review_state cycle
