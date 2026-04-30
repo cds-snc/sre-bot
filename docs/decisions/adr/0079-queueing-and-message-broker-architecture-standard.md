@@ -229,7 +229,7 @@ The migration from the current in-process model to managed queue-backed processi
 ## Compliance and Boundaries
 
 - Package/infrastructure boundary impact: Queue service facade and Protocol are infrastructure-owned (`app/infrastructure/queues/` or `app/infrastructure/events/`). Feature packages consume them via the injection boundary (ADR-0048 B2). Feature packages register queue consumers via pluggy hooks (ADR-0049 Standard 7).
-- Type boundary impact: Queue Protocol shape emerges from wrapping the managed service SDK (Standard 1). Queue settings use Pydantic `BaseSettings` (configuration boundary). These follow ADR-0040 type boundary rules.
+- Type boundary impact: Queue Protocol shape emerges from wrapping the managed service SDK (Standard 1). Queue settings use Pydantic `BaseSettings` (configuration boundary). These follow ADR-0065 type boundary rules.
 - Startup/plugin registration impact: Queue consumer registration happens during lifespan phase 3 (discovery and registration) via pluggy hookspecs. Event handler registration happens during phase 4 (feature activation). Consumer start happens during phase 5 (transport). No import-time side effects (ADR-0048 B4). Event handler registration must migrate from import-time decorators to startup-driven pluggy hooks (Standard 2).
 - Settings partitioning impact: Standard 6 mandates `QueueSettings` with `QUEUE_BACKEND` and `QUEUE_ENDPOINT_URL` as backend-selection keys. Operational settings (visibility timeout, max retries) are configured in Terraform, not in application settings.
 - DI alias ceremony impact: Queue Protocol follows ADR-0056 Standard 4 — provider function in `providers.py`, `Annotated[..., Depends(...)]` in `dependencies.py`.
