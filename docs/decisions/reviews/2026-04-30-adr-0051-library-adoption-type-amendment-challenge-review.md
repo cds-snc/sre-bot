@@ -1,0 +1,131 @@
+# ADR-0051 Library Adoption Decision Type Amendment — Challenge Review
+
+**Scope:** Amended sections only (new Tier-5 decision_type addition per authoring workflow amendment procedure).
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0051: ADR Taxonomy and Classification Enforcement Standard — Library Adoption Decision Type Amendment |
+| **Amendment Type** | Normative (new decision_type value added to taxonomy) |
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Revalidation Due** | 2026-08-28 |
+| **Gate Outcome** | ⚪ **PASS** |
+| **Outcome Rationale** | `Library Adoption Decision` is a natural extension of the existing Tier-5 decision_type catalog. It complements `Migration Decision` and `Deprecation Decision` by governing the *selection* of infrastructure libraries, which carry similar long-term maintenance commitments. Mirrors the ADR-0044 Tier-5 library trigger amendment. |
+
+---
+
+## 2. Evidence Gathering (Amended Sections Only)
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| ADR-0044 Tier-5 Library Trigger | `library adoption tier-5 governance trigger` | ADR-0044 amendment establishes library adoption as a Tier-5 trigger category. This taxonomy entry implements that trigger at the classification level. | ✅ Aligned | — |
+| ADR-0045 P7 (Managed Service Delegation) | `infrastructure library selections require Tier-5 ADR` | P7 states: "Infrastructure library selections require a Tier-5 ADR per ADR-0044." | ✅ Aligned | — |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 2
+**Aligned with Best Practice:** 2
+**Deliberate Deviations:** 0
+
+**High-Level Finding:** 🟢 **Fully Grounded**
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Library adoption decisions belong at Tier-5
+
+- **Stated Norm:** `Library Adoption Decision` is a Tier-5 decision_type.
+- **Underlying Assumption:** Library adoption has similar governance characteristics to migration and deprecation decisions — time-bound evaluation with explicit criteria.
+- **Challenge:** Library adoption is a forward-looking selection, not a time-bound migration. Should it be Tier-4 (feature decision) or Tier-2 (standard)?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Library adoption decisions share key Tier-5 characteristics: they bridge existing custom implementations to library-based implementations (migration-like), they include evaluation criteria with a decision point, and the selection has long-term maintenance implications. ADR-0044 explicitly categorizes library adoption alongside migration/deprecation as a Tier-5 trigger. The evaluation is one-time; once adopted, the library is pre-approved for all subsequent uses.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+---
+
+## 4. Failure Modes Identified
+
+No Moderate or Low confidence assumptions. No failure modes to document.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| Metadata reference must be updated alongside ADR-0051 | ADR-0051, metadata template | 🟢 Low | ✅ Resolved — Both the ADR-0051 decision text and the metadata reference template have been updated. |
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation (Amended Sections Only)
+
+### Scenario 6.1: Creating `tenacity` Tier-5 ADR
+
+| Aspect | Amendment Requirement | Expected Behavior | Gap? | Notes |
+|--------|----------------------|-------------------|------|-------|
+| decision_type selection | `Library Adoption Decision` | ADR metadata uses `decision_type: Library Adoption Decision` | ✅ No | New value available |
+| Tier compatibility | Tier-5 allows `Library Adoption Decision` | Metadata validation passes | ✅ No | Compatibility table updated |
+
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Three Tier-5 Types vs Two
+
+- **Chosen:** Add third Tier-5 decision_type.
+- **Rejected:** Reuse `Migration Decision` for library adoptions.
+- **Rationale:** Library adoption is semantically distinct from migration. A migration moves from state A to state B; a library adoption *selects* a dependency after evaluation. Using `Migration Decision` would conflate selection with transition.
+- **Risk Accepted:** Slightly larger taxonomy.
+- **Contingency:** If the distinction proves confusing, `Library Adoption Decision` can be merged back into `Migration Decision`.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Create `tenacity` Tier-5 ADR using new type | ❌ No | SRE Team | Per tracker Item #25 | First use of `Library Adoption Decision` |
+| Create `pybreaker` Tier-5 ADR using new type | ❌ No | SRE Team | Per tracker Item #24 | Second use of `Library Adoption Decision` |
+
+**Blocking Actions:** None.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **PASS** → ADR-0051 Library Adoption Decision type amendment is professionally sound and ready for acceptance.
+
+**Rationale:**
+
+- Amendment directly implements ADR-0044 library trigger at the taxonomy level
+- Semantically distinct from existing Tier-5 types (selection vs transition vs retirement)
+- Metadata reference template updated in parallel
+- Single assumption survives challenge with High confidence
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Review Type** | Amendment review (normative change, scoped to amended sections per authoring workflow §Amendment Procedure) |
