@@ -169,6 +169,7 @@ Rate limiting is implemented as a layered defense strategy. Each layer has a dis
 - **S3-R4: Rate limit key functions**: The default key function is IP-based (`get_remote_address`). Custom key functions may bypass rate limiting for monitoring requests (sentinel pattern) by returning `None`. Custom key functions must not log or expose client IP addresses beyond what is necessary for rate limit computation.
 
 - **S3-R5: Decorator ordering**: Rate limit decorators must be placed below the route decorator (SlowAPI requirement):
+
   ```python
   @router.get("/endpoint")       # route decorator first
   @limiter.limit("50/minute")    # rate limit second
