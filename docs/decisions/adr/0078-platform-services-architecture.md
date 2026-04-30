@@ -223,12 +223,12 @@ Platform services are owned by the infrastructure layer. Features are consumers,
 - Accessed date: 2026-04-29
 - Relevance summary: Companion standard governing feature-side interaction boundaries, hookspec contracts, and HTTP-first bridge patterns. This record governs platform-side architecture; ADR-0059 governs feature-side consumption.
 
-4. Platform Services Assessment (2026-04-29):
+4. Platform Services Assessment:
 
-- URL: tmp/platform-services-assessment-2026-04-29.md
+- URL: docs/decisions/analysis/platform-services-assessment.md
 - Publisher/maintainer: SRE Team
-- Accessed date: 2026-04-29
-- Relevance summary: Authoritative assessment that rejected the unified InteractionProvider Protocol and established the concrete per-platform services architecture codified here.
+- Date: 2026-04-29
+- Relevance summary: Authoritative assessment that rejected the unified InteractionProvider Protocol and established the concrete per-platform services architecture codified here. Key finding: each platform SDK (Slack Bolt, Teams Bot Framework, Google API Client) exposes fundamentally different interaction models that a unified Protocol would erase.
 
 5. Slack Bolt Python Documentation:
 
