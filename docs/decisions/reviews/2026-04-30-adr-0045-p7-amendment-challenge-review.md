@@ -1,0 +1,215 @@
+# ADR-0045 P7 Amendment — Challenge Review
+
+**Scope:** Amended sections only (Principle 7 addition and supporting updates per authoring workflow amendment procedure).
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0045: Core Architectural Principles — P7 Amendment |
+| **Amendment Type** | Normative (new principle added) |
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Revalidation Due** | 2026-08-28 |
+| **Gate Outcome** | ⚪ **PASS** |
+| **Outcome Rationale** | P7 is grounded in four authoritative sources, fills an identified governance gap (what sits behind the Protocol adapter), does not contradict existing ADRs, and correctly scopes its configurable-backend mandate to Category A services only. |
+
+---
+
+## 2. Evidence Gathering (Amended Sections Only)
+
+### 2.A Language & Framework Standards
+
+Not applicable — P7 does not introduce language or framework-specific claims.
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor IV: Backing Services | `backing services attached resources` | "The code for a twelve-factor app makes no distinction between local and third-party services... should be able to swap out a local MySQL database with one managed by a third party without any changes to the app's code." | ✅ Aligned | — |
+| AWS Well-Architected — Operational Excellence | `use managed services reduce operational burden` | "Use managed services. Reduce the operational burden by using AWS managed services where possible." | ✅ Aligned | — |
+| GC Cloud Adoption Strategy | `portability interoperability cloud services` | Principle 8: portability and interoperability. Service model priority: SaaS > PaaS > IaaS. | ✅ Aligned | — |
+
+### 2.C Cross-Cutting Design Patterns
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Hexagonal Architecture / Ports and Adapters | `ports adapters hexagonal architecture` | Port = interface (Protocol); Adapter = implementation behind it. Pattern governs substitution but does not itself prescribe *what* the adapter should delegate to. | ✅ Aligned | P7 fills the gap: the pattern defines the port/adapter shape; P7 governs what sits behind the adapter. This is an extension, not a deviation. |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 4  
+**Aligned with Best Practice:** 4  
+**Deliberate Deviations:** 0
+
+**High-Level Finding:** 🟢 **Fully Grounded** — All standards checked; no unresolved deviations.
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Managed services are always preferable to custom code
+
+- **Stated Norm:** "Infrastructure concerns must be served by the highest applicable delegation tier: managed cloud service (preferred)"
+- **Underlying Assumption:** Managed cloud services provide better operational outcomes (availability, scaling, patching) than custom implementations for infrastructure concerns.
+- **Challenge:** A managed service might not exist for the specific concern, might have unacceptable latency or cost characteristics, or might introduce vendor lock-in that conflicts with GC portability requirements.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — P7 addresses this directly: managed service is *preferred*, not *mandated*. The hierarchy explicitly provides Tier 2 and Tier 3 fallbacks. The configurable backend model and Protocol contracts mitigate vendor lock-in.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** P7's "highest applicable tier" phrasing correctly handles edge cases. The word "applicable" does the heavy lifting — it means "can a managed service actually handle this specific concern?" not "use a managed service regardless."
+
+### Assumption 3.2: The delegation hierarchy belongs at Tier-1, not Tier-2
+
+- **Stated Norm:** P7 is a Tier-1 foundational principle, not a Tier-2 standard.
+- **Underlying Assumption:** The preference for managed services over custom code is an architectural posture that must constrain all downstream decisions, not a refinable implementation pattern.
+- **Challenge:** Could this be handled adequately at Tier-2 (e.g., in ADR-0077 as a Category A classification rule)?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — The delegation hierarchy governs *all* infrastructure concerns across multiple Tier-2 standards (0077, 0056, 0054, 0055, 0079). Placing it in any single Tier-2 record would give that record undue authority over sibling standards. The principle parallels P6: P6 governs the port shape, P7 governs what sits behind the adapter. Both are foundational architectural intents.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** The Alternative §2 in the amended ADR explicitly considers and rejects Tier-2 placement with clear rationale.
+
+### Assumption 3.3: Every Category A service must support configurable backends
+
+- **Stated Norm:** "Every Protocol-backed service (Category A per ADR-0077) must support backend selection through configuration"
+- **Underlying Assumption:** All Category A services have plausible alternative implementations that warrant a settings-driven backend selection.
+- **Challenge:** Some Category A services may currently have only one implementation. Requiring backend selection upfront could be over-engineering.
+- **Evidence Strength:** ⭐⭐ Moderate
+- **Counter-Evidence Found:** Partial — The requirement is forward-looking (cloud portability, dev/test fallbacks). Even single-implementation services benefit from an in-memory fallback for testing. However, this could be read as mandating immediate `*_BACKEND` settings for every Category A service, which may be premature.
+- **Confidence (ADR survives challenge):** 🟡 Moderate
+- **Reviewer Notes:** The P7 text says "must support backend selection through configuration" — this is a design target, not a retrofit mandate. The detailed migration timing is governed by downstream Tier-2 standards (ADR-0077 migration path, ADR-0056 provider patterns). P7 sets the principle; Tier-2 governs the pace. Acceptable as stated, but downstream standards should clarify that existing Category A services gain backend selection incrementally, not via a Big Bang migration.
+
+### Assumption 3.4: Library selections require Tier-5 ADR governance
+
+- **Stated Norm:** "Infrastructure library selections require a Tier-5 ADR per ADR-0044"
+- **Underlying Assumption:** Library adoption for infrastructure concerns carries sufficient long-term maintenance burden to warrant a formal decision record.
+- **Challenge:** This could slow down adoption of well-established libraries. Developer friction for "obvious" choices (e.g., `tenacity` for retry) might be disproportionate.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Infrastructure libraries are foundational dependencies that the entire codebase depends on. The ADR evaluation cost (a few hours) is proportional to the multi-year maintenance commitment. The alternative (undocumented library adoption) has already produced the current custom implementations that P7 aims to replace.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Tier-5 ADRs are lightweight records. The evaluation criteria (maturity, maintenance, license, type hints, async support) are reasonable and prevent adopting unmaintained or incompatible libraries.
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Over-engineering via premature backend abstraction
+
+- **If Assumption 3.3 Fails:** Teams interpret P7 as mandating immediate `*_BACKEND` settings for every Category A service, creating unnecessary abstraction layers for services with only one viable implementation.
+- **Platform Impact:**
+  - Incident management workflow: None
+  - Access synchronization workflow: Low (could add indirection without benefit)
+  - Access request workflow: None
+  - Multi-provider integrations: None
+- **Probability Estimate:** Low — P7 delegates migration pace to Tier-2 standards
+- **Mitigation:** Downstream standards (ADR-0077, ADR-0056) should explicitly state that backend selection is adopted incrementally as part of normal service evolution, not as a retrofit mandate.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| P7 requires configurable backends for Category A; ADR-0078 rejects Protocol for platform services (Category C) | ADR-0045 P7, ADR-0078 | 🟢 Low | ✅ Resolved — P7 scopes backend selection to "Category A per ADR-0077." Category C services (ADR-0078) are explicitly excluded. No conflict. |
+| P7 says "custom implementation = last resort"; existing codebase has custom circuit breaker, retry logic, event dispatcher | ADR-0045 P7, current code | 🟢 Low | ✅ Resolved — P7 is a design principle, not a retrofit mandate. Existing custom code is flagged for incremental delegation per delegation tracker. Event dispatcher assessed as proportional (keep). |
+| P7 references ADR-0044 for Tier-5 library governance, but ADR-0044 may not yet have the "Library Adoption" trigger type | ADR-0045 P7, ADR-0044 | 🟡 Medium | ⚪ Unresolved — ADR-0044 amendment is Item #3 in the delegation review tracker. P7 forward-references the intended state. Acceptable: the cascade will resolve this. |
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** ADR-0001 (unchanged by this amendment)
+- **Inheritance Status:** All inherited constraints acknowledged.
+- **Gaps Identified:** None
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation (Amended Sections Only)
+
+### Scenario 6.1: Access Synchronization Workflow
+
+| Aspect | P7 Requirement | Workflow Reality | Gap? | Notes |
+|--------|---------------|------------------|------|-------|
+| Identity provider delegation | Tier 1 preferred (managed service wrapper) | Google Workspace + AWS IAM Center wrapped in thin SDK facades behind Protocol | ✅ No | Already correctly Tier 1 |
+| Retry logic | Tier 2 preferred (library) | Custom in-process retry (~400 LOC) | ⚠️ Yes | Flagged for `tenacity` migration via Tier-5 ADR. Not a blocker for P7 acceptance. |
+| DynamoDB retry store | Tier 1 (managed service) | DynamoDB conditional writes | ✅ No | Already correctly Tier 1 |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling — existing custom retry is acknowledged and scheduled for incremental migration.
+
+### Scenario 6.2: Multi-Provider Integration
+
+| Aspect | P7 Requirement | Integration Reality | Gap? | Notes |
+|--------|---------------|---------------------|------|-------|
+| Platform services (Slack, Teams) | Tier 3 acceptable if justified | Category C per ADR-0078, concrete services with documented justification | ✅ No | P7's Category A scope excludes Category C |
+| Circuit breaker | Tier 2 preferred | Custom ~300 LOC | ⚠️ Yes | Flagged for `pybreaker` migration via Tier-5 ADR |
+
+**Validation Summary:** ⚠️ Aligned with documented exception handling — existing custom code flagged for migration, not blocking.
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Principle Count — Seven vs Six
+
+- **Chosen:** Add P7 as seventh foundational principle
+- **Rejected:** Handle delegation at Tier-2 only
+- **Rationale:** Delegation hierarchy governs multiple Tier-2 standards; placing it at Tier-2 would create authority disputes between sibling standards. P6+P7 form a complete pair: port shape + adapter governance.
+- **Risk Accepted:** Slightly higher Tier-1 amendment friction (7 principles to maintain vs 6).
+- **Contingency:** If P7 proves too abstract to be actionable, it can be narrowed. Tier-2 standards carry the implementation detail.
+
+### Tradeoff 7.2: Delegation Evaluation Overhead
+
+- **Chosen:** Require teams to evaluate managed service → library → custom before implementing
+- **Rejected:** Allow teams to choose implementation approach freely
+- **Rationale:** The evaluation cost (documenting why a managed service or library was rejected) is proportional to the multi-year maintenance burden of custom infrastructure code.
+- **Risk Accepted:** Modest process overhead for "obvious" Tier 3 cases where no managed service or library exists.
+- **Contingency:** Tier-2 standards can establish "pre-approved" Tier 3 categories that skip the full evaluation (e.g., application-specific business logic adapters).
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Cascade P7 to ADR-0044 (Tier-5 library trigger) | ❌ No | SRE Team | Per tracker | Add "Library Adoption" as explicit Tier-5 trigger type |
+| Cascade P7 to ADR-0077 (delegation tier declaration) | ❌ No | SRE Team | Per tracker | Extend Category A to require delegation tier documentation |
+| Cascade P7 to ADR-0047 (backend settings pattern) | ❌ No | SRE Team | Per tracker | Formalize `*_BACKEND` settings pattern |
+| Cascade P7 to ADR-0056 (provider backend selection) | ❌ No | SRE Team | Per tracker | Formalize settings-driven factory pattern in providers |
+| Cascade P7 to ADR-0054 (dev/test fallback) | ❌ No | SRE Team | Per tracker | Add explicit dev/test fallback standard |
+| Cascade P7 to ADR-0055 (backend settings dissolution) | ❌ No | SRE Team | Per tracker | Add `*_BACKEND` as recognized settings pattern |
+| Cascade P7 to ADR-0079 (queue/messaging rework) | ❌ No | SRE Team | Per tracker | Rework per delegation framework assessment |
+
+**Blocking Actions:** None. All cascades are follow-up work tracked in `managed-services-delegation-adr-review-tracker-2026-04-30.md`.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **PASS** → ADR-0045 P7 amendment is professionally sound and ready for acceptance.
+
+**Rationale:**
+
+- P7 is grounded in four authoritative sources (Twelve-Factor IV, AWS Well-Architected, GC Cloud Adoption Strategy, Hexagonal Architecture)
+- No High-severity contradictions
+- Assumptions survive challenge with High or Moderate confidence
+- The one Moderate-confidence assumption (3.3: configurable backends for all Category A) is mitigated by P7's delegation of migration pace to Tier-2 standards
+- Scenario validation shows alignment with documented exception handling for existing custom code
+- One Medium-severity unresolved item (ADR-0044 forward-reference) is acceptable — cascade will resolve it
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Review Type** | Amendment review (normative change, scoped to amended sections per authoring workflow §Amendment Procedure) |

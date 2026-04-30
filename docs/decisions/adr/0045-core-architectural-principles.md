@@ -12,9 +12,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-28
-last_updated: 2026-04-29
-last_reviewed: 2026-04-29
-next_review_due: 2026-08-26
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
 impacts:
@@ -22,8 +22,12 @@ impacts:
  - ADR-0048
  - ADR-0049
  - ADR-0050
+ - ADR-0054
+ - ADR-0055
+ - ADR-0056
  - ADR-0065
  - ADR-0077
+ - ADR-0079
 supersedes:
  - ADR-0001
 superseded_by: []
@@ -59,7 +63,7 @@ related_packages: []
 
 ## Decision
 
-- Chosen approach: Establish six foundational architectural principles as the governing constraints for all downstream ADRs, standards, and patterns.
+- Chosen approach: Establish seven foundational architectural principles as the governing constraints for all downstream ADRs, standards, and patterns.
 - Why this approach: Separating principles from implementation allows Tier-2 standards to evolve (e.g., new async libraries, new DI frameworks) without requiring a Tier-1 amendment.
 
 ### Principle 1: Stateless Process Design
@@ -91,16 +95,26 @@ Sensitive data (credentials, tokens, API keys) must never appear in logs, error 
 
 Infrastructure services consumed by feature packages must be defined by Protocol contracts. Feature code depends on the Protocol type, never on the concrete implementation class. This enables backing-service substitution (e.g., DynamoDB to RDS, Google Workspace to Entra ID) without modifying feature code. Concrete implementations are internal to the infrastructure layer and assembled in the composition root. The specific contract requirements, service classification, and migration path are governed by ADR-0077.
 
+### Principle 7: Managed Service Delegation Hierarchy
+
+Infrastructure concerns must be served by the highest applicable delegation tier:
+
+1. **Managed cloud service** (preferred) — the cloud provider owns availability, scaling, patching, and monitoring. The application wraps the managed service SDK in a thin facade behind a Protocol contract (Principle 6). Examples: DynamoDB for persistence, SQS for queuing, CloudWatch for metrics.
+2. **Industry-standard library** (fallback) — when no managed service covers the concern, a proven, well-maintained library provides battle-tested correctness. The application wraps the library API in a thin adapter. Examples: `schedule` for background job timing, `slowapi` for application-level rate limiting.
+3. **Custom implementation** (last resort) — only when neither a managed service nor a proven library is applicable. Custom code must be proportional in scope, must document why higher tiers do not apply, and must be flagged for future delegation when viable alternatives emerge.
+
+Every Protocol-backed service (Category A per ADR-0077) must support backend selection through configuration, enabling cloud portability and dev/test fallbacks without code changes. The configurable backend settings pattern is governed by ADR-0047; provider construction and backend-selection logic are governed by ADR-0056; dev/test fallback requirements are governed by ADR-0054. Infrastructure library selections require a Tier-5 ADR per ADR-0044.
+
 ## Alternatives Considered
 
 1. Retain principles and implementation guidance in one Tier-1 record:
  - Pros: Single reference for both principle and practice.
  - Cons: Tier-1 scope leakage; implementation changes force Tier-1 amendments; downstream ADRs cannot distinguish binding principles from refinable guidance.
  - Why not chosen: Violates ADR-0044 governance rule of one authority level per record and ADR-0051 taxonomy enforcement.
-2. Split into more than six principles:
- - Pros: Finer-grained authority for each concern.
- - Cons: Excessive Tier-1 churn; some concerns (e.g., async strategy) are implementation-level, not principle-level.
- - Why not chosen: Six principles cover the foundational invariants; further decomposition belongs at Tier-2.
+2. Keep at six principles and handle delegation at Tier-2 only:
+ - Pros: Fewer Tier-1 constraints; less amendment friction.
+ - Cons: The delegation hierarchy is a foundational design intent that completes Principle 6. Without a Tier-1 mandate, teams could implement custom infrastructure when managed services or proven libraries exist, accumulating unnecessary operational burden. The pattern parallels Principle 6: Protocol contracts govern the port shape; the delegation hierarchy governs what sits behind the adapter.
+ - Why not chosen: The preference for managed services over custom code is a core architectural posture aligned with GC Cloud Adoption Strategy, AWS Well-Architected Framework, and Twelve-Factor backing services. It must constrain all downstream standards.
 3. Omit Protocol-driven contracts as a principle and handle at Tier-2 only:
  - Pros: Fewer Tier-1 constraints; less amendment friction.
  - Cons: The swappable service layer is a foundational architectural intent, not an implementation detail. Without a Tier-1 mandate, Protocol adoption would be optional and inconsistent.
@@ -114,7 +128,8 @@ Infrastructure services consumed by feature packages must be defined by Protocol
  - Principle boundaries are reviewable and auditable per ADR-0051 taxonomy enforcement.
 - Tradeoffs accepted:
  - Developers must consult both this Tier-1 record and relevant Tier-2 standards for complete guidance.
- - The six principles are deliberately abstract; actionable implementation rules live in lower-tier ADRs.
+ - The seven principles are deliberately abstract; actionable implementation rules live in lower-tier ADRs.
+ - Principle 7 introduces a delegation evaluation step when selecting infrastructure implementations. This overhead is justified by the long-term reduction in custom code maintenance burden.
 - Risks introduced:
  - Principles may be too abstract for new team members without accompanying Tier-2 standards.
 - Mitigations:
@@ -125,7 +140,8 @@ Infrastructure services consumed by feature packages must be defined by Protocol
 
 - Package/infrastructure boundary impact: Principle 3 (layer separation) directly governs the boundary between `app/packages`, `app/infrastructure`, and `app/server`. Principle 6 (Protocol contracts) governs the contract surface between infrastructure services and feature packages.
 - Type boundary impact: Principle 6 mandates Protocol types for service contracts. Detailed type-boundary rules deferred to ADR-0065 (Type-Model Boundaries Canonical Principle).
-- Service contract impact: Principle 6 establishes the Protocol contract requirement; service classification and migration are governed by ADR-0077.
+- Service contract impact: Principle 6 establishes the Protocol contract requirement; service classification and migration are governed by ADR-0077. Principle 7 requires each Category A service to declare its delegation tier and justify any Tier 3 (custom) choice.
+- Managed service delegation impact: Principle 7 governs what sits behind Protocol adapters — managed service wrapper, library delegation, or custom code. Backend-selection settings patterns are governed by ADR-0047 and ADR-0055. Provider construction with backend selection is governed by ADR-0056. Dev/test fallback provision is governed by ADR-0054. Library adoption governance is governed by ADR-0044 (Tier-5 trigger). Queue and messaging delegation is governed by ADR-0079.
 - Startup/plugin registration impact: Principle 4 (fail-fast configuration) constrains startup behavior; detailed startup policy is governed by ADR-0046 and ADR-0049.
 - Settings partitioning impact: Principle 4 establishes the configuration validation invariant; partitioning rules are governed by ADR-0047.
 - Infrastructure composition impact: Principle 3 clarifies that infrastructure services collaborate internally through the composition root - the isolation boundary is between layers, not within the infrastructure layer. Detailed composition governance is provided by ADR-0076 and ADR-0056.
@@ -134,18 +150,22 @@ Infrastructure services consumed by feature packages must be defined by Protocol
 
 - Revalidation date: 2026-04-28
 - Sources rechecked:
- - Twelve-Factor App: Factor III (Config), Factor VI (Processes), Factor IX (Disposability).
+ - Twelve-Factor App: Factor III (Config), Factor IV (Backing Services), Factor VI (Processes), Factor IX (Disposability).
  - Python 3.12+ typing and dependency injection conventions.
  - FastAPI dependency injection documentation (Annotated + Depends pattern).
  - OWASP secure logging and credential management guidance.
  - Python `typing.Protocol` documentation (PEP 544) for structural subtyping contracts.
  - Backstage backend services architecture (service interfaces, service factories, service references) as the original inspiration for the shared service layer model.
+ - AWS Well-Architected Framework — Operational Excellence pillar (managed service preference).
+ - GC Cloud Adoption Strategy (2018/2023) — Principle 8 (portability), service model priority (SaaS > PaaS > IaaS).
+ - Hexagonal Architecture / Ports and Adapters (Cockburn) — governance of what sits behind the adapter.
 - Alignment summary:
- - All six principles align with Twelve-Factor methodology and current Python/FastAPI best practices.
+ - All seven principles align with Twelve-Factor methodology and current Python/FastAPI best practices.
  - Stateless process design directly implements Factor VI.
  - Fail-fast configuration validation aligns with Factor III and pydantic-settings validation patterns.
  - Security-by-default boundaries align with OWASP logging and secrets management guidance.
  - Protocol-driven service contracts align with PEP 544 structural subtyping, the Ports and Adapters pattern, and Backstage's ServiceRef + ServiceFactory model adapted for Python.
+ - Managed service delegation hierarchy aligns with Twelve-Factor Factor IV (backing services as attached resources, swappable via config), AWS Well-Architected ("use managed services to reduce undifferentiated heavy lifting"), GC Cloud Adoption Strategy Principle 8 (portability and interoperability), and Hexagonal Architecture (governance of adapter implementations behind port contracts).
 - Intentional deviations:
  - The original Backstage mental model included plugin-to-plugin isolation (no code-level communication between plugins). This rule applies correctly to feature packages (`app/packages`) but was incorrectly applied to infrastructure services in early ADRs. Infrastructure services are shared utilities that compose freely - analogous to Backstage's core services, not to Backstage's plugins. This deviation from the original mental model is intentional and corrective.
 
@@ -154,10 +174,11 @@ Infrastructure services consumed by feature packages must be defined by Protocol
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Canonical rewrite of ADR-0001 with implementation examples removed and principle scope enforced per ADR-0044 and ADR-0051.
+- Validation summary: Canonical rewrite of ADR-0001 with implementation examples removed and principle scope enforced per ADR-0044 and ADR-0051. P7 amendment adds managed service delegation hierarchy as a foundational principle.
 - Follow-up actions:
  - Ensure all downstream Tier-2 standards reference this record in `constrained_by`.
  - Mark ADR-0001 as superseded with `superseded_by: [ADR-0045]`.
+ - Cascade P7 delegation hierarchy into ADR-0077 (Category A delegation tier declaration), ADR-0047 (backend settings pattern), ADR-0056 (provider backend selection), ADR-0054 (dev/test fallback), ADR-0055 (backend settings dissolution), ADR-0044 (Tier-5 library adoption trigger), ADR-0079 (queue/messaging rework).
 
 ## Source References
 
@@ -191,6 +212,21 @@ Infrastructure services consumed by feature packages must be defined by Protocol
  - Publisher/maintainer: Backstage / CNCF
  - Accessed date (YYYY-MM-DD): 2026-04-29
  - Relevance summary: Original inspiration for the shared service layer mental model. Service interfaces (ServiceRef) + service factories (createServiceFactory) + DI container (backend instance) map to Protocol + provider function + composition root in Python.
+7. Source title: AWS Well-Architected Framework — Operational Excellence Pillar
+ - URL: https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/
+ - Publisher/maintainer: Amazon Web Services
+ - Accessed date (YYYY-MM-DD): 2026-04-30
+ - Relevance summary: "Use managed services to reduce operational burden" — directly informs Principle 7's preference for managed cloud services over custom implementations.
+8. Source title: Government of Canada Cloud Adoption Strategy
+ - URL: https://www.canada.ca/en/government/system/digital-government/digital-government-innovations/cloud-services/government-canada-cloud-adoption-strategy.html
+ - Publisher/maintainer: Treasury Board of Canada Secretariat
+ - Accessed date (YYYY-MM-DD): 2026-04-30
+ - Relevance summary: Principle 8 (portability and interoperability) and service model priority (SaaS > PaaS > IaaS) directly inform Principle 7's delegation hierarchy and configurable backend requirement.
+9. Source title: Twelve-Factor App — Factor IV: Backing Services
+ - URL: https://12factor.net/backing-services
+ - Publisher/maintainer: 12factor contributors
+ - Accessed date (YYYY-MM-DD): 2026-04-30
+ - Relevance summary: "Treat backing services as attached resources" — swap between local and third-party services via configuration. Directly supports Principle 7's configurable backend model.
 
 ## Implementation Guidance
 
@@ -205,6 +241,7 @@ Infrastructure services consumed by feature packages must be defined by Protocol
 
 ## Change Log
 
+- 2026-04-30: Added Principle 7 (Managed Service Delegation Hierarchy). Every infrastructure concern must be served by the highest applicable delegation tier: managed cloud service → industry library → custom implementation. Completes the governance gap identified during ADR-0079 R2 review: Principle 6 governs the port shape (Protocol contracts); Principle 7 governs what sits behind the adapter. Updated alternatives, consequences, compliance, revalidation, and source references. Triggers cascade amendments to ADR-0077, ADR-0047, ADR-0056, ADR-0054, ADR-0055, ADR-0044, ADR-0079. See managed-services-delegation-adr-review-tracker-2026-04-30.md.
 - 2026-04-29: Added Principle 6 (Protocol-Driven Service Contracts). Amended Principle 3 to clarify infrastructure layer's role as a shared service platform with internal collaboration. Updated alternatives, consequences, compliance, and revalidation sections. Root cause: Backstage's plugin isolation rule ("plugins must never communicate through code") was misapplied to the infrastructure service layer via ADR-0048 B5. In Backstage, core services freely compose through declared deps; only plugins are isolated. The correct analogy for `app/infrastructure` is Backstage core services (shared utilities), not Backstage plugins. This amendment codifies Protocol-driven contracts as the Python/FastAPI equivalent of Backstage's ServiceRef pattern.
 - 2026-04-28: Revised Principle 2 to remove mechanism-specific language (constructor injection) and delegate boundary mechanics to ADR-0048, resolving dual-authority overlap identified in challenge review.
 - 2026-04-28: Created canonical Tier-1 principle record; supersedes ADR-0001. Implementation examples removed; five principles distilled to foundational invariants.
