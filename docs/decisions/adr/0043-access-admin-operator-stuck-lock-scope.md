@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0043
 title: "Access Admin Operator Stuck-Lock Scope"
-status: Proposed
+status: Rejected
 decision_type: Feature Decision
 tier: Tier-4
 primary_domain: Transport and API
@@ -9,9 +9,9 @@ secondary_domains:
   - Security and Access Control
   - Data and Persistence
 date_created: 2026-04-27
-last_updated: 2026-04-27
-last_reviewed: 2026-04-27
-next_review_due: 2026-08-25
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 owners:
   - SRE Team
 constrained_by:
@@ -21,9 +21,7 @@ impacts: []
 supersedes: []
 superseded_by: []
 related_records:
-  - ADR-0032
-  - ADR-0033
-  - ADR-0041
+  - ADR-0058
   - ADR-0065
 related_packages:
   - app/packages/access/admin
@@ -150,3 +148,4 @@ review_state: current
 ## Change Log
 
 - 2026-04-27: Created tentative Tier-4 ADR to scope access/admin operator interventions to stuck-lock release only and defer app-level centralized admin service.
+- 2026-04-30: **REJECTED.** Feature-scoped lock release contradicts ADR-0058 Standard 4 ("The singleton lock implementation must be provided as an infrastructure utility, not reimplemented per job") and new Standard 9 (Singleton Lock Lifecycle and Operator Intervention). Lock release is the logical inverse of lock acquisition — both must be infrastructure-owned. The operator intervention concern is now governed by ADR-0058 Standard 9 R4 (infrastructure-level operator release utility). Feature packages consume the utility; they do not reimplement it. See ADR-0066 for consolidation rationale.
