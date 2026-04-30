@@ -57,7 +57,6 @@ Do not use SlowAPI as a substitute for WAF rules. Use it only where application 
 **Decision**: Use SlowAPI.
 
 **Implementation**:
-
 ```python
 # api/dependencies/rate_limits.py
 from slowapi import Limiter
@@ -78,7 +77,6 @@ def health_check(request: Request):
 ```
 
 **Rules**:
-
 - ✅ Apply to public endpoints
 - ✅ Use `@limiter.limit("N/period")` decorator
 - ✅ Require `Request` parameter when using limiter
@@ -91,7 +89,6 @@ def health_check(request: Request):
 **Decision**: Use custom key functions.
 
 **Implementation**:
-
 ```python
 def sentinel_key_func(request: Request):
     # Skip rate limiting for sentinel (monitoring)
@@ -105,7 +102,6 @@ limiter = Limiter(key_func=sentinel_key_func)
 ```
 
 **Rules**:
-
 - ✅ Return `None` to skip rate limiting
 - ✅ Return unique key per client
 - ✅ Use for monitoring/health checks
@@ -118,7 +114,6 @@ limiter = Limiter(key_func=sentinel_key_func)
 **Decision**: Custom 429 handler.
 
 **Implementation**:
-
 ```python
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
@@ -134,7 +129,6 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 ```
 
 **Rules**:
-
 - ✅ Return 429 status code
 - ✅ Include clear error message
 - ✅ Register handler at app level
@@ -147,7 +141,6 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 **Decision**: Log rate limit events.
 
 **Implementation**:
-
 ```python
 from slowapi import Limiter
 from structlog import get_logger
