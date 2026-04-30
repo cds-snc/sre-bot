@@ -12,9 +12,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
-last_reviewed: 2026-04-29
-next_review_due: 2026-08-27
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
  - ADR-0045
@@ -35,6 +35,7 @@ supersedes: []
 superseded_by: []
 review_state: current
 related_records:
+ - ADR-0045
  - ADR-0046
  - ADR-0049
  - ADR-0053
@@ -91,28 +92,20 @@ related_packages:
 - Chosen approach: Establish a Tier-2 architectural standard that defines queue abstractions, consumer lifecycle, delivery semantics, and the phased evolution from in-process async to durable queue-backed processing. Fix the event dispatcher's import-time side effect violation. Classify queue services per ADR-0077.
 - Why this approach: The codebase already has three async mechanisms. Without a governing standard, future queue integrations (SQS backend for retry, event-driven processing) will be implemented ad-hoc. A proactive architectural standard prevents drift and ensures all queue infrastructure follows the established DI, lifecycle, and observability patterns.
 
-### Standard 1: Queue Abstraction Layer
+### Standard 1: Queue Integration Standard
 
-Queue interactions must be mediated through a Protocol-based abstraction layer:
+When the application adopts a managed queue service (SQS, Azure Service Bus, etc.) per ADR-0045 P7 (Tier 1 — managed cloud service preferred), the integration must follow these rules:
 
-1. **Message Producer Protocol**: A `MessageProducer` Protocol defines the outbound message interface:
-   - `send(queue_name: str, message: MessageEnvelope) → OperationResult[None]`
-   - `send_batch(queue_name: str, messages: list[MessageEnvelope]) → OperationResult[BatchResult]`
+1. **Thin SDK wrapper behind Protocol contract**: The queue client must be wrapped in a thin facade behind a Protocol contract (ADR-0077 Category A). The Protocol shape should emerge from wrapping the actual managed service SDK, not from pre-designed generic abstractions.
+2. **`QUEUE_BACKEND` settings configuration**: Backend selection follows ADR-0055 Standard 9 and ADR-0056 Standard 8. A `QUEUE_BACKEND: Literal["memory", "sqs"] = "memory"` settings key enables dev/test fallback.
+3. **Consumer lifecycle in lifespan transport phase**: Queue consumers start during lifespan phase 5 (transport phase, per ADR-0046) and stop during shutdown step 2 (per ADR-0057). Consumer registration uses pluggy hookspecs (ADR-0049 Standard 7).
+4. **Dev/test in-memory fallback**: An in-memory queue implementation must exist per ADR-0054 dev/test fallback standard. It satisfies the Protocol contract for local development and CI testing.
 
-2. **Message Consumer Protocol**: A `MessageConsumer` Protocol defines the inbound message interface:
-   - `receive(queue_name: str, max_messages: int, visibility_timeout: int) → OperationResult[list[MessageEnvelope]]`
-   - `acknowledge(queue_name: str, receipt_handle: str) → OperationResult[None]`
-   - `reject(queue_name: str, receipt_handle: str, delay: int) → OperationResult[None]`
+**Classification**: Queue services are **Category A** per ADR-0077 — they abstract a backing service (SQS, in-memory) and are consumed by feature packages. Protocol contracts are required.
 
-3. **MessageEnvelope**: A `@dataclass(frozen=True)` carrying:
-   - `message_id: str` — unique message identifier.
-   - `body: dict[str, Any]` — serialized message payload.
-   - `attributes: dict[str, str]` — message metadata (correlation_id, event_type, source, timestamp).
-   - `receipt_handle: str | None` — broker-specific acknowledgment handle (populated on receive, None on send).
+**Timing**: These standards apply when the first durable queue integration is implemented. The Protocol shape is not pre-defined — it emerges from the actual SDK wrapping work. Pre-designing `MessageProducer`/`MessageConsumer` Protocols before implementation risks creating abstractions that don't match the managed service's actual API surface.
 
-4. **Classification**: `MessageProducer` and `MessageConsumer` are **Category A** per ADR-0077 — they abstract a backing service (SQS, Redis, in-memory) and are consumed by feature packages. Protocol contracts are required.
-
-These Protocols are not required until the first durable queue integration is implemented. This standard establishes the target interface so that implementation is aligned from the start.
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 1 was narrowed from a pre-defined Protocol specification (`MessageProducer`, `MessageConsumer`, `MessageEnvelope`) to a queue integration standard that lets the Protocol shape emerge from wrapping the first managed service. Pre-designing Protocols before implementation tends to produce abstractions that don't match the actual API surface. See ADR-0045 P7: managed service wrapper is the preferred delegation tier.
 
 ### Standard 2: Event Dispatcher Remediation
 
@@ -128,71 +121,66 @@ The current event dispatcher (`app/infrastructure/events/dispatcher.py`) violate
 
 **Timeline**: The event dispatcher remediation is independent of the durable queue migration. It should be executed during the next event infrastructure touch.
 
-### Standard 3: Delivery Semantics
+### Standard 3: Delivery Semantics Posture
 
-All durable queue integrations must implement **at-least-once delivery**:
+Delivery semantics (at-least-once, ordering guarantees, deduplication) are properties of the managed queue service, not application-architecture standards. The application documents which managed service semantics it relies on, but does not codify them as app-level standards.
 
-1. **At-least-once guarantee**: Messages are guaranteed to be delivered at least once. Consumers must be idempotent — processing the same message twice must produce the same outcome.
-2. **Idempotency enforcement**: Queue consumers must use the idempotency service (ADR-0077 Standard 1, `IdempotencyService`) to deduplicate messages. The `message_id` (Standard 1) is the idempotency key.
-3. **Exactly-once is not guaranteed**: The standard explicitly does not require exactly-once delivery. Exactly-once semantics are broker-specific and add significant complexity. At-least-once with idempotent consumers is the target model.
-4. **Ordering**: Message ordering is not guaranteed across queue consumers. Features that require ordered processing must implement ordering within the consumer (e.g., sequence numbers, causality tracking).
-5. **In-process event dispatcher**: The current in-process event dispatcher provides at-most-once delivery (fire-and-forget with `ThreadPoolExecutor`). This is acceptable for non-critical, observability-focused events (audit trail enrichment, metrics emission). Critical business events that require durability must use the durable queue path when available.
+When adopting a managed queue:
 
-### Standard 4: Dead-Letter and Poison-Message Policy
+1. **Document relied-upon semantics**: Record which delivery guarantees the application depends on (e.g., "SQS standard queue: at-least-once delivery, best-effort ordering") in the queue service's implementation documentation.
+2. **Idempotent consumers**: Queue consumers should be idempotent — processing the same message twice must produce the same outcome. Use the `IdempotencyService` (ADR-0077) for deduplication where needed.
+3. **Ordering**: If a feature requires ordered processing, it must implement ordering within the consumer (sequence numbers, causality tracking), not rely on broker ordering guarantees.
 
-1. **Dead-letter queue (DLQ)**: Every durable queue must have a configured dead-letter queue. Messages that fail processing after the maximum retry count are moved to the DLQ, not silently dropped.
-2. **Maximum retry count**: Configurable per queue via settings (ADR-0055). Default: 3 retries with exponential backoff.
-3. **Poison-message detection**: A message that fails all retries is a poison message. The DLQ handler must:
-   - Log the poison message with structured context (message_id, queue_name, attempt_count, last_error, correlation_id) per ADR-0054.
-   - Emit a notification via the notification service (ADR-0077 P2 migration candidate) if configured.
-   - Never automatically reprocess poison messages. Manual intervention or explicit replay is required.
-4. **DLQ monitoring**: DLQ depth must be observable. The operations team must be alerted when DLQ messages accumulate beyond a configured threshold.
-5. **Retry backoff**: Retry delays must use exponential backoff with jitter, consistent with the retry infrastructure's existing `RetryRecord` model (base delay, max delay). Queue-level retry delays are separate from application-level retry (ADR-0050 `retry_after`) — queue retry is infrastructure-level; application retry is service-level.
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 3 was narrowed from prescribing at-least-once delivery, idempotency enforcement, and ordering policies as app-level standards to a posture statement. Delivery semantics are the managed service's responsibility (SQS owns at-least-once delivery; the app doesn't define it). The app documents which semantics it relies on. See ADR-0045 P7: the managed service owns availability, scaling, and delivery guarantees.
+
+### Standard 4: Dead-Letter Queue Posture
+
+Dead-letter queue (DLQ) configuration is an infrastructure-as-code concern (Terraform), not an application architecture standard. When the application adopts a managed queue:
+
+1. **DLQ configuration**: DLQ setup (max receive count, DLQ queue ARN) is configured in Terraform, not in application code.
+2. **Application responsibility**: The application handles poison messages by logging structured context (message_id, queue_name, attempt_count, last_error, correlation_id) per ADR-0054 and not crashing. The application does not implement DLQ routing — the managed service handles that.
+3. **DLQ monitoring**: DLQ depth monitoring and alerting are configured in Terraform (CloudWatch alarms).
+
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 4 was narrowed from prescribing DLQ configuration, retry counts, backoff policies, and poison-message handling as app-level standards to a posture statement. DLQ mechanics are an SQS/Terraform configuration concern, not an app architecture concern. The app logs failures and doesn't crash; the managed service handles DLQ routing. See ADR-0045 P7: the managed service owns these operational mechanics.
 
 ### Standard 5: Consumer Lifecycle Integration
 
 Queue consumers must integrate with the lifespan model (ADR-0046):
 
 1. **Startup phase**: Queue consumers start during lifespan phase 5 (transport phase), after all services, plugins, and feature handlers are initialized. This ensures that consumer handlers can safely use injected services.
-2. **Registration**: Queue consumers register via pluggy hookspecs (ADR-0049 Standard 7):
-   - `register_queue_consumers(registry: QueueConsumerRegistry)` hookspec — feature packages implement this to register consumer handlers.
-   - Consumer registration includes: queue name, handler function, concurrency settings, and DLQ configuration.
-3. **Shutdown**: Queue consumers stop during shutdown step 2 (reverse of phase 5 — background work stops first in step 1, then transport connections including queue consumers stop in step 2, per ADR-0046 Invariant 4 and ADR-0057 Standard 2):
-   - Stop polling for new messages.
-   - Drain in-flight messages within the shutdown timeout budget (ADR-0057 Standard 2).
-   - Messages not acknowledged within the timeout are returned to the queue (visibility timeout expiry).
-   - Log shutdown completion with message counts (drained, returned).
-4. **Health check**: Queue consumer health is part of the application health check. A consumer that fails to poll for longer than a configured threshold is unhealthy.
+2. **Registration**: Queue consumers register via pluggy hookspecs (ADR-0049 Standard 7).
+3. **Shutdown**: Queue consumers stop during shutdown step 2 (per ADR-0046 Invariant 4 and ADR-0057 Standard 2): stop polling, drain in-flight messages within the shutdown timeout budget. Messages not acknowledged within the timeout are returned to the queue (visibility timeout expiry).
+
+Health checks, poll intervals, and drain semantics are implementation details of the queue consumer adapter, not architecture standards. They are determined when wrapping the specific managed service SDK.
+
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 5 was simplified from a detailed specification (health checks, poll intervals, drain semantics, consumer registration hookspec signatures) to the essential lifecycle integration points. Implementation details belong in the adapter code, not in the architecture standard. See ADR-0045 P7: the managed service adapter owns operational implementation details.
 
 ### Standard 6: Queue Settings Partitioning
 
-Queue-specific settings follow ADR-0055 Standard 1 (independent singleton per domain):
+Queue-specific settings follow ADR-0055 Standard 1 (independent singleton per domain) and Standard 9 (backend-selection pattern):
 
 1. **`QueueSettings`**: A `BaseSettings` class defining queue infrastructure configuration:
-   - `QUEUE_BACKEND`: Backend type (`memory`, `sqs`, `redis`). Default: `memory`.
-   - `QUEUE_ENDPOINT_URL`: Broker endpoint (for SQS, Redis). Release-phase bound (ADR-0052).
-   - `QUEUE_DEFAULT_VISIBILITY_TIMEOUT`: Seconds before an unacknowledged message becomes visible again. Default: 30.
-   - `QUEUE_DEFAULT_MAX_RETRIES`: Maximum delivery attempts before DLQ. Default: 3.
-   - `QUEUE_POLL_INTERVAL_SECONDS`: Consumer poll frequency. Default: 10.
+   - `QUEUE_BACKEND: Literal["memory", "sqs"] = "memory"` — Backend selection per ADR-0055 Standard 9. Default `"memory"` for dev-safe startup.
+   - `QUEUE_ENDPOINT_URL: str | None = None` — Broker endpoint (for SQS). Release-phase bound (ADR-0052).
 
 2. **Provider**: `get_queue_settings()` with `@lru_cache(maxsize=1)`.
-3. **Per-queue overrides**: Feature packages may define queue-specific settings in their own settings module (e.g., `packages/<feature>/settings.py`) for queue name, visibility timeout, and retry count. Feature settings override defaults.
+3. **Infrastructure-owned**: Queue settings are infrastructure-owned (ADR-0055 Standard 9 K5).
+
+Visibility timeout, max retries, poll interval, and other operational settings are the managed service's configuration (set in Terraform), not application settings. Only settings that affect which implementation the application constructs belong in `QueueSettings`.
+
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 6 was narrowed from specifying `QUEUE_DEFAULT_VISIBILITY_TIMEOUT`, `QUEUE_DEFAULT_MAX_RETRIES`, `QUEUE_POLL_INTERVAL_SECONDS`, and per-queue feature overrides to the essential backend-selection keys only. Operational settings (visibility timeout, max retries) are the managed service's domain, configured in Terraform. The application only needs to know which backend to construct. See ADR-0045 P7: the managed service owns operational configuration.
 
 ### Standard 7: Evolution Phases
 
-The migration from the current in-process model to durable queue-backed processing follows a phased approach:
+The migration from the current in-process model to managed queue-backed processing follows a phased approach aligned with the delegation hierarchy (ADR-0045 P7):
 
-1. **Phase 0 (current)**: In-process event dispatcher + `schedule`-based background jobs + DynamoDB retry queue. No SQS or external message broker. ADR-0058 governs this phase.
-2. **Phase 1 (event dispatcher remediation)**: Fix import-time side effects (Standard 2). Encapsulate handler registry. Add pluggy-based handler registration. No functional change to delivery semantics.
-3. **Phase 2 (durable queue infrastructure)**: Implement `MessageProducer` and `MessageConsumer` Protocols with an SQS backend. Implement DLQ configuration. Implement consumer lifecycle integration (Standard 5). Settings partitioning (Standard 6).
-4. **Phase 3 (feature migration)**: Individual features opt into durable queue-backed processing for specific operations (e.g., access sync entitlement application, webhook delivery). Migration is per-feature and incremental. Each migration is a Tier-5 ADR.
-5. **Phase 4 (evaluate worker separation)**: When queue consumer volume or side-effect complexity outgrows the colocated model (ADR-0058 Standard 4 two-tier classification), evaluate separating queue consumers into a dedicated worker ECS service. This is not mandated — it is an evaluation trigger.
+1. **Phase 0 (current — in-process)**: In-process event dispatcher + `schedule`-based background jobs + DynamoDB retry queue. No external message broker. ADR-0058 governs this phase.
+2. **Phase 1 (event dispatcher remediation)**: Fix import-time side effects (Standard 2). Encapsulate handler registry. Add pluggy-based handler registration. No functional change to delivery semantics. **Independent of queue adoption.**
+3. **Phase 2 (managed queue adoption)**: Adopt a managed queue service (SQS per Tier 1 preference). Wrap the SDK in a thin Protocol-backed facade (Standard 1). Add `QUEUE_BACKEND` settings (Standard 6). Add in-memory fallback for dev/test. Integrate consumer lifecycle with lifespan (Standard 5). DLQ configured in Terraform (Standard 4).
+4. **Phase 3 (feature migration)**: Individual features opt into managed queue-backed processing for specific operations. Each migration is a Tier-5 ADR. Migration is per-feature and incremental.
+5. **Phase 4 (evaluate worker separation)**: When queue consumer volume or resource contention outgrows the colocated model (ADR-0058 Standard 4), evaluate separating queue consumers into a dedicated worker ECS service.
 
-**Evolution triggers** (from ADR-0058 Standard 4):
-
-- Job execution time regularly exceeds the shutdown timeout budget (ADR-0057).
-- Queue consumer processing creates resource contention with the web server (CPU, memory, connection pool exhaustion).
-- Horizontal scaling requirements differ between web and worker workloads.
+> **Revision (2026-04-30 — Managed Service Delegation Review):** Standard 7 was reframed from "building queue infrastructure" to "adopting a managed queue service." Phase 2 description was changed from implementing custom Protocols and DLQ infrastructure to adopting a managed service (SQS) with thin SDK wrapper and Terraform-configured DLQ. This aligns with ADR-0045 P7: managed cloud service is the preferred delegation tier for queue infrastructure.
 
 ## Alternatives Considered
 
@@ -240,14 +228,15 @@ The migration from the current in-process model to durable queue-backed processi
 
 ## Compliance and Boundaries
 
-- Package/infrastructure boundary impact: Queue Protocols (`MessageProducer`, `MessageConsumer`) are infrastructure-owned (`app/infrastructure/queues/` or `app/infrastructure/events/`). Feature packages consume them via the injection boundary (ADR-0048 B2). Feature packages register queue consumers via pluggy hooks (ADR-0049 Standard 7).
-- Type boundary impact: `MessageEnvelope` is a `@dataclass(frozen=True)` (internal data carrier). Queue Protocols use `Protocol` (service contracts). Queue settings use Pydantic `BaseSettings` (configuration boundary). These follow ADR-0040 type boundary rules.
+- Package/infrastructure boundary impact: Queue service facade and Protocol are infrastructure-owned (`app/infrastructure/queues/` or `app/infrastructure/events/`). Feature packages consume them via the injection boundary (ADR-0048 B2). Feature packages register queue consumers via pluggy hooks (ADR-0049 Standard 7).
+- Type boundary impact: Queue Protocol shape emerges from wrapping the managed service SDK (Standard 1). Queue settings use Pydantic `BaseSettings` (configuration boundary). These follow ADR-0040 type boundary rules.
 - Startup/plugin registration impact: Queue consumer registration happens during lifespan phase 3 (discovery and registration) via pluggy hookspecs. Event handler registration happens during phase 4 (feature activation). Consumer start happens during phase 5 (transport). No import-time side effects (ADR-0048 B4). Event handler registration must migrate from import-time decorators to startup-driven pluggy hooks (Standard 2).
-- Settings partitioning impact: Standard 6 mandates `QueueSettings` extraction with independent singleton provider. Feature-specific queue settings follow ADR-0055 Standard 3 (package-local settings).
-- DI alias ceremony impact: Queue Protocols follow ADR-0056 Standard 4 — provider function in `providers.py`, `Annotated[MessageProducerProtocol, Depends(get_message_producer)]` in `dependencies.py`.
-- Service contract impact: `MessageProducer` and `MessageConsumer` are Category A per ADR-0077. `EventDispatcher` is Category B (shared utility, concrete OK — it does not abstract a backing service in the current in-process model; reclassify to Category A if migrated to a durable broker).
-- Graceful shutdown impact: Queue consumers must respect ADR-0057 Standard 2 shutdown timeout budgeting. In-flight messages must be drained or returned within the shutdown window.
-- Background execution relationship: ADR-0058 governs the colocated scheduled worker model. This standard governs queue-backed asynchronous processing. They are complementary: background jobs may produce messages to queues; queue consumers are a separate async execution path.
+- Settings partitioning impact: Standard 6 mandates `QueueSettings` with `QUEUE_BACKEND` and `QUEUE_ENDPOINT_URL` as backend-selection keys. Operational settings (visibility timeout, max retries) are configured in Terraform, not in application settings.
+- DI alias ceremony impact: Queue Protocol follows ADR-0056 Standard 4 — provider function in `providers.py`, `Annotated[..., Depends(...)]` in `dependencies.py`.
+- Service contract impact: Queue services are Category A per ADR-0077 (Standard 1). `EventDispatcher` is Category B (shared utility, concrete OK — it does not abstract a backing service in the current in-process model; reclassify to Category A if migrated to a durable broker).
+- Managed service delegation impact: Standards 3 and 4 were narrowed to posture statements — delivery semantics and DLQ configuration are the managed service's responsibility. The application documents relied-upon semantics but does not codify them. Standard 1 defers Protocol shape to implementation time. This aligns with ADR-0045 P7 (Tier 1 — managed cloud service preferred).
+- Graceful shutdown impact: Queue consumers must respect ADR-0057 Standard 2 shutdown timeout budgeting (Standard 5).
+- Background execution relationship: ADR-0058 governs the colocated scheduled worker model. This standard governs queue-backed asynchronous processing. They are complementary.
 
 ## Codebase Audit (2026-04-29)
 
@@ -274,11 +263,10 @@ The migration from the current in-process model to durable queue-backed processi
 
 | Action | Phase | Standard | Trigger |
 |--------|-------|----------|---------|
-| Implement `MessageProducer` Protocol | Phase 2 | Standard 1 | First durable queue need |
-| Implement `MessageConsumer` Protocol | Phase 2 | Standard 1 | First durable queue need |
+| Wrap managed queue SDK in Protocol-backed facade | Phase 2 | Standard 1 | First durable queue need |
 | Implement SQS backend for retry store | Phase 2 | Standard 1 | Retry volume exceeds DynamoDB cost-efficiency |
-| Implement DLQ infrastructure | Phase 2 | Standard 4 | First durable queue deployment |
-| Define `QueueSettings` | Phase 2 | Standard 6 | First durable queue deployment |
+| Configure DLQ in Terraform | Phase 2 | Standard 4 | First durable queue deployment |
+| Define `QueueSettings` with `QUEUE_BACKEND` | Phase 2 | Standard 6 | First durable queue deployment |
 | Implement consumer lifecycle in lifespan | Phase 2 | Standard 5 | First queue consumer |
 
 ## Best-Practice Revalidation
@@ -292,12 +280,12 @@ The migration from the current in-process model to durable queue-backed processi
 - PEP 544 Protocols: Structural subtyping (<https://peps.python.org/pep-0544/>) — Protocol-based queue abstractions.
 - Seemann, Mark. "Dependency Injection in .NET" (2011) — Composition Root pattern for service wiring.
 - Alignment summary:
-- Standard 1 (Protocol abstraction) aligns with Hexagonal Architecture ports and Cosmic Python's message bus abstraction. The `MessageProducer`/`MessageConsumer` split follows the Enterprise Integration Patterns message channel pattern.
+- Standard 1 (queue integration) aligns with Hexagonal Architecture ports and Cosmic Python's message bus abstraction. The Protocol shape is deferred to implementation time, consistent with the "wrap the SDK" guidance from managed service best practices.
 - Standard 2 (event dispatcher remediation) aligns with Cosmic Python Ch. 11's guidance on separating handler discovery from handler registration.
-- Standard 3 (at-least-once delivery) aligns with AWS SQS's native delivery model and Enterprise Integration Patterns' idempotent receiver.
-- Standard 4 (DLQ) aligns with Enterprise Integration Patterns' dead-letter channel and AWS SQS DLQ best practices.
+- Standard 3 (delivery semantics posture) aligns with AWS SQS's native at-least-once delivery model — the app documents reliance on the managed service's semantics rather than reimplementing them.
+- Standard 4 (DLQ posture) aligns with AWS SQS DLQ best practices — DLQ configuration is infrastructure-as-code, not application architecture.
 - Standard 5 (consumer lifecycle) aligns with Twelve-Factor Factor VIII (process types) and the existing lifespan transport-phase model.
-- Standard 7 (evolution phases) aligns with ADR-0058's explicit acknowledgment that the colocated model has a bounded lifetime.
+- Standard 7 (evolution phases) aligns with ADR-0058's explicit acknowledgment that the colocated model has a bounded lifetime, reframed around managed service adoption per ADR-0045 P7.
 - Intentional deviations:
 - The standard does not mandate separate worker processes (Factor VIII) because the current deployment model is single-process ECS Fargate. Worker separation is an evolution trigger (Standard 7 Phase 4), not a current mandate.
 - The standard does not prescribe a broker. This deviates from opinionated frameworks (Celery mandates Redis/RabbitMQ) but is correct for an architecture standard that governs the abstraction layer, not the implementation.
@@ -307,11 +295,18 @@ The migration from the current in-process model to durable queue-backed processi
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: New Tier-2 standard establishing queue architecture, consumer lifecycle, delivery semantics, and phased evolution from in-process async to durable queue-backed processing. No legacy ADR superseded (new coverage gap). All upstream constraint references verified against current accepted ADRs.
+- Validation summary: Tier-2 standard narrowed by managed service delegation review (2026-04-30). Standards 1/3/4/5/6/7 revised to align with ADR-0045 P7 delegation hierarchy. Pre-designed Protocols deferred to implementation time. Delivery semantics and DLQ configuration delegated to managed service. Evolution phases reframed around managed service adoption. Standard 2 (event dispatcher remediation) unchanged.
 - Follow-up actions:
 - Execute P1 event dispatcher remediation (Standard 2): encapsulate global handler registry, add pluggy hookspec, migrate handler registrations.
 - Add `register_event_handlers` hookspec to plugin manager.
 - Update ADR-0058 related_records to include ADR-0079.
+
+## Change Log
+
+| Date | Section | Change Summary |
+|------|---------|----------------|
+| 2026-04-29 | All | Initial Draft — full queueing and message-broker architecture standard. |
+| 2026-04-30 | Standards 1, 3, 4, 5, 6, 7, Compliance, Audit, Revalidation | Managed service delegation rework: narrowed Standard 1 from pre-defined Protocols to queue integration standard; narrowed Standards 3/4 to posture statements (managed service owns delivery semantics and DLQ); simplified Standard 5 to essential lifecycle points; narrowed Standard 6 to backend-selection keys only; reframed Standard 7 evolution phases around managed service adoption. Aligned with ADR-0045 P7 delegation hierarchy. |
 
 ## Source References
 

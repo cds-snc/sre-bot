@@ -1,0 +1,90 @@
+# Challenge Review: ADR-0079 Managed Service Delegation Rework
+
+## 1. Metadata
+
+| Field | Value |
+|-------|-------|
+| ADR under review | ADR-0079 — Queueing and Message-Broker Architecture Standard |
+| Review type | Normative amendment — delegation hierarchy rework |
+| Reviewer | AI Architecture Agent |
+| Review date | 2026-04-30 |
+| Amendment scope | Standards 1, 3, 4, 5, 6, 7; Compliance; Codebase Audit; Revalidation; Freshness |
+| Trigger | Managed Services Delegation Review Program (Phase 2, Item #11) |
+
+## 2. Evidence Gathering
+
+| Source | Finding |
+|--------|---------|
+| ADR-0045 P7 | Delegation hierarchy: Tier 1 (managed cloud service) → Tier 2 (industry library) → Tier 3 (custom code). Queue infrastructure is Tier 1. |
+| ADR-0077 Standard 1 | Category A services must support configurable backends with Protocol contracts. |
+| ADR-0055 Standard 9 | `*_BACKEND` settings convention for backend selection. |
+| ADR-0056 Standard 8 | Settings-driven factory pattern for backend selection. |
+| Delegation framework §7 | Keep: Standard 2, Standard 6 (narrowed). Keep revised: Standard 7. Defer/simplify: Standard 1. Remove: Standards 3, 4. Simplify: Standard 5. |
+| Original ADR-0079 | 7 standards covering queue abstractions, event dispatcher fix, delivery semantics, DLQ policy, consumer lifecycle, settings, evolution phases. |
+
+## 3. Assumptions Challenged
+
+| Assumption | Challenge | Verdict |
+|------------|-----------|---------|
+| Pre-designing `MessageProducer`/`MessageConsumer` Protocols is valuable | Pre-designed Protocols risk not matching the actual SDK surface. Let shape emerge from wrapping SQS. | **Agreed** — narrowed Standard 1 |
+| App must codify at-least-once delivery | At-least-once is SQS's native behavior, not an app architecture decision | **Agreed** — Standard 3 narrowed to posture |
+| App must implement DLQ routing | DLQ is SQS/Terraform config, not app code | **Agreed** — Standard 4 narrowed to posture |
+| Consumer lifecycle needs detailed health check/poll/drain specs | These are adapter implementation details, not architecture standards | **Agreed** — Standard 5 simplified |
+| QueueSettings needs visibility timeout, max retries, poll interval | These are managed service config (Terraform), not app settings | **Agreed** — Standard 6 narrowed |
+| Standard 2 (event dispatcher remediation) should be unchanged | It addresses a real ADR-0048 B4 violation unrelated to delegation | **Agreed** — kept as-is |
+
+## 4. Failure Modes Identified
+
+| Failure Mode | Likelihood | Impact | Mitigation |
+|--------------|------------|--------|------------|
+| Protocol shape deferred too long, ad-hoc integrations emerge | Low | Medium | Standard 1 mandates Protocol contract at integration time; Standard 7 Phase 2 defines the trigger |
+| Delivery semantics posture is too vague for implementers | Low | Low | Standard 3 requires documenting relied-upon semantics; SQS behavior is well-known |
+| DLQ posture doesn't prevent app-level bugs | Low | Medium | App still logs failures with structured context; Terraform DLQ catches unhandled failures |
+
+## 5. Contradiction Audit
+
+| Potential Contradiction | Resolution |
+|------------------------|------------|
+| Standard 1 says "Protocol shape emerges from wrapping SDK" vs ADR-0077 "Category A requires Protocol contracts" | No contradiction — Standard 1 mandates Protocol contract, just defers shape design to implementation time |
+| Standard 4 says "DLQ is Terraform" vs original "DLQ handler must log/notify" | Resolved — app still logs poison messages (Standard 4 rule 2), Terraform handles DLQ routing |
+| Standard 6 removes operational settings vs ADR-0055 "independent BaseSettings" | No contradiction — QueueSettings still exists as independent BaseSettings, just with fewer keys |
+
+## 6. Scenario Validation
+
+| Scenario | Outcome |
+|----------|---------|
+| Team implements SQS queue consumer for first time | Standard 1 guides: wrap SDK in Protocol facade. Standard 5: lifecycle in transport phase. Standard 6: QUEUE_BACKEND setting. Standard 7 Phase 2 applies. Clear path. |
+| Team needs DLQ for SQS queue | Standard 4: configure in Terraform. App logs failures with structured context. No app-level DLQ code needed. Clear. |
+| Team wants to add Redis queue backend | Standard 1: QUEUE_BACKEND gains "redis" option. Standard 6: QUEUE_ENDPOINT_URL covers Redis endpoint. Factory pattern (ADR-0056 S8) selects implementation. Works. |
+
+## 7. Tradeoffs Acknowledged
+
+| Tradeoff | Accepted? |
+|----------|-----------|
+| Less prescriptive Standards 3/4 may lead to inconsistent documentation of relied-upon semantics | Yes — the team knows SQS semantics; over-codifying them adds governance burden without safety benefit |
+| Deferred Protocol shape may require revision at implementation | Yes — this is explicitly preferred over pre-designing Protocols that don't match the SDK |
+| Simplified Standard 5 gives less implementation guidance | Yes — adapter implementation details should be in code, not architecture standards |
+
+## 8. Follow-Up Actions
+
+| Action | Owner | Priority | Timeline |
+|--------|-------|----------|----------|
+| Execute P1 event dispatcher remediation (Standard 2) | Dev team | P1 | Next event infrastructure touch |
+| Add `register_event_handlers` hookspec to plugin manager | Dev team | P1 | With Standard 2 remediation |
+
+## 9. Gate Outcome
+
+| Gate | Result |
+|------|--------|
+| Are all amended sections internally consistent? | **Yes** |
+| Do amendments align with ADR-0045 P7 delegation hierarchy? | **Yes** |
+| Are upstream constraint references still valid? | **Yes** |
+| Is Standard 2 (the unchanged standard) still valid? | **Yes** |
+
+**Result: PASS**
+
+## 10. Reviewer Sign-Off
+
+- Reviewer: AI Architecture Agent
+- Date: 2026-04-30
+- Outcome: **PASS** — ADR-0079 rework correctly narrows Standards 1/3/4/5/6 and reframes Standard 7 around managed service adoption per ADR-0045 P7. Standard 2 (event dispatcher remediation) correctly unchanged. No contradictions found.
